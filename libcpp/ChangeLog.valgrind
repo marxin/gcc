@@ -1,0 +1,9 @@
+2012-10-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR bootstrap/54691
+	* config.in: Regenerated.
+	* configure: Likewise.
+	* configure.ac: Define ENABLE_VALGRIND_CHECKING for
+	--enable-checking=valgrind.
+	* lex.c (search_line_fast): Disable MMX/SSE optimization if
+	ENABLE_VALGRIND_CHECKING is defined.
