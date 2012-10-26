@@ -375,6 +375,7 @@ extern struct simple_ipa_opt_pass pass_ipa_free_inline_summary;
 extern struct ipa_opt_pass_d pass_ipa_cp;
 extern struct ipa_opt_pass_d pass_ipa_reference;
 extern struct ipa_opt_pass_d pass_ipa_pure_const;
+extern struct simple_ipa_opt_pass pass_ipa_sem_equality;
 extern struct simple_ipa_opt_pass pass_ipa_pta;
 extern struct ipa_opt_pass_d pass_ipa_lto_wpa_fixup;
 extern struct ipa_opt_pass_d pass_ipa_lto_finish_out;
