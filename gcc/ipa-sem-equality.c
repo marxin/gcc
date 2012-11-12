@@ -10,6 +10,7 @@
 #include "cgraph.h"
 #include "cfgloop.h"
 #include "tree-ssa-sccvn.h"
+#include "coverage.h"
 
 /* Forward struct declaration */
 typedef struct sem_bb sem_bb_t;
@@ -20,11 +21,13 @@ typedef struct sem_func
 {
   struct cgraph_node *node;
   tree func_decl;
-  enum tree_code result_type;
-  enum tree_code *arg_types;
+  tree result_type;
+  tree *arg_types;
   unsigned int arg_count;
   unsigned int bb_count;
+  unsigned int edge_count;
   unsigned int *bb_sizes;
+  unsigned cfg_checksum;
   hashval_t hashcode;
   sem_bb_t **bb_sorted;
   sem_func_t *next;
@@ -56,6 +59,18 @@ static sem_func_t **sem_functions;
 static unsigned int sem_function_count;
 static htab_t sem_function_hash;
 
+static
+hashval_t iterative_hash_tree (tree type, hashval_t hash)
+{
+  uintptr_t pointer = (uintptr_t)type;
+  hashval_t *h = (hashval_t *)&pointer;
+
+  for (unsigned i = 0; i < sizeof(uintptr_t) / sizeof(hashval_t); ++i)
+    hash = iterative_hash_object (h[i], hash);
+
+  return hash;
+}
+
 /* Htab calculation function for semantic function struct. */
 
 static hashval_t
@@ -69,9 +84,13 @@ func_hash (const void *func)
   
   hash = iterative_hash_object (f->arg_count, hash);
   hash = iterative_hash_object (f->bb_count, hash);
+  hash = iterative_hash_object (f->edge_count, hash);
+  hash = iterative_hash_object (f->cfg_checksum, hash);
 
   for(i = 0; i < f->arg_count; ++i)
-    hash = iterative_hash_object (f->arg_types[i], hash);
+    hash = iterative_hash_tree (f->arg_types[i], hash);
+
+  hash = iterative_hash_tree (f->result_type, hash);
 
   for(i = 0; i < f->bb_count; ++i)
     hash = iterative_hash_object (f->bb_sizes[i], hash);
@@ -87,7 +106,6 @@ func_equal (const void *func1, const void *func2)
   const sem_func_t *f1 = (const sem_func_t *)func1;
   const sem_func_t *f2 = (const sem_func_t *)func2;
 
-  /* TODO */
   return f1->hashcode == f2->hashcode; 
 }
 
@@ -129,10 +147,13 @@ generate_summary (void)
 
     printf ("  function: %s\n", cgraph_node_name (f->node));
     printf ("  hash: %d\n", f->hashcode);
-    printf ("    res: %u\n", f->result_type);
+    //printf ("    res: %u\n", f->result_type);
 
+    /*
     for(j = 0; j < f->arg_count; ++j)
       printf ("    arg[%u]: %u\n", j, f->arg_types[j]);
+
+    */
 
     for(j = 0; j < f->bb_count; ++j)
       printf ("      bb[%u]: %u, hashcode: %u\n", j, f->bb_sizes[j], f->bb_sorted[j]->hashcode);
@@ -150,7 +171,6 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   gimple_stmt_iterator gsi;
   basic_block bb;
   sem_bb_t *sem_bb;
-  gimple g;
 
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
@@ -171,30 +191,28 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     param_num++;
 
   f->arg_count = param_num;
-  f->arg_types = XCNEWVEC (enum tree_code, param_num);
+  f->arg_types = XCNEWVEC (tree, param_num);
 
   param_num = 0;
   for (parm = fnargs; parm; parm = DECL_CHAIN (parm))
-    f->arg_types[param_num++] = TREE_CODE(DECL_ARG_TYPE(parm));
+    f->arg_types[param_num++] = gimple_register_canonical_type (DECL_ARG_TYPE (parm));
 
   /* Function result type */
   result = DECL_RESULT(fndecl);
 
   if (result)
-    f->result_type = TREE_CODE (TREE_TYPE (DECL_RESULT(fndecl)));
+    f->result_type = gimple_register_canonical_type (TREE_TYPE (DECL_RESULT(fndecl)));
 
-  bb_count = 0;
-  FOR_EACH_BB_FN (bb, my_function)
-  {
-    bb_count++;
-  }
+  /* basic block iteration */
+  // TODO: ASK!!!!!
+  f->bb_count = n_basic_blocks_for_function (my_function) - 2;
 
- /* basic block iteration */
-  f->bb_count = bb_count;
+  f->edge_count = n_edges_for_function (my_function);
   f->bb_sizes = XCNEWVEC (unsigned int, f->bb_count);
 
   f->bb_sorted = XCNEWVEC (sem_bb_t *, f->bb_count);
-  
+  f->cfg_checksum = coverage_compute_cfg_checksum_fn (my_function);
+
   // TODO: remove
   bb_count = 0;
   FOR_EACH_BB_FN (bb, my_function)
@@ -204,7 +222,6 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       edge_count = 0;
-      g = gsi_stmt(gsi);
 
       /*
        * DEBUG OUTPUT
@@ -231,8 +248,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     sem_bb->count = gimple_count;
     sem_bb->hashcode = bb_hash (sem_bb);
 
-    f->bb_sorted[bb_count] = sem_bb;
-    bb_count++;
+    f->bb_sorted[bb_count++] = sem_bb;
   }
 }
 
@@ -342,7 +358,7 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t ssa_dict)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
-  if (t1 == NULL_TREE || t2 == NULL_TREE)
+  if (t1 == NULL_TREE && t2 == NULL_TREE)
     return true;
   else if(t1 == NULL_TREE || t2 == NULL_TREE)
     return false;
@@ -355,19 +371,21 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t ssa_dict)
 {
   tree lhs1, lhs2;
   tree rhs1, rhs2;
-  enum gimple_rhs_class class1, class2;
   enum tree_code code1, code2;
-
-  class1 = gimple_assign_rhs_class (s1);
-  class2 = gimple_assign_rhs_class (s2);
-
-  if (class1 != class2)
-    return false;
+  enum gimple_rhs_class class1;
 
   code1 = gimple_expr_code (s1);
   code2 = gimple_expr_code (s2);
 
   if (code1 != code2)
+    return false;
+
+  code1 = gimple_assign_rhs_code (s1);
+  code2 = gimple_assign_rhs_code (s2);
+
+  class1 = gimple_assign_rhs_class (s1);
+
+  if (code1 != code2) 
     return false;
 
   switch (class1)
@@ -398,17 +416,6 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t ssa_dict)
   lhs1 = gimple_get_lhs (s1);
   lhs2 = gimple_get_lhs (s2);
 
-  if (gimple_vdef (s1))
-  { 
-    if (vn_valueize (gimple_vdef (s1)) != vn_valueize (gimple_vdef (s2)))
-      return false;
-
-    if (TREE_CODE (lhs1) != SSA_NAME && TREE_CODE (lhs2) != SSA_NAME)
-      return true;
-
-    return false;
-  }
-
   if (TREE_CODE (lhs1) == SSA_NAME && TREE_CODE (lhs2) == SSA_NAME)
     return ssa_check_names (ssa_dict, lhs1, lhs2);
   else
@@ -421,6 +428,11 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t ssa_dict)
   tree t1, t2;
   enum tree_code code1, code2;
 
+  code1 = gimple_expr_code (s1);
+  code2 = gimple_expr_code (s2);
+
+  return code1 == code2;
+
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
 
@@ -432,11 +444,6 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t ssa_dict)
 
   if (!check_ssa_or_const (t1, t2, ssa_dict))
     return false;
-
-  code1 = gimple_expr_code (s1);
-  code2 = gimple_expr_code (s2);
-
-  return code1 == code2;
 }
 
 static bool
@@ -516,6 +523,44 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t ssa_dict)
   return true;
 }
 
+static bool
+compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t ssa_dict)
+{
+  gimple_stmt_iterator si1, si2;
+  gimple phi1, phi2;
+  unsigned size1, size2, i;
+  tree t1, t2;
+
+  si2 = gsi_start_phis (bb2);
+  for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1); gsi_next (&si1))
+  {
+    phi1 = gsi_stmt (si1);
+    phi2 = gsi_stmt (si2);
+
+    size1 = gimple_phi_num_args (phi1);
+    size2 = gimple_phi_num_args (phi2);
+
+    if (size1 != size2)
+      return false;
+
+    for (i = 0; i < size1; ++i)
+    {
+      t1 = gimple_phi_arg (phi1, i)->def;
+      t2 = gimple_phi_arg (phi2, i)->def;
+
+      if (!check_ssa_or_const (t1, t2, ssa_dict))
+          return false;
+    }
+
+    if (gsi_end_p (si2))
+      return false;
+
+    gsi_next (&si2);
+  }
+
+  return true;
+}
+
 static bool bb_dict_test (int* bb_dict, int source, int target)
 {
   if (bb_dict[source] == -1)
@@ -539,7 +584,8 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   unsigned int i;
   ssa_dict_t ssa_dict;
 
-  if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count)
+  if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count ||
+    f1->edge_count != f2->edge_count || f1->cfg_checksum != f2->cfg_checksum)
     return false;
 
   /* Result type checking */
@@ -574,15 +620,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   ssa_dict.source = htab_create (0, ssa_hash, ssa_equal, ssa_free);
   ssa_dict.target = htab_create (0, ssa_hash, ssa_equal, ssa_free);
 
-  bool result = true;
-
   /* Checking all basic blocks */
   for (i = 0; i < f1->bb_count; ++i)
     if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], ssa_dict))
-    {
-      result = false;
-      break;
-    }
+      return false;
 
   /* Basic block edges check */
   for (i = 0; i < f1->bb_count; ++i)
@@ -615,11 +656,16 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
     free (bb_dict);
   } 
 
+  /* Basic block PHI nodes comparison */
+  for (i = 0; i < f1->bb_count; ++i)
+    if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb, ssa_dict))
+      return false;
+
   /* Htab deletion */
   htab_delete (ssa_dict.source);
   htab_delete (ssa_dict.target);
 
-  return result;
+  return true;
 }
 
 static unsigned int
@@ -635,6 +681,8 @@ semantic_equality (void)
   sem_function_hash = htab_create (nnodes, func_hash, func_equal, func_free);
 
   printf ("=== IPA semantic equality pass dump ===\n");
+
+  generate_summary ();
 
   FOR_EACH_DEFINED_FUNCTION (node)
   {
@@ -672,7 +720,6 @@ semantic_equality (void)
     *slot = f;
   }
 
-  /* generate_summary (); */
 
   return 0; 
 }

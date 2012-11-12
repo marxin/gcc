@@ -554,10 +554,17 @@ coverage_compute_lineno_checksum (void)
 unsigned
 coverage_compute_cfg_checksum (void)
 {
-  basic_block bb;
-  unsigned chksum = n_basic_blocks;
+  return coverage_compute_cfg_checksum_fn (cfun);
+}
 
-  FOR_EACH_BB (bb)
+/* Compute cfg checksum for the function given as argument. */
+unsigned
+coverage_compute_cfg_checksum_fn (struct function *fn)
+{
+  basic_block bb;
+  unsigned chksum = n_basic_blocks_for_function (fn);
+
+  FOR_EACH_BB_FN (bb, fn)
     {
       edge e;
       edge_iterator ei;
@@ -570,7 +577,6 @@ coverage_compute_cfg_checksum (void)
 
   return chksum;
 }
-
 /* Begin output to the notes file for the current function.
    Writes the function header. Returns nonzero if data should be output.  */
 

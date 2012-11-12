@@ -166,6 +166,13 @@ int nsd_different_result(int x, int y)
   if(x <= 0 || y <= 0)
     return 1;
 
+  if(x < 10)
+    y = 12;
+  else if(x == 44)
+    y = 124;
+  else
+    y = 1111;
+
   if(x < y)
   {
     pes = x;
@@ -188,6 +195,43 @@ int nsd_different_result(int x, int y)
   return x;
 }
 
+int nsd_different_result2(int x, int y) __attribute__ ((pure));
+
+int nsd_different_result2(int x, int y)
+{
+  int pes;
+
+  if(x <= 0 || y <= 0)
+    return 1;
+
+  if(x < 10)
+    y = 12;
+  else if(x == 44)
+    y = 124;
+  else
+    y = 1111;
+
+  if(x < y)
+  {
+    pes = x;
+    x = y;
+    y = pes;
+  }
+
+  while(x != y)
+  {
+    x = x - y;
+
+    if(y > x)
+    {
+      pes = x;
+      x = y;
+      y = pes;
+    }
+  }
+
+  return x;
+}
 
 int main(int argc, char **argv)
 {
