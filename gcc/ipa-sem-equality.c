@@ -420,6 +420,36 @@ check_ssa_label (gimple g1, gimple g2)
 }
 
 static bool
+check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d)
+{
+  unsigned lsize1, lsize2, i;
+  tree t1, t2;
+
+  lsize1 = gimple_switch_num_labels (g1);
+  lsize2 = gimple_switch_num_labels (g2);
+
+  if (lsize1 != lsize2)
+    return false;
+
+  t1 = gimple_switch_index (g1);
+  t2 = gimple_switch_index (g2);
+
+  if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
+    return false;
+
+  if (!check_ssa_or_const (t1, t2, d))
+    return false;
+
+  for (i = 0; i < lsize1; i++)
+  {
+    t1 = CASE_LABEL (gimple_switch_label (g1, i));
+    t2 = CASE_LABEL (gimple_switch_label (g2, i));
+  }
+
+  return true;
+}
+
+static bool
 check_ssa_return (gimple g1, gimple g2, ssa_dict_t *d)
 {
   tree t1, t2;
@@ -465,7 +495,8 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d)
         break;
 
       case GIMPLE_SWITCH:
-        printf ("xxx TODO: SWITCH\n");
+        if (!check_ssa_switch (s1, s2, d))
+          return false;
         break;
 
       case GIMPLE_RESX:
