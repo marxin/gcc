@@ -1,3 +1,135 @@
+2012-11-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/54903
+	* decl2.c (mark_used): Don't complain about auto in templates.
+
+	PR c++/37276
+	* decl.c (decls_match): Remove #ifdef around earlier fix.
+
+2012-11-13  Jason Merrill  <jason@redhat.com>
+
+	* class.c (finish_struct_1): Check virtual functions
+	for missing ABI tags.
+
+	PR c++/55275
+	* pt.c (maybe_process_partial_specialization): Update
+	DECL_SOURCE_LOCATION for new specializations.
+
+2012-11-14  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/55323
+	* init.c (emit_mem_initializers): Skip arguments == error_mark_node.
+
+2012-11-14  Fabien Chêne  <fabien@gcc.gnu.org>
+
+	PR c++/11750
+	* call.c (build_new_method_call_1): Check that the instance type
+	and the function context are the same before setting the flag
+	LOOKUP_NONVIRTUAL.
+
+2012-11-13  Sriraman Tallam  <tmsriram@google.com>
+
+	* class.c (mark_versions_used): Remove.
+	(resolve_address_of_overloaded_function): Call target hook
+	for versioned functions. Refactor to call
+	get_function_versions_dispatcher.
+	* decl.c (duplicate_decls): Add comments.
+	* cp/call.c (get_function_version_dispatcher): Expose function.
+	(mark_versions_used): Expose function.
+	* cp/cp-tree.h (mark_versions_used): New declaration.
+	(get_function_version_dispatcher): Ditto.
+
+2012-11-13  Dodji Seketeli  <dodji@redhat.com>
+
+	PR c++/54466
+	* pt.c (lookup_template_class_1): TYPE_STUB_DECL should be
+	accessed on the main variant of the type.
+
+2012-11-12  Ed Smith-Rowland  <3dw4rd@verizon.net>
+
+	* parser.c (cp_parser_objc_class_ivars):
+	Index declspecs.locations by ds_typedef rather than ds_thread.
+
+2012-11-09  Ed Smith-Rowland  <3dw4rd@verizon.net>
+
+	PR c++/54413
+	* decl.c (grokfndecl): Adjust calls to interpret_x_suffix.
+
+2012-11-09  Jason Merrill  <jason@redhat.com>
+
+	PR c++/54859
+	* pt.c (check_instantiated_arg): Don't complain about dependent args.
+
+	* tree.c (cxx_attribute_table): Add abi_tag attribute.
+	(check_abi_tag_redeclaration, handle_abi_tag_attribute): New.
+	* class.c (find_abi_tags_r, check_abi_tags): New.
+	(check_bases, check_field_decl): Call check_abi_tags.
+	* decl.c (redeclaration_error_message): Call
+	check_abi_tag_redeclaration.
+	* mangle.c (tree_string_cmp, write_abi_tags): New.
+	(write_unqualified_name): Call write_abi_tags.
+
+2012-11-07  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/55226
+	Revert:
+	2012-10-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/54922
+	* semantics.c (cx_check_missing_mem_inits): Handle anonymous union
+	members.
+
+2012-11-07  Florian Weimer  <fweimer@redhat.com>
+
+	* init.c (build_new_1): Do not check for arithmetic overflow if
+	inner array size is 1.
+
+2012-11-05  Sriraman Tallam  <tmsriram@google.com>
+
+	* class.c (add_method): Change assembler names of function versions.
+	(mark_versions_used): New static function.
+	(resolve_address_of_overloaded_function): Create dispatcher decl and
+	return address of dispatcher instead.
+	* decl.c (decls_match): Make decls unmatched for versioned
+	functions.
+	(duplicate_decls): Remove ambiguity for versioned functions.
+	Delete versioned function data for merged decls.
+	* decl2.c (check_classfn): Check attributes of versioned functions
+	for match.
+	* call.c (get_function_version_dispatcher): New function.
+	(mark_versions_used): New static function.
+	(build_over_call): Make calls to multiversioned functions
+	to call the dispatcher.
+	(joust): For calls to multi-versioned functions, make the most
+	specialized function version win.
+
+2012-10-31  Lawrence Crowl  <crowl@google.com>
+
+	* decl2.c (var_finalized_p): Rename varpool_node to
+	varpool_node_for_decl.
+	(maybe_emit_vtables): Likewise.
+
+2012-10-31  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/54583
+	* tree.c (build_cplus_array_type): Set TREE_NO_WARNING on the
+	TYPE_SIZE of VLAs.
+
+2012-10-31  Dodji Seketeli  <dodji@redhat.com>
+
+	PR c++/54955
+	* parser.c (cp_nth_tokens_can_be_std_attribute_p): Recognize the
+	'Alignas' keyword as the beginning of a c++11 attribute specifier.
+	Update the comment of the function.
+	(cp_next_tokens_can_be_gnu_attribute_p): Update the comment of the
+	function.
+
+2012-10-29  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	PR c++/54930
+	* typeck.c (maybe_warn_about_returning_address_of_local): Use
+	OPT_Wreturn_local_addr.
+
 2012-10-26  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/55081

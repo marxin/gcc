@@ -3222,6 +3222,9 @@ when the Visual Instruction Set is available.
 @item C
 The constant all-ones, for floating-point.
 
+@item A
+Signed 5-bit constant
+
 @item D
 A vector constant
 
@@ -3277,6 +3280,9 @@ instruction sequence
 
 @item T
 Memory address aligned to an 8-byte boundary
+
+@item U
+Even register
 
 @item W
 Memory address for @samp{e} constraint registers
@@ -4483,8 +4489,8 @@ means of constraints requiring operands 1 and 0 to be the same location.
 @cindex @code{ior@var{m}3} instruction pattern
 @cindex @code{xor@var{m}3} instruction pattern
 @item @samp{ssadd@var{m}3}, @samp{usadd@var{m}3}
-@item @samp{sub@var{m}3}, @samp{sssub@var{m}3}, @samp{ussub@var{m}3}
-@item @samp{mul@var{m}3}, @samp{ssmul@var{m}3}, @samp{usmul@var{m}3}
+@itemx @samp{sub@var{m}3}, @samp{sssub@var{m}3}, @samp{ussub@var{m}3}
+@itemx @samp{mul@var{m}3}, @samp{ssmul@var{m}3}, @samp{usmul@var{m}3}
 @itemx @samp{div@var{m}3}, @samp{ssdiv@var{m}3}
 @itemx @samp{udiv@var{m}3}, @samp{usdiv@var{m}3}
 @itemx @samp{mod@var{m}3}, @samp{umod@var{m}3}
@@ -4881,7 +4887,7 @@ type @code{float}.
 
 @cindex @code{sincos@var{m}3} instruction pattern
 @item @samp{sincos@var{m}3}
-Store the sine of operand 2 into operand 0 and the cosine of
+Store the cosine of operand 2 into operand 0 and the sine of
 operand 2 into operand 1.
 
 The @code{sin} and @code{cos} built-in functions of C always use the
@@ -7566,7 +7572,7 @@ For example, if the following is present in the @file{md} file:
 the following lines will be written to the file @file{insn-attr.h}.
 
 @smallexample
-#define HAVE_ATTR_type
+#define HAVE_ATTR_type 1
 enum attr_type @{TYPE_BRANCH, TYPE_FP, TYPE_LOAD,
                  TYPE_STORE, TYPE_ARITH@};
 extern enum attr_type get_attr_type ();
@@ -7590,6 +7596,10 @@ The @code{enabled} attribute can be defined to prevent certain
 alternatives of an insn definition from being used during code
 generation. @xref{Disable Insn Alternatives}.
 @end table
+
+For each of these special attributes, the corresponding
+@samp{HAVE_ATTR_@var{name}} @samp{#define} is also written when the
+attribute is not defined; in that case, it is defined as @samp{0}.
 
 @findex define_enum_attr
 @anchor{define_enum_attr}

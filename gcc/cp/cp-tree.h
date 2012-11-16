@@ -4320,7 +4320,6 @@ extern GTY(()) VEC(tree,gc) *local_classes;
 
 #else /* NO_DOLLAR_IN_LABEL */
 
-#define IN_CHARGE_NAME "__in_chrg"
 #define AUTO_TEMP_NAME "__tmp_"
 #define TEMP_NAME_P(ID_NODE) \
   (!strncmp (IDENTIFIER_POINTER (ID_NODE), AUTO_TEMP_NAME, \
@@ -4972,6 +4971,8 @@ extern bool is_list_ctor			(tree);
 #ifdef ENABLE_CHECKING
 extern void validate_conversion_obstack		(void);
 #endif /* ENABLE_CHECKING */
+extern void mark_versions_used			(tree);
+extern tree get_function_version_dispatcher	(tree);
 
 /* in class.c */
 extern tree build_vfield_ref			(tree, tree);
@@ -5750,6 +5751,7 @@ extern bool type_has_nontrivial_default_init	(const_tree);
 extern bool type_has_nontrivial_copy_init	(const_tree);
 extern bool class_tmpl_impl_spec_p		(const_tree);
 extern int zero_init_p				(const_tree);
+extern bool check_abi_tag_redeclaration		(const_tree, const_tree, const_tree);
 extern tree strip_typedefs			(tree);
 extern tree strip_typedefs_expr			(tree);
 extern tree copy_binfo				(tree, tree, tree,

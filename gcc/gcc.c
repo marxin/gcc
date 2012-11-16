@@ -267,6 +267,7 @@ static const char *compare_debug_dump_opt_spec_function (int, const char **);
 static const char *compare_debug_self_opt_spec_function (int, const char **);
 static const char *compare_debug_auxbase_opt_spec_function (int, const char **);
 static const char *pass_through_libs_spec_func (int, const char **);
+static const char *replace_extension_spec_func (int, const char **);
 
 /* The Specs Language
 
@@ -447,7 +448,7 @@ ignored.  White space may also appear anywhere on the left side of the
 colon in these constructs, except between . or * and the corresponding
 word.
 
-The -O, -f, -m, and -W switches are handled specifically in these
+The -O, -f, -g, -m, and -W switches are handled specifically in these
 constructs.  If another value of -O or the negated form of a -f, -m, or
 -W switch is found later in the command line, the earlier switch
 value is ignored, except with {S*} where S is just one letter; this
@@ -480,7 +481,14 @@ proper position among the other output files.  */
 /* config.h can define ASM_FINAL_SPEC to run a post processor after
    the assembler has run.  */
 #ifndef ASM_FINAL_SPEC
-#define ASM_FINAL_SPEC ""
+#define ASM_FINAL_SPEC \
+  "%{gsplit-dwarf: \n\
+       objcopy --extract-dwo \
+	 %{c:%{o*:%*}%{!o*:%b%O}}%{!c:%U%O} \
+	 %{c:%{o*:%:replace-extension(%{o*:%*} .dwo)}%{!o*:%b.dwo}}%{!c:%b.dwo} \n\
+       objcopy --strip-dwo \
+	 %{c:%{o*:%*}%{!o*:%b%O}}%{!c:%U%O} \
+    }"
 #endif
 
 /* config.h can define CPP_SPEC to provide extra args to the C preprocessor
@@ -679,6 +687,7 @@ proper position among the other output files.  */
     %{fgnu-tm:%:include(libitm.spec)%(link_itm)}\
     %(mflib) " STACK_SPLIT_SPEC "\
     %{fprofile-arcs|fprofile-generate*|coverage:-lgcov}\
+    %{faddress-sanitizer:-lasan}\
     %{!nostdlib:%{!nodefaultlibs:%(link_ssp) %(link_gcc_c_sequence)}}\
     %{!nostdlib:%{!nostartfiles:%E}} %{T*} }}}}}}"
 #endif
@@ -1154,6 +1163,11 @@ static const char *multilib_dir;
    set_multilib_dir based on the compilation options.  */
 
 static const char *multilib_os_dir;
+
+/* Subdirectory to use for locating libraries in multiarch conventions.  Set by
+   set_multilib_dir based on the compilation options.  */
+
+static const char *multiarch_dir;
 
 /* Structure to keep track of the specs that have been defined so far.
    These are accessed using %(specname) in a compiler or link
@@ -1262,6 +1276,7 @@ static const struct spec_function static_spec_functions[] =
   { "compare-debug-self-opt",	compare_debug_self_opt_spec_function },
   { "compare-debug-auxbase-opt", compare_debug_auxbase_opt_spec_function },
   { "pass-through-libs",	pass_through_libs_spec_func },
+  { "replace-extension",	replace_extension_spec_func },
 #ifdef EXTRA_SPEC_FUNCTIONS
   EXTRA_SPEC_FUNCTIONS
 #endif
@@ -2084,6 +2099,7 @@ for_each_path (const struct path_prefix *paths,
   struct prefix_list *pl;
   const char *multi_dir = NULL;
   const char *multi_os_dir = NULL;
+  const char *multiarch_suffix = NULL;
   const char *multi_suffix;
   const char *just_multi_suffix;
   char *path = NULL;
@@ -2101,11 +2117,14 @@ for_each_path (const struct path_prefix *paths,
     }
   if (do_multi && multilib_os_dir && strcmp (multilib_os_dir, ".") != 0)
     multi_os_dir = concat (multilib_os_dir, dir_separator_str, NULL);
+  if (multiarch_dir)
+    multiarch_suffix = concat (multiarch_dir, dir_separator_str, NULL);
 
   while (1)
     {
       size_t multi_dir_len = 0;
       size_t multi_os_dir_len = 0;
+      size_t multiarch_len = 0;
       size_t suffix_len;
       size_t just_suffix_len;
       size_t len;
@@ -2114,16 +2133,15 @@ for_each_path (const struct path_prefix *paths,
 	multi_dir_len = strlen (multi_dir);
       if (multi_os_dir)
 	multi_os_dir_len = strlen (multi_os_dir);
+      if (multiarch_suffix)
+	multiarch_len = strlen (multiarch_suffix);
       suffix_len = strlen (multi_suffix);
       just_suffix_len = strlen (just_multi_suffix);
 
       if (path == NULL)
 	{
 	  len = paths->max_len + extra_space + 1;
-	  if (suffix_len > multi_os_dir_len)
-	    len += suffix_len;
-	  else
-	    len += multi_os_dir_len;
+	  len += MAX (MAX (suffix_len, multi_os_dir_len), multiarch_len);
 	  path = XNEWVEC (char, len);
 	}
 
@@ -2147,6 +2165,16 @@ for_each_path (const struct path_prefix *paths,
 	      && pl->require_machine_suffix == 2)
 	    {
 	      memcpy (path + len, just_multi_suffix, just_suffix_len + 1);
+	      ret = callback (path, callback_info);
+	      if (ret)
+		break;
+	    }
+
+	  /* Now try the multiarch path.  */
+	  if (!skip_multi_dir
+	      && !pl->require_machine_suffix && multiarch_dir)
+	    {
+	      memcpy (path + len, multiarch_suffix, multiarch_len + 1);
 	      ret = callback (path, callback_info);
 	      if (ret)
 		break;
@@ -2980,6 +3008,9 @@ display_help (void)
   fputs (_("  -print-libgcc-file-name  Display the name of the compiler's companion library\n"), stdout);
   fputs (_("  -print-file-name=<lib>   Display the full path to library <lib>\n"), stdout);
   fputs (_("  -print-prog-name=<prog>  Display the full path to compiler component <prog>\n"), stdout);
+  fputs (_("\
+  -print-multiarch         Display the target's normalized GNU triplet, used as\n\
+                           a component in the library path\n"), stdout);
   fputs (_("  -print-multi-directory   Display the root directory for versions of libgcc\n"), stdout);
   fputs (_("\
   -print-multi-lib         Display the mapping between command line options and\n\
@@ -3264,6 +3295,7 @@ driver_handle_option (struct gcc_options *opts,
     case OPT_print_multi_directory:
     case OPT_print_sysroot:
     case OPT_print_multi_os_directory:
+    case OPT_print_multiarch:
     case OPT_print_sysroot_headers_suffix:
     case OPT_time:
     case OPT_wrapper:
@@ -3969,18 +4001,12 @@ process_command (unsigned int decoded_options_count,
   if (n_infiles == last_language_n_infiles && spec_lang != 0)
     warning (0, "%<-x %s%> after last input file has no effect", spec_lang);
 
+  /* Synthesize -fcompare-debug flag from the GCC_COMPARE_DEBUG
+     environment variable.  */
   if (compare_debug == 2 || compare_debug == 3)
     {
-      alloc_switch ();
-      switches[n_switches].part1 = concat ("fcompare-debug=",
-					   compare_debug_opt,
-					   NULL);
-      switches[n_switches].args = 0;
-      switches[n_switches].live_cond = 0;
-      switches[n_switches].validated = false;
-      switches[n_switches].known = false;
-      switches[n_switches].ordering = 0;
-      n_switches++;
+      const char *opt = concat ("-fcompare-debug=", compare_debug_opt, NULL);
+      save_switch (opt, 0, NULL, false, true);
       compare_debug = 1;
     }
 
@@ -4920,6 +4946,15 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 		  do_spec_1 (" ", 0, NULL);
 		}
 
+	      if (multiarch_dir)
+		{
+		  do_spec_1 ("-imultiarch", 1, NULL);
+		  /* Make this a separate argument.  */
+		  do_spec_1 (" ", 0, NULL);
+		  do_spec_1 (multiarch_dir, 1, NULL);
+		  do_spec_1 (" ", 0, NULL);
+		}
+
 	      if (gcc_exec_prefix)
 		{
 		  do_spec_1 ("-iprefix", 1, NULL);
@@ -5814,7 +5849,7 @@ process_brace_body (const char *p, const char *atom, const char *end_atom,
    on the command line.  PREFIX_LENGTH is the length of XXX in an {XXX*}
    spec, or -1 if either exact match or %* is used.
 
-   A -O switch is obsoleted by a later -O switch.  A -f, -m, or -W switch
+   A -O switch is obsoleted by a later -O switch.  A -f, -g, -m, or -W switch
    whose value does not begin with "no-" is obsoleted by the same value
    with the "no-", similarly for a switch with the "no-" prefix.  */
 
@@ -5851,7 +5886,7 @@ check_live_switch (int switchnum, int prefix_length)
 	  }
       break;
 
-    case 'W':  case 'f':  case 'm':
+    case 'W':  case 'f':  case 'm': case 'g':
       if (! strncmp (name + 1, "no-", 3))
 	{
 	  /* We have Xno-YYY, search for XYYY.  */
@@ -6586,6 +6621,15 @@ main (int argc, char **argv)
 	printf (".\n");
       else
 	printf ("%s\n", multilib_dir);
+      return (0);
+    }
+
+  if (print_multiarch)
+    {
+      if (multiarch_dir == NULL)
+	printf ("\n");
+      else
+	printf ("%s\n", multiarch_dir);
       return (0);
     }
 
@@ -7360,7 +7404,9 @@ default_arg (const char *p, int len)
    options are present, then we will ignore this completely. Passing
    that, gcc will consider each multilib_select in turn using the same
    rules for matching the options. If a match is found, that subdirectory
-   will be used.  */
+   will be used.
+   A subdirectory name is optionally followed by a colon and the corresponding
+   multiarch name.  */
 
 static void
 set_multilib_dir (void)
@@ -7572,10 +7618,25 @@ set_multilib_dir (void)
 	    q++;
 	  if (q < end)
 	    {
-	      char *new_multilib_os_dir = XNEWVEC (char, end - q);
-	      memcpy (new_multilib_os_dir, q + 1, end - q - 1);
-	      new_multilib_os_dir[end - q - 1] = '\0';
-	      multilib_os_dir = new_multilib_os_dir;
+	      const char *q2 = q + 1, *ml_end = end;
+	      char *new_multilib_os_dir;
+
+	      while (q2 < end && *q2 != ':')
+		q2++;
+	      if (*q2 == ':')
+		ml_end = q2;
+	      new_multilib_os_dir = XNEWVEC (char, ml_end - q);
+	      memcpy (new_multilib_os_dir, q + 1, ml_end - q - 1);
+	      new_multilib_os_dir[ml_end - q - 1] = '\0';
+	      multilib_os_dir = *new_multilib_os_dir ? new_multilib_os_dir : ".";
+
+	      if (q2 < end && *q2 == ':')
+		{
+		  char *new_multiarch_dir = XNEWVEC (char, end - q2);
+		  memcpy (new_multiarch_dir, q2 + 1, end - q2 - 1);
+		  new_multiarch_dir[end - q2 - 1] = '\0';
+		  multiarch_dir = new_multiarch_dir;
+		}
 	      break;
 	    }
 	}
@@ -7635,9 +7696,10 @@ print_multilib_info (void)
 	}
 
       /* When --disable-multilib was used but target defines
-	 MULTILIB_OSDIRNAMES, entries starting with .: are there just
-	 to find multilib_os_dir, so skip them from output.  */
-      if (this_path[0] == '.' && this_path[1] == ':')
+	 MULTILIB_OSDIRNAMES, entries starting with .: (and not starting
+         with .:: for multiarch configurations) are there just to find
+         multilib_os_dir, so skip them from output.  */
+      if (this_path[0] == '.' && this_path[1] == ':' && this_path[2] != ':')
 	skip = 1;
 
       /* Check for matches with the multilib_exclusions. We don't bother
@@ -8379,4 +8441,34 @@ pass_through_libs_spec_func (int argc, const char **argv)
 	free (old);
     }
   return prepended;
+}
+
+/* %:replace-extension spec function.  Replaces the extension of the
+   first argument with the second argument.  */
+
+const char *
+replace_extension_spec_func (int argc, const char **argv)
+{
+  char *name;
+  char *p;
+  char *result;
+  int i;
+
+  if (argc != 2)
+    fatal_error ("too few arguments to %%:replace-extension");
+
+  name = xstrdup (argv[0]);
+
+  for (i = strlen(name) - 1; i >= 0; i--)
+    if (IS_DIR_SEPARATOR (name[i]))
+      break;
+
+  p = strrchr (name + i + 1, '.');
+  if (p != NULL)
+      *p = '\0';
+
+  result = concat (name, argv[1], NULL);
+
+  free (name);
+  return result;
 }

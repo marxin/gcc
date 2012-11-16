@@ -1033,6 +1033,15 @@ libraries to support different target variants, calling
 conventions, etc.@: should not be built.  The default is to build a
 predefined set of them.
 
+@item --enable-multiarch
+Specify whether to enable or disable multiarch support.  The default is
+to check for glibc start files in a multiarch location, and enable it
+if the files are found.  The auto detection is enabled for native builds,
+and for cross builds configured with @option{--with-sysroot}, and without
+@option{--with-native-system-header-dir}.
+More documentation about multiarch can be found at
+@uref{http://wiki.debian.org/Multiarch}.
+
 Some targets provide finer-grained control over which multilibs are built
 (e.g., @option{--disable-softfloat}):
 @table @code
@@ -3927,8 +3936,7 @@ the O32 ABI.
 <hr />
 @end html
 @heading @anchor{moxie-x-elf}moxie-*-elf
-The moxie processor.  See @uref{http://moxielogic.org/} for more
-information about this processor.
+The moxie processor.
 
 @html
 <hr />
@@ -4260,9 +4268,9 @@ releases mishandled unaligned relocations on @code{sparc-*-*} targets.
 @end html
 @heading @anchor{sparc64-x-solaris2}sparc64-*-solaris2*
 
-When configuring the GNU Multiple Precision Library (GMP) or the
-MPFR library, the canonical target triplet must be specified as
-the @command{build} parameter on the configure line.  For example
+When configuring the GNU Multiple Precision Library (GMP), the MPFR
+library or the MPC library, the canonical target triplet must be specified
+as the @command{build} parameter on the configure line.  For example
 on a Solaris 9 system:
 
 @smallexample

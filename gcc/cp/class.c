@@ -1087,6 +1087,35 @@ add_method (tree type, tree method, tree using_decl)
 	      || same_type_p (TREE_TYPE (fn_type),
 			      TREE_TYPE (method_type))))
 	{
+	  /* For function versions, their parms and types match
+	     but they are not duplicates.  Record function versions
+	     as and when they are found.  extern "C" functions are
+	     not treated as versions.  */
+	  if (TREE_CODE (fn) == FUNCTION_DECL
+	      && TREE_CODE (method) == FUNCTION_DECL
+	      && !DECL_EXTERN_C_P (fn)
+	      && !DECL_EXTERN_C_P (method)
+	      && (DECL_FUNCTION_SPECIFIC_TARGET (fn)
+		  || DECL_FUNCTION_SPECIFIC_TARGET (method))
+	      && targetm.target_option.function_versions (fn, method))
+ 	    {
+	      /* Mark functions as versions if necessary.  Modify the mangled
+		 decl name if necessary.  */
+	      if (!DECL_FUNCTION_VERSIONED (fn))
+		{
+		  DECL_FUNCTION_VERSIONED (fn) = 1;
+		  if (DECL_ASSEMBLER_NAME_SET_P (fn))
+		    mangle_decl (fn);
+		}
+	      if (!DECL_FUNCTION_VERSIONED (method))
+		{
+		  DECL_FUNCTION_VERSIONED (method) = 1;
+		  if (DECL_ASSEMBLER_NAME_SET_P (method))
+		    mangle_decl (method);
+		}
+	      record_function_versions (fn, method);
+	      continue;
+	    }
 	  if (DECL_INHERITED_CTOR_BASE (method))
 	    {
 	      if (DECL_INHERITED_CTOR_BASE (fn))
@@ -1273,6 +1302,89 @@ handle_using_decl (tree using_decl, tree t)
     alter_access (t, decl, access);
 }
 
+/* walk_tree callback for check_abi_tags: if the type at *TP involves any
+   types with abi tags, add the corresponding identifiers to the VEC in
+   *DATA and set IDENTIFIER_MARKED.  */
+
+struct abi_tag_data
+{
+  tree t;
+  tree subob;
+};
+
+static tree
+find_abi_tags_r (tree *tp, int */*walk_subtrees*/, void *data)
+{
+  if (!TAGGED_TYPE_P (*tp))
+    return NULL_TREE;
+
+  if (tree attributes = lookup_attribute ("abi_tag", TYPE_ATTRIBUTES (*tp)))
+    {
+      struct abi_tag_data *p = static_cast<struct abi_tag_data*>(data);
+      for (tree list = TREE_VALUE (attributes); list;
+	   list = TREE_CHAIN (list))
+	{
+	  tree tag = TREE_VALUE (list);
+	  tree id = get_identifier (TREE_STRING_POINTER (tag));
+	  if (!IDENTIFIER_MARKED (id))
+	    {
+	      if (TYPE_P (p->subob))
+		{
+		  warning (OPT_Wabi_tag, "%qT does not have the %E abi tag "
+			   "that base %qT has", p->t, tag, p->subob);
+		  inform (location_of (p->subob), "%qT declared here",
+			  p->subob);
+		}
+	      else
+		{
+		  warning (OPT_Wabi_tag, "%qT does not have the %E abi tag "
+			   "that %qT (used in the type of %qD) has",
+			   p->t, tag, *tp, p->subob);
+		  inform (location_of (p->subob), "%qD declared here",
+			  p->subob);
+		  inform (location_of (*tp), "%qT declared here", *tp);
+		}
+	    }
+	}
+    }
+  return NULL_TREE;
+}
+
+/* Check that class T has all the abi tags that subobject SUBOB has, or
+   warn if not.  */
+
+static void
+check_abi_tags (tree t, tree subob)
+{
+  tree attributes = lookup_attribute ("abi_tag", TYPE_ATTRIBUTES (t));
+  if (attributes)
+    {
+      for (tree list = TREE_VALUE (attributes); list;
+	   list = TREE_CHAIN (list))
+	{
+	  tree tag = TREE_VALUE (list);
+	  tree id = get_identifier (TREE_STRING_POINTER (tag));
+	  IDENTIFIER_MARKED (id) = true;
+	}
+    }
+
+  tree subtype = TYPE_P (subob) ? subob : TREE_TYPE (subob);
+  struct abi_tag_data data = { t, subob };
+
+  cp_walk_tree_without_duplicates (&subtype, find_abi_tags_r, &data);
+
+  if (attributes)
+    {
+      for (tree list = TREE_VALUE (attributes); list;
+	   list = TREE_CHAIN (list))
+	{
+	  tree tag = TREE_VALUE (list);
+	  tree id = get_identifier (TREE_STRING_POINTER (tag));
+	  IDENTIFIER_MARKED (id) = false;
+	}
+    }
+}
+
 /* Run through the base classes of T, updating CANT_HAVE_CONST_CTOR_P,
    and NO_CONST_ASN_REF_P.  Also set flag bits in T based on
    properties of the bases.  */
@@ -1402,6 +1514,8 @@ check_bases (tree t,
 	  if (tm_attr)
 	    seen_tm_mask |= tm_attr_to_mask (tm_attr);
 	}
+
+      check_abi_tags (t, basetype);
     }
 
   /* If one of the base classes had TM attributes, and the current class
@@ -3118,6 +3232,9 @@ check_field_decl (tree field,
 	  && !TYPE_HAS_CONST_COPY_ASSIGN (type))
 	*no_const_asn_ref = 1;
     }
+
+  check_abi_tags (t, field);
+
   if (DECL_INITIAL (field) != NULL_TREE)
     {
       /* `build_class_init_list' does not recognize
@@ -6158,6 +6275,12 @@ finish_struct_1 (tree t)
 	/* Here we know enough to change the type of our virtual
 	   function table, but we will wait until later this function.  */
 	build_primary_vtable (CLASSTYPE_PRIMARY_BINFO (t), t);
+
+      /* If we're warning about ABI tags, check the types of the new
+	 virtual functions.  */
+      if (warn_abi_tag)
+	for (tree v = virtuals; v; v = TREE_CHAIN (v))
+	  check_abi_tags (t, TREE_VALUE (v));
     }
 
   if (TYPE_CONTAINS_VPTR_P (t))
@@ -7162,12 +7285,17 @@ resolve_address_of_overloaded_function (tree target_type,
     {
       /* There were too many matches.  First check if they're all
 	 the same function.  */
-      tree match;
+      tree match = NULL_TREE;
 
       fn = TREE_PURPOSE (matches);
+
+      /* For multi-versioned functions, more than one match is just fine and
+	 decls_match will return false as they are different.  */
       for (match = TREE_CHAIN (matches); match; match = TREE_CHAIN (match))
-	if (!decls_match (fn, TREE_PURPOSE (match)))
-	  break;
+	if (!decls_match (fn, TREE_PURPOSE (match))
+	    && !targetm.target_option.function_versions
+	       (fn, TREE_PURPOSE (match)))
+          break;
 
       if (match)
 	{
@@ -7206,6 +7334,20 @@ resolve_address_of_overloaded_function (tree target_type,
 	  inform (input_location, "(a pointer to member can only be formed with %<&%E%>)", fn);
 	  explained = 1;
 	}
+    }
+
+  /* If a pointer to a function that is multi-versioned is requested, the
+     pointer to the dispatcher function is returned instead.  This works
+     well because indirectly calling the function will dispatch the right
+     function version at run-time.  */
+  if (DECL_FUNCTION_VERSIONED (fn))
+    {
+      fn = get_function_version_dispatcher (fn);
+      if (fn == NULL)
+	return error_mark_node;
+      /* Mark all the versions corresponding to the dispatcher as used.  */
+      if (!(flags & tf_conv))
+	mark_versions_used (fn);
     }
 
   /* If we're doing overload resolution purely for the purpose of

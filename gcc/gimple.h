@@ -875,6 +875,9 @@ extern bool is_gimple_condexpr (tree);
 /* Returns true iff T is a valid call address expression.  */
 extern bool is_gimple_call_addr (tree);
 
+/* Return TRUE iff stmt is a call to a built-in function.  */
+extern bool is_gimple_builtin_call (gimple stmt);
+
 extern void recalculate_side_effects (tree);
 extern bool gimple_compare_field_offset (tree, tree);
 extern tree gimple_register_canonical_type (tree);
@@ -2039,6 +2042,31 @@ gimple_assign_single_p (gimple gs)
 {
   return (is_gimple_assign (gs)
           && gimple_assign_rhs_class (gs) == GIMPLE_SINGLE_RHS);
+}
+
+/* Return true if GS performs a store to its lhs.  */
+
+static inline bool
+gimple_store_p (gimple gs)
+{
+  tree lhs = gimple_get_lhs (gs);
+  return lhs && !is_gimple_reg (lhs);
+}
+
+/* Return true if GS is an assignment that loads from its rhs1.  */
+
+static inline bool
+gimple_assign_load_p (gimple gs)
+{
+  tree rhs;
+  if (!gimple_assign_single_p (gs))
+    return false;
+  rhs = gimple_assign_rhs1 (gs);
+  if (TREE_CODE (rhs) == WITH_SIZE_EXPR)
+    return true;
+  rhs = get_base_address (rhs);
+  return (DECL_P (rhs)
+	  || TREE_CODE (rhs) == MEM_REF || TREE_CODE (rhs) == TARGET_MEM_REF);
 }
 
 

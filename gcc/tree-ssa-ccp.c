@@ -184,10 +184,12 @@ dump_lattice_value (FILE *outf, const char *prefix, prop_value_t val)
       fprintf (outf, "%sVARYING", prefix);
       break;
     case CONSTANT:
-      fprintf (outf, "%sCONSTANT ", prefix);
       if (TREE_CODE (val.value) != INTEGER_CST
 	  || val.mask.is_zero ())
-	print_generic_expr (outf, val.value, dump_flags);
+	{
+	  fprintf (outf, "%sCONSTANT ", prefix);
+	  print_generic_expr (outf, val.value, dump_flags);
+	}
       else
 	{
 	  double_int cval = tree_to_double_int (val.value).and_not (val.mask);
@@ -2123,6 +2125,7 @@ struct gimple_opt_pass pass_ccp =
  {
   GIMPLE_PASS,
   "ccp",				/* name */
+  OPTGROUP_NONE,                        /* optinfo_flags */
   gate_ccp,				/* gate */
   do_ssa_ccp,				/* execute */
   NULL,					/* sub */
@@ -2507,6 +2510,7 @@ struct gimple_opt_pass pass_fold_builtins =
  {
   GIMPLE_PASS,
   "fab",				/* name */
+  OPTGROUP_NONE,                        /* optinfo_flags */
   NULL,					/* gate */
   execute_fold_all_builtins,		/* execute */
   NULL,					/* sub */

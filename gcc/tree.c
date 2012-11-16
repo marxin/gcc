@@ -1992,12 +1992,25 @@ real_zerop (const_tree expr)
 {
   STRIP_NOPS (expr);
 
-  return ((TREE_CODE (expr) == REAL_CST
-	   && REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconst0)
-	   && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr)))))
-	  || (TREE_CODE (expr) == COMPLEX_CST
-	      && real_zerop (TREE_REALPART (expr))
-	      && real_zerop (TREE_IMAGPART (expr))));
+  switch (TREE_CODE (expr))
+    {
+    case REAL_CST:
+      return REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconst0)
+	     && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr))));
+    case COMPLEX_CST:
+      return real_zerop (TREE_REALPART (expr))
+	     && real_zerop (TREE_IMAGPART (expr));
+    case VECTOR_CST:
+      {
+	unsigned i;
+	for (i = 0; i < VECTOR_CST_NELTS (expr); ++i)
+	  if (!real_zerop (VECTOR_CST_ELT (expr, i)))
+	    return false;
+	return true;
+      }
+    default:
+      return false;
+    }
 }
 
 /* Return 1 if EXPR is the real constant one in real or complex form.
@@ -2009,12 +2022,25 @@ real_onep (const_tree expr)
 {
   STRIP_NOPS (expr);
 
-  return ((TREE_CODE (expr) == REAL_CST
-	   && REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconst1)
-	   && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr)))))
-	  || (TREE_CODE (expr) == COMPLEX_CST
-	      && real_onep (TREE_REALPART (expr))
-	      && real_zerop (TREE_IMAGPART (expr))));
+  switch (TREE_CODE (expr))
+    {
+    case REAL_CST:
+      return REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconst1)
+	     && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr))));
+    case COMPLEX_CST:
+      return real_onep (TREE_REALPART (expr))
+	     && real_zerop (TREE_IMAGPART (expr));
+    case VECTOR_CST:
+      {
+	unsigned i;
+	for (i = 0; i < VECTOR_CST_NELTS (expr); ++i)
+	  if (!real_onep (VECTOR_CST_ELT (expr, i)))
+	    return false;
+	return true;
+      }
+    default:
+      return false;
+    }
 }
 
 /* Return 1 if EXPR is the real constant two.  Trailing zeroes matter
@@ -2025,12 +2051,25 @@ real_twop (const_tree expr)
 {
   STRIP_NOPS (expr);
 
-  return ((TREE_CODE (expr) == REAL_CST
-	   && REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconst2)
-	   && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr)))))
-	  || (TREE_CODE (expr) == COMPLEX_CST
-	      && real_twop (TREE_REALPART (expr))
-	      && real_zerop (TREE_IMAGPART (expr))));
+  switch (TREE_CODE (expr))
+    {
+    case REAL_CST:
+      return REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconst2)
+	     && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr))));
+    case COMPLEX_CST:
+      return real_twop (TREE_REALPART (expr))
+	     && real_zerop (TREE_IMAGPART (expr));
+    case VECTOR_CST:
+      {
+	unsigned i;
+	for (i = 0; i < VECTOR_CST_NELTS (expr); ++i)
+	  if (!real_twop (VECTOR_CST_ELT (expr, i)))
+	    return false;
+	return true;
+      }
+    default:
+      return false;
+    }
 }
 
 /* Return 1 if EXPR is the real constant minus one.  Trailing zeroes
@@ -2041,12 +2080,25 @@ real_minus_onep (const_tree expr)
 {
   STRIP_NOPS (expr);
 
-  return ((TREE_CODE (expr) == REAL_CST
-	   && REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconstm1)
-	   && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr)))))
-	  || (TREE_CODE (expr) == COMPLEX_CST
-	      && real_minus_onep (TREE_REALPART (expr))
-	      && real_zerop (TREE_IMAGPART (expr))));
+  switch (TREE_CODE (expr))
+    {
+    case REAL_CST:
+      return REAL_VALUES_EQUAL (TREE_REAL_CST (expr), dconstm1)
+	     && !(DECIMAL_FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (expr))));
+    case COMPLEX_CST:
+      return real_minus_onep (TREE_REALPART (expr))
+	     && real_zerop (TREE_IMAGPART (expr));
+    case VECTOR_CST:
+      {
+	unsigned i;
+	for (i = 0; i < VECTOR_CST_NELTS (expr); ++i)
+	  if (!real_minus_onep (VECTOR_CST_ELT (expr, i)))
+	    return false;
+	return true;
+      }
+    default:
+      return false;
+    }
 }
 
 /* Nonzero if EXP is a constant or a cast of a constant.  */
@@ -5240,6 +5292,7 @@ struct simple_ipa_opt_pass pass_ipa_free_lang_data =
  {
   SIMPLE_IPA_PASS,
   "*free_lang_data",			/* name */
+  OPTGROUP_NONE,                        /* optinfo_flags */
   NULL,					/* gate */
   free_lang_data,			/* execute */
   NULL,					/* sub */
@@ -9488,6 +9541,39 @@ build_common_tree_nodes (bool signed_char, bool short_double)
   }
 }
 
+/* Modify DECL for given flags.  */
+void
+set_call_expr_flags (tree decl, int flags)
+{
+  if (flags & ECF_NOTHROW)
+    TREE_NOTHROW (decl) = 1;
+  if (flags & ECF_CONST)
+    TREE_READONLY (decl) = 1;
+  if (flags & ECF_PURE)
+    DECL_PURE_P (decl) = 1;
+  if (flags & ECF_LOOPING_CONST_OR_PURE)
+    DECL_LOOPING_CONST_OR_PURE_P (decl) = 1;
+  if (flags & ECF_NOVOPS)
+    DECL_IS_NOVOPS (decl) = 1;
+  if (flags & ECF_NORETURN)
+    TREE_THIS_VOLATILE (decl) = 1;
+  if (flags & ECF_MALLOC)
+    DECL_IS_MALLOC (decl) = 1;
+  if (flags & ECF_RETURNS_TWICE)
+    DECL_IS_RETURNS_TWICE (decl) = 1;
+  if (flags & ECF_LEAF)
+    DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("leaf"),
+					NULL, DECL_ATTRIBUTES (decl));
+  if ((flags & ECF_TM_PURE) && flag_tm)
+    DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("transaction_pure"),
+					NULL, DECL_ATTRIBUTES (decl));
+  /* Looping const or pure is implied by noreturn.
+     There is currently no way to declare looping const or looping pure alone.  */
+  gcc_assert (!(flags & ECF_LOOPING_CONST_OR_PURE)
+	      || ((flags & ECF_NORETURN) && (flags & (ECF_CONST | ECF_PURE))));
+}
+
+
 /* A subroutine of build_common_builtin_nodes.  Define a builtin function.  */
 
 static void
@@ -9498,23 +9584,7 @@ local_define_builtin (const char *name, tree type, enum built_in_function code,
 
   decl = add_builtin_function (name, type, code, BUILT_IN_NORMAL,
 			       library_name, NULL_TREE);
-  if (ecf_flags & ECF_CONST)
-    TREE_READONLY (decl) = 1;
-  if (ecf_flags & ECF_PURE)
-    DECL_PURE_P (decl) = 1;
-  if (ecf_flags & ECF_LOOPING_CONST_OR_PURE)
-    DECL_LOOPING_CONST_OR_PURE_P (decl) = 1;
-  if (ecf_flags & ECF_NORETURN)
-    TREE_THIS_VOLATILE (decl) = 1;
-  if (ecf_flags & ECF_NOTHROW)
-    TREE_NOTHROW (decl) = 1;
-  if (ecf_flags & ECF_MALLOC)
-    DECL_IS_MALLOC (decl) = 1;
-  if (ecf_flags & ECF_LEAF)
-    DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("leaf"),
-					NULL, DECL_ATTRIBUTES (decl));
-  if ((ecf_flags & ECF_TM_PURE) && flag_tm)
-    apply_tm_attr (decl, get_identifier ("transaction_pure"));
+  set_call_expr_flags (decl, ecf_flags);
 
   set_builtin_decl (code, decl, true);
 }
