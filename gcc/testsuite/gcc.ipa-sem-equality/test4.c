@@ -233,6 +233,31 @@ int nsd_different_result2(int x, int y)
   return x;
 }
 
+int s1(int x)
+{
+  switch (x)
+  {
+    case 10:
+      return 2;
+    case 12:
+      return 123;
+    default:
+      return x + 2;
+  }
+}
+
+int s2(int x)
+{
+  switch (x)
+  {
+    case 10:
+      return 2;
+    case 12:
+      return 123;
+    default:
+      return x + 2;
+  }
+}
 int main(int argc, char **argv)
 {
   if(argc < 3)

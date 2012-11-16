@@ -28,6 +28,7 @@ typedef struct sem_func
   unsigned int edge_count;
   unsigned int *bb_sizes;
   unsigned cfg_checksum;
+  unsigned ssa_names_size;
   hashval_t hashcode;
   sem_bb_t **bb_sorted;
   sem_func_t *next;
@@ -39,7 +40,8 @@ typedef struct sem_bb
   basic_block bb;
   sem_func_t *func;
   htab_t variables;
-  unsigned int count;
+  unsigned stmt_count;
+  unsigned edge_count;
   hashval_t hashcode;
 } sem_bb_t;
 
@@ -51,8 +53,8 @@ typedef struct ssa_pair
 
 typedef struct ssa_dict
 {
-  htab_t source;
-  htab_t target;
+  int *source;
+  int *target;
 } ssa_dict_t;
 
 static sem_func_t **sem_functions;
@@ -71,8 +73,46 @@ hashval_t iterative_hash_tree (tree type, hashval_t hash)
   return hash;
 }
 
-/* Htab calculation function for semantic function struct. */
+/* SSA dictionary functions */
+static void
+ssa_dict_init (ssa_dict_t *d, unsigned ssa_names_size1, unsigned ssa_names_size2) 
+{
+  d->source = XCNEWVEC (int, ssa_names_size1);
+  d->target = XCNEWVEC (int, ssa_names_size2);
 
+  memset (d->source, -1, ssa_names_size1 * sizeof (int));
+  memset (d->target, -1, ssa_names_size2 * sizeof (int));
+}
+
+static void
+ssa_dict_free (ssa_dict_t *d)
+{
+  free (d->source);
+  free (d->target);
+}
+
+static bool
+ssa_dict_look_up (ssa_dict_t *d, tree ssa1, tree ssa2)
+{
+  unsigned i1, i2;
+
+  i1 = SSA_NAME_VERSION (ssa1);
+  i2 = SSA_NAME_VERSION (ssa2);
+
+  if (d->source[i1] == -1)
+    d->source[i1] = i2;
+  else if (d->source[i1] != (int)i2)
+    return false;
+
+  if(d->target[i2] == -1)
+    d->target[i2] = i1;
+  else if (d->target[i2] != (int)i1)
+    return false;
+
+  return true;
+}
+
+/* Htab calculation function for semantic function struct. */
 static hashval_t
 func_hash (const void *func)
 {
@@ -126,7 +166,8 @@ bb_hash (const void *basic_block)
 {
   const sem_bb_t *bb = (const sem_bb_t *)basic_block;
 
-  hashval_t hash = bb->count;
+  hashval_t hash = bb->stmt_count;
+  hash = iterative_hash_object (bb->edge_count, hash);
 
   return hash;
 }
@@ -164,9 +205,7 @@ static void
 visit_function (struct cgraph_node *node, sem_func_t *f)
 {
   tree fndecl, fnargs, parm, result;
-  unsigned int param_num, gimple_count, bb_count, edge_count;
-  edge e;
-  edge_iterator ei;
+  unsigned int param_num, gimple_count, bb_count;
   struct function *my_function;
   gimple_stmt_iterator gsi;
   basic_block bb;
@@ -175,12 +214,11 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
 
-  // TODO
-  if (!my_function)
-  {
+  /* TODO: add alert */
+  if (!my_function) 
     return;
-  }
 
+  f->ssa_names_size = VEC_length (tree, SSANAMES (my_function));
   f->node = node;
   f->func_decl = fndecl;
   fnargs = DECL_ARGUMENTS (fndecl);
@@ -213,124 +251,52 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   f->bb_sorted = XCNEWVEC (sem_bb_t *, f->bb_count);
   f->cfg_checksum = coverage_compute_cfg_checksum_fn (my_function);
 
-  // TODO: remove
   bb_count = 0;
   FOR_EACH_BB_FN (bb, my_function)
   {
     gimple_count = 0;
 
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-    {
-      edge_count = 0;
-
-      /*
-       * DEBUG OUTPUT
-      printf( "\t%s\n", gimple_code_name[gimple_code(g)]);
-      debug_gimple_stmt(gsi_stmt(gsi));
-      */
-
-      /* iterating all edges */
-      FOR_EACH_EDGE (e, ei, bb->succs)
-      {
-        edge_count++;
-      }
-
       gimple_count++;
-    }
 
     f->bb_sizes[bb_count] = gimple_count;
 
     /* Inserting basic block to hash table */
-
     sem_bb = XCNEW (sem_bb_t);
     sem_bb->bb = bb;
     sem_bb->func = f;
-    sem_bb->count = gimple_count;
+    sem_bb->stmt_count = gimple_count;
+    sem_bb->edge_count = EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs);
     sem_bb->hashcode = bb_hash (sem_bb);
 
     f->bb_sorted[bb_count++] = sem_bb;
   }
 }
 
-static void
-ssa_free (void *ssa_name)
+static bool
+ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
 {
-  free(ssa_name);
-}
+  if (!ssa_dict_look_up (d, t1, t2))
+    return false;
 
-static hashval_t
-ssa_hash (const void *ssa_name)
-{
-  const ssa_pair_t *p = (const ssa_pair_t *)ssa_name;
-
-  return (size_t)p->source;
-}
-
-static int ssa_equal (const void *ssa_name1, const void *ssa_name2)
-{
-  const ssa_pair_t *p1 = (const ssa_pair_t *)ssa_name1;
-  const ssa_pair_t *p2 = (const ssa_pair_t *)ssa_name2;
-
-  return p1->source == p2->source;
+  return useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2))
+    && useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2));
 }
 
 static bool
-ssa_check_htable (htab_t ssa_htable, tree_ssa_name *n1, tree_ssa_name *n2)
-{
-  void **slot;
-
-  ssa_pair_t *pair = XCNEW (ssa_pair_t);
-  pair->source = n1;
-  pair->target = n2;
-
-  ssa_pair_t *hit = (ssa_pair_t *)htab_find (ssa_htable, pair);
-
-  if(hit)
-  {
-    tree_ssa_name *hit_target = hit->target;
-    free (pair);
-    return hit_target == n2;
-  }
-  else
-  {
-    slot = htab_find_slot (ssa_htable, pair, INSERT);
-    *slot = pair;
-
-    return true;
-  }
-}
-
-static bool
-ssa_check_names (ssa_dict_t ssa_dict, tree t1, tree t2)
-{
-  bool result = ssa_check_htable (ssa_dict.source, &t1->ssa_name, &t2->ssa_name);
-
-  if(!result)
-    return false; /* source ssa name already coresponds to a different one */
-  else
-  {
-    if (!ssa_check_htable (ssa_dict.source, &t2->ssa_name, &t1->ssa_name))
-      return false;
-
-    return useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2))
-      && useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2));
-  }
-}
-
-static bool
-check_ssa_or_const (tree t1, tree t2, ssa_dict_t ssa_dict)
+check_ssa_or_const (tree t1, tree t2, ssa_dict_t *d)
 {
   if (t1 == NULL || t2 == NULL)
     return false;
 
   if (TREE_CODE (t1) == SSA_NAME && TREE_CODE (t2) == SSA_NAME)
-    return ssa_check_names (ssa_dict, t1, t2); 
+    return ssa_check_names (d, t1, t2); 
   else
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
 
 static bool
-check_ssa_call (gimple s1, gimple s2, ssa_dict_t ssa_dict)
+check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d)
 {
   unsigned i;
   tree t1, t2;
@@ -348,7 +314,7 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t ssa_dict)
     t2 = gimple_call_arg (s2, i);
 
     if (TREE_CODE (t1) == SSA_NAME && TREE_CODE (t2) == SSA_NAME)
-      return ssa_check_names (ssa_dict, t1, t2);
+      return ssa_check_names (d, t1, t2);
 
     if (!operand_equal_p (t1, t2, OEP_ONLY_CONST))
         return false;
@@ -363,11 +329,11 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t ssa_dict)
   else if(t1 == NULL_TREE || t2 == NULL_TREE)
     return false;
   else
-    return check_ssa_or_const (t1, t2, ssa_dict);
+    return check_ssa_or_const (t1, t2, d);
 }
 
 static bool
-check_ssa_assign (gimple s1, gimple s2, ssa_dict_t ssa_dict)
+check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d)
 {
   tree lhs1, lhs2;
   tree rhs1, rhs2;
@@ -395,7 +361,7 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t ssa_dict)
       rhs1 = gimple_assign_rhs2 (s1);
       rhs2 = gimple_assign_rhs2 (s2);
 
-      if (!check_ssa_or_const (rhs1, rhs2, ssa_dict))
+      if (!check_ssa_or_const (rhs1, rhs2, d))
         return false;
     }
     case GIMPLE_SINGLE_RHS:
@@ -404,7 +370,7 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t ssa_dict)
       rhs1 = gimple_assign_rhs1 (s1);
       rhs2 = gimple_assign_rhs1 (s2);
 
-      if (!check_ssa_or_const (rhs1, rhs2, ssa_dict))
+      if (!check_ssa_or_const (rhs1, rhs2, d))
         return false;
 
       break;
@@ -417,13 +383,13 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t ssa_dict)
   lhs2 = gimple_get_lhs (s2);
 
   if (TREE_CODE (lhs1) == SSA_NAME && TREE_CODE (lhs2) == SSA_NAME)
-    return ssa_check_names (ssa_dict, lhs1, lhs2);
+    return ssa_check_names (d, lhs1, lhs2);
   else
     return false;
 }
 
 static bool
-check_ssa_cond (gimple s1, gimple s2, ssa_dict_t ssa_dict)
+check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d)
 {
   tree t1, t2;
   enum tree_code code1, code2;
@@ -436,45 +402,42 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t ssa_dict)
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
 
-  if (!check_ssa_or_const (t1, t2, ssa_dict))
+  if (!check_ssa_or_const (t1, t2, d))
     return false;
 
   t1 = gimple_cond_rhs (s1);
   t2 = gimple_cond_rhs (s2);
 
-  if (!check_ssa_or_const (t1, t2, ssa_dict))
+  if (!check_ssa_or_const (t1, t2, d))
     return false;
 }
 
 static bool
 check_ssa_label (gimple g1, gimple g2)
 {
-  /* TODO
-  tree t1, t2;
-
-  t1 = gimple_label_label (g1);
-  t2 = gimple_label_label (g2);
-  */
-
-  return true;
+  // TODO: test me!
+  return !(FORCED_LABEL (gimple_label_label (g1)) || FORCED_LABEL (gimple_label_label (g2)));
 }
 
 static bool
-check_ssa_return (gimple g1, gimple g2, ssa_dict_t ssa_dict)
+check_ssa_return (gimple g1, gimple g2, ssa_dict_t *d)
 {
   tree t1, t2;
 
   t1 = gimple_return_retval (g1);
   t2 = gimple_return_retval (g2);
 
-  return check_ssa_or_const (t1, t2, ssa_dict);
+  return check_ssa_or_const (t1, t2, d);
 }
 
 static bool
-compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t ssa_dict)
+compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d)
 {
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
+
+  if (bb1->stmt_count != bb2->stmt_count || bb1->edge_count != bb2->edge_count)
+    return false;
 
   gsi2 = gsi_start_bb (bb2->bb);
   for (gsi1 = gsi_start_bb (bb1->bb); !gsi_end_p (gsi1); gsi_next (&gsi1))
@@ -488,20 +451,33 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t ssa_dict)
     switch (gimple_code (s1))
     {
       case GIMPLE_CALL:
-        if (!check_ssa_call (s1, s2, ssa_dict))
+        if (!check_ssa_call (s1, s2, d))
           return false;
         break;
       case GIMPLE_ASSIGN:
-        if (!check_ssa_assign (s1, s2, ssa_dict))
+        if (!check_ssa_assign (s1, s2, d))
           return false;
         break;
 
       case GIMPLE_COND:
-        if (!check_ssa_cond (s1, s2, ssa_dict))
+        if (!check_ssa_cond (s1, s2, d))
           return false;
         break;
 
+      case GIMPLE_SWITCH:
+        printf ("xxx TODO: SWITCH\n");
+        break;
+
+      case GIMPLE_RESX:
+        printf ("xxx TODO: RESX \n");
+        break;
+
+      case GIMPLE_DEBUG:
+        printf ("xxx TODO: DEBUG \n");
+        break;
+
       case GIMPLE_GOTO:
+        printf ("xxx TODO: GOTO\n");
         break;
 
       case GIMPLE_LABEL:
@@ -509,7 +485,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t ssa_dict)
           return false;
         break;
       case GIMPLE_RETURN:
-        if (!check_ssa_return (s1, s2, ssa_dict))
+        if (!check_ssa_return (s1, s2, d))
           return false;
         break;
 
@@ -524,7 +500,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t ssa_dict)
 }
 
 static bool
-compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t ssa_dict)
+compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d)
 {
   gimple_stmt_iterator si1, si2;
   gimple phi1, phi2;
@@ -548,7 +524,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t ssa_dict)
       t1 = gimple_phi_arg (phi1, i)->def;
       t2 = gimple_phi_arg (phi2, i)->def;
 
-      if (!check_ssa_or_const (t1, t2, ssa_dict))
+      if (!check_ssa_or_const (t1, t2, d))
           return false;
     }
 
@@ -616,13 +592,11 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   if(decl1 != decl2)
     return false;
 
-  /* SSA names hash table */
-  ssa_dict.source = htab_create (0, ssa_hash, ssa_equal, ssa_free);
-  ssa_dict.target = htab_create (0, ssa_hash, ssa_equal, ssa_free);
+  ssa_dict_init (&ssa_dict, f1->ssa_names_size, f2->ssa_names_size);
 
   /* Checking all basic blocks */
   for (i = 0; i < f1->bb_count; ++i)
-    if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], ssa_dict))
+    if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], &ssa_dict))
       return false;
 
   /* Basic block edges check */
@@ -658,12 +632,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   /* Basic block PHI nodes comparison */
   for (i = 0; i < f1->bb_count; ++i)
-    if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb, ssa_dict))
+    if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb, &ssa_dict))
       return false;
 
-  /* Htab deletion */
-  htab_delete (ssa_dict.source);
-  htab_delete (ssa_dict.target);
+  ssa_dict_free (&ssa_dict);
 
   return true;
 }
