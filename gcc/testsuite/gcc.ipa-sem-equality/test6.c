@@ -1,31 +1,26 @@
-int f1(void)
+struct container
 {
-  int x = 123;
+  int x;
+  int y;
+};
 
-  void *ptr = &&a;
+static struct container max;
+static int pole[3][3];
 
-  if(x == 1)
-    goto *ptr;
+void f1(struct container *c)
+{
+  void *x = &pole;
 
-  ++x;
-
-  a:
-    return 2;
+  if(x != 0)
+    pole[1][2] = 123;
 }
 
-int f2(void)
+void f2(struct container *c)
 {
-  int x = 123;
+  void *x = &pole;
 
-  void *ptr = &&a;
-
-  if(x == 1)
-    goto *ptr;
-
-  ++x;
-
-  a:
-    return 2;
+  if(x != 0)
+    pole[1][2] = 123;
 }
 
 int main(int argc, char **argv)
