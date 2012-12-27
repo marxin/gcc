@@ -283,39 +283,47 @@ ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
     && useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2));
 }
 
-static bool compare_handled_component (tree t1, tree t2)
+static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d)
 {
   tree o1, o2, base1, base2;
-  HOST_WIDE_INT offset1, size1, max_size1;
-  HOST_WIDE_INT offset2, size2, max_size2;
+  enum tree_code code;
+  HOST_WIDE_INT offset1, offset2;
   
-  base1 = get_ref_base_and_extent (t1, &offset1, &size1, &max_size1);
-  base2 = get_ref_base_and_extent (t2, &offset2, &size2, &max_size2);
+  base1 = get_addr_base_and_unit_offset (t1, &offset1);
+  base2 = get_addr_base_and_unit_offset (t2, &offset2);
 
-  if (TREE_CODE (base1) != TREE_CODE (base2))
+  if (TREE_CODE (base1) != TREE_CODE (base2) && offset1 != offset2)
     return false;
 
-  if (DECL_NAME (base1))
-    return base1 == base2;
-  else
+  switch (TREE_CODE (base1))
   {
-    switch (TREE_CODE (base1))
+    case ADDR_EXPR:
     {
+      o1 = TREE_OPERAND (base1, 0);
+      o2 = TREE_OPERAND (base2, 0);
 
-      case MEM_REF:
-      {
-        o1 = TREE_OPERAND (base1, 0);
-        o2 = TREE_OPERAND (base2, 0);
-
-        return o1 == o2;
-
-        break;
-      }
-      default:
-        break;
+      return compare_handled_component (o1, o2, d);
     }
+    case MEM_REF:
+    {
+      o1 = TREE_OPERAND (base1, 0);
+      o2 = TREE_OPERAND (base2, 0);
+
+      if (TREE_CODE (o1) == SSA_NAME)
+        return ssa_check_names (d, o1, o2);
+
+      return o1 == o2;
+    }
+    case VAR_DECL:
+      return base1 == base2;
+    case FUNCTION_DECL:
+      return base1 == base2;
+    default:
+      printf ("Not handled!!!!!\n");
+      break;
   }
-  return true;
+  
+  return false;
 }
 
 static bool
@@ -325,9 +333,9 @@ check_ssa_or_const (tree t1, tree t2, ssa_dict_t *d)
   if (t1 == NULL || t2 == NULL)
     return false;
 
-  if ((handled_component_p (t1) && handled_component_p (t1)) || TREE_CODE (t1) == ADDR_EXPR)
+  if ((handled_component_p (t1) && handled_component_p (t1)) || TREE_CODE (t1) == ADDR_EXPR || TREE_CODE (t1) == MEM_REF)
   {
-    return compare_handled_component (t1, t2);
+    return compare_handled_component (t1, t2, d);
   }
   
   if (TREE_CODE (t1) == SSA_NAME && TREE_CODE (t2) == SSA_NAME)
