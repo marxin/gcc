@@ -21,9 +21,11 @@ AC_MSG_RESULT($version_specific_libs)
 AC_CANONICAL_SYSTEM
 target_alias=${target_alias-$host_alias}
 AC_SUBST(target_alias)
+GCC_LIBSTDCXX_RAW_CXX_FLAGS
 
 AM_INIT_AUTOMAKE(foreign)
 AM_ENABLE_MULTILIB(, ..)
+AM_MAINTAINER_MODE
 
 # Calculate toolexeclibdir
 # Also toolexecdir, though it's only used in toolexeclibdir
@@ -66,11 +68,24 @@ AM_PROG_LIBTOOL
 AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
 
+AC_CHECK_SIZEOF([void *])
+
 if test "${multilib}" = "yes"; then
   multilib_arg="--enable-multilib"
 else
   multilib_arg=
 fi
+
+# Get target configury.
+unset TSAN_SUPPORTED
+. ${srcdir}/configure.tgt
+AM_CONDITIONAL(TSAN_SUPPORTED, [test "x$TSAN_SUPPORTED" = "xyes"])
+
+case "$host" in
+  *-*-darwin*) MAC_INTERPOSE=true ; enable_static=no ;;
+  *) MAC_INTERPOSE=false ;;
+esac
+AM_CONDITIONAL(USING_MAC_INTERPOSE, $MAC_INTERPOSE)
 
 AC_CONFIG_FILES([Makefile])
 
@@ -86,5 +101,20 @@ _EOF
    . ${multi_basedir}/config-ml.in
    AS_UNSET([ml_norecursion])
 ])
+
+if test "x$TSAN_SUPPORTED" = "xyes"; then
+  AC_CONFIG_FILES(AC_FOREACH([DIR], [tsan], [DIR/Makefile ]), 
+    [cat > vpsed$$ << \_EOF
+s!`test -f '$<' || echo '$(srcdir)/'`!!
+_EOF
+    sed -f vpsed$$ $ac_file > tmp$$
+    mv tmp$$ $ac_file
+    rm vpsed$$
+    echo 'MULTISUBDIR =' >> $ac_file
+    ml_norecursion=yes
+    . ${multi_basedir}/config-ml.in
+    AS_UNSET([ml_norecursion])
+])
+fi
 
 AC_OUTPUT

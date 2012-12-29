@@ -49,6 +49,12 @@ using __sanitizer::uptr;
 # define ASAN_INTERCEPT_STRNLEN 0
 #endif
 
+#if defined(__linux__) && !defined(ANDROID)
+# define ASAN_INTERCEPT_SWAPCONTEXT 1
+#else
+# define ASAN_INTERCEPT_SWAPCONTEXT 0
+#endif
+
 #if !defined(ANDROID) && !defined(_WIN32)
 # define ASAN_INTERCEPT_SIGNAL_AND_SIGACTION 1
 #else
@@ -197,7 +203,7 @@ DECLARE_FUNCTION_AND_WRAPPER(void, __CFInitialize, void);
 DECLARE_FUNCTION_AND_WRAPPER(CFStringRef, CFStringCreateCopy,
                              CFAllocatorRef alloc, CFStringRef str);
 DECLARE_FUNCTION_AND_WRAPPER(void, free, void* ptr);
-#if MAC_INTERPOSE_FUNCTIONS
+#if MAC_INTERPOSE_FUNCTIONS && !defined(MISSING_BLOCKS_SUPPORT)
 DECLARE_FUNCTION_AND_WRAPPER(void, dispatch_group_async,
                              dispatch_group_t dg,
                              dispatch_queue_t dq, void (^work)(void));

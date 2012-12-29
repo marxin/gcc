@@ -64,9 +64,9 @@ func (i *Iter) Done() bool {
 }
 
 // Next writes f(i.input[i.Pos():n]...) to buffer buf, where n is the
-// largest boundary of i.input such that the result fits in buf.  
+// largest boundary of i.input such that the result fits in buf.
 // It returns the number of bytes written to buf.
-// len(buf) should be at least MaxSegmentSize. 
+// len(buf) should be at least MaxSegmentSize.
 // Done must be false before calling Next.
 func (i *Iter) Next(buf []byte) int {
 	return i.next(i, buf)
@@ -179,7 +179,7 @@ doNorm:
 	i.rb.src.copySlice(out[outCopyStart:], inCopyStart, i.p)
 	if !i.rb.insertDecomposed(out[i.outStart:outp]) {
 		// Start over to prevent decompositions from crossing segment boundaries.
-		// This is a rare occurance.
+		// This is a rare occurrence.
 		i.p = i.inStart
 		i.info = i.rb.f.info(i.rb.src, i.p)
 	}

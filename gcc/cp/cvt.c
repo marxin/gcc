@@ -215,16 +215,14 @@ cp_convert_to_pointer (tree type, tree expr, tsubst_flags_t complain)
 	return build_ptrmemfunc (TYPE_PTRMEMFUNC_FN_TYPE (type), expr, 0,
 				 /*c_cast_p=*/false, complain);
 
-      if (TYPE_PTRDATAMEM_P (type))
-	{
-	  /* A NULL pointer-to-member is represented by -1, not by
-	     zero.  */
-	  expr = build_int_cst_type (type, -1);
-	}
-      else
-	expr = build_int_cst (type, 0);
+      /* A NULL pointer-to-data-member is represented by -1, not by
+	 zero.  */
+      tree val = (TYPE_PTRDATAMEM_P (type)
+		  ? build_int_cst_type (type, -1)
+		  : build_int_cst (type, 0));
 
-      return expr;
+      return (TREE_SIDE_EFFECTS (expr)
+	      ? build2 (COMPOUND_EXPR, type, expr, val) : val);
     }
   else if (TYPE_PTRMEM_P (type) && INTEGRAL_CODE_P (form))
     {
@@ -561,7 +559,7 @@ force_rvalue (tree expr, tsubst_flags_t complain)
   tree type = TREE_TYPE (expr);
   if (MAYBE_CLASS_TYPE_P (type) && TREE_CODE (expr) != TARGET_EXPR)
     {
-      VEC(tree,gc) *args = make_tree_vector_single (expr);
+      vec<tree, va_gc> *args = make_tree_vector_single (expr);
       expr = build_special_member_call (NULL_TREE, complete_ctor_identifier,
 					&args, type, LOOKUP_NORMAL, complain);
       release_tree_vector (args);
@@ -690,6 +688,8 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
 	 conversion.  */
       else if (TREE_CODE (type) == COMPLEX_TYPE)
 	return fold_if_not_in_template (convert_to_complex (type, e));
+      else if (TREE_CODE (type) == VECTOR_TYPE)
+	return fold_if_not_in_template (convert_to_vector (type, e));
       else if (TREE_CODE (e) == TARGET_EXPR)
 	{
 	  /* Don't build a NOP_EXPR of class type.  Instead, change the
@@ -855,7 +855,7 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
 	ctor = build_user_type_conversion (type, ctor, flags, complain);
       else
 	{
-	  VEC(tree,gc) *ctor_vec = make_tree_vector_single (ctor);
+	  vec<tree, va_gc> *ctor_vec = make_tree_vector_single (ctor);
 	  ctor = build_special_member_call (NULL_TREE,
 					    complete_ctor_identifier,
 					    &ctor_vec,

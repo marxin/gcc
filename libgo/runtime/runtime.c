@@ -79,33 +79,6 @@ runtime_goenvs_unix(void)
 	syscall_Envs.__capacity = n;
 }
 
-const byte*
-runtime_getenv(const char *s)
-{
-	int32 i, j, len;
-	const byte *v, *bs;
-	String* envv;
-	int32 envc;
-
-	bs = (const byte*)s;
-	len = runtime_findnull(bs);
-	envv = (String*)syscall_Envs.__values;
-	envc = syscall_Envs.__count;
-	for(i=0; i<envc; i++){
-		if(envv[i].len <= len)
-			continue;
-		v = (const byte*)envv[i].str;
-		for(j=0; j<len; j++)
-			if(bs[j] != v[j])
-				goto nomatch;
-		if(v[len] != '=')
-			goto nomatch;
-		return v+len+1;
-	nomatch:;
-	}
-	return nil;
-}
-
 int32
 runtime_atoi(const byte *p)
 {
@@ -159,13 +132,13 @@ runtime_cputicks(void)
 }
 
 bool
-runtime_showframe(const unsigned char *s)
+runtime_showframe(String s)
 {
 	static int32 traceback = -1;
 	
 	if(traceback < 0)
 		traceback = runtime_gotraceback();
-	return traceback > 1 || (s != nil && __builtin_strchr((const char*)s, '.') != nil && __builtin_memcmp(s, "runtime.", 7) != 0);
+	return traceback > 1 || (__builtin_memchr(s.str, '.', s.len) != nil && __builtin_memcmp(s.str, "runtime.", 7) != 0);
 }
 
 static Lock ticksLock;

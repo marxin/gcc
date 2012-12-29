@@ -1,3 +1,316 @@
+2012-12-19  Jason Merrill  <jason@redhat.com>
+
+	PR c++/55724
+	* pt.c (type_unification_real): Re-combine post-deduction loops.
+
+2012-12-14  Jason Merrill  <jason@redhat.com>
+
+	PR c++/55685
+	* pt.c (tsubst_copy_and_build): Don't use SIZEOF_EXPR_TYPE_P in
+	templates.
+
+	PR c++/42315
+	* decl.c (maybe_deduce_size_from_array_init): Don't change the
+	variable type.
+
+2012-12-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/55652
+	* typeck2.c (merge_exception_specifiers): Don't call operand_equal_p
+	if noex is NULL.
+
+2012-12-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/54883
+	* decl2.c (min_vis_r): Handle anon visibility for enums.
+
+2012-12-11  Marc Glisse  <marc.glisse@inria.fr>
+
+	PR c++/53094
+	* tree.c (cp_tree_equal): Handle VECTOR_CST.
+	* semantics.c (cxx_eval_bare_aggregate): Protect a dereference.
+	Handle VECTOR_CST.
+
+2012-12-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/55643
+	* expr.c (mark_exp_read): Handle FLOAT_EXPR similarly to NOP_EXPR.
+
+2012-12-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/54416
+	* pt.c (maybe_process_partial_specialization): Don't accept
+	definition of a specialization without the appropriate header.
+
+	* pt.c (maybe_process_partial_specialization): Handle aliases first.
+
+2012-12-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/55619
+	* semantics.c (finish_asm_stmt): Don't call decay_conversion
+	on input operands that can be only in memory.
+
+2012-12-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* Make-lang.in (cp/typeck.o): Add dependency on $(PARAMS_H).
+	(cp/name-lookup.o): Likewise.
+
+2012-12-10  Steven Bosscher  <steven@gcc.gnu.org>
+
+	* decl2.c (cp_write_global_declarations): Return after writing a PCH.
+
+2012-12-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/55127
+	* search.c (accessible_in_template_p): New.
+	* cp-tree.h: Declare it.
+	* pt.c (instantiation_dependent_scope_ref_p): New.
+	(value_dependent_expression_p): Use it.
+	(instantiation_dependent_r): Likewise.
+	* semantics.c (finish_decltype_type): Handle SCOPE_REF.
+
+	PR c++/55419
+	* tree.c (build_target_expr): Don't set TREE_CONSTANT.
+
+2012-12-07  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR c++/55513
+	* semantics.c (cxx_eval_builtin_function_call): Set non_constant_p
+	after folding.
+
+2012-12-07  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* tree.c (build_aggr_init_expr): Remove tsubst_flags_t parameter.
+	(build_cplus_new): Adjust.
+	* cp-tree.h: Adjust declaration.
+	* init.c (build_value_init): Adjust.
+
+2012-12-07  Dodji Seketeli  <dodji@redhat.com>
+
+	PR c++/54401
+	* parser.c (cp_parser_alias_declaration): Commit to tentative
+	parse when see the '=' token.  Get out if the type-id is invalid.
+	Update function comment.
+	(cp_parser_member_declaration): Don't try to parse a using
+	declaration if we know that we expected an alias declaration; that
+	is, if we see the '=' token after the identifier.
+
+2012-12-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/54325
+	* tree.c (build_aggr_init_expr): Don't check for abstract class.
+	(build_cplus_new): Check here instead.
+
+	PR c++/55058
+	* pt.c (tsubst): Keep the quals when looking through a typedef.
+
+	PR c++/55249
+	* tree.c (build_vec_init_elt): Use the type of the initializer.
+
+	PR c++/54744
+	* pt.c (resolve_typename_type): Check TYPENAME_IS_RESOLVING_P on scope.
+	* init.c (expand_member_init): Check for being in a template first.
+	* parser.c (cp_parser_mem_initializer_list): Only check class types
+	for equivalence to the current class.
+
+	PR c++/54913
+	* semantics.c (finish_qualified_id_expr): convert_from_reference
+	after building a SCOPE_REF.
+
+2012-12-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/54207
+	* except.c (build_noexcept_spec): Avoid direct comparison
+	with boolean_true_node or boolean_false_node, instead use
+	operand_equal_p and/or INTEGER_CST check.
+	* pt.c (tsubst_exception_specification): Likewise.
+	* typeck2.c (merge_exception_specifiers): Likewise.
+
+2012-12-06  Marc Glisse  <marc.glisse@inria.fr>
+
+	PR c++/55573
+	* semantics.c (adjust_temp_type): Handle VECTOR_CST.
+
+2012-12-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/54947
+	* parser.c (cp_parser_initializer_list): Don't require an
+	expression in [] to be constant until we know it's a C99
+	designator.
+
+	PR c++/55015
+	PR c++/53821
+	* semantics.c (maybe_add_lambda_conv_op): Revert earlier change.
+	* decl.c (start_preparsed_function): Make local class methods comdat
+	in templates, too.
+
+	PR c++/54653
+	* parser.c (cp_parser_class_head): A partial specialization scope
+	counts as a template.
+	* pt.c (tsubst_template_parms): Handle template template parm parms.
+	(tsubst_decl) [TEMPLATE_DECL]: Handle getting a template template
+	argument back.
+
+	PR c++/55564
+	* pt.c (unify) [ARRAY_TYPE]: Unify the element type before the bounds.
+
+2012-12-03  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/54170
+	* cvt.c (cp_convert_to_pointer): Don't discard side-effects from
+	expressions of nullptr_t.
+	* typeck.c (build_ptrmemfunc): Likewise.
+
+2012-12-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/55542
+	* pt.c (make_ith_pack_parameter_name): Return NULL if
+	name is NULL.
+	(tsubst_decl): Call make_ith_pack_parameter_name even if
+	DECL_NAME is NULL.
+
+2012-11-29  Jason Merrill  <jason@redhat.com>
+
+	PR c++/53137
+	* pt.c (tsubst_expr) [DECL_EXPR]: Set LAMBDA_EXPR_THIS_CAPTURE here.
+	(tsubst_copy_and_build) [LAMBDA_EXPR]: And clear it here.
+	(instantiate_class_template_1): Not here.
+
+2012-11-29  Marc Glisse  <marc.glisse@inria.fr>
+
+	PR c++/53094
+	* cvt.c (ocp_convert): Call convert_to_vector.
+
+2012-11-29  Kai Tietz  <ktietz@redhat.com>
+
+	PR target/53912
+	* class.c (dump_class_hierarchy_r): Cast from pointer via uintptr_t.
+	(dump_vtable): Likewise.
+
+2012-11-29  Ed Smith-Rowland  <3dw4rd@verizon.net>
+
+	PR c++/52654
+	* parser.c (cp_parser_string_literal): Add overflow_type arg.
+	(cp_parser_userdef_numeric_literal): Warn on numeric overflow.
+
+2012-11-28  Andrew Pinski  <apinski@cavium.com>
+
+	PR bootstrap/54279
+	* Make-lang.in (g++$(exeext)): Rename to
+	(xg++$(exeext)): This.
+	(g++-cross$(exeext)): Use xg++$(exeext) instead of g++$(exeext).
+	(c++.start.encap): Likewise.
+	(c++.install-common): Likewise.
+
+2012-11-24  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/55446
+	* init.c (build_vec_init): Do not early return error_mark_mode
+	when integer_all_onesp (maxindex).
+
+2012-11-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/54046
+	* cp-objcp-common.h (LANG_HOOKS_BLOCK_MAY_FALLTHRU): Redefine.
+	* cp-objcp-common.c (cxx_block_may_fallthru): New function.
+	* cp-tree.h (cxx_block_may_fallthru): New prototype.
+
+2012-11-23  Markus Trippelsdorf  <markus@trippelsdorf.de>
+
+	PR c++/55418
+	* method.c (implicitly_declare_fn): Properly initialize trivial_p.
+
+2012-11-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/55137
+	* semantics.c (verify_constant): Track overflow separately.
+	(reduced_constant_expression_p): Don't check it here.
+	(cxx_eval_constant_expression): Check it on CSTs.
+	(cxx_eval_outermost_constant_expr): Treat overflows as non-constant
+	at this point, but still return the folded version.
+	(potential_constant_expression_1): Don't check overflow.
+
+	* call.c (extend_ref_init_temps_1): Recompute TREE_CONSTANT for
+	the ADDR_EXPR.
+
+2012-11-20  Diego Novillo  <dnovillo@google.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	* name-lookup.c: Replace all vec<T, A>() initializers
+	with vNULL.
+	* semantics.c: Likewise.
+
+2012-11-19  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/55368
+	* parser.c (cp_parser_member_declaration): Emit an error in case
+	of stray comma at end of member declaration.
+
+2012-11-19  Jason Merrill  <jason@redhat.com>
+
+	* class.c (one_inheriting_sig): Don't inherit base copy ctors.
+
+	PR c++/55262
+	* method.c (implicitly_declare_fn): Set DECL_PARM_INDEX on
+	the parms of an inheriting ctor.
+
+	PR c++/55261
+	* class.c (add_implicitly_declared_members): Use
+	lookup_fnfields_slot to get the base constructors.
+
+2012-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/54630
+	* class.c (fixed_type_or_null_ref_ht): New variable.
+	(fixed_type_or_null): Use it instead of local static ht.
+
+2012-11-17  Diego Novillo  <dnovillo@google.com>
+
+	Adjust for new vec API (http://gcc.gnu.org/wiki/cxx-conversion/cxx-vec)
+
+	* Make-lang.in: Remove dependencies on vecir.h and vecprim.h everywhere.
+	* call.c: Use new vec API in vec.h.
+	* class.c: Likewise.
+	* cp-gimplify.c: Likewise.
+	* cp-tree.h: Likewise.
+	* cvt.c: Likewise.
+	* decl.c: Likewise.
+	* decl2.c: Likewise.
+	* error.c: Likewise.
+	* except.c: Likewise.
+	* init.c: Likewise.
+	* mangle.c: Likewise.
+	* method.c: Likewise.
+	* name-lookup.c: Likewise.
+	* name-lookup.h: Likewise.
+	* parser.c: Likewise.
+	* parser.h: Likewise.
+	* pt.c: Likewise.
+	* repo.c: Likewise.
+	* rtti.c: Likewise.
+	* search.c: Likewise.
+	* semantics.c: Likewise.
+	* tree.c: Likewise.
+	* typeck.c: Likewise.
+	* typeck2.c: Likewise.
+
+2012-11-17  Gabriel Dos Reis  <gdr@integrable-solutions.net>
+
+	* semantics.c (finish_id_expression): Tidy diagnostic message.
+
+2012-11-16  Dodji Seketeli  <dodji@redhat.com>
+
+	PR c++/54875
+	* pt.c (lookup_template_class_1): Look at the type of the
+	potential member enum of class template to determine if we are
+	actually substituting into a member enum of class template.
+
+2012-11-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/55337
+	* tree.c (cp_tree_equal) <case ALIGNOF_EXPR>: Use SIZEOF_EXPR_TYPE_P
+	only on SIZEOF_EXPR.
+
 2012-11-14  Jason Merrill  <jason@redhat.com>
 
 	PR c++/54903

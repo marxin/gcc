@@ -329,8 +329,6 @@ build_target_expr (tree decl, tree value, tsubst_flags_t complain)
      side-effects, then the optimizer should be able to get rid of
      whatever code is generated anyhow.  */
   TREE_SIDE_EFFECTS (t) = 1;
-  if (literal_type_p (type))
-    TREE_CONSTANT (t) = TREE_CONSTANT (value);
 
   return t;
 }
@@ -407,17 +405,12 @@ build_aggr_init_array (tree return_type, tree fn, tree slot, int nargs,
    callable.  */
 
 tree
-build_aggr_init_expr (tree type, tree init, tsubst_flags_t complain)
+build_aggr_init_expr (tree type, tree init)
 {
   tree fn;
   tree slot;
   tree rval;
   int is_ctor;
-
-  /* Make sure that we're not trying to create an instance of an
-     abstract class.  */
-  if (abstract_virtuals_error_sfinae (NULL_TREE, type, complain))
-    return error_mark_node;
 
   if (TREE_CODE (init) == CALL_EXPR)
     fn = CALL_EXPR_FN (init);
@@ -474,8 +467,13 @@ build_aggr_init_expr (tree type, tree init, tsubst_flags_t complain)
 tree
 build_cplus_new (tree type, tree init, tsubst_flags_t complain)
 {
-  tree rval = build_aggr_init_expr (type, init, complain);
+  tree rval = build_aggr_init_expr (type, init);
   tree slot;
+
+  /* Make sure that we're not trying to create an instance of an
+     abstract class.  */
+  if (abstract_virtuals_error_sfinae (NULL_TREE, type, complain))
+    return error_mark_node;
 
   if (TREE_CODE (rval) == AGGR_INIT_EXPR)
     slot = AGGR_INIT_EXPR_SLOT (rval);
@@ -508,7 +506,7 @@ static tree
 build_vec_init_elt (tree type, tree init, tsubst_flags_t complain)
 {
   tree inner_type = strip_array_types (type);
-  VEC(tree,gc) *argvec;
+  vec<tree, va_gc> *argvec;
 
   if (integer_zerop (array_type_nelts_total (type))
       || !CLASS_TYPE_P (inner_type))
@@ -524,10 +522,11 @@ build_vec_init_elt (tree type, tree init, tsubst_flags_t complain)
   argvec = make_tree_vector ();
   if (init)
     {
-      tree dummy = build_dummy_object (inner_type);
+      tree init_type = strip_array_types (TREE_TYPE (init));
+      tree dummy = build_dummy_object (init_type);
       if (!real_lvalue_p (init))
 	dummy = move (dummy);
-      VEC_quick_push (tree, argvec, dummy);
+      argvec->quick_push (dummy);
     }
   init = build_special_member_call (NULL_TREE, complete_ctor_identifier,
 				    &argvec, inner_type, LOOKUP_NORMAL,
@@ -1286,13 +1285,13 @@ strip_typedefs_expr (tree t)
 
     case TREE_LIST:
       {
-	VEC(tree,gc) *vec = make_tree_vector ();
+	vec<tree, va_gc> *vec = make_tree_vector ();
 	bool changed = false;
 	tree it;
 	for (it = t; it; it = TREE_CHAIN (it))
 	  {
 	    tree val = strip_typedefs_expr (TREE_VALUE (t));
-	    VEC_safe_push (tree, gc, vec, val);
+	    vec_safe_push (vec, val);
 	    if (val != TREE_VALUE (t))
 	      changed = true;
 	    gcc_assert (TREE_PURPOSE (it) == NULL_TREE);
@@ -1300,7 +1299,7 @@ strip_typedefs_expr (tree t)
 	if (changed)
 	  {
 	    r = NULL_TREE;
-	    FOR_EACH_VEC_ELT_REVERSE (tree, vec, i, it)
+	    FOR_EACH_VEC_ELT_REVERSE (*vec, i, it)
 	      r = tree_cons (NULL_TREE, it, r);
 	  }
 	else
@@ -1312,13 +1311,13 @@ strip_typedefs_expr (tree t)
     case TREE_VEC:
       {
 	bool changed = false;
-	VEC(tree,gc)* vec = make_tree_vector ();
+	vec<tree, va_gc> *vec = make_tree_vector ();
 	n = TREE_VEC_LENGTH (t);
-	VEC_reserve (tree, gc, vec, n);
+	vec_safe_reserve (vec, n);
 	for (i = 0; i < n; ++i)
 	  {
 	    tree op = strip_typedefs_expr (TREE_VEC_ELT (t, i));
-	    VEC_quick_push (tree, vec, op);
+	    vec->quick_push (op);
 	    if (op != TREE_VEC_ELT (t, i))
 	      changed = true;
 	  }
@@ -1326,7 +1325,7 @@ strip_typedefs_expr (tree t)
 	  {
 	    r = copy_node (t);
 	    for (i = 0; i < n; ++i)
-	      TREE_VEC_ELT (r, i) = VEC_index (tree, vec, i);
+	      TREE_VEC_ELT (r, i) = (*vec)[i];
 	  }
 	else
 	  r = t;
@@ -1337,13 +1336,13 @@ strip_typedefs_expr (tree t)
     case CONSTRUCTOR:
       {
 	bool changed = false;
-	VEC(constructor_elt,gc) *vec
-	  = VEC_copy (constructor_elt, gc, CONSTRUCTOR_ELTS (t));
+	vec<constructor_elt, va_gc> *vec
+	  = vec_safe_copy (CONSTRUCTOR_ELTS (t));
 	n = CONSTRUCTOR_NELTS (t);
 	type = strip_typedefs (TREE_TYPE (t));
 	for (i = 0; i < n; ++i)
 	  {
-	    constructor_elt *e = &VEC_index (constructor_elt, vec, i);
+	    constructor_elt *e = &(*vec)[i];
 	    tree op = strip_typedefs_expr (e->value);
 	    if (op != e->value)
 	      {
@@ -1355,7 +1354,7 @@ strip_typedefs_expr (tree t)
 
 	if (!changed && type == TREE_TYPE (t))
 	  {
-	    VEC_free (constructor_elt, gc, vec);
+	    vec_free (vec);
 	    return t;
 	  }
 	else
@@ -1484,7 +1483,7 @@ copy_binfo (tree binfo, tree type, tree t, tree *igo_prev, int virt)
     {
       /* Push it onto the list after any virtual bases it contains
 	 will have been pushed.  */
-      VEC_quick_push (tree, CLASSTYPE_VBASECLASSES (t), new_binfo);
+      CLASSTYPE_VBASECLASSES (t)->quick_push (new_binfo);
       BINFO_VIRTUAL_P (new_binfo) = 1;
       BINFO_INHERITANCE_CHAIN (new_binfo) = TYPE_BINFO (t);
     }
@@ -2184,9 +2183,9 @@ bot_replace (tree* t, int* /*walk_subtrees*/, void* data)
       /* In an NSDMI build_base_path defers building conversions to virtual
 	 bases, and we handle it here.  */
       tree basetype = TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (*t)));
-      VEC(tree,gc) *vbases = CLASSTYPE_VBASECLASSES (current_class_type);
+      vec<tree, va_gc> *vbases = CLASSTYPE_VBASECLASSES (current_class_type);
       int i; tree binfo;
-      FOR_EACH_VEC_ELT (tree, vbases, i, binfo)
+      FOR_EACH_VEC_SAFE_ELT (vbases, i, binfo)
 	if (BINFO_TYPE (binfo) == basetype)
 	  break;
       *t = build_base_path (PLUS_EXPR, TREE_OPERAND (*t, 0), binfo, true,
@@ -2327,7 +2326,7 @@ build_min_non_dep (enum tree_code code, tree non_dep, ...)
    that has been built.  */
 
 tree
-build_min_non_dep_call_vec (tree non_dep, tree fn, VEC(tree,gc) *argvec)
+build_min_non_dep_call_vec (tree non_dep, tree fn, vec<tree, va_gc> *argvec)
 {
   tree t = build_nt_call_vec (fn, argvec);
   if (REFERENCE_REF_P (non_dep))
@@ -2468,6 +2467,9 @@ cp_tree_equal (tree t1, tree t2)
     case COMPLEX_CST:
       return cp_tree_equal (TREE_REALPART (t1), TREE_REALPART (t2))
 	&& cp_tree_equal (TREE_IMAGPART (t1), TREE_IMAGPART (t2));
+
+    case VECTOR_CST:
+      return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 
     case CONSTRUCTOR:
       /* We need to do this when determining whether or not two
@@ -2610,10 +2612,13 @@ cp_tree_equal (tree t1, tree t2)
 	tree o1 = TREE_OPERAND (t1, 0);
 	tree o2 = TREE_OPERAND (t2, 0);
 
-	if (SIZEOF_EXPR_TYPE_P (t1))
-	  o1 = TREE_TYPE (o1);
-	if (SIZEOF_EXPR_TYPE_P (t2))
-	  o2 = TREE_TYPE (o2);
+	if (code1 == SIZEOF_EXPR)
+	  {
+	    if (SIZEOF_EXPR_TYPE_P (t1))
+	      o1 = TREE_TYPE (o1);
+	    if (SIZEOF_EXPR_TYPE_P (t2))
+	      o2 = TREE_TYPE (o2);
+	  }
 	if (TREE_CODE (o1) != TREE_CODE (o2))
 	  return false;
 	if (TYPE_P (o1))
@@ -3739,8 +3744,8 @@ stabilize_init (tree init, tree *initp)
       unsigned i;
       constructor_elt *ce;
       bool good = true;
-      VEC(constructor_elt,gc) *v = CONSTRUCTOR_ELTS (t);
-      for (i = 0; VEC_iterate (constructor_elt, v, i, ce); ++i)
+      vec<constructor_elt, va_gc> *v = CONSTRUCTOR_ELTS (t);
+      for (i = 0; vec_safe_iterate (v, i, &ce); ++i)
 	{
 	  tree type = TREE_TYPE (ce->value);
 	  tree subinit;
@@ -3824,7 +3829,7 @@ cp_fix_function_decl_p (tree decl)
       /* Don't fix same_body aliases.  Although they don't have their own
 	 CFG, they share it with what they alias to.  */
       if (!node || !node->alias
-	  || !VEC_length (ipa_ref_t, node->symbol.ref_list.references))
+	  || !vec_safe_length (node->symbol.ref_list.references))
 	return true;
     }
 

@@ -1,3 +1,432 @@
+2012-12-28  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/55763
+	* check.c (gfc_check_move_alloc): Handle unlimited polymorphic.
+	* trans-intrinsic.c (conv_intrinsic_move_alloc): Ditto.
+
+2012-12-27  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/48976
+	* gfortran.h (gfc_inquire struct): Add pointer for inquire stream.
+	* io.c (io_tag): Add tag for inquire stream. (match_inquire_element):
+	Add matcher for new tag. (gfc_resolve_inquire): Resolve new tag.
+	* ioparm.def: Add new parameter for inquire stream.
+	* trans-io.c (gfc_trans_inquire): Add tranlste code for inquire
+	stream.
+
+2012-12-23  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/54884
+	* module.c (write_symbol1_recursion): Set attr.public_use.
+	* interface.c (check_sym_interfaces, check_uop_interfaces,
+	gfc_check_interfaces): Remove attr.public_use code.
+	* resolve.c (resolve_function, resolve_variable,
+	resolve_typebound_procedure): Ditto.
+
+2012-12-22  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/55763
+	* module.c (mio_component): Don't skip _hash's initializer.
+	* resolve.c (resolve_select_type): Add an assert.
+	* trans-expr.c (gfc_conv_procedure_call): Handle
+	INTENT(OUT) for UNLIMIT_POLY.
+
+2012-12-21  Richard Biener  <rguenther@suse.de>
+
+	PR bootstrap/54659
+	* gfortran.h: Do not include gmp.h here.
+
+2012-12-21  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/55763
+	* match.c (select_type_set_tmp): Return is a derived type or
+	class typespec has no derived type.
+	* resolve.c (resolve_fl_var_and_proc): Exclude select type
+	temporaries from 'pointer'.
+	(resolve_symbol): Exclude select type temporaries from tests
+	for assumed size and assumed rank.
+
+2012-12-20  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/36044
+	* gfortran.h (gfc_isym_id): Add GFC_ISYM_BACKTRACE.
+	* intrinsic.c (add_subroutines): Add "backtrace".
+	* intrinsic.texi (BACKTRACE): Document BACKTRACE intrinsic.
+
+2012-12-20  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/54818
+	* trans-intrinsic.c (gfc_conv_intrinsic_transfer): Ensure that
+	the string length is of type gfc_charlen_type_node.
+
+2012-12-19  Paul Thomas  <pault@gcc.gnu.org>
+
+	* array.c (resolve_array_list): Apply C4106.
+	* check.c (gfc_check_same_type_as): Exclude polymorphic
+	entities from check for extensible types. Improved error
+	for disallowed argument types to name the offending type.
+	* class.c : Update copyright date.
+	(gfc_class_null_initializer): Add argument for initialization
+	expression and deal with unlimited polymorphic typespecs.
+	(get_unique_type_string): Give unlimited polymorphic
+	entities a type string.
+	(gfc_intrinsic_hash_value): New function.
+	(gfc_build_class_symbol): Incorporate unlimited polymorphic
+	entities.
+	(gfc_find_derived_vtab): Deal with unlimited polymorphic
+	entities.
+	(gfc_find_intrinsic_vtab): New function.
+	* decl.c (gfc_match_decl_type_spec): Match typespec for
+	unlimited polymorphic type.
+	(gfc_match_data_decl): Skip to 'ok' if unlimited polymorphic.
+	expr.c (gfc_check_pointer_assign): Apply C717.  If unlimited
+	polymorphic lvalue, find rvalue vtable for all typespecs,
+	except unlimited polymorphic expressions.
+	(gfc_check_vardef_context): Handle unlimited polymorphic
+	entities.
+	* gfortran.h : Add unlimited polymorphic attribute. Add
+	second arg to gfc_class_null_initializer primitive and
+	primitive for gfc_find_intrinsic_vtab.  Add UNLIMITED_POLY
+	to detect unlimited polymorphic expressions.
+	* interface.c (gfc_compare_types): If expr1 is unlimited
+	polymorphic, always return 1. If expr2 is unlimited polymorphic
+	enforce C717.
+	(gfc_compare_interfaces): Skip past conditions that do not
+	apply for unlimited polymorphic entities.
+	(compare_parameter): Make sure that an unlimited polymorphic,
+	allocatable or pointer, formal argument is matched by an
+	unlimited polymorphic actual argument.
+	(compare_actual_formal): Ensure that an intrinsic vtable exists
+	to match an unlimited polymorphic formal argument.
+	* match.c (gfc_match_allocate): Type kind parameter does not
+	need to match an unlimited polymorphic allocate-object.
+	(alloc_opt_list): An unlimited polymorphic allocate-object
+	requires a typespec or a SOURCE tag.
+	(select_intrinsic_set_tmp): New function.
+	(select_type_set_tmp): Call new function.  If it returns NULL,
+	build a derived type or class temporary instead.
+	(gfc_match_type_is): Remove restriction to derived types only.
+	Bind(C) or sequence derived types not permitted.
+	* misc (gfc_typename):  Printed CLASS(*) for unlimited
+	polymorphism.
+	* module.c : Add AB_UNLIMITED_POLY to pass unlimited
+	polymorphic attribute to and from modules.
+	* resolve.c (resolve_common_vars): Unlimited polymorphic
+	entities cannot appear in common blocks.
+	(resolve_deallocate_expr): Deallocate unlimited polymorphic
+	enities.
+	(resolve_allocate_expr): Likewise for allocation.  Make sure
+	vtable exists.
+	(gfc_type_is_extensible): Unlimited polymorphic entities are
+	not extensible.
+	(resolve_select_type): Handle unlimited polymorphic selectors.
+	Ensure that length type parameters are assumed and that names
+	for intrinsic types are generated.
+	(resolve_fl_var_and_proc): Exclude select type temporaries
+	from test of extensibility of type.
+	(resolve_fl_variable): Likewise for test that assumed character
+	length must be a dummy or a parameter.
+	(resolve_fl_derived0): Return SUCCESS unconditionally for
+	unlimited polymorphic entities. Also, allow unlimited
+	polymorphic components.
+	(resolve_fl_derived): Return SUCCESS unconditionally for
+	unlimited polymorphic entities.
+	(resolve_symbol): Return early with unlimited polymorphic
+	entities.
+	* simplifiy.c : Update copyright year.
+	(gfc_simplify_extends_type_of): No simplification possible
+	for unlimited polymorphic arguments.
+	* symbol.c (gfc_use_derived): Nothing to do for unlimited
+	polymorphic "derived type".
+	(gfc_type_compatible): Return unity if ts1 is unlimited
+	polymorphic.
+	* trans-decl.c (create_function_arglist) Formal arguments
+	without a character length should be treated in the same way
+	as passed lengths.
+	(gfc_trans_deferred_vars): Nullify the vptr of unlimited
+	polymorphic pointers. Avoid unlimited polymorphic entities
+	triggering gcc_unreachable.
+	* trans-expr.c (gfc_conv_intrinsic_to_class): New function.
+	(gfc_trans_class_init_assign): Make indirect reference of
+	src.expr.
+	(gfc_trans_class_assign): Expression NULL of unknown type
+	should set NULL vptr on lhs. Treat C717 cases where lhs is
+	a derived type and the rhs is unlimited polymorphic.
+	(gfc_conv_procedure_call): Handle the conversion of a non-class
+	actual argument to match an unlimited polymorphic formal
+	argument.  Suppress the passing of a character string length
+	in this case.  Make sure that calls to the character __copy
+	function have two character string length arguments.
+	(gfc_conv_initializer): Pass the initialization expression to
+	gfc_class_null_initializer.
+	(gfc_trans_subcomponent_assign): Ditto.
+	(gfc_conv_structure): Move handling of _size component.
+	trans-intrinsic.c: (gfc_conv_same_type_as): Handle conditions
+	where unlimited polymorphic arguments have null vptr.
+	* trans-stmt.c (trans_associate_var): Correctly treat array
+	temporaries associated with unlimited polymorphic selectors.
+	Recover the overwritten dtype for the descriptor. Use the _size
+	field of the vptr for character string lengths.
+	(gfc_trans_allocate): Cope with unlimited polymorphic allocate
+	objects; especially with character source tags.
+	(reset_vptr): New function.
+	(gfc_trans_deallocate): Call it.
+	* trans-types.c (gfc_get_derived_type): Detect unlimited
+	polymorphic types and deal with cases where the derived type of
+	components is null.
+	* trans.c : Update copyright year.
+	(trans_code): Call gfc_trans_class_assign for C717 cases where
+	the lhs is not unlimited polymorphic.
+
+2012-12-19  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/55733
+	* trans-decl.c (gfc_create_string_length): Avoid setting
+	TREE_STATIC for automatic variables with -fno-automatic.
+
+2012-12-19  Tobias Burnus  <burnus@net-b.de>
+	    Jakub Jelinek  <jakub@redhat.com>
+	    Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/55636
+	PR fortran/55733
+	* gfortran.h (GFC_PREFIX): Define.
+	* trans-decl.c (gfc_create_string_length): For VAR_DECLs that
+	will be TREE_STATIC, use GFC_PREFIX to mangle the names. Handle
+	-fno-automatic
+	(gfc_trans_deferred_vars): Don't free variables SAVEd via
+	-fno-automatic.
+
+2012-12-16  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/55197
+	* module.c (gfc_use_module): Free rename list only for
+	internally generated intrinsic modules.
+
+2012-12-16  Tobias Burnus  <burnus@net-b.de>
+
+	* trans-intrinsic.c (conv_intrinsic_move_alloc): Set dynamic
+	type of the FROM variable to the declared type.
+
+2012-12-16  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/55638
+	* resolve.c (resolve_formal_arglist): Allow VALUE without
+	INTENT for ELEMENTAL procedures.
+
+2012-12-10  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/52909
+	* trans-decl.c (get_proc_pointer_decl): Apply name mangling.
+
+2012-12-09  Tobias Burnus  <burnus@net-b.de>
+
+	* trans-array.c (structure_alloc_comps): Use NULL_TREE in the
+	call to gfc_deallocate_scalar_with_status.
+	* trans-decl.c (gfc_trans_deferred_vars): Pass symbol.
+	* trans-stmt.c (gfc_trans_deallocate): Pass polymorphic variable.
+
+2012-12-09  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/55593
+	* frontend-passes.c (doloop_code):  Use resolved_sym
+	instead of n.sym->formal for formal argument list
+	to get the correct version for all generic subroutines.
+
+2012-12-05  Tobias Burnus  <burnus@net-b.de>
+
+	* resolve.c (generate_component_assignments): Fix memleak.
+
+2012-12-03  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/55548
+	* intrinsic.texi (SYSTEM_CLOCK): Update documentation of SYSTEM_CLOCK.
+
+2012-12-03  Tobias Burnus  <burnus@net-b.de>
+	    Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/37336
+	* class.c (gfc_is_finalizable): New function.
+	* gfortran.h (gfc_is_finalizable): Its prototype.
+	* module.c (mio_component): Read initializer for vtype's _final.
+	* resolve.c (resolve_fl_derived0): Call gfc_is_finalizable.
+	* trans-expr.c (gfc_vtable_final_get): New function.
+	(conv_parent_component_references): Fix comment.
+	(gfc_conv_variable): Fix for scalar coarray components.
+	* trans-intrinsic.c (conv_intrinsic_move_alloc): For BT_CLASS,
+	pass the BT_CLASS type and not the declared type to
+	gfc_deallocate_scalar_with_status.
+	* trans.h (gfc_vtable_final_get): New prototype.
+
+2012-12-03  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/55475
+	* scanner.c (gfc_next_char_literal): Fix setting locus
+	to free_line_length for the error message.
+	* error.c (show_locus): Fix potential out-of-bounds
+	read.
+
+2012-12-03  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/37336
+	* class.c (finalizer_insert_packed_call): New static function.
+	(finalize_component, generate_finalization_wrapper):
+	Fix coarray handling and packing.
+
+2012-12-02  Paul Thomas  <pault@gcc.gnu.org>
+
+	* resolve.c (resolve_allocate_deallocate,
+	resolve_typebound_intrinsic_op): Recover revisions 193568 and
+	193778, which were accidentally reverted by the previous patch.
+
+2012-12-01   Alessandro Fanfarillo <alessandro.fanfarillo@gmail.com>
+	     Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/46897
+	* gfortran.h : Add bit field 'defined_assign_comp' to
+	symbol_attribute structure.
+	Add primitive for gfc_add_full_array_ref.
+	* expr.c (gfc_add_full_array_ref): New function.
+	(gfc_lval_expr_from_sym): Call new function.
+	* resolve.c (add_comp_ref): New function.
+	(build_assignment): New function.
+	(get_temp_from_expr): New function
+	(add_code_to_chain): New function
+	(generate_component_assignments): New function that calls all
+	the above new functions.
+	(resolve_code): Call generate_component_assignments.
+	(check_defined_assignments): New function.
+	(resolve_fl_derived0): Call check_defined_assignments.
+	(gfc_resolve): Reset component_assignment_level in case it is
+	left in a bad state by errors.
+
+
+	* resolve.c (is_sym_host_assoc, resolve_procedure_interface,
+	resolve_contained_fntype, resolve_procedure_expression,
+	resolve_elemental_actual, resolve_global_procedure,
+	is_scalar_expr_ptr, gfc_iso_c_func_interface, resolve_function,
+	set_name_and_label, gfc_iso_c_sub_interface,
+	resolve_specific_s0, resolve_operator, compare_bound_mpz_t,
+	gfc_resolve_character_operator, resolve_typebound_function,
+	gfc_resolve_expr, forall_index, remove_last_array_ref,
+	conformable_arrays, resolve_allocate_expr,
+	resolve_allocate_deallocate, resolve_select_type,
+	resolve_transfer, resolve_where,
+	gfc_resolve_where_code_in_forall, gfc_resolve_forall_body,
+	gfc_count_forall_iterators, resolve_values,
+	resolve_bind_c_comms, resolve_bind_c_derived_types,
+	gfc_verify_binding_labels, apply_default_init,
+	build_default_init_expr, apply_default_init_local,
+	resolve_fl_var_and_proc, resolve_fl_procedure,
+	gfc_resolve_finalizers, check_generic_tbp_ambiguity,
+	resolve_typebound_intrinsic_op, resolve_typebound_procedure,
+	resolve_typebound_procedures, ensure_not_abstract,
+	resolve_fl_derived0, resolve_fl_parameter, resolve_symbol,
+	resolve_equivalence_derived): Remove trailing white space.
+	* gfortran.h : Remove trailing white space.
+
+2012-11-28  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/52161
+	* trans-stmt.c (gfc_trans_sync): Fix bound checking
+	for -fcoarray=lib.
+
+2012-11-28  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/52161
+	* trans-stmt.c (gfc_trans_sync): Fix bound checking.
+
+2012-11-27  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/55476
+	* expr.c (gfc_check_pointer_assign): Fix check
+	pointer-might-outlive-target check for host_assoc.
+
+2012-11-26  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* trans-decl.c (gfc_finish_var_decl): Do not set DECL_RESTRICTED_P.
+
+2012-11-26  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/54997
+	* decl.c (match_procedure_decl): Don't set 'referenced' attribute
+	for PROCEDURE declarations.
+	* parse.c (gfc_fixup_sibling_symbols,parse_contained): Don't set
+	'referenced' attribute for all contained procedures.
+	* trans-decl.c (gfc_get_symbol_decl): Allow for unreferenced procedures.
+	(build_function_decl): Set TREE_USED for referenced procedures.
+
+2012-11-26  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/54881
+	* match.c (select_derived_set_tmp,select_class_set_tmp): Removed and
+	unified into ...
+	(select_type_set_tmp): ... this one. Set POINTER argument according to
+	selector.
+	* trans-intrinsic.c (gfc_conv_associated): Use 'gfc_class_data_get'
+	instead of 'gfc_add_data_component'.
+
+2012-11-25  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/30146
+	* frontend-passes.c (doloop_warn):  New function.
+	(doloop_list):  New static variable.
+	(doloop_size):  New static variable.
+	(doloop_level):  New static variable.
+	(gfc_run_passes): Call doloop_warn.
+	(doloop_code):  New function.
+	(doloop_function):  New function.
+	(gfc_code_walker):  Keep track of DO level.
+
+2012-11-24  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/55314
+	* resolve.c (resolve_allocate_deallocate):  Compare all
+	subscripts when deciding if to reject a (de)allocate
+	statement.
+
+2012-11-21  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/55352
+	* trans-decl.c (generate_local_decl): Don't warn for explicitly imported
+	but unused module variables which are in a namelist or common block.
+
+2012-11-20  Diego Novillo  <dnovillo@google.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	* trans-openmp.c: Replace all vec<T, A>() initializers
+	with vNULL.
+
+2012-11-17  Diego Novillo  <dnovillo@google.com>
+
+	Adjust for new vec API (http://gcc.gnu.org/wiki/cxx-conversion/cxx-vec)
+
+	* frontend-passes.c: Use new vec API in vec.h.
+	* trans-array.c: Likewise.
+	* trans-common.c: Likewise.
+	* trans-decl.c: Likewise.
+	* trans-expr.c: Likewise.
+	* trans-intrinsic.c: Likewise.
+	* trans-openmp.c: Likewise.
+	* trans-stmt.c: Likewise.
+	* trans-types.c: Likewise.
+	* trans.h: Likewise.
+
+2012-11-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/55341
+	* trans-intrinsic.c (gfc_conv_intrinsic_transfer): Convert last
+	argument to memcpy to size_type_node type.
+	* trans-stmt.c (gfc_conv_elemental_dependencies): Likewise.
+	* trasn-array.c (duplicate_allocatable): Likewise.
+
+2012-11-16  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/55297
+	* resolve.c (resolve_typebound_intrinsic_op): Only add typebound
+	operators to the operator list in the namespace of the derived type.
+
+
 2012-11-12  Jan Hubicka  <jh@suse.cz>
 
 	* f95-lang.c (ATTR_NOTHROW_LEAF_MALLOC_LIST): New macro.
@@ -166,7 +595,7 @@
 	(get_sym_storage_size): Remove always-true checks.
 	* io.c (format_lex): Add comment.
 	(gfc_free_wait): Free memory.
-	* match.c (gfc_match_select_type): Ditto. 
+	* match.c (gfc_match_select_type): Ditto.
 	* matchexpr.c (match_level_3): Ditto.
 	* primary.c (match_string_constant): Ditto.
 	(match_actual_arg): Check return value.
@@ -941,7 +1370,7 @@
 	* data.c (gfc_assign_data_value): Ditto.
 	* decl.c (var_element, char_len_param_value, match_char_length,
 	gfc_verify_c_interop_param, match_pointer_init, variable_decl,
-	gfc_match_decl_type_spec, gfc_match_import, match_attr_spec, 
+	gfc_match_decl_type_spec, gfc_match_import, match_attr_spec,
 	gfc_match_prefix, gfc_match_suffix, match_ppc_decl,
 	match_procedure_in_interface, gfc_match_procedure,gfc_match_entry,
 	gfc_match_subroutine, gfc_match_end, gfc_match_codimension,
@@ -1282,15 +1711,15 @@
 	PR fortran/52158
 	PR fortran/45170
 	PR fortran/49430
-	* resolve.c (resolve_fl_derived0): Deferred character length 
+	* resolve.c (resolve_fl_derived0): Deferred character length
 	procedure components are supported.
-	* trans-expr.c (gfc_conv_procedure_call): Handle TBP with 
+	* trans-expr.c (gfc_conv_procedure_call): Handle TBP with
 	deferred-length results.
 	(gfc_string_to_single_character): Add a new check to prevent
 	NULL read.
-	(gfc_conv_procedure_call): Remove unuseful checks on 
+	(gfc_conv_procedure_call): Remove unuseful checks on
 	symbol's attributes. Add new checks to prevent NULL read on
-	string length. 
+	string length.
 
 2012-05-12  Tobias Burnus  <burnus@net-b.de>
 
@@ -1599,7 +2028,7 @@
 2012-03-04  Mikael Morin  <mikael@gcc.gnu.org>
 
 	PR fortran/50981
-	* trans-expr.c (gfc_conv_procedure_call): Save se->ss's value. 
+	* trans-expr.c (gfc_conv_procedure_call): Save se->ss's value.
 	Handle the case of unallocated arrays passed to elemental procedures.
 
 2012-03-04  Mikael Morin  <mikael@gcc.gnu.org>
@@ -1658,7 +2087,7 @@
 	* module.c (bt_types): Ditto.
 	* resolve.c (assumed_type_expr_allowed): New static variable.
 	(resolve_actual_arglist, resolve_variable, resolve_symbol):
-	Handle type(*). 
+	Handle type(*).
 	* trans-expr.c (gfc_conv_procedure_call): Ditto.
 	* trans-types.c (gfc_typenode_for_spec, gfc_get_dtype): Ditto.
 
@@ -2093,7 +2522,7 @@
 
 	PR fortran/50981
 	* trans-array.c (gfc_walk_elemental_function_args): Fix
-	passing of deallocated allocatables/pointers as absent argument. 
+	passing of deallocated allocatables/pointers as absent argument.
 
 2012-01-16  Tobias Burnus  <burnus@net-b.de>
 
@@ -2129,7 +2558,7 @@
 2012-01-16  Paul Thomas  <pault@gcc.gnu.org>
 
 	* trans-array.c (gfc_trans_create_temp_array): In the case of a
-	class array temporary, detect a null 'eltype' on entry and use 
+	class array temporary, detect a null 'eltype' on entry and use
 	'initial' to provde the class reference and so, through the
 	vtable, the element size for the dynamic type.
 	* trans-stmt.c (gfc_conv_elemental_dependencies): For class

@@ -32,6 +32,7 @@
 #pragma GCC system_header
 
 #if __cplusplus >= 201103L
+# include <bits/move.h>
 # include <bits/alloc_traits.h>
 #else
 # include <bits/allocator.h>  // for __alloc_swap
@@ -72,6 +73,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _Tp, typename _Array>
     const bool
     __allocator_always_compares_equal<array_allocator<_Tp, _Array>>::value;
+
+  template<typename> struct bitmap_allocator;
+
+  template<typename _Tp>
+    struct __allocator_always_compares_equal<bitmap_allocator<_Tp>>
+    { static const bool value = true; };
+
+  template<typename _Tp>
+    const bool __allocator_always_compares_equal<bitmap_allocator<_Tp>>::value;
+
+  template<typename> struct malloc_allocator;
+
+  template<typename _Tp>
+    struct __allocator_always_compares_equal<malloc_allocator<_Tp>>
+    { static const bool value = true; };
+
+  template<typename _Tp>
+    const bool __allocator_always_compares_equal<malloc_allocator<_Tp>>::value;
 
   template<typename> struct mt_allocator;
 

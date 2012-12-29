@@ -243,14 +243,21 @@ described below.
 
 @heading Tools/packages necessary for building GCC
 @table @asis
-@item ISO C90 compiler
+@item ISO C++98 compiler
 Necessary to bootstrap GCC, although versions of GCC prior
-to 3.4 also allow bootstrapping with a traditional (K&R) C compiler.
+to 4.8 also allow bootstrapping with a ISO C89 compiler and versions
+of GCC prior to 3.4 also allow bootstrapping with a traditional
+(K&R) C compiler.
 
 To build all languages in a cross-compiler or other configuration where
 3-stage bootstrap is not performed, you need to start with an existing
-GCC binary (version 2.95 or later) because source code for language
+GCC binary (version 3.4 or later) because source code for language
 frontends other than C might use GCC extensions.
+
+Note that to bootstrap GCC with versions of GCC earlier than 3.4, you
+may need to use @option{--disable-stage1-checking}, though
+bootstrapping the compiler with such earlier compilers is strongly
+discouraged.
 
 @item GNAT
 
@@ -1027,12 +1034,6 @@ For ARM targets, possible values for @var{dialect} are @code{gnu} or
 @code{gnu2}, which select between the original GNU dialect and the GNU TLS
 descriptor-based dialect.
 
-@item --disable-multilib
-Specify that multiple target
-libraries to support different target variants, calling
-conventions, etc.@: should not be built.  The default is to build a
-predefined set of them.
-
 @item --enable-multiarch
 Specify whether to enable or disable multiarch support.  The default is
 to check for glibc start files in a multiarch location, and enable it
@@ -1041,6 +1042,12 @@ and for cross builds configured with @option{--with-sysroot}, and without
 @option{--with-native-system-header-dir}.
 More documentation about multiarch can be found at
 @uref{http://wiki.debian.org/Multiarch}.
+
+@item --disable-multilib
+Specify that multiple target
+libraries to support different target variants, calling
+conventions, etc.@: should not be built.  The default is to build a
+predefined set of them.
 
 Some targets provide finer-grained control over which multilibs are built
 (e.g., @option{--disable-softfloat}):
@@ -1719,6 +1726,14 @@ link time when @option{-fuse-linker-plugin} is enabled.
 This linker should have plugin support such as gold starting with
 version 2.20 or GNU ld starting with version 2.21.
 See @option{-fuse-linker-plugin} for details.
+
+@item --enable-canonical-system-headers
+@itemx --disable-canonical-system-headers
+Enable system header path canonicalization for @file{libcpp}.  This can
+produce shorter header file paths in diagnostics and dependency output
+files, but these changed header paths may conflict with some compilation
+environments.  Enabled by default, and may be disabled using
+@option{--disable-canonical-system-headers}.
 @end table
 
 @subheading Cross-Compiler-Specific Options

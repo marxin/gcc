@@ -98,6 +98,9 @@
 #define TARGET_ASM_FUNCTION_RODATA_SECTION default_no_function_rodata_section
 #define TARGET_STRIP_NAME_ENCODING  rs6000_xcoff_strip_name_encoding
 #define TARGET_SECTION_TYPE_FLAGS  rs6000_xcoff_section_type_flags
+#ifdef HAVE_AS_TLS
+#define TARGET_ENCODE_SECTION_INFO rs6000_xcoff_encode_section_info
+#endif
 
 /* FP save and restore routines.  */
 #define	SAVE_FP_PREFIX "._savef"
@@ -303,6 +306,15 @@
 		(TARGET_32BIT ? (SIZE) : (ROUNDED)),	\
 		xcoff_bss_section_name);		\
      } while (0)
+
+#ifdef HAVE_AS_TLS
+#define ASM_OUTPUT_TLS_COMMON(FILE, DECL, NAME, SIZE)	\
+  do { fputs(COMMON_ASM_OP, (FILE));			\
+       RS6000_OUTPUT_BASENAME ((FILE), (NAME));		\
+       fprintf ((FILE), "[UL],"HOST_WIDE_INT_PRINT_UNSIGNED"\n", \
+       (SIZE));						\
+  } while (0)
+#endif
 
 /* This is how we tell the assembler that two symbols have the same value.  */
 #define SET_ASM_OP "\t.set "

@@ -392,10 +392,8 @@ nonzero_address_p (const_rtx x)
       return nonzero_address_p (XEXP (x, 0));
 
     case PLUS:
-      if (CONST_INT_P (XEXP (x, 1)))
-        return nonzero_address_p (XEXP (x, 0));
       /* Handle PIC references.  */
-      else if (XEXP (x, 0) == pic_offset_table_rtx
+      if (XEXP (x, 0) == pic_offset_table_rtx
 	       && CONSTANT_P (XEXP (x, 1)))
 	return true;
       return false;
@@ -2084,8 +2082,8 @@ remove_node_from_expr_list (const_rtx node, rtx *listp)
 
 /* Nonzero if X contains any volatile instructions.  These are instructions
    which may cause unpredictable machine state instructions, and thus no
-   instructions should be moved or combined across them.  This includes
-   only volatile asms and UNSPEC_VOLATILE instructions.  */
+   instructions or register uses should be moved or combined across them.
+   This includes only volatile asms and UNSPEC_VOLATILE instructions.  */
 
 int
 volatile_insn_p (const_rtx x)
@@ -2109,7 +2107,6 @@ volatile_insn_p (const_rtx x)
       return 0;
 
     case UNSPEC_VOLATILE:
- /* case TRAP_IF: This isn't clear yet.  */
       return 1;
 
     case ASM_INPUT:
@@ -2242,7 +2239,6 @@ side_effects_p (const_rtx x)
     case POST_MODIFY:
     case CALL:
     case UNSPEC_VOLATILE:
- /* case TRAP_IF: This isn't clear yet.  */
       return 1;
 
     case MEM:
@@ -2314,9 +2310,9 @@ may_trap_p_1 (const_rtx x, unsigned flags)
       return 0;
 
     case UNSPEC:
-    case UNSPEC_VOLATILE:
       return targetm.unspec_may_trap_p (x, flags);
 
+    case UNSPEC_VOLATILE:
     case ASM_INPUT:
     case TRAP_IF:
       return 1;
@@ -2408,8 +2404,7 @@ may_trap_p_1 (const_rtx x, unsigned flags)
 
     default:
       /* Any floating arithmetic may trap.  */
-      if (SCALAR_FLOAT_MODE_P (GET_MODE (x))
-	  && flag_trapping_math)
+      if (SCALAR_FLOAT_MODE_P (GET_MODE (x)) && flag_trapping_math)
 	return 1;
     }
 

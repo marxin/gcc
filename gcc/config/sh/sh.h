@@ -1618,7 +1618,8 @@ struct sh_args {
    They give nonzero only if REGNO is a hard reg of the suitable class
    or a pseudo reg currently allocated to a suitable hard reg.
    Since they use reg_renumber, they are safe only once reg_renumber
-   has been allocated, which happens in local-alloc.c.  */
+   has been allocated, which happens in reginfo.c during register
+   allocation.  */
 
 #define REGNO_OK_FOR_BASE_P(REGNO) \
   (GENERAL_OR_AP_REGISTER_P (REGNO) \
@@ -1871,10 +1872,6 @@ struct sh_args {
    truncation in the library function call patterns, as this gives slightly
    more compact code.  */
 #define SHIFT_COUNT_TRUNCATED (0)
-
-/* CANONICALIZE_COMPARISON macro for the combine pass.  */
-#define CANONICALIZE_COMPARISON(CODE, OP0, OP1) \
-  sh_canonicalize_comparison ((CODE), (OP0), (OP1))
 
 /* All integers have the same format so truncation is easy.  */
 /* But SHmedia must sign-extend DImode when truncating to SImode.  */

@@ -1,3 +1,314 @@
+2012-12-21  Kai Tietz  <ktietz@redhat.com>
+
+	* config/os/mingw32/os_defines.h (_GLIBCXX_LLP64): Define if llp64
+	abi is used.
+	* config/os/mingw32-w64/os_defines.h: Likewise.
+	* libsupc++/cxxabi.h (__base_class_type_info): Adjust
+	type of __offset_flags for llp64.
+	* libsupc++/eh_alloc.cc (EMERGENCY_OBJ_SIZE): Define proper
+	for llp64 abi.
+	(EMERGENCY_OBJ_COUNT): Likewise.
+	(bitmask_type): Likewise.
+	* libsupc++/hash_bytes.cc (_Hash_bytes): Handle llp64.
+
+2012-12-20  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* include/std/functional (_Require): Move to ...
+	* include/std/type_traits (_Require): ... here.
+	* include/bits/shared_ptr_base.h (__shared_count::_S_create_from_up):
+	Handle unique_ptr for arrays or with custom pointer types.
+	(__shared_ptr::__shared_ptr(unique_ptr<_Tp1, _Del>&&): Likewise.
+	* include/bits/unique_ptr.h (unique_ptr<_Tp[], _Dp>): Use
+	_Dp::pointer if defined. Implement proposed resolution of LWG 2118.
+	* testsuite/20_util/shared_ptr/cons/unique_ptr_array.cc: New.
+	* testsuite/20_util/unique_ptr/assign/cv_qual.cc: New.
+	* testsuite/20_util/unique_ptr/cons/array_convertible_neg.cc: New.
+	* testsuite/20_util/unique_ptr/cons/convertible_neg.cc: New.
+	* testsuite/20_util/unique_ptr/cons/cv_qual.cc: New.
+	* testsuite/20_util/unique_ptr/modifiers/cv_qual.cc: New.
+	* testsuite/20_util/unique_ptr/requirements/pointer_type_array.cc: New.
+	* testsuite/20_util/shared_ptr/cons/unique_ptr.cc: Adjust comments.
+	* testsuite/20_util/unique_ptr/cons/pointer_array_convertible_neg.cc:
+	Likewise.
+	* testsuite/20_util/unique_ptr/requirements/pointer_type.cc: Likewise.
+	* testsuite/20_util/bind/ref_neg.cc: Adjust dg-error line number.
+	* testsuite/20_util/declval/requirements/1_neg.cc: Likewise.
+	* testsuite/20_util/default_delete/48631_neg.cc: Likewise.
+	* testsuite/20_util/shared_ptr/cons/43820_neg.cc: Likewise.
+	* testsuite/20_util/unique_ptr/assign/48635_neg.cc: Likewise.
+	* testsuite/20_util/unique_ptr/modifiers/reset_neg.cc: Adjust
+	dg-error text.
+	* testsuite/20_util/unique_ptr/cons/ptr_deleter_neg.cc: Use
+	different instantiations so static_assert fails for each.
+
+2012-12-20  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	PR libstdc++/55741
+	* acinclude.m4 (GLIBCXX_ENABLE_LIBSTDCXX_TIME): Check for Sleep.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* src/c++11/thread.cc (__sleep_for): Use Sleep if available.
+
+2012-12-18  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* doc/xml/manual/abi.xml: Update URLs for C++ ABI.
+	* doc/xml/manual/policy_data_structures_biblio.xml: Add xmlns
+	attribute.
+	* doc/xml/manual/debug_mode.xml: Give filenames to chunks.
+	* doc/xml/manual/diagnostics.xml: Likewise.
+	* doc/xml/manual/extensions.xml: Likewise.
+	* doc/xml/manual/bitmap_allocator.xml: Likewise.
+	* doc/xml/manual/mt_allocator.xml: Likewise.
+	* doc/xml/manual/policy_data_structures.xml: Likewise.
+	* doc/xml/manual/parallel_mode.xml: Likewise.
+	* doc/xml/manual/profile_mode.xml: Likewise.
+	* doc/xml/manual/spine.xml: Likewise. Update copyright years.
+	* doc/html/*: Regenerate.
+
+2012-12-17  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* include/std/future (__async_sfinae_helper): Remove.
+
+2012-12-16  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* src/c++11/thread.cc (execute_native_thread_routine): Do not swallow
+	__forced_unwind exceptions.
+	* testsuite/30_threads/thread/native_handle/cancel.cc: New.
+
+2012-12-14  Steve Ellcey  <sellcey@mips.com>
+
+	* testsuite/21_strings/basic_string/append/wchar_t/3.cc: Shrink
+	memory usage under simulator.
+	* testsuite/21_strings/basic_string/cons/wchar_t/6.cc: Ditto.
+	* testsuite/21_strings/basic_string/inserters_extractors/wchar_t/10.cc:
+	Ditto.
+	* testsuite/21_strings/basic_string/inserters_extractors/wchar_t/11.cc:
+	Ditto.
+
+2012-12-13  Steve Ellcey  <sellcey@mips.com>
+
+	* testsuite/21_strings/basic_string/capacity/char/18654.cc: Shrink
+	memory usage under simulator.
+	* testsuite/21_strings/basic_string/capacity/wchar_t/18654.cc: Ditto.
+	* testsuite/22_locale/collate/transform/char/28277.cc: Ditto.
+	* testsuite/22_locale/collate/transform/wchar_t/28277.cc: Ditto.
+
+2012-12-12  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* doc/xml/manual/documentation_hacking.xml: Fix validation issue.
+
+2012-12-11  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	PR libstdc++/55631
+	* include/ext/alloc_traits.h: Include missing header.
+	* include/ext/pointer.h: Likewise.
+	* include/ext/string_conversions.h: Require C++11.
+	* libsupc++/initializer_list: Reindent.
+
+2012-12-10  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* doc/Makefile.am (xml_sources_manual): Add
+	policy_data_structures_biblio.xml.
+	(${docbook_outdir}/latex): Add.
+	(doc-xml-validate-docbook): Split into..
+	(doc-xml-validate-dtd-db):... this for DTD.
+	(doc-xml-validate-rng-db):... this for Relax NG.
+	(doc-pdf-docbook-dirs): Add.
+	(doc-pdf-docbook-pre): Add.
+	* doc/xml/manual/build_hacking.xml: Add literal markup.
+	* doc/xml/manual/documentation_hacking.xml: Clean whitespace in
+	<filename> markup. Add notes about debugging the generation process.
+	* doc/xml/manual/policy_data_structures.xml: Split biblio into...
+	* doc/xml/manual/policy_data_structures_biblio.xml: ... this. New.
+	* doc/xml/manual/test_policy_data_structures.xml: Fixup <filename>
+	markup.
+
+2012-12-10  Matthias Klose  <doko@ubuntu.com>
+
+	* src/Makefile.am (libstdc++-symbols.ver): Use CONFIG_HEADER.
+	* src/Makefile.in: Regenerate.
+
+2012-12-09  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* testsuite/lib/libstdc++.exp (dg-test): Unset testname_with_flags
+	after running the test.
+
+2012-12-04  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* include/Makefile.am (${host_builddir}/c++config.h): Replace
+	[<space><tab>] by [<tab><space>].
+	* include/Makefile.in: Regenerate.
+
+2012-12-04  Steven Bosscher  <steven@gcc.gnu.org>
+
+	* include/Makefile.am: Fix regexp broken by previous commit.
+	* include/Makefile.in: Likewise.
+
+2012-12-03  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* include/ext/pb_ds/detail/cc_hash_table_map_/standard_policies.hpp:
+	Remove.
+	* include/ext/pb_ds/detail/gp_hash_table_map_/standard_policies.hpp:
+	Remove.
+	* include/Makefile.am (pb_headers): Remove include files.
+	* include/Makefile.in: Regenerated.
+
+2012-12-01  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	PR libstdc++/55503
+	* testsuite/30_threads/condition_variable/members/53841.cc: Add
+	hppa*-hp-hpux11* to -pthread dg-options.
+
+2012-11-29  Kai Tietz  <ktietz@redhat.com>
+
+	PR target/55445
+	* libsupc++/eh_personaltity.cc (__SEH__): Additional check
+	for not being SjLj.
+
+2012-11-28  Andrew Pinski  <apinski@cavium.com>
+
+	PR bootstrap/54279
+	* scripts/testsuite_flags.in (--build-cxx): Use xg++ instead of g++.
+	* testsuite/lib/libstdc++.exp (libstdc++_init): Likewise.
+
+2012-11-28  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* include/std/functional (_Mem_fn): Constrain function call operators
+	to avoid ambiguities. Use perfect forwarding.
+	* testsuite/20_util/function_objects/mem_fn/55463.cc: Additional
+	tests.
+	* testsuite/20_util/function_objects/mem_fn/forward.cc: New.
+	* testsuite/20_util/bind/ref_neg.cc: Adjust dg-error line numbers.
+
+2012-11-27  Ollie Wild  <aaw@google.com>
+
+	* include/bits/stl_tree.h (@headername): Fix incorrect Doxygen macro
+	invocation.
+
+2012-11-26  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* include/std/functional (__is_socketlike): Change from class
+	template to alias template.
+
+2012-11-26  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	PR libstdc++/55463
+	* include/std/functional (_Mem_fn): Handle rvalue objects. Add
+	noexcept-specifications.
+	* testsuite/20_util/function_objects/mem_fn/55463.cc: New.
+	* testsuite/20_util/bind/ref_neg.cc: Adjust dg-error line numbers.
+
+2012-11-23  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	PR libstdc++/52680
+	* acinclude.m4 (GLIBCXX_ENABLE_LIBSTDCXX_TIME): Check for usleep and
+	sleep if nanosleep is not available. Bump libtool revision.
+	* config.h.in: Regenerate.
+	* configure: Likewise.
+	* config/abi/pre/gnu.ver (GLIBCXX_3.4.18): Add __sleep_for.
+	* include/std/thread (this_thread::__sleep_for): Add.
+	(this_thread::yield, this_thread::sleep_until, this_thread::sleep_for):
+	Declare unconditionally.
+	* src/c++11/thread.cc (this_thread::__sleep_for): Define.
+	* testsuite/lib/libstdc++.exp (check_v3_target_nanosleep): Rename to
+	check_v3_target_sleep.
+	* testsuite/lib/dg-options.exp (dg-require-nanosleep): Rename to
+	dg-require-sleep.
+	* testsuite/30_threads/condition_variable_any/53830.cc: Update.
+	* testsuite/30_threads/this_thread/2.cc: Likewise.
+	* testsuite/30_threads/this_thread/3.cc: Likewise.
+	* testsuite/30_threads/this_thread/4.cc: Likewise.
+	* testsuite/30_threads/async/54297.cc: Likewise.
+
+2012-11-20  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR libstdc++/55413
+	* include/bits/hashtable.h (_Hashtable<>::_M_rehash_aux): Initialize
+	__bbegin_bkt and __prev_bkt to avoid uninitialized warnings.
+	* testsuite/23_containers/unordered_set/instantiation_neg.cc: Adjust
+	dg-error line number.
+
+2012-11-20  Matthias Klose  <doko@ubuntu.com>
+
+	* doc/doxygen/user.cfg.in (ALIASES). Escape sharp braces.
+	* include/bits/allocator.h: Escape sharp braces in comment.
+	* include/profile/impl/profiler_algos.h: Likewise.
+
+2012-11-20  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* include/ext/array_allocator.h: Replace uses of
+	__GXX_EXPERIMENTAL_CXX0X__ with __cplusplus.
+
+2012-11-19  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* testsuite/20_util/allocator/requirements/typedefs.cc: Check rebind
+	and improve propagate_on_container_move_assignment check.
+
+2012-11-19  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* include/bits/stl_algo.h (reverse_copy): Update comment per DR 2074.
+	* include/bits/unordered_map.h: Apply DR 2005 resolution.
+	* doc/xml/manual/status_cxx2011.xml: Update per DR 2048.
+	* include/bits/allocator.h (allocator): Apply DR 2103 resolution.
+	* include/ext/array_allocator.h: Likewise.
+	* include/ext/bitmap_allocator.h: Likewise.
+	* include/ext/malloc_allocator.h: Likewise.
+	* include/ext/mt_allocator.h: Likewise.
+	* include/ext/new_allocator.h: Likewise.
+	* include/ext/pool_allocator.h: Likewise.
+	* include/ext/throw_allocator.h: Likewise.
+	* include/ext/alloc_traits.h (__allocator_always_compares_equal): Add
+	additional specializations.
+	* include/std/functional: Add comment about DR resolution.
+	* include/std/future: Likewise.
+	* include/std/scoped_allocator: Likewise.
+	* include/std/thread: Likewise.
+	* testsuite/20_util/allocator/requirements/typedefs.cc: New.
+	* testsuite/20_util/bind/ref_neg.cc: Adjust dg-error line numbers.
+
+2012-11-19  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	* include/bits/hashtable.h: Improve comments.
+	* include/bits/hashtable_policy.h: Likewise.
+
+2012-11-17  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR libstdc++/55363
+	* include/std/array (tuple_size, tuple_element): Move out
+	NAMESPACE_CONTAINER.
+	* testsuite/23_containers/array/tuple_interface/get_neg.cc: Adjust
+	dg-error line numbers.
+	* testsuite/23_containers/array/tuple_interface/tuple_element_neg.cc:
+	Likewise.
+
+2012-11-16  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/hashtable_policy.h (_Prime_rehash_policy): Remove
+	automatic shrink.
+	(_Prime_rehash_policy::_M_bkt_for_elements): Do not call
+	_M_next_bkt anymore.
+	(_Prime_rehash_policy::_M_next_bkt): Move usage of
+	_S_growth_factor ...
+	(_Prime_rehash_policy::_M_need_rehash): ... here.
+	* include/bits/hashtable.h (_Hashtable<>): Adapt.
+	* testsuite/performance/23_containers/insert_erase/41975.cc: Add
+	_USE_TR1 to force build using std::tr1 container.
+	* testsuite/performance/23_containers/insert/unordered_set.cc:
+	Likewise.
+	* testsuite/performance/23_containers/insert/54075.cc: New.
+
+2012-11-16  Tom Tromey  <tromey@redhat.com>
+
+	* testsuite/libstdc++-prettyprinters/whatis.cc: New file.
+	* testsuite/lib/gdb-test.exp (whatis-test): New proc.
+	(gdb-test): Handle 'whatis' tests.
+	(gdb_batch_check): New proc.
+	(gdb_version_check): Rewrite to use gdb_batch_check.
+	* python/libstdcxx/v6/printers.py: Import gdb.types.
+	(FilteringTypePrinter): New class.
+	(add_one_type_printer, register_type_printers): New functions.
+	(register_libstdcxx_printers): Call register_type_printers.
+
 2012-11-15  Jonathan Wakely  <jwakely.gcc@gmail.com>
 
 	PR libstdc++/53841

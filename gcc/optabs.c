@@ -170,14 +170,14 @@ optab_libfunc (optab optab, enum machine_mode mode)
 
    If the last insn does not set TARGET, don't do anything, but return 1.
 
-   If a previous insn sets TARGET and TARGET is one of OP0 or OP1,
-   don't add the REG_EQUAL note but return 0.  Our caller can then try
-   again, ensuring that TARGET is not one of the operands.  */
+   If the last insn or a previous insn sets TARGET and TARGET is one of OP0
+   or OP1, don't add the REG_EQUAL note but return 0.  Our caller can then
+   try again, ensuring that TARGET is not one of the operands.  */
 
 static int
 add_equal_note (rtx insns, rtx target, enum rtx_code code, rtx op0, rtx op1)
 {
-  rtx last_insn, insn, set;
+  rtx last_insn, set;
   rtx note;
 
   gcc_assert (insns && INSN_P (insns) && NEXT_INSN (insns));
@@ -191,6 +191,12 @@ add_equal_note (rtx insns, rtx target, enum rtx_code code, rtx op0, rtx op1)
 
   if (GET_CODE (target) == ZERO_EXTRACT)
     return 1;
+
+  /* If TARGET is in OP0 or OP1, punt.  We'd end up with a note referencing
+     a value changing in the insn, so the note would be invalid for CSE.  */
+  if (reg_overlap_mentioned_p (target, op0)
+      || (op1 && reg_overlap_mentioned_p (target, op1)))
+    return 0;
 
   for (last_insn = insns;
        NEXT_INSN (last_insn) != NULL_RTX;
@@ -206,21 +212,6 @@ add_equal_note (rtx insns, rtx target, enum rtx_code code, rtx op0, rtx op1)
       && (GET_CODE (SET_DEST (set)) != STRICT_LOW_PART
 	  || ! rtx_equal_p (XEXP (SET_DEST (set), 0), target)))
     return 1;
-
-  /* If TARGET is in OP0 or OP1, check if anything in SEQ sets TARGET
-     besides the last insn.  */
-  if (reg_overlap_mentioned_p (target, op0)
-      || (op1 && reg_overlap_mentioned_p (target, op1)))
-    {
-      insn = PREV_INSN (last_insn);
-      while (insn != NULL_RTX)
-	{
-	  if (reg_set_p (target, insn))
-	    return 0;
-
-	  insn = PREV_INSN (insn);
-	}
-    }
 
   if (GET_RTX_CLASS (code) == RTX_UNARY)
     switch (code)
@@ -7477,14 +7468,14 @@ expand_atomic_load (rtx target, rtx mem, enum memmodel model)
   if (!target || target == const0_rtx)
     target = gen_reg_rtx (mode);
 
-  /* Emit the appropriate barrier before the load.  */
-  expand_mem_thread_fence (model);
+  /* For SEQ_CST, emit a barrier before the load.  */
+  if (model == MEMMODEL_SEQ_CST)
+    expand_mem_thread_fence (model);
 
   emit_move_insn (target, mem);
 
-  /* For SEQ_CST, also emit a barrier after the load.  */
-  if (model == MEMMODEL_SEQ_CST)
-    expand_mem_thread_fence (model);
+  /* Emit the appropriate barrier after the load.  */
+  expand_mem_thread_fence (model);
 
   return target;
 }
@@ -7545,13 +7536,12 @@ expand_atomic_store (rtx mem, rtx val, enum memmodel model, bool use_release)
         return NULL_RTX;
     }
 
-  /* If there is no mem_store, default to a move with barriers */
-  if (model == MEMMODEL_SEQ_CST || model == MEMMODEL_RELEASE)
-    expand_mem_thread_fence (model);
+  /* Otherwise assume stores are atomic, and emit the proper barriers.  */
+  expand_mem_thread_fence (model);
 
   emit_move_insn (mem, val);
 
-  /* For SEQ_CST, also emit a barrier after the load.  */
+  /* For SEQ_CST, also emit a barrier after the store.  */
   if (model == MEMMODEL_SEQ_CST)
     expand_mem_thread_fence (model);
 
@@ -8237,6 +8227,211 @@ expand_jump_insn (enum insn_code icode, unsigned int nops,
 {
   if (!maybe_expand_jump_insn (icode, nops, ops))
     gcc_unreachable ();
+}
+
+/* Reduce conditional compilation elsewhere.  */
+#ifndef HAVE_insv
+#define HAVE_insv	0
+#define CODE_FOR_insv	CODE_FOR_nothing
+#endif
+#ifndef HAVE_extv
+#define HAVE_extv	0
+#define CODE_FOR_extv	CODE_FOR_nothing
+#endif
+#ifndef HAVE_extzv
+#define HAVE_extzv	0
+#define CODE_FOR_extzv	CODE_FOR_nothing
+#endif
+
+/* Enumerates the possible types of structure operand to an
+   extraction_insn.  */
+enum extraction_type { ET_unaligned_mem, ET_reg };
+
+/* Check whether insv, extv or extzv pattern ICODE can be used for an
+   insertion or extraction of type TYPE on a structure of mode MODE.
+   Return true if so and fill in *INSN accordingly.  STRUCT_OP is the
+   operand number of the structure (the first sign_extract or zero_extract
+   operand) and FIELD_OP is the operand number of the field (the other
+   side of the set from the sign_extract or zero_extract).  */
+
+static bool
+get_traditional_extraction_insn (extraction_insn *insn,
+				 enum extraction_type type,
+				 enum machine_mode mode,
+				 enum insn_code icode,
+				 int struct_op, int field_op)
+{
+  const struct insn_data_d *data = &insn_data[icode];
+
+  enum machine_mode struct_mode = data->operand[struct_op].mode;
+  if (struct_mode == VOIDmode)
+    struct_mode = word_mode;
+  if (mode != struct_mode)
+    return false;
+
+  enum machine_mode field_mode = data->operand[field_op].mode;
+  if (field_mode == VOIDmode)
+    field_mode = word_mode;
+
+  enum machine_mode pos_mode = data->operand[struct_op + 2].mode;
+  if (pos_mode == VOIDmode)
+    pos_mode = word_mode;
+
+  insn->icode = icode;
+  insn->field_mode = field_mode;
+  insn->struct_mode = (type == ET_unaligned_mem ? byte_mode : struct_mode);
+  insn->pos_mode = pos_mode;
+  return true;
+}
+
+/* Return true if an optab exists to perform an insertion or extraction
+   of type TYPE in mode MODE.  Describe the instruction in *INSN if so.
+
+   REG_OPTAB is the optab to use for register structures and
+   MISALIGN_OPTAB is the optab to use for misaligned memory structures.
+   POS_OP is the operand number of the bit position.  */
+
+static bool
+get_optab_extraction_insn (struct extraction_insn *insn,
+			   enum extraction_type type,
+			   enum machine_mode mode, direct_optab reg_optab,
+			   direct_optab misalign_optab, int pos_op)
+{
+  direct_optab optab = (type == ET_unaligned_mem ? misalign_optab : reg_optab);
+  enum insn_code icode = direct_optab_handler (optab, mode);
+  if (icode == CODE_FOR_nothing)
+    return false;
+
+  const struct insn_data_d *data = &insn_data[icode];
+
+  insn->icode = icode;
+  insn->field_mode = mode;
+  insn->struct_mode = (type == ET_unaligned_mem ? BLKmode : mode);
+  insn->pos_mode = data->operand[pos_op].mode;
+  if (insn->pos_mode == VOIDmode)
+    insn->pos_mode = word_mode;
+  return true;
+}
+
+/* Return true if an instruction exists to perform an insertion or
+   extraction (PATTERN says which) of type TYPE in mode MODE.
+   Describe the instruction in *INSN if so.  */
+
+static bool
+get_extraction_insn (extraction_insn *insn,
+		     enum extraction_pattern pattern,
+		     enum extraction_type type,
+		     enum machine_mode mode)
+{
+  switch (pattern)
+    {
+    case EP_insv:
+      if (HAVE_insv
+	  && get_traditional_extraction_insn (insn, type, mode,
+					      CODE_FOR_insv, 0, 3))
+	return true;
+      return get_optab_extraction_insn (insn, type, mode, insv_optab,
+					insvmisalign_optab, 2);
+
+    case EP_extv:
+      if (HAVE_extv
+	  && get_traditional_extraction_insn (insn, type, mode,
+					      CODE_FOR_extv, 1, 0))
+	return true;
+      return get_optab_extraction_insn (insn, type, mode, extv_optab,
+					extvmisalign_optab, 3);
+
+    case EP_extzv:
+      if (HAVE_extzv
+	  && get_traditional_extraction_insn (insn, type, mode,
+					      CODE_FOR_extzv, 1, 0))
+	return true;
+      return get_optab_extraction_insn (insn, type, mode, extzv_optab,
+					extzvmisalign_optab, 3);
+
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Return true if an instruction exists to access a field of mode
+   FIELDMODE in a structure that has STRUCT_BITS significant bits.
+   Describe the "best" such instruction in *INSN if so.  PATTERN and
+   TYPE describe the type of insertion or extraction we want to perform.
+
+   For an insertion, the number of significant structure bits includes
+   all bits of the target.  For an extraction, it need only include the
+   most significant bit of the field.  Larger widths are acceptable
+   in both cases.  */
+
+static bool
+get_best_extraction_insn (extraction_insn *insn,
+			  enum extraction_pattern pattern,
+			  enum extraction_type type,
+			  unsigned HOST_WIDE_INT struct_bits,
+			  enum machine_mode field_mode)
+{
+  enum machine_mode mode = smallest_mode_for_size (struct_bits, MODE_INT);
+  while (mode != VOIDmode)
+    {
+      if (get_extraction_insn (insn, pattern, type, mode))
+	{
+	  while (mode != VOIDmode
+		 && GET_MODE_SIZE (mode) <= GET_MODE_SIZE (field_mode)
+		 && !TRULY_NOOP_TRUNCATION_MODES_P (insn->field_mode,
+						    field_mode))
+	    {
+	      get_extraction_insn (insn, pattern, type, mode);
+	      mode = GET_MODE_WIDER_MODE (mode);
+	    }
+	  return true;
+	}
+      mode = GET_MODE_WIDER_MODE (mode);
+    }
+  return false;
+}
+
+/* Return true if an instruction exists to access a field of mode
+   FIELDMODE in a register structure that has STRUCT_BITS significant bits.
+   Describe the "best" such instruction in *INSN if so.  PATTERN describes
+   the type of insertion or extraction we want to perform.
+
+   For an insertion, the number of significant structure bits includes
+   all bits of the target.  For an extraction, it need only include the
+   most significant bit of the field.  Larger widths are acceptable
+   in both cases.  */
+
+bool
+get_best_reg_extraction_insn (extraction_insn *insn,
+			      enum extraction_pattern pattern,
+			      unsigned HOST_WIDE_INT struct_bits,
+			      enum machine_mode field_mode)
+{
+  return get_best_extraction_insn (insn, pattern, ET_reg, struct_bits,
+				   field_mode);
+}
+
+/* Return true if an instruction exists to access a field of BITSIZE
+   bits starting BITNUM bits into a memory structure.  Describe the
+   "best" such instruction in *INSN if so.  PATTERN describes the type
+   of insertion or extraction we want to perform and FIELDMODE is the
+   natural mode of the extracted field.
+
+   The instructions considered here only access bytes that overlap
+   the bitfield; they do not touch any surrounding bytes.  */
+
+bool
+get_best_mem_extraction_insn (extraction_insn *insn,
+			      enum extraction_pattern pattern,
+			      HOST_WIDE_INT bitsize, HOST_WIDE_INT bitnum,
+			      enum machine_mode field_mode)
+{
+  unsigned HOST_WIDE_INT struct_bits = (bitnum % BITS_PER_UNIT
+					+ bitsize
+					+ BITS_PER_UNIT - 1);
+  struct_bits -= struct_bits % BITS_PER_UNIT;
+  return get_best_extraction_insn (insn, pattern, ET_unaligned_mem,
+				   struct_bits, field_mode);
 }
 
 #include "gt-optabs.h"

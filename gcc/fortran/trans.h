@@ -348,6 +348,7 @@ tree gfc_vtable_size_get (tree);
 tree gfc_vtable_extends_get (tree);
 tree gfc_vtable_def_init_get (tree);
 tree gfc_vtable_copy_get (tree);
+tree gfc_vtable_final_get (tree);
 tree gfc_get_vptr_from_expr (tree);
 tree gfc_get_class_array_ref (tree, tree);
 tree gfc_copy_class_to_class (tree, tree, tree);
@@ -427,7 +428,7 @@ int gfc_is_intrinsic_libcall (gfc_expr *);
 /* Used to call ordinary functions/subroutines
    and procedure pointer components.  */
 int gfc_conv_procedure_call (gfc_se *, gfc_symbol *, gfc_actual_arglist *,
-			     gfc_expr *, VEC(tree,gc) *);
+			     gfc_expr *, vec<tree, va_gc> *);
 
 void gfc_conv_subref_array_arg (gfc_se *, gfc_expr *, int, sym_intent, bool);
 

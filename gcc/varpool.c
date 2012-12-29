@@ -63,9 +63,8 @@ varpool_remove_node (struct varpool_node *node)
       && !DECL_IN_CONSTANT_POOL (node->symbol.decl)
       /* Keep vtables for BINFO folding.  */
       && !DECL_VIRTUAL_P (node->symbol.decl)
-      /* dbxout output constant initializers for readonly vars.  */
-      && (!host_integerp (DECL_INITIAL (node->symbol.decl), 0)
-	  || !TREE_READONLY (node->symbol.decl)))
+      /* FIXME: http://gcc.gnu.org/PR55395 */
+      && debug_info_level == DINFO_LEVEL_NONE)
     DECL_INITIAL (node->symbol.decl) = error_mark_node;
   ggc_free (node);
 }
@@ -243,7 +242,7 @@ varpool_analyze_node (struct varpool_node *node)
 	    node->alias = false;
 	    continue;
 	  }
-      if (!VEC_length (ipa_ref_t, node->symbol.ref_list.references))
+      if (!vec_safe_length (node->symbol.ref_list.references))
 	ipa_record_reference ((symtab_node)node, (symtab_node)tgt, IPA_REF_ALIAS, NULL);
       if (node->extra_name_alias)
 	{
@@ -359,8 +358,7 @@ varpool_remove_unreferenced_decls (void)
 	  && (!varpool_can_remove_if_no_refs (node)
 	      /* We just expanded all function bodies.  See if any of
 		 them needed the variable.  */
-	      || (!DECL_EXTERNAL (node->symbol.decl)
-		  && DECL_RTL_SET_P (node->symbol.decl))))
+	      || DECL_RTL_SET_P (node->symbol.decl)))
 	{
 	  enqueue_node (node, &first);
           if (cgraph_dump_file)

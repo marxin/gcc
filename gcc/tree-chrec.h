@@ -64,7 +64,7 @@ extern tree chrec_convert_aggressive (tree, tree);
 
 /* Operations.  */
 extern tree chrec_apply (unsigned, tree, tree);
-extern tree chrec_apply_map (tree, VEC (tree, heap) *);
+extern tree chrec_apply_map (tree, vec<tree> );
 extern tree chrec_replace_initial_condition (tree, tree);
 extern tree initial_condition (tree);
 extern tree initial_condition_in_loop_num (tree, unsigned);
@@ -117,7 +117,7 @@ no_evolution_in_loop_p (tree chrec, unsigned loop_num, bool *res)
 
   STRIP_NOPS (chrec);
   scev = hide_evolution_in_other_loops_than_loop (chrec, loop_num);
-  *res = !tree_is_chrec (scev);
+  *res = !tree_contains_chrecs (scev, NULL);
   return true;
 }
 

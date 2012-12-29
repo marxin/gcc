@@ -2338,15 +2338,17 @@ gfc_get_derived_type (gfc_symbol * derived)
   tree canonical = NULL_TREE;
   tree *chain = NULL;
   bool got_canonical = false;
+  bool unlimited_entity = false;
   gfc_component *c;
   gfc_dt_list *dt;
   gfc_namespace *ns;
 
+  if (derived->attr.unlimited_polymorphic)
+    return ptr_type_node;
+
   if (derived && derived->attr.flavor == FL_PROCEDURE
       && derived->attr.generic)
     derived = gfc_find_dt_in_generic (derived);
-
-  gcc_assert (derived && derived->attr.flavor == FL_DERIVED);
 
   /* See if it's one of the iso_c_binding derived types.  */
   if (derived->attr.is_iso_c == 1)
@@ -2431,6 +2433,12 @@ gfc_get_derived_type (gfc_symbol * derived)
       derived->backend_decl = typenode;
     }
 
+  if (derived->components
+	&& derived->components->ts.type == BT_DERIVED
+	&& strcmp (derived->components->name, "_data") == 0
+	&& derived->components->ts.u.derived->attr.unlimited_polymorphic)
+    unlimited_entity = true;
+
   /* Go through the derived type components, building them as
      necessary. The reason for doing this now is that it is
      possible to recurse back to this derived type through a
@@ -2511,14 +2519,16 @@ gfc_get_derived_type (gfc_symbol * derived)
 						    !c->attr.target);
 	}
       else if ((c->attr.pointer || c->attr.allocatable)
-	       && !c->attr.proc_pointer)
+	       && !c->attr.proc_pointer
+	       && !(unlimited_entity && c == derived->components))
 	field_type = build_pointer_type (field_type);
 
       if (c->attr.pointer)
 	field_type = gfc_nonrestricted_type (field_type);
 
       /* vtype fields can point to different types to the base type.  */
-      if (c->ts.type == BT_DERIVED && c->ts.u.derived->attr.vtype)
+      if (c->ts.type == BT_DERIVED
+	    && c->ts.u.derived && c->ts.u.derived->attr.vtype)
 	  field_type = build_pointer_type_for_mode (TREE_TYPE (field_type),
 						    ptr_mode, true);
 
@@ -2690,7 +2700,7 @@ tree
 gfc_get_function_type (gfc_symbol * sym)
 {
   tree type;
-  VEC(tree,gc) *typelist;
+  vec<tree, va_gc> *typelist;
   gfc_formal_arglist *f;
   gfc_symbol *arg;
   int alternate_return;
@@ -2713,7 +2723,7 @@ gfc_get_function_type (gfc_symbol * sym)
 
   if (sym->attr.entry_master)
     /* Additional parameter for selecting an entry point.  */
-    VEC_safe_push (tree, gc, typelist, gfc_array_index_type);
+    vec_safe_push (typelist, gfc_array_index_type);
 
   if (sym->result)
     arg = sym->result;
@@ -2732,17 +2742,16 @@ gfc_get_function_type (gfc_symbol * sym)
 	  || arg->ts.type == BT_CHARACTER)
 	type = build_reference_type (type);
 
-      VEC_safe_push (tree, gc, typelist, type);
+      vec_safe_push (typelist, type);
       if (arg->ts.type == BT_CHARACTER)
 	{
 	  if (!arg->ts.deferred)
 	    /* Transfer by value.  */
-	    VEC_safe_push (tree, gc, typelist, gfc_charlen_type_node);
+	    vec_safe_push (typelist, gfc_charlen_type_node);
 	  else
 	    /* Deferred character lengths are transferred by reference
 	       so that the value can be returned.  */
-	    VEC_safe_push (tree, gc, typelist,
-			   build_pointer_type (gfc_charlen_type_node));
+	    vec_safe_push (typelist, build_pointer_type(gfc_charlen_type_node));
 	}
     }
 
@@ -2780,7 +2789,7 @@ gfc_get_function_type (gfc_symbol * sym)
 	     used without an explicit interface, and cannot be passed as
 	     actual parameters for a dummy procedure.  */
 
-	  VEC_safe_push (tree, gc, typelist, type);
+	  vec_safe_push (typelist, type);
 	}
       else
         {
@@ -2803,11 +2812,11 @@ gfc_get_function_type (gfc_symbol * sym)
 	       so that the value can be returned.  */
 	    type = build_pointer_type (gfc_charlen_type_node);
 
-	  VEC_safe_push (tree, gc, typelist, type);
+	  vec_safe_push (typelist, type);
 	}
     }
 
-  if (!VEC_empty (tree, typelist)
+  if (!vec_safe_is_empty (typelist)
       || sym->attr.is_main_program
       || sym->attr.if_source != IFSRC_UNKNOWN)
     is_varargs = false;

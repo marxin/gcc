@@ -607,7 +607,7 @@ gimplify_and_update_call_from_tree (gimple_stmt_iterator *si_p, tree expr)
 	      unlink_stmt_vdef (stmt);
 	      release_defs (stmt);
 	    }
-	  gsi_remove (si_p, true);
+	  gsi_replace (si_p, gimple_build_nop (), true);
 	  return;
 	}
     }
@@ -1157,11 +1157,6 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace)
   bool changed = false;
   gimple stmt = gsi_stmt (*gsi);
   unsigned i;
-  gimple_stmt_iterator gsinext = *gsi;
-  gimple next_stmt;
-
-  gsi_next (&gsinext);
-  next_stmt = gsi_end_p (gsinext) ? NULL : gsi_stmt (gsinext);
 
   /* Fold the main computation performed by the statement.  */
   switch (gimple_code (stmt))
@@ -1282,19 +1277,10 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace)
     default:;
     }
 
-  /* If stmt folds into nothing and it was the last stmt in a bb,
-     don't call gsi_stmt.  */
-  if (gsi_end_p (*gsi))
-    {
-      gcc_assert (next_stmt == NULL);
-      return changed;
-    }
-
   stmt = gsi_stmt (*gsi);
 
-  /* Fold *& on the lhs.  Don't do this if stmt folded into nothing,
-     as we'd changing the next stmt.  */
-  if (gimple_has_lhs (stmt) && stmt != next_stmt)
+  /* Fold *& on the lhs.  */
+  if (gimple_has_lhs (stmt))
     {
       tree lhs = gimple_get_lhs (stmt);
       if (lhs && REFERENCE_CLASS_P (lhs))

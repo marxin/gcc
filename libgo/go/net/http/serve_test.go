@@ -314,7 +314,7 @@ func TestServerTimeouts(t *testing.T) {
 	l.Close()
 }
 
-// TestIdentityResponse verifies that a handler can unset 
+// TestIdentityResponse verifies that a handler can unset
 func TestIdentityResponse(t *testing.T) {
 	handler := HandlerFunc(func(rw ResponseWriter, req *Request) {
 		rw.Header().Set("Content-Length", "3")
@@ -918,15 +918,19 @@ func TestZeroLengthPostAndResponse(t *testing.T) {
 	}
 }
 
+func TestHandlerPanicNil(t *testing.T) {
+	testHandlerPanic(t, false, nil)
+}
+
 func TestHandlerPanic(t *testing.T) {
-	testHandlerPanic(t, false)
+	testHandlerPanic(t, false, "intentional death for testing")
 }
 
 func TestHandlerPanicWithHijack(t *testing.T) {
-	testHandlerPanic(t, true)
+	testHandlerPanic(t, true, "intentional death for testing")
 }
 
-func testHandlerPanic(t *testing.T, withHijack bool) {
+func testHandlerPanic(t *testing.T, withHijack bool, panicValue interface{}) {
 	// Unlike the other tests that set the log output to ioutil.Discard
 	// to quiet the output, this test uses a pipe.  The pipe serves three
 	// purposes:
@@ -955,7 +959,7 @@ func testHandlerPanic(t *testing.T, withHijack bool) {
 			}
 			defer rwc.Close()
 		}
-		panic("intentional death for testing")
+		panic(panicValue)
 	}))
 	defer ts.Close()
 
@@ -968,7 +972,7 @@ func testHandlerPanic(t *testing.T, withHijack bool) {
 		_, err := pr.Read(buf)
 		pr.Close()
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		done <- true
 	}()
@@ -976,6 +980,10 @@ func testHandlerPanic(t *testing.T, withHijack bool) {
 	_, err := Get(ts.URL)
 	if err == nil {
 		t.Logf("expected an error")
+	}
+
+	if panicValue == nil {
+		return
 	}
 
 	select {
@@ -1063,7 +1071,7 @@ type countReader struct {
 
 func (cr countReader) Read(p []byte) (n int, err error) {
 	n, err = cr.r.Read(p)
-	*cr.n += int64(n)
+	atomic.AddInt64(cr.n, int64(n))
 	return
 }
 
@@ -1081,8 +1089,8 @@ func TestRequestBodyLimit(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	nWritten := int64(0)
-	req, _ := NewRequest("POST", ts.URL, io.LimitReader(countReader{neverEnding('a'), &nWritten}, limit*200))
+	nWritten := new(int64)
+	req, _ := NewRequest("POST", ts.URL, io.LimitReader(countReader{neverEnding('a'), nWritten}, limit*200))
 
 	// Send the POST, but don't care it succeeds or not.  The
 	// remote side is going to reply and then close the TCP
@@ -1095,7 +1103,7 @@ func TestRequestBodyLimit(t *testing.T) {
 	// the remote side hung up on us before we wrote too much.
 	_, _ = DefaultClient.Do(req)
 
-	if nWritten > limit*100 {
+	if atomic.LoadInt64(nWritten) > limit*100 {
 		t.Errorf("handler restricted the request body to %d bytes, but client managed to write %d",
 			limit, nWritten)
 	}
@@ -1249,6 +1257,94 @@ func TestContentLengthZero(t *testing.T) {
 			t.Errorf("For version %q, Content-Length = %v; want 0", version, cl)
 		}
 		conn.Close()
+	}
+}
+
+func TestCloseNotifier(t *testing.T) {
+	gotReq := make(chan bool, 1)
+	sawClose := make(chan bool, 1)
+	ts := httptest.NewServer(HandlerFunc(func(rw ResponseWriter, req *Request) {
+		gotReq <- true
+		cc := rw.(CloseNotifier).CloseNotify()
+		<-cc
+		sawClose <- true
+	}))
+	conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("error dialing: %v", err)
+	}
+	diec := make(chan bool)
+	go func() {
+		_, err = fmt.Fprintf(conn, "GET / HTTP/1.1\r\nConnection: keep-alive\r\nHost: foo\r\n\r\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		<-diec
+		conn.Close()
+	}()
+For:
+	for {
+		select {
+		case <-gotReq:
+			diec <- true
+		case <-sawClose:
+			break For
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout")
+		}
+	}
+	ts.Close()
+}
+
+func TestOptions(t *testing.T) {
+	uric := make(chan string, 2) // only expect 1, but leave space for 2
+	mux := NewServeMux()
+	mux.HandleFunc("/", func(w ResponseWriter, r *Request) {
+		uric <- r.RequestURI
+	})
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	conn, err := net.Dial("tcp", ts.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	// An OPTIONS * request should succeed.
+	_, err = conn.Write([]byte("OPTIONS * HTTP/1.1\r\nHost: foo.com\r\n\r\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	br := bufio.NewReader(conn)
+	res, err := ReadResponse(br, &Request{Method: "OPTIONS"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != 200 {
+		t.Errorf("Got non-200 response to OPTIONS *: %#v", res)
+	}
+
+	// A GET * request on a ServeMux should fail.
+	_, err = conn.Write([]byte("GET * HTTP/1.1\r\nHost: foo.com\r\n\r\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = ReadResponse(br, &Request{Method: "GET"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != 400 {
+		t.Errorf("Got non-400 response to GET *: %#v", res)
+	}
+
+	res, err = Get(ts.URL + "/second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if got := <-uric; got != "/second" {
+		t.Errorf("Handler saw request for %q; want /second", got)
 	}
 }
 

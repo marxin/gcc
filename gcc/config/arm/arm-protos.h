@@ -53,7 +53,6 @@ extern int const_ok_for_op (HOST_WIDE_INT, enum rtx_code);
 extern int const_ok_for_dimode_op (HOST_WIDE_INT, enum rtx_code);
 extern int arm_split_constant (RTX_CODE, enum machine_mode, rtx,
 			       HOST_WIDE_INT, rtx, rtx, int);
-extern RTX_CODE arm_canonicalize_comparison (RTX_CODE, rtx *, rtx *);
 extern int legitimate_pic_operand_p (rtx);
 extern rtx legitimize_pic_address (rtx, enum machine_mode, rtx);
 extern rtx legitimize_tls_address (rtx, rtx);
@@ -243,6 +242,10 @@ struct tune_params
   int (*branch_cost) (bool, bool);
   /* Prefer STRD/LDRD instructions over PUSH/POP/LDM/STM.  */
   bool prefer_ldrd_strd;
+  /* The preference for non short cirtcuit operation when optimizing for
+     performance. The first element covers Thumb state and the second one
+     is for ARM state.  */
+  bool logical_op_non_short_circuit[2];
 };
 
 extern const struct tune_params *current_tune;

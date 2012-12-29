@@ -617,9 +617,9 @@ AC_SUBST(enable_multilib)
 AC_ARG_ENABLE(multiarch,
 [AS_HELP_STRING([--enable-multiarch],
 		[enable support for multiarch paths])],
-[case "${withval}" in
-yes|no|auto) enable_multiarch=$withval;;
-*) AC_MSG_ERROR(bad value ${withval} given for --enable-multiarch option) ;;
+[case "${enableval}" in
+yes|no|auto) enable_multiarch=$enableval;;
+*) AC_MSG_ERROR(bad value ${enableval} given for --enable-multiarch option) ;;
 esac], [enable_multiarch=auto])
 if test x${enable_multiarch} = xauto; then
   if test x${with_native_system_header_dir} != x; then
@@ -636,6 +636,7 @@ AC_SUBST(enable_multiarch)
 AC_MSG_RESULT($enable_multiarch$ma_msg_suffix)
 
 # needed for setting the multiarch name for soft-float/hard-float ABIs
+AC_SUBST(with_cpu)
 AC_SUBST(with_float)
 
 # Enable __cxa_atexit for C++.
@@ -2030,8 +2031,8 @@ ORIGINAL_PLUGIN_LD_FOR_TARGET=$gcc_cv_ld
 PLUGIN_LD_SUFFIX=`basename $gcc_cv_ld | sed -e "s,$target_alias-,,"`
 # if the PLUGIN_LD is set ld-new, just have it as ld
 # as that is the installed named.
-if test x$PLUGIN_LD_SUFFIX == xld-new \
-   || test x$PLUGIN_LD_SUFFIX == xcollect-ld ; then
+if test x$PLUGIN_LD_SUFFIX = xld-new \
+   || test x$PLUGIN_LD_SUFFIX = xcollect-ld ; then
   PLUGIN_LD_SUFFIX=ld
 fi
 AC_ARG_WITH(plugin-ld,

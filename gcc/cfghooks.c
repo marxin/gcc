@@ -280,6 +280,22 @@ dump_bb (FILE *outf, basic_block bb, int indent, int flags)
   fputc ('\n', outf);
 }
 
+/* Dumps basic block BB to pretty-printer PP, for use as a label of
+   a DOT graph record-node.  The implementation of this hook is
+   expected to write the label to the stream that is attached to PP.
+   Field separators between instructions are pipe characters printed
+   verbatim.  Instructions should be written with some characters
+   escaped, using pp_write_text_as_dot_label_to_stream().  */
+
+void
+dump_bb_for_graph (pretty_printer *pp, basic_block bb)
+{
+  if (!cfg_hooks->dump_bb_for_graph)
+    internal_error ("%s does not support dump_bb_for_graph",
+		    cfg_hooks->name);
+  cfg_hooks->dump_bb_for_graph (pp, bb);
+}
+
 /* Dump the complete CFG to FILE.  FLAGS are the TDF_* flags in dumpfile.h.  */
 void
 dump_flow_info (FILE *file, int flags)
@@ -708,11 +724,23 @@ merge_blocks (basic_block a, basic_block b)
 
   cfg_hooks->merge_blocks (a, b);
 
-  /* If we merge a loop header into its predecessor, update the loop
-     structure.  */
   if (current_loops != NULL)
     {
-      if (b->loop_father->header == b)
+      /* If the block we merge into is a loop header do nothing unless ... */
+      if (a->loop_father->header == a)
+	{
+	  /* ... we merge two loop headers, in which case we kill
+	     the inner loop.  */
+	  if (b->loop_father->header == b)
+	    {
+	      b->loop_father->header = NULL;
+	      b->loop_father->latch = NULL;
+	      loops_state_set (LOOPS_NEED_FIXUP);
+	    }
+	}
+      /* If we merge a loop header into its predecessor, update the loop
+	 structure.  */
+      else if (b->loop_father->header == b)
 	{
 	  remove_bb_from_loops (a);
 	  add_bb_to_loop  (a, b->loop_father);
@@ -814,11 +842,12 @@ make_forwarder_block (basic_block bb, bool (*redirect_edge_p) (edge),
 
   if (dom_info_available_p (CDI_DOMINATORS))
     {
-      VEC (basic_block, heap) *doms_to_fix = VEC_alloc (basic_block, heap, 2);
-      VEC_quick_push (basic_block, doms_to_fix, dummy);
-      VEC_quick_push (basic_block, doms_to_fix, bb);
+      vec<basic_block> doms_to_fix;
+      doms_to_fix.create (2);
+      doms_to_fix.quick_push (dummy);
+      doms_to_fix.quick_push (bb);
       iterate_fix_dominators (CDI_DOMINATORS, doms_to_fix, false);
-      VEC_free (basic_block, heap, doms_to_fix);
+      doms_to_fix.release ();
     }
 
   if (current_loops != NULL)
@@ -1144,7 +1173,7 @@ bool
 cfg_hook_duplicate_loop_to_header_edge (struct loop *loop, edge e,
 					unsigned int ndupl,
 					sbitmap wont_exit, edge orig,
-					VEC (edge, heap) **to_remove,
+					vec<edge> *to_remove,
 					int flags)
 {
   gcc_assert (cfg_hooks->cfg_hook_duplicate_loop_to_header_edge);

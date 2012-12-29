@@ -4557,21 +4557,48 @@ get_bit_range (unsigned HOST_WIDE_INT *bitstart,
   *bitend = *bitstart + tree_low_cst (DECL_SIZE (repr), 1) - 1;
 }
 
+/* Returns true if ADDR is an ADDR_EXPR of a DECL that does not reside
+   in memory and has non-BLKmode.  DECL_RTL must not be a MEM; if
+   DECL_RTL was not set yet, return NORTL.  */
+
+static inline bool
+addr_expr_of_non_mem_decl_p_1 (tree addr, bool nortl)
+{
+  if (TREE_CODE (addr) != ADDR_EXPR)
+    return false;
+
+  tree base = TREE_OPERAND (addr, 0);
+
+  if (!DECL_P (base)
+      || TREE_ADDRESSABLE (base)
+      || DECL_MODE (base) == BLKmode)
+    return false;
+
+  if (!DECL_RTL_SET_P (base))
+    return nortl;
+
+  return (!MEM_P (DECL_RTL (base)));
+}
+
 /* Returns true if the MEM_REF REF refers to an object that does not
    reside in memory and has non-BLKmode.  */
 
-static bool
+static inline bool
 mem_ref_refers_to_non_mem_p (tree ref)
 {
   tree base = TREE_OPERAND (ref, 0);
-  if (TREE_CODE (base) != ADDR_EXPR)
-    return false;
-  base = TREE_OPERAND (base, 0);
-  return (DECL_P (base)
-	  && !TREE_ADDRESSABLE (base)
-	  && DECL_MODE (base) != BLKmode
-	  && DECL_RTL_SET_P (base)
-	  && !MEM_P (DECL_RTL (base)));
+  return addr_expr_of_non_mem_decl_p_1 (base, false);
+}
+
+/* Return TRUE iff OP is an ADDR_EXPR of a DECL that's not
+   addressable.  This is very much like mem_ref_refers_to_non_mem_p,
+   but instead of the MEM_REF, it takes its base, and it doesn't
+   assume a DECL is in memory just because its RTL is not set yet.  */
+
+bool
+addr_expr_of_non_mem_decl_p (tree op)
+{
+  return addr_expr_of_non_mem_decl_p_1 (op, true);
 }
 
 /* Expand an assignment that stores the value of FROM into TO.  If NONTEMPORAL
@@ -4818,8 +4845,6 @@ expand_assignment (tree to, tree from, bool nontemporal)
 		 done for MEM.  Also set MEM_KEEP_ALIAS_SET_P if needed.  */
 	      if (volatilep)
 		MEM_VOLATILE_P (to_rtx) = 1;
-	      if (component_uses_parent_alias_set (to))
-		MEM_KEEP_ALIAS_SET_P (to_rtx) = 1;
 	    }
 
 	  if (optimize_bitfield_assignment_op (bitsize, bitpos,
@@ -4922,7 +4947,12 @@ expand_assignment (tree to, tree from, bool nontemporal)
       rtx temp;
 
       push_temp_slots ();
-      if (REG_P (to_rtx) && TYPE_MODE (TREE_TYPE (from)) == BLKmode)
+
+      /* If the source is itself a return value, it still is in a pseudo at
+	 this point so we can move it back to the return register directly.  */
+      if (REG_P (to_rtx)
+	  && TYPE_MODE (TREE_TYPE (from)) == BLKmode
+	  && TREE_CODE (from) != CALL_EXPR)
 	temp = copy_blkmode_to_reg (GET_MODE (to_rtx), from);
       else
 	temp = expand_expr (from, NULL_RTX, GET_MODE (to_rtx), EXPAND_NORMAL);
@@ -5779,7 +5809,7 @@ store_constructor (tree exp, rtx target, int cleared, HOST_WIDE_INT size)
 	   register whose mode size isn't equal to SIZE since
 	   clear_storage can't handle this case.  */
 	else if (size > 0
-		 && (((int)VEC_length (constructor_elt, CONSTRUCTOR_ELTS (exp))
+		 && (((int)vec_safe_length (CONSTRUCTOR_ELTS (exp))
 		      != fields_length (type))
 		     || mostly_zeros_p (exp))
 		 && (!REG_P (target)
@@ -6241,7 +6271,7 @@ store_constructor (tree exp, rtx target, int cleared, HOST_WIDE_INT size)
         /* Store each element of the constructor into the corresponding
 	   element of TARGET, determined by counting the elements.  */
 	for (idx = 0, i = 0;
-	     VEC_iterate (constructor_elt, CONSTRUCTOR_ELTS (exp), idx, ce);
+	     vec_safe_iterate (CONSTRUCTOR_ELTS (exp), idx, &ce);
 	     idx++, i += bitsize / elt_size)
 	  {
 	    HOST_WIDE_INT eltpos;
@@ -7131,7 +7161,7 @@ safe_from_p (const_rtx x, tree exp, int top_p)
 	  constructor_elt *ce;
 	  unsigned HOST_WIDE_INT idx;
 
-	  FOR_EACH_VEC_ELT (constructor_elt, CONSTRUCTOR_ELTS (exp), idx, ce)
+	  FOR_EACH_VEC_SAFE_ELT (CONSTRUCTOR_ELTS (exp), idx, ce)
 	    if ((ce->index != NULL_TREE && !safe_from_p (x, ce->index, 0))
 		|| !safe_from_p (x, ce->value, 0))
 	      return 0;
@@ -9325,9 +9355,9 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
 	  }
 	if (!tmp)
 	  {
-	    VEC(constructor_elt,gc) *v;
+	    vec<constructor_elt, va_gc> *v;
 	    unsigned i;
-	    v = VEC_alloc (constructor_elt, gc, VECTOR_CST_NELTS (exp));
+	    vec_alloc (v, VECTOR_CST_NELTS (exp));
 	    for (i = 0; i < VECTOR_CST_NELTS (exp); ++i)
 	      CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, VECTOR_CST_ELT (exp, i));
 	    tmp = build_constructor (type, v);

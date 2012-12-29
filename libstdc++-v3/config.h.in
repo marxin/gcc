@@ -327,6 +327,9 @@
 /* Define to 1 if you have the `sinl' function. */
 #undef HAVE_SINL
 
+/* Defined if sleep exists. */
+#undef HAVE_SLEEP
+
 /* Define to 1 if you have the `sqrtf' function. */
 #undef HAVE_SQRTF
 
@@ -436,6 +439,9 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
+/* Defined if usleep exists. */
+#undef HAVE_USLEEP
+
 /* Defined if vfwscanf exists. */
 #undef HAVE_VFWSCANF
 
@@ -453,6 +459,9 @@
 
 /* Define to 1 if you have the <wctype.h> header file. */
 #undef HAVE_WCTYPE_H
+
+/* Defined if Sleep exists. */
+#undef HAVE_WIN32_SLEEP
 
 /* Define if writev is available in <sys/uio.h>. */
 #undef HAVE_WRITEV

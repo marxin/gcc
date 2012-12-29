@@ -289,7 +289,8 @@ Objective-C and Objective-C++ Dialects}.
 @item Debugging Options
 @xref{Debugging Options,,Options for Debugging Your Program or GCC}.
 @gccoptlist{-d@var{letters}  -dumpspecs  -dumpmachine  -dumpversion @gol
--faddress-sanitizer -fdbg-cnt-list -fdbg-cnt=@var{counter-value-list} @gol
+-fsanitize=@var{style} @gol
+-fdbg-cnt-list -fdbg-cnt=@var{counter-value-list} @gol
 -fdisable-ipa-@var{pass_name} @gol
 -fdisable-rtl-@var{pass_name} @gol
 -fdisable-rtl-@var{pass-name}=@var{range-list} @gol
@@ -304,7 +305,7 @@ Objective-C and Objective-C++ Dialects}.
 -fdump-tree-all @gol
 -fdump-tree-original@r{[}-@var{n}@r{]}  @gol
 -fdump-tree-optimized@r{[}-@var{n}@r{]} @gol
--fdump-tree-cfg -fdump-tree-vcg -fdump-tree-alias @gol
+-fdump-tree-cfg -fdump-tree-alias @gol
 -fdump-tree-ch @gol
 -fdump-tree-ssa@r{[}-@var{n}@r{]} -fdump-tree-pre@r{[}-@var{n}@r{]} @gol
 -fdump-tree-ccp@r{[}-@var{n}@r{]} -fdump-tree-dce@r{[}-@var{n}@r{]} @gol
@@ -452,8 +453,9 @@ Objective-C and Objective-C++ Dialects}.
 @xref{Link Options,,Options for Linking}.
 @gccoptlist{@var{object-file-name}  -l@var{library} @gol
 -nostartfiles  -nodefaultlibs  -nostdlib -pie -rdynamic @gol
--s  -static  -static-libgcc  -static-libstdc++ -shared  @gol
--shared-libgcc  -symbolic @gol
+-s  -static -static-libgcc -static-libstdc++ @gol
+-static-libasan -static-libtsan @gol
+-shared -shared-libgcc  -symbolic @gol
 -T @var{script}  -Wl,@var{option}  -Xlinker @var{option} @gol
 -u @var{symbol}}
 
@@ -504,7 +506,6 @@ Objective-C and Objective-C++ Dialects}.
 -msingle-pic-base  -mno-single-pic-base @gol
 -mpic-register=@var{reg} @gol
 -mnop-fun-dllimport @gol
--mcirrus-fix-invalid-insns -mno-cirrus-fix-invalid-insns @gol
 -mpoke-function-name @gol
 -mthumb  -marm @gol
 -mtpcs-frame  -mtpcs-leaf-frame @gol
@@ -5369,7 +5370,7 @@ appended with a sequential number starting from 1.  @var{range-list} is a
 comma-separated list of function ranges or assembler names.  Each range is a number
 pair separated by a colon.  The range is inclusive in both ends.  If the range
 is trivial, the number pair can be simplified as a single number.  If the
-function's cgraph node's @var{uid} falls within one of the specified ranges,
+function's call graph node's @var{uid} falls within one of the specified ranges,
 the @var{pass} is disabled for that function.  The @var{uid} is shown in the
 function header of a dump file, and the pass names can be dumped by using
 option @option{-fdump-passes}.
@@ -5725,12 +5726,6 @@ also printed.
 Dump the RTL in the assembler output as a comment before each instruction.
 Also turns on @option{-dp} annotation.
 
-@item -dv
-@opindex dv
-For each of the other indicated dump files (@option{-fdump-rtl-@var{pass}}),
-dump a representation of the control flow graph suitable for viewing with VCG
-to @file{@var{file}.@var{pass}.vcg}.
-
 @item -dx
 @opindex dx
 Just generate RTL for a function instead of compiling it.  Usually used
@@ -5839,10 +5834,16 @@ If @code{DECL_ASSEMBLER_NAME} has been set for a given decl, use that
 in the dump instead of @code{DECL_NAME}.  Its primary use is ease of
 use working backward from mangled names in the assembly file.
 @item slim
-Inhibit dumping of members of a scope or body of a function merely
-because that scope has been reached.  Only dump such items when they
-are directly reachable by some other path.  When dumping pretty-printed
-trees, this option inhibits dumping the bodies of control structures.
+When dumping front-end intermediate representations, inhibit dumping
+of members of a scope or body of a function merely because that scope
+has been reached.  Only dump such items when they are directly reachable
+by some other path.
+
+When dumping pretty-printed trees, this option inhibits dumping the
+bodies of control structures.
+
+When dumping RTL, print the RTL in slim (condensed) form instead of
+the default LISP-like representation.
 @item raw
 Print a raw representation of the tree.  By default, trees are
 pretty-printed into a C-like representation.
@@ -5854,6 +5855,15 @@ Enable dumping various statistics about the pass (not honored by every dump
 option).
 @item blocks
 Enable showing basic block boundaries (disabled in raw dumps).
+@item graph
+For each of the other indicated dump files (@option{-fdump-rtl-@var{pass}}),
+dump a representation of the control flow graph suitable for viewing with
+GraphViz to @file{@var{file}.@var{passid}.@var{pass}.dot}.  Each function in
+the file is pretty-printed as a subgraph, so that GraphViz can render them
+all in a single plot.
+
+This option currently only works for RTL dumps, and the RTL is always
+dumped in slim form.
 @item vops
 Enable showing virtual operands for every statement.
 @item lineno
@@ -5920,14 +5930,6 @@ file name is made by appending @file{.gimple} to the source file name.
 @opindex fdump-tree-cfg
 Dump the control flow graph of each function to a file.  The file name is
 made by appending @file{.cfg} to the source file name.
-
-@item vcg
-@opindex fdump-tree-vcg
-Dump the control flow graph of each function to a file in VCG format.  The
-file name is made by appending @file{.vcg} to the source file name.  Note
-that if the file contains more than one function, the generated file cannot
-be used directly by VCG@.  You must cut and paste each function's
-graph into its own separate file first.
 
 @item ch
 @opindex fdump-tree-ch
@@ -6855,11 +6857,17 @@ assumptions based on that.
 
 The default is @option{-fzero-initialized-in-bss}.
 
-@item -faddress-sanitizer
+@item -fsanitize=address
 Enable AddressSanitizer, a fast memory error detector.
 Memory access instructions will be instrumented to detect
-out-of-bounds and use-after-free bugs. So far only heap bugs will be detected.
+out-of-bounds and use-after-free bugs.
 See @uref{http://code.google.com/p/address-sanitizer/} for more details.
+
+@item -fsanitize=thread
+Enable ThreadSanitizer, a fast data race detector.
+Memory access instructions will be instrumented to detect
+data race bugs. 
+See @uref{http://code.google.com/p/data-race-test/wiki/ThreadSanitizer} for more details.
 
 @item -fmudflap -fmudflapth -fmudflapir
 @opindex fmudflap
@@ -9216,9 +9224,9 @@ doing loop versioning for alias in the vectorizer.  See option
 The maximum number of iterations of a loop the brute-force algorithm
 for analysis of the number of iterations of the loop tries to evaluate.
 
-@item hot-bb-count-fraction
-Select fraction of the maximal count of repetitions of basic block in program
-given basic block needs to have to be considered hot.
+@item hot-bb-count-ws-permille
+A basic block profile count is considered hot if it contributes to 
+the given permillage (i.e. 0...1000) of the entire profiled execution.
 
 @item hot-bb-frequency-fraction
 Select fraction of the entry block frequency of executions of basic block in
@@ -9936,6 +9944,24 @@ exceptions, you must link it using the G++ or GCJ driver, as appropriate
 for the languages used in the program, or using the option
 @option{-shared-libgcc}, such that it is linked with the shared
 @file{libgcc}.
+
+@item -static-libasan
+When the @option{-fsanitize=address} option is used to link a program,
+the GCC driver automatically links against @option{libasan}.  If
+@file{libasan} is available as a shared library, and the @option{-static}
+option is not used, then this links against the shared version of
+@file{libasan}.  The @option{-static-libasan} option directs the GCC
+driver to link @file{libasan} statically, without necessarily linking
+other libraries statically.
+
+@item -static-libtsan
+When the @option{-fsanitize=thread} option is used to link a program,
+the GCC driver automatically links against @option{libtsan}.  If
+@file{libtsan} is available as a shared library, and the @option{-static}
+option is not used, then this links against the shared version of
+@file{libtsan}.  The @option{-static-libtsan} option directs the GCC
+driver to link @file{libtsan} statically, without necessarily linking
+other libraries statically.
 
 @item -static-libstdc++
 When the @command{g++} program is used to link a C++ program, it
@@ -11357,18 +11383,6 @@ before execution begins.
 @opindex mpic-register
 Specify the register to be used for PIC addressing.  The default is R10
 unless stack-checking is enabled, when R9 is used.
-
-@item -mcirrus-fix-invalid-insns
-@opindex mcirrus-fix-invalid-insns
-@opindex mno-cirrus-fix-invalid-insns
-Insert NOPs into the instruction stream to in order to work around
-problems with invalid Maverick instruction combinations.  This option
-is only valid if the @option{-mcpu=ep9312} option has been used to
-enable generation of instructions for the Cirrus Maverick floating-point
-co-processor.  This option is not enabled by default, since the
-problem is only present in older Maverick implementations.  The default
-can be re-enabled by use of the @option{-mno-cirrus-fix-invalid-insns}
-switch.
 
 @item -mpoke-function-name
 @opindex mpoke-function-name

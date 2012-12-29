@@ -40,7 +40,7 @@ namespace __asan {
 
 void GetPcSpBp(void *context, uptr *pc, uptr *sp, uptr *bp) {
   ucontext_t *ucontext = (ucontext_t*)context;
-# if __WORDSIZE == 64
+# if SANITIZER_WORDSIZE == 64
   *pc = ucontext->uc_mcontext->__ss.__rip;
   *bp = ucontext->uc_mcontext->__ss.__rbp;
   *sp = ucontext->uc_mcontext->__ss.__rsp;
@@ -48,7 +48,7 @@ void GetPcSpBp(void *context, uptr *pc, uptr *sp, uptr *bp) {
   *pc = ucontext->uc_mcontext->__ss.__eip;
   *bp = ucontext->uc_mcontext->__ss.__ebp;
   *sp = ucontext->uc_mcontext->__ss.__esp;
-# endif  // __WORDSIZE
+# endif  // SANITIZER_WORDSIZE
 }
 
 int GetMacosVersion() {
@@ -66,6 +66,7 @@ int GetMacosVersion() {
       switch (version[1]) {
         case '0': return MACOS_VERSION_SNOW_LEOPARD;
         case '1': return MACOS_VERSION_LION;
+        case '2': return MACOS_VERSION_MOUNTAIN_LION;
         default: return MACOS_VERSION_UNKNOWN;
       }
     }
@@ -128,7 +129,14 @@ bool AsanInterceptsSignal(int signum) {
 }
 
 void AsanPlatformThreadInit() {
-  ReplaceCFAllocator();
+  // For the first program thread, we can't replace the allocator before
+  // __CFInitialize() has been called. If it hasn't, we'll call
+  // MaybeReplaceCFAllocator() later on this thread.
+  // For other threads __CFInitialize() has been called before their creation.
+  // See also asan_malloc_mac.cc.
+  if (((CFRuntimeBase*)kCFAllocatorSystemDefault)->_cfisa) {
+    MaybeReplaceCFAllocator();
+  }
 }
 
 AsanLock::AsanLock(LinkerInitialized) {
@@ -161,6 +169,10 @@ void GetStackTrace(StackTrace *stack, uptr max_s, uptr pc, uptr bp) {
   }
 }
 
+void ClearShadowMemoryForContext(void *context) {
+  UNIMPLEMENTED();
+}
+
 // The range of pages to be used for escape islands.
 // TODO(glider): instead of mapping a fixed range we must find a range of
 // unmapped pages in vmmap and take them.
@@ -169,12 +181,12 @@ void GetStackTrace(StackTrace *stack, uptr max_s, uptr pc, uptr bp) {
 // kHighMemBeg or kHighMemEnd.
 static void *island_allocator_pos = 0;
 
-#if __WORDSIZE == 32
-# define kIslandEnd (0xffdf0000 - kPageSize)
-# define kIslandBeg (kIslandEnd - 256 * kPageSize)
+#if SANITIZER_WORDSIZE == 32
+# define kIslandEnd (0xffdf0000 - GetPageSizeCached())
+# define kIslandBeg (kIslandEnd - 256 * GetPageSizeCached())
 #else
-# define kIslandEnd (0x7fffffdf0000 - kPageSize)
-# define kIslandBeg (kIslandEnd - 256 * kPageSize)
+# define kIslandEnd (0x7fffffdf0000 - GetPageSizeCached())
+# define kIslandBeg (kIslandEnd - 256 * GetPageSizeCached())
 #endif
 
 extern "C"
@@ -198,7 +210,7 @@ mach_error_t __interception_allocate_island(void **ptr,
     internal_memset(island_allocator_pos, 0xCC, kIslandEnd - kIslandBeg);
   };
   *ptr = island_allocator_pos;
-  island_allocator_pos = (char*)island_allocator_pos + kPageSize;
+  island_allocator_pos = (char*)island_allocator_pos + GetPageSizeCached();
   if (flags()->verbosity) {
     Report("Branch island allocated at %p\n", *ptr);
   }
@@ -371,7 +383,7 @@ INTERCEPTOR(void, dispatch_group_async_f, dispatch_group_t group,
                                asan_dispatch_call_block_and_release);
 }
 
-#if MAC_INTERPOSE_FUNCTIONS
+#if MAC_INTERPOSE_FUNCTIONS && !defined(MISSING_BLOCKS_SUPPORT)
 // dispatch_async, dispatch_group_async and others tailcall the corresponding
 // dispatch_*_f functions. When wrapping functions with mach_override, those
 // dispatch_*_f are intercepted automatically. But with dylib interposition

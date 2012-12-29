@@ -101,6 +101,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    known at compile time or estimated via feedback, the SIZE array
    is walked in order until MAX is greater then the estimate (or -1
    means infinity).  Corresponding ALG is used then.
+   When NOALIGN is true the code guaranting the alignment of the memory
+   block is skipped.
+
    For example initializer:
     {{256, loop}, {-1, rep_prefix_4_byte}}
    will use loop for blocks smaller or equal to 256 bytes, rep prefix will
@@ -111,6 +114,7 @@ struct stringop_algs
   const struct stringop_strategy {
     const int max;
     const enum stringop_alg alg;
+    int noalign;
   } size [MAX_STRINGOP_ALGS];
 };
 
@@ -242,12 +246,8 @@ extern const struct processor_costs ix86_size_cost;
 #define TARGET_K8 (ix86_tune == PROCESSOR_K8)
 #define TARGET_ATHLON_K8 (TARGET_K8 || TARGET_ATHLON)
 #define TARGET_NOCONA (ix86_tune == PROCESSOR_NOCONA)
-#define TARGET_CORE2_32 (ix86_tune == PROCESSOR_CORE2_32)
-#define TARGET_CORE2_64 (ix86_tune == PROCESSOR_CORE2_64)
-#define TARGET_CORE2 (TARGET_CORE2_32 || TARGET_CORE2_64)
-#define TARGET_COREI7_32 (ix86_tune == PROCESSOR_COREI7_32)
-#define TARGET_COREI7_64 (ix86_tune == PROCESSOR_COREI7_64)
-#define TARGET_COREI7 (TARGET_COREI7_32 || TARGET_COREI7_64)
+#define TARGET_CORE2 (ix86_tune == PROCESSOR_CORE2)
+#define TARGET_COREI7 (ix86_tune == PROCESSOR_COREI7)
 #define TARGET_GENERIC32 (ix86_tune == PROCESSOR_GENERIC32)
 #define TARGET_GENERIC64 (ix86_tune == PROCESSOR_GENERIC64)
 #define TARGET_GENERIC (TARGET_GENERIC32 || TARGET_GENERIC64)
@@ -314,7 +314,6 @@ enum ix86_tune_indices {
   X86_TUNE_PAD_RETURNS,
   X86_TUNE_PAD_SHORT_FUNCTION,
   X86_TUNE_EXT_80387_CONSTANTS,
-  X86_TUNE_SHORTEN_X87_SSE,
   X86_TUNE_AVOID_VECTOR_DECODE,
   X86_TUNE_PROMOTE_HIMODE_IMUL,
   X86_TUNE_SLOW_IMUL_IMM32_MEM,
@@ -332,6 +331,7 @@ enum ix86_tune_indices {
   X86_TUNE_REASSOC_INT_TO_PARALLEL,
   X86_TUNE_REASSOC_FP_TO_PARALLEL,
   X86_TUNE_GENERAL_REGS_SSE_SPILL,
+  X86_TUNE_AVOID_MEM_OPND_FOR_CMOVE,
 
   X86_TUNE_LAST
 };
@@ -408,7 +408,6 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
 	ix86_tune_features[X86_TUNE_PAD_SHORT_FUNCTION]
 #define TARGET_EXT_80387_CONSTANTS \
 	ix86_tune_features[X86_TUNE_EXT_80387_CONSTANTS]
-#define TARGET_SHORTEN_X87_SSE	ix86_tune_features[X86_TUNE_SHORTEN_X87_SSE]
 #define TARGET_AVOID_VECTOR_DECODE \
 	ix86_tune_features[X86_TUNE_AVOID_VECTOR_DECODE]
 #define TARGET_TUNE_PROMOTE_HIMODE_IMUL \
@@ -438,6 +437,8 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
 	ix86_tune_features[X86_TUNE_REASSOC_FP_TO_PARALLEL]
 #define TARGET_GENERAL_REGS_SSE_SPILL \
 	ix86_tune_features[X86_TUNE_GENERAL_REGS_SSE_SPILL]
+#define TARGET_AVOID_MEM_OPND_FOR_CMOVE \
+	ix86_tune_features[X86_TUNE_AVOID_MEM_OPND_FOR_CMOVE]
 
 /* Feature tests against the various architecture variations.  */
 enum ix86_arch_indices {
@@ -1616,7 +1617,8 @@ typedef struct ix86_args {
    They give nonzero only if REGNO is a hard reg of the suitable class
    or a pseudo reg currently allocated to a suitable hard reg.
    Since they use reg_renumber, they are safe only once reg_renumber
-   has been allocated, which happens in local-alloc.c.  */
+   has been allocated, which happens in reginfo.c during register
+   allocation.  */
 
 #define REGNO_OK_FOR_INDEX_P(REGNO) 					\
   ((REGNO) < STACK_POINTER_REGNUM 					\
@@ -2094,10 +2096,8 @@ enum processor_type
   PROCESSOR_PENTIUM4,
   PROCESSOR_K8,
   PROCESSOR_NOCONA,
-  PROCESSOR_CORE2_32,
-  PROCESSOR_CORE2_64,
-  PROCESSOR_COREI7_32,
-  PROCESSOR_COREI7_64,
+  PROCESSOR_CORE2,
+  PROCESSOR_COREI7,
   PROCESSOR_GENERIC32,
   PROCESSOR_GENERIC64,
   PROCESSOR_AMDFAM10,

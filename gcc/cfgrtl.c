@@ -350,10 +350,10 @@ rtl_create_basic_block (void *headp, void *endp, basic_block after)
   basic_block bb;
 
   /* Grow the basic block array if needed.  */
-  if ((size_t) last_basic_block >= VEC_length (basic_block, basic_block_info))
+  if ((size_t) last_basic_block >= basic_block_info->length ())
     {
       size_t new_size = last_basic_block + (last_basic_block + 3) / 4;
-      VEC_safe_grow_cleared (basic_block, gc, basic_block_info, new_size);
+      vec_safe_grow_cleared (basic_block_info, new_size);
     }
 
   n_basic_blocks++;
@@ -890,7 +890,8 @@ rtl_merge_blocks (basic_block a, basic_block b)
   df_bb_delete (b->index);
 
   /* If B was a forwarder block, propagate the locus on the edge.  */
-  if (forwarder_p && !EDGE_SUCC (b, 0)->goto_locus)
+  if (forwarder_p
+      && LOCATION_LOCUS (EDGE_SUCC (b, 0)->goto_locus) == UNKNOWN_LOCATION)
     EDGE_SUCC (b, 0)->goto_locus = EDGE_SUCC (a, 0)->goto_locus;
 
   if (dump_file)
@@ -1401,7 +1402,7 @@ force_nonfallthru_and_redirect (edge e, basic_block target, rtx jump_label)
 	    {
 	      if (tmp == e)
 		{
-		  VEC_unordered_remove (edge, ENTRY_BLOCK_PTR->succs, ei.index);
+		  ENTRY_BLOCK_PTR->succs->unordered_remove (ei.index);
 		  found = true;
 		  break;
 		}
@@ -1411,7 +1412,7 @@ force_nonfallthru_and_redirect (edge e, basic_block target, rtx jump_label)
 
 	  gcc_assert (found);
 
-	  VEC_safe_push (edge, gc, bb->succs, e);
+	  vec_safe_push (bb->succs, e);
 	  make_single_succ_edge (ENTRY_BLOCK_PTR, bb, EDGE_FALLTHRU);
 	}
     }
@@ -2013,14 +2014,6 @@ print_rtl_with_bb (FILE *outf, const_rtx rtx_first, int flags)
       free (start);
       free (end);
       free (in_bb_p);
-    }
-
-  if (crtl->epilogue_delay_list != 0)
-    {
-      fprintf (outf, "\n;; Insns in epilogue delay list:\n\n");
-      for (tmp_rtx = crtl->epilogue_delay_list; tmp_rtx != 0;
-	   tmp_rtx = XEXP (tmp_rtx, 1))
-	print_rtl_single (outf, XEXP (tmp_rtx, 0));
     }
 }
 
@@ -4149,7 +4142,7 @@ cfg_layout_merge_blocks (basic_block a, basic_block b)
 
   /* If B was a forwarder block, propagate the locus on the edge.  */
   if (forwarder_p
-      && LOCATION_LOCUS (EDGE_SUCC (b, 0)->goto_locus) != UNKNOWN_LOCATION)
+      && LOCATION_LOCUS (EDGE_SUCC (b, 0)->goto_locus) == UNKNOWN_LOCATION)
     EDGE_SUCC (b, 0)->goto_locus = EDGE_SUCC (a, 0)->goto_locus;
 
   if (dump_file)
@@ -4536,6 +4529,7 @@ struct cfg_hooks rtl_cfg_hooks = {
   "rtl",
   rtl_verify_flow_info,
   rtl_dump_bb,
+  rtl_dump_bb_for_graph,
   rtl_create_basic_block,
   rtl_redirect_edge_and_branch,
   rtl_redirect_edge_and_branch_force,
@@ -4577,6 +4571,7 @@ struct cfg_hooks cfg_layout_rtl_cfg_hooks = {
   "cfglayout mode",
   rtl_verify_flow_info_1,
   rtl_dump_bb,
+  rtl_dump_bb_for_graph,
   cfg_layout_create_basic_block,
   cfg_layout_redirect_edge_and_branch,
   cfg_layout_redirect_edge_and_branch_force,

@@ -161,7 +161,7 @@ func TestSetBasicAuth(t *testing.T) {
 }
 
 func TestMultipartRequest(t *testing.T) {
-	// Test that we can read the values and files of a 
+	// Test that we can read the values and files of a
 	// multipart request with FormValue and FormFile,
 	// and that ParseMultipartForm can be called multiple times.
 	req := newTestMultipartRequest(t)
@@ -225,6 +225,16 @@ func TestReadRequestErrors(t *testing.T) {
 		if err != tt.err {
 			t.Errorf("%d. got error = %v; want %v", i, err, tt.err)
 		}
+	}
+}
+
+func TestNewRequestHost(t *testing.T) {
+	req, err := NewRequest("GET", "http://localhost:1234/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Host != "localhost:1234" {
+		t.Errorf("Host = %q; want localhost:1234", req.Host)
 	}
 }
 
