@@ -218,7 +218,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   if (!my_function) 
     return;
 
-  f->ssa_names_size = VEC_length (tree, SSANAMES (my_function));
+  f->ssa_names_size = SSANAMES (my_function)->length ();
   f->node = node;
   f->func_decl = fndecl;
   fnargs = DECL_ARGUMENTS (fndecl);
