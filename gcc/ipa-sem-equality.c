@@ -284,12 +284,22 @@ ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
 
 static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d)
 {
-  tree o1, o2, base1, base2, x1, x2, x3, x4;
+  tree o1, o2, base1, base2, x1, x2, y1, y2;
   enum tree_code code;
+
   HOST_WIDE_INT offset1, offset2;
   
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
+
+  if (base1 && base2)
+  {
+    if (offset1 != offset2)
+      return false;
+
+    t1 = base1;
+    t2 = base2;
+  }
 
   /* TODO: remove
   o1 = TREE_OPERAND(t1, 0);
@@ -302,41 +312,34 @@ static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d)
 
   //o1 = TREE_OPERAND(o1, 1);
 
-  if(base1 == NULL) /* */
-    return false;
-
-  if (TREE_CODE (base1) != TREE_CODE (base2) && offset1 != offset2)
-    return false;
-
-  switch (TREE_CODE (base1))
+  switch (TREE_CODE (t1))
   {
-    case ADDR_EXPR:
-    {
-      o1 = TREE_OPERAND (base1, 0);
-      o2 = TREE_OPERAND (base2, 0);
-
-      return compare_handled_component (o1, o2, d);
-    }
+    case ARRAY_REF:
+    case COMPONENT_REF:
     case MEM_REF:
     {
-      o1 = TREE_OPERAND (base1, 0);
-      o2 = TREE_OPERAND (base2, 0);
+      x1 = TREE_OPERAND (t1, 0);
+      x2 = TREE_OPERAND (t2, 0);
+      y1 = TREE_OPERAND (t1, 1);
+      y2 = TREE_OPERAND (t2, 1);
 
-      if (TREE_CODE (o1) == SSA_NAME)
-        return ssa_check_names (d, o1, o2);
-
-      return o1 == o2;
+      return compare_handled_component (x1, x2, d) && compare_handled_component (y1, y2, d);
     }
+    case ADDR_EXPR:
+    {
+      x1 = TREE_OPERAND (t1, 0);
+      x2 = TREE_OPERAND (t2, 0);
+      return compare_handled_component (x1, x2, d);
+    }
+    case SSA_NAME:
+      return ssa_check_names (d, t1, t2);
     case VAR_DECL:
-      return base1 == base2;
     case FUNCTION_DECL:
-      return base1 == base2;
+    case FIELD_DECL:
+      return t1 == t2;
     default:
-      printf ("Not handled!!!!!\n");
-      break;
+      return false;
   }
-  
-  return false;
 }
 
 static bool
