@@ -1,28 +1,22 @@
-void f1(int x)
+class SuperObject
 {
-  try
-  {    
-    throw x;
-  }
-  catch(int e)
-  {
-  }
-}
+  public:
+    static int RandomNumber()
+    {
+      return 123;
+    }
+};
 
-void f2(int x)
+template <class myType>
+myType GetMax(myType a, myType b)
 {
-  try
-  {    
-    throw x;
-  }
-  catch(int e)
-  {
-  }
+  return a > b ? a : b;
 }
 
 int main(int argc, char **argv)
 {
-  f1(argc);
+  long x = GetMax<long>(2, 4);
+  int y = GetMax<int>(2, 4);
 
   return 0;
 }

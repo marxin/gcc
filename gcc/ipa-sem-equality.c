@@ -242,7 +242,6 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     f->result_type = gimple_register_canonical_type (TREE_TYPE (DECL_RESULT(fndecl)));
 
   /* basic block iteration */
-  // TODO: ASK!!!!!
   f->bb_count = n_basic_blocks_for_function (my_function) - 2;
 
   f->edge_count = n_edges_for_function (my_function);
@@ -285,12 +284,26 @@ ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
 
 static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d)
 {
-  tree o1, o2, base1, base2;
+  tree o1, o2, base1, base2, x1, x2, x3, x4;
   enum tree_code code;
   HOST_WIDE_INT offset1, offset2;
   
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
+
+  /* TODO: remove
+  o1 = TREE_OPERAND(t1, 0);
+  o2 = TREE_OPERAND(t1, 1);
+  x1 = TREE_OPERAND(o1, 0);
+  x2 = TREE_OPERAND(o1, 1);
+  x3 = TREE_OPERAND(x1, 0);
+  x4 = TREE_OPERAND(x1, 1);
+  */
+
+  //o1 = TREE_OPERAND(o1, 1);
+
+  if(base1 == NULL) /* */
+    return false;
 
   if (TREE_CODE (base1) != TREE_CODE (base2) && offset1 != offset2)
     return false;
