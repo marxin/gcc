@@ -282,7 +282,7 @@ ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
     && useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2));
 }
 
-static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d)
+static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 {
   tree o1, o2, base1, base2, x1, x2, y1, y2;
   enum tree_code code;
@@ -323,45 +323,58 @@ static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d)
       y1 = TREE_OPERAND (t1, 1);
       y2 = TREE_OPERAND (t2, 1);
 
-      return compare_handled_component (x1, x2, d) && compare_handled_component (y1, y2, d);
+      return compare_handled_component (x1, x2, d, func1, func2) && compare_handled_component (y1, y2, d, func1, func2);
     }
     case ADDR_EXPR:
     {
       x1 = TREE_OPERAND (t1, 0);
       x2 = TREE_OPERAND (t2, 0);
-      return compare_handled_component (x1, x2, d);
+      return compare_handled_component (x1, x2, d, func1, func2);
     }
+    case INTEGER_CST:
+      return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case SSA_NAME:
       return ssa_check_names (d, t1, t2);
-    case VAR_DECL:
     case FUNCTION_DECL:
     case FIELD_DECL:
-      return t1 == t2;
+    case VAR_DECL:
+      if (auto_var_in_fn_p (t1, func1) && auto_var_in_fn_p (t2, func2))
+        return true; // TODO
+      else
+        return t1 == t2;
     default:
       return false;
   }
 }
 
 static bool
-check_ssa_or_const (tree t1, tree t2, ssa_dict_t *d)
+check_ssa_or_const (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 {
+  enum tree_code tc1, tc2;
 
   if (t1 == NULL || t2 == NULL)
     return false;
 
-  if ((handled_component_p (t1) && handled_component_p (t1)) || TREE_CODE (t1) == ADDR_EXPR || TREE_CODE (t1) == MEM_REF)
+  tc1 = TREE_CODE (t1);
+  tc2 = TREE_CODE (t2);
+
+  /* TODO: handle in a proper way */
+  if (tc1 == CONSTRUCTOR && tc2 == CONSTRUCTOR)
+    return true;
+
+  if ((handled_component_p (t1) && handled_component_p (t1)) || tc1 == ADDR_EXPR || tc2 == MEM_REF)
   {
-    return compare_handled_component (t1, t2, d);
+    return compare_handled_component (t1, t2, d, func1, func2);
   }
   
-  if (TREE_CODE (t1) == SSA_NAME && TREE_CODE (t2) == SSA_NAME)
+  if (tc1 == SSA_NAME && tc2 == SSA_NAME)
     return ssa_check_names (d, t1, t2); 
   else
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
 
 static bool
-check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d)
+check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
 {
   unsigned i;
   tree t1, t2;
@@ -394,11 +407,11 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d)
   else if(t1 == NULL_TREE || t2 == NULL_TREE)
     return false;
   else
-    return check_ssa_or_const (t1, t2, d);
+    return check_ssa_or_const (t1, t2, d, func1, func2);
 }
 
 static bool
-check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d)
+check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
 {
   tree lhs1, lhs2;
   tree rhs1, rhs2;
@@ -426,7 +439,7 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d)
       rhs1 = gimple_assign_rhs2 (s1);
       rhs2 = gimple_assign_rhs2 (s2);
 
-      if (!check_ssa_or_const (rhs1, rhs2, d))
+      if (!check_ssa_or_const (rhs1, rhs2, d, func1, func2))
         return false;
     }
     case GIMPLE_SINGLE_RHS:
@@ -435,7 +448,7 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d)
       rhs1 = gimple_assign_rhs1 (s1);
       rhs2 = gimple_assign_rhs1 (s2);
 
-      if (!check_ssa_or_const (rhs1, rhs2, d))
+      if (!check_ssa_or_const (rhs1, rhs2, d, func1, func2))
         return false;
 
       break;
@@ -447,11 +460,11 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d)
   lhs1 = gimple_get_lhs (s1);
   lhs2 = gimple_get_lhs (s2);
 
-  return check_ssa_or_const (lhs1, lhs2, d);
+  return check_ssa_or_const (lhs1, lhs2, d, func1, func2);
 }
 
 static bool
-check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d)
+check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
 {
   tree t1, t2;
   enum tree_code code1, code2;
@@ -464,13 +477,13 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d)
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
 
-  if (!check_ssa_or_const (t1, t2, d))
+  if (!check_ssa_or_const (t1, t2, d, func1, func2))
     return false;
 
   t1 = gimple_cond_rhs (s1);
   t2 = gimple_cond_rhs (s2);
 
-  if (!check_ssa_or_const (t1, t2, d))
+  if (!check_ssa_or_const (t1, t2, d, func1, func2))
     return false;
 }
 
@@ -482,7 +495,7 @@ check_ssa_label (gimple g1, gimple g2)
 }
 
 static bool
-check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d)
+check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
 {
   unsigned lsize1, lsize2, i;
   tree t1, t2;
@@ -499,7 +512,7 @@ check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d)
   if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
     return false;
 
-  if (!check_ssa_or_const (t1, t2, d))
+  if (!check_ssa_or_const (t1, t2, d, func1, func2))
     return false;
 
   for (i = 0; i < lsize1; i++)
@@ -512,7 +525,7 @@ check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d)
 }
 
 static bool
-check_ssa_return (gimple g1, gimple g2, ssa_dict_t *d)
+check_ssa_return (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
 {
   tree t1, t2;
 
@@ -523,11 +536,11 @@ check_ssa_return (gimple g1, gimple g2, ssa_dict_t *d)
   if (t1 == NULL && t2 == NULL)
     return true;
   else
-    return check_ssa_or_const (t1, t2, d);
+    return check_ssa_or_const (t1, t2, d, func1, func2);
 }
 
 static bool
-compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d)
+compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d, tree func1, tree func2)
 {
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
@@ -547,21 +560,21 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d)
     switch (gimple_code (s1))
     {
       case GIMPLE_CALL:
-        if (!check_ssa_call (s1, s2, d))
+        if (!check_ssa_call (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_ASSIGN:
-        if (!check_ssa_assign (s1, s2, d))
+        if (!check_ssa_assign (s1, s2, d, func1, func2))
           return false;
         break;
 
       case GIMPLE_COND:
-        if (!check_ssa_cond (s1, s2, d))
+        if (!check_ssa_cond (s1, s2, d, func1, func2))
           return false;
         break;
 
       case GIMPLE_SWITCH:
-        if (!check_ssa_switch (s1, s2, d))
+        if (!check_ssa_switch (s1, s2, d, func1, func2))
           return false;
         break;
 
@@ -582,7 +595,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d)
           return false;
         break;
       case GIMPLE_RETURN:
-        if (!check_ssa_return (s1, s2, d))
+        if (!check_ssa_return (s1, s2, d, func1, func2))
           return false;
         break;
 
@@ -597,7 +610,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d)
 }
 
 static bool
-compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d)
+compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d, tree func1, tree func2)
 {
   gimple_stmt_iterator si1, si2;
   gimple phi1, phi2;
@@ -621,7 +634,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d)
       t1 = gimple_phi_arg (phi1, i)->def;
       t2 = gimple_phi_arg (phi2, i)->def;
 
-      if (!check_ssa_or_const (t1, t2, d))
+      if (!check_ssa_or_const (t1, t2, d, func1, func2))
           return false;
     }
 
@@ -693,7 +706,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   /* Checking all basic blocks */
   for (i = 0; i < f1->bb_count; ++i)
-    if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], &ssa_dict))
+    if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], &ssa_dict, f1->func_decl, f2->func_decl))
       return false;
 
   /* Basic block edges check */
@@ -729,7 +742,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   /* Basic block PHI nodes comparison */
   for (i = 0; i < f1->bb_count; ++i)
-    if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb, &ssa_dict))
+    if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb, &ssa_dict, f1->func_decl, f2->func_decl))
       return false;
 
   ssa_dict_free (&ssa_dict);

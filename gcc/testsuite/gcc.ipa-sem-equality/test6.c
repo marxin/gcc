@@ -31,18 +31,15 @@ void x2(int a)
 
 void f1(struct container *c)
 {
-//  void (*f)(void) = &foo;
+  void (*f)(void) = &foo;
 //  struct container pes;
-  void *x = &max;
-  /*
-  pes.x = 123;
-  struct container *pesp = &pes;
+//  pes.x = 123;
+  c->x = 5;
+  struct container *pesp = c;
 
-  /*
   pesp->x = 5;
 
   pole[1][2] = 3;
-  c->x = 5;
 
 
   superpole[4][3].x = 4;
@@ -55,25 +52,22 @@ void f1(struct container *c)
 
   if(x != 0)
     pole[1][2] = 123;
-  */
 }
 
 void f2(struct container *c)
 {
-
-//  void (*f)(void) = &foo;
+  void (*f)(void) = &foo;
 //  struct container pes;
-  void *x = &max;
-  /*
-  pes.x = 123;
-  struct container *pesp = &pes;
-/*
+//  pes.x = 123;
+  c->x = 5;
+  struct container *pesp = c;
   pesp->x = 5;
 
   pole[1][2] = 3;
-  c->x = 5;
+
 
   superpole[4][3].x = 4;
+
   max.x = 3;
   void *x = &pole;
 
@@ -82,7 +76,6 @@ void f2(struct container *c)
 
   if(x != 0)
     pole[1][2] = 123;
-*/
 }
 
 int main(int argc, char **argv)
