@@ -31,9 +31,10 @@ void x2(int a)
 
 void f1(struct container *c)
 {
-  void (*f)(void) = &foo;
-//  struct container pes;
-//  pes.x = 123;
+  struct container pes;
+  pes.x = 123;
+  pes.y = 123;
+
   c->x = 5;
   struct container *pesp = c;
 
@@ -56,9 +57,10 @@ void f1(struct container *c)
 
 void f2(struct container *c)
 {
-  void (*f)(void) = &foo;
-//  struct container pes;
-//  pes.x = 123;
+  struct container pes;
+  pes.x = 123;
+  pes.y = 123;
+
   c->x = 5;
   struct container *pesp = c;
   pesp->x = 5;

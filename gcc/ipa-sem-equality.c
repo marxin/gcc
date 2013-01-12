@@ -51,10 +51,18 @@ typedef struct ssa_pair
   tree_ssa_name *target;
 } ssa_pair_t;
 
+typedef struct vardecl_pair
+{
+  tree source;
+  tree target;
+  vardecl_pair *next;
+} vardecl_pair_t;
+
 typedef struct ssa_dict
 {
   int *source;
   int *target;
+  vardecl_pair_t *vardecl_list;
 } ssa_dict_t;
 
 static sem_func_t **sem_functions;
@@ -82,11 +90,23 @@ ssa_dict_init (ssa_dict_t *d, unsigned ssa_names_size1, unsigned ssa_names_size2
 
   memset (d->source, -1, ssa_names_size1 * sizeof (int));
   memset (d->target, -1, ssa_names_size2 * sizeof (int));
+
+  d->vardecl_list = NULL;
 }
 
 static void
 ssa_dict_free (ssa_dict_t *d)
 {
+  vardecl_pair_t *p;
+
+  while (d->vardecl_list)
+  {
+    p = d->vardecl_list;
+    d->vardecl_list = d->vardecl_list->next;
+
+    free (p);
+  }
+
   free (d->source);
   free (d->target);
 }
@@ -139,7 +159,6 @@ func_hash (const void *func)
 }
 
 /* Semantic function equality comparer. */
-
 static int
 func_equal (const void *func1, const void *func2)
 {
@@ -150,7 +169,6 @@ func_equal (const void *func1, const void *func2)
 }
 
 /* Semantic function htab memory release function. */
-
 static void
 func_free (void *func)
 {
@@ -282,11 +300,43 @@ ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
     && useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2));
 }
 
-static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
+static bool
+check_vardecl (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 {
-  tree o1, o2, base1, base2, x1, x2, y1, y2;
-  enum tree_code code;
+  vardecl_pair_t *vardecl_pair, *vardecl_next_pair;
 
+  if (auto_var_in_fn_p (t1, func1) && auto_var_in_fn_p (t2, func2))
+  {
+    vardecl_pair = d->vardecl_list;
+
+    while (vardecl_pair)
+    {
+      if (vardecl_pair->source == t1 || vardecl_pair->target == t2)
+        return vardecl_pair->source == t1 && vardecl_pair->target == t2;
+
+      vardecl_pair = vardecl_pair->next;
+    }
+
+    vardecl_next_pair = XCNEW (vardecl_pair_t);
+    vardecl_next_pair->source = t1;
+    vardecl_next_pair->target = t2;
+    vardecl_next_pair->next = NULL;
+
+    if (vardecl_pair)
+      vardecl_pair->next = vardecl_next_pair;
+    else
+      d->vardecl_list = vardecl_next_pair;
+
+    return true;
+  }
+  else
+    return t1 == t2;
+}
+
+static bool
+compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
+{
+  tree base1, base2, x1, x2, y1, y2;
   HOST_WIDE_INT offset1, offset2;
   
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
@@ -300,17 +350,6 @@ static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree fun
     t1 = base1;
     t2 = base2;
   }
-
-  /* TODO: remove
-  o1 = TREE_OPERAND(t1, 0);
-  o2 = TREE_OPERAND(t1, 1);
-  x1 = TREE_OPERAND(o1, 0);
-  x2 = TREE_OPERAND(o1, 1);
-  x3 = TREE_OPERAND(x1, 0);
-  x4 = TREE_OPERAND(x1, 1);
-  */
-
-  //o1 = TREE_OPERAND(o1, 1);
 
   switch (TREE_CODE (t1))
   {
@@ -338,10 +377,7 @@ static bool compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree fun
     case FUNCTION_DECL:
     case FIELD_DECL:
     case VAR_DECL:
-      if (auto_var_in_fn_p (t1, func1) && auto_var_in_fn_p (t2, func2))
-        return true; // TODO
-      else
-        return t1 == t2;
+      return check_vardecl (t1, t2, d, func1, func2);
     default:
       return false;
   }
@@ -362,10 +398,11 @@ check_ssa_or_const (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
   if (tc1 == CONSTRUCTOR && tc2 == CONSTRUCTOR)
     return true;
 
+  if (tc1 == VAR_DECL && tc2 == VAR_DECL)
+    return check_vardecl (t1, t2, d, func1, func2);
+
   if ((handled_component_p (t1) && handled_component_p (t1)) || tc1 == ADDR_EXPR || tc2 == MEM_REF)
-  {
     return compare_handled_component (t1, t2, d, func1, func2);
-  }
   
   if (tc1 == SSA_NAME && tc2 == SSA_NAME)
     return ssa_check_names (d, t1, t2); 
@@ -647,7 +684,8 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d, tree func1, 
   return true;
 }
 
-static bool bb_dict_test (int* bb_dict, int source, int target)
+static bool
+bb_dict_test (int* bb_dict, int source, int target)
 {
   if (bb_dict[source] == -1)
   {
