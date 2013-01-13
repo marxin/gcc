@@ -206,13 +206,6 @@ generate_summary (void)
 
     printf ("  function: %s\n", cgraph_node_name (f->node));
     printf ("  hash: %d\n", f->hashcode);
-    //printf ("    res: %u\n", f->result_type);
-
-    /*
-    for(j = 0; j < f->arg_count; ++j)
-      printf ("    arg[%u]: %u\n", j, f->arg_types[j]);
-
-    */
 
     for(j = 0; j < f->bb_count; ++j)
       printf ("      bb[%u]: %u, hashcode: %u\n", j, f->bb_sizes[j], f->bb_sorted[j]->hashcode);
@@ -376,6 +369,7 @@ compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree fun
       return ssa_check_names (d, t1, t2);
     case FUNCTION_DECL:
     case FIELD_DECL:
+      return t1 == t2;
     case VAR_DECL:
       return check_vardecl (t1, t2, d, func1, func2);
     default:
@@ -384,7 +378,7 @@ compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree fun
 }
 
 static bool
-check_ssa_or_const (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
+check_var_operand (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 {
   enum tree_code tc1, tc2;
 
@@ -394,19 +388,24 @@ check_ssa_or_const (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
   tc1 = TREE_CODE (t1);
   tc2 = TREE_CODE (t2);
 
-  /* TODO: handle in a proper way */
-  if (tc1 == CONSTRUCTOR && tc2 == CONSTRUCTOR)
-    return true;
+  if (tc1 != tc2)
+    return false;
 
-  if (tc1 == VAR_DECL && tc2 == VAR_DECL)
-    return check_vardecl (t1, t2, d, func1, func2);
+  switch (tc1)
+  {
+    case CONSTRUCTOR: /* TODO: handle in a proper way */
+      return true;
+    case VAR_DECL:
+      return check_vardecl (t1, t2, d, func1, func2);
+    case SSA_NAME:
+      return ssa_check_names (d, t1, t2); 
+    default:
+      break;
+  }
 
   if ((handled_component_p (t1) && handled_component_p (t1)) || tc1 == ADDR_EXPR || tc2 == MEM_REF)
     return compare_handled_component (t1, t2, d, func1, func2);
-  
-  if (tc1 == SSA_NAME && tc2 == SSA_NAME)
-    return ssa_check_names (d, t1, t2); 
-  else
+  else 
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
 
@@ -444,7 +443,7 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
   else if(t1 == NULL_TREE || t2 == NULL_TREE)
     return false;
   else
-    return check_ssa_or_const (t1, t2, d, func1, func2);
+    return check_var_operand (t1, t2, d, func1, func2);
 }
 
 static bool
@@ -476,7 +475,7 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
       rhs1 = gimple_assign_rhs2 (s1);
       rhs2 = gimple_assign_rhs2 (s2);
 
-      if (!check_ssa_or_const (rhs1, rhs2, d, func1, func2))
+      if (!check_var_operand (rhs1, rhs2, d, func1, func2))
         return false;
     }
     case GIMPLE_SINGLE_RHS:
@@ -485,7 +484,7 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
       rhs1 = gimple_assign_rhs1 (s1);
       rhs2 = gimple_assign_rhs1 (s2);
 
-      if (!check_ssa_or_const (rhs1, rhs2, d, func1, func2))
+      if (!check_var_operand (rhs1, rhs2, d, func1, func2))
         return false;
 
       break;
@@ -497,7 +496,7 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
   lhs1 = gimple_get_lhs (s1);
   lhs2 = gimple_get_lhs (s2);
 
-  return check_ssa_or_const (lhs1, lhs2, d, func1, func2);
+  return check_var_operand (lhs1, lhs2, d, func1, func2);
 }
 
 static bool
@@ -514,20 +513,20 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
 
-  if (!check_ssa_or_const (t1, t2, d, func1, func2))
+  if (!check_var_operand (t1, t2, d, func1, func2))
     return false;
 
   t1 = gimple_cond_rhs (s1);
   t2 = gimple_cond_rhs (s2);
 
-  if (!check_ssa_or_const (t1, t2, d, func1, func2))
+  if (!check_var_operand (t1, t2, d, func1, func2))
     return false;
 }
 
 static bool
 check_ssa_label (gimple g1, gimple g2)
 {
-  // TODO: test me!
+  // TODO: do a complex check
   return !(FORCED_LABEL (gimple_label_label (g1)) || FORCED_LABEL (gimple_label_label (g2)));
 }
 
@@ -549,7 +548,7 @@ check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
   if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
     return false;
 
-  if (!check_ssa_or_const (t1, t2, d, func1, func2))
+  if (!check_var_operand (t1, t2, d, func1, func2))
     return false;
 
   for (i = 0; i < lsize1; i++)
@@ -573,7 +572,7 @@ check_ssa_return (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
   if (t1 == NULL && t2 == NULL)
     return true;
   else
-    return check_ssa_or_const (t1, t2, d, func1, func2);
+    return check_var_operand (t1, t2, d, func1, func2);
 }
 
 static bool
@@ -616,16 +615,9 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d, tree func1, tree func2)
         break;
 
       case GIMPLE_RESX:
-        printf ("xxx TODO: RESX \n");
-        break;
-
       case GIMPLE_DEBUG:
-        printf ("xxx TODO: DEBUG \n");
-        break;
-
       case GIMPLE_GOTO:
-        printf ("xxx TODO: GOTO\n");
-        break;
+        return false;
 
       case GIMPLE_LABEL:
         if (!check_ssa_label (s1, s2))
@@ -671,7 +663,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d, tree func1, 
       t1 = gimple_phi_arg (phi1, i)->def;
       t2 = gimple_phi_arg (phi2, i)->def;
 
-      if (!check_ssa_or_const (t1, t2, d, func1, func2))
+      if (!check_var_operand (t1, t2, d, func1, func2))
           return false;
     }
 
@@ -750,7 +742,6 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   /* Basic block edges check */
   for (i = 0; i < f1->bb_count; ++i)
   {
-    /* TODO: ask */
     bb_dict = XCNEWVEC (int, f1->bb_count + 2);
     memset (bb_dict, -1, (f1->bb_count + 2) * sizeof (int));
 
@@ -823,7 +814,6 @@ semantic_equality (void)
 
     while(f1)
     {
-
       /* TODO */
       printf ("\t\tcomparing with: '%s'", cgraph_node_name (f1->node));
 
@@ -832,7 +822,6 @@ semantic_equality (void)
       printf (" (%s)\n", result ? "EQUAL" : "different");
 
       f1 = f1->next;
-    
     }
 
     f1 = (sem_func_t *)*slot;

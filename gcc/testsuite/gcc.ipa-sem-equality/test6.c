@@ -17,7 +17,6 @@ void foo(void)
   printf("Sparta");
 }
 
-/*
 void x1(int x)
 {
   pole2[2] = 13;
@@ -27,7 +26,6 @@ void x2(int a)
 {
   pole2[2] = 13;
 }
-*/
 
 void f1(struct container *c)
 {
