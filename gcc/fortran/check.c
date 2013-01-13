@@ -1,7 +1,5 @@
 /* Check functions
-   Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-   2011, 2012
-   Free Software Foundation, Inc.
+   Copyright (C) 2002-2013 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Katherine Holcomb
 
 This file is part of GCC.
@@ -895,12 +893,10 @@ gfc_check_associated (gfc_expr *pointer, gfc_expr *target)
 
   where = &pointer->where;
 
-  if (pointer->expr_type == EXPR_VARIABLE || pointer->expr_type == EXPR_FUNCTION)
-    attr1 = gfc_expr_attr (pointer);
-  else if (pointer->expr_type == EXPR_NULL)
+  if (pointer->expr_type == EXPR_NULL)
     goto null_arg;
-  else
-    gcc_assert (0); /* Pointer must be a variable or a function.  */
+
+  attr1 = gfc_expr_attr (pointer);
 
   if (!attr1.pointer && !attr1.proc_pointer)
     {

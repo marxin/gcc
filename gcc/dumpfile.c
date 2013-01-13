@@ -1,5 +1,5 @@
 /* Dump infrastructure for optimizations and intermediate representation.
-   Copyright (C) 2012 Free Software Foundation, Inc.
+   Copyright (C) 2012-2013 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -265,7 +265,9 @@ dump_loc (int dump_kind, FILE *dfile, source_location loc)
                  DECL_SOURCE_FILE (current_function_decl),
                  DECL_SOURCE_LINE (current_function_decl));
      else
-        fprintf (dfile, "\n%d: ", LOCATION_LINE (loc));
+        fprintf (dfile, "\n%s:%d: note: ",
+                 LOCATION_FILE (loc),
+                 LOCATION_LINE (loc));
     }
 }
 
