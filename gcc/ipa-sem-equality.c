@@ -85,8 +85,8 @@ hashval_t iterative_hash_tree (tree type, hashval_t hash)
 static void
 ssa_dict_init (ssa_dict_t *d, unsigned ssa_names_size1, unsigned ssa_names_size2) 
 {
-  d->source = XCNEWVEC (int, ssa_names_size1);
-  d->target = XCNEWVEC (int, ssa_names_size2);
+  d->source = XNEWVEC (int, ssa_names_size1);
+  d->target = XNEWVEC (int, ssa_names_size2);
 
   memset (d->source, -1, ssa_names_size1 * sizeof (int));
   memset (d->target, -1, ssa_names_size2 * sizeof (int));
@@ -195,7 +195,7 @@ generate_summary (void)
 {
   unsigned int i, j;
 
-  printf ("analysed functions (%u):\n", sem_function_count);
+  fprintf (stderr, "analysed functions (%u):\n", sem_function_count);
 
   for(i = 0; i < sem_function_count; ++i)
   {
@@ -204,11 +204,11 @@ generate_summary (void)
     if(f == NULL)
       continue;
 
-    printf ("  function: %s\n", cgraph_node_name (f->node));
-    printf ("  hash: %d\n", f->hashcode);
+    fprintf (stderr, "  function: %s\n", cgraph_node_name (f->node));
+    fprintf (stderr, "  hash: %d\n", f->hashcode);
 
     for(j = 0; j < f->bb_count; ++j)
-      printf ("      bb[%u]: %u, hashcode: %u\n", j, f->bb_sizes[j], f->bb_sorted[j]->hashcode);
+      fprintf (stderr, "      bb[%u]: %u, hashcode: %u\n", j, f->bb_sizes[j], f->bb_sorted[j]->hashcode);
   }
 }
 
@@ -219,8 +219,10 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   unsigned int param_num, gimple_count, bb_count;
   struct function *my_function;
   gimple_stmt_iterator gsi;
+  gimple stmt;
   basic_block bb;
   sem_bb_t *sem_bb;
+  hashval_t gcode_hash, code;
 
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
@@ -240,7 +242,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     param_num++;
 
   f->arg_count = param_num;
-  f->arg_types = XCNEWVEC (tree, param_num);
+  f->arg_types = XNEWVEC (tree, param_num);
 
   param_num = 0;
   for (parm = fnargs; parm; parm = DECL_CHAIN (parm))
@@ -256,28 +258,34 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   f->bb_count = n_basic_blocks_for_function (my_function) - 2;
 
   f->edge_count = n_edges_for_function (my_function);
-  f->bb_sizes = XCNEWVEC (unsigned int, f->bb_count);
+  f->bb_sizes = XNEWVEC (unsigned int, f->bb_count);
 
-  f->bb_sorted = XCNEWVEC (sem_bb_t *, f->bb_count);
+  f->bb_sorted = XNEWVEC (sem_bb_t *, f->bb_count);
   f->cfg_checksum = coverage_compute_cfg_checksum_fn (my_function);
 
   bb_count = 0;
   FOR_EACH_BB_FN (bb, my_function)
   {
     gimple_count = 0;
+    gcode_hash = 0;
 
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+    {
       gimple_count++;
+      stmt = gsi_stmt (gsi);
+      code = (hashval_t) gimple_code (stmt);
+      gcode_hash = iterative_hash_object (code, gcode_hash);
+    }
 
     f->bb_sizes[bb_count] = gimple_count;
 
     /* Inserting basic block to hash table */
-    sem_bb = XCNEW (sem_bb_t);
+    sem_bb = XNEW (sem_bb_t);
     sem_bb->bb = bb;
     sem_bb->func = f;
     sem_bb->stmt_count = gimple_count;
     sem_bb->edge_count = EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs);
-    sem_bb->hashcode = bb_hash (sem_bb);
+    sem_bb->hashcode = iterative_hash_object (gcode_hash, bb_hash (sem_bb));
 
     f->bb_sorted[bb_count++] = sem_bb;
   }
@@ -310,7 +318,7 @@ check_vardecl (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
       vardecl_pair = vardecl_pair->next;
     }
 
-    vardecl_next_pair = XCNEW (vardecl_pair_t);
+    vardecl_next_pair = XNEW (vardecl_pair_t);
     vardecl_next_pair->source = t1;
     vardecl_next_pair->target = t2;
     vardecl_next_pair->next = NULL;
@@ -347,6 +355,7 @@ compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree fun
   switch (TREE_CODE (t1))
   {
     case ARRAY_REF:
+    case ARRAY_RANGE_REF:
     case COMPONENT_REF:
     case MEM_REF:
     {
@@ -418,6 +427,7 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
   if (gimple_call_num_args (s1) != gimple_call_num_args (s2))
     return false;
 
+  // TODO: do it more complex?
   if (!gimple_call_same_target_p (s1, s2))
     return false;
 
@@ -427,11 +437,8 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
     t1 = gimple_call_arg (s1, i);
     t2 = gimple_call_arg (s2, i);
 
-    if (TREE_CODE (t1) == SSA_NAME && TREE_CODE (t2) == SSA_NAME)
-      return ssa_check_names (d, t1, t2);
-
-    if (!operand_equal_p (t1, t2, OEP_ONLY_CONST))
-        return false;
+    if (!check_var_operand (t1, t2, d, func1, func2))
+      return false;
   }
 
   /* return value checking */
@@ -440,8 +447,6 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
 
   if (t1 == NULL_TREE && t2 == NULL_TREE)
     return true;
-  else if(t1 == NULL_TREE || t2 == NULL_TREE)
-    return false;
   else
     return check_var_operand (t1, t2, d, func1, func2);
 }
@@ -449,10 +454,9 @@ check_ssa_call (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
 static bool
 check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
 {
-  tree lhs1, lhs2;
-  tree rhs1, rhs2;
+  tree arg1, arg2;
   enum tree_code code1, code2;
-  enum gimple_rhs_class class1;
+  unsigned i;
 
   code1 = gimple_expr_code (s1);
   code2 = gimple_expr_code (s2);
@@ -463,40 +467,19 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
   code1 = gimple_assign_rhs_code (s1);
   code2 = gimple_assign_rhs_code (s2);
 
-  class1 = gimple_assign_rhs_class (s1);
-
   if (code1 != code2) 
     return false;
 
-  switch (class1)
+  for (i = 0; i < gimple_num_ops (s1); i++)
   {
-    case GIMPLE_BINARY_RHS:
-    {
-      rhs1 = gimple_assign_rhs2 (s1);
-      rhs2 = gimple_assign_rhs2 (s2);
+    arg1 = gimple_op (s1, i);
+    arg2 = gimple_op (s2, i);
 
-      if (!check_var_operand (rhs1, rhs2, d, func1, func2))
+     if (!check_var_operand (arg1, arg2, d, func1, func2))
         return false;
-    }
-    case GIMPLE_SINGLE_RHS:
-    case GIMPLE_UNARY_RHS:
-    {
-      rhs1 = gimple_assign_rhs1 (s1);
-      rhs2 = gimple_assign_rhs1 (s2);
-
-      if (!check_var_operand (rhs1, rhs2, d, func1, func2))
-        return false;
-
-      break;
-    }
-    default:
-      return false;
   }
 
-  lhs1 = gimple_get_lhs (s1);
-  lhs2 = gimple_get_lhs (s2);
-
-  return check_var_operand (lhs1, lhs2, d, func1, func2);
+  return true;
 }
 
 static bool
@@ -615,10 +598,12 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d, tree func1, tree func2)
         break;
 
       case GIMPLE_RESX:
-      case GIMPLE_DEBUG:
       case GIMPLE_GOTO:
+      case GIMPLE_ASM:
         return false;
 
+      case GIMPLE_DEBUG:
+        return true;
       case GIMPLE_LABEL:
         if (!check_ssa_label (s1, s2))
           return false;
@@ -742,7 +727,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   /* Basic block edges check */
   for (i = 0; i < f1->bb_count; ++i)
   {
-    bb_dict = XCNEWVEC (int, f1->bb_count + 2);
+    bb_dict = XNEWVEC (int, f1->bb_count + 2);
     memset (bb_dict, -1, (f1->bb_count + 2) * sizeof (int));
 
     bb1 = f1->bb_sorted[i]->bb;
@@ -788,16 +773,16 @@ semantic_equality (void)
   unsigned int nnodes = 0;
   void **slot;
 
-  sem_functions = XCNEWVEC (sem_func_t *, cgraph_n_nodes);
+  sem_functions = XNEWVEC (sem_func_t *, cgraph_n_nodes);
   sem_function_hash = htab_create (nnodes, func_hash, func_equal, func_free);
 
-  printf ("=== IPA semantic equality pass dump ===\n");
+  fprintf (stderr, "=== IPA semantic equality pass dump ===\n");
 
   generate_summary ();
 
   FOR_EACH_DEFINED_FUNCTION (node)
   {
-    f = XCNEW (sem_func_t);
+    f = XNEW (sem_func_t);
     f->next = NULL;
 
     visit_function (node, f);
@@ -807,7 +792,7 @@ semantic_equality (void)
     /* hash table insertion */
     f->hashcode = func_hash(f);
 
-    printf ("\tfunction: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
+    fprintf (stderr, "\tfunction: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
 
     slot = htab_find_slot_with_hash (sem_function_hash, f, f->hashcode, INSERT);
     f1 = (sem_func_t *)*slot;
@@ -815,11 +800,11 @@ semantic_equality (void)
     while(f1)
     {
       /* TODO */
-      printf ("\t\tcomparing with: '%s'", cgraph_node_name (f1->node));
+      fprintf (stderr, "\t\tcomparing with: '%s'", cgraph_node_name (f1->node));
 
       result = compare_functions(f1, f);
 
-      printf (" (%s)\n", result ? "EQUAL" : "different");
+      fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
 
       f1 = f1->next;
     }
