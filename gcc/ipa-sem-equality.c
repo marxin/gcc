@@ -402,8 +402,8 @@ check_var_operand (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 
   switch (tc1)
   {
-    case CONSTRUCTOR: /* TODO: handle in a proper way */
-      return true;
+    case CONSTRUCTOR:
+      return operand_equal_p (t1, t2, 0);
     case VAR_DECL:
       return check_vardecl (t1, t2, d, func1, func2);
     case SSA_NAME:
@@ -517,7 +517,7 @@ static bool
 check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
 {
   unsigned lsize1, lsize2, i;
-  tree t1, t2;
+  tree t1, t2, low1, low2, high1, high2;
 
   lsize1 = gimple_switch_num_labels (g1);
   lsize2 = gimple_switch_num_labels (g2);
@@ -536,8 +536,19 @@ check_ssa_switch (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
 
   for (i = 0; i < lsize1; i++)
   {
-    t1 = CASE_LABEL (gimple_switch_label (g1, i));
-    t2 = CASE_LABEL (gimple_switch_label (g2, i));
+    low1 = CASE_LOW (gimple_switch_label (g1, i));
+    low2 = CASE_LOW (gimple_switch_label (g2, i));
+
+    if ((low1 != NULL) ^ (low2 != NULL) ||
+      (low1 && low2 && TREE_INT_CST_LOW (low1) != TREE_INT_CST_LOW (low2)))
+        return false;
+
+    high1 = CASE_HIGH (gimple_switch_label (g1, i));
+    high2 = CASE_HIGH (gimple_switch_label (g2, i));
+
+    if ((high1 != NULL) ^ (high2 != NULL) ||
+      (high1 && high2 && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
+        return false;
   }
 
   return true;

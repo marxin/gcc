@@ -238,6 +238,7 @@ int s1(int x)
   switch (x)
   {
     case 10:
+    case 11:
       return 2;
     case 12:
       return 123;
@@ -251,6 +252,7 @@ int s2(int x)
   switch (x)
   {
     case 10:
+    case 11:
       return 2;
     case 12:
       return 123;
