@@ -17,6 +17,16 @@ void foo(void)
   printf("Sparta");
 }
 
+int order(int x, int y)
+{
+   return x < y ? 2 : 4; 
+}
+
+int order2(int y, int x)
+{
+   return x < y ? 2 : 4; 
+}
+
 void x1(int x)
 {
   pole2[2] = 13;
