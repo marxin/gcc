@@ -45,24 +45,17 @@ typedef struct sem_bb
   hashval_t hashcode;
 } sem_bb_t;
 
-typedef struct ssa_pair
-{
-  tree_ssa_name *source;
-  tree_ssa_name *target;
-} ssa_pair_t;
-
-typedef struct vardecl_pair
+typedef struct decl_pair
 {
   tree source;
   tree target;
-  vardecl_pair *next;
-} vardecl_pair_t;
+} decl_pair_t;
 
 typedef struct ssa_dict
 {
   int *source;
   int *target;
-  vardecl_pair_t *vardecl_list;
+  htab_t decl_hash;
 } ssa_dict_t;
 
 static sem_func_t **sem_functions;
@@ -75,13 +68,39 @@ hashval_t iterative_hash_tree (tree type, hashval_t hash)
   uintptr_t pointer = (uintptr_t)type;
   hashval_t *h = (hashval_t *)&pointer;
 
-  for (unsigned i = 0; i < sizeof(uintptr_t) / sizeof(hashval_t); ++i)
+  for (unsigned i = 0; i < sizeof (uintptr_t) / sizeof (hashval_t); ++i)
     hash = iterative_hash_object (h[i], hash);
 
   return hash;
 }
 
 /* SSA dictionary functions */
+static hashval_t
+decl_hash (const void *decl)
+{
+  hashval_t h = 0;
+  const decl_pair_t *pair = (const decl_pair_t *)decl;
+
+  return iterative_hash_tree (pair->source, h);
+}
+
+static int
+decl_equal (const void *decl1, const void *decl2)
+{
+  const decl_pair_t *pair1 = (const decl_pair_t *)decl1;
+  const decl_pair_t *pair2 = (const decl_pair_t *)decl2;
+
+  return pair1->source == pair2->source;
+}
+
+static void
+decl_free (void *decl)
+{
+  decl_pair_t *pair = (decl_pair_t *)decl;
+  
+  free (pair);
+}
+
 static void
 ssa_dict_init (ssa_dict_t *d, unsigned ssa_names_size1, unsigned ssa_names_size2) 
 {
@@ -91,22 +110,12 @@ ssa_dict_init (ssa_dict_t *d, unsigned ssa_names_size1, unsigned ssa_names_size2
   memset (d->source, -1, ssa_names_size1 * sizeof (int));
   memset (d->target, -1, ssa_names_size2 * sizeof (int));
 
-  d->vardecl_list = NULL;
+  d->decl_hash = htab_create (10, decl_hash, decl_equal, decl_free);
 }
 
 static void
 ssa_dict_free (ssa_dict_t *d)
 {
-  vardecl_pair_t *p;
-
-  while (d->vardecl_list)
-  {
-    p = d->vardecl_list;
-    d->vardecl_list = d->vardecl_list->next;
-
-    free (p);
-  }
-
   free (d->source);
   free (d->target);
 }
@@ -304,29 +313,28 @@ ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
 static bool
 check_vardecl (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 {
-  vardecl_pair_t *vardecl_pair, *vardecl_next_pair;
+  void **slot;
+  bool r;
+  decl_pair_t *decl_pair, *slot_decl_pair;
 
   if (auto_var_in_fn_p (t1, func1) && auto_var_in_fn_p (t2, func2))
   {
-    vardecl_pair = d->vardecl_list;
+    decl_pair = XNEW (decl_pair_t);
+    decl_pair->source = t1;
+    decl_pair->target = t2;
 
-    while (vardecl_pair)
+    slot = htab_find_slot_with_hash (d->decl_hash, decl_pair, decl_hash (decl_pair), INSERT);
+    slot_decl_pair = (decl_pair_t *)*slot;
+
+    if (slot_decl_pair)
     {
-      if (vardecl_pair->source == t1 || vardecl_pair->target == t2)
-        return vardecl_pair->source == t1 && vardecl_pair->target == t2;
+      r = decl_pair->target == slot_decl_pair->target;
+      free (decl_pair);
 
-      vardecl_pair = vardecl_pair->next;
+      return r;
     }
-
-    vardecl_next_pair = XNEW (vardecl_pair_t);
-    vardecl_next_pair->source = t1;
-    vardecl_next_pair->target = t2;
-    vardecl_next_pair->next = NULL;
-
-    if (vardecl_pair)
-      vardecl_pair->next = vardecl_next_pair;
     else
-      d->vardecl_list = vardecl_next_pair;
+      *slot = decl_pair;
 
     return true;
   }
@@ -412,9 +420,10 @@ check_var_operand (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
       break;
   }
 
-  if ((handled_component_p (t1) && handled_component_p (t1)) || tc1 == ADDR_EXPR || tc2 == MEM_REF)
+  if ((handled_component_p (t1) && handled_component_p (t1)) || tc1 == ADDR_EXPR || tc1 == MEM_REF
+    || tc1 == REALPART_EXPR || tc1 == IMAGPART_EXPR)
     return compare_handled_component (t1, t2, d, func1, func2);
-  else 
+  else /* COMPLEX_CST compared correctly here */
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
 
@@ -475,8 +484,8 @@ check_ssa_assign (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
     arg1 = gimple_op (s1, i);
     arg2 = gimple_op (s2, i);
 
-     if (!check_var_operand (arg1, arg2, d, func1, func2))
-        return false;
+    if (!check_var_operand (arg1, arg2, d, func1, func2))
+      return false;
   }
 
   return true;

@@ -29,11 +29,19 @@ int order2(int y, int x)
 
 void x1(int x)
 {
+  int i;
+  for(i = 0; i < 20; ++i)
+    pole2[i] = i;
+
   pole2[2] = 13;
 }
 
 void x2(int a)
 {
+  int i;
+  for(i = 0; i < 20; ++i)
+    pole2[i] = i;
+
   pole2[2] = 13;
 }
 
