@@ -934,7 +934,7 @@ gfc_is_constant_expr (gfc_expr *e)
 	  && sym->attr.proc != PROC_INTERNAL
 	  && sym->attr.proc != PROC_ST_FUNCTION
 	  && sym->attr.proc != PROC_UNKNOWN
-	  && sym->formal == NULL)
+	  && gfc_sym_get_dummy_args (sym) == NULL)
 	return 1;
 
       if (e->value.function.isym
@@ -3506,7 +3506,11 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue)
       if (comp)
 	s1 = comp->ts.interface;
       else
-	s1 = lvalue->symtree->n.sym;
+	{
+	  s1 = lvalue->symtree->n.sym;
+	  if (s1->ts.interface)
+	    s1 = s1->ts.interface;
+	}
 
       comp = gfc_get_proc_ptr_comp (rvalue);
       if (comp)
@@ -3514,7 +3518,7 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue)
 	  if (rvalue->expr_type == EXPR_FUNCTION)
 	    {
 	      s2 = comp->ts.interface->result;
-	      name = comp->ts.interface->result->name;
+	      name = s2->name;
 	    }
 	  else
 	    {
@@ -3525,16 +3529,30 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue)
       else if (rvalue->expr_type == EXPR_FUNCTION)
 	{
 	  s2 = rvalue->symtree->n.sym->result;
-	  name = rvalue->symtree->n.sym->result->name;
+	  name = s2->name;
 	}
       else
 	{
 	  s2 = rvalue->symtree->n.sym;
-	  name = rvalue->symtree->n.sym->name;
+	  name = s2->name;
 	}
 
-      if (s1 && s2 && !gfc_compare_interfaces (s1, s2, name, 0, 1,
-					       err, sizeof(err), NULL, NULL))
+      if (s2 && s2->attr.proc_pointer && s2->ts.interface)
+	s2 = s2->ts.interface;
+
+      if (s1 == s2 || !s1 || !s2)
+	return SUCCESS;
+
+      if (!gfc_compare_interfaces (s1, s2, name, 0, 1,
+				   err, sizeof(err), NULL, NULL))
+	{
+	  gfc_error ("Interface mismatch in procedure pointer assignment "
+		     "at %L: %s", &rvalue->where, err);
+	  return FAILURE;
+	}
+
+      if (!gfc_compare_interfaces (s2, s1, name, 0, 1,
+				   err, sizeof(err), NULL, NULL))
 	{
 	  gfc_error ("Interface mismatch in procedure pointer assignment "
 		     "at %L: %s", &rvalue->where, err);
@@ -4280,72 +4298,6 @@ gfc_expr_check_typed (gfc_expr* e, gfc_namespace* ns, bool strict)
   error_found = gfc_traverse_expr (e, NULL, &expr_check_typed_help, 0);
 
   return error_found ? FAILURE : SUCCESS;
-}
-
-
-/* Walk an expression tree and replace all dummy symbols by the corresponding
-   symbol in the formal_ns of "sym". Needed for copying interfaces in PROCEDURE
-   statements. The boolean return value is required by gfc_traverse_expr.  */
-
-static bool
-replace_symbol (gfc_expr *expr, gfc_symbol *sym, int *i ATTRIBUTE_UNUSED)
-{
-  if ((expr->expr_type == EXPR_VARIABLE
-       || (expr->expr_type == EXPR_FUNCTION
-	   && !gfc_is_intrinsic (expr->symtree->n.sym, 0, expr->where)))
-      && expr->symtree->n.sym->ns == sym->ts.interface->formal_ns
-      && expr->symtree->n.sym->attr.dummy)
-    {
-      gfc_symtree *root = sym->formal_ns ? sym->formal_ns->sym_root
-					 : gfc_current_ns->sym_root;
-      gfc_symtree *stree = gfc_find_symtree (root, expr->symtree->n.sym->name);
-      gcc_assert (stree);
-      stree->n.sym->attr = expr->symtree->n.sym->attr;
-      expr->symtree = stree;
-    }
-  return false;
-}
-
-void
-gfc_expr_replace_symbols (gfc_expr *expr, gfc_symbol *dest)
-{
-  gfc_traverse_expr (expr, dest, &replace_symbol, 0);
-}
-
-
-/* The following is analogous to 'replace_symbol', and needed for copying
-   interfaces for procedure pointer components. The argument 'sym' must formally
-   be a gfc_symbol, so that the function can be passed to gfc_traverse_expr.
-   However, it gets actually passed a gfc_component (i.e. the procedure pointer
-   component in whose formal_ns the arguments have to be).  */
-
-static bool
-replace_comp (gfc_expr *expr, gfc_symbol *sym, int *i ATTRIBUTE_UNUSED)
-{
-  gfc_component *comp;
-  comp = (gfc_component *)sym;
-  if ((expr->expr_type == EXPR_VARIABLE
-       || (expr->expr_type == EXPR_FUNCTION
-	   && !gfc_is_intrinsic (expr->symtree->n.sym, 0, expr->where)))
-      && expr->symtree->n.sym->ns == comp->ts.interface->formal_ns)
-    {
-      gfc_symtree *stree;
-      gfc_namespace *ns = comp->formal_ns;
-      /* Don't use gfc_get_symtree as we prefer to fail badly if we don't find
-	 the symtree rather than create a new one (and probably fail later).  */
-      stree = gfc_find_symtree (ns ? ns->sym_root : gfc_current_ns->sym_root,
-		      		expr->symtree->n.sym->name);
-      gcc_assert (stree);
-      stree->n.sym->attr = expr->symtree->n.sym->attr;
-      expr->symtree = stree;
-    }
-  return false;
-}
-
-void
-gfc_expr_replace_comp (gfc_expr *expr, gfc_component *dest)
-{
-  gfc_traverse_expr (expr, (gfc_symbol *)dest, &replace_comp, 0);
 }
 
 

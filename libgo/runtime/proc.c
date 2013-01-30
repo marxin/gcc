@@ -167,6 +167,13 @@ runtime_m(void)
 
 int32	runtime_gcwaiting;
 
+G*	runtime_allg;
+G*	runtime_lastg;
+M*	runtime_allm;
+
+int8*	runtime_goos;
+int32	runtime_ncpu;
+
 // The static TLS size.  See runtime_newm.
 static int tlssize;
 
@@ -503,8 +510,8 @@ runtime_schedinit(void)
 		runtime_raceinit();
 }
 
-extern void main_init(void) __asm__ ("__go_init_main");
-extern void main_main(void) __asm__ ("main.main");
+extern void main_init(void) __asm__ (GOSYM_PREFIX "__go_init_main");
+extern void main_main(void) __asm__ (GOSYM_PREFIX "main.main");
 
 // The main goroutine.
 void
@@ -521,6 +528,7 @@ runtime_main(void)
 	setmcpumax(runtime_gomaxprocs);
 	runtime_sched.init = true;
 	scvg = __go_go(runtime_MHeap_Scavenger, nil);
+	scvg->issystem = true;
 	main_init();
 	runtime_sched.init = false;
 	if(!runtime_sched.lockmain)
@@ -631,11 +639,15 @@ void
 runtime_tracebackothers(G * volatile me)
 {
 	G * volatile gp;
-	Traceback traceback;
+	Traceback tb;
+	int32 traceback;
 
-	traceback.gp = me;
+	tb.gp = me;
+	traceback = runtime_gotraceback();
 	for(gp = runtime_allg; gp != nil; gp = gp->alllink) {
 		if(gp == me || gp->status == Gdead)
+			continue;
+		if(gp->issystem && traceback < 2)
 			continue;
 		runtime_printf("\n");
 		runtime_goroutineheader(gp);
@@ -654,7 +666,7 @@ runtime_tracebackothers(G * volatile me)
 			continue;
 		}
 
-		gp->traceback = &traceback;
+		gp->traceback = &tb;
 
 #ifdef USING_SPLIT_STACK
 		__splitstack_getcontext(&me->stack_context[0]);
@@ -665,7 +677,7 @@ runtime_tracebackothers(G * volatile me)
 			runtime_gogo(gp);
 		}
 
-		runtime_printtrace(traceback.pcbuf, traceback.c);
+		runtime_printtrace(tb.pcbuf, tb.c, false);
 		runtime_goroutinetrailer(gp);
 	}
 }
@@ -968,6 +980,7 @@ top:
 	if((scvg == nil && runtime_sched.grunning == 0) ||
 	   (scvg != nil && runtime_sched.grunning == 1 && runtime_sched.gwait == 0 &&
 	    (scvg->status == Grunning || scvg->status == Gsyscall))) {
+		m->throwing = -1;  // do not dump full stacks
 		runtime_throw("all goroutines are asleep - deadlock!");
 	}
 
@@ -1500,7 +1513,7 @@ runtime_malg(int32 stacksize, byte** ret_stack, size_t* ret_stacksize)
 /* For runtime package testing.  */
 
 void runtime_testing_entersyscall(void)
-  __asm__("runtime.entersyscall");
+  __asm__ (GOSYM_PREFIX "runtime.entersyscall");
 
 void
 runtime_testing_entersyscall()
@@ -1509,7 +1522,7 @@ runtime_testing_entersyscall()
 }
 
 void runtime_testing_exitsyscall(void)
-  __asm__("runtime.exitsyscall");
+  __asm__ (GOSYM_PREFIX "runtime.exitsyscall");
 
 void
 runtime_testing_exitsyscall()
@@ -1609,7 +1622,7 @@ gfget(void)
 	return gp;
 }
 
-void runtime_Gosched (void) asm ("runtime.Gosched");
+void runtime_Gosched (void) __asm__ (GOSYM_PREFIX "runtime.Gosched");
 
 void
 runtime_Gosched(void)
@@ -1688,7 +1701,7 @@ runtime_lockedOSThread(void)
 // for testing of callbacks
 
 _Bool runtime_golockedOSThread(void)
-  asm("runtime.golockedOSThread");
+  __asm__ (GOSYM_PREFIX "runtime.golockedOSThread");
 
 _Bool
 runtime_golockedOSThread(void)
@@ -1704,7 +1717,7 @@ runtime_mid()
 }
 
 intgo runtime_NumGoroutine (void)
-  __asm__ ("runtime.NumGoroutine");
+  __asm__ (GOSYM_PREFIX "runtime.NumGoroutine");
 
 intgo
 runtime_NumGoroutine()
