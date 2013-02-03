@@ -301,45 +301,65 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 }
 
 static bool
-ssa_check_names (ssa_dict_t *d, tree t1, tree t2)
-{
-  if (!ssa_dict_look_up (d, t1, t2))
-    return false;
-
-  return useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2))
-    && useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2));
-}
-
-static bool
-check_vardecl (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
+check_declaration (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 {
   void **slot;
   bool r;
   decl_pair_t *decl_pair, *slot_decl_pair;
 
-  if (auto_var_in_fn_p (t1, func1) && auto_var_in_fn_p (t2, func2))
+  decl_pair = XNEW (decl_pair_t);
+  decl_pair->source = t1;
+  decl_pair->target = t2;
+
+  if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
+    return t1 == t2; /* global variable declaration */
+
+  slot = htab_find_slot_with_hash (d->decl_hash, decl_pair, decl_hash (decl_pair), INSERT);
+  slot_decl_pair = (decl_pair_t *)*slot;
+
+  if (slot_decl_pair)
   {
-    decl_pair = XNEW (decl_pair_t);
-    decl_pair->source = t1;
-    decl_pair->target = t2;
+    r = decl_pair->target == slot_decl_pair->target;
+    free (decl_pair);
 
-    slot = htab_find_slot_with_hash (d->decl_hash, decl_pair, decl_hash (decl_pair), INSERT);
-    slot_decl_pair = (decl_pair_t *)*slot;
-
-    if (slot_decl_pair)
-    {
-      r = decl_pair->target == slot_decl_pair->target;
-      free (decl_pair);
-
-      return r;
-    }
-    else
-      *slot = decl_pair;
-
-    return true;
+    return r;
   }
   else
-    return t1 == t2;
+    *slot = decl_pair;
+
+  return true;
+}
+
+static bool
+ssa_check_names (ssa_dict_t *d, tree t1, tree t2, tree func1, tree func2)
+{
+  tree b1, b2;
+
+  if (!ssa_dict_look_up (d, t1, t2))
+    return false;
+
+  b1 = SSA_NAME_VAR (t1);
+  b2 = SSA_NAME_VAR (t2);
+
+  if (b1 == NULL && b2 == NULL)
+    return true;
+
+  if (TREE_CODE (b1) != TREE_CODE (b2))
+    return false;
+
+  switch (TREE_CODE (b1))
+  {
+    case VAR_DECL:
+    case PARM_DECL:
+      return check_declaration (b1, b2, d, func1, func2);
+      break;
+    default:
+      fprintf (stderr, "Unhandled TREE_CODE in ssa_check_naames: %u\n", TREE_CODE (b1));
+      return false;
+  }
+
+  return useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2))
+    && useless_type_conversion_p (TREE_TYPE (t1), TREE_TYPE (t2));
 }
 
 static bool
@@ -383,12 +403,12 @@ compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree fun
     case INTEGER_CST:
       return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case SSA_NAME:
-      return ssa_check_names (d, t1, t2);
+      return ssa_check_names (d, t1, t2, func1, func2);
     case FUNCTION_DECL:
     case FIELD_DECL:
       return t1 == t2;
     case VAR_DECL:
-      return check_vardecl (t1, t2, d, func1, func2);
+      return check_declaration (t1, t2, d, func1, func2);
     default:
       return false;
   }
@@ -413,9 +433,9 @@ check_var_operand (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
     case CONSTRUCTOR:
       return operand_equal_p (t1, t2, 0);
     case VAR_DECL:
-      return check_vardecl (t1, t2, d, func1, func2);
+      return check_declaration (t1, t2, d, func1, func2);
     case SSA_NAME:
-      return ssa_check_names (d, t1, t2); 
+      return ssa_check_names (d, t1, t2, func1, func2); 
     default:
       break;
   }

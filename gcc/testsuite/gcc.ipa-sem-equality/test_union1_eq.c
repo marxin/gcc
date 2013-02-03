@@ -54,20 +54,6 @@ intflt foo2(intflt j)
   a.u.f = a.u.f;
   return a.u.k;
 }
-float f1(long i)
-{
-  float x = (float)i;
-  sss.u.i = i;
-  return sss.u.f;
-}
-
-float f2(long i)
-{
-  float x = (float)i;
-
-  sss.u.i = i;
-  return sss.u.f;
-}
 
 int main()
 {
