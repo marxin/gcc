@@ -5,7 +5,7 @@ COMPILER="$BASEDIR/../../../objdir/gcc/xgcc -B $BASEDIR/../../../objdir/gcc/ -fi
 
 echo "IPA semantic equality tests"
 
-echo "a) positive tests"
+echo "a) POSITIVE tests"
 
 for i in $BASEDIR/*_eq.c
 do
@@ -18,7 +18,7 @@ do
   fi
 done
 
-echo "b) negative tests"
+echo "b) NEGATIVE tests"
 
 for i in $BASEDIR/*_diff.c
 do

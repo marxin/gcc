@@ -431,7 +431,9 @@ check_var_operand (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
   switch (tc1)
   {
     case CONSTRUCTOR:
-      return operand_equal_p (t1, t2, 0);
+      return true;
+      /* TODO: ask
+        return operand_equal_p (t1, t2, 0); */
     case VAR_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     case SSA_NAME:
@@ -520,7 +522,8 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
   code1 = gimple_expr_code (s1);
   code2 = gimple_expr_code (s2);
 
-  return code1 == code2;
+  if (code1 != code2)
+    return false;
 
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
@@ -531,8 +534,7 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
   t1 = gimple_cond_rhs (s1);
   t2 = gimple_cond_rhs (s2);
 
-  if (!check_var_operand (t1, t2, d, func1, func2))
-    return false;
+  return check_var_operand (t1, t2, d, func1, func2);
 }
 
 static bool

@@ -18,15 +18,12 @@ void f1(struct container *c)
   pes.x = 123;
   pes.y = 123;
 
-  c->x = 5;
   struct container *pesp = c;
   pesp->x = 5;
 
   pole[1][2] = 3;
 
-
   superpole[4][3].x = 4;
-
   max.x = 3;
   void *x = &pole;
 
@@ -35,7 +32,6 @@ void f1(struct container *c)
 
   if(x != 0)
     pole[1][2] = 123;
-
 }
 
 void f2(struct container *c)
@@ -44,15 +40,12 @@ void f2(struct container *c)
   pes.x = 123;
   pes.y = 123;
 
-  c->x = 5;
   struct container *pesp = c;
   pesp->x = 5;
 
   pole[1][2] = 3;
 
-
   superpole[4][3].x = 4;
-
   max.x = 3;
   void *x = &pole;
 
