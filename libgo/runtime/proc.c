@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 #include <limits.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -631,7 +632,7 @@ runtime_goroutinetrailer(G *g)
 struct Traceback
 {
 	G* gp;
-	uintptr pcbuf[100];
+	Location locbuf[100];
 	int32 c;
 };
 
@@ -677,7 +678,7 @@ runtime_tracebackothers(G * volatile me)
 			runtime_gogo(gp);
 		}
 
-		runtime_printtrace(tb.pcbuf, tb.c, false);
+		runtime_printtrace(tb.locbuf, tb.c, false);
 		runtime_goroutinetrailer(gp);
 	}
 }
@@ -692,8 +693,8 @@ gtraceback(G* gp)
 
 	traceback = gp->traceback;
 	gp->traceback = nil;
-	traceback->c = runtime_callers(1, traceback->pcbuf,
-		sizeof traceback->pcbuf / sizeof traceback->pcbuf[0]);
+	traceback->c = runtime_callers(1, traceback->locbuf,
+		sizeof traceback->locbuf / sizeof traceback->locbuf[0]);
 	runtime_gogo(traceback->gp);
 }
 
@@ -1217,6 +1218,9 @@ runtime_newm(void)
 	pthread_attr_t attr;
 	pthread_t tid;
 	size_t stacksize;
+	sigset_t clear;
+	sigset_t old;
+	int ret;
 
 #if 0
 	static const Type *mtype;  // The Go type M
@@ -1249,7 +1253,15 @@ runtime_newm(void)
 	if(pthread_attr_setstacksize(&attr, stacksize) != 0)
 		runtime_throw("pthread_attr_setstacksize");
 
-	if(pthread_create(&tid, &attr, runtime_mstart, mp) != 0)
+	// Block signals during pthread_create so that the new thread
+	// starts with signals disabled.  It will enable them in minit.
+	sigfillset(&clear);
+	sigemptyset(&old);
+	sigprocmask(SIG_BLOCK, &clear, &old);
+	ret = pthread_create(&tid, &attr, runtime_mstart, mp);
+	sigprocmask(SIG_SETMASK, &old, nil);
+
+	if (ret != 0)
 		runtime_throw("pthread_create");
 
 	return mp;
@@ -1742,13 +1754,14 @@ static struct {
 	void (*fn)(uintptr*, int32);
 	int32 hz;
 	uintptr pcbuf[100];
+	Location locbuf[100];
 } prof;
 
 // Called if we receive a SIGPROF signal.
 void
 runtime_sigprof()
 {
-	int32 n;
+	int32 n, i;
 
 	if(prof.fn == nil || prof.hz == 0)
 		return;
@@ -1758,7 +1771,9 @@ runtime_sigprof()
 		runtime_unlock(&prof);
 		return;
 	}
-	n = runtime_callers(0, prof.pcbuf, nelem(prof.pcbuf));
+	n = runtime_callers(0, prof.locbuf, nelem(prof.locbuf));
+	for(i = 0; i < n; i++)
+		prof.pcbuf[i] = prof.locbuf[i].pc;
 	if(n > 0)
 		prof.fn(prof.pcbuf, n);
 	runtime_unlock(&prof);

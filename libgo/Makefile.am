@@ -1656,6 +1656,13 @@ endif
 endif
 endif
 
+# Define socket functions.
+if LIBGO_IS_SOLARIS
+syscall_socket_os_file = go/syscall/socket_xnet.go
+else
+syscall_socket_os_file = go/syscall/socket_posix.go
+endif
+
 # Support for uname.
 if LIBGO_IS_SOLARIS
 if LIBGO_IS_386
@@ -1696,6 +1703,13 @@ else
 syscall_utimesnano_file = go/syscall/libcall_posix_utimesnano.go
 endif
 
+# Test files.
+if LIBGO_IS_LINUX
+syscall_creds_test_file = go/syscall/creds_test.go
+else
+syscall_creds_test_file =
+endif
+
 go_base_syscall_files = \
 	go/syscall/env_unix.go \
 	go/syscall/syscall_errno.go \
@@ -1715,6 +1729,7 @@ go_base_syscall_files = \
 	$(syscall_errstr_file) \
 	$(syscall_size_file) \
 	$(syscall_socket_file) \
+	$(syscall_socket_os_file) \
 	$(syscall_uname_file) \
 	$(syscall_netlink_file) \
 	$(syscall_lsf_file) \
@@ -1734,12 +1749,23 @@ go_syscall_c_files = \
 	go/syscall/signame.c \
 	$(syscall_wait_c_file)
 
+go_syscall_test_files = \
+	$(syscall_creds_test_file) \
+	go/syscall/passfd_test.go
+
 libcalls.go: s-libcalls; @true
-s-libcalls: Makefile go/syscall/mksyscall.awk $(go_base_syscall_files)
+s-libcalls: libcalls-list go/syscall/mksyscall.awk $(go_base_syscall_files)
 	rm -f libcalls.go.tmp
-	files=`echo $^ | sed -e 's/Makefile//' -e 's|[^ ]*go/syscall/mksyscall.awk||'`; \
+	files=`echo $^ | sed -e 's/libcalls-list//' -e 's|[^ ]*go/syscall/mksyscall.awk||'`; \
 	$(AWK) -f $(srcdir)/go/syscall/mksyscall.awk $${files} > libcalls.go.tmp
 	$(SHELL) $(srcdir)/../move-if-change libcalls.go.tmp libcalls.go
+	$(STAMP) $@
+
+libcalls-list: s-libcalls-list; @true
+s-libcalls-list: Makefile
+	rm -f libcalls-list.tmp
+	echo $(go_base_syscall_files) > libcalls-list.tmp
+	$(SHELL) $(srcdir)/../move-if-change libcalls-list.tmp libcalls-list
 	$(STAMP) $@
 
 syscall_arch.go: s-syscall_arch; @true
@@ -1980,19 +2006,13 @@ BUILDPACKAGE = \
 	files=`echo $^ | sed -e 's/[^ ]*\.gox//g'`; \
 	$(LTGOCOMPILE) -I . -c -fgo-pkgpath=`echo $@ | sed -e 's/.lo$$//' -e 's/-go$$//'` -o $@ $$files
 
-if LIBGO_IS_RTEMS
-use_dejagnu = yes
-else
-use_dejagnu = no
-endif
-
 GOTESTFLAGS =
 
 # Check a package.
 CHECK = \
 	GC="$(GOC) $(GOCFLAGS) $($(subst /,_,$@)_GOCFLAGS) -L `${PWD_COMMAND}` -L `${PWD_COMMAND}`/.libs"; \
 	export GC; \
-	GOLIBS="$(MATH_LIBS) $(NET_LIBS)"; \
+	GOLIBS="$(MATH_LIBS) $(NET_LIBS) $(LIBS)"; \
 	export GOLIBS; \
 	RUNTESTFLAGS="$(RUNTESTFLAGS)"; \
 	export RUNTESTFLAGS; \
@@ -2004,10 +2024,10 @@ CHECK = \
 	export LD_LIBRARY_PATH; \
 	$(MKDIR_P) $(@D); \
 	rm -f $@-testsum $@-testlog; \
-	if test "$(use_dejagnu)" = "yes"; then \
-	  $(SHELL) $(srcdir)/testsuite/gotest --dejagnu=yes --basedir=$(srcdir) --srcdir=$(srcdir)/go/$(@D) --pkgpath="$(@D)" --pkgfiles="$(go_$(subst /,_,$(@D))_files)" --testname="$(@D)" --goarch="$(GOARCH)" $(GOTESTFLAGS); \
+	if test "$(USE_DEJAGNU)" = "yes"; then \
+	  $(SHELL) $(srcdir)/testsuite/gotest --dejagnu=yes --basedir=$(srcdir) --srcdir=$(srcdir)/go/$(@D) --pkgpath="$(@D)" --pkgfiles="$(go_$(subst /,_,$(@D))_files)" --testname="$(@D)" --goarch="$(GOARCH)" $(GOTESTFLAGS) $(go_$(subst /,_,$(@D))_test_files); \
 	else \
-	  if $(SHELL) $(srcdir)/testsuite/gotest --basedir=$(srcdir) --srcdir=$(srcdir)/go/$(@D) --pkgpath="$(@D)" --pkgfiles="$(go_$(subst /,_,$(@D))_files)" --goarch="$(GOARCH)" $(GOTESTFLAGS) >>$@-testlog 2>&1; then \
+	  if $(SHELL) $(srcdir)/testsuite/gotest --basedir=$(srcdir) --srcdir=$(srcdir)/go/$(@D) --pkgpath="$(@D)" --pkgfiles="$(go_$(subst /,_,$(@D))_files)" --goarch="$(GOARCH)" $(GOTESTFLAGS) $(go_$(subst /,_,$(@D))_test_files) >>$@-testlog 2>&1; then \
 	    echo "PASS: $(@D)" >> $@-testlog; \
 	    echo "PASS: $(@D)"; \
 	    echo "PASS: $(@D)" > $@-testsum; \
@@ -3843,7 +3863,10 @@ check-head:
 	@echo >> libgo.head
 
 check-tail: check-recursive check-multi
-	@lib=`${PWD_COMMAND} | sed -e 's,^.*/\([^/][^/]*\)$$,\1,'`; \
+	@if test "$(USE_DEJAGNU)" = "yes"; then \
+	  exit 0; \
+	fi; \
+	lib=`${PWD_COMMAND} | sed -e 's,^.*/\([^/][^/]*\)$$,\1,'`; \
 	for dir in . $(MULTIDIRS); do \
 	  mv ../$${dir}/$${lib}/libgo.sum ../$${dir}/$${lib}/libgo.sum.sep; \
 	  mv ../$${dir}/$${lib}/libgo.log ../$${dir}/$${lib}/libgo.log.sep; \
