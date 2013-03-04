@@ -469,6 +469,7 @@ compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree fun
     case FIELD_DECL:
       return t1 == t2;
     case VAR_DECL:
+    case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     default:
       return false;
@@ -496,6 +497,7 @@ check_var_operand (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
       /* TODO: ask
         return operand_equal_p (t1, t2, 0); */
     case VAR_DECL:
+    case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     case SSA_NAME:
       return ssa_check_names (d, t1, t2, func1, func2); 
@@ -599,11 +601,14 @@ check_ssa_cond (gimple s1, gimple s2, ssa_dict_t *d, tree func1, tree func2)
 }
 
 static bool
-check_ssa_label (gimple g1, gimple g2)
+check_ssa_label (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
 {
-  // TODO: do a complex check
-  // fprintf (stderr, "label reached \n");
-  return !(FORCED_LABEL (gimple_label_label (g1)) || FORCED_LABEL (gimple_label_label (g2)));
+  tree label1, label2;
+
+  label1 = gimple_label_label (g1);
+  label2 = gimple_label_label (g2);
+
+  return check_var_operand (label1, label2, d, func1, func2);
 }
 
 static bool
@@ -663,6 +668,20 @@ check_ssa_return (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
 }
 
 static bool
+check_ssa_goto (gimple g1, gimple g2, ssa_dict_t *d, tree func1, tree func2)
+{
+  tree dest1, dest2;
+
+  dest1 = gimple_goto_dest (g1);
+  dest2 = gimple_goto_dest (g2);
+
+  if (TREE_CODE (dest1) != TREE_CODE (dest2) || TREE_CODE(dest1) != SSA_NAME)
+    return false;
+
+  return check_var_operand (dest1, dest2, d, func1, func2);
+}
+
+static bool
 compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d, tree func1, tree func2)
 {
   gimple_stmt_iterator gsi1, gsi2;
@@ -690,33 +709,31 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d, tree func1, tree func2)
         if (!check_ssa_assign (s1, s2, d, func1, func2))
           return false;
         break;
-
       case GIMPLE_COND:
         if (!check_ssa_cond (s1, s2, d, func1, func2))
           return false;
         break;
-
       case GIMPLE_SWITCH:
         if (!check_ssa_switch (s1, s2, d, func1, func2))
           return false;
         break;
-
-      case GIMPLE_RESX:
-      case GIMPLE_GOTO:
-      case GIMPLE_ASM:
-        return false;
-
       case GIMPLE_DEBUG:
         return true;
       case GIMPLE_LABEL:
-        if (!check_ssa_label (s1, s2))
+        if (!check_ssa_label (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_RETURN:
         if (!check_ssa_return (s1, s2, d, func1, func2))
           return false;
         break;
-
+      case GIMPLE_GOTO:
+        if (!check_ssa_goto (s1, s2, d, func1, func2))
+          return false;
+        break;
+      case GIMPLE_RESX:
+      case GIMPLE_ASM:
+        return false;
       default:
         return false;
     }
