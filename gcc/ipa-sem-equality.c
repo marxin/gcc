@@ -51,11 +51,18 @@ typedef struct decl_pair
   tree target;
 } decl_pair_t;
 
+typedef struct edge_pair
+{
+  edge source;
+  edge target;
+} edge_pair_t;
+
 typedef struct ssa_dict
 {
   int *source;
   int *target;
   htab_t decl_hash;
+  htab_t edge_hash;
 } ssa_dict_t;
 
 static sem_func_t **sem_functions;
@@ -63,9 +70,9 @@ static unsigned int sem_function_count;
 static htab_t sem_function_hash;
 
 static
-hashval_t iterative_hash_tree (tree type, hashval_t hash)
+hashval_t iterative_hash_tree (void *ptr, hashval_t hash)
 {
-  uintptr_t pointer = (uintptr_t)type;
+  uintptr_t pointer = (uintptr_t)ptr;
   hashval_t *h = (hashval_t *)&pointer;
 
   for (unsigned i = 0; i < sizeof (uintptr_t) / sizeof (hashval_t); ++i)
@@ -101,6 +108,32 @@ decl_free (void *decl)
   free (pair);
 }
 
+static hashval_t
+edge_hash (const void *edge)
+{
+  hashval_t h = 0;
+  const edge_pair_t *pair = (const edge_pair_t*)edge;
+
+  return iterative_hash_tree (pair->source, h);
+}
+
+static int
+edge_equal (const void *edge1, const void *edge2)
+{
+  const edge_pair_t *pair1 = (const edge_pair_t *)edge1;
+  const edge_pair_t *pair2 = (const edge_pair_t *)edge2;
+
+  return pair1->source == pair2->source;
+}
+
+static void
+edge_free (void *edge)
+{
+  edge_pair_t *pair = (edge_pair_t *)edge;
+  
+  free (pair);
+}
+
 static void
 ssa_dict_init (ssa_dict_t *d, unsigned ssa_names_size1, unsigned ssa_names_size2) 
 {
@@ -111,6 +144,7 @@ ssa_dict_init (ssa_dict_t *d, unsigned ssa_names_size1, unsigned ssa_names_size2
   memset (d->target, -1, ssa_names_size2 * sizeof (int));
 
   d->decl_hash = htab_create (10, decl_hash, decl_equal, decl_free);
+  d->edge_hash = htab_create (10, edge_hash, edge_equal, edge_free);
 }
 
 static void
@@ -331,6 +365,33 @@ check_declaration (tree t1, tree t2, ssa_dict_t *d, tree func1, tree func2)
 }
 
 static bool
+check_edges (edge e1, edge e2, ssa_dict_t *d)
+{
+  void **slot;
+  bool r;
+  edge_pair_t *edge_pair, *slot_edge_pair;
+
+  edge_pair = XNEW (edge_pair_t);
+  edge_pair->source = e1;
+  edge_pair->target = e2;
+
+  slot = htab_find_slot_with_hash (d->edge_hash, edge_pair, edge_hash (edge_pair), INSERT);
+  slot_edge_pair = (edge_pair_t *)*slot;
+
+  if (slot_edge_pair)
+  {
+    r = edge_pair->target == slot_edge_pair->target;
+    free (edge_pair);
+
+    return r;
+  }
+  else
+    *slot = edge_pair;
+
+  return true;
+}
+
+static bool
 ssa_check_names (ssa_dict_t *d, tree t1, tree t2, tree func1, tree func2)
 {
   tree b1, b2;
@@ -541,6 +602,7 @@ static bool
 check_ssa_label (gimple g1, gimple g2)
 {
   // TODO: do a complex check
+  // fprintf (stderr, "label reached \n");
   return !(FORCED_LABEL (gimple_label_label (g1)) || FORCED_LABEL (gimple_label_label (g2)));
 }
 
@@ -672,6 +734,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d, tree func1, 
   gimple phi1, phi2;
   unsigned size1, size2, i;
   tree t1, t2;
+  edge e1, e2;
 
   si2 = gsi_start_phis (bb2);
   for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1); gsi_next (&si1))
@@ -692,6 +755,12 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, ssa_dict_t *d, tree func1, 
 
       if (!check_var_operand (t1, t2, d, func1, func2))
           return false;
+
+      e1 = gimple_phi_arg_edge (phi1, i);
+      e2 = gimple_phi_arg_edge (phi2, i);
+
+      if (!check_edges (e1, e2, d))
+        return false;
     }
 
     if (gsi_end_p (si2))
@@ -788,6 +857,9 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
         return false;
 
       if (e1->flags != e2->flags)
+        return false;
+
+      if (!check_edges (e1, e2, &ssa_dict))
         return false;
 
       ei_next (&ei2);
