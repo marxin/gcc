@@ -255,7 +255,7 @@ generate_summary (void)
   }
 }
 
-static void 
+static bool
 visit_function (struct cgraph_node *node, sem_func_t *f)
 {
   tree fndecl, fnargs, parm, result;
@@ -271,8 +271,8 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   my_function = DECL_STRUCT_FUNCTION (fndecl);
 
   /* TODO: add alert */
-  if (!my_function) 
-    return;
+  if (!my_function || !my_function->gimple_df) 
+    return false;
 
   f->ssa_names_size = SSANAMES (my_function)->length ();
   f->node = node;
@@ -332,6 +332,8 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 
     f->bb_sorted[bb_count++] = sem_bb;
   }
+
+  return true;
 }
 
 static bool
@@ -405,6 +407,9 @@ ssa_check_names (ssa_dict_t *d, tree t1, tree t2, tree func1, tree func2)
   if (b1 == NULL && b2 == NULL)
     return true;
 
+  if (b1 == NULL || b2 == NULL)
+    return false;
+
   if (TREE_CODE (b1) != TREE_CODE (b2))
     return false;
 
@@ -440,6 +445,9 @@ compare_handled_component (tree t1, tree t2, ssa_dict_t *d, tree func1, tree fun
     t1 = base1;
     t2 = base2;
   }
+  
+  if (TREE_CODE (t1) != TREE_CODE (t2))
+    return false;
 
   switch (TREE_CODE (t1))
   {
@@ -898,7 +906,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 static unsigned int
 semantic_equality (void)
 {
-  bool result;
+  bool result, detected;
   sem_func_t *f, *f1;
   struct cgraph_node *node;
   unsigned int nnodes = 0;
@@ -916,35 +924,38 @@ semantic_equality (void)
     f = XNEW (sem_func_t);
     f->next = NULL;
 
-    visit_function (node, f);
-
-    sem_functions[sem_function_count++] = f;
-
-    /* hash table insertion */
-    f->hashcode = func_hash(f);
-
-    fprintf (stderr, "\tfunction: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
-
-    slot = htab_find_slot_with_hash (sem_function_hash, f, f->hashcode, INSERT);
-    f1 = (sem_func_t *)*slot;
-
-    while(f1)
+    detected = visit_function (node, f);
+    if (detected)
     {
-      /* TODO */
-      fprintf (stderr, "\t\tcomparing with: '%s'", cgraph_node_name (f1->node));
+      sem_functions[sem_function_count++] = f;
 
-      result = compare_functions(f1, f);
+      /* hash table insertion */
+      f->hashcode = func_hash(f);
 
-      fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
+      fprintf (stderr, "\tfunction: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
 
-      f1 = f1->next;
+      slot = htab_find_slot_with_hash (sem_function_hash, f, f->hashcode, INSERT);
+      f1 = (sem_func_t *)*slot;
+
+      while(f1)
+      {
+        /* TODO */
+        fprintf (stderr, "\t\tcomparing with: '%s'", cgraph_node_name (f1->node));
+
+        result = compare_functions(f1, f);
+
+        fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
+
+        f1 = f1->next;
+      }
+
+      f1 = (sem_func_t *)*slot;
+      f->next = f1;
+      *slot = f;
     }
-
-    f1 = (sem_func_t *)*slot;
-    f->next = f1;
-    *slot = f;
+    else
+      free (f);
   }
-
 
   return 0; 
 }
