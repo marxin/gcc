@@ -152,6 +152,9 @@ ssa_dict_free (ssa_dict_t *d)
 {
   free (d->source);
   free (d->target);
+
+  htab_delete (d->decl_hash);
+  htab_delete (d->edge_hash);
 }
 
 static bool
@@ -959,6 +962,8 @@ semantic_equality (void)
     else
       free (f);
   }
+
+  htab_delete (sem_function_hash);
 
   return 0; 
 }
