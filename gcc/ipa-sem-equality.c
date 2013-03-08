@@ -946,6 +946,9 @@ semantic_equality (void)
 
         fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
 
+        if (result)
+          fprintf (stderr, "XXX:%s:%s\n", cgraph_node_name (f->node), cgraph_node_name (f1->node));
+
         f1 = f1->next;
       }
 
