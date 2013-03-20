@@ -806,7 +806,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   int *bb_dict = NULL;
   unsigned int i;
   ssa_dict_t ssa_dict;
-  bool result = false;
+  bool result = true;
 
   if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count ||
     f1->edge_count != f2->edge_count || f1->cfg_checksum != f2->cfg_checksum)
@@ -932,7 +932,7 @@ semantic_equality (void)
       /* hash table insertion */
       f->hashcode = func_hash(f);
 
-      fprintf (stderr, "SEM_EQUALITY: new: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
+      fprintf (stderr, "IPA_SEM_EQ: new: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
 
       slot = htab_find_slot_with_hash (sem_function_hash, f, f->hashcode, INSERT);
       f1 = (sem_func_t *)*slot;
@@ -940,14 +940,14 @@ semantic_equality (void)
       while(f1)
       {
         /* TODO */
-        fprintf (stderr, "SEM_EQUALITY: \t\tcomparing with: '%s'", cgraph_node_name (f1->node));
+        fprintf (stderr, "IPA_SEM_EQ: \t\tcomparing with: '%s'", cgraph_node_name (f1->node));
 
         result = compare_functions(f1, f);
 
         fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
 
         if (result)
-          fprintf (stderr, "SEM_EQUALITY HIT:%s:%s\n", cgraph_node_name (f->node), cgraph_node_name (f1->node));
+          fprintf (stderr, "IPA_SEM_EQ HIT:%s:%s\n", cgraph_node_name (f->node), cgraph_node_name (f1->node));
 
         f1 = f1->next;
       }
