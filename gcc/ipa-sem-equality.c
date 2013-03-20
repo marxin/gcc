@@ -218,10 +218,16 @@ func_equal (const void *func1, const void *func2)
 static void
 func_free (void *func)
 {
+  unsigned int i;
+
   sem_func_t *f = (sem_func_t *)func;
+
+  for (i = 0; i < f->bb_count; ++i)
+    free(f->bb_sorted[i]);
 
   free(f->arg_types);
   free(f->bb_sizes);
+  free(f->bb_sorted);
   free(f);
 }
 
@@ -234,28 +240,6 @@ bb_hash (const void *basic_block)
   hash = iterative_hash_object (bb->edge_count, hash);
 
   return hash;
-}
-
-static void
-generate_summary (void)
-{
-  unsigned int i, j;
-
-  fprintf (stderr, "analysed functions (%u):\n", sem_function_count);
-
-  for(i = 0; i < sem_function_count; ++i)
-  {
-    sem_func_t *f = sem_functions[i];
-
-    if(f == NULL)
-      continue;
-
-    fprintf (stderr, "  function: %s\n", cgraph_node_name (f->node));
-    fprintf (stderr, "  hash: %d\n", f->hashcode);
-
-    for(j = 0; j < f->bb_count; ++j)
-      fprintf (stderr, "      bb[%u]: %u, hashcode: %u\n", j, f->bb_sizes[j], f->bb_sorted[j]->hashcode);
-  }
 }
 
 static bool
@@ -729,7 +713,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, ssa_dict_t *d, tree func1, tree func2)
           return false;
         break;
       case GIMPLE_DEBUG:
-        return true;
+        break;
       case GIMPLE_LABEL:
         if (!check_ssa_label (s1, s2, d, func1, func2))
           return false;
@@ -819,10 +803,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   basic_block bb1, bb2;
   edge e1, e2;
   edge_iterator ei1, ei2;
-  int *bb_dict;
-
+  int *bb_dict = NULL;
   unsigned int i;
   ssa_dict_t ssa_dict;
+  bool result = false;
 
   if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count ||
     f1->edge_count != f2->edge_count || f1->cfg_checksum != f2->cfg_checksum)
@@ -861,7 +845,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   /* Checking all basic blocks */
   for (i = 0; i < f1->bb_count; ++i)
     if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], &ssa_dict, f1->func_decl, f2->func_decl))
-      return false;
+    {
+      result = false;
+      goto free_ssa_dict;
+    }
 
   /* Basic block edges check */
   for (i = 0; i < f1->bb_count; ++i)
@@ -879,31 +866,45 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
       ei_cond (ei2, &e2);
 
       if (!bb_dict_test (bb_dict, e1->src->index, e2->src->index))
-        return false;
+      {
+        result = false;
+        goto free_bb_dict;
+      }
 
       if (!bb_dict_test (bb_dict, e1->dest->index, e2->dest->index))
-        return false;
+      {
+        result = false;
+        goto free_bb_dict;
+      }
 
       if (e1->flags != e2->flags)
-        return false;
+      {
+        result = false;
+        goto free_bb_dict;
+      }
 
       if (!check_edges (e1, e2, &ssa_dict))
-        return false;
+      {
+        result = false;
+        goto free_bb_dict;
+      }
 
       ei_next (&ei2);
     }
-
-    free (bb_dict);
   } 
 
   /* Basic block PHI nodes comparison */
   for (i = 0; i < f1->bb_count; ++i)
     if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb, &ssa_dict, f1->func_decl, f2->func_decl))
-      return false;
+      result = false;
 
-  ssa_dict_free (&ssa_dict);
+  free_bb_dict:
+    free (bb_dict);
 
-  return true;
+  free_ssa_dict:
+    ssa_dict_free (&ssa_dict);
+
+  return result;
 }
 
 static unsigned int
@@ -918,10 +919,6 @@ semantic_equality (void)
   sem_functions = XNEWVEC (sem_func_t *, cgraph_n_nodes);
   sem_function_hash = htab_create (nnodes, func_hash, func_equal, func_free);
 
-  fprintf (stderr, "=== IPA semantic equality pass dump ===\n");
-
-  generate_summary ();
-
   FOR_EACH_DEFINED_FUNCTION (node)
   {
     f = XNEW (sem_func_t);
@@ -935,7 +932,7 @@ semantic_equality (void)
       /* hash table insertion */
       f->hashcode = func_hash(f);
 
-      fprintf (stderr, "\tfunction: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
+      fprintf (stderr, "SEM_EQUALITY: new: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
 
       slot = htab_find_slot_with_hash (sem_function_hash, f, f->hashcode, INSERT);
       f1 = (sem_func_t *)*slot;
@@ -943,14 +940,14 @@ semantic_equality (void)
       while(f1)
       {
         /* TODO */
-        fprintf (stderr, "\t\tcomparing with: '%s'", cgraph_node_name (f1->node));
+        fprintf (stderr, "SEM_EQUALITY: \t\tcomparing with: '%s'", cgraph_node_name (f1->node));
 
         result = compare_functions(f1, f);
 
         fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
 
         if (result)
-          fprintf (stderr, "XXX:%s:%s\n", cgraph_node_name (f->node), cgraph_node_name (f1->node));
+          fprintf (stderr, "SEM_EQUALITY HIT:%s:%s\n", cgraph_node_name (f->node), cgraph_node_name (f1->node));
 
         f1 = f1->next;
       }
@@ -963,6 +960,7 @@ semantic_equality (void)
       free (f);
   }
 
+  free (sem_functions);
   htab_delete (sem_function_hash);
 
   return 0; 
