@@ -5,6 +5,7 @@
 #include "tree.h"
 #include "tree-flow.h"
 #include "tree-pass.h"
+#include "tree-dump.h"
 #include "langhooks.h"
 #include "gimple.h"
 #include "cgraph.h"
@@ -932,7 +933,7 @@ semantic_equality (void)
       /* hash table insertion */
       f->hashcode = func_hash(f);
 
-      fprintf (stderr, "IPA_SEM_EQ: new: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
+      // fprintf (stderr, "IPA_SEM_EQ: new: '%s' with hash: %u\n", cgraph_node_name (f->node), f->hashcode);
 
       slot = htab_find_slot_with_hash (sem_function_hash, f, f->hashcode, INSERT);
       f1 = (sem_func_t *)*slot;
@@ -940,14 +941,18 @@ semantic_equality (void)
       while(f1)
       {
         /* TODO */
-        fprintf (stderr, "IPA_SEM_EQ: \t\tcomparing with: '%s'", cgraph_node_name (f1->node));
+        // fprintf (stderr, "IPA_SEM_EQ: \t\tcomparing with: '%s'", cgraph_node_name (f1->node));
 
         result = compare_functions(f1, f);
 
-        fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
+        // fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
 
         if (result)
+        {
           fprintf (stderr, "IPA_SEM_EQ HIT:%s:%s\n", cgraph_node_name (f->node), cgraph_node_name (f1->node));
+          // dump_function_to_file (f1->func_decl, stderr, TDF_DETAILS);
+          // dump_function_to_file (f->func_decl, stderr, TDF_DETAILS);
+        }
 
         f1 = f1->next;
       }
