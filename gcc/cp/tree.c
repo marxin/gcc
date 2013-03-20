@@ -469,6 +469,9 @@ build_cplus_new (tree type, tree init, tsubst_flags_t complain)
   tree rval = build_aggr_init_expr (type, init);
   tree slot;
 
+  if (!complete_type_or_maybe_complain (type, init, complain))
+    return error_mark_node;
+
   /* Make sure that we're not trying to create an instance of an
      abstract class.  */
   if (abstract_virtuals_error_sfinae (NULL_TREE, type, complain))
@@ -1418,7 +1421,8 @@ strip_typedefs_expr (tree t)
       }
 
     case LAMBDA_EXPR:
-      gcc_unreachable ();
+      error ("lambda-expression in a constant expression");
+      return error_mark_node;
 
     default:
       break;
@@ -2024,11 +2028,12 @@ no_linkage_check (tree t, bool relaxed_p)
       if (TYPE_PTRMEMFUNC_P (t))
 	goto ptrmem;
       /* Lambda types that don't have mangling scope have no linkage.  We
-	 check CLASSTYPE_LAMBDA_EXPR here rather than LAMBDA_TYPE_P because
+	 check CLASSTYPE_LAMBDA_EXPR for error_mark_node because
 	 when we get here from pushtag none of the lambda information is
 	 set up yet, so we want to assume that the lambda has linkage and
 	 fix it up later if not.  */
       if (CLASSTYPE_LAMBDA_EXPR (t)
+	  && CLASSTYPE_LAMBDA_EXPR (t) != error_mark_node
 	  && LAMBDA_TYPE_EXTRA_SCOPE (t) == NULL_TREE)
 	return t;
       /* Fall through.  */
@@ -2486,7 +2491,7 @@ cp_tree_equal (tree t1, tree t2)
     t1 = TREE_OPERAND (t1, 0);
   for (code2 = TREE_CODE (t2);
        CONVERT_EXPR_CODE_P (code2)
-	 || code1 == NON_LVALUE_EXPR;
+	 || code2 == NON_LVALUE_EXPR;
        code2 = TREE_CODE (t2))
     t2 = TREE_OPERAND (t2, 0);
 
@@ -2863,13 +2868,6 @@ maybe_dummy_object (tree type, tree* binfop)
       && (same_type_ignoring_top_level_qualifiers_p
 	  (TREE_TYPE (current_class_ref), context)))
     decl = current_class_ref;
-  else if (current != current_class_type
-	   && context == nonlambda_method_basetype ())
-    /* In a lambda, need to go through 'this' capture.  */
-    decl = (build_x_indirect_ref
-	    (input_location, (lambda_expr_this_capture
-			      (CLASSTYPE_LAMBDA_EXPR (current_class_type))),
-	     RO_NULL, tf_warning_or_error));
   else
     decl = build_dummy_object (context);
 

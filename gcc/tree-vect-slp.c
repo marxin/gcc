@@ -2078,7 +2078,6 @@ static bb_vec_info
 vect_slp_analyze_bb_1 (basic_block bb)
 {
   bb_vec_info bb_vinfo;
-  vec<ddr_p> ddrs;
   vec<slp_instance> slp_instances;
   slp_instance instance;
   int i;
@@ -2100,8 +2099,7 @@ vect_slp_analyze_bb_1 (basic_block bb)
       return NULL;
     }
 
-  ddrs = BB_VINFO_DDRS (bb_vinfo);
-  if (!ddrs.length ())
+  if (BB_VINFO_DATAREFS (bb_vinfo).length () < 2)
     {
       if (dump_enabled_p ())
         dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -3181,7 +3179,15 @@ vect_schedule_slp (loop_vec_info loop_vinfo, bb_vec_info bb_vinfo)
       unsigned int j;
       gimple_stmt_iterator gsi;
 
-      vect_remove_slp_scalar_calls (root);
+      /* Remove scalar call stmts.  Do not do this for basic-block
+	 vectorization as not all uses may be vectorized.
+	 ???  Why should this be necessary?  DCE should be able to
+	 remove the stmts itself.
+	 ???  For BB vectorization we can as well remove scalar
+	 stmts starting from the SLP tree root if they have no
+	 uses.  */
+      if (loop_vinfo)
+	vect_remove_slp_scalar_calls (root);
 
       for (j = 0; SLP_TREE_SCALAR_STMTS (root).iterate (j, &store)
                   && j < SLP_INSTANCE_GROUP_SIZE (instance); j++)
