@@ -13,6 +13,8 @@
 #include "tree-ssa-sccvn.h"
 #include "coverage.h"
 
+#define IPA_SEM_EQUALITY_DEBUG
+
 /* Forward struct declaration */
 typedef struct sem_bb sem_bb_t;
 typedef struct sem_func sem_func_t;
@@ -908,6 +910,19 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   return result;
 }
 
+static void
+merge_functions (sem_func_t *original, sem_func_t *alias)
+{
+  return;
+
+  cgraph_release_function_body (alias->node);
+  cgraph_reset_node (alias->node);
+
+  // TODO: fix me
+  // assert cgraph.c:566
+  cgraph_create_function_alias (original->func_decl, alias->func_decl);
+}
+
 static unsigned int
 semantic_equality (void)
 {
@@ -949,9 +964,12 @@ semantic_equality (void)
 
         if (result)
         {
+#ifdef IPA_SEM_EQUALITY_DEBUG
           fprintf (stderr, "IPA_SEM_EQ HIT:%s:%s\n", cgraph_node_name (f->node), cgraph_node_name (f1->node));
-          // dump_function_to_file (f1->func_decl, stderr, TDF_DETAILS);
-          // dump_function_to_file (f->func_decl, stderr, TDF_DETAILS);
+          dump_function_to_file (f1->func_decl, stderr, TDF_DETAILS);
+          dump_function_to_file (f->func_decl, stderr, TDF_DETAILS);
+#endif        
+          merge_functions (f, f1);
         }
 
         f1 = f1->next;

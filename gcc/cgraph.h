@@ -659,6 +659,7 @@ void cgraph_finalize_function (tree, bool);
 void finalize_compilation_unit (void);
 void compile (void);
 void init_cgraph (void);
+void cgraph_reset_node (struct cgraph_node *node);
 bool cgraph_process_new_functions (void);
 void cgraph_process_same_body_aliases (void);
 void fixup_same_cpp_alias_visibility (symtab_node node, symtab_node target, tree alias);

@@ -354,7 +354,7 @@ cgraph_process_new_functions (void)
    ??? It may make more sense to use one body for inlining and other
    body for expanding the function but this is difficult to do.  */
 
-static void
+void
 cgraph_reset_node (struct cgraph_node *node)
 {
   /* If node->process is set, then we have already begun whole-unit analysis.
