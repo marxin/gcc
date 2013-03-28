@@ -213,9 +213,8 @@ static tree instantiate_alias_template (tree, tree, tsubst_flags_t);
 static void
 push_access_scope (tree t)
 {
-  gcc_assert (TREE_CODE (t) == FUNCTION_DECL
-	      || TREE_CODE (t) == TYPE_DECL
-	      || TREE_CODE (t) == VAR_DECL);
+  gcc_assert (VAR_OR_FUNCTION_DECL_P (t)
+	      || TREE_CODE (t) == TYPE_DECL);
 
   if (DECL_FRIEND_CONTEXT (t))
     push_nested_class (DECL_FRIEND_CONTEXT (t));
@@ -5736,7 +5735,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
 	 shall be one of: [...]
 
 	 -- the address of an object or function with external linkage.  */
-      if (TREE_CODE (expr) == INDIRECT_REF
+      if (INDIRECT_REF_P (expr)
 	  && TYPE_REF_OBJ_P (TREE_TYPE (TREE_OPERAND (expr, 0))))
 	{
 	  expr = TREE_OPERAND (expr, 0);
@@ -14014,36 +14013,38 @@ tsubst_copy_and_build (tree t,
 		if (unq != function)
 		  {
 		    tree fn = unq;
-		    if (TREE_CODE (fn) == INDIRECT_REF)
+		    if (INDIRECT_REF_P (fn))
 		      fn = TREE_OPERAND (fn, 0);
 		    if (TREE_CODE (fn) == COMPONENT_REF)
 		      fn = TREE_OPERAND (fn, 1);
 		    if (is_overloaded_fn (fn))
 		      fn = get_first_fn (fn);
-		    permerror (EXPR_LOC_OR_HERE (t),
-			       "%qD was not declared in this scope, "
-			       "and no declarations were found by "
-			       "argument-dependent lookup at the point "
-			       "of instantiation", function);
-		    if (!DECL_P (fn))
-		      /* Can't say anything more.  */;
-		    else if (DECL_CLASS_SCOPE_P (fn))
+		    if (permerror (EXPR_LOC_OR_HERE (t),
+				   "%qD was not declared in this scope, "
+				   "and no declarations were found by "
+				   "argument-dependent lookup at the point "
+				   "of instantiation", function))
 		      {
-			inform (EXPR_LOC_OR_HERE (t),
-				"declarations in dependent base %qT are "
-				"not found by unqualified lookup",
-				DECL_CLASS_CONTEXT (fn));
-			if (current_class_ptr)
-			  inform (EXPR_LOC_OR_HERE (t),
-				  "use %<this->%D%> instead", function);
+			if (!DECL_P (fn))
+			  /* Can't say anything more.  */;
+			else if (DECL_CLASS_SCOPE_P (fn))
+			  {
+			    inform (EXPR_LOC_OR_HERE (t),
+				    "declarations in dependent base %qT are "
+				    "not found by unqualified lookup",
+				    DECL_CLASS_CONTEXT (fn));
+			    if (current_class_ptr)
+			      inform (EXPR_LOC_OR_HERE (t),
+				      "use %<this->%D%> instead", function);
+			    else
+			      inform (EXPR_LOC_OR_HERE (t),
+				      "use %<%T::%D%> instead",
+				      current_class_name, function);
+			  }
 			else
-			  inform (EXPR_LOC_OR_HERE (t),
-				  "use %<%T::%D%> instead",
-				  current_class_name, function);
+			  inform (0, "%q+D declared here, later in the "
+				  "translation unit", fn);
 		      }
-		    else
-		      inform (0, "%q+D declared here, later in the "
-				"translation unit", fn);
 		    function = unq;
 		  }
 	      }
@@ -18598,8 +18599,7 @@ instantiate_decl (tree d, int defer_ok,
 
   /* This function should only be used to instantiate templates for
      functions and static member variables.  */
-  gcc_assert (TREE_CODE (d) == FUNCTION_DECL
-	      || TREE_CODE (d) == VAR_DECL);
+  gcc_assert (VAR_OR_FUNCTION_DECL_P (d));
 
   /* Variables are never deferred; if instantiation is required, they
      are instantiated right away.  That allows for better code in the

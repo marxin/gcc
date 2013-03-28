@@ -7730,7 +7730,7 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 	  cast_to_void = true;
 	  call = TREE_OPERAND (call, 0);
 	}
-      if (TREE_CODE (call) == INDIRECT_REF)
+      if (INDIRECT_REF_P (call))
 	call = TREE_OPERAND (call, 0);
       call = (build_min_non_dep_call_vec
 	      (call,
@@ -8650,13 +8650,15 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 		{
 		  if (complain & tf_error)
 		    {
-		      permerror (input_location,
-				 "default argument mismatch in "
-				 "overload resolution");
-		      inform (input_location,
-			      " candidate 1: %q+#F", cand1->fn);
-		      inform (input_location,
-			      " candidate 2: %q+#F", cand2->fn);
+		      if (permerror (input_location,
+				     "default argument mismatch in "
+				     "overload resolution"))
+			{
+			  inform (input_location,
+				  " candidate 1: %q+#F", cand1->fn);
+			  inform (input_location,
+				  " candidate 2: %q+#F", cand2->fn);
+			}
 		    }
 		  else
 		    return 0;

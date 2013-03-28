@@ -1762,6 +1762,10 @@ finish_qualified_id_expr (tree qualifying_class,
       return expr;
     }
 
+  /* No need to check access within an enum.  */
+  if (TREE_CODE (qualifying_class) == ENUMERAL_TYPE)
+    return expr;
+
   /* Within the scope of a class, turn references to non-static
      members into expression of the form "this->...".  */
   if (template_arg_p)
@@ -2236,7 +2240,7 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 
   if (processing_template_decl && result != error_mark_node)
     {
-      if (TREE_CODE (result) == INDIRECT_REF)
+      if (INDIRECT_REF_P (result))
 	result = TREE_OPERAND (result, 0);
       result = build_call_vec (TREE_TYPE (result), orig_fn, orig_args);
       SET_EXPR_LOCATION (result, input_location);
@@ -2771,8 +2775,7 @@ note_decl_for_pch (tree decl)
 
   /* There's a good chance that we'll have to mangle names at some
      point, even if only for emission in debugging information.  */
-  if ((TREE_CODE (decl) == VAR_DECL
-       || TREE_CODE (decl) == FUNCTION_DECL)
+  if (VAR_OR_FUNCTION_DECL_P (decl)
       && !processing_template_decl)
     mangle_decl (decl);
 }
@@ -5276,15 +5279,15 @@ finish_decltype_type (tree expr, bool id_expression_or_member_access_p,
 
   expr = resolve_nondeduced_context (expr);
 
+  if (invalid_nonstatic_memfn_p (expr, complain))
+    return error_mark_node;
+
   if (type_unknown_p (expr))
     {
       if (complain & tf_error)
 	error ("decltype cannot resolve address of overloaded function");
       return error_mark_node;
     }
-
-  if (invalid_nonstatic_memfn_p (expr, complain))
-    return error_mark_node;
 
   /* To get the size of a static data member declared as an array of
      unknown bound, we need to instantiate it.  */
@@ -5302,7 +5305,7 @@ finish_decltype_type (tree expr, bool id_expression_or_member_access_p,
       if (identifier_p (expr))
         expr = lookup_name (expr);
 
-      if (TREE_CODE (expr) == INDIRECT_REF)
+      if (INDIRECT_REF_P (expr))
         /* This can happen when the expression is, e.g., "a.b". Just
            look at the underlying operand.  */
         expr = TREE_OPERAND (expr, 0);
@@ -5949,7 +5952,7 @@ build_data_member_initialization (tree t, vec<constructor_elt, va_gc> **vec)
     return true;
   else
     gcc_unreachable ();
-  if (TREE_CODE (member) == INDIRECT_REF)
+  if (INDIRECT_REF_P (member))
     member = TREE_OPERAND (member, 0);
   if (TREE_CODE (member) == NOP_EXPR)
     {
@@ -9454,6 +9457,11 @@ lambda_expr_this_capture (tree lambda)
 
   tree this_capture = LAMBDA_EXPR_THIS_CAPTURE (lambda);
 
+  /* In unevaluated context this isn't an odr-use, so just return the
+     nearest 'this'.  */
+  if (cp_unevaluated_operand)
+    return lookup_name (this_identifier);
+
   /* Try to default capture 'this' if we can.  */
   if (!this_capture
       && LAMBDA_EXPR_DEFAULT_CAPTURE_MODE (lambda) != CPLD_NONE)
@@ -9523,11 +9531,6 @@ lambda_expr_this_capture (tree lambda)
 
   if (!this_capture)
     {
-      /* In unevaluated context this isn't an odr-use, so just return the
-	 nearest 'this'.  */
-      if (cp_unevaluated_operand)
-	return lookup_name (this_identifier);
-
       error ("%<this%> was not captured for this lambda function");
       result = error_mark_node;
     }
@@ -9565,7 +9568,8 @@ maybe_resolve_dummy (tree object)
 
   if (type != current_class_type
       && current_class_type
-      && LAMBDA_TYPE_P (current_class_type))
+      && LAMBDA_TYPE_P (current_class_type)
+      && DERIVED_FROM_P (type, current_nonlambda_class_type ()))
     {
       /* In a lambda, need to go through 'this' capture.  */
       tree lam = CLASSTYPE_LAMBDA_EXPR (current_class_type);
