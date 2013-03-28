@@ -567,6 +567,12 @@ cgraph_create_function_alias (tree alias, tree decl)
   alias_node->thunk.alias = decl;
   alias_node->local.finalized = true;
   alias_node->alias = 1;
+  if (same_body_aliases_done || cgraph_state > CGRAPH_STATE_CONSTRUCTION)
+    {
+      ipa_record_reference ((symtab_node)alias_node, (symtab_node)cgraph_get_node (decl),
+			    IPA_REF_ALIAS, NULL);
+      alias_node->analyzed = cgraph_state > CGRAPH_STATE_CONSTRUCTION;
+    }
   return alias_node;
 }
 
@@ -590,9 +596,6 @@ cgraph_same_body_alias (struct cgraph_node *decl_node ATTRIBUTE_UNUSED, tree ali
 
   n = cgraph_create_function_alias (alias, decl);
   n->same_body_alias = true;
-  if (same_body_aliases_done)
-    ipa_record_reference ((symtab_node)n, (symtab_node)cgraph_get_node (decl),
-			  IPA_REF_ALIAS, NULL);
   return n;
 }
 

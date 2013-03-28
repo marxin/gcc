@@ -2,3 +2,4 @@
 
 CXXFLAGS="-ggdb3 -O0" CFLAGS="-ggdb3 -O0" ../configure --enable-languages=c --disable-bootstrap --disable-libsanitizer --prefix=/home/marxin/Programming/gcc-mainline
 # CXXFLAGS="-ggdb3 -O0" CFLAGS="-ggdb3 -O0" ../configure --enable-languages=c,c++ --enable-bootstrap --disable-libsanitizer --prefix=/home/marxin/Programming/gcc-mainline
+# CXXFLAGS="-ffunction-sections" CFLAGS="-ffunction-sections" ../configure --enable-languages=c --enable-bootstrap --disable-libsanitizer --prefix=/home/marxin/Programming/gcc-mainline --with-boot-ldflags="--icf=all --print-icf-sections"
