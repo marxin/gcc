@@ -678,7 +678,7 @@ pushdecl_maybe_friend_1 (tree x, bool is_friend)
 	 block scope declaration declares that same entity and
 	 receives the linkage of the previous declaration.  */
       if (! t && current_function_decl && x != current_function_decl
-	  && (TREE_CODE (x) == FUNCTION_DECL || TREE_CODE (x) == VAR_DECL)
+	  && VAR_OR_FUNCTION_DECL_P (x)
 	  && DECL_EXTERNAL (x))
 	{
 	  /* Look in block scope.  */
@@ -1163,8 +1163,8 @@ pushdecl_maybe_friend_1 (tree x, bool is_friend)
 	    {
 	      tree member;
 
-	      if (current_class_ptr)
-		member = lookup_member (current_class_type,
+	      if (nonlambda_method_basetype ())
+		member = lookup_member (current_nonlambda_class_type (),
 					name,
 					/*protect=*/0,
 					/*want_type=*/false,
@@ -1799,6 +1799,22 @@ print_binding_level (cp_binding_level* lvl)
       fprintf (stderr, "\n");
     }
 }
+
+DEBUG_FUNCTION void
+debug (cp_binding_level &ref)
+{
+  print_binding_level (&ref);
+}
+
+DEBUG_FUNCTION void
+debug (cp_binding_level *ptr)
+{
+  if (ptr)
+    debug (*ptr);
+  else
+    fprintf (stderr, "<nil>\n");
+}
+
 
 void
 print_other_binding_stack (cp_binding_level *stack)
