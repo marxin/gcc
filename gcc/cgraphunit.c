@@ -370,6 +370,7 @@ cgraph_reset_node (struct cgraph_node *node)
   memset (&node->rtl, 0, sizeof (node->rtl));
   node->analyzed = false;
   node->local.finalized = false;
+  ipa_remove_all_references (&node->symbol.ref_list);
 
   cgraph_node_remove_callees (node);
 }
