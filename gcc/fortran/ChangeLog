@@ -1,3 +1,55 @@
+2013-04-04  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/40881
+	* match.c (gfc_match_return): Remove standard notification.
+	* primary.c (gfc_match_actual_arglist): Add standard notification.
+
+2013-04-04  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/50269
+	* gcc/fortran/check.c (is_c_interoperable,
+	gfc_check_c_loc): Correct c_loc array checking
+	for Fortran 2003 and Fortran 2008.
+
+2013-04-03  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/56284
+	PR fortran/40881
+	* decl.c (gfc_match_formal_arglist): Warn about alternate-return
+	arguments.
+	* interface.c (check_dummy_characteristics): Return if symbols are NULL.
+
+2013-04-01  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/56500
+	* symbol.c (gfc_set_default_type): Build class container for
+	IMPLICIT CLASS.
+
+2013-03-31  Tobias Burnus  <burnus@net-b.de>
+
+	* class.c (finalization_scalarizer, finalizer_insert_packed_call,
+	generate_finalization_wrapper): Avoid segfault with absent SIZE=
+	argment to TRANSFER and use correct result kind for SIZE.
+	* intrinsic.c (gfc_isym_id_by_intmod): Also handle ids of
+	nonmodules.
+	* trans.c (gfc_build_final_call): Handle coarrays.
+
+2013-03-30  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* trans-expr.c (build_memcmp_call):  New function.
+	(gfc_build_compare_string):  If the strings
+	compared have constant and equal lengths and
+	the strings are kind=1, or, for kind=4 strings,
+	the test is for (in)equality, use memcmp().
+
+2013-03-29  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/35203
+	* trans-decl.c (create_function_arglist): Pass hidden argument
+	for passed-by-value optional+value dummies.
+	* trans-expr.c (gfc_conv_expr_present,
+	gfc_conv_procedure_call): Handle those.
+
 2013-03-28  Thomas Koenig  <tkoenig@gcc.gnu.org>
 
 	PR fortran/45159
@@ -243,7 +295,7 @@
 	* trans-array.c (structure_alloc_comps): Handle procedure-pointer
 	components with allocatable result.
 
-2012-02-21  Tobias Burnus  <burnus@net-b.de>
+2013-02-21  Tobias Burnus  <burnus@net-b.de>
 
 	PR fortran/56416
 	* gfortran.texi (Part II: Language Reference, Extensions,
