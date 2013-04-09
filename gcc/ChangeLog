@@ -1,3 +1,207 @@
+2013-04-08  Steven Bosscher  <steven@gcc.gnu.org>
+
+	* doc/rtl.texi (sequence): Rewrite documentation to match the
+	current use of SEQUENCE rtl objects.
+	* rtl.def (SEQUENCE): Likewise.
+
+	* doc/rtl.texi (NOTE_INSN_EH_REGION_BEG, NOTE_INSN_EH_REGION_END):
+	Update documentation.
+	(NOTE_INSN_LOOP_BEG, NOTE_INSN_LOOP_END, NOTE_INSN_LOOP_CONT,
+	NOTE_INSN_LOOP_VTOP): Remove documentation for non-existing notes.
+
+	* reg-notes.def (REG_EH_CONTEXT): Remove unused note.
+
+2013-04-08  Teresa Johnson  <tejohnson@google.com>
+
+	* basic-block.h (GCOV_COMPUTE_SCALE): Define.
+	* ipa-inline-analysis.c (param_change_prob): Use helper rounding divide
+        methods.
+	(estimate_edge_size_and_time): Add comment to suggest using rounding
+	methods.
+	(estimate_node_size_and_time): Ditto.
+	(remap_edge_change_prob): Use helper rounding divide methods.
+	* value-prof.c (gimple_divmod_fixed_value_transform): Ditto.
+	(gimple_mod_pow2_value_transform): Ditto.
+	(gimple_mod_subtract_transform): Ditto.
+	(gimple_ic_transform): Ditto.
+	(gimple_stringops_transform): Ditto.
+	* stmt.c (conditional_probability): Ditto.
+	(emit_case_dispatch_table): Ditto.
+	* lto-cgraph.c (merge_profile_summaries): Ditto.
+	* tree-optimize.c (execute_fixup_cfg): Ditto.
+	* cfgcleanup.c (try_forward_edges): Ditto.
+	* cfgloopmanip.c (scale_loop_profile): Ditto.
+	(loopify): Ditto.
+	(duplicate_loop_to_header_edge): Ditto.
+	(lv_adjust_loop_entry_edge): Ditto.
+	* tree-vect-loop.c (vect_transform_loop): Ditto.
+	* profile.c (compute_branch_probabilities): Ditto.
+	* cfgbuild.c (compute_outgoing_frequencies): Ditto.
+	* lto-streamer-in.c (input_cfg): Ditto.
+	* gimple-streamer-in.c (input_bb): Ditto.
+	* ipa-cp.c (update_profiling_info): Ditto.
+	(update_specialized_profile): Ditto.
+	* tree-vect-loop-manip.c (slpeel_tree_peel_loop_to_edge): Ditto.
+	* cfg.c (update_bb_profile_for_threading): Add comment to suggest using
+        rounding methods.
+	* sched-rgn.c (compute_dom_prob_ps): Ditto.
+	(compute_trg_info): Ditto.
+	* cfgrtl.c (force_nonfallthru_and_redirect): Ditto.
+	(purge_dead_edges): Ditto.
+	* loop-unswitch.c (unswitch_loop): Ditto.
+	* cgraphclones.c (cgraph_clone_edge): Ditto.
+	(cgraph_clone_node): Ditto.
+	* tree-inline.c (copy_bb): Ditto.
+	(copy_edges_for_bb): Ditto.
+	(initialize_cfun): Ditto.
+	(copy_cfg_body): Ditto.
+	(expand_call_inline): Ditto.
+
+2013-04-08  Kai Tietz  <ktietz@redhat.com>
+
+	* config/i386/cygwin.h (EXTRA_OS_CPP_BUILTINS): Replaced
+	TARGET_CYGWIN64 by TARGET_64BIT.
+
+2013-04-08  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* config/epiphany/epiphany.md (GPR_1): New constant.
+	(define_expand "mov<mode>cc): FAIL if gen_compare_reg returned 0.
+	* config/epiphany/epiphany.c (gen_compare_reg):
+	For flag_finite_math_only, avoid swapping operands when r0 and/or r1
+	is already in place.
+	Use GPR_0 / GPR_1 instead of 0/1 for r0/r1 register numbers.
+	Don't require being called during rtl expansion; If y operlaps r0,
+	return 0.
+	(epiphany_compute_frame_size, epiphany_expand_prologue): Use GPR_1.
+	(epiphany_expand_epilogue): Likewise.
+
+	* config/epiphany/epiphany.c (epiphany_select_cc_mode):
+	Don't use CC_FPmode for ORDERED / UNORDERED.
+	* config/epiphany/epiphany.md (cmpsf_ord): Make pattern
+	unconditional.
+
+	* config/epiphany/constraints.md (CnL): New constraint.
+	* config/epiphany/epiphany.md (addsi3_i): Add r/r/CnL alternative.
+	* config/epiphany/predicates.md (add_operand): Allow 1024.
+
+	* config/epiphany/epiphany.md (logical_op): New code iterator.
+	(op_mnc): New code attribute.
+	(<op_mnc>_f, mov_f, cstoresi4): New patterns.
+	(mov_f+1, mov_f+2): New peephole2 patterns.
+
+	* config/epiphany/epiphany.md (mov_f+2): New peephole2 pattern.
+	(cstoresi4): Also allow re-use of zero result when doing a NE
+	comparison to a non-zero operand.
+	Use (clobber (scratch)) for first insn if the gpr output is not needed.
+
+	* config/epiphany/epiphany.md (<insn_opname>v2si3):
+	Use gen_addsi3_i / gen_subsi3_i.
+
+2013-04-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/34949
+	PR c++/50243
+	* tree-eh.c (optimize_clobbers): Only remove clobbers if bb doesn't
+	contain anything but clobbers, at most one __builtin_stack_restore,
+	optionally debug stmts and final resx, and if it has at least one
+	incoming EH edge.  Don't check for SSA_NAME on LHS of a clobber.
+	(sink_clobbers): Don't check for SSA_NAME on LHS of a clobber.
+	Instead of moving clobbers with MEM_REF LHS with SSA_NAME address
+	which isn't defaut definition, remove them.
+	(unsplit_eh, cleanup_empty_eh): Use single_{pred,succ}_{p,edge}
+	instead of EDGE_COUNT comparisons or EDGE_{PRED,SUCC}.
+	* tree-ssa-ccp.c (execute_fold_all_builtins): Remove clobbers
+	with MEM_REF LHS with SSA_NAME address.
+
+2013-04-08  Jeff Law  <law@redhat.com>
+
+	* gimple.c (canonicalize_cond_expr_cond): Rewrite x ^ y into x != y.
+		        
+2013-04-08  Richard Biener  <rguenther@suse.de>
+
+	* gimple-pretty-print.c (debug_gimple_stmt): Do not print
+	extra newline.
+	* tree-vect-loop.c (vect_determine_vectorization_factor): Dump
+	determined vector type.
+	(vect_analyze_data_refs): Likewise.
+	(vect_get_new_vect_var): Adjust.
+	(vect_create_destination_var): Preserve SSA name versions.
+	* tree-vect-stmts.c (get_vectype_for_scalar_type_and_size): Do
+	not dump anything here.
+
+2013-04-08  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* config/epiphany/epiphany.h (struct GTY (()) machine_function):
+	Add member lr_slot_known.
+	* config/epiphany/epiphany.md (reload_insi_ra): Compute lr_slot_offs
+	if necessary.
+	* config/epiphany/epiphany.c (epiphany_compute_frame_size):
+	Remove code that sets lr_slot_offset according to what a previous
+	version of epiphany_emit_save_restore used to do.
+	(epiphany_emit_save_restore): When doing an lr save or restore,
+	set/verify lr_slot_known and lr_slot_offset.
+
+2013-04-08  Xinyu Qi  <xyqi@marvell.com>
+
+ 	PR target/54338
+ 	* config/arm/arm.h (REG_CLASS_CONTENTS): Include IWMMXT_GR_REGS
+	in ALL_REGS.
+
+2013-04-08  Richard Biener  <rguenther@suse.de>
+
+	* alias.c (find_base_term): Fix thinko in previous change.
+
+2013-04-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* tree-loop-distribution.c (const_with_all_bytes_same): New function.
+	(generate_memset_builtin): Only handle integer_all_onesp as -1 val if
+	TYPE_PRECISION is equal to mode bitsize.  Use const_with_all_bytes_same
+	if possible to compute val.
+	(classify_partition): Verify CONSTRUCTOR doesn't have any elts.
+	For QImode integers don't require anything about precision.  Use
+	const_with_all_bytes_same to find out if the constant doesn't have
+	repeated bytes in it.
+
+2013-04-08  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* config/s390/s390.c (s390_expand_insv): Only accept insertions
+	within mode size.
+
+2013-04-08  Marek Polacek  <polacek@redhat.com>
+
+	PR rtl-optimization/48182
+	* params.def (PARAM_MIN_CROSSJUMP_INSNS): Increase the minimum
+	value to 1.
+
+2013-04-06  John David Anglin  <dave.anglin@nrc-cnrc.gc.ca>
+
+	PR target/55487
+	* config/pa/pa.c (legitimize_pic_address): Before incrementing label
+	nuses, make sure we have a label.
+
+2013-04-05  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR target/56843
+	* config/rs6000/rs6000.c (rs6000_emit_swdiv_high_precision): Remove.
+	(rs6000_emit_swdiv_low_precision): Remove.
+	(rs6000_emit_swdiv): Rewrite to handle between one and four
+	iterations of Newton-Raphson generally; modify required number of
+	iterations for some cases.
+	* config/rs6000/rs6000.h (RS6000_RECIP_HIGH_PRECISION_P): Remove.
+
+2013-04-05  Steven Bosscher  <steven@gcc.gnu.org>
+
+	* bb-reorder.c (fix_crossing_unconditional_branches): Remove a
+	set-but-unused variable.
+
+	* cgraph.c (cgraph_release_function_body): Clear cfun->cfg to make
+	basic blocks of released function bodies garbage-collectable.
+
+	* ree.c (find_and_remove_re): Do not call df_finish_pass here.
+	(struct rtl_opt_pass): Add TODO_df_finish.
+
+	* rtl.def (DEFINE_SUBST, DEFINE_SUBST_ATTR): Add documentation.
+
 2013-04-05  Greta Yorsh  <Greta.Yorsh@arm.com>
 
 	* config/arm/constraints.md (q): New constraint.
