@@ -12,6 +12,7 @@
 #include "cfgloop.h"
 #include "tree-ssa-sccvn.h"
 #include "coverage.h"
+#include "hash-table.h"
 
 #define IPA_SEM_EQUALITY_DEBUG
 
@@ -32,7 +33,6 @@ typedef struct sem_func
   unsigned int *bb_sizes;
   unsigned cfg_checksum;
   unsigned ssa_names_size;
-  hashval_t hashcode;
   sem_bb_t **bb_sorted;
   sem_func_t *next;
 } sem_func_t;
@@ -42,7 +42,6 @@ typedef struct sem_bb
 {
   basic_block bb;
   sem_func_t *func;
-  htab_t variables;
   unsigned stmt_count;
   unsigned edge_count;
   hashval_t hashcode;
@@ -62,19 +61,8 @@ typedef struct edge_pair
   edge target;
 } edge_pair_t;
 
-/* Struct used for all kind of function dictionaries like
-   SSA names, call graph edges and all kind of declarations.*/
-typedef struct func_dict
-{
-  int *source;
-  int *target;
-  htab_t decl_hash;
-  htab_t edge_hash;
-} func_dict_t;
-
 static sem_func_t **sem_functions;
 static unsigned int sem_function_count;
-static htab_t sem_function_hash;
 
 /* Hash combine function. */
 
@@ -90,69 +78,57 @@ hashval_t iterative_hash_tree (void *ptr, hashval_t hash)
   return hash;
 }
 
-/* Computes a hash value of a declaration type of tree node. */
-
-static hashval_t
-decl_hash (const void *decl)
+struct decl_var_hash: typed_noop_remove <decl_pair_t>
 {
-  hashval_t h = 0;
-  const decl_pair_t *pair = (const decl_pair_t *) decl;
+  typedef decl_pair_t value_type;
+  typedef decl_pair_t compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+};
 
-  return iterative_hash_tree (pair->source, h);
+inline hashval_t
+decl_var_hash::hash (const decl_pair_t *pair)
+{
+  return iterative_hash_tree (pair->source, 0);
 }
 
-/* An equality comparer of a declaration type. */
-
-static int
-decl_equal (const void *decl1, const void *decl2)
+inline int
+decl_var_hash::equal (const decl_pair_t *pair1, const decl_pair_t *pair2)
 {
-  const decl_pair_t *pair1 = (const decl_pair_t *) decl1;
-  const decl_pair_t *pair2 = (const decl_pair_t *) decl2;
-
   return pair1->source == pair2->source;
 }
 
-/* Memory release function for a declaration. */
-
-static void
-decl_free (void *decl)
+struct edge_var_hash: typed_noop_remove <edge_pair_t>
 {
-  decl_pair_t *pair = (decl_pair_t *) decl;
-  
-  free (pair);
+  typedef edge_pair_t value_type;
+  typedef edge_pair_t compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+};
+
+inline hashval_t
+edge_var_hash::hash (const edge_pair_t *pair)
+{
+  return iterative_hash_tree (pair->source, 0);
 }
 
-/* Computes a hash value of a callgraph's edge. */
-
-static hashval_t
-edge_hash (const void *edge)
+inline int
+edge_var_hash::equal (const edge_pair_t *pair1, const edge_pair_t *pair2)
 {
-  hashval_t h = 0;
-  const edge_pair_t *pair = (const edge_pair_t*) edge;
-
-  return iterative_hash_tree (pair->source, h);
-}
-
-/* An equality comparer of a callgraph's edge. */
-
-static int
-edge_equal (const void *edge1, const void *edge2)
-{
-  const edge_pair_t *pair1 = (const edge_pair_t *) edge1;
-  const edge_pair_t *pair2 = (const edge_pair_t *) edge2;
-
   return pair1->source == pair2->source;
 }
 
-/* Memory release function for a callgraph's edge. */
+/* Struct used for all kind of function dictionaries like
+   SSA names, call graph edges and all kind of declarations.*/
 
-static void
-edge_free (void *edge)
+typedef struct func_dict
 {
-  edge_pair_t *pair = (edge_pair_t *) edge;
-  
-  free (pair);
-}
+  int *source;
+  int *target;
+  hash_table <decl_var_hash> decl_hash;
+  hash_table <edge_var_hash> edge_hash;
+} func_dict_t;
+
 
 /* Function dictionary initializer. */
 
@@ -166,8 +142,8 @@ func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
   memset (d->source, -1, ssa_names_size1 * sizeof (int));
   memset (d->target, -1, ssa_names_size2 * sizeof (int));
 
-  d->decl_hash = htab_create (10, decl_hash, decl_equal, decl_free);
-  d->edge_hash = htab_create (10, edge_hash, edge_equal, edge_free);
+  d->decl_hash.create (10);
+  d->edge_hash.create (10);
 }
 
 /* Free memory handler for a function dictionary.  */
@@ -178,43 +154,23 @@ func_dict_free (func_dict_t *d)
   free (d->source);
   free (d->target);
 
-  htab_delete (d->decl_hash);
-  htab_delete (d->edge_hash);
+  d->decl_hash.dispose ();
+  d->edge_hash.dispose ();
 }
 
-/* Checks two SSA names from a different functions and returns true
-   if equal. */
-
-static bool
-func_dict_ssa_look_up (func_dict_t *d, tree ssa1, tree ssa2)
+struct sem_func_var_hash: typed_noop_remove <sem_func_t>
 {
-  unsigned i1, i2;
+  typedef sem_func_t value_type;
+  typedef sem_func_t compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+  static inline void remove (value_type *);
+};
 
-  i1 = SSA_NAME_VERSION (ssa1);
-  i2 = SSA_NAME_VERSION (ssa2);
-
-  if (d->source[i1] == -1)
-    d->source[i1] = i2;
-  else if (d->source[i1] != (int)i2)
-    return false;
-
-  if(d->target[i2] == -1)
-    d->target[i2] = i1;
-  else if (d->target[i2] != (int)i1)
-    return false;
-
-  return true;
-}
-
-/* A hash value calculation used for a faster determination if
-   two given functions are semantically equal. */
-
-static hashval_t
-func_hash (const void *func)
+inline hashval_t
+sem_func_var_hash::hash (const sem_func_t *f)
 {
   unsigned int i;
-
-  const sem_func_t *f = (const sem_func_t *) func;
 
   hashval_t hash = 0;
   
@@ -234,25 +190,16 @@ func_hash (const void *func)
   return hash;
 }
 
-/* Semantic function equality comparer. */
-
-static int
-func_equal (const void *func1, const void *func2)
+inline int
+sem_func_var_hash::equal (const value_type *f1, const compare_type *f2)
 {
-  const sem_func_t *f1 = (const sem_func_t *) func1;
-  const sem_func_t *f2 = (const sem_func_t *) func2;
-
-  return f1->hashcode == f2->hashcode; 
+  return sem_func_var_hash::hash (f1) == sem_func_var_hash::hash (f2);
 }
 
-/* Semantic function hash table memory release function. */
-
-static void
-func_free (void *func)
+inline void
+sem_func_var_hash::remove (value_type *f)
 {
   unsigned int i;
-
-  sem_func_t *f = (sem_func_t *) func;
 
   for (i = 0; i < f->bb_count; ++i)
     free (f->bb_sorted[i]);
@@ -274,6 +221,30 @@ bb_hash (const void *basic_block)
   hash = iterative_hash_object (bb->edge_count, hash);
 
   return hash;
+}
+
+/* Checks two SSA names from a different functions and returns true
+   if equal. */
+
+static bool
+func_dict_ssa_look_up (func_dict_t *d, tree ssa1, tree ssa2)
+{
+  unsigned i1, i2;
+
+  i1 = SSA_NAME_VERSION (ssa1);
+  i2 = SSA_NAME_VERSION (ssa2);
+
+  if (d->source[i1] == -1)
+    d->source[i1] = i2;
+  else if (d->source[i1] != (int) i2)
+    return false;
+
+  if(d->target[i2] == -1)
+    d->target[i2] = i1;
+  else if (d->target[i2] != (int) i1)
+    return false;
+
+  return true;
 }
 
 /* Semantic equality visit function loads all basic informations 
@@ -321,11 +292,11 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
       (DECL_ARG_TYPE (parm));
 
   /* Function result type */
-  result = DECL_RESULT(fndecl);
+  result = DECL_RESULT (fndecl);
 
   if (result)
     f->result_type = gimple_register_canonical_type
-      (TREE_TYPE (DECL_RESULT(fndecl)));
+      (TREE_TYPE (DECL_RESULT (fndecl)));
 
   /* basic block iteration */
   f->bb_count = n_basic_blocks_for_function (my_function) - 2;
@@ -338,30 +309,30 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 
   bb_count = 0;
   FOR_EACH_BB_FN (bb, my_function)
-  {
-    gimple_count = 0;
-    gcode_hash = 0;
+    {
+      gimple_count = 0;
+      gcode_hash = 0;
 
-    for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-      {
-        gimple_count++;
-        stmt = gsi_stmt (gsi);
-        code = (hashval_t) gimple_code (stmt);
-        gcode_hash = iterative_hash_object (code, gcode_hash);
-      }
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+        {
+          gimple_count++;
+          stmt = gsi_stmt (gsi);
+          code = (hashval_t) gimple_code (stmt);
+          gcode_hash = iterative_hash_object (code, gcode_hash);
+        }
 
-    f->bb_sizes[bb_count] = gimple_count;
+      f->bb_sizes[bb_count] = gimple_count;
 
-    /* Inserting basic block to hash table */
-    sem_bb = XNEW (sem_bb_t);
-    sem_bb->bb = bb;
-    sem_bb->func = f;
-    sem_bb->stmt_count = gimple_count;
-    sem_bb->edge_count = EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs);
-    sem_bb->hashcode = iterative_hash_object (gcode_hash, bb_hash (sem_bb));
+      /* Inserting basic block to hash table */
+      sem_bb = XNEW (sem_bb_t);
+      sem_bb->bb = bb;
+      sem_bb->func = f;
+      sem_bb->stmt_count = gimple_count;
+      sem_bb->edge_count = EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs);
+      sem_bb->hashcode = iterative_hash_object (gcode_hash, bb_hash (sem_bb));
 
-    f->bb_sorted[bb_count++] = sem_bb;
-  }
+      f->bb_sorted[bb_count++] = sem_bb;
+    }
 
   return true;
 }
@@ -372,7 +343,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 static bool
 check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 {
-  void **slot;
+  decl_pair_t **slot;
   bool r;
   decl_pair_t *decl_pair, *slot_decl_pair;
 
@@ -383,8 +354,7 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
     return t1 == t2; /* global variable declaration */
 
-  slot = htab_find_slot_with_hash (d->decl_hash, decl_pair,
-    decl_hash (decl_pair), INSERT);
+  slot = d->decl_hash.find_slot (decl_pair, INSERT);
 
   slot_decl_pair = (decl_pair_t *) *slot;
 
@@ -406,7 +376,7 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 static bool
 check_edges (edge e1, edge e2, func_dict_t *d)
 {
-  void **slot;
+  edge_pair_t **slot;
   bool r;
   edge_pair_t *edge_pair, *slot_edge_pair;
 
@@ -414,8 +384,8 @@ check_edges (edge e1, edge e2, func_dict_t *d)
   edge_pair->source = e1;
   edge_pair->target = e2;
 
-  slot = htab_find_slot_with_hash (d->edge_hash, edge_pair,
-    edge_hash (edge_pair), INSERT);
+  slot = d->edge_hash.find_slot (edge_pair, INSERT);
+
   slot_edge_pair = (edge_pair_t *) *slot;
 
   if (slot_edge_pair)
@@ -453,12 +423,12 @@ function_check_names (func_dict_t *d, tree t1, tree t2, tree func1, tree func2)
 
   switch (TREE_CODE (b1))
     {
-      case VAR_DECL:
-      case PARM_DECL:
-        return check_declaration (b1, b2, d, func1, func2);
-        break;
-      default:
-        return false;
+    case VAR_DECL:
+    case PARM_DECL:
+      return check_declaration (b1, b2, d, func1, func2);
+      break;
+    default:
+      return false;
     }
 }
 
@@ -476,19 +446,19 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
 
   if (base1 && base2)
-  {
-    if (offset1 != offset2)
-      return false;
+    {
+      if (offset1 != offset2)
+        return false;
 
-    t1 = base1;
-    t2 = base2;
-  }
+      t1 = base1;
+      t2 = base2;
+    }
   
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return false;
 
   switch (TREE_CODE (t1))
-  {
+    {
     case ARRAY_REF:
     case ARRAY_RANGE_REF:
     case COMPONENT_REF:
@@ -520,7 +490,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       return check_declaration (t1, t2, d, func1, func2);
     default:
       return false;
-  }
+    }
 }
 
 /* Operand comparer could handle a tree operand. */
@@ -529,6 +499,9 @@ static bool
 check_var_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 {
   enum tree_code tc1, tc2;
+
+  if (t1 == NULL && t2 == NULL)
+    return true;
 
   if (t1 == NULL || t2 == NULL)
     return false;
@@ -541,21 +514,21 @@ check_var_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 
   switch (tc1)
     {
-      case CONSTRUCTOR:
-        return true;
-      case VAR_DECL:
-      case LABEL_DECL:
-        return check_declaration (t1, t2, d, func1, func2);
-      case SSA_NAME:
-        return function_check_names (d, t1, t2, func1, func2); 
-      default:
-        break;
+    case CONSTRUCTOR:
+      return true;
+    case VAR_DECL:
+    case LABEL_DECL:
+      return check_declaration (t1, t2, d, func1, func2);
+    case SSA_NAME:
+      return function_check_names (d, t1, t2, func1, func2); 
+    default:
+      break;
     }
 
-  if ((handled_component_p (t1) && handled_component_p (t1)) ||
-    tc1 == ADDR_EXPR || tc1 == MEM_REF || tc1 == REALPART_EXPR ||
-    tc1 == IMAGPART_EXPR)
-      return compare_handled_component (t1, t2, d, func1, func2);
+  if ((handled_component_p (t1) && handled_component_p (t1))
+    || tc1 == ADDR_EXPR || tc1 == MEM_REF || tc1 == REALPART_EXPR
+      || tc1 == IMAGPART_EXPR)
+    return compare_handled_component (t1, t2, d, func1, func2);
   else /* COMPLEX_CST compared correctly here */
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
@@ -768,7 +741,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
       return false;
 
     switch (gimple_code (s1))
-    {
+      {
       case GIMPLE_CALL:
         if (!check_ssa_call (s1, s2, d, func1, func2))
           return false;
@@ -804,7 +777,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
         return false;
       default:
         return false;
-    }
+      }
 
     gsi_next (&gsi2);
   }
@@ -898,14 +871,14 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   /* Checking types of arguments */
   for (i = 0; i < f1->arg_count; ++i)
-    if (f1->arg_types[i] != f2->arg_types[i])
+    if (!types_compatible_p (f1->arg_types[i], f2->arg_types[i]))
       return false;
 
   /* Checking function arguments */
   decl1 = DECL_ATTRIBUTES (f1->node->symbol.decl);
   decl2 = DECL_ATTRIBUTES (f2->node->symbol.decl);
 
-  while(decl1)
+  while (decl1)
     {
       if (decl2 == NULL)
         return false;
@@ -917,7 +890,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
       decl2 = TREE_CHAIN (decl2);
     }
 
-  if(decl1 != decl2)
+  if (decl1 != decl2)
     return false;
 
   func_dict_init (&func_dict, f1->ssa_names_size, f2->ssa_names_size);
@@ -1010,11 +983,12 @@ semantic_equality (void)
   sem_func_t *f, *f1;
   struct cgraph_node *node;
   unsigned int nnodes = 0;
-  void **slot;
+  sem_func_t **slot;
   bool merged = false;
+  hash_table <sem_func_var_hash> sem_function_hash;
 
   sem_functions = XNEWVEC (sem_func_t *, cgraph_n_nodes);
-  sem_function_hash = htab_create (nnodes, func_hash, func_equal, func_free);
+  sem_function_hash.create (nnodes);
 
   FOR_EACH_DEFINED_FUNCTION (node)
     {
@@ -1026,13 +1000,8 @@ semantic_equality (void)
         {
           sem_functions[sem_function_count++] = f;
 
-          /* hash table insertion */
-          f->hashcode = func_hash (f);
-
-          slot = htab_find_slot_with_hash (sem_function_hash,
-            f, f->hashcode, INSERT);
-
-          f1 = (sem_func_t *) *slot;
+          slot = sem_function_hash.find_slot (f, INSERT);
+          f1 = *slot;
 
           while(f1)
           {
@@ -1060,21 +1029,22 @@ semantic_equality (void)
             f1 = f1->next;
           }
 
-        if (merged)
-          free (f);
-        else
-          {
-            f1 = (sem_func_t *) *slot;
-            f->next = f1;
-            *slot = f;
-          }
-      }
+          if (merged)
+            free (f);
+          else
+            {
+              f1 = (sem_func_t *) *slot;
+              f->next = f1;
+              *slot = f;
+            }
+        }
       else
         free (f);
     }
 
   free (sem_functions);
-  htab_delete (sem_function_hash);
+
+  sem_function_hash.dispose();
 
   return 0; 
 }
@@ -1087,20 +1057,20 @@ gate_sem_equality (void)
 
 struct simple_ipa_opt_pass pass_ipa_sem_equality =
 {
-  {
-    SIMPLE_IPA_PASS,
-    "sem-equality",         /* name */
-    OPTGROUP_IPA,           /* optinfo_flags */
-    gate_sem_equality,      /* gate */
-    semantic_equality,      /* execute */
-    NULL,                   /* sub */
-    NULL,                   /* next */
-    0,                      /* static_pass_number */
-    TV_IPA_SEM_EQUALITY,    /* tv_id */
-    0,                      /* properties_required */
-    0,                      /* properties_provided */
-    0,                      /* properties_destroyed */
-    0,                      /* todo_flags_start */
-    0                       /* todo_flags_finish */
-  }
+ {
+  SIMPLE_IPA_PASS,
+  "sem-equality",         /* name */
+  OPTGROUP_IPA,           /* optinfo_flags */
+  gate_sem_equality,      /* gate */
+  semantic_equality,      /* execute */
+  NULL,                   /* sub */
+  NULL,                   /* next */
+  0,                      /* static_pass_number */
+  TV_IPA_SEM_EQUALITY,    /* tv_id */
+  0,                      /* properties_required */
+  0,                      /* properties_provided */
+  0,                      /* properties_destroyed */
+  0,                      /* todo_flags_start */
+  0                       /* todo_flags_finish */
+ }
 };
