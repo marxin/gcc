@@ -1,3 +1,53 @@
+/* Interprocedural semantic function equality pass
+   Copyright (C) 2013 Free Software Foundation, Inc.
+
+This file is part of GCC.
+
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 3, or (at your option) any later
+version.
+
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
+
+/* Interprocedural sematic function equality pass.
+
+   The goal of this transformation is to discover functions which do have
+   exactly the same semantics. For such function we could either create
+   a virtual clone or do a simple function wrapper that will call
+   equivalent function.
+
+   The algorithm basically consists of 3 stages. In the first, we calculate
+   for each newly visited function a simple checksum that includes
+   number of arguments, types of that arguments, number of basic blocks and
+   statements nested in each block. The checksum is saved to hashtable,
+   where all functions having the same checksum live in a linked list.
+   Each table collision is a candidate for semantic equality. 
+
+   Second, deep comparison phase, is based on further function collation.
+   We traverse all basic blocks and each statement living in the block,
+   building bidictionaries of SSA names, function, parameter and variable
+   declarations. Corresponding statement types are mandatory, each statement
+   operand must point to an appropriate one in a function we do
+   comparison with.
+   
+   Edge bidictionary is helpfull for phi node collation, where all phi node
+   arguments must point to an appropriate basic block.
+
+   Finally, function attribute chain is traversed and checked for having
+   same set of values.
+
+   If we encounter two candidates being really substitutable, we do merge type
+   decision. We either process function aliasing or a simple wrapper
+   is construced.  */
+
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -16,11 +66,11 @@
 
 #define IPA_SEM_EQUALITY_DEBUG
 
-/* Forward struct declaration */
+/* Forward struct declaration.  */
 typedef struct sem_bb sem_bb_t;
 typedef struct sem_func sem_func_t;
 
-/* Function struct for sematic equality pass */
+/* Function struct for sematic equality pass.  */
 typedef struct sem_func
 {
   struct cgraph_node *node;
@@ -37,7 +87,7 @@ typedef struct sem_func
   sem_func_t *next;
 } sem_func_t;
 
-/* Basic block struct for sematic equality pass. */
+/* Basic block struct for sematic equality pass.  */
 typedef struct sem_bb
 {
   basic_block bb;
@@ -47,14 +97,14 @@ typedef struct sem_bb
   hashval_t hashcode;
 } sem_bb_t;
 
-/* Tree declaration used for hash table purpose. */
+/* Tree declaration used for hash table purpose.  */
 typedef struct decl_pair
 {
   tree source;
   tree target;
 } decl_pair_t;
 
-/* Call graph edge pair used for hash table purpose. */
+/* Call graph edge pair used for hash table purpose.  */
 typedef struct edge_pair
 {
   edge source;
@@ -64,7 +114,7 @@ typedef struct edge_pair
 static sem_func_t **sem_functions;
 static unsigned int sem_function_count;
 
-/* Hash combine function. */
+/* Hash combine function.  */
 
 static
 hashval_t iterative_hash_tree (void *ptr, hashval_t hash)
@@ -119,7 +169,7 @@ edge_var_hash::equal (const edge_pair_t *pair1, const edge_pair_t *pair2)
 }
 
 /* Struct used for all kind of function dictionaries like
-   SSA names, call graph edges and all kind of declarations.*/
+   SSA names, call graph edges and all kind of declarations.  */
 
 typedef struct func_dict
 {
@@ -130,7 +180,7 @@ typedef struct func_dict
 } func_dict_t;
 
 
-/* Function dictionary initializer. */
+/* Function dictionary initializer.  */
 
 static void
 func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
@@ -210,7 +260,7 @@ sem_func_var_hash::remove (value_type *f)
   free (f);
 }
 
-/* Simple basic block hash computing function. */
+/* Simple basic block hash computing function.  */
 
 static hashval_t
 bb_hash (const void *basic_block)
@@ -224,10 +274,10 @@ bb_hash (const void *basic_block)
 }
 
 /* Checks two SSA names from a different functions and returns true
-   if equal. */
+   if equal.  */
 
 static bool
-func_dict_ssa_look_up (func_dict_t *d, tree ssa1, tree ssa2)
+func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
 {
   unsigned i1, i2;
 
@@ -248,7 +298,7 @@ func_dict_ssa_look_up (func_dict_t *d, tree ssa1, tree ssa2)
 }
 
 /* Semantic equality visit function loads all basic informations 
-   about a function and save them to a structure used for a further analysis */
+   about a function and save them to a structure used for a further analysis.  */
 
 static bool
 visit_function (struct cgraph_node *node, sem_func_t *f)
@@ -265,20 +315,16 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
 
-  /* TODO: do a deep analysis what kind of functions do such a behaviour */
-  if (!my_function || !my_function->gimple_df)
-    return false;
-
-  /* variadic functions are ignored */
-  if (stdarg_p (TREE_TYPE (fndecl)))
-    return false;
-
   f->ssa_names_size = SSANAMES (my_function)->length ();
   f->node = node;
+
+  if (!cgraph_function_with_gimple_body_p (node))
+    return false;
+
   f->func_decl = fndecl;
   fnargs = DECL_ARGUMENTS (fndecl);
 
-  /* iterating all function arguments */
+  /* iterating all function arguments.  */
   param_num = 0;
   for (parm = fnargs; parm; parm = DECL_CHAIN (parm))
     param_num++;
@@ -291,14 +337,14 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     f->arg_types[param_num++] = gimple_register_canonical_type
       (DECL_ARG_TYPE (parm));
 
-  /* Function result type */
+  /* Function result type.  */
   result = DECL_RESULT (fndecl);
 
   if (result)
     f->result_type = gimple_register_canonical_type
       (TREE_TYPE (DECL_RESULT (fndecl)));
 
-  /* basic block iteration */
+  /* basic block iteration.  */
   f->bb_count = n_basic_blocks_for_function (my_function) - 2;
 
   f->edge_count = n_edges_for_function (my_function);
@@ -315,15 +361,20 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
         {
-          gimple_count++;
           stmt = gsi_stmt (gsi);
           code = (hashval_t) gimple_code (stmt);
-          gcode_hash = iterative_hash_object (code, gcode_hash);
+
+          /* We ignore all debug statements. */
+          if (code != GIMPLE_DEBUG) 
+          {
+            gimple_count++;
+            gcode_hash = iterative_hash_object (code, gcode_hash);
+          }
         }
 
       f->bb_sizes[bb_count] = gimple_count;
 
-      /* Inserting basic block to hash table */
+      /* Inserting basic block to hash table.  */
       sem_bb = XNEW (sem_bb_t);
       sem_bb->bb = bb;
       sem_bb->func = f;
@@ -338,7 +389,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 }
 
 /* Declaration comparer- global declarations are comparer for a pointer equality,
-   local one are stored in the function dictionary. */
+   local one are stored in the function dictionary.  */
 
 static bool
 check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
@@ -352,7 +403,7 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   decl_pair->target = t2;
 
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
-    return t1 == t2; /* global variable declaration */
+    return t1 == t2; /* global variable declaration.  */
 
   slot = d->decl_hash.find_slot (decl_pair, INSERT);
 
@@ -371,7 +422,7 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   return true;
 }
 
-/* Edge comparer- we just build edge bidictionary for each visited edge. */
+/* Edge comparer- we just build edge bidictionary for each visited edge.  */
 
 static bool
 check_edges (edge e1, edge e2, func_dict_t *d)
@@ -402,14 +453,14 @@ check_edges (edge e1, edge e2, func_dict_t *d)
 }
 
 /* Comparer responsible for a comparison of either SSA names or
-   a declaration (variable or parameter). */
+   a declaration (variable or parameter).  */
 
 static bool
 function_check_names (func_dict_t *d, tree t1, tree t2, tree func1, tree func2)
 {
   tree b1, b2;
 
-  if (!func_dict_ssa_look_up (d, t1, t2))
+  if (!func_dict_ssa_lookup (d, t1, t2))
     return false;
 
   b1 = SSA_NAME_VAR (t1);
@@ -433,7 +484,7 @@ function_check_names (func_dict_t *d, tree t1, tree t2, tree func1, tree func2)
 }
 
 /* Each handled componend is decomposed for arguments that are
-   recursivelly compared. */
+   recursivelly compared.  */
 
 static bool
 compare_handled_component (tree t1, tree t2, func_dict_t *d,
@@ -478,10 +529,9 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       x2 = TREE_OPERAND (t2, 0);
       return compare_handled_component (x1, x2, d, func1, func2);
     }
-    case INTEGER_CST:
-      return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case SSA_NAME:
       return function_check_names (d, t1, t2, func1, func2);
+    case INTEGER_CST:
     case FUNCTION_DECL:
     case FIELD_DECL:
       return t1 == t2;
@@ -493,10 +543,10 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     }
 }
 
-/* Operand comparer could handle a tree operand. */
+/* Operand comparer could handle a tree operand.  */
 
 static bool
-check_var_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
+check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 {
   enum tree_code tc1, tc2;
 
@@ -529,13 +579,13 @@ check_var_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
     || tc1 == ADDR_EXPR || tc1 == MEM_REF || tc1 == REALPART_EXPR
       || tc1 == IMAGPART_EXPR)
     return compare_handled_component (t1, t2, d, func1, func2);
-  else /* COMPLEX_CST compared correctly here */
+  else /* COMPLEX_CST compared correctly here.  */
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
 
 /* Function comparer- all function arguments including a return type
    are checked and we support only calls pointing to the save
-   function. */
+   function.  */
 
 static bool
 check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
@@ -549,27 +599,27 @@ check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   if (!gimple_call_same_target_p (s1, s2))
     return false;
 
-  /* argument checking */
+  /* Checking of argument.  */
   for (i = 0; i < gimple_call_num_args (s1); ++i)
     { 
       t1 = gimple_call_arg (s1, i);
       t2 = gimple_call_arg (s2, i);
 
-      if (!check_var_operand (t1, t2, d, func1, func2))
+      if (!check_operand (t1, t2, d, func1, func2))
         return false;
     }
 
-  /* return value checking */
+  /* Return value checking.  */
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
   if (t1 == NULL_TREE && t2 == NULL_TREE)
     return true;
   else
-    return check_var_operand (t1, t2, d, func1, func2);
+    return check_operand (t1, t2, d, func1, func2);
 }
 
-/* Assignment comparer- all parts of expression are checked. */
+/* Assignment comparer- all parts of expression are checked.  */
 
 static bool
 check_ssa_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
@@ -595,7 +645,7 @@ check_ssa_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
     arg1 = gimple_op (s1, i);
     arg2 = gimple_op (s2, i);
 
-    if (!check_var_operand (arg1, arg2, d, func1, func2))
+    if (!check_operand (arg1, arg2, d, func1, func2))
       return false;
   }
 
@@ -620,16 +670,16 @@ check_ssa_cond (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
 
-  if (!check_var_operand (t1, t2, d, func1, func2))
+  if (!check_operand (t1, t2, d, func1, func2))
     return false;
 
   t1 = gimple_cond_rhs (s1);
   t2 = gimple_cond_rhs (s2);
 
-  return check_var_operand (t1, t2, d, func1, func2);
+  return check_operand (t1, t2, d, func1, func2);
 }
 
-/* Label comparer. */
+/* Label comparer.  */
 
 static bool
 check_ssa_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -639,10 +689,10 @@ check_ssa_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   label1 = gimple_label_label (g1);
   label2 = gimple_label_label (g2);
 
-  return check_var_operand (label1, label2, d, func1, func2);
+  return check_operand (label1, label2, d, func1, func2);
 }
 
-/* Switch comparer. */
+/* Switch comparer.  */
 
 static bool
 check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -662,7 +712,7 @@ check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
     return false;
 
-  if (!check_var_operand (t1, t2, d, func1, func2))
+  if (!check_operand (t1, t2, d, func1, func2))
     return false;
 
   for (i = 0; i < lsize1; i++)
@@ -685,7 +735,7 @@ check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   return true;
 }
 
-/* Return comparer. */
+/* Return comparer.  */
 
 static bool
 check_ssa_return (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -695,14 +745,14 @@ check_ssa_return (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   t1 = gimple_return_retval (g1);
   t2 = gimple_return_retval (g2);
 
-  /* void return type */
+  /* Void return type.  */
   if (t1 == NULL && t2 == NULL)
     return true;
   else
-    return check_var_operand (t1, t2, d, func1, func2);
+    return check_operand (t1, t2, d, func1, func2);
 }
 
-/* Goto comparer */
+/* Goto comparer.  */
 
 static bool
 check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -715,11 +765,11 @@ check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   if (TREE_CODE (dest1) != TREE_CODE (dest2) || TREE_CODE (dest1) != SSA_NAME)
     return false;
 
-  return check_var_operand (dest1, dest2, d, func1, func2);
+  return check_operand (dest1, dest2, d, func1, func2);
 }
 
 /* Deep basic block comparison function. All statements are iterated,
-   type of the statement is chosen and a corresponding comparer is called. */
+   type of the statement is chosen and a corresponding comparer is called.  */
 
 static bool
 compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
@@ -785,7 +835,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
   return true;
 }
 
-/* Phi comparer. */
+/* Phi comparer.  */
 
 static bool
 compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
@@ -814,7 +864,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
       t1 = gimple_phi_arg (phi1, i)->def;
       t2 = gimple_phi_arg (phi2, i)->def;
 
-      if (!check_var_operand (t1, t2, d, func1, func2))
+      if (!check_operand (t1, t2, d, func1, func2))
           return false;
 
       e1 = gimple_phi_arg_edge (phi1, i);
@@ -833,7 +883,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
   return true;
 }
 
-/* Basic block bidictionary testing function. */
+/* Basic block bidictionary testing function.  */
 
 static bool
 bb_dict_test (int* bb_dict, int source, int target)
@@ -847,7 +897,7 @@ bb_dict_test (int* bb_dict, int source, int target)
     return bb_dict[source] == target;
 }
 
-/* The main handler called for all a deep function comparison. */
+/* The main handler called for all a deep function comparison.  */
 
 static bool
 compare_functions (sem_func_t *f1, sem_func_t *f2)
@@ -865,16 +915,16 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
     f1->edge_count != f2->edge_count || f1->cfg_checksum != f2->cfg_checksum)
       return false;
 
-  /* Result type checking */
+  /* Result type checking.  */
   if (f1->result_type != f2->result_type)
     return false;
 
-  /* Checking types of arguments */
+  /* Checking types of arguments.  */
   for (i = 0; i < f1->arg_count; ++i)
     if (!types_compatible_p (f1->arg_types[i], f2->arg_types[i]))
       return false;
 
-  /* Checking function arguments */
+  /* Checking function arguments.  */
   decl1 = DECL_ATTRIBUTES (f1->node->symbol.decl);
   decl2 = DECL_ATTRIBUTES (f2->node->symbol.decl);
 
@@ -895,7 +945,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   func_dict_init (&func_dict, f1->ssa_names_size, f2->ssa_names_size);
 
-  /* Checking all basic blocks */
+  /* Checking all basic blocks.  */
   for (i = 0; i < f1->bb_count; ++i)
     if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], &func_dict,
       f1->func_decl, f2->func_decl))
@@ -904,7 +954,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
         goto free_func_dict;
       }
 
-  /* Basic block edges check */
+  /* Basic block edges check.  */
   for (i = 0; i < f1->bb_count; ++i)
     {
       bb_dict = XNEWVEC (int, f1->bb_count + 2);
@@ -947,7 +997,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
         }
       } 
 
-  /* Basic block PHI nodes comparison */
+  /* Basic block PHI nodes comparison.  */
   for (i = 0; i < f1->bb_count; ++i)
     if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb,
         &func_dict, f1->func_decl, f2->func_decl))
@@ -962,7 +1012,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   return result;
 }
 
-/* Two semantically equal function are merged. */
+/* Two semantically equal function are merged.  */
 
 /*
 static void
@@ -974,7 +1024,7 @@ merge_functions (sem_func_t *original, sem_func_t *alias)
 }
 */
 
-/* IPA semantic equality pass entry point. */
+/* IPA semantic equality pass entry point.  */
 
 static unsigned int
 semantic_equality (void)
@@ -1008,7 +1058,7 @@ semantic_equality (void)
             merged = false;
             result = compare_functions (f1, f);
 
-            /* fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different"); */
+            fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
 
             if (result)
               {
@@ -1019,7 +1069,7 @@ semantic_equality (void)
                 dump_function_to_file (f1->func_decl, stderr, TDF_DETAILS);
                 dump_function_to_file (f->func_decl, stderr, TDF_DETAILS);
 #endif        
-                /* Experimental merging of two functions */
+                /* Experimental merging of two functions.  */
                 /* merge_functions (f, f1); */
 
                 merged = true;
