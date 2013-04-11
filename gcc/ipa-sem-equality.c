@@ -184,7 +184,7 @@ typedef struct func_dict
 
 static void
 func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
-  unsigned ssa_names_size2) 
+                unsigned ssa_names_size2) 
 {
   d->source = XNEWVEC (int, ssa_names_size1);
   d->target = XNEWVEC (int, ssa_names_size2);
@@ -335,14 +335,14 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   param_num = 0;
   for (parm = fnargs; parm; parm = DECL_CHAIN (parm))
     f->arg_types[param_num++] = gimple_register_canonical_type
-      (DECL_ARG_TYPE (parm));
+                                  (DECL_ARG_TYPE (parm));
 
   /* Function result type.  */
   result = DECL_RESULT (fndecl);
 
   if (result)
     f->result_type = gimple_register_canonical_type
-      (TREE_TYPE (DECL_RESULT (fndecl)));
+                       (TREE_TYPE (DECL_RESULT (fndecl)));
 
   /* basic block iteration.  */
   f->bb_count = n_basic_blocks_for_function (my_function) - 2;
@@ -456,31 +456,37 @@ check_edges (edge e1, edge e2, func_dict_t *d)
    a declaration (variable or parameter).  */
 
 static bool
-function_check_names (func_dict_t *d, tree t1, tree t2, tree func1, tree func2)
+function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
+                          tree func2)
 {
   tree b1, b2;
 
   if (!func_dict_ssa_lookup (d, t1, t2))
     return false;
 
-  b1 = SSA_NAME_VAR (t1);
-  b2 = SSA_NAME_VAR (t2);
-
-  if (b1 == NULL && b2 == NULL)
-    return true;
-
-  if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
-    return false;
-
-  switch (TREE_CODE (b1))
+  if (SSA_NAME_IS_DEFAULT_DEF (t1))
     {
-    case VAR_DECL:
-    case PARM_DECL:
-      return check_declaration (b1, b2, d, func1, func2);
-      break;
-    default:
-      return false;
+      b1 = SSA_NAME_VAR (t1);
+      b2 = SSA_NAME_VAR (t2);
+
+      /* TODO: simplify? */
+      if (b1 == NULL && b2 == NULL)
+        return true;
+
+      if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
+        return false;
+
+      switch (TREE_CODE (b1))
+        {
+        case VAR_DECL:
+        case PARM_DECL:
+          return check_declaration (b1, b2, d, func1, func2);
+        default:
+          return false;
+        }
     }
+  else
+    return true;
 }
 
 /* Each handled componend is decomposed for arguments that are
@@ -488,7 +494,7 @@ function_check_names (func_dict_t *d, tree t1, tree t2, tree func1, tree func2)
 
 static bool
 compare_handled_component (tree t1, tree t2, func_dict_t *d,
-  tree func1, tree func2)
+                           tree func1, tree func2)
 {
   tree base1, base2, x1, x2, y1, y2;
   HOST_WIDE_INT offset1, offset2;
@@ -520,8 +526,8 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       y1 = TREE_OPERAND (t1, 1);
       y2 = TREE_OPERAND (t2, 1);
 
-      return compare_handled_component (x1, x2, d, func1, func2) &&
-        compare_handled_component (y1, y2, d, func1, func2);
+      return compare_handled_component (x1, x2, d, func1, func2)
+        && compare_handled_component (y1, y2, d, func1, func2);
     }
     case ADDR_EXPR:
     {
@@ -530,7 +536,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       return compare_handled_component (x1, x2, d, func1, func2);
     }
     case SSA_NAME:
-      return function_check_names (d, t1, t2, func1, func2);
+      return function_check_ssa_names (d, t1, t2, func1, func2);
     case INTEGER_CST:
     case FUNCTION_DECL:
     case FIELD_DECL:
@@ -570,7 +576,7 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
     case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     case SSA_NAME:
-      return function_check_names (d, t1, t2, func1, func2); 
+      return function_check_ssa_names (d, t1, t2, func1, func2); 
     default:
       break;
     }
@@ -720,16 +726,17 @@ check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
     low1 = CASE_LOW (gimple_switch_label (g1, i));
     low2 = CASE_LOW (gimple_switch_label (g2, i));
 
-    if ((low1 != NULL) ^ (low2 != NULL) ||
-      (low1 && low2 && TREE_INT_CST_LOW (low1) != TREE_INT_CST_LOW (low2)))
-        return false;
+    if ((low1 != NULL) != (low2 != NULL)
+      || (low1 && low2 && TREE_INT_CST_LOW (low1) != TREE_INT_CST_LOW (low2)))
+      return false;
 
     high1 = CASE_HIGH (gimple_switch_label (g1, i));
     high2 = CASE_HIGH (gimple_switch_label (g2, i));
 
-    if ((high1 != NULL) ^ (high2 != NULL) ||
-      (high1 && high2 && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
-        return false;
+    if ((high1 != NULL) != (high2 != NULL)
+      || (high1 && high2
+        && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
+      return false;
   }
 
   return true;
@@ -773,7 +780,7 @@ check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 
 static bool
 compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
-  tree func1, tree func2)
+            tree func1, tree func2)
 {
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
@@ -839,7 +846,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
 
 static bool
 compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
-  tree func1, tree func2)
+                   tree func1, tree func2)
 {
   gimple_stmt_iterator si1, si2;
   gimple phi1, phi2;
@@ -911,9 +918,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   func_dict_t func_dict;
   bool result = true;
 
-  if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count ||
-    f1->edge_count != f2->edge_count || f1->cfg_checksum != f2->cfg_checksum)
-      return false;
+  if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count
+    || f1->edge_count != f2->edge_count
+      || f1->cfg_checksum != f2->cfg_checksum)
+    return false;
 
   /* Result type checking.  */
   if (f1->result_type != f2->result_type)
@@ -1058,7 +1066,7 @@ semantic_equality (void)
             merged = false;
             result = compare_functions (f1, f);
 
-            fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
+            /* fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different"); */
 
             if (result)
               {
