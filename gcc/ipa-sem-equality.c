@@ -690,8 +690,8 @@ check_ssa_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   return true;
 }
 
-/* Condition comparer- conditions with swapped arguments are not
-   supported yet.  */
+/* Returns true if conditions S1 comming from a function FUNC1 and S2 comming
+   from FUNC2 do correspond. Collation is based on function dictionary D.  */
 
 static bool
 check_ssa_cond (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
@@ -717,7 +717,8 @@ check_ssa_cond (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   return check_operand (t1, t2, d, func1, func2);
 }
 
-/* Label comparer.  */
+/* Returns true if labels G1 and G2 collate in functions FUNC1 and FUNC2.
+   Function dictionary D is reposponsible for all correspondence checks.  */
 
 static bool
 check_ssa_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -730,7 +731,9 @@ check_ssa_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   return check_operand (label1, label2, d, func1, func2);
 }
 
-/* Switch comparer.  */
+/* Switch checking function takes switch statements G1 and G2 and process
+   collation based on function dictionary D. All cases are compared separately,
+   statements must come from functions FUNC1 and FUNC2.  */
 
 static bool
 check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -774,7 +777,8 @@ check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   return true;
 }
 
-/* Return comparer.  */
+/* Return statements G1 and G2, comming from functions FUNC1 and FUNC2, are
+   equal if types in function dictionary D do collate.  */
 
 static bool
 check_ssa_return (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -791,7 +795,9 @@ check_ssa_return (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
     return check_operand (t1, t2, d, func1, func2);
 }
 
-/* Goto comparer.  */
+/* Returns true if goto statements G1 and G2 are correspoding in function
+   FUNC1, respectively FUNC2. Goto operands collation is based on function
+   dictionary D.  */
 
 static bool
 check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
@@ -807,8 +813,11 @@ check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   return check_operand (dest1, dest2, d, func1, func2);
 }
 
-/* Deep basic block comparison function. All statements are iterated,
-   type of the statement is chosen and a corresponding comparer is called.  */
+/* Basic block comparison for blocks BB1 and BB2 that are a part of functions
+   FUNC1 and FUNC2 uses function dictionary D as a collation lookup data
+   structure. All statements are iterated, type distinguished and
+   a call of corresponding collation function is called. If any particular
+   item does not equal, false is returned.  */
 
 static bool
 compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
@@ -874,7 +883,9 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
   return true;
 }
 
-/* Phi comparer.  */
+/* Returns true if basic blocks BB1 and BB2 have all phi nodes in collation,
+   blocks are defined in functions FUNC1 and FUNC2 and partial operands are
+   checked with help of function dictionary D.  */
 
 static bool
 compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
@@ -922,7 +933,8 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
   return true;
 }
 
-/* Basic block bidictionary testing function.  */
+/* Returns true if an item at index SOURCE points to index TARGET.
+   If SOURCE index is not filled, we insert TARGET index and return true.  */
 
 static bool
 bb_dict_test (int* bb_dict, int source, int target)
@@ -936,7 +948,8 @@ bb_dict_test (int* bb_dict, int source, int target)
     return bb_dict[source] == target;
 }
 
-/* The main handler called for all a deep function comparison.  */
+/* Main comparison called for semantic function struct F1 and F2 returns
+   true if functions are considered semantically equal.  */
 
 static bool
 compare_functions (sem_func_t *f1, sem_func_t *f2)
@@ -1138,6 +1151,8 @@ semantic_equality (void)
 
   return 0; 
 }
+
+/* IPA pass gate function.  */
 
 static bool
 gate_sem_equality (void)
