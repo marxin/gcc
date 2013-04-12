@@ -46,7 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 
    If we encounter two candidates being really substitutable, we do merge type
    decision. We either process function aliasing or a simple wrapper
-   is construced.  */
+   is constructed.  */
 
 #include "config.h"
 #include "system.h"
@@ -114,7 +114,8 @@ typedef struct edge_pair
 static sem_func_t **sem_functions;
 static unsigned int sem_function_count;
 
-/* Hash combine function.  */
+/* Void pointer hash combine function. PTR argument is cast to a hashval_t
+   and combined with HASH.  */
 
 static
 hashval_t iterative_hash_tree (void *ptr, hashval_t hash)
@@ -128,6 +129,8 @@ hashval_t iterative_hash_tree (void *ptr, hashval_t hash)
   return hash;
 }
 
+/* Hash table struct used for a pair of declarations.  */
+
 struct decl_var_hash: typed_noop_remove <decl_pair_t>
 {
   typedef decl_pair_t value_type;
@@ -136,17 +139,23 @@ struct decl_var_hash: typed_noop_remove <decl_pair_t>
   static inline int equal (const value_type *, const compare_type *);  
 };
 
+/* Hash compute function returns hash for a given declaration pair.  */
+
 inline hashval_t
 decl_var_hash::hash (const decl_pair_t *pair)
 {
   return iterative_hash_tree (pair->source, 0);
 }
 
+/* Returns zero if PAIR1 and PAIR2 are equal.  */
+
 inline int
 decl_var_hash::equal (const decl_pair_t *pair1, const decl_pair_t *pair2)
 {
   return pair1->source == pair2->source;
 }
+
+/* Hash table struct used for a pair of edges  */
 
 struct edge_var_hash: typed_noop_remove <edge_pair_t>
 {
@@ -156,11 +165,15 @@ struct edge_var_hash: typed_noop_remove <edge_pair_t>
   static inline int equal (const value_type *, const compare_type *);  
 };
 
+/* Hash compute function returns hash for a given edge pair.  */
+
 inline hashval_t
 edge_var_hash::hash (const edge_pair_t *pair)
 {
   return iterative_hash_tree (pair->source, 0);
 }
+
+/* Returns zero if PAIR1 and PAIR2 are equal.  */
 
 inline int
 edge_var_hash::equal (const edge_pair_t *pair1, const edge_pair_t *pair2)
@@ -180,7 +193,9 @@ typedef struct func_dict
 } func_dict_t;
 
 
-/* Function dictionary initializer.  */
+/* Function dictionary initializer, all members of D are itiliazed.
+   Arrays for SSA names are allocated according to SSA_NAMES_SIZE1 and
+   SSA_NAMES_SIZE2 arguments.  */
 
 static void
 func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
@@ -196,7 +211,7 @@ func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
   d->edge_hash.create (10);
 }
 
-/* Free memory handler for a function dictionary.  */
+/* Releases function dictionary item D.  */
 
 static void
 func_dict_free (func_dict_t *d)
@@ -208,6 +223,8 @@ func_dict_free (func_dict_t *d)
   d->edge_hash.dispose ();
 }
 
+/* Hash table struct used for a pair of semantic functions.  */
+
 struct sem_func_var_hash: typed_noop_remove <sem_func_t>
 {
   typedef sem_func_t value_type;
@@ -216,6 +233,9 @@ struct sem_func_var_hash: typed_noop_remove <sem_func_t>
   static inline int equal (const value_type *, const compare_type *);  
   static inline void remove (value_type *);
 };
+
+/* Hash compute function returns hash for a given semantic function
+   struct F.  */
 
 inline hashval_t
 sem_func_var_hash::hash (const sem_func_t *f)
@@ -240,11 +260,15 @@ sem_func_var_hash::hash (const sem_func_t *f)
   return hash;
 }
 
+/* Returns zero if F1 and F2 are equal semantic functions.  */
+
 inline int
 sem_func_var_hash::equal (const value_type *f1, const compare_type *f2)
 {
   return sem_func_var_hash::hash (f1) == sem_func_var_hash::hash (f2);
 }
+
+/* Releases semantic function dictionary item F.  */
 
 inline void
 sem_func_var_hash::remove (value_type *f)
@@ -260,7 +284,8 @@ sem_func_var_hash::remove (value_type *f)
   free (f);
 }
 
-/* Simple basic block hash computing function.  */
+/* Basic block hash function combines for BASIC_BLOCK number of statements
+   and number of edges.  */
 
 static hashval_t
 bb_hash (const void *basic_block)
@@ -273,8 +298,8 @@ bb_hash (const void *basic_block)
   return hash;
 }
 
-/* Checks two SSA names from a different functions and returns true
-   if equal.  */
+/* Checks two SSA names SSA1 and SSA2 from a different functions and returns true
+   if equal. Function dictionary D is equired for a correct comparison. */
 
 static bool
 func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
@@ -298,7 +323,8 @@ func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
 }
 
 /* Semantic equality visit function loads all basic informations 
-   about a function and save them to a structure used for a further analysis.  */
+   about a function NODE and save them to a structure used for a further analysis.
+   Successfull parsing fills F and returns true.  */
 
 static bool
 visit_function (struct cgraph_node *node, sem_func_t *f)
@@ -315,11 +341,11 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
 
-  f->ssa_names_size = SSANAMES (my_function)->length ();
-  f->node = node;
-
   if (!cgraph_function_with_gimple_body_p (node))
     return false;
+
+  f->ssa_names_size = SSANAMES (my_function)->length ();
+  f->node = node;
 
   f->func_decl = fndecl;
   fnargs = DECL_ARGUMENTS (fndecl);
@@ -422,7 +448,8 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   return true;
 }
 
-/* Edge comparer- we just build edge bidictionary for each visited edge.  */
+/* Function dictionary D compares if edges E1 and E2 correspond.
+   Returns true if equal, false otherwise.  */
 
 static bool
 check_edges (edge e1, edge e2, func_dict_t *d)
@@ -452,8 +479,8 @@ check_edges (edge e1, edge e2, func_dict_t *d)
   return true;
 }
 
-/* Comparer responsible for a comparison of either SSA names or
-   a declaration (variable or parameter).  */
+/* Returns true if SSA names T1 and T2 do correspond in functions FUNC1 and
+   FUNC2. Function dictionary D is responsible for a correspondence.  */
 
 static bool
 function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
@@ -489,8 +516,9 @@ function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
     return true;
 }
 
-/* Each handled componend is decomposed for arguments that are
-   recursivelly compared.  */
+/* Returns true if handled components T1 and T2 do correspond in functions
+   FUNC1 and FUNC2. Handled components are decomposed and the function is
+   called recursivelly for arguments.  */
 
 static bool
 compare_handled_component (tree t1, tree t2, func_dict_t *d,
@@ -549,7 +577,8 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     }
 }
 
-/* Operand comparer could handle a tree operand.  */
+/* Operand comparison function takes operand T1 from a function FUNC1 and
+   compares it to a given operand T2 from a function FUNC2.  */
 
 static bool
 check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
@@ -589,9 +618,10 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
 
-/* Function comparer- all function arguments including a return type
-   are checked and we support only calls pointing to the save
-   function.  */
+/* Call comparer takes statements S1 from a function FUNC1 and S2 from
+   a function FUNC2. True is returned in case of call pointing to the
+   same function, where all arguments and return type must be
+   in correspondence.  */
 
 static bool
 check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
@@ -625,7 +655,9 @@ check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
     return check_operand (t1, t2, d, func1, func2);
 }
 
-/* Assignment comparer- all parts of expression are checked.  */
+/* Functions FUNC1 and FUNC2 are considered equal if assignment statements
+   S1 and S2 contain all operands equal. Equality is checked by function
+   dictionary D.  */
 
 static bool
 check_ssa_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
