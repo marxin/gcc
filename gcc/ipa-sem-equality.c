@@ -813,6 +813,23 @@ check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   return check_operand (dest1, dest2, d, func1, func2);
 }
 
+/* Returns for a given GSI statement first nondebug statement.  */
+
+static void iterate_nondebug_stmt (gimple_stmt_iterator &gsi)
+{
+  gimple s;
+
+  s = gsi_stmt (gsi);
+
+  while (gimple_code (s) == GIMPLE_DEBUG)
+  {
+    gsi_next (&gsi);    
+    gcc_assert (!gsi_end_p (gsi));
+
+    s = gsi_stmt (gsi);
+  }
+}
+
 /* Basic block comparison for blocks BB1 and BB2 that are a part of functions
    FUNC1 and FUNC2 uses function dictionary D as a collation lookup data
    structure. All statements are iterated, type distinguished and
@@ -823,15 +840,21 @@ static bool
 compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
             tree func1, tree func2)
 {
+  unsigned i;
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
 
   if (bb1->stmt_count != bb2->stmt_count || bb1->edge_count != bb2->edge_count)
     return false;
 
+  gsi1 = gsi_start_bb (bb1->bb);
   gsi2 = gsi_start_bb (bb2->bb);
-  for (gsi1 = gsi_start_bb (bb1->bb); !gsi_end_p (gsi1); gsi_next (&gsi1))
+
+  for (i = 0; i < bb1->stmt_count; i++)
   {
+    iterate_nondebug_stmt (gsi1);
+    iterate_nondebug_stmt (gsi2);
+
     s1 = gsi_stmt (gsi1);
     s2 = gsi_stmt (gsi2);
 
@@ -877,6 +900,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
         return false;
       }
 
+    gsi_next (&gsi1);
     gsi_next (&gsi2);
   }
 
