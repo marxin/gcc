@@ -601,7 +601,8 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   switch (tc1)
     {
     case CONSTRUCTOR:
-      return true;
+      return vec_safe_length (CONSTRUCTOR_ELTS (t1)) == 0
+        && vec_safe_length (CONSTRUCTOR_ELTS (t2)) == 0;
     case VAR_DECL:
     case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
@@ -615,7 +616,7 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
     || tc1 == ADDR_EXPR || tc1 == MEM_REF || tc1 == REALPART_EXPR
       || tc1 == IMAGPART_EXPR)
     return compare_handled_component (t1, t2, d, func1, func2);
-  else /* COMPLEX_CST compared correctly here.  */
+  else /* COMPLEX_CST, VECTOR_CST compared correctly here.  */
     return operand_equal_p (t1, t2, OEP_ONLY_CONST);
 }
 
@@ -1131,9 +1132,6 @@ semantic_equality (void)
 
           slot = sem_function_hash.find_slot (f, INSERT);
           f1 = *slot;
-
-          fprintf (stderr, "visited:%s:%u\n",
-            cgraph_node_name (f->node), sem_func_var_hash::hash (f));
 
           while(f1)
           {
