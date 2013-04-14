@@ -63,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-sccvn.h"
 #include "coverage.h"
 #include "hash-table.h"
+#include "except.h"
 
 #define IPA_SEM_EQUALITY_DEBUG
 
@@ -75,6 +76,7 @@ typedef struct sem_func
 {
   struct cgraph_node *node;
   tree func_decl;
+  eh_region region_tree;
   tree result_type;
   tree *arg_types;
   unsigned int arg_count;
@@ -348,6 +350,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   f->node = node;
 
   f->func_decl = fndecl;
+  f->region_tree = my_function->eh->region_tree;
   fnargs = DECL_ARGUMENTS (fndecl);
 
   /* iterating all function arguments.  */
@@ -988,6 +991,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   unsigned int i;
   func_dict_t func_dict;
   bool result = true;
+
+  /* Exception handling regions are not supported by the pass.  */
+  if (f1->region_tree != NULL || f2->region_tree != NULL)
+    return false;
 
   if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count
     || f1->edge_count != f2->edge_count
