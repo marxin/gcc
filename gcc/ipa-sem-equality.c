@@ -566,6 +566,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     case SSA_NAME:
       return function_check_ssa_names (d, t1, t2, func1, func2);
     case INTEGER_CST:
+      return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case FUNCTION_DECL:
     case FIELD_DECL:
       return t1 == t2;
@@ -1119,6 +1120,7 @@ semantic_equality (void)
 
   FOR_EACH_DEFINED_FUNCTION (node)
     {
+      merged = false;
       f = XNEW (sem_func_t);
       f->next = NULL;
 
@@ -1130,9 +1132,11 @@ semantic_equality (void)
           slot = sem_function_hash.find_slot (f, INSERT);
           f1 = *slot;
 
+          fprintf (stderr, "visited:%s:%u\n",
+            cgraph_node_name (f->node), sem_func_var_hash::hash (f));
+
           while(f1)
           {
-            merged = false;
             result = compare_functions (f1, f);
 
             /* fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different"); */
