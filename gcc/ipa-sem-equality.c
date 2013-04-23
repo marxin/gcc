@@ -65,8 +65,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-table.h"
 #include "except.h"
 
-#define IPA_SEM_EQUALITY_DEBUG
-
 /* Forward struct declaration.  */
 typedef struct sem_bb sem_bb_t;
 typedef struct sem_func sem_func_t;
@@ -116,21 +114,6 @@ typedef struct edge_pair
 static sem_func_t **sem_functions;
 static unsigned int sem_function_count;
 
-/* Void pointer hash combine function. PTR argument is cast to a hashval_t
-   and combined with HASH.  */
-
-static
-hashval_t iterative_hash_tree (void *ptr, hashval_t hash)
-{
-  uintptr_t pointer = (uintptr_t) ptr;
-  hashval_t *h = (hashval_t *) &pointer;
-
-  for (unsigned i = 0; i < sizeof (uintptr_t) / sizeof (hashval_t); ++i)
-    hash = iterative_hash_object (h[i], hash);
-
-  return hash;
-}
-
 /* Hash table struct used for a pair of declarations.  */
 
 struct decl_var_hash: typed_noop_remove <decl_pair_t>
@@ -146,7 +129,7 @@ struct decl_var_hash: typed_noop_remove <decl_pair_t>
 inline hashval_t
 decl_var_hash::hash (const decl_pair_t *pair)
 {
-  return iterative_hash_tree (pair->source, 0);
+  return iterative_hash_expr (pair->source, 0);
 }
 
 /* Returns zero if PAIR1 and PAIR2 are equal.  */
@@ -172,7 +155,7 @@ struct edge_var_hash: typed_noop_remove <edge_pair_t>
 inline hashval_t
 edge_var_hash::hash (const edge_pair_t *pair)
 {
-  return iterative_hash_tree (pair->source, 0);
+  return htab_hash_pointer (pair->source);
 }
 
 /* Returns zero if PAIR1 and PAIR2 are equal.  */
@@ -252,9 +235,9 @@ sem_func_var_hash::hash (const sem_func_t *f)
   hash = iterative_hash_object (f->cfg_checksum, hash);
 
   for(i = 0; i < f->arg_count; ++i)
-    hash = iterative_hash_tree (f->arg_types[i], hash);
+    hash = iterative_hash_object (f->arg_types[i], hash);
 
-  hash = iterative_hash_tree (f->result_type, hash);
+  hash = iterative_hash_object (f->result_type, hash);
 
   for(i = 0; i < f->bb_count; ++i)
     hash = iterative_hash_object (f->bb_sizes[i], hash);
@@ -363,15 +346,13 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 
   param_num = 0;
   for (parm = fnargs; parm; parm = DECL_CHAIN (parm))
-    f->arg_types[param_num++] = gimple_register_canonical_type
-                                  (DECL_ARG_TYPE (parm));
+    f->arg_types[param_num++] = TYPE_CANONICAL (DECL_ARG_TYPE (parm));
 
   /* Function result type.  */
   result = DECL_RESULT (fndecl);
 
   if (result)
-    f->result_type = gimple_register_canonical_type
-                       (TREE_TYPE (DECL_RESULT (fndecl)));
+    f->result_type = TYPE_CANONICAL (TREE_TYPE (DECL_RESULT (fndecl)));
 
   /* basic block iteration.  */
   f->bb_count = n_basic_blocks_for_function (my_function) - 2;
@@ -557,8 +538,8 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       y1 = TREE_OPERAND (t1, 1);
       y2 = TREE_OPERAND (t2, 1);
 
-      return compare_handled_component (x1, x2, d, func1, func2)
-        && compare_handled_component (y1, y2, d, func1, func2);
+      return (compare_handled_component (x1, x2, d, func1, func2)
+              && compare_handled_component (y1, y2, d, func1, func2));
     }
     case ADDR_EXPR:
     {
@@ -604,8 +585,8 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   switch (tc1)
     {
     case CONSTRUCTOR:
-      return vec_safe_length (CONSTRUCTOR_ELTS (t1)) == 0
-        && vec_safe_length (CONSTRUCTOR_ELTS (t2)) == 0;
+      return (vec_safe_length (CONSTRUCTOR_ELTS (t1)) == 0
+              && vec_safe_length (CONSTRUCTOR_ELTS (t2)) == 0);
     case VAR_DECL:
     case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
@@ -774,8 +755,8 @@ check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
     high2 = CASE_HIGH (gimple_switch_label (g2, i));
 
     if ((high1 != NULL) != (high2 != NULL)
-      || (high1 && high2
-        && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
+         || (high1 && high2
+             && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
       return false;
   }
 
@@ -900,6 +881,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
         break;
       case GIMPLE_RESX:
       case GIMPLE_ASM:
+        /* TODO: add debug print */
         return false;
       default:
         return false;
@@ -1148,13 +1130,17 @@ semantic_equality (void)
 
             if (result)
               {
-#ifdef IPA_SEM_EQUALITY_DEBUG
-                fprintf (stderr, "IPA_SEM_EQ HIT:%s:%s\n",
-                  cgraph_node_name (f->node), cgraph_node_name (f1->node));
+                if (dump_file)
+                {
+                  fprintf (dump_file, "IPA_SEM_EQ HIT:%s:%s\n",
+                    cgraph_node_name (f->node), cgraph_node_name (f1->node));
 
-                dump_function_to_file (f1->func_decl, stderr, TDF_DETAILS);
-                dump_function_to_file (f->func_decl, stderr, TDF_DETAILS);
-#endif        
+                  if (dump_file && (dump_flags & TDF_DETAILS))
+                  {
+                    dump_function_to_file (f1->func_decl, dump_file, TDF_DETAILS);
+                    dump_function_to_file (f->func_decl, dump_file, TDF_DETAILS);
+                  }
+                }
                 /* Experimental merging of two functions.  */
                 /* merge_functions (f, f1); */
 
