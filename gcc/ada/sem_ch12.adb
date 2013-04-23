@@ -3244,11 +3244,10 @@ package body Sem_Ch12 is
          begin
             Aspect := First (Aspect_Specifications (N));
             while Present (Aspect) loop
-               if Get_Aspect_Id (Chars (Identifier (Aspect)))
-                  /= Aspect_Warnings
-               then
+               if Get_Aspect_Id (Aspect) /= Aspect_Warnings then
                   Analyze (Expression (Aspect));
                end if;
+
                Next (Aspect);
             end loop;
 

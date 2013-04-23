@@ -35,6 +35,7 @@ with Exp_Ch3;  use Exp_Ch3;
 with Exp_Ch9;  use Exp_Ch9;
 with Exp_Disp; use Exp_Disp;
 with Exp_Dist; use Exp_Dist;
+with Exp_Pakd; use Exp_Pakd;
 with Exp_Tss;  use Exp_Tss;
 with Exp_Util; use Exp_Util;
 with Fname;    use Fname;
@@ -2201,7 +2202,7 @@ package body Sem_Ch3 is
 
                --  Analyze preconditions and postconditions
 
-               Prag := Spec_PPC_List (Contract (Sent));
+               Prag := Pre_Post_Conditions (Contract (Sent));
                while Present (Prag) loop
                   Analyze_PPC_In_Decl_Part (Prag, Sent);
                   Prag := Next_Pragma (Prag);
@@ -2209,9 +2210,22 @@ package body Sem_Ch3 is
 
                --  Analyze contract-cases and test-cases
 
-               Prag := Spec_CTC_List (Contract (Sent));
+               Prag := Contract_Test_Cases (Contract (Sent));
                while Present (Prag) loop
                   Analyze_CTC_In_Decl_Part (Prag, Sent);
+                  Prag := Next_Pragma (Prag);
+               end loop;
+
+               --  Analyze classification pragmas
+
+               Prag := Classifications (Contract (Sent));
+               while Present (Prag) loop
+                  if Pragma_Name (Prag) = Name_Depends then
+                     Analyze_Depends_In_Decl_Part (Prag);
+                  else
+                     Analyze_Global_In_Decl_Part (Prag);
+                  end if;
+
                   Prag := Next_Pragma (Prag);
                end loop;
 
@@ -11113,6 +11127,7 @@ package body Sem_Ch3 is
    is
       Loc         : constant Source_Ptr := Sloc (Constrained_Typ);
       Compon_Type : constant Entity_Id := Etype (Comp);
+      Array_Comp  : Node_Id;
 
       function Build_Constrained_Array_Type
         (Old_Type : Entity_Id) return Entity_Id;
@@ -11510,7 +11525,18 @@ package body Sem_Ch3 is
          return Compon_Type;
 
       elsif Is_Array_Type (Compon_Type) then
-         return Build_Constrained_Array_Type (Compon_Type);
+         Array_Comp := Build_Constrained_Array_Type (Compon_Type);
+
+         --  If the component of the parent is packed, and the record type is
+         --  already frozen, as is the case for an itype, the component type
+         --  itself will not be frozen, and the packed array type for it must
+         --  be constructed explicitly.
+
+         if Is_Packed (Compon_Type) and then Is_Frozen (Current_Scope) then
+            Create_Packed_Array_Type (Array_Comp);
+         end if;
+
+         return Array_Comp;
 
       elsif Has_Discriminants (Compon_Type) then
          return Build_Constrained_Discriminated_Type (Compon_Type);

@@ -1429,11 +1429,12 @@ package Einfo is
 --       type has no discriminants and the full view has discriminants with
 --       defaults. In Ada 2005 heap-allocated objects of such types are not
 --       constrained, and can change their discriminants with full assignment.
---       Sem_Aux.Effectively_Has_Constrained_Partial_View should be always
---       used by callers, rather than reading this attribute directly because,
---       according to RM 3.10.2 (27/2), untagged generic formal private types
---       and subtypes are also considered to have a constrained partial view
---       [when in a generic body].
+--
+--       Ada 2012 has an additional rule (3.3. (23/10.3)) concerning objects
+--       declared in a generic package body. Objects whose type is an untagged
+--       generic formal private type are considered to have a constrained
+--       partial view. The predicate Object_Type_Has_Constrained_Partial_View
+--       in sem_aux is used to test for this case.
 
 --    Has_Contiguous_Rep (Flag181)
 --       Defined in enumeration types. True if the type as a representation
@@ -2543,7 +2544,7 @@ package Einfo is
 --       entirely synthesized, by looking at the bounds, and the immediate
 --       subtype parent. However, this method does not work for some Itypes
 --       that have no parent set (and the only way to find the immediate
---       subtype parent is to go through the tree). For now, this flay is set
+--       subtype parent is to go through the tree). For now, this flag is set
 --       conservatively, i.e. if it is set then for sure the subtype is non-
 --       static, but if it is not set, then the type may or may not be static.
 --       Thus the test for a static subtype is that this flag is clear AND that

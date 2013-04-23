@@ -83,7 +83,7 @@ package body Sem_Util is
    NCT_Hash_Tables_Used : Boolean := False;
    --  Set to True if hash tables are in use
 
-   NCT_Table_Entries : Nat;
+   NCT_Table_Entries : Nat := 0;
    --  Count entries in table to see if threshold is reached
 
    NCT_Hash_Table_Setup : Boolean := False;
@@ -207,6 +207,43 @@ package body Sem_Util is
 
       Append_Elmt (A, L);
    end Add_Access_Type_To_Process;
+
+   -----------------------
+   -- Add_Contract_Item --
+   -----------------------
+
+   procedure Add_Contract_Item (Item : Node_Id; Subp_Id : Entity_Id) is
+      Items : constant Node_Id := Contract (Subp_Id);
+      Nam   : Name_Id;
+
+   begin
+      if Present (Items) and then Nkind (Item) = N_Pragma then
+         Nam := Pragma_Name (Item);
+
+         if Nam_In (Nam, Name_Precondition, Name_Postcondition) then
+            Set_Next_Pragma (Item, Pre_Post_Conditions (Items));
+            Set_Pre_Post_Conditions (Items, Item);
+
+         elsif Nam_In (Nam, Name_Contract_Cases, Name_Test_Case) then
+            Set_Next_Pragma (Item, Contract_Test_Cases (Items));
+            Set_Contract_Test_Cases (Items, Item);
+
+         elsif Nam_In (Nam, Name_Depends, Name_Global) then
+            Set_Next_Pragma (Item, Classifications (Items));
+            Set_Classifications (Items, Item);
+
+         --  The pragma is not a proper contract item
+
+         else
+            raise Program_Error;
+         end if;
+
+      --  The subprogram has not been properly decorated or the item is illegal
+
+      else
+         raise Program_Error;
+      end if;
+   end Add_Contract_Item;
 
    ----------------------------
    -- Add_Global_Declaration --
@@ -7980,7 +8017,7 @@ package body Sem_Util is
                   --  designated object is known to be constrained.
 
                   if Ekind (Prefix_Type) = E_Access_Type
-                    and then not Effectively_Has_Constrained_Partial_View
+                    and then not Object_Type_Has_Constrained_Partial_View
                                    (Typ  => Designated_Type (Prefix_Type),
                                     Scop => Current_Scope)
                   then
@@ -8122,19 +8159,25 @@ package body Sem_Util is
    ----------------------------
 
    function Is_Expression_Function (Subp : Entity_Id) return Boolean is
-      Decl : constant Node_Id := Unit_Declaration_Node (Subp);
+      Decl : Node_Id;
 
    begin
-      return Ekind (Subp) = E_Function
-        and then Nkind (Decl) = N_Subprogram_Declaration
-        and then
-          (Nkind (Original_Node (Decl)) = N_Expression_Function
-            or else
-              (Present (Corresponding_Body (Decl))
-                and then
-                  Nkind (Original_Node
-                     (Unit_Declaration_Node (Corresponding_Body (Decl))))
-                 = N_Expression_Function));
+      if Ekind (Subp) /= E_Function then
+         return False;
+
+      else
+         Decl := Unit_Declaration_Node (Subp);
+         return Nkind (Decl) = N_Subprogram_Declaration
+           and then
+             (Nkind (Original_Node (Decl)) = N_Expression_Function
+               or else
+                 (Present (Corresponding_Body (Decl))
+                   and then
+                     Nkind (Original_Node
+                             (Unit_Declaration_Node
+                               (Corresponding_Body (Decl)))) =
+                                  N_Expression_Function));
+      end if;
    end Is_Expression_Function;
 
    --------------
@@ -8462,8 +8505,10 @@ package body Sem_Util is
       Typ : Entity_Id) return Boolean
    is
    begin
+      --  Check that the operation has been created by the type declaration
+
       return Is_Inherited_Operation (E)
-        and then Etype (Parent (E)) = Typ;
+        and then Defining_Identifier (Parent (E)) = Typ;
    end Is_Inherited_Operation_For_Type;
 
    -----------------

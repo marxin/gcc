@@ -3612,7 +3612,7 @@ package body Sem_Res is
                  and then not Same_Ancestor (Etype (F), Etype (Expression (A)))
                  and then
                   (Is_Limited_Type (Etype (F))
-                     or else Is_Limited_Type (Etype (Expression (A))))
+                    or else Is_Limited_Type (Etype (Expression (A))))
                then
                   Error_Msg_N
                     ("conversion between unrelated limited array types "
@@ -3671,13 +3671,13 @@ package body Sem_Res is
                   end if;
                end if;
 
-               --  (Ada 2005): The call may be to a primitive operation of
-               --   a tagged synchronized type, declared outside of the type.
-               --   In this case the controlling actual must be converted to
-               --   its corresponding record type, which is the formal type.
-               --   The actual may be a subtype, either because of a constraint
-               --   or because it is a generic actual, so use base type to
-               --   locate concurrent type.
+               --  (Ada 2005): The call may be to a primitive operation of a
+               --  tagged synchronized type, declared outside of the type. In
+               --  this case the controlling actual must be converted to its
+               --  corresponding record type, which is the formal type. The
+               --  actual may be a subtype, either because of a constraint or
+               --  because it is a generic actual, so use base type to locate
+               --  concurrent type.
 
                F_Typ := Base_Type (Etype (F));
 
@@ -3946,12 +3946,14 @@ package body Sem_Res is
 
                --  Apply predicate checks, unless this is a call to the
                --  predicate check function itself, which would cause an
-               --  infinite recursion.
+               --  infinite recursion, or it is a call to an initialization
+               --  procedure whose operand is of course an unfinished object.
 
                if not (Ekind (Nam) = E_Function
                         and then (Is_Predicate_Function (Nam)
                                     or else
                                   Is_Predicate_Function_M (Nam)))
+                 and then not Is_Init_Proc (Nam)
                then
                   Apply_Predicate_Check (A, F_Typ);
                end if;
@@ -4292,8 +4294,8 @@ package body Sem_Res is
          Error_Msg_N ("type of allocator cannot be abstract",  N);
       end if;
 
-      --  For qualified expression, resolve the expression using the
-      --  given subtype (nothing to do for type mark, subtype indication)
+      --  For qualified expression, resolve the expression using the given
+      --  subtype (nothing to do for type mark, subtype indication)
 
       if Nkind (E) = N_Qualified_Expression then
          if Is_Class_Wide_Type (Etype (E))
@@ -4307,8 +4309,8 @@ package body Sem_Res is
          Resolve (Expression (E), Etype (E));
          Check_Unset_Reference (Expression (E));
 
-         --  A qualified expression requires an exact match of the type,
-         --  class-wide matching is not allowed.
+         --  A qualified expression requires an exact match of the type.
+         --  Class-wide matching is not allowed.
 
          if (Is_Class_Wide_Type (Etype (Expression (E)))
               or else Is_Class_Wide_Type (Etype (E)))
@@ -4349,9 +4351,9 @@ package body Sem_Res is
          --  deeper than the type of the allocator (in contrast to access
          --  parameters, where the level of the actual can be arbitrary).
 
-         --  We can't use Valid_Conversion to perform this check because
-         --  in general the type of the allocator is unrelated to the type
-         --  of the access discriminant.
+         --  We can't use Valid_Conversion to perform this check because in
+         --  general the type of the allocator is unrelated to the type of
+         --  the access discriminant.
 
          if Ekind (Typ) /= E_Anonymous_Access_Type
            or else Is_Local_Anonymous_Access (Typ)
@@ -4770,8 +4772,7 @@ package body Sem_Res is
             Resolve (N, Any_Fixed);
 
          elsif Is_Fixed_Point_Type (B_Typ)
-           and then (T = Universal_Real
-                      or else Is_Fixed_Point_Type (T))
+           and then (T = Universal_Real or else Is_Fixed_Point_Type (T))
            and then Is_Overloaded (N)
          then
             --  C * F(X) in a fixed context, where C is a real literal or a
@@ -4879,7 +4880,7 @@ package body Sem_Res is
                         and then Is_Fixed_Point_Type (B_Typ))
               or else (Is_Fixed_Point_Type (B_Typ)
                         and then (Is_Integer_Or_Universal (L)
-                                   or else
+                                    or else
                                   Is_Integer_Or_Universal (R))))
         and then Nkind_In (N, N_Op_Multiply, N_Op_Divide)
       then
@@ -4973,7 +4974,7 @@ package body Sem_Res is
 
       else
          if (TL = Universal_Integer or else TL = Universal_Real)
-              and then
+               and then
             (TR = Universal_Integer or else TR = Universal_Real)
          then
             Check_For_Visible_Operator (N, B_Typ);
@@ -5137,7 +5138,7 @@ package body Sem_Res is
                --  In this case, the back end has to generate additional tests.
 
                if (Nkind (N) = N_Op_Rem and then (LNeg and RNeg))
-                    or else
+                     or else
                   (Nkind (N) = N_Op_Mod and then (LNeg or RNeg))
                then
                   Check_Restriction (No_Implicit_Conditionals, N);
@@ -5376,22 +5377,24 @@ package body Sem_Res is
 
       Check_Internal_Protected_Use (N, Nam);
 
-      --  Freeze the subprogram name if not in a spec-expression. Note that we
-      --  freeze procedure calls as well as function calls. Procedure calls are
-      --  not frozen according to the rules (RM 13.14(14)) because it is
-      --  impossible to have a procedure call to a non-frozen procedure in pure
-      --  Ada, but in the code that we generate in the expander, this rule
-      --  needs extending because we can generate procedure calls that need
-      --  freezing.
+      --  Freeze the subprogram name if not in a spec-expression. Note that
+      --  we freeze procedure calls as well as function calls. Procedure calls
+      --  are not frozen according to the rules (RM 13.14(14)) because it is
+      --  impossible to have a procedure call to a non-frozen procedure in
+      --  pure Ada, but in the code that we generate in the expander, this
+      --  rule needs extending because we can generate procedure calls that
+      --  need freezing.
 
       --  In Ada 2012, expression functions may be called within pre/post
       --  conditions of subsequent functions or expression functions. Such
-      --  calls do not freeze when they appear within generated bodies, which
-      --  would place the freeze node in the wrong scope.  An expression
-      --  function is frozen in the usual fashion, by the appearance of a real
-      --  body, or at the end of a declarative part.
+      --  calls do not freeze when they appear within generated bodies,
+      --  (including the body of another expression function) which would
+      --  place the freeze node in the wrong scope. An expression function
+      --  is frozen in the usual fashion, by the appearance of a real body,
+      --  or at the end of a declarative part.
 
       if Is_Entity_Name (Subp) and then not In_Spec_Expression
+        and then not Is_Expression_Function (Current_Scope)
         and then
           (not Is_Expression_Function (Entity (Subp))
             or else Scope (Entity (Subp)) = Current_Scope)
@@ -5896,19 +5899,13 @@ package body Sem_Res is
       --  In formal mode, the primitive operations of a tagged type or type
       --  extension do not include functions that return the tagged type.
 
-      --  Commented out as the call to Is_Inherited_Operation_For_Type may
-      --  cause an error because the type entity of the parent node of
-      --  Entity (Name (N) may not be set. ???
-      --  So why not just add a guard ???
-
---      if Nkind (N) = N_Function_Call
---        and then Is_Tagged_Type (Etype (N))
---        and then Is_Entity_Name (Name (N))
---        and then Is_Inherited_Operation_For_Type
---                   (Entity (Name (N)), Etype (N))
---      then
---         Check_SPARK_Restriction ("function not inherited", N);
---      end if;
+      if Nkind (N) = N_Function_Call
+        and then Is_Tagged_Type (Etype (N))
+        and then Is_Entity_Name (Name (N))
+        and then Is_Inherited_Operation_For_Type (Entity (Name (N)), Etype (N))
+      then
+         Check_SPARK_Restriction ("function not inherited", N);
+      end if;
 
       --  Implement rule in 12.5.1 (23.3/2): In an instance, if the actual is
       --  class-wide and the call dispatches on result in a context that does
@@ -8911,27 +8908,32 @@ package body Sem_Res is
             Orig : constant Node_Id := Original_Node (Parent (N));
 
          begin
+            --  Special handling of Asssert pragma
+
             if Nkind (Orig) = N_Pragma
               and then Pragma_Name (Orig) = Name_Assert
             then
-               --  Don't want to warn if original condition is explicit False
-
                declare
                   Expr : constant Node_Id :=
                            Original_Node
                              (Expression
                                (First (Pragma_Argument_Associations (Orig))));
+
                begin
+                  --  Don't warn if original condition is explicit False,
+                  --  since obviously the failure is expected in this case.
+
                   if Is_Entity_Name (Expr)
                     and then Entity (Expr) = Standard_False
                   then
                      null;
-                  else
-                     --  Issue warning. We do not want the deletion of the
-                     --  IF/AND-THEN to take this message with it. We achieve
-                     --  this by making sure that the expanded code points to
-                     --  the Sloc of the expression, not the original pragma.
 
+                  --  Issue warning. We do not want the deletion of the
+                  --  IF/AND-THEN to take this message with it. We achieve this
+                  --  by making sure that the expanded code points to the Sloc
+                  --  of the expression, not the original pragma.
+
+                  else
                      --  Note: Use Error_Msg_F here rather than Error_Msg_N.
                      --  The source location of the expression is not usually
                      --  the best choice here. For example, it gets located on
