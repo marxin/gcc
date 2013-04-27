@@ -934,7 +934,7 @@ dump_simple_decl (tree t, tree type, int flags)
     pp_string (cxx_pp, "...");
   if (DECL_NAME (t))
     {
-      if (DECL_CLASS_SCOPE_P (t) && LAMBDA_TYPE_P (DECL_CONTEXT (t)))
+      if (TREE_CODE (t) == FIELD_DECL && DECL_NORMAL_CAPTURE_P (t))
 	{
 	  pp_character (cxx_pp, '<');
 	  pp_string (cxx_pp, IDENTIFIER_POINTER (DECL_NAME (t)) + 2);
@@ -2962,7 +2962,7 @@ cp_print_error_function (diagnostic_context *context,
       const char *file = LOCATION_FILE (diagnostic->location);
       tree abstract_origin = diagnostic_abstract_origin (diagnostic);
       char *new_prefix = (file && abstract_origin == NULL)
-			 ? file_name_as_prefix (file) : NULL;
+			 ? file_name_as_prefix (context, file) : NULL;
 
       pp_base_set_prefix (context->printer, new_prefix);
 

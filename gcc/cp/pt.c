@@ -11794,7 +11794,8 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	--c_inhibit_evaluation_warnings;
 
 	if (DECLTYPE_FOR_LAMBDA_CAPTURE (t))
-	  type = lambda_capture_field_type (type);
+	  type = lambda_capture_field_type (type,
+					    DECLTYPE_FOR_INIT_CAPTURE (t));
 	else if (DECLTYPE_FOR_LAMBDA_PROXY (t))
 	  type = lambda_proxy_type (type);
 	else
@@ -12053,7 +12054,7 @@ tsubst_qualified_id (tree qualified_id, tree args,
       expr = (finish_qualified_id_expr
 	      (scope, expr, done, address_p && PTRMEM_OK_P (qualified_id),
 	       QUALIFIED_NAME_IS_TEMPLATE (qualified_id),
-	       /*template_arg_p=*/false));
+	       /*template_arg_p=*/false, complain));
     }
 
   /* Expressions do not generally have reference type.  */
@@ -16040,7 +16041,7 @@ resolve_nondeduced_context (tree orig_expr)
 	    {
 	      tree base
 		= TYPE_MAIN_VARIANT (TREE_TYPE (TREE_OPERAND (offset, 0)));
-	      expr = build_offset_ref (base, expr, addr);
+	      expr = build_offset_ref (base, expr, addr, tf_warning_or_error);
 	    }
 	  if (addr)
 	    expr = cp_build_addr_expr (expr, tf_warning_or_error);

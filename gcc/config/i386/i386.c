@@ -23714,7 +23714,8 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
 		  rtx callarg2,
 		  rtx pop, bool sibcall)
 {
-  int const cregs_size = ARRAY_SIZE (x86_64_ms_sysv_extra_clobbered_registers);
+  unsigned int const cregs_size
+    = ARRAY_SIZE (x86_64_ms_sysv_extra_clobbered_registers);
   rtx vec[3 + cregs_size];
   rtx use = NULL, call;
   unsigned int vec_len = 0;
@@ -40841,7 +40842,9 @@ ix86_expand_mul_widen_evenodd (rtx dest, rtx op1, rtx op2,
      the even slots.  For some cpus this is faster than a PSHUFD.  */
   if (odd_p)
     {
-      if (TARGET_XOP && mode == V4SImode)
+      /* For XOP use vpmacsdqh, but only for smult, as it is only
+	 signed.  */
+      if (TARGET_XOP && mode == V4SImode && !uns_p)
 	{
 	  x = force_reg (wmode, CONST0_RTX (wmode));
 	  emit_insn (gen_xop_pmacsdqh (dest, op1, op2, x));

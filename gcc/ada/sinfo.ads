@@ -1414,10 +1414,10 @@ package Sinfo is
    --  Label_Construct (Node2-Sem)
    --    Used in an N_Implicit_Label_Declaration node. Refers to an N_Label,
    --    N_Block_Statement or N_Loop_Statement node to which the label
-   --    declaration applies. This is not currently used in the compiler
-   --    itself, but it is useful in the implementation of ASIS queries.
-   --    This field is left empty for the special labels generated as part
-   --    of expanding raise statements with a local exception handler.
+   --    declaration applies. This attribute is used both in the compiler and
+   --    in the implementation of ASIS queries. The field is left empty for the
+   --    special labels generated as part of expanding raise statements with a
+   --    local exception handler.
 
    --  Library_Unit (Node4-Sem)
    --    In a stub node, Library_Unit points to the compilation unit node of
@@ -7043,18 +7043,18 @@ package Sinfo is
       --  Classifications (Node3) (set to Empty if none)
 
       --  Pre_Post_Conditions contains a collection of pragmas that correspond
-      --  to pre- and post-conditions associated with an entry or a subprogram.
+      --  to pre- and postconditions associated with an entry or a subprogram.
       --  The pragmas can either come from source or be the byproduct of aspect
-      --  expansion. The ordering in the list is of LIFO fasion.
+      --  expansion. The ordering in the list is of LIFO fashion.
 
       --  Contract_Test_Cases contains a collection of pragmas that correspond
       --  to aspects/pragmas Contract_Cases and Test_Case. The ordering in the
-      --  list is of LIFO fasion.
+      --  list is of LIFO fashion.
 
       --  Classifications contains pragmas that either categorize subprogram
       --  inputs and outputs or establish dependencies between them. Currently
       --  pragmas Depends and Global are stored in this list. The ordering is
-      --  of LIFO fasion.
+      --  of LIFO fashion.
 
       -------------------
       -- Expanded_Name --
@@ -7121,8 +7121,8 @@ package Sinfo is
       --  Expression (Node3)
       --  plus fields for expression
 
-      --  Note: the actions list is always non-null, since we would
-      --  never have created this node if there weren't some actions.
+      --  Note: the actions list is always non-null, since we would never have
+      --  created this node if there weren't some actions.
 
       --  Note: Expression may be a Null_Statement, in which case the
       --  N_Expression_With_Actions has type Standard_Void_Type. However some

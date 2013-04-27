@@ -1,3 +1,44 @@
+2013-04-26  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* testsuite/23_containers/unordered_set/insert/move_range.cc: Adjust
+	dialect to -std=gnu++11.
+
+2013-04-26  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/hashtable_policy.h
+	(_Insert_base<>::insert<_It>(_It, _It)): Enable move semantics.
+	* testsuite/23_containers/unordered_set/insert/move_range.cc: New.
+
+2013-04-26  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* include/c_global/cstdio (gets): Provide only in C++98 and C++11.
+	* include/c_std/cstdio (gets): Likewise.
+	* testsuite/27_io/headers/cstdio/functions_std.cc: Adjust.
+
+2013-04-25  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR libstdc++/57065
+	* include/debug/unordered_map (unordered_map, unordered_multimap):
+	Fix default allocator type.
+	* include/profile/unordered_map (unordered_map, unordered_multimap):
+	Likewise.
+	* include/bits/unordered_map.h: Fix comments.
+
+2013-04-24  Jonathan Wakely  <jwakely.gcc@gmail.com>
+
+	PR libstdc++/56905
+	* libsupc++/exception_ptr.h (copy_exception): Deprecate and
+	move implementation to make_exception_ptr.
+	* include/std/future (_State_base::_M_break_promise): Replace
+	copy_exception with make_exception_ptr.
+	* testsuite/18_support/exception_ptr/move.cc: Likewise.
+	* testsuite/18_support/exception_ptr/rethrow_exception.cc: Likewise.
+	* testsuite/30_threads/future/members/get2.cc: Likewise.
+	* testsuite/30_threads/promise/members/set_exception.cc: Likewise.
+	* testsuite/30_threads/promise/members/set_exception2.cc: Likewise.
+	* testsuite/30_threads/promise/members/set_value2.cc: Likewise.
+	* testsuite/30_threads/shared_future/members/get2.cc: Likewise.
+
 2013-04-22  Jason Merrill  <jason@redhat.com>
 
 	* src/c++11/hashtable_c++0x.cc: Include ext/aligned_buffer.h.

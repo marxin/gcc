@@ -925,9 +925,33 @@ package body Sem_Ch13 is
    -----------------------------------
 
    procedure Analyze_Aspect_Specifications (N : Node_Id; E : Entity_Id) is
+      procedure Decorate_Delayed_Aspect_And_Pragma
+        (Asp  : Node_Id;
+         Prag : Node_Id);
+      --  Establish the linkages between a delayed aspect and its corresponding
+      --  pragma. Set all delay-related flags on both constructs.
+
       procedure Insert_Delayed_Pragma (Prag : Node_Id);
       --  Insert a postcondition-like pragma into the tree depending on the
-      --  context. Prag one of the following: Pre, Post, Depends or Global.
+      --  context. Prag must denote one of the following: Pre, Post, Depends,
+      --  Global or Contract_Cases.
+
+      ----------------------------------------
+      -- Decorate_Delayed_Aspect_And_Pragma --
+      ----------------------------------------
+
+      procedure Decorate_Delayed_Aspect_And_Pragma
+        (Asp  : Node_Id;
+         Prag : Node_Id)
+      is
+      begin
+         Set_Aspect_Rep_Item           (Asp, Prag);
+         Set_Corresponding_Aspect      (Prag, Asp);
+         Set_From_Aspect_Specification (Prag);
+         Set_Is_Delayed_Aspect         (Prag);
+         Set_Is_Delayed_Aspect         (Asp);
+         Set_Parent                    (Prag, Asp);
+      end Decorate_Delayed_Aspect_And_Pragma;
 
       ---------------------------
       -- Insert_Delayed_Pragma --
@@ -985,6 +1009,8 @@ package body Sem_Ch13 is
       Ins_Node : Node_Id := N;
       --  Insert pragmas/attribute definition clause after this node when no
       --  delayed analysis is required.
+
+      --  Start of processing for Analyze_Aspect_Specifications
 
       --  The general processing involves building an attribute definition
       --  clause or a pragma node that corresponds to the aspect. Then in order
@@ -1309,6 +1335,16 @@ package body Sem_Ch13 is
                       Chars      => Chars (Id),
                       Expression => Relocate_Node (Expr));
 
+                  --  If the address is specified, then we treat the entity as
+                  --  referenced, to avoid spurious warnings. This is analogous
+                  --  to what is done with an attribute definition clause, but
+                  --  here we don't want to generate a reference because this
+                  --  is the point of definition of the entity.
+
+                  if A_Id = Aspect_Address then
+                     Set_Referenced (E);
+                  end if;
+
                --  Case 2: Aspects corresponding to pragmas
 
                --  Case 2a: Aspects corresponding to pragmas with two
@@ -1483,6 +1519,11 @@ package body Sem_Ch13 is
                      Make_Aitem_Pragma
                        (Pragma_Argument_Associations => Arg_List,
                         Pragma_Name                  => P_Name);
+
+                     --  Convention is a static name, and must be associated
+                     --  with the entity at once.
+
+                     Delay_Required := False;
                   end;
 
                --  CPU, Interrupt_Priority, Priority
@@ -1596,15 +1637,7 @@ package body Sem_Ch13 is
                          Expression => Relocate_Node (Expr))),
                      Pragma_Name                  => Name_Depends);
 
-                  --  Decorate the aspect and pragma
-
-                  Set_Aspect_Rep_Item           (Aspect, Aitem);
-                  Set_Corresponding_Aspect      (Aitem, Aspect);
-                  Set_From_Aspect_Specification (Aitem);
-                  Set_Is_Delayed_Aspect         (Aitem);
-                  Set_Is_Delayed_Aspect         (Aspect);
-                  Set_Parent                    (Aitem, Aspect);
-
+                  Decorate_Delayed_Aspect_And_Pragma (Aspect, Aitem);
                   Insert_Delayed_Pragma (Aitem);
                   goto Continue;
 
@@ -1622,15 +1655,7 @@ package body Sem_Ch13 is
                          Expression => Relocate_Node (Expr))),
                      Pragma_Name                  => Name_Global);
 
-                  --  Decorate the aspect and pragma
-
-                  Set_Aspect_Rep_Item           (Aspect, Aitem);
-                  Set_Corresponding_Aspect      (Aitem, Aspect);
-                  Set_From_Aspect_Specification (Aitem);
-                  Set_Is_Delayed_Aspect         (Aitem);
-                  Set_Is_Delayed_Aspect         (Aspect);
-                  Set_Parent                    (Aitem, Aspect);
-
+                  Decorate_Delayed_Aspect_And_Pragma (Aspect, Aitem);
                   Insert_Delayed_Pragma (Aitem);
                   goto Continue;
 
@@ -1730,7 +1755,7 @@ package body Sem_Ch13 is
                --  required pragma placement. The processing for the pragmas
                --  takes care of the required delay.
 
-               when Pre_Post_Aspects => declare
+               when Pre_Post_Aspects => Pre_Post : declare
                   Pname : Name_Id;
 
                begin
@@ -1807,7 +1832,7 @@ package body Sem_Ch13 is
 
                   Insert_Delayed_Pragma (Aitem);
                   goto Continue;
-               end;
+               end Pre_Post;
 
                --  Test_Case
 
@@ -1880,79 +1905,16 @@ package body Sem_Ch13 is
 
                --  Contract_Cases
 
-               when Aspect_Contract_Cases => Contract_Cases : declare
-                  Case_Guard  : Node_Id;
-                  Extra       : Node_Id;
-                  Others_Seen : Boolean := False;
-                  Post_Case   : Node_Id;
-
-               begin
-                  if Nkind (Parent (N)) = N_Compilation_Unit then
-                     Error_Msg_Name_1 := Nam;
-                     Error_Msg_N ("incorrect placement of aspect `%`", E);
-                     goto Continue;
-                  end if;
-
-                  if Nkind (Expr) /= N_Aggregate then
-                     Error_Msg_Name_1 := Nam;
-                     Error_Msg_NE
-                       ("wrong syntax for aspect `%` for &", Id, E);
-                     goto Continue;
-                  end if;
-
-                  --  Verify the legality of individual post cases
-
-                  Post_Case := First (Component_Associations (Expr));
-                  while Present (Post_Case) loop
-                     if Nkind (Post_Case) /= N_Component_Association then
-                        Error_Msg_N ("wrong syntax in post case", Post_Case);
-                        goto Continue;
-                     end if;
-
-                     --  Each post case must have exactly one case guard
-
-                     Case_Guard := First (Choices (Post_Case));
-                     Extra      := Next (Case_Guard);
-
-                     if Present (Extra) then
-                        Error_Msg_N
-                          ("post case may have only one case guard", Extra);
-                        goto Continue;
-                     end if;
-
-                     --  Check the placement of "others" (if available)
-
-                     if Nkind (Case_Guard) = N_Others_Choice then
-                        if Others_Seen then
-                           Error_Msg_Name_1 := Nam;
-                           Error_Msg_N
-                             ("only one others choice allowed in aspect %",
-                              Case_Guard);
-                           goto Continue;
-                        else
-                           Others_Seen := True;
-                        end if;
-
-                     elsif Others_Seen then
-                        Error_Msg_Name_1 := Nam;
-                        Error_Msg_N
-                          ("others must be the last choice in aspect %", N);
-                        goto Continue;
-                     end if;
-
-                     Next (Post_Case);
-                  end loop;
-
-                  --  Transform the aspect into a pragma
-
+               when Aspect_Contract_Cases =>
                   Make_Aitem_Pragma
                     (Pragma_Argument_Associations => New_List (
                        Make_Pragma_Argument_Association (Loc,
                          Expression => Relocate_Node (Expr))),
                      Pragma_Name                  => Nam);
 
-                  Delay_Required := False;
-               end Contract_Cases;
+                  Decorate_Delayed_Aspect_And_Pragma (Aspect, Aitem);
+                  Insert_Delayed_Pragma (Aitem);
+                  goto Continue;
 
                --  Case 5: Special handling for aspects with an optional
                --  boolean argument.
@@ -1960,8 +1922,6 @@ package body Sem_Ch13 is
                --  In the general case, the corresponding pragma cannot be
                --  generated yet because the evaluation of the boolean needs
                --  to be delayed till the freeze point.
-
-               --  Boolwn_Aspects
 
                when Boolean_Aspects      |
                     Library_Unit_Aspects =>
@@ -2026,7 +1986,9 @@ package body Sem_Ch13 is
                   --  issue of visibility delay for these aspects.
 
                   if A_Id in Library_Unit_Aspects
-                    and then Nkind (N) = N_Package_Declaration
+                    and then
+                      Nkind_In (N, N_Package_Declaration,
+                                   N_Generic_Package_Declaration)
                     and then Nkind (Parent (N)) /= N_Compilation_Unit
                   then
                      Error_Msg_N
@@ -2081,7 +2043,9 @@ package body Sem_Ch13 is
             --  In the context of a compilation unit, we directly put the
             --  pragma in the Pragmas_After list of the N_Compilation_Unit_Aux
             --  node (no delay is required here) except for aspects on a
-            --  subprogram body (see below).
+            --  subprogram body (see below) and a generic package, for which
+            --  we need to introduce the pragma before building the generic
+            --  copy (see sem_ch12).
 
             elsif Nkind (Parent (N)) = N_Compilation_Unit
               and then (Present (Aitem) or else Is_Boolean_Aspect (Aspect))
@@ -2121,6 +2085,14 @@ package body Sem_Ch13 is
                      end if;
 
                      Prepend (Aitem, Declarations (N));
+
+                  elsif Nkind (N) = N_Generic_Package_Declaration then
+                     if No (Visible_Declarations (Specification (N))) then
+                        Set_Visible_Declarations (Specification (N), New_List);
+                     end if;
+
+                     Prepend (Aitem,
+                       Visible_Declarations (Specification (N)));
 
                   else
                      if No (Pragmas_After (Aux)) then
@@ -5781,6 +5753,9 @@ package body Sem_Ch13 is
       Raise_Expression_Present : Boolean := False;
       --  Set True if Expr has at least one Raise_Expression
 
+      Static_Predic : Node_Id := Empty;
+      --  Set to N_Pragma node for a static predicate if one is encountered
+
       procedure Add_Call (T : Entity_Id);
       --  Includes a call to the predicate function for type T in Expr if T
       --  has predicates and Predicate_Function (T) is non-empty.
@@ -5804,13 +5779,6 @@ package body Sem_Ch13 is
 
       procedure Process_REs is new Traverse_Proc (Process_RE);
       --  Marks any raise expressions in Expr_M to return False
-
-      Dynamic_Predicate_Present : Boolean := False;
-      --  Set True if a dynamic predicate is present, results in the entire
-      --  predicate being considered dynamic even if it looks static
-
-      Static_Predicate_Present : Node_Id := Empty;
-      --  Set to N_Pragma node for a static predicate if one is encountered
 
       --------------
       -- Add_Call --
@@ -5906,15 +5874,14 @@ package body Sem_Ch13 is
             if Nkind (Ritem) = N_Pragma
               and then Pragma_Name (Ritem) = Name_Predicate
             then
-               if Present (Corresponding_Aspect (Ritem)) then
-                  case Chars (Identifier (Corresponding_Aspect (Ritem))) is
-                     when Name_Dynamic_Predicate =>
-                        Dynamic_Predicate_Present := True;
-                     when Name_Static_Predicate =>
-                        Static_Predicate_Present := Ritem;
-                     when others =>
-                        null;
-                  end case;
+               --  Save the static predicate of the type for diagnostics and
+               --  error reporting purposes.
+
+               if Present (Corresponding_Aspect (Ritem))
+                 and then Chars (Identifier (Corresponding_Aspect (Ritem))) =
+                            Name_Static_Predicate
+               then
+                  Static_Predic := Ritem;
                end if;
 
                --  Acquire arguments
@@ -6239,42 +6206,43 @@ package body Sem_Ch13 is
             end;
          end if;
 
-         --  Deal with static predicate case
+         if Is_Scalar_Type (Typ) then
 
-         --  ??? We don't currently deal with real types
-         --  ??? Why requiring that Typ is static?
+            --  Attempt to build a static predicate for a discrete or a real
+            --  subtype. This action may fail because the actual expression may
+            --  not be static. Note that the presence of an inherited or
+            --  explicitly declared dynamic predicate is orthogonal to this
+            --  check because we are only interested in the static predicate.
 
-         if Ekind (Typ) in Discrete_Kind
-           and then Is_Static_Subtype (Typ)
-           and then not Dynamic_Predicate_Present
-         then
-            --  Only build the predicate for subtypes
-
-            if Ekind_In (Typ, E_Enumeration_Subtype,
+            if Ekind_In (Typ, E_Decimal_Fixed_Point_Subtype,
+                              E_Enumeration_Subtype,
+                              E_Floating_Point_Subtype,
                               E_Modular_Integer_Subtype,
+                              E_Ordinary_Fixed_Point_Subtype,
                               E_Signed_Integer_Subtype)
             then
                Build_Static_Predicate (Typ, Expr, Object_Name);
 
-               if Present (Static_Predicate_Present)
-                 and No (Static_Predicate (Typ))
+               --  Emit an error when the predicate is categorized as static
+               --  but its expression is dynamic.
+
+               if Present (Static_Predic)
+                 and then No (Static_Predicate (Typ))
                then
                   Error_Msg_F
                     ("expression does not have required form for "
                      & "static predicate",
                      Next (First (Pragma_Argument_Associations
-                                   (Static_Predicate_Present))));
+                                   (Static_Predic))));
                end if;
             end if;
 
-         --  If a Static_Predicate applies on other types, that's an error:
+         --  If a static predicate applies on other types, that's an error:
          --  either the type is scalar but non-static, or it's not even a
          --  scalar type. We do not issue an error on generated types, as
          --  these may be duplicates of the same error on a source type.
 
-         elsif Present (Static_Predicate_Present)
-           and then Comes_From_Source (Typ)
-         then
+         elsif Present (Static_Predic) and then Comes_From_Source (Typ) then
             if Is_Scalar_Type (Typ) then
                Error_Msg_FE
                  ("static predicate not allowed for non-static type&",
