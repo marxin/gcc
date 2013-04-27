@@ -1258,10 +1258,7 @@ finalize_task_copyfn (gimple task_stmt)
     return;
 
   child_cfun = DECL_STRUCT_FUNCTION (child_fn);
-
-  /* Inform the callgraph about the new function.  */
-  DECL_STRUCT_FUNCTION (child_fn)->curr_properties
-    = cfun->curr_properties & ~PROP_loops;
+  DECL_STRUCT_FUNCTION (child_fn)->curr_properties = cfun->curr_properties;
 
   push_cfun (child_cfun);
   bind = gimplify_body (child_fn, false);
@@ -1276,6 +1273,7 @@ finalize_task_copyfn (gimple task_stmt)
   gimple_set_body (child_fn, seq);
   pop_cfun ();
 
+  /* Inform the callgraph about the new function.  */
   cgraph_add_new_function (child_fn, false);
 }
 
@@ -3056,6 +3054,11 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
 
 	  make_edge (cond_bb, then_bb, EDGE_TRUE_VALUE);
 	  make_edge (cond_bb, else_bb, EDGE_FALSE_VALUE);
+	  if (current_loops)
+	    {
+	      add_bb_to_loop (then_bb, cond_bb->loop_father);
+	      add_bb_to_loop (else_bb, cond_bb->loop_father);
+	    }
 	  e_then = make_edge (then_bb, bb, EDGE_FALLTHRU);
 	  e_else = make_edge (else_bb, bb, EDGE_FALLTHRU);
 
@@ -3568,6 +3571,11 @@ expand_omp_taskreg (struct omp_region *region)
       new_bb = move_sese_region_to_fn (child_cfun, entry_bb, exit_bb, block);
       if (exit_bb)
 	single_succ_edge (new_bb)->flags = EDGE_FALLTHRU;
+      /* ???  As the OMP expansion process does not update the loop
+         tree of the original function before outlining the region to
+	 the new child function we need to discover loops in the child.
+	 Arrange for that.  */
+      child_cfun->x_current_loops->state |= LOOPS_NEED_FIXUP;
 
       /* Remove non-local VAR_DECLs from child_cfun->local_decls list.  */
       num = vec_safe_length (child_cfun->local_decls);
@@ -3584,8 +3592,7 @@ expand_omp_taskreg (struct omp_region *region)
 	vec_safe_truncate (child_cfun->local_decls, dstidx);
 
       /* Inform the callgraph about the new function.  */
-      DECL_STRUCT_FUNCTION (child_fn)->curr_properties
-	= cfun->curr_properties & ~PROP_loops;
+      DECL_STRUCT_FUNCTION (child_fn)->curr_properties = cfun->curr_properties;
       cgraph_add_new_function (child_fn, true);
 
       /* Fix the callgraph edges for child_cfun.  Those for cfun will be
@@ -4011,6 +4018,8 @@ expand_omp_for_generic (struct omp_region *region,
 	      tree vtype = TREE_TYPE (fd->loops[i].v);
 
 	      bb = create_empty_bb (last_bb);
+	      if (current_loops)
+		add_bb_to_loop (bb, last_bb->loop_father);
 	      gsi = gsi_start_bb (bb);
 
 	      if (i < fd->collapse - 1)
@@ -4114,6 +4123,8 @@ expand_omp_for_generic (struct omp_region *region,
       remove_edge (e);
 
       make_edge (cont_bb, l2_bb, EDGE_FALSE_VALUE);
+      if (current_loops)
+	add_bb_to_loop (l2_bb, cont_bb->loop_father);
       if (fd->collapse > 1)
 	{
 	  e = find_edge (cont_bb, l1_bb);
@@ -4902,6 +4913,8 @@ expand_omp_sections (struct omp_region *region)
   t = gimple_block_label (default_bb);
   u = build_case_label (NULL, NULL, t);
   make_edge (l0_bb, default_bb, 0);
+  if (current_loops)
+    add_bb_to_loop (default_bb, l0_bb->loop_father);
 
   stmt = gimple_build_switch (vmain, u, label_vec);
   gsi_insert_after (&switch_si, stmt, GSI_SAME_STMT);
@@ -5437,6 +5450,10 @@ expand_omp_atomic_pipeline (basic_block load_bb, basic_block store_bb,
 
   if (gimple_in_ssa_p (cfun))
     update_ssa (TODO_update_ssa_no_phi);
+
+  /* ???  The above could use loop construction primitives.  */
+  if (current_loops)
+    loops_state_set (LOOPS_NEED_FIXUP);
 
   return true;
 }

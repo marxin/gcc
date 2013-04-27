@@ -6155,7 +6155,7 @@ cp_parser_postfix_dot_deref_expression (cp_parser *parser,
       /* Unlike the object expression in other contexts, *this is not
 	 required to be of complete type for purposes of class member
 	 access (5.2.5) outside the member function body.  */
-      else if (scope != current_class_ref
+      else if (postfix_expression != current_class_ref
 	       && !(processing_template_decl && scope == current_class_type))
 	scope = complete_type_or_else (scope, NULL_TREE);
       /* Let the name lookup machinery know that we are processing a
@@ -8548,17 +8548,18 @@ cp_parser_lambda_introducer (cp_parser* parser, tree lambda_expr)
 	}
 
       /* Find the initializer for this capture.  */
-      if (cp_lexer_next_token_is (parser->lexer, CPP_EQ))
+      if (cp_lexer_next_token_is (parser->lexer, CPP_EQ)
+	  || cp_lexer_next_token_is (parser->lexer, CPP_OPEN_PAREN)
+	  || cp_lexer_next_token_is (parser->lexer, CPP_OPEN_BRACE))
 	{
-	  /* An explicit expression exists.  */
-	  cp_lexer_consume_token (parser->lexer);
+	  bool direct, non_constant;
+	  /* An explicit initializer exists.  */
 	  if (cxx_dialect < cxx1y)
 	    pedwarn (input_location, 0,
 		     "lambda capture initializers "
 		     "only available with -std=c++1y or -std=gnu++1y");
-	  capture_init_expr = cp_parser_assignment_expression (parser,
-							       /*cast_p=*/true,
-							       &idk);
+	  capture_init_expr = cp_parser_initializer (parser, &direct,
+						     &non_constant);
 	  explicit_init_p = true;
 	}
       else
