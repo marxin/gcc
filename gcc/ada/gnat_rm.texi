@@ -122,7 +122,7 @@ Implementation Defined Pragmas
 * Pragma Complete_Representation::
 * Pragma Complex_Representation::
 * Pragma Component_Alignment::
-* Pragma Contract_Case::
+* Pragma Contract_Cases::
 * Pragma Convention_Identifier::
 * Pragma CPP_Class::
 * Pragma CPP_Constructor::
@@ -548,6 +548,8 @@ The GNAT Library
 * System.Address_Image (s-addima.ads)::
 * System.Assertions (s-assert.ads)::
 * System.Memory (s-memory.ads)::
+* System.Multiprocessors (s-multip.ads)::
+* System.Multiprocessors.Dispatching_Domains (s-mudido.ads)::
 * System.Partition_Interface (s-parint.ads)::
 * System.Pool_Global (s-pooglo.ads)::
 * System.Pool_Local (s-pooloc.ads)::
@@ -875,7 +877,7 @@ consideration, the use of these pragmas should be minimized.
 * Pragma Complete_Representation::
 * Pragma Complex_Representation::
 * Pragma Component_Alignment::
-* Pragma Contract_Case::
+* Pragma Contract_Cases::
 * Pragma Convention_Identifier::
 * Pragma CPP_Class::
 * Pragma CPP_Constructor::
@@ -1227,46 +1229,79 @@ addition.
 
 @node Pragma Assertion_Policy
 @unnumberedsec Pragma Assertion_Policy
-@findex Debug_Policy
+@findex Assertion_Policy
 @noindent
 Syntax:
-
 @smallexample @c ada
 pragma Assertion_Policy (CHECK | DISABLE | IGNORE);
+
+pragma Assertion_Policy (
+    ASSERTION_KIND => POLICY_IDENTIFIER
+ @{, ASSERTION_KIND => POLICY_IDENTIFIER@});
+
+ASSERTION_KIND ::= RM_ASSERTION_KIND | ID_ASSERTION_KIND
+
+RM_ASSERTION_KIND ::= Assert               |
+                      Static_Predicate     |
+                      Dynamic_Predicate    |
+                      Pre                  |
+                      Pre'Class            |
+                      Post                 |
+                      Post'Class           |
+                      Type_Invariant       |
+                      Type_Invariant'Class
+
+ID_ASSERTION_KIND ::= Assertions           |
+                      Assert_And_Cut       |
+                      Assume               |
+                      Contract_Cases       |
+                      Debug                |
+                      Invariant            |
+                      Invariant'Class      |
+                      Loop_Invariant       |
+                      Loop_Variant         |
+                      Postcondition        |
+                      Precondition         |
+                      Predicate
+                      Statement_Assertions
+
+POLICY_IDENTIFIER ::= Check | Disable | Ignore
 @end smallexample
 
 @noindent
-This is a standard Ada 2005 pragma that is available as an
+This is a standard Ada 2012 pragma that is available as an
 implementation-defined pragma in earlier versions of Ada.
+The assertion kinds @code{RM_ASSERTION_KIND} are those defined in
+the Ada standard. The assertion kinds @code{ID_ASSERTION_KIND}
+are implementation defined additions recognized by the GNAT compiler.
 
-If the argument is @code{CHECK}, then assertions are enabled.
-If the argument is @code{IGNORE}, then assertions are ignored.
+The pragma applies in both cases to pragmas and aspects with matching
+names, e.g. @code{Pre} applies to the Pre aspect, and @code{Precondition}
+applies to both the @code{Precondition} pragma
+and the aspect @code{Precondition}.
+
+If the policy is @code{CHECK}, then assertions are enabled, i.e.
+the corresponding pragma or aspect is activated.
+If the policy is @code{IGNORE}, then assertions are ignored, i.e.
+the corresponding pragma or aspect is deactivated.
 This pragma overrides the effect of the @option{-gnata} switch on the
 command line.
 
-Assertions are of three kinds:
-
-@itemize @bullet
-@item
-Pragma @code{Assert}.
-@item
-In Ada 2012, all assertions defined in the RM as aspects: preconditions,
-postconditions, type invariants and (sub)type predicates.
-@item
-Corresponding pragmas for type invariants and (sub)type predicates.
-@end itemize
-
 The implementation defined policy @code{DISABLE} is like
 @code{IGNORE} except that it completely disables semantic
-checking of the argument to @code{pragma Assert}. This may
-be useful when the pragma argument references subprograms
+checking of the corresponding pragma or aspect. This is
+useful when the pragma or aspect argument references subprograms
 in a with'ed package which is replaced by a dummy package
 for the final build.
 
-Note: this is a standard language-defined pragma in versions
-of Ada from 2005 on. In GNAT, it is implemented in all versions
-of Ada, and the DISABLE policy is an implementation-defined
-addition.
+The implementation defined policy @code{Assertions} applies to all
+assertion kinds. The form with no assertion kind given implies this
+choice, so it applies to all assertion kinds (RM defined, and
+implementation defined).
+
+The implementation defined policy @code{Statement_Assertions}
+applies to @code{Assert}, @code{Assert_And_Cut},
+@code{Assume}, and @code{Loop_Invariant}.
 
 @node Pragma Assume_No_Invalid_Values
 @unnumberedsec Pragma Assume_No_Invalid_Values
@@ -1414,9 +1449,15 @@ passing mechanisms on a parameter by parameter basis.
 Syntax:
 @smallexample @c ada
 pragma Check (
-     [Name    =>] Identifier,
+     [Name    =>] CHECK_KIND,
      [Check   =>] Boolean_EXPRESSION
   [, [Message =>] string_EXPRESSION] );
+
+CHECK_KIND ::= IDENTIFIER           |
+               Pre'Class            |
+               Post'Class           |
+               Type_Invariant'Class |
+               Invariant'Class
 @end smallexample
 
 @noindent
@@ -1424,14 +1465,16 @@ This pragma is similar to the predefined pragma @code{Assert} except that an
 extra identifier argument is present. In conjunction with pragma
 @code{Check_Policy}, this can be used to define groups of assertions that can
 be independently controlled. The identifier @code{Assertion} is special, it
-refers to the normal set of pragma @code{Assert} statements. The identifiers
-@code{Precondition} and @code{Postcondition} correspond to the pragmas of these
-names, so these three names would normally not be used directly in a pragma
-@code{Check}.
+refers to the normal set of pragma @code{Assert} statements.
 
 Checks introduced by this pragma are normally deactivated by default. They can
 be activated either by the command line option @option{-gnata}, which turns on
 all checks, or individually controlled using pragma @code{Check_Policy}.
+
+The identifiers @code{Assertions} and @code{Statement_Assertions} are not
+permitted as check kinds, since this would cause confusion with the use
+of these identifiers in @code{Assertion_Policy} and @code{Check_Policy}
+pragmas, where they are used to refer to sets of assertions.
 
 @node Pragma Check_Float_Overflow
 @unnumberedsec Pragma Check_Float_Overflow
@@ -1516,6 +1559,9 @@ the current unit, or if it appears at the start of any unit that
 is part of the dependency set of the current unit (e.g., units that
 are mentioned in @code{with} clauses).
 
+Check names introduced by this pragma are subject to control by compiler
+switches (in particular -gnatp) in the usual manner.
+
 @node Pragma Check_Policy
 @unnumberedsec Pragma Check_Policy
 @cindex Controlling assertions
@@ -1527,22 +1573,50 @@ are mentioned in @code{with} clauses).
 Syntax:
 @smallexample @c ada
 pragma Check_Policy
- ([Name   =>] Identifier,
+ ([Name   =>] CHECK_KIND,
   [Policy =>] POLICY_IDENTIFIER);
+
+pragma Check_Policy (
+    CHECK_KIND => POLICY_IDENTIFIER
+ @{, CHECK_KIND => POLICY_IDENTIFIER@});
+
+ASSERTION_KIND ::= RM_ASSERTION_KIND | ID_ASSERTION_KIND
+
+CHECK_KIND ::= IDENTIFIER           |
+               Pre'Class            |
+               Post'Class           |
+               Type_Invariant'Class |
+               Invariant'Class
+
+The identifiers Name and Policy are not allowed as CHECK_KIND values. This
+avoids confusion between the two possible syntax forms for this pragma.
 
 POLICY_IDENTIFIER ::= ON | OFF | CHECK | DISABLE | IGNORE
 @end smallexample
 
 @noindent
-This pragma is similar to the predefined pragma @code{Assertion_Policy},
-except that it controls sets of named assertions introduced using the
-@code{Check} pragmas. It can be used as a configuration pragma or (unlike
-@code{Assertion_Policy}) can be used within a declarative part, in which case
-it controls the status to the end of the corresponding construct (in a manner
-identical to pragma @code{Suppress)}.
+This pragma is used to set the checking policy for assertions (specified
+by aspects or pragmas), the @code{Debug} pragma, or additional checks
+to be checked using the @code{Check} pragma. It may appear either as
+a configuration pragma, or within a declarative part of package. In the
+latter case, it applies from the point where it appears to the end of
+the declarative region (like pragma @code{Suppress}).
 
-The identifier given as the first argument corresponds to a name used in
-associated @code{Check} pragmas. For example, if the pragma:
+The @code{Check_Policy} pragma is similar to the
+predefined @code{Assertion_Policy} pragma,
+and if the check kind corresponds to one of the assertion kinds that
+are allowed by @code{Assertion_Policy}, then the effect is identical.
+
+If the first argument is Debug, then the policy applies to Debug pragmas,
+disabling their effect if the policy is @code{OFF}, @code{DISABLE}, or
+@code{IGNORE}, and allowing them to execute with normal semantics if
+the policy is @code{ON} or @code{CHECK}. In addition if the policy is
+@code{DISABLE}, then the procedure call in @code{Debug} pragmas will
+be totally ignored and not analyzed semantically.
+
+Finally the first argument may be some other identifier than the above
+possibilities, in which case it controls a set of named assertions
+that can be checked using pragma @code{Check}. For example, if the pragma:
 
 @smallexample @c ada
 pragma Check_Policy (Critical_Error, OFF);
@@ -1550,37 +1624,18 @@ pragma Check_Policy (Critical_Error, OFF);
 
 @noindent
 is given, then subsequent @code{Check} pragmas whose first argument is also
-@code{Critical_Error} will be disabled. The special identifier @code{Assertion}
-controls the behavior of normal assertions (thus a pragma
-@code{Check_Policy} with this identifier is similar to the normal
-@code{Assertion_Policy} pragma except that it can appear within a
-declarative part).
-
-The special identifiers @code{Precondition} and @code{Postcondition} control
-the status of preconditions and postconditions given as pragmas.
-If a @code{Precondition} pragma
-is encountered, it is ignored if turned off by a @code{Check_Policy} specifying
-that @code{Precondition} checks are @code{Off} or @code{Ignored}. Similarly use
-of the name @code{Postcondition} controls whether @code{Postcondition} pragmas
-are recognized. Note that preconditions and postconditions given as aspects
-are controlled differently, either by the @code{Assertion_Policy} pragma or
-by the @code{Check_Policy} pragma with identifier @code{Assertion}.
+@code{Critical_Error} will be disabled.
 
 The check policy is @code{OFF} to turn off corresponding checks, and @code{ON}
 to turn on corresponding checks. The default for a set of checks for which no
 @code{Check_Policy} is given is @code{OFF} unless the compiler switch
 @option{-gnata} is given, which turns on all checks by default.
 
-The check policy settings @code{CHECK} and @code{IGNORE} are also recognized
+The check policy settings @code{CHECK} and @code{IGNORE} are recognized
 as synonyms for @code{ON} and @code{OFF}. These synonyms are provided for
-compatibility with the standard @code{Assertion_Policy} pragma.
-
-The implementation defined policy @code{DISABLE} is like
-@code{OFF} except that it completely disables semantic
-checking of the argument to the corresponding class of
-pragmas. This may be useful when the pragma arguments reference
-subprograms in a with'ed package which is replaced by a dummy package
-for the final build.
+compatibility with the standard @code{Assertion_Policy} pragma. The check
+policy setting @code{DISABLE} causes the second argument of a corresponding
+@code{Check} pragma to be completely ignored and not analyzed.
 
 @node Pragma Comment
 @unnumberedsec Pragma Comment
@@ -1820,107 +1875,88 @@ If the alignment for a record or array type is not specified (using
 pragma @code{Pack}, pragma @code{Component_Alignment}, or a record rep
 clause), the GNAT uses the default alignment as described previously.
 
-@node Pragma Contract_Case
-@unnumberedsec Pragma Contract_Case
+@node Pragma Contract_Cases
+@unnumberedsec Pragma Contract_Cases
 @cindex Contract cases
-@findex Contract_Case
+@findex Contract_Cases
 @noindent
 Syntax:
 
 @smallexample @c ada
-pragma Contract_Case (
-   [Name     =>] static_string_Expression
-  ,[Mode     =>] (Nominal | Robustness)
- [, Requires =>  Boolean_Expression]
- [, Ensures  =>  Boolean_Expression]);
+pragma Contract_Cases (
+   Condition => Consequence
+ @{,Condition => Consequence@});
 @end smallexample
 
 @noindent
-The @code{Contract_Case} pragma allows defining fine-grain specifications
+The @code{Contract_Cases} pragma allows defining fine-grain specifications
 that can complement or replace the contract given by a precondition and a
-postcondition. Additionally, the @code{Contract_Case} pragma can be used
+postcondition. Additionally, the @code{Contract_Cases} pragma can be used
 by testing and formal verification tools. The compiler checks its validity and,
 depending on the assertion policy at the point of declaration of the pragma,
 it may insert a check in the executable. For code generation, the contract
-case
+cases
 
 @smallexample @c ada
-pragma Contract_Case (
-   Name     => ...
-   Mode     => ...
-   Requires => R,
-   Ensures  => E);
+pragma Contract_Cases (
+  Cond1 => Pred1,
+  Cond2 => Pred2);
 @end smallexample
 
 @noindent
-is equivalent to
+are equivalent to
 
 @smallexample @c ada
-pragma Postcondition (not R'Old or else E);
+C1 : constant Boolean := Cond1;  --  evaluated at subprogram entry
+C2 : constant Boolean := Cond2;  --  evaluated at subprogram entry
+pragma Precondition ((C1 and not C2) or (C2 and not C1));
+pragma Postcondition (if C1 then Pred1);
+pragma Postcondition (if C2 then Pred2);
 @end smallexample
 
 @noindent
-which is also equivalent to (in Ada 2012)
-
-@smallexample @c ada
-pragma Postcondition (if R'Old then E);
-@end smallexample
-
-@noindent
-expressing that, whenever condition @code{R} is satisfied on entry to the
-subprogram, condition @code{E} should be fulfilled on exit to the subprogram.
+The precondition expresses that one and only one of the conditions is
+satisfied on entry to the subprogram.
+The postcondition expresses that, whenever condition @code{Ci} is satisfied
+on entry to the subprogram, consequence @code{Predi} should be fulfilled on
+exit to the subprogram.
 
 A precondition @code{P} and postcondition @code{Q} can also be
 expressed as contract cases:
 
 @smallexample @c ada
-pragma Contract_Case (
-   Name     => "Replace precondition",
-   Mode     => Nominal,
-   Requires => not P,
-   Ensures  => False);
-pragma Contract_Case (
-   Name     => "Replace postcondition",
-   Mode     => Nominal,
-   Requires => P,
-   Ensures  => Q);
+pragma Contract_Cases (P => Q);
 @end smallexample
 
-@code{Contract_Case} pragmas may only appear immediately following the
-(separate) declaration of a subprogram in a package declaration, inside
-a package spec unit. Only other pragmas may intervene (that is appear
-between the subprogram declaration and a contract case).
+The placement and visibility rules for @code{Contract_Cases} pragmas are
+identical to those described for preconditions and postconditions.
 
-The compiler checks that boolean expressions given in @code{Requires} and
-@code{Ensures} are valid, where the rules for @code{Requires} are the
-same as the rule for an expression in @code{Precondition} and the rules
-for @code{Ensures} are the same as the rule for an expression in
+The compiler checks that boolean expressions given in conditions and
+consequences are valid, where the rules for conditions are the same as
+the rule for an expression in @code{Precondition} and the rules for
+consequences are the same as the rule for an expression in
 @code{Postcondition}. In particular, attributes @code{'Old} and
-@code{'Result} can only be used within the @code{Ensures}
-expression. The following is an example of use within a package spec:
+@code{'Result} can only be used within consequence expressions.
+The condition for the last contract case may be @code{others}, to denote
+any case not captured by the previous cases. The
+following is an example of use within a package spec:
 
 @smallexample @c ada
 package Math_Functions is
    ...
    function Sqrt (Arg : Float) return Float;
-   pragma Contract_Case (Name     => "Small argument",
-                         Mode     => Nominal,
-                         Requires => Arg < 100,
-                         Ensures  => Sqrt'Result < 10);
+   pragma Contract_Cases ((Arg in 0 .. 99) => Sqrt'Result < 10,
+                          Arg >= 100       => Sqrt'Result >= 10,
+                          others           => Sqrt'Result = 0);
    ...
 end Math_Functions;
 @end smallexample
 
 @noindent
-The meaning of a contract case is that, whenever the associated subprogram is
-executed in a context where @code{Requires} holds, then @code{Ensures}
-should hold when the subprogram returns. Mode @code{Nominal} indicates
-that the input context should also satisfy the precondition of the
-subprogram, and the output context should also satisfy its
-postcondition. More @code{Robustness} indicates that the precondition and
-postcondition of the subprogram should be ignored for this contract case,
-which is mostly useful when testing such a contract using a testing tool
-that understands contract cases.
+The meaning of contract cases is that only one case should apply at each
+call, as determined by the corresponding condition evaluating to True,
+and that the consequence for this case should hold when the subprogram
+returns.
 
 @node Pragma Convention_Identifier
 @unnumberedsec Pragma Convention_Identifier
@@ -2108,7 +2144,8 @@ corresponding to the argument with a terminating semicolon. Pragmas are
 permitted in sequences of declarations, so you can use pragma @code{Debug} to
 intersperse calls to debug procedures in the middle of declarations. Debug
 pragmas can be enabled either by use of the command line switch @option{-gnata}
-or by use of the configuration pragma @code{Debug_Policy}.
+or by use of the pragma @code{Check_Policy} with a first argument of
+@code{Debug}.
 
 @node Pragma Debug_Policy
 @unnumberedsec Pragma Debug_Policy
@@ -2117,21 +2154,13 @@ or by use of the configuration pragma @code{Debug_Policy}.
 Syntax:
 
 @smallexample @c ada
-pragma Debug_Policy (CHECK | DISABLE | IGNORE);
+pragma Debug_Policy (CHECK | DISABLE | IGNORE | ON | OFF);
 @end smallexample
 
 @noindent
-If the argument is @code{CHECK}, then pragma @code{DEBUG} is enabled.
-If the argument is @code{IGNORE}, then pragma @code{DEBUG} is ignored.
-This pragma overrides the effect of the @option{-gnata} switch on the
-command line.
-
-The implementation defined policy @code{DISABLE} is like
-@code{IGNORE} except that it completely disables semantic
-checking of the argument to @code{pragma Debug}. This may
-be useful when the pragma argument references subprograms
-in a with'ed package which is replaced by a dummy package
-for the final build.
+This pragma is equivalent to a corresponding @code{Check_Policy} pragma
+with a first argument of @code{Debug}. It is retained for historical
+compatibility reasons.
 
 @node Pragma Default_Storage_Pool
 @unnumberedsec Pragma Default_Storage_Pool
@@ -2847,7 +2876,18 @@ the standard runtime libraries be recompiled.
 The two argument form specifies the representation to be used for
 the specified floating-point type. On all systems other than OpenVMS,
 the argument must
-be @code{IEEE_Float} and the pragma has no effect. On OpenVMS, the
+be @code{IEEE_Float} to specify the use of IEEE format, as follows:
+
+@itemize @bullet
+@item
+For a digits value of 6, 32-bit IEEE short format will be used.
+@item
+For a digits value of 15, 64-bit IEEE long format will be used.
+@item
+No other value of digits is permitted.
+@end itemize
+
+On OpenVMS, the
 argument may be @code{VAX_Float} to specify the use of the VAX float
 format, as follows:
 
@@ -4029,7 +4069,7 @@ earlier versions of the package body.
 Syntax:
 
 @smallexample @c ada
-pragma No_Inline (NAME [, NAME]);
+pragma No_Inline (NAME @{, NAME@});
 @end smallexample
 
 @noindent
@@ -4857,10 +4897,10 @@ priority-ordered scheduling policy.
 @item Locking_Policy (Ceiling_Locking)
 [RM D.3] While tasks and interrupts execute a protected action, they inherit
 the ceiling priority of the corresponding protected object.
-@c
-@c @item Detect_Blocking
-@c This pragma forces the detection of potentially blocking operations within a
-@c protected operation, and to raise Program_Error if that happens.
+
+@item Detect_Blocking
+This pragma forces the detection of potentially blocking operations within a
+protected operation, and to raise Program_Error if that happens.
 @end table
 @noindent
 
@@ -5789,12 +5829,10 @@ pragma Test_Case (
 
 @noindent
 The @code{Test_Case} pragma allows defining fine-grain specifications
-for use by testing tools. Its syntax is similar to the syntax of the
-@code{Contract_Case} pragma, which is used for both testing and
-formal verification.
+for use by testing tools.
 The compiler checks the validity of the @code{Test_Case} pragma, but its
 presence does not lead to any modification of the code generated by the
-compiler, contrary to the treatment of the @code{Contract_Case} pragma.
+compiler.
 
 @code{Test_Case} pragmas may only appear immediately following the
 (separate) declaration of a subprogram in a package declaration, inside
@@ -7130,7 +7168,7 @@ what is passed to @code{Allocate} and returned from @code{Deallocate}.
 the number of values represented by the subtype (zero for a null
 range).  The result is static for static subtypes.  @code{Range_Length}
 applied to the index subtype of a one dimensional array always gives the
-same result as @code{Range} applied to the array itself.
+same result as @code{Length} applied to the array itself.
 
 @node Ref
 @unnumberedsec Ref
@@ -14256,6 +14294,25 @@ The use of these parameters is described later in this section. If an
 unrecognized keyword appears in a form string, it is silently ignored
 and not considered invalid.
 
+@noindent
+For OpenVMS additional FORM string keywords are available for use with
+RMS services.  The syntax is:
+
+@smallexample
+VMS_RMS_Keys=(keyword=value,@dots{},keyword=value)
+@end smallexample
+
+@noindent
+The following RMS keywords and values are currently defined:
+
+@smallexample
+Context=Force_Stream_Mode|Force_Record_Mode
+@end smallexample
+
+@noindent
+VMS RMS keys are silently ignored on non-VMS systems.  On OpenVMS
+unimplented RMS keywords, values, or invalid syntax will raise Use_Error.
+
 @node Direct_IO
 @section Direct_IO
 
@@ -15505,6 +15562,8 @@ of GNAT, and will generate a warning message.
 * System.Address_Image (s-addima.ads)::
 * System.Assertions (s-assert.ads)::
 * System.Memory (s-memory.ads)::
+* System.Multiprocessors (s-multip.ads)::
+* System.Multiprocessors.Dispatching_Domains (s-mudido.ads)::
 * System.Partition_Interface (s-parint.ads)::
 * System.Pool_Global (s-pooglo.ads)::
 * System.Pool_Local (s-pooloc.ads)::
@@ -16967,6 +17026,22 @@ allocation mechanisms for the default pool, and in addition, direct
 calls to this unit may be made for low level allocation uses (for
 example see the body of @code{GNAT.Tables}).
 
+@node System.Multiprocessors (s-multip.ads)
+@section @code{System.Multiprocessors} (@file{s-multip.ads})
+@cindex @code{System.Multiprocessors} (@file{s-multip.ads})
+@cindex Multiprocessor interface
+This is an Ada 2012 unit defined in the Ada 2012 Reference Manual, but
+in GNAT we also make it available in Ada 95 and Ada 2005 (where it is
+technically an implementation-defined addition).
+
+@node System.Multiprocessors.Dispatching_Domains (s-mudido.ads)
+@section @code{System.Multiprocessors.Dispatching_Domains} (@file{s-mudido.ads})
+@cindex @code{System.Multiprocessors.Dispatching_Domains} (@file{s-mudido.ads})
+@cindex Multiprocessor interface
+This is an Ada 2012 unit defined in the Ada 2012 Reference Manual, but
+in GNAT we also make it available in Ada 95 and Ada 2005 (where it is
+technically an implementation-defined addition).
+
 @node System.Partition_Interface (s-parint.ads)
 @section @code{System.Partition_Interface} (@file{s-parint.ads})
 @cindex @code{System.Partition_Interface} (@file{s-parint.ads})
@@ -18072,7 +18147,7 @@ A complete description of the AIs may be found in
 @item @code{Atomic_Components} @tab
 @item @code{Bit_Order} @tab
 @item @code{Component_Size} @tab
-@item @code{Contract_Case} @tab                 -- GNAT
+@item @code{Contract_Cases} @tab                 -- GNAT
 @item @code{Discard_Names} @tab
 @item @code{External_Tag} @tab
 @item @code{Favor_Top_Level} @tab               -- GNAT

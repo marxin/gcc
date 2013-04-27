@@ -23,6 +23,7 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
+with Aspects;  use Aspects;
 with Atree;    use Atree;
 with Checks;   use Checks;
 with Debug;    use Debug;
@@ -942,6 +943,7 @@ package body Exp_Ch6 is
       Formal    : Entity_Id;
       N_Node    : Node_Id;
       Post_Call : List_Id;
+      E_Actual  : Entity_Id;
       E_Formal  : Entity_Id;
 
       procedure Add_Call_By_Copy_Code;
@@ -1508,6 +1510,7 @@ package body Exp_Ch6 is
       Actual := First_Actual (N);
       while Present (Formal) loop
          E_Formal := Etype (Formal);
+         E_Actual := Etype (Actual);
 
          if Is_Scalar_Type (E_Formal)
            or else Nkind (Actual) = N_Slice
@@ -1645,7 +1648,7 @@ package body Exp_Ch6 is
             --  conversion" errors.
 
             elsif Is_Access_Type (E_Formal)
-              and then not Same_Type (E_Formal, Etype (Actual))
+              and then not Same_Type (E_Formal, E_Actual)
               and then not Is_Tagged_Type (Designated_Type (E_Formal))
             then
                Add_Call_By_Copy_Code;
@@ -1661,7 +1664,7 @@ package body Exp_Ch6 is
 
             elsif Is_Entity_Name (Actual)
               and then Is_Volatile (Entity (Actual))
-              and then not Is_By_Reference_Type (Etype (Actual))
+              and then not Is_By_Reference_Type (E_Actual)
               and then not Is_Scalar_Type (Etype (Entity (Actual)))
               and then not Is_Volatile (E_Formal)
             then
@@ -1682,10 +1685,10 @@ package body Exp_Ch6 is
 
             elsif Is_Scalar_Type (E_Formal)
               and then
-                (not In_Subrange_Of (E_Formal, Etype (Actual))
+                (not In_Subrange_Of (E_Formal, E_Actual)
                   or else
                     (Ekind (Formal) = E_In_Out_Parameter
-                      and then not In_Subrange_Of (Etype (Actual), E_Formal)))
+                      and then not In_Subrange_Of (E_Actual, E_Formal)))
             then
                --  Perhaps the setting back to False should be done within
                --  Add_Call_By_Copy_Code, since it could get set on other
@@ -1696,6 +1699,56 @@ package body Exp_Ch6 is
                end if;
 
                Add_Call_By_Copy_Code;
+            end if;
+
+            --  RM 3.2.4 (23/3) : A predicate is checked on in-out and out
+            --  by-reference parameters on exit from the call. If the actual
+            --  is a derived type and the operation is inherited, the body
+            --  of the operation will not contain a call to the predicate
+            --  function, so it must be done explicitly after the call. Ditto
+            --  if the actual is an entity of a predicated subtype.
+
+            --  The rule refers to by-reference types, but a check is needed
+            --  for by-copy types as well. That check is subsumed by the rule
+            --  for subtype conversion on assignment, but we can generate the
+            --  required check now.
+
+            --  Note that this is needed only if the subtype of the actual has
+            --  an explicit predicate aspect, not if it inherits them from a
+            --  base type or ancestor. The check is also superfluous if the
+            --  subtype is elaborated before the body of the subprogram, but
+            --  this is harder to verify, and there may be a redundant check.
+
+            --  Note also that Subp may be either a subprogram entity for
+            --  direct calls, or a type entity for indirect calls, which must
+            --  be handled separately because the name does not denote an
+            --  overloadable entity.
+
+            --  If the formal is class-wide the corresponding postcondition
+            --  procedure does not include a predicate call, so it has to be
+            --  generated explicitly.
+
+            if (Has_Aspect (E_Actual, Aspect_Predicate)
+                  or else
+                Has_Aspect (E_Actual, Aspect_Dynamic_Predicate)
+                  or else
+                Has_Aspect (E_Actual, Aspect_Static_Predicate))
+              and then not Is_Init_Proc (Subp)
+            then
+               if (Is_Derived_Type (E_Actual)
+                    and then Is_Overloadable (Subp)
+                    and then Is_Inherited_Operation_For_Type (Subp, E_Actual))
+                 or else Is_Entity_Name (Actual)
+               then
+                  Append_To (Post_Call,
+                    Make_Predicate_Check (E_Actual, Actual));
+
+               elsif Is_Class_Wide_Type (E_Formal)
+                 and then not Is_Class_Wide_Type (E_Actual)
+               then
+                  Append_To (Post_Call,
+                    Make_Predicate_Check (E_Actual, Actual));
+               end if;
             end if;
 
          --  Processing for IN parameters
@@ -2559,6 +2612,39 @@ package body Exp_Ch6 is
       --  as we go through the loop, since this is a convenient place to do it.
       --  (Though it seems that this would be better done in Expand_Actuals???)
 
+      --  Special case: Thunks must not compute the extra actuals; they must
+      --  just propagate to the target primitive their extra actuals.
+
+      if Is_Thunk (Current_Scope)
+        and then Thunk_Entity (Current_Scope) = Subp
+        and then Present (Extra_Formals (Subp))
+      then
+         pragma Assert (Present (Extra_Formals (Current_Scope)));
+
+         declare
+            Target_Formal : Entity_Id;
+            Thunk_Formal  : Entity_Id;
+
+         begin
+            Target_Formal := Extra_Formals (Subp);
+            Thunk_Formal  := Extra_Formals (Current_Scope);
+            while Present (Target_Formal) loop
+               Add_Extra_Actual
+                 (New_Occurrence_Of (Thunk_Formal, Loc), Thunk_Formal);
+
+               Target_Formal := Extra_Formal (Target_Formal);
+               Thunk_Formal  := Extra_Formal (Thunk_Formal);
+            end loop;
+
+            while Is_Non_Empty_List (Extra_Actuals) loop
+               Add_Actual_Parameter (Remove_Head (Extra_Actuals));
+            end loop;
+
+            Expand_Actuals (Call_Node, Subp);
+            return;
+         end;
+      end if;
+
       Formal := First_Formal (Subp);
       Actual := First_Actual (Call_Node);
       Param_Count := 1;
@@ -2691,9 +2777,7 @@ package body Exp_Ch6 is
             --  Ada 2005 (AI-251): Thunks must propagate the extra actuals of
             --  accessibility levels.
 
-            if Ekind (Current_Scope) in Subprogram_Kind
-              and then Is_Thunk (Current_Scope)
-            then
+            if Is_Thunk (Current_Scope) then
                declare
                   Parm_Ent : Entity_Id;
 
@@ -5489,6 +5573,12 @@ package body Exp_Ch6 is
    --  Start of processing for Expand_N_Extended_Return_Statement
 
    begin
+      --  Given that functionality of interface thunks is simple (just displace
+      --  the pointer to the object) they are always handled by means of
+      --  simple return statements.
+
+      pragma Assert (not Is_Thunk (Current_Scope));
+
       if Nkind (Ret_Obj_Decl) = N_Object_Declaration then
          Exp := Expression (Ret_Obj_Decl);
       else
@@ -6460,6 +6550,7 @@ package body Exp_Ch6 is
       if Init_Or_Norm_Scalars and then Is_Subprogram (Spec_Id) then
          declare
             F : Entity_Id;
+            A : Node_Id;
 
          begin
             --  Loop through formals
@@ -6474,12 +6565,15 @@ package body Exp_Ch6 is
                   --  Insert the initialization. We turn off validity checks
                   --  for this assignment, since we do not want any check on
                   --  the initial value itself (which may well be invalid).
+                  --  Predicate checks are disabled as well (RM 6.4.1 (13/3))
+
+                  A :=  Make_Assignment_Statement (Loc,
+                      Name       => New_Occurrence_Of (F, Loc),
+                      Expression => Get_Simple_Init_Val (Etype (F), N));
+                  Set_Suppress_Assignment_Checks (A);
 
                   Insert_Before_And_Analyze (First (L),
-                    Make_Assignment_Statement (Loc,
-                      Name       => New_Occurrence_Of (F, Loc),
-                      Expression => Get_Simple_Init_Val (Etype (F), N)),
-                    Suppress => Validity_Check);
+                    A, Suppress => Validity_Check);
                end if;
 
                Next_Formal (F);
@@ -7132,18 +7226,26 @@ package body Exp_Ch6 is
         and then Is_Immutably_Limited_Type (Etype (Expression (N)))
         and then Ada_Version >= Ada_2005
         and then not Debug_Flag_Dot_L
+
+         --  The functionality of interface thunks is simple and it is always
+         --  handled by means of simple return statements. This leaves their
+         --  expansion simple and clean.
+
+        and then not Is_Thunk (Current_Scope)
       then
          declare
             Return_Object_Entity : constant Entity_Id :=
                                      Make_Temporary (Loc, 'R', Exp);
+
             Obj_Decl : constant Node_Id :=
                          Make_Object_Declaration (Loc,
                            Defining_Identifier => Return_Object_Entity,
                            Object_Definition   => Subtype_Ind,
                            Expression          => Exp);
 
-            Ext : constant Node_Id := Make_Extended_Return_Statement (Loc,
-                    Return_Object_Declarations => New_List (Obj_Decl));
+            Ext : constant Node_Id :=
+                    Make_Extended_Return_Statement (Loc,
+                      Return_Object_Declarations => New_List (Obj_Decl));
             --  Do not perform this high-level optimization if the result type
             --  is an interface because the "this" pointer must be displaced.
 
@@ -7203,6 +7305,13 @@ package body Exp_Ch6 is
       if Is_Immutably_Limited_Type (Exptyp)
         or else Is_Limited_Interface (Exptyp)
       then
+         null;
+
+      --  No copy needed for thunks returning interface type objects since
+      --  the object is returned by reference and the maximum functionality
+      --  required is just to displace the pointer.
+
+      elsif Is_Thunk (Current_Scope) and then Is_Interface (Exptyp) then
          null;
 
       elsif not Requires_Transient_Scope (R_Type) then
@@ -7433,12 +7542,16 @@ package body Exp_Ch6 is
       --  return expression has a specific type whose level is known not to
       --  be statically deeper than the function's result type.
 
+      --  No runtime check needed in interface thunks since it is performed
+      --  by the target primitive associated with the thunk.
+
       --  Note: accessibility check is skipped in the VM case, since there
       --  does not seem to be any practical way to implement this check.
 
       elsif Ada_Version >= Ada_2005
         and then Tagged_Type_Expansion
         and then Is_Class_Wide_Type (R_Type)
+        and then not Is_Thunk (Current_Scope)
         and then not Scope_Suppress.Suppress (Accessibility_Check)
         and then
           (Is_Class_Wide_Type (Etype (Exp))
@@ -7789,10 +7902,23 @@ package body Exp_Ch6 is
 
          else
             declare
-               ExpR : constant Node_Id   := Relocate_Node (Exp);
+               ExpR : Node_Id            := Relocate_Node (Exp);
                Tnn  : constant Entity_Id := Make_Temporary (Loc, 'T', ExpR);
 
             begin
+               --  In the case of discriminated objects, we have created a
+               --  constrained subtype above, and used the underlying type.
+               --  This transformation is post-analysis and harmless, except
+               --  that now the call to the post-condition will be analyzed and
+               --  type kinds have to match.
+
+               if Nkind (ExpR) = N_Unchecked_Type_Conversion
+                 and then
+                   Is_Private_Type (R_Type) /= Is_Private_Type (Etype (ExpR))
+               then
+                  ExpR := Expression (ExpR);
+               end if;
+
                --  For a complex expression of an elementary type, capture
                --  value in the temporary and use it as the reference.
 

@@ -791,20 +791,6 @@ ipa_get_jf_ancestor_result (struct ipa_jump_func *jfunc, tree input)
     return NULL_TREE;
 }
 
-/* Extract the acual BINFO being described by JFUNC which must be a known type
-   jump function.  */
-
-static tree
-ipa_value_from_known_type_jfunc (struct ipa_jump_func *jfunc)
-{
-  tree base_binfo = TYPE_BINFO (ipa_get_jf_known_type_base_type (jfunc));
-  if (!base_binfo)
-    return NULL_TREE;
-  return get_binfo_at_offset (base_binfo,
-			      ipa_get_jf_known_type_offset (jfunc),
-			      ipa_get_jf_known_type_component_type (jfunc));
-}
-
 /* Determine whether JFUNC evaluates to a known value (that is either a
    constant or a binfo) and if so, return it.  Otherwise return NULL. INFO
    describes the caller node so that pass-through jump functions can be
@@ -816,7 +802,7 @@ ipa_value_from_jfunc (struct ipa_node_params *info, struct ipa_jump_func *jfunc)
   if (jfunc->type == IPA_JF_CONST)
     return ipa_get_jf_constant (jfunc);
   else if (jfunc->type == IPA_JF_KNOWN_TYPE)
-    return ipa_value_from_known_type_jfunc (jfunc);
+    return ipa_binfo_from_known_type_jfunc (jfunc);
   else if (jfunc->type == IPA_JF_PASS_THROUGH
 	   || jfunc->type == IPA_JF_ANCESTOR)
     {
@@ -1103,7 +1089,7 @@ propagate_scalar_accross_jump_function (struct cgraph_edge *cs,
 
       if (jfunc->type == IPA_JF_KNOWN_TYPE)
 	{
-	  val = ipa_value_from_known_type_jfunc (jfunc);
+	  val = ipa_binfo_from_known_type_jfunc (jfunc);
 	  if (!val)
 	    return set_lattice_contains_variable (dest_lat);
 	}
@@ -2572,14 +2558,16 @@ update_profiling_info (struct cgraph_node *orig_node,
 
   for (cs = new_node->callees; cs ; cs = cs->next_callee)
     if (cs->frequency)
-      cs->count = cs->count * (new_sum * REG_BR_PROB_BASE
-			       / orig_node_count) / REG_BR_PROB_BASE;
+      cs->count = apply_probability (cs->count,
+                                     GCOV_COMPUTE_SCALE (new_sum,
+                                                         orig_node_count));
     else
       cs->count = 0;
 
   for (cs = orig_node->callees; cs ; cs = cs->next_callee)
-    cs->count = cs->count * (remainder * REG_BR_PROB_BASE
-			     / orig_node_count) / REG_BR_PROB_BASE;
+    cs->count = apply_probability (cs->count,
+                                   GCOV_COMPUTE_SCALE (remainder,
+                                                       orig_node_count));
 
   if (dump_file)
     dump_profile_updates (orig_node, new_node);
@@ -2611,14 +2599,17 @@ update_specialized_profile (struct cgraph_node *new_node,
 
   for (cs = new_node->callees; cs ; cs = cs->next_callee)
     if (cs->frequency)
-      cs->count += cs->count * redirected_sum / new_node_count;
+      cs->count += apply_probability (cs->count,
+                                      GCOV_COMPUTE_SCALE (redirected_sum,
+                                                          new_node_count));
     else
       cs->count = 0;
 
   for (cs = orig_node->callees; cs ; cs = cs->next_callee)
     {
-      gcov_type dec = cs->count * (redirected_sum * REG_BR_PROB_BASE
-				   / orig_node_count) / REG_BR_PROB_BASE;
+      gcov_type dec = apply_probability (cs->count,
+                                         GCOV_COMPUTE_SCALE (redirected_sum,
+                                                             orig_node_count));
       if (dec < cs->count)
 	cs->count -= dec;
       else
@@ -3655,7 +3646,7 @@ struct ipa_opt_pass_d pass_ipa_cp =
   0,				/* properties_destroyed */
   0,				/* todo_flags_start */
   TODO_dump_symtab |
-  TODO_remove_functions | TODO_ggc_collect /* todo_flags_finish */
+  TODO_remove_functions         /* todo_flags_finish */
  },
  ipcp_generate_summary,			/* generate_summary */
  ipcp_write_summary,			/* write_summary */

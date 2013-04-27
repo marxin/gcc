@@ -2192,9 +2192,9 @@ gfc_conv_intrinsic_ttynam (gfc_se * se, gfc_expr * expr)
     minmax (a1, a2, a3, ...)
     {
       mvar = a1;
-      if (a2 .op. mvar || isnan(mvar))
+      if (a2 .op. mvar || isnan (mvar))
         mvar = a2;
-      if (a3 .op. mvar || isnan(mvar))
+      if (a3 .op. mvar || isnan (mvar))
         mvar = a3;
       ...
       return mvar
@@ -2749,7 +2749,7 @@ gfc_conv_intrinsic_arith (gfc_se * se, gfc_expr * expr, enum tree_code op,
 
   if (norm2)
     {
-      /* if (x(i) != 0.0)
+      /* if (x (i) != 0.0)
 	   {
 	     absX = abs(x(i))
 	     if (absX > scale)
@@ -3104,7 +3104,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
   else
     {
       mpz_t asize;
-      if (gfc_array_size (arrayexpr, &asize) == SUCCESS)
+      if (gfc_array_size (arrayexpr, &asize))
 	{
 	  nonempty = gfc_conv_mpz_to_tree (asize, gfc_index_integer_kind);
 	  mpz_clear (asize);
@@ -3594,7 +3594,7 @@ gfc_conv_intrinsic_minmaxval (gfc_se * se, gfc_expr * expr, enum tree_code op)
   else
     {
       mpz_t asize;
-      if (gfc_array_size (arrayexpr, &asize) == SUCCESS)
+      if (gfc_array_size (arrayexpr, &asize))
 	{
 	  nonempty = gfc_conv_mpz_to_tree (asize, gfc_index_integer_kind);
 	  mpz_clear (asize);
@@ -6317,8 +6317,13 @@ conv_isocbinding_function (gfc_se *se, gfc_expr *expr)
     {
       if (arg->expr->rank == 0)
 	gfc_conv_expr_reference (se, arg->expr);
-      else
+      else if (gfc_is_simply_contiguous (arg->expr, false))
 	gfc_conv_array_parameter (se, arg->expr, true, NULL, NULL, NULL);
+      else
+	{
+	  gfc_conv_expr_descriptor (se, arg->expr);
+	  se->expr = gfc_conv_descriptor_data_get (se->expr);
+	}
 
       /* TODO -- the following two lines shouldn't be necessary, but if
 	 they're removed, a bug is exposed later in the code path.

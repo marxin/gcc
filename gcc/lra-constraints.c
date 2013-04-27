@@ -704,7 +704,7 @@ match_reload (signed char out, signed char *ins, enum reg_class goal_class,
 	     pseudos still live where reload pseudos dies.  */
 	  if (REG_P (in_rtx) && (int) REGNO (in_rtx) < lra_new_regno_start
 	      && find_regno_note (curr_insn, REG_DEAD, REGNO (in_rtx)))
-	    lra_reg_info[REGNO (reg)].val = lra_reg_info[REGNO (in_rtx)].val;
+	    lra_assign_reg_val (REGNO (in_rtx), REGNO (reg));
 	}
       else
 	{
@@ -733,8 +733,7 @@ match_reload (signed char out, signed char *ins, enum reg_class goal_class,
 		  && GET_MODE (subreg_reg) == outmode
 		  && SUBREG_BYTE (in_rtx) == SUBREG_BYTE (new_in_reg)
 		  && find_regno_note (curr_insn, REG_DEAD, REGNO (subreg_reg)))
-		lra_reg_info[REGNO (reg)].val
-		  = lra_reg_info[REGNO (subreg_reg)].val;
+		lra_assign_reg_val (REGNO (subreg_reg), REGNO (reg));
 	    }
 	}
     }
@@ -1978,8 +1977,15 @@ process_alt_operands (int only_alternative)
 			      (op, this_alternative) == NO_REGS))))
 		reject += LRA_MAX_REJECT;
 
-	      if (! ((const_to_mem && constmemok)
-		     || (MEM_P (op) && offmemok)))
+	      if (MEM_P (op) && offmemok)
+		{
+		  /* If we know offset and this non-offsetable memory,
+		     something wrong with this memory and it is better
+		     to try other memory possibilities.  */
+		  if (MEM_OFFSET_KNOWN_P (op))
+		    reject += LRA_MAX_REJECT;
+		}
+	      else if (! (const_to_mem && constmemok))
 		{
 		  /* We prefer to reload pseudos over reloading other
 		     things, since such reloads may be able to be

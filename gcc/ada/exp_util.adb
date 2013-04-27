@@ -1774,6 +1774,35 @@ package body Exp_Util is
       end if;
    end Ensure_Defined;
 
+   ---------------
+   -- Entity_Of --
+   ---------------
+
+   function Entity_Of (N : Node_Id) return Entity_Id is
+      Id : Entity_Id;
+
+   begin
+      Id := Empty;
+
+      if Is_Entity_Name (N) then
+         Id := Entity (N);
+
+         --  Follow a possible chain of renamings to reach the root renamed
+         --  object.
+
+         while Present (Renamed_Object (Id)) loop
+            if Is_Entity_Name (Renamed_Object (Id)) then
+               Id := Entity (Renamed_Object (Id));
+            else
+               Id := Empty;
+               exit;
+            end if;
+         end loop;
+      end if;
+
+      return Id;
+   end Entity_Of;
+
    --------------------
    -- Entry_Names_OK --
    --------------------
@@ -2011,8 +2040,19 @@ package body Exp_Util is
                    Make_Literal_Range (Loc,
                      Literal_Typ => Exp_Typ)))));
 
+      --  If the type of the expression is an internally generated type it
+      --  may not be necessary to create a new subtype. However there are two
+      --  exceptions: references to the current instances, and aliased array
+      --  object declarations for which the backend needs to create a template.
+
       elsif Is_Constrained (Exp_Typ)
         and then not Is_Class_Wide_Type (Unc_Type)
+        and then
+          (Nkind (N) /= N_Object_Declaration
+            or else not Is_Entity_Name (Expression (N))
+            or else not Comes_From_Source (Entity (Expression (N)))
+            or else not Is_Array_Type (Exp_Typ)
+            or else not Aliased_Present (N))
       then
          if Is_Itype (Exp_Typ) then
 
@@ -2037,7 +2077,7 @@ package body Exp_Util is
                   end if;
                end;
 
-            --  No need to generate a new one (new what???)
+            --  No need to generate a new subtype
 
             else
                T := Exp_Typ;
@@ -2192,8 +2232,7 @@ package body Exp_Util is
          return First_Elmt (Access_Disp_Table (Typ));
 
       else
-         ADT :=
-           Next_Elmt (Next_Elmt (First_Elmt (Access_Disp_Table (Typ))));
+         ADT := Next_Elmt (Next_Elmt (First_Elmt (Access_Disp_Table (Typ))));
          while Present (ADT)
            and then Present (Related_Type (Node (ADT)))
            and then Related_Type (Node (ADT)) /= Iface
@@ -2496,7 +2535,10 @@ package body Exp_Util is
    -- Fully_Qualified_Name_String --
    ---------------------------------
 
-   function Fully_Qualified_Name_String (E : Entity_Id) return String_Id is
+   function Fully_Qualified_Name_String
+     (E          : Entity_Id;
+      Append_NUL : Boolean := True) return String_Id
+   is
       procedure Internal_Full_Qualified_Name (E : Entity_Id);
       --  Compute recursively the qualified name without NUL at the end, adding
       --  it to the currently started string being generated
@@ -2544,7 +2586,11 @@ package body Exp_Util is
    begin
       Start_String;
       Internal_Full_Qualified_Name (E);
-      Store_String_Char (Get_Char_Code (ASCII.NUL));
+
+      if Append_NUL then
+         Store_String_Char (Get_Char_Code (ASCII.NUL));
+      end if;
+
       return End_String;
    end Fully_Qualified_Name_String;
 
@@ -3674,6 +3720,7 @@ package body Exp_Util is
                N_Push_Storage_Error_Label               |
                N_Qualified_Expression                   |
                N_Quantified_Expression                  |
+               N_Raise_Expression                       |
                N_Range                                  |
                N_Range_Constraint                       |
                N_Real_Literal                           |
@@ -4268,7 +4315,7 @@ package body Exp_Util is
          --  Look for aspect Default_Iterator
 
          if Has_Aspects (Parent (Typ)) then
-            Aspect := Find_Aspect (Typ, Aspect_Default_Iterator);
+            Aspect := Find_Value_Of_Aspect (Typ, Aspect_Default_Iterator);
 
             if Present (Aspect) then
                Iter := Entity (Aspect);
@@ -5159,11 +5206,9 @@ package body Exp_Util is
       --  True if access attribute
 
       elsif Nkind (N) = N_Attribute_Reference
-        and then (Attribute_Name (N) = Name_Access
-                    or else
-                  Attribute_Name (N) = Name_Unchecked_Access
-                    or else
-                  Attribute_Name (N) = Name_Unrestricted_Access)
+        and then Nam_In (Attribute_Name (N), Name_Access,
+                                             Name_Unchecked_Access,
+                                             Name_Unrestricted_Access)
       then
          return True;
 
@@ -5428,10 +5473,7 @@ package body Exp_Util is
       pragma Assert
         (Has_Invariants (Typ) and then Present (Invariant_Procedure (Typ)));
 
-      if Check_Enabled (Name_Invariant)
-           or else
-         Check_Enabled (Name_Assertion)
-      then
+      if Check_Kind (Name_Invariant) = Name_Check then
          return
            Make_Procedure_Call_Statement (Loc,
              Name                   =>
@@ -5519,18 +5561,36 @@ package body Exp_Util is
 
    function Make_Predicate_Call
      (Typ  : Entity_Id;
-      Expr : Node_Id) return Node_Id
+      Expr : Node_Id;
+      Mem  : Boolean := False) return Node_Id
    is
       Loc : constant Source_Ptr := Sloc (Expr);
 
    begin
       pragma Assert (Present (Predicate_Function (Typ)));
 
+      --  Call special membership version if requested and available
+
+      if Mem then
+         declare
+            PFM : constant Entity_Id := Predicate_Function_M (Typ);
+         begin
+            if Present (PFM) then
+               return
+                 Make_Function_Call (Loc,
+                   Name                   => New_Occurrence_Of (PFM, Loc),
+                   Parameter_Associations => New_List (Relocate_Node (Expr)));
+            end if;
+         end;
+      end if;
+
+      --  Case of calling normal predicate function
+
       return
-        Make_Function_Call (Loc,
-          Name                   =>
-            New_Occurrence_Of (Predicate_Function (Typ), Loc),
-          Parameter_Associations => New_List (Relocate_Node (Expr)));
+          Make_Function_Call (Loc,
+            Name                   =>
+              New_Occurrence_Of (Predicate_Function (Typ), Loc),
+            Parameter_Associations => New_List (Relocate_Node (Expr)));
    end Make_Predicate_Call;
 
    --------------------------
@@ -5542,14 +5602,26 @@ package body Exp_Util is
       Expr : Node_Id) return Node_Id
    is
       Loc : constant Source_Ptr := Sloc (Expr);
+      Nam : Name_Id;
 
    begin
+      --  Compute proper name to use, we need to get this right so that the
+      --  right set of check policies apply to the Check pragma we are making.
+
+      if Has_Dynamic_Predicate_Aspect (Typ) then
+         Nam := Name_Dynamic_Predicate;
+      elsif Has_Static_Predicate_Aspect (Typ) then
+         Nam := Name_Static_Predicate;
+      else
+         Nam := Name_Predicate;
+      end if;
+
       return
         Make_Pragma (Loc,
           Pragma_Identifier            => Make_Identifier (Loc, Name_Check),
           Pragma_Argument_Associations => New_List (
             Make_Pragma_Argument_Association (Loc,
-              Expression => Make_Identifier (Loc, Name_Predicate)),
+              Expression => Make_Identifier (Loc, Nam)),
             Make_Pragma_Argument_Association (Loc,
               Expression => Make_Predicate_Call (Typ, Expr))));
    end Make_Predicate_Check;
@@ -7965,13 +8037,7 @@ package body Exp_Util is
 
          --  Prevent the search from going too far
 
-         elsif Nkind_In (Par, N_Entry_Body,
-                              N_Package_Body,
-                              N_Package_Declaration,
-                              N_Protected_Body,
-                              N_Subprogram_Body,
-                              N_Task_Body)
-         then
+         elsif Is_Body_Or_Package_Declaration (Par) then
             return False;
          end if;
 

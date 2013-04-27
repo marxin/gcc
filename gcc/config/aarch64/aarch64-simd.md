@@ -59,9 +59,9 @@
 ; simd_fmul             floating point multiply.
 ; simd_fmul_elt         floating point multiply (by element).
 ; simd_fnegabs          floating point neg/abs.
-; simd_frcpe            floating point reciprocal estimate.
-; simd_frcps            floating point reciprocal step.
-; simd_frecx            floating point reciprocal exponent.
+; simd_frecpe            floating point reciprocal estimate.
+; simd_frecps            floating point reciprocal step.
+; simd_frecpx            floating point reciprocal exponent.
 ; simd_frint            floating point round to integer.
 ; simd_fsqrt            floating point square root.
 ; simd_icvtf            integer convert to floating point.
@@ -163,9 +163,9 @@
    simd_fmul,\
    simd_fmul_elt,\
    simd_fnegabs,\
-   simd_frcpe,\
-   simd_frcps,\
-   simd_frecx,\
+   simd_frecpe,\
+   simd_frecps,\
+   simd_frecpx,\
    simd_frint,\
    simd_fsqrt,\
    simd_icvtf,\
@@ -305,8 +305,8 @@
 	  (eq_attr "simd_type" "simd_store3,simd_store4") (const_string "neon_vst1_3_4_regs")
 	  (eq_attr "simd_type" "simd_store1s,simd_store2s") (const_string "neon_vst1_vst2_lane")
 	  (eq_attr "simd_type" "simd_store3s,simd_store4s") (const_string "neon_vst3_vst4_lane")
-	  (and (eq_attr "simd_type" "simd_frcpe,simd_frcps") (eq_attr "simd_mode" "V2SF")) (const_string "neon_fp_vrecps_vrsqrts_ddd")
-	  (and (eq_attr "simd_type" "simd_frcpe,simd_frcps") (eq_attr "simd_mode" "V4SF,V2DF")) (const_string "neon_fp_vrecps_vrsqrts_qqq")
+	  (and (eq_attr "simd_type" "simd_frecpe,simd_frecps") (eq_attr "simd_mode" "V2SF")) (const_string "neon_fp_vrecps_vrsqrts_ddd")
+	  (and (eq_attr "simd_type" "simd_frecpe,simd_frecps") (eq_attr "simd_mode" "V4SF,V2DF")) (const_string "neon_fp_vrecps_vrsqrts_qqq")
 	  (eq_attr "simd_type" "none") (const_string "none")
   ]
   (const_string "unknown")))
@@ -1622,6 +1622,7 @@
   "TARGET_SIMD"
 {
   int inverse = 0;
+  int use_zero_form = 0;
   int swap_bsl_operands = 0;
   rtx mask = gen_reg_rtx (<V_cmp_result>mode);
   rtx tmp = gen_reg_rtx (<V_cmp_result>mode);
@@ -1632,12 +1633,16 @@
   switch (GET_CODE (operands[3]))
     {
     case GE:
+    case GT:
     case LE:
+    case LT:
     case EQ:
-      if (!REG_P (operands[5])
-	  && (operands[5] != CONST0_RTX (<MODE>mode)))
-	operands[5] = force_reg (<MODE>mode, operands[5]);
-      break;
+      if (operands[5] == CONST0_RTX (<MODE>mode))
+	{
+	  use_zero_form = 1;
+	  break;
+	}
+      /* Fall through.  */
     default:
       if (!REG_P (operands[5]))
 	operands[5] = force_reg (<MODE>mode, operands[5]);
@@ -1688,7 +1693,26 @@
 	 a GT b -> a GT b
 	 a LE b -> b GE a
 	 a LT b -> b GT a
-	 a EQ b -> a EQ b  */
+	 a EQ b -> a EQ b
+	 Note that there also exist direct comparison against 0 forms,
+	 so catch those as a special case.  */
+      if (use_zero_form)
+	{
+	  inverse = 0;
+	  switch (GET_CODE (operands[3]))
+	    {
+	    case LT:
+	      base_comparison = gen_aarch64_cmlt<mode>;
+	      break;
+	    case LE:
+	      base_comparison = gen_aarch64_cmle<mode>;
+	      break;
+	    default:
+	      /* Do nothing, other zero form cases already have the correct
+		 base_comparison.  */
+	      break;
+	    }
+	}
 
       if (!inverse)
 	emit_insn (base_comparison (mask, operands[4], operands[5]));
@@ -2873,28 +2897,6 @@
    (set_attr "simd_mode" "<MODE>")]
 )
 
-;; vshl_n
-
-(define_expand "aarch64_sshl_n<mode>"
-  [(match_operand:VSDQ_I_DI 0 "register_operand" "=w")
-   (match_operand:VSDQ_I_DI 1 "register_operand" "w")
-   (match_operand:SI 2 "immediate_operand" "i")]
-  "TARGET_SIMD"
-{
-  emit_insn (gen_ashl<mode>3 (operands[0], operands[1], operands[2]));
-  DONE;
-})
-
-(define_expand "aarch64_ushl_n<mode>"
-  [(match_operand:VSDQ_I_DI 0 "register_operand" "=w")
-   (match_operand:VSDQ_I_DI 1 "register_operand" "w")
-   (match_operand:SI 2 "immediate_operand" "i")]
-  "TARGET_SIMD"
-{
-  emit_insn (gen_ashl<mode>3 (operands[0], operands[1], operands[2]));
-  DONE;
-})
-
 ;; vshll_n
 
 (define_insn "aarch64_<sur>shll_n<mode>"
@@ -2938,28 +2940,6 @@
   [(set_attr "simd_type" "simd_shift_imm")
    (set_attr "simd_mode" "<MODE>")]
 )
-
-;; vshr_n
-
-(define_expand "aarch64_sshr_n<mode>"
-  [(match_operand:VSDQ_I_DI 0 "register_operand" "=w")
-   (match_operand:VSDQ_I_DI 1 "register_operand" "w")
-   (match_operand:SI 2 "immediate_operand" "i")]
-  "TARGET_SIMD"
-{
-  emit_insn (gen_ashr<mode>3 (operands[0], operands[1], operands[2]));
-  DONE;
-})
-
-(define_expand "aarch64_ushr_n<mode>"
-  [(match_operand:VSDQ_I_DI 0 "register_operand" "=w")
-   (match_operand:VSDQ_I_DI 1 "register_operand" "w")
-   (match_operand:SI 2 "immediate_operand" "i")]
-  "TARGET_SIMD"
-{
-  emit_insn (gen_lshr<mode>3 (operands[0], operands[1], operands[2]));
-  DONE;
-})
 
 ;; vrshr_n
 
@@ -3117,19 +3097,6 @@
    (set_attr "simd_mode" "DI")]
 )
 
-;; v(max|min)
-
-(define_expand "aarch64_<maxmin><mode>"
- [(set (match_operand:VDQ_BHSI 0 "register_operand" "=w")
-       (MAXMIN:VDQ_BHSI (match_operand:VDQ_BHSI 1 "register_operand" "w")
-			(match_operand:VDQ_BHSI 2 "register_operand" "w")))]
- "TARGET_SIMD"
-{
-  emit_insn (gen_<maxmin><mode>3 (operands[0], operands[1], operands[2]));
-  DONE;
-})
-
-
 (define_insn "aarch64_<fmaxmin><mode>"
   [(set (match_operand:VDQF 0 "register_operand" "=w")
         (unspec:VDQF [(match_operand:VDQF 1 "register_operand" "w")
@@ -3151,16 +3118,6 @@
   [(set_attr "simd_type" "simd_fsqrt")
    (set_attr "simd_mode" "<MODE>")]
 )
-
-(define_expand "aarch64_sqrt<mode>"
-  [(match_operand:VDQF 0 "register_operand" "=w")
-   (match_operand:VDQF 1 "register_operand" "w")]
-  "TARGET_SIMD"
-{
-  emit_insn (gen_sqrt<mode>2 (operands[0], operands[1]));
-  DONE;
-})
-
 
 ;; Patterns for vector struct loads and stores.
 
@@ -3726,3 +3683,25 @@
   "ld1r\\t{%0.<Vtype>}, %1"
   [(set_attr "simd_type" "simd_load1r")
    (set_attr "simd_mode" "<MODE>")])
+
+(define_insn "aarch64_frecpe<mode>"
+  [(set (match_operand:VDQF 0 "register_operand" "=w")
+	(unspec:VDQF [(match_operand:VDQF 1 "register_operand" "w")]
+		    UNSPEC_FRECPE))]
+  "TARGET_SIMD"
+  "frecpe\\t%0.<Vtype>, %1.<Vtype>"
+  [(set_attr "simd_type" "simd_frecpe")
+   (set_attr "simd_mode" "<MODE>")]
+)
+
+(define_insn "aarch64_frecps<mode>"
+  [(set (match_operand:VDQF 0 "register_operand" "=w")
+	(unspec:VDQF [(match_operand:VDQF 1 "register_operand" "w")
+		     (match_operand:VDQF 2 "register_operand" "w")]
+		    UNSPEC_FRECPS))]
+  "TARGET_SIMD"
+  "frecps\\t%0.<Vtype>, %1.<Vtype>, %2.<Vtype>"
+  [(set_attr "simd_type" "simd_frecps")
+   (set_attr "simd_mode" "<MODE>")]
+)
+

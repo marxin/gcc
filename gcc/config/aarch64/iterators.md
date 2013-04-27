@@ -249,6 +249,9 @@
 ;; 32-bit version and "%x0" in the 64-bit version.
 (define_mode_attr w [(QI "w") (HI "w") (SI "w") (DI "x") (SF "s") (DF "d")])
 
+;; For constraints used in scalar immediate vector moves
+(define_mode_attr hq [(HI "h") (QI "q")])
+
 ;; For scalar usage of vector/FP registers
 (define_mode_attr v [(QI "b") (HI "h") (SI "s") (DI "d")
 		    (V8QI "") (V16QI "")
@@ -695,6 +698,8 @@
 (define_int_iterator FCVT [UNSPEC_FRINTZ UNSPEC_FRINTP UNSPEC_FRINTM
 			    UNSPEC_FRINTA])
 
+(define_int_iterator FRECP [UNSPEC_FRECPE UNSPEC_FRECPX])
+
 ;; -------------------------------------------------------------------
 ;; Int Iterators Attributes.
 ;; -------------------------------------------------------------------
@@ -800,3 +805,5 @@
 (define_int_attr perm_hilo [(UNSPEC_ZIP1 "1") (UNSPEC_ZIP2 "2")
 			    (UNSPEC_TRN1 "1") (UNSPEC_TRN2 "2")
 			    (UNSPEC_UZP1 "1") (UNSPEC_UZP2 "2")])
+
+(define_int_attr frecp_suffix  [(UNSPEC_FRECPE "e") (UNSPEC_FRECPX "x")])

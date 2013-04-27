@@ -378,6 +378,10 @@ extern void dot_cfg (void);
 extern void debug_cfg_stats (void);
 extern void debug_loops (int);
 extern void debug_loop (struct loop *, int);
+extern void debug (struct loop &ref);
+extern void debug (struct loop *ptr);
+extern void debug_verbose (struct loop &ref);
+extern void debug_verbose (struct loop *ptr);
 extern void debug_loop_num (unsigned, int);
 extern void print_loops (FILE *, int);
 extern void print_loops_bb (FILE *, basic_block, int, int);
@@ -745,6 +749,7 @@ extern void tree_check_data_deps (void);
 /* In tree-ssa-loop-ivopts.c  */
 bool expr_invariant_in_loop_p (struct loop *, tree);
 bool stmt_invariant_in_loop_p (struct loop *, gimple);
+struct loop *outermost_invariant_loop_for_expr (struct loop *, tree);
 bool multiplier_allowed_in_address_p (HOST_WIDE_INT, enum machine_mode,
 				      addr_space_t);
 bool may_be_nonaddressable_p (tree expr);

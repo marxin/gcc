@@ -2635,11 +2635,6 @@ try_combine (rtx i3, rtx i2, rtx i1, rtx i0, int *new_direct_jump_p,
       int offset = -1;
       int width = 0;
       
-      /* There are not explicit tests to make sure that this is not a
-	 float, but there is code here that would not be correct if it
-	 was.  */
-      gcc_assert (GET_MODE_CLASS (GET_MODE (SET_SRC (temp))) != MODE_FLOAT);
-
       if (GET_CODE (dest) == ZERO_EXTRACT)
 	{
 	  if (CONST_INT_P (XEXP (dest, 1))
@@ -10764,8 +10759,9 @@ simplify_compare_const (enum rtx_code code, rtx op0, rtx *pop1)
       && (code == EQ || code == NE || code == GE || code == GEU
 	  || code == LT || code == LTU)
       && mode_width <= HOST_BITS_PER_WIDE_INT
-      && exact_log2 (const_op) >= 0
-      && nonzero_bits (op0, mode) == (unsigned HOST_WIDE_INT) const_op)
+      && exact_log2 (const_op & GET_MODE_MASK (mode)) >= 0
+      && (nonzero_bits (op0, mode)
+	  == (unsigned HOST_WIDE_INT) (const_op & GET_MODE_MASK (mode))))
     {
       code = (code == EQ || code == GE || code == GEU ? NE : EQ);
       const_op = 0;
@@ -13822,7 +13818,6 @@ struct rtl_opt_pass pass_combine =
   0,                                    /* properties_provided */
   0,                                    /* properties_destroyed */
   0,                                    /* todo_flags_start */
-  TODO_df_finish | TODO_verify_rtl_sharing |
-  TODO_ggc_collect,                     /* todo_flags_finish */
+  TODO_df_finish | TODO_verify_rtl_sharing /* todo_flags_finish */
  }
 };

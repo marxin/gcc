@@ -1818,7 +1818,7 @@ package body Exp_Ch5 is
          LE  := Node (LE_Elmt);
          Typ := Etype (Prefix (LE));
 
-         --  Declare a constant to capture the value of the previx of each
+         --  Declare a constant to capture the value of the prefix of each
          --  Loop_Entry attribute.
 
          --  Generate:
@@ -3377,7 +3377,7 @@ package body Exp_Ch5 is
             declare
                Default_Iter : constant Entity_Id :=
                                 Entity
-                                  (Find_Aspect
+                                  (Find_Value_Of_Aspect
                                     (Etype (Container),
                                      Aspect_Default_Iterator));
 

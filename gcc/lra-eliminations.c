@@ -716,7 +716,9 @@ mark_not_eliminable (rtx x)
 	       ep++)
 	    if (ep->to_rtx == SET_DEST (x)
 		&& SET_DEST (x) != hard_frame_pointer_rtx
-		&& (GET_CODE (SET_SRC (x)) != PLUS
+		&& (! (SUPPORTS_STACK_ALIGNMENT && stack_realign_fp
+		       && REGNO (ep->to_rtx) == STACK_POINTER_REGNUM)
+		    || GET_CODE (SET_SRC (x)) != PLUS
 		    || XEXP (SET_SRC (x), 0) != SET_DEST (x)
 		    || ! CONST_INT_P (XEXP (SET_SRC (x), 1))))
 	      setup_can_eliminate (ep, false);
@@ -769,8 +771,6 @@ eliminate_regs_in_insn (rtx insn, bool replace_p)
     {
       lra_assert (GET_CODE (PATTERN (insn)) == USE
 		  || GET_CODE (PATTERN (insn)) == CLOBBER
-		  || GET_CODE (PATTERN (insn)) == ADDR_VEC
-		  || GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC
 		  || GET_CODE (PATTERN (insn)) == ASM_INPUT);
       return;
     }
@@ -1124,8 +1124,15 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
   setup_elimination_map ();
   for (ep = reg_eliminate; ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++)
     if (elimination_map[ep->from] == ep && ep->previous_offset != ep->offset)
-      bitmap_ior_into (insns_with_changed_offsets,
-		       &lra_reg_info[ep->from].insn_bitmap);
+      {
+	bitmap_ior_into (insns_with_changed_offsets,
+			 &lra_reg_info[ep->from].insn_bitmap);
+
+	/* Update offset when the eliminate offset have been
+	   changed.  */
+	lra_update_reg_val_offset (lra_reg_info[ep->from].val,
+				   ep->offset - ep->previous_offset);
+      }
 }
 
 /* Initialize the table of hard registers to eliminate.

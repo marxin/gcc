@@ -3087,7 +3087,8 @@ aarch64_select_cc_mode (RTX_CODE code, rtx x, rtx y)
   if ((GET_MODE (x) == SImode || GET_MODE (x) == DImode)
       && y == const0_rtx
       && (code == EQ || code == NE || code == LT || code == GE)
-      && (GET_CODE (x) == PLUS || GET_CODE (x) == MINUS || GET_CODE (x) == AND))
+      && (GET_CODE (x) == PLUS || GET_CODE (x) == MINUS || GET_CODE (x) == AND
+	  || GET_CODE (x) == NEG))
     return CC_NZmode;
 
   /* A compare with a shifted operand.  Because of canonicalization,
@@ -3879,14 +3880,21 @@ aarch64_can_eliminate (const int from, const int to)
     }
   else
     {
-      /* If we decided that we didn't need a frame pointer but then used
-	 LR in the function, then we do need a frame pointer after all, so
-	 prevent this elimination to ensure a frame pointer is used.  */
+      /* If we decided that we didn't need a leaf frame pointer but then used
+	 LR in the function, then we'll want a frame pointer after all, so
+	 prevent this elimination to ensure a frame pointer is used.
 
+	 NOTE: the original value of flag_omit_frame_pointer gets trashed
+	 IFF flag_omit_leaf_frame_pointer is true, so we check the value
+	 of faked_omit_frame_pointer here (which is true when we always
+	 wish to keep non-leaf frame pointers but only wish to keep leaf frame
+	 pointers when LR is clobbered).  */
       if (from == FRAME_POINTER_REGNUM && to == STACK_POINTER_REGNUM
-	  && df_regs_ever_live_p (LR_REGNUM))
+	  && df_regs_ever_live_p (LR_REGNUM)
+	  && faked_omit_frame_pointer)
 	return false;
     }
+
   return true;
 }
 
@@ -4063,7 +4071,7 @@ aarch64_output_casesi (rtx *operands)
 {
   char buf[100];
   char label[100];
-  rtx diff_vec = PATTERN (next_real_insn (operands[2]));
+  rtx diff_vec = PATTERN (next_active_insn (operands[2]));
   int index;
   static const char *const patterns[4][2] =
   {
@@ -6400,6 +6408,21 @@ aarch64_simd_gen_const_vector_dup (enum machine_mode mode, int val)
   return gen_rtx_CONST_VECTOR (mode, v);
 }
 
+/* Check OP is a legal scalar immediate for the MOVI instruction.  */
+
+bool
+aarch64_simd_scalar_immediate_valid_for_move (rtx op, enum machine_mode mode)
+{
+  enum machine_mode vmode;
+
+  gcc_assert (!VECTOR_MODE_P (mode));
+  vmode = aarch64_preferred_simd_mode (mode);
+  rtx op_v = aarch64_simd_gen_const_vector_dup (vmode, INTVAL (op));
+  int retval = aarch64_simd_immediate_valid_for_move (op_v, vmode, 0,
+						      NULL, NULL, NULL, NULL);
+  return retval;
+}
+
 /* Construct and return a PARALLEL RTX vector.  */
 rtx
 aarch64_simd_vect_par_cnst_half (enum machine_mode mode, bool high)
@@ -7058,12 +7081,30 @@ aarch64_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
 }
 
 static void
+aarch64_print_extension (void)
+{
+  const struct aarch64_option_extension *opt = NULL;
+
+  for (opt = all_extensions; opt->name != NULL; opt++)
+    if ((aarch64_isa_flags & opt->flags_on) == opt->flags_on)
+      asm_fprintf (asm_out_file, "+%s", opt->name);
+
+  asm_fprintf (asm_out_file, "\n");
+}
+
+static void
 aarch64_start_file (void)
 {
   if (selected_arch)
-    asm_fprintf (asm_out_file, "\t.arch %s\n", selected_arch->name);
+    {
+      asm_fprintf (asm_out_file, "\t.arch %s", selected_arch->name);
+      aarch64_print_extension ();
+    }
   else if (selected_cpu)
-    asm_fprintf (asm_out_file, "\t.cpu %s\n", selected_cpu->name);
+    {
+      asm_fprintf (asm_out_file, "\t.cpu %s", selected_cpu->name);
+      aarch64_print_extension ();
+    }
   default_file_start();
 }
 

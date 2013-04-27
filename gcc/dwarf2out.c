@@ -5351,6 +5351,22 @@ debug_dwarf_die (dw_die_ref die)
   print_die (die, stderr);
 }
 
+DEBUG_FUNCTION void
+debug (die_struct &ref)
+{
+  print_die (&ref, stderr);
+}
+
+DEBUG_FUNCTION void
+debug (die_struct *ptr)
+{
+  if (ptr)
+    debug (*ptr);
+  else
+    fprintf (stderr, "<nil>\n");
+}
+
+
 /* Print all DWARF information collected for the compilation unit.
    This routine is a debugging aid only.  */
 
@@ -9002,11 +9018,13 @@ output_pubnames (vec<pubname_entry, va_gc> *names)
       /* Enumerator names are part of the pubname table, but the parent
          DW_TAG_enumeration_type die may have been pruned.  Don't output
          them if that is the case.  */
-      if (pub->die->die_tag == DW_TAG_enumerator && !pub->die->die_mark)
+      if (pub->die->die_tag == DW_TAG_enumerator &&
+          (pub->die->die_parent == NULL
+	   || !pub->die->die_parent->die_perennial_p))
         continue;
 
       /* We shouldn't see pubnames for DIEs outside of the main CU.  */
-      if (names == pubname_table)
+      if (names == pubname_table && pub->die->die_tag != DW_TAG_enumerator)
 	gcc_assert (pub->die->die_mark);
 
       if (names != pubtype_table
@@ -17009,15 +17027,27 @@ gen_enumeration_type_die (tree type, dw_die_ref context_die)
 	  if (TREE_CODE (value) == CONST_DECL)
 	    value = DECL_INITIAL (value);
 
-	  if (host_integerp (value, TYPE_UNSIGNED (TREE_TYPE (value))))
+	  if (host_integerp (value, TYPE_UNSIGNED (TREE_TYPE (value)))
+	      && (simple_type_size_in_bits (TREE_TYPE (value))
+		  <= HOST_BITS_PER_WIDE_INT || host_integerp (value, 0)))
 	    /* DWARF2 does not provide a way of indicating whether or
 	       not enumeration constants are signed or unsigned.  GDB
 	       always assumes the values are signed, so we output all
 	       values as if they were signed.  That means that
 	       enumeration constants with very large unsigned values
-	       will appear to have negative values in the debugger.  */
-	    add_AT_int (enum_die, DW_AT_const_value,
-			tree_low_cst (value, tree_int_cst_sgn (value) > 0));
+	       will appear to have negative values in the debugger.
+
+	       TODO: the above comment is wrong, DWARF2 does provide
+	       DW_FORM_sdata/DW_FORM_udata to represent signed/unsigned data.
+	       This should be re-worked to use correct signed/unsigned
+	       int/double tags for all cases, instead of always treating as
+	       signed.  */
+	    add_AT_int (enum_die, DW_AT_const_value, TREE_INT_CST_LOW (value));
+	  else
+	    /* Enumeration constants may be wider than HOST_WIDE_INT.  Handle
+	       that here.  */
+	    add_AT_double (enum_die, DW_AT_const_value,
+			   TREE_INT_CST_HIGH (value), TREE_INT_CST_LOW (value));
 	}
 
       add_gnat_descriptive_type_attribute (type_die, type, context_die);
@@ -18812,6 +18842,7 @@ gen_producer_string (void)
       case OPT_fdiagnostics_show_location_:
       case OPT_fdiagnostics_show_option:
       case OPT_fdiagnostics_show_caret:
+      case OPT_fdiagnostics_color_:
       case OPT_fverbose_asm:
       case OPT____:
       case OPT__sysroot_:

@@ -967,25 +967,35 @@ make_abnormal_goto_edges (basic_block bb, bool for_call)
   gimple_stmt_iterator gsi;
 
   FOR_EACH_BB (target_bb)
-    for (gsi = gsi_start_bb (target_bb); !gsi_end_p (gsi); gsi_next (&gsi))
-      {
-	gimple label_stmt = gsi_stmt (gsi);
-	tree target;
+    {
+      for (gsi = gsi_start_bb (target_bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple label_stmt = gsi_stmt (gsi);
+	  tree target;
 
-	if (gimple_code (label_stmt) != GIMPLE_LABEL)
-	  break;
-
-	target = gimple_label_label (label_stmt);
-
-	/* Make an edge to every label block that has been marked as a
-	   potential target for a computed goto or a non-local goto.  */
-	if ((FORCED_LABEL (target) && !for_call)
-	    || (DECL_NONLOCAL (target) && for_call))
-	  {
-	    make_edge (bb, target_bb, EDGE_ABNORMAL);
+	  if (gimple_code (label_stmt) != GIMPLE_LABEL)
 	    break;
-	  }
-      }
+
+	  target = gimple_label_label (label_stmt);
+
+	  /* Make an edge to every label block that has been marked as a
+	     potential target for a computed goto or a non-local goto.  */
+	  if ((FORCED_LABEL (target) && !for_call)
+	      || (DECL_NONLOCAL (target) && for_call))
+	    {
+	      make_edge (bb, target_bb, EDGE_ABNORMAL);
+	      break;
+	    }
+	}
+      if (!gsi_end_p (gsi))
+	{
+	  /* Make an edge to every setjmp-like call.  */
+	  gimple call_stmt = gsi_stmt (gsi);
+	  if (is_gimple_call (call_stmt)
+	      && (gimple_call_flags (call_stmt) & ECF_RETURNS_TWICE))
+	    make_edge (bb, target_bb, EDGE_ABNORMAL);
+	}
+    }
 }
 
 /* Create edges for a goto statement at block BB.  */
@@ -2147,7 +2157,8 @@ call_can_make_abnormal_goto (gimple t)
 {
   /* If the function has no non-local labels, then a call cannot make an
      abnormal transfer of control.  */
-  if (!cfun->has_nonlocal_label)
+  if (!cfun->has_nonlocal_label
+      && !cfun->calls_setjmp)
    return false;
 
   /* Likewise if the call has no side effects.  */
@@ -2302,6 +2313,11 @@ stmt_starts_bb_p (gimple stmt, gimple prev_stmt)
       else
 	return true;
     }
+  else if (gimple_code (stmt) == GIMPLE_CALL
+	   && gimple_call_flags (stmt) & ECF_RETURNS_TWICE)
+    /* setjmp acts similar to a nonlocal GOTO target and thus should
+       start a new block.  */
+    return true;
 
   return false;
 }
@@ -3815,9 +3831,9 @@ verify_gimple_assign_single (gimple stmt)
     }
 
   if (gimple_clobber_p (stmt)
-      && !DECL_P (lhs))
+      && !(DECL_P (lhs) || TREE_CODE (lhs) == MEM_REF))
     {
-      error ("non-decl LHS in clobber statement");
+      error ("non-decl/MEM_REF LHS in clobber statement");
       debug_generic_expr (lhs);
       return true;
     }
@@ -7062,7 +7078,8 @@ print_loop (FILE *file, struct loop *loop, int indent, int verbosity)
    loop, or just its structure.  */
 
 static void
-print_loop_and_siblings (FILE *file, struct loop *loop, int indent, int verbosity)
+print_loop_and_siblings (FILE *file, struct loop *loop, int indent,
+			 int verbosity)
 {
   if (loop == NULL)
     return;
@@ -7082,6 +7099,40 @@ print_loops (FILE *file, int verbosity)
   bb = ENTRY_BLOCK_PTR;
   if (bb && bb->loop_father)
     print_loop_and_siblings (file, bb->loop_father, 0, verbosity);
+}
+
+/* Dump a loop.  */
+
+DEBUG_FUNCTION void
+debug (struct loop &ref)
+{
+  print_loop (stderr, &ref, 0, /*verbosity*/0);
+}
+
+DEBUG_FUNCTION void
+debug (struct loop *ptr)
+{
+  if (ptr)
+    debug (*ptr);
+  else
+    fprintf (stderr, "<nil>\n");
+}
+
+/* Dump a loop verbosely.  */
+
+DEBUG_FUNCTION void
+debug_verbose (struct loop &ref)
+{
+  print_loop (stderr, &ref, 0, /*verbosity*/3);
+}
+
+DEBUG_FUNCTION void
+debug_verbose (struct loop *ptr)
+{
+  if (ptr)
+    debug (*ptr);
+  else
+    fprintf (stderr, "<nil>\n");
 }
 
 
@@ -7497,7 +7548,8 @@ gimple_purge_dead_abnormal_call_edges (basic_block bb)
   edge_iterator ei;
   gimple stmt = last_stmt (bb);
 
-  if (!cfun->has_nonlocal_label)
+  if (!cfun->has_nonlocal_label
+      && !cfun->calls_setjmp)
     return false;
 
   if (stmt && stmt_can_make_abnormal_goto (stmt))
