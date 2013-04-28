@@ -1558,7 +1558,13 @@ assemble_thunk (struct cgraph_node *node)
   set_cfun (NULL);
 }
 
-
+static int
+node_cmp (const void *pa, const void *pb)
+{
+  const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
+  const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
+  return b->order - a->order;
+}
 
 /* Assemble thunks and aliases associated to NODE.  */
 
@@ -1735,6 +1741,9 @@ expand_all_functions (void)
   for (i = 0; i < order_pos; i++)
     if (order[i]->process)
       order[new_order_pos++] = order[i];
+
+  if (flag_reorder_functions)
+    qsort (order, new_order_pos, sizeof (struct cgraph_node *), node_cmp);
 
   for (i = new_order_pos - 1; i >= 0; i--)
     {
