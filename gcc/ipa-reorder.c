@@ -524,8 +524,7 @@ ipa_func_reorder (void)
 static bool
 gate_ipa_func_reorder (void)
 {
-  fprintf (stderr, "gate called, %u\n", flag_reorder_functions);
-  return flag_reorder_functions;// && flag_toplevel_reorder;
+  return flag_reorder_functions && flag_toplevel_reorder;
 }
 
 struct ipa_opt_pass_d pass_ipa_func_reorder =
