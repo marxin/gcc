@@ -491,6 +491,7 @@ function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
         {
         case VAR_DECL:
         case PARM_DECL:
+        case RESULT_DECL:
           return check_declaration (b1, b2, d, func1, func2);
         default:
           gcc_unreachable ();

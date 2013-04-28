@@ -66,8 +66,6 @@ account_callees (struct partition *part,
 {
   struct cgraph_edge *edge;
   struct priority *p;
-  int i;
-  struct ipa_ref *ref;
 
   for (edge = node->callees; edge; edge = edge->next_callee)
     if (edge->inline_failed)
@@ -139,8 +137,6 @@ static void
 clear_callees (struct cgraph_node *node)
 {
   struct cgraph_edge *edge;
-  int i;
-  struct ipa_ref *ref;
 
   for (edge = node->callees; edge; edge = edge->next_callee)
     if (edge->inline_failed)
@@ -241,10 +237,10 @@ merge_partitions (vec<partition_ptr, va_heap, vl_embed> *partitions,
         && i2 == vec_safe_length (part2->priorities))
       break;
 
-      if ((i1 < vec_safe_length (part1->priorities)
-        && i2 == vec_safe_length (part2->priorities))
+      if (i1 < vec_safe_length (part1->priorities)
+        && (i2 == vec_safe_length (part2->priorities)
             || ((*part1->priorities)[i1]->dest_partition->index
-                < (*part2->priorities)[i2]->dest_partition->index))
+                < (*part2->priorities)[i2]->dest_partition->index)))
       {
         p1 = (*part1->priorities)[i1];
         if (p1->dest_partition != part2)
@@ -253,10 +249,10 @@ merge_partitions (vec<partition_ptr, va_heap, vl_embed> *partitions,
           delete_priority (heap, p1);
         i1++;
       }
-      else if ((i2 < vec_safe_length (part2->priorities)
-             && i1 == vec_safe_length (part1->priorities))
+      else if (i2 < vec_safe_length (part2->priorities)
+             && (i1 == vec_safe_length (part1->priorities)
                  || ((*part1->priorities)[i1]->dest_partition->index
-                     > (*part2->priorities)[i2]->dest_partition->index))
+                     > (*part2->priorities)[i2]->dest_partition->index)))
       {
         p2 = (*part2->priorities)[i2];
         if (p2->dest_partition != part1)
@@ -307,8 +303,8 @@ merge_partitions (vec<partition_ptr, va_heap, vl_embed> *partitions,
         && i2 == vec_safe_length (part2->in_priorities))
       break;
 
-      if (i1 < part1->in_priorities->length ()
-        && (i2 == part2->in_priorities->length ()
+      if (i1 < vec_safe_length (part1->in_priorities)
+        && (i2 == vec_safe_length (part2->in_priorities)
             || ((*part1->in_priorities)[i1]->src_partition->index
                 < (*part2->in_priorities)[i2]->src_partition->index)))
       {
@@ -319,8 +315,8 @@ merge_partitions (vec<partition_ptr, va_heap, vl_embed> *partitions,
           delete_priority (heap, p1);
         i1++;
       }
-      else if (i2 < part2->in_priorities->length ()
-             && (i1 == part1->in_priorities->length()
+      else if (i2 < vec_safe_length (part2->in_priorities)
+             && (i1 == vec_safe_length (part1->in_priorities)
                  || ((*part1->in_priorities)[i1]->src_partition->index
                      > (*part2->in_priorities)[i2]->src_partition->index)))
       {
