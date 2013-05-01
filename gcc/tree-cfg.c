@@ -6153,10 +6153,19 @@ move_stmt_op (tree *tp, int *walk_subtrees, void *data)
 
   if (EXPR_P (t))
     {
-      if (TREE_BLOCK (t) == p->orig_block
+      tree block = TREE_BLOCK (t);
+      if (block == p->orig_block
 	  || (p->orig_block == NULL_TREE
-	  && TREE_BLOCK (t) == NULL_TREE))
+	      && block != NULL_TREE))
 	TREE_SET_BLOCK (t, p->new_block);
+#ifdef ENABLE_CHECKING
+      else if (block != NULL_TREE)
+	{
+	  while (block && TREE_CODE (block) == BLOCK && block != p->orig_block)
+	    block = BLOCK_SUPERCONTEXT (block);
+	  gcc_assert (block == p->orig_block);
+	}
+#endif
     }
   else if (DECL_P (t) || TREE_CODE (t) == SSA_NAME)
     {
@@ -6241,18 +6250,10 @@ move_stmt_r (gimple_stmt_iterator *gsi_p, bool *handled_ops_p,
   gimple stmt = gsi_stmt (*gsi_p);
   tree block = gimple_block (stmt);
 
-  if (p->orig_block == NULL_TREE
-      || block == p->orig_block
-      || block == NULL_TREE)
+  if (block == p->orig_block
+      || (p->orig_block == NULL_TREE
+	  && block != NULL_TREE))
     gimple_set_block (stmt, p->new_block);
-#ifdef ENABLE_CHECKING
-  else if (block != p->new_block)
-    {
-      while (block && block != p->orig_block)
-	block = BLOCK_SUPERCONTEXT (block);
-      gcc_assert (block);
-    }
-#endif
 
   switch (gimple_code (stmt))
     {
@@ -6486,14 +6487,6 @@ move_block_to_fn (struct function *dest_cfun, basic_block bb,
 	  e->goto_locus = d->new_block ?
 	      COMBINE_LOCATION_DATA (line_table, e->goto_locus, d->new_block) :
 	      LOCATION_LOCUS (e->goto_locus);
-#ifdef ENABLE_CHECKING
-	else if (block != d->new_block)
-	  {
-	    while (block && block != d->orig_block)
-	      block = BLOCK_SUPERCONTEXT (block);
-	    gcc_assert (block);
-	  }
-#endif
       }
 }
 
@@ -6593,11 +6586,11 @@ fixup_loop_arrays_after_move (struct function *fn1, struct function *fn2,
 			      struct loop *loop)
 {
   /* Discard it from the old loop array.  */
-  (*fn1->x_current_loops->larray)[loop->num] = NULL;
+  (*get_loops (fn1))[loop->num] = NULL;
 
   /* Place it in the new loop array, assigning it a new number.  */
-  loop->num = vec_safe_length (fn2->x_current_loops->larray);
-  vec_safe_push (fn2->x_current_loops->larray, loop);
+  loop->num = number_of_loops (fn2);
+  vec_safe_push (loops_for_fn (fn2)->larray, loop);
 
   /* Recurse to children.  */
   for (loop = loop->inner; loop; loop = loop->next)
@@ -6724,9 +6717,10 @@ move_sese_region_to_fn (struct function *dest_cfun, basic_block entry_bb,
     }
 
   /* Initialize an empty loop tree.  */
-  dest_cfun->x_current_loops = ggc_alloc_cleared_loops ();
-  init_loops_structure (dest_cfun, dest_cfun->x_current_loops, 1);
-  dest_cfun->x_current_loops->state = LOOPS_MAY_HAVE_MULTIPLE_LATCHES;
+  struct loops *loops = ggc_alloc_cleared_loops ();
+  init_loops_structure (dest_cfun, loops, 1);
+  loops->state = LOOPS_MAY_HAVE_MULTIPLE_LATCHES;
+  set_loops_for_fn (dest_cfun, loops);
 
   /* Move the outlined loop tree part.  */
   FOR_EACH_VEC_ELT (bbs, i, bb)
@@ -6736,25 +6730,25 @@ move_sese_region_to_fn (struct function *dest_cfun, basic_block entry_bb,
 	{
 	  struct loop *loop = bb->loop_father;
 	  flow_loop_tree_node_remove (bb->loop_father);
-	  flow_loop_tree_node_add (dest_cfun->x_current_loops->tree_root, loop);
+	  flow_loop_tree_node_add (get_loop (dest_cfun, 0), loop);
 	  fixup_loop_arrays_after_move (saved_cfun, cfun, loop);
 	}
 
       /* Remove loop exits from the outlined region.  */
-      if (saved_cfun->x_current_loops->exits)
+      if (loops_for_fn (saved_cfun)->exits)
 	FOR_EACH_EDGE (e, ei, bb->succs)
 	  {
 	    void **slot = htab_find_slot_with_hash
-		(saved_cfun->x_current_loops->exits, e,
+		(loops_for_fn (saved_cfun)->exits, e,
 		 htab_hash_pointer (e), NO_INSERT);
 	    if (slot)
-	      htab_clear_slot (saved_cfun->x_current_loops->exits, slot);
+	      htab_clear_slot (loops_for_fn (saved_cfun)->exits, slot);
 	  }
     }
 
 
   /* Adjust the number of blocks in the tree root of the outlined part.  */
-  dest_cfun->x_current_loops->tree_root->num_nodes = bbs.length () + 2;
+  get_loop (dest_cfun, 0)->num_nodes = bbs.length () + 2;
 
   /* Setup a mapping to be used by move_block_to_fn.  */
   loop->aux = current_loops->tree_root;
@@ -7233,7 +7227,7 @@ debug_loop (struct loop *loop, int verbosity)
 DEBUG_FUNCTION void
 debug_loop_num (unsigned num, int verbosity)
 {
-  debug_loop (get_loop (num), verbosity);
+  debug_loop (get_loop (cfun, num), verbosity);
 }
 
 /* Return true if BB ends with a call, possibly followed by some

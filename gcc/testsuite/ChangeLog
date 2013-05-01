@@ -1,3 +1,152 @@
+2013-05-01  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* gcc.target/aarch64/scalar-vca.c: New.
+	* gcc.target/aarch64/vect-vca.c: Likewise.
+
+2013-05-01  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* gcc.target/aarch64/scalar_intrinsics.c (force_simd): New.
+	(test_vceqd_s64): Force arguments to SIMD registers.
+	(test_vceqzd_s64): Likewise.
+	(test_vcged_s64): Likewise.
+	(test_vcled_s64): Likewise.
+	(test_vcgezd_s64): Likewise.
+	(test_vcged_u64): Likewise.
+	(test_vcgtd_s64): Likewise.
+	(test_vcltd_s64): Likewise.
+	(test_vcgtzd_s64): Likewise.
+	(test_vcgtd_u64): Likewise.
+	(test_vclezd_s64): Likewise.
+	(test_vcltzd_s64): Likewise.
+	(test_vtst_s64): Likewise.
+	(test_vtst_u64): Likewise.
+
+2013-05-01  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/57092
+	* g++.dg/cpp0x/decltype53.C: New.
+
+2013-04-30  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/57071
+	* gfortran.dg/power_5.f90:  New test.
+
+2013-04-30  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57122
+	* gcc.dg/torture/pr57122.c: New testcase.
+
+2013-04-30  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57107
+	* g++.dg/torture/pr57107.C: New testcase.
+
+2013-04-30  Andrey Belevantsev  <abel@ispras.ru>
+
+	PR rtl-optimization/57105
+	* gcc.dg/pr57105.c: New test.
+
+2013-04-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/57104
+	* gcc.dg/pr57104.c: New test.
+
+2013-04-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/44578
+	* gcc.target/i386/pr44578.c: New test.
+
+2013-04-29  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR target/57097
+	* gcc.target/i386/pr57097.c: New test.
+
+2013-04-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/57098
+	* gcc.target/i386/pr57098.c: New test.
+
+2013-04-29  Kai Tietz  <ktietz@redhat.com>
+
+	* gcc.c-torture/execute/pr55875.c: New test.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57075
+	* gcc.dg/torture/pr57075.c: New testcase.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57103
+	* gcc.dg/autopar/pr57103.c: New testcase.
+
+2013-04-29  Senthil Kumar Selvaraj  <senthil_kumar.selvaraj@atmel.com>
+
+	* gcc.dg/c1x-align-3.c: Add test for negative power of 2.
+
+2013-04-29  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.dg/pr50763.c: Update test.
+
+2013-04-26  Jeff Law  <law@redhat.com>
+
+	* gcc.dg/tree-ssa/vrp88.c: New test.
+
+2013-04-29  Christian Bruel  <christian.bruel@st.com>
+
+	PR target/57108
+	* gcc.target/sh/pr57108.c: New test.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57089
+	* gfortran.dg/gomp/pr57089.f90: New testcase.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* lib/target-supports.exp (vect_uintfloat_cvt): Enable for AArch64.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* gcc.target/aarch64/vect-vcvt.c: New.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* gcc.target/aarch64/vect-vrnd.c: New.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/57081
+	* gcc.dg/torture/pr57081.c: New testcase.
+
+2013-04-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/57083
+	* gcc.dg/torture/pr57083.c: New test.
+
+2013-04-28  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/56450
+	* g++.dg/cpp0x/decltype52.C: New.
+
+2013-04-28  Jakub Jelinek  <jakub@redhat.com>
+
+	N3472 binary constants
+	* g++.dg/cpp/limits.C: Adjust warning wording.
+	* g++.dg/system-binary-constants-1.C: Likewise.
+	* g++.dg/cpp1y/system-binary-constants-1.C: New test.
+
+2013-04-28  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/57093
+	* gfortran.dg/coarray_30.f90: New.
+
+2013-04-28  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/57071
+	* frontend-passes (optimize_power):  New function.
+	(optimize_op):  Use it.
+
 2013-04-27  Jakub Jelinek  <jakub@redhat.com>
 
 	PR target/56866
@@ -37,7 +186,7 @@
 2013-04-25  Marek Polacek  <polacek@redhat.com>
 
 	PR tree-optimization/57066
-        * gcc.dg/torture/builtin-logb-1.c: Adjust testcase.
+	* gcc.dg/torture/builtin-logb-1.c: Adjust testcase.
 
 2013-04-25  James Greenhalgh  <james.greenhalgh@arm.com>
 	    Tejas Belagod  <tejas.belagod@arm.com>

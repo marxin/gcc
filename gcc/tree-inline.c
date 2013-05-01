@@ -1519,7 +1519,7 @@ copy_bb (copy_body_data *id, basic_block bb, int frequency_scale,
      basic_block_info automatically.  */
   copy_basic_block = create_basic_block (NULL, (void *) 0,
                                          (basic_block) prev->aux);
-  /* Update to use apply_probability().  */
+  /* Update to use apply_scale().  */
   copy_basic_block->count = bb->count * count_scale / REG_BR_PROB_BASE;
 
   /* We are going to rebuild frequencies from scratch.  These values
@@ -1891,7 +1891,7 @@ copy_edges_for_bb (basic_block bb, gcov_type count_scale, basic_block ret_bb,
 	    && old_edge->dest->aux != EXIT_BLOCK_PTR)
 	  flags |= EDGE_FALLTHRU;
 	new_edge = make_edge (new_bb, (basic_block) old_edge->dest->aux, flags);
-        /* Update to use apply_probability().  */
+        /* Update to use apply_scale().  */
 	new_edge->count = old_edge->count * count_scale / REG_BR_PROB_BASE;
 	new_edge->probability = old_edge->probability;
       }
@@ -1923,11 +1923,7 @@ copy_edges_for_bb (basic_block bb, gcov_type count_scale, basic_block ret_bb,
          into a COMPONENT_REF which doesn't.  If the copy
          can throw, the original could also throw.  */
       can_throw = stmt_can_throw_internal (copy_stmt);
-      /* If the call we inline cannot make abnormal goto do not add
-         additional abnormal edges but only retain those already present
-	 in the original function body.  */
-      nonlocal_goto
-	= can_make_abnormal_goto && stmt_can_make_abnormal_goto (copy_stmt);
+      nonlocal_goto = stmt_can_make_abnormal_goto (copy_stmt);
 
       if (can_throw || nonlocal_goto)
 	{
@@ -1955,6 +1951,10 @@ copy_edges_for_bb (basic_block bb, gcov_type count_scale, basic_block ret_bb,
       else if (can_throw)
 	make_eh_edges (copy_stmt);
 
+      /* If the call we inline cannot make abnormal goto do not add
+         additional abnormal edges but only retain those already present
+	 in the original function body.  */
+      nonlocal_goto &= can_make_abnormal_goto;
       if (nonlocal_goto)
 	make_abnormal_goto_edges (gimple_bb (copy_stmt), true);
 
@@ -2223,7 +2223,7 @@ copy_loops (bitmap blocks_to_copy,
 	  copy_loop_info (src_loop, dest_loop);
 
 	  /* Finally place it into the loop array and the loop tree.  */
-	  place_new_loop (dest_loop);
+	  place_new_loop (cfun, dest_loop);
 	  flow_loop_tree_node_add (dest_parent, dest_loop);
 
 	  /* Recurse.  */
@@ -2278,7 +2278,7 @@ copy_cfg_body (copy_body_data * id, gcov_type count, int frequency_scale,
 	    incoming_frequency += EDGE_FREQUENCY (e);
 	    incoming_count += e->count;
 	  }
-      /* Update to use apply_probability().  */
+      /* Update to use apply_scale().  */
       incoming_count = incoming_count * count_scale / REG_BR_PROB_BASE;
       /* Update to use EDGE_FREQUENCY.  */
       incoming_frequency
@@ -2332,11 +2332,11 @@ copy_cfg_body (copy_body_data * id, gcov_type count, int frequency_scale,
     }
 
   /* Duplicate the loop tree, if available and wanted.  */
-  if (id->src_cfun->x_current_loops != NULL
+  if (loops_for_fn (src_cfun) != NULL
       && current_loops != NULL)
     {
       copy_loops (blocks_to_copy, entry_block_map->loop_father,
-		  id->src_cfun->x_current_loops->tree_root);
+		  get_loop (src_cfun, 0));
       /* Defer to cfgcleanup to update loop-father fields of basic-blocks.  */
       loops_state_set (LOOPS_NEED_FIXUP);
     }
@@ -5199,7 +5199,7 @@ tree_function_versioning (tree old_decl, tree new_decl,
     }
 
   /* Set up the destination functions loop tree.  */
-  if (DECL_STRUCT_FUNCTION (old_decl)->x_current_loops)
+  if (loops_for_fn (DECL_STRUCT_FUNCTION (old_decl)) != NULL)
     {
       cfun->curr_properties &= ~PROP_loops;
       loop_optimizer_init (AVOID_CFG_MODIFICATIONS);

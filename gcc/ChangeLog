@@ -1,3 +1,509 @@
+2013-05-01  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/arm_neon.h
+	(vac<ge, gt><sd>_f<32, 64>): Rename to...
+	(vca<ge, gt><sd>_f<32, 64>): ...this, reimpliment in C.
+	(vca<ge, gt, lt, le><q>_f<32, 64>): Reimpliment in C.
+
+2013-05-01  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-simd.md (*aarch64_fac<optab><mode>): New.
+	* config/aarch64/iterators.md (FAC_COMPARISONS): New.
+
+2013-05-01  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-simd.md
+	(vcond<mode>_internal): Handle special cases for constant masks.
+	(vcond<mode><mode>): Allow nonmemory_operands for outcome vectors.
+	(vcondu<mode><mode>): Likewise.
+	(vcond<v_cmp_result><mode>): New.
+
+2013-05-01  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-builtins.c (BUILTIN_VALLDI): Define.
+	(aarch64_fold_builtin): Add folding for cm<eq,ge,gt,tst>.
+	* config/aarch64/aarch64-simd-builtins.def
+	(cmeq): Update to BUILTIN_VALLDI.
+	(cmgt): Likewise.
+	(cmge): Likewise.
+	(cmle): Likewise.
+	(cmlt): Likewise.
+	* config/aarch64/arm_neon.h
+	(vc<eq, lt, le, gt, ge, tst><z><qsd>_<fpsu><8,16,32,64>): Remap
+	to builtins or C as appropriate.
+
+2013-05-01  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-simd-builtins.def (cmhs): Rename to...
+	(cmgeu): ...This.
+	(cmhi): Rename to...
+	(cmgtu): ...This.
+	* config/aarch64/aarch64-simd.md
+	(simd_mode): Add SF.
+	(aarch64_vcond_internal): Use new names for unsigned comparison insns.
+	(aarch64_cm<optab><mode>): Rewrite to not use UNSPECs.
+	* config/aarch64/aarch64.md (*cstore<mode>_neg): Rename to...
+	(cstore<mode>_neg): ...This.
+	* config/aarch64/iterators.md
+	(VALLF): new.
+	(unspec): Remove UNSPEC_CM<EQ, LE, LT, GE, GT, HS, HI, TST>.
+	(COMPARISONS): New.
+	(UCOMPARISONS): Likewise.
+	(optab): Add missing comparisons.
+	(n_optab): New.
+	(cmp_1): Likewise.
+	(cmp_2): Likewise.
+	(CMP): Likewise.
+	(cmp): Remove.
+	(VCMP_S): Likewise.
+	(VCMP_U): Likewise.
+	(V_cmp_result): Add DF, SF modes.
+	(v_cmp_result): Likewise.
+	(v): Likewise.
+	(vmtype): Likewise.
+	* config/aarch64/predicates.md (aarch64_reg_or_fp_zero): New.
+
+2013-05-01  Greta Yorsh  <Greta.Yorsh@arm.com>
+
+	* config/arm/thumb2.md (thumb2_smaxsi3,thumb2_sminsi3): Convert
+	define_insn to define_insn_and_split.
+	(thumb32_umaxsi3,thumb2_uminsi3): Likewise.
+	(thumb2_negdi2,thumb2_abssi2,thumb2_neg_abssi2): Likewise.
+	(thumb2_mov_scc,thumb2_mov_negscc,thumb2_mov_notscc): Likewise.
+	(thumb2_movsicc_insn,thumb2_and_scc,thumb2_ior_scc): Likewise.
+	(thumb2_negscc): Likewise.
+
+2013-04-30  Greta Yorsh  <Greta.Yorsh@arm.com>
+
+	* config/arm/thumb2.md (thumb2_incscc, thumb2_decscc): Delete.
+
+2013-04-30  Greta Yorsh  <Greta.Yorsh@arm.com>
+
+	* config/arm/thumb2.md: Remove trailing whitespaces.
+
+2013-04-30  Richard Sandiford  <rsandifo@linux.vnet.ibm.com>
+
+	* explow.c (plus_constant): Pass "mode" to immed_double_int_const.
+	Use gen_int_mode rather than GEN_INT.
+
+2013-04-30  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* value-prof.c (stream_in_histogram_value): Remove the strayed
+	debug_gimple_stmt.
+
+2013-04-30  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57122
+	* cfghooks.c (split_edge): Properly check for the loop
+	latch edge.
+
+2013-04-30  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57107
+	* tree-eh.c (sink_clobbers): Preserve virtual SSA form.
+
+2013-04-30  Andrey Belevantsev  <abel@ispras.ru>
+
+	PR rtl-optimization/56957
+	PR rtl-optimization/57105
+
+	* sel-sched.c (move_op_orig_expr_found): Remove insn_emitted
+	variable.  Use just INSN_UID for determining whether an insn
+	should be only disconnected from the insn stream.
+	* sel-sched-ir.h (EXPR_WAS_CHANGED): Remove.
+
+2013-04-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/57104
+	* tsan.c (instrument_expr): Don't instrument accesses to
+	DECL_HARD_REGISTER VAR_DECLs.
+
+2013-04-30  Richard Biener  <rguenther@suse.de>
+
+	* function.h (loops_for_fn): New inline function.
+	(set_loops_for_fn): Likewise.
+	* cfgloop.h (place_new_loop): Add struct function parameter.
+	(get_loop): Likewise.
+	(get_loops): Likewise.
+	(number_of_loops): Likewise.
+	(fel_next): Adjust.
+	(fel_init): Likewise.
+	* cfg.c (get_loop_copy): Adjust.
+	* cfgloop.c (flow_loops_dump): Likewise.
+	(record_loop_exits): Likewise.
+	(verify_loop_structure): Likewise.
+	* cfgloopanal.c (mark_irreducible_loops): Likewise.
+	(estimate_reg_pressure_cost): Likewise.
+	(mark_loop_exit_edges): Likewise.
+	* cfgloopmanip.c (place_new_loop): Likewise.
+	(add_loop): Likewise.
+	(duplicate_loop): Likewise.
+	* graph.c (draw_cfg_nodes): Likewise.
+	* graphite-clast-to-gimple.c (translate_clast_user): Likewise.
+	* graphite-sese-to-poly.c (build_scop_scattering): Likewise.
+	(extract_affine_chrec): Likewise.
+	(build_scop_iteration_domain): Likewise.
+	* graphite.c (graphite_initialize): Likewise.
+	* ira-build.c (create_loop_tree_nodes): Likewise.
+	(more_one_region_p): Likewise.
+	(rebuild_regno_allocno_maps): Likewise.
+	(mark_loops_for_removal): Likewise.
+	(mark_all_loops_for_removal): Likewise.
+	(remove_unnecessary_regions): Likewise.
+	(ira_build): Likewise.
+	* ira-emit.c (setup_entered_from_non_parent_p): Likewise.
+	* loop-init.c (fix_loop_structure): Likewise.
+	(gate_rtl_move_loop_invariants): Likewise.
+	(gate_rtl_unswitch): Likewise.
+	(gate_rtl_unroll_and_peel_loops): Likewise.
+	(rtl_doloop): Likewise.
+	* lto-streamer-in.c (input_cfg): Likewise.
+	* lto-streamer-out.c (output_cfg): Likewise.
+	* modulo-sched.c (sms_schedule): Likewise.
+	* predict.c (tree_estimate_probability): Likewise.
+	(tree_estimate_probability_driver): Likewise.
+	(estimate_loops): Likewise.
+	* tree-cfg.c (fixup_loop_arrays_after_move): Likewise.
+	(move_sese_region_to_fn): Likewise.
+	(debug_loop_num): Likewise.
+	* tree-chrec.c (chrec_evaluate): Likewise.
+	(hide_evolution_in_other_loops_than_loop): Likewise.
+	(chrec_component_in_loop_num): Likewise.
+	(reset_evolution_in_loop): Likewise.
+	(evolution_function_is_invariant_rec_p): Likewise.
+	* tree-if-conv.c (main_tree_if_conversion): Likewise.
+	* tree-inline.c (copy_loops): Likewise.
+	(copy_cfg_body): Likewise.
+	(tree_function_versioning): Likewise.
+	* tree-loop-distribution.c (rdg_flag_loop_exits): Likewise.
+	* tree-scalar-evolution.c (chrec_contains_symbols_defined_in_loop):
+	Likewise.
+	(add_to_evolution_1): Likewise.
+	(scev_const_prop): Likewise.
+	* tree-scalar-evolution.h (get_chrec_loop): Likewise.
+	* tree-ssa-loop-ch.c (copy_loop_headers): Likewise.
+	* tree-ssa-loop-im.c (analyze_memory_references): Likewise.
+	(tree_ssa_lim_initialize): Likewise.
+	* tree-ssa-loop-manip.c (rewrite_into_loop_closed_ssa): Likewise.
+	(verify_loop_closed_ssa): Likewise.
+	* tree-ssa-loop.c  (tree_ssa_loop_init): Likewise.
+	(tree_ssa_loop_im): Likewise.
+	(tree_ssa_loop_unswitch): Likewise.
+	(tree_vectorize): Likewise.
+	(check_data_deps): Likewise.
+	(tree_ssa_loop_ivcanon): Likewise.
+	(tree_ssa_loop_bounds): Likewise.
+	(tree_complete_unroll): Likewise.
+	(tree_complete_unroll_inner): Likewise.
+	(tree_parallelize_loops): Likewise.
+	(tree_ssa_loop_prefetch): Likewise.
+	(tree_ssa_loop_ivopts): Likewise.
+	* tree-ssa.c (execute_update_addresses_taken): Liekwise.
+	* tree-vectorizer.c (vectorize_loops): Likewise.
+
+2013-04-29  Mike Frysinger  <vapier@gentoo.org>
+
+	* config/arm/bpabi.h (EABI_LINK_SPEC): Define.
+	(BPABI_LINK_SPEC): Use new EABI_LINK_SPEC.
+	* config/arm/linux-eabi.h (LINK_SPEC): Replace BE8_LINK_SPEC
+	with EABI_LINK_SPEC.
+
+2013-04-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/44578
+	* config/i386/i386.md (*zero_extendsidi2): Add "!" to m->?*y
+	alternative.
+
+2013-04-29  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR target/57097
+	* lra-constraints.c (process_alt_operands): Discourage a bit more
+	using memory for pseudos.  Print cost dump for alternatives.
+	Modify cost values for conflicts with early clobbers.
+	(curr_insn_transform): Spill pseudos reassigned to NO_REGS.
+
+2013-04-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/57098
+	* config/i386/i386.c (ix86_expand_vec_perm): Validize constant memory.
+
+2013-04-29  Ian Bolton  <ian.bolton@arm.com>
+
+	* config/aarch64/aarch64.md (movsi_aarch64): Support LDR/STR
+	from/to S register.
+	(movdi_aarch64): Support LDR/STR from/to D register.
+
+2013-04-29  Ian Bolton  <ian.bolton@arm.com>
+
+	* common/config/aarch64/aarch64-common.c: Enable REE pass at O2
+	or higher by default.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57075
+	* tree-inline.c (copy_edges_for_bb): Still split the bbs,
+	even if not adding abnormal edges for calls that can make
+	abnormal gotos.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57103
+	* tree-cfg.c (move_stmt_op): Fix condition under which to update
+	TREE_BLOCK.
+	(move_stmt_r): Remove redundant checking.
+
+2013-04-29  Teresa Johnson  <tejohnson@google.com>
+
+	PR bootstrap/57077
+	* basic-block.h (apply_scale): New function.
+	(apply_probability): Use apply_scale.
+	* gimple-streamer-in.c (input_bb): Ditto.
+	* lto-streamer-in.c (input_cfg): Ditto.
+	* lto-cgraph.c (merge_profile_summaries): Ditto.
+	* tree-optimize.c (execute_fixup_cfg): Ditto.
+	* tree-inline.c (copy_bb): Update comment to use apply_scale.
+	(copy_edges_for_bb): Ditto.
+	(copy_cfg_body): Ditto.
+
+2013-04-29  Tom de Vries  <tom@codesourcery.com>
+
+	* tree-ssa-tail-merge.c (find_same_succ_bb): Skip loop latch bbs.
+	(replace_block_by): Don't set LOOPS_NEED_FIXUP.
+	(tail_merge_optimize): Handle current_loops == NULL.
+
+2013-04-26  Jeff Law  <law@redhat.com>
+
+	* tree-vrp.c (range_fits_type_p): Move to earlier point in file.
+	(simplify_cond_using_ranges): Generalize code to simplify
+	COND_EXPRs where one argument is a constant and the other
+	is an SSA_NAME created by an integral type conversion.
+
+2013-04-29  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/arm/arm.md (store_minmaxsi): Use only when
+	optimize_insn_for_size_p.
+
+2013-04-29  Christian Bruel  <christian.bruel@st.com>
+
+	PR target/57108
+	* sh.md (tstsi_t_zero_extract_eq): Set mode for operand 0.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57089
+	* omp-low.c (expand_omp_taskreg): If the parent function had a broken
+	loop tree make sure to schedule a fixup for the child as well.
+	(expand_omp_for_generic): Properly add loops.
+	(expand_omp_for_static_nochunk): Likewise.
+	(expand_omp_for_static_chunk): Likewise.
+	(expand_omp_for): For the degenerate case fixup loops.
+	(expand_omp_sections): Fix default bb placement in loops.
+	(expand_omp_atomic_pipeline): Properly add loops.
+
+2013-04-29  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* predict.c: Fix typo in comment above #define PROB_VERY_UNLIKELY.
+
+2013-04-29  Tom de Vries  <tom@codesourcery.com>
+
+	* tree-ssa-tail-merge.c: Update header comment.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/arm_neon.h
+	(vcvt<sd>_f<32,64>_s<32,64>): Rewrite in C.
+	(vcvt<q>_f<32,64>_s<32,64>): Rewrite using builtins.
+	(vcvt_<high_>_f<32,64>_f<32,64>): Likewise.
+	(vcvt<qsd>_<su><32,64>_f<32,64>): Likewise.
+	(vcvta<qsd>_<su><32,64>_f<32,64>): Likewise.
+	(vcvtm<qsd>_<su><32,64>_f<32,64>): Likewise.
+	(vcvtn<qsd>_<su><32,64>_f<32,64>): Likewise.
+	(vcvtp<qsd>_<su><32,64>_f<32,64>): Likewise.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-simd.md
+	(<optab><VDQF:mode><fcvt_target>2): New, maps to fix, fixuns.
+	(<fix_trunc_optab><VDQF:mode><fcvt_target>2): New, maps to
+	fix_trunc, fixuns_trunc.
+	(ftrunc<VDQF:mode>2): New.
+	* config/aarch64/iterators.md (optab): Add fix, fixuns.
+	(fix_trunc_optab): New.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-builtins.c
+	(aarch64_builtin_vectorized_function): Vectorize over ifloorf,
+	iceilf, lround, iroundf.
+
+2013-04-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/54349
+	* config/i386/i386.h (enum ix86_tune_indices)
+	<X86_TUNE_INTER_UNIT_MOVES_TO_VEC, X86_TUNE_INTER_UNIT_MOVES_FROM_VEC>:
+	New, split from X86_TUNE_INTER_UNIT_MOVES.
+	<X86_TUNE_INTER_UNIT_MOVES>: Remove.
+	(TARGET_INTER_UNIT_MOVES_TO_VEC): New define.
+	(TARGET_INTER_UNIT_MOVES_FROM_VEC): Ditto.
+	(TARGET_INTER_UNIT_MOVES): Remove.
+	* config/i386/i386.c (initial_ix86_tune_features): Update.
+	Disable X86_TUNE_INTER_UNIT_MOVES_FROM_VEC for m_ATHLON_K8 only.
+	(ix86_expand_convert_uns_didf_sse): Use
+	TARGET_INTER_UNIT_MOVES_TO_VEC instead of TARGET_INTER_UNIT_MOVES.
+	(ix86_expand_vector_init_one_nonzero): Ditto.
+	(ix86_expand_vector_init_interleave): Ditto.
+	(inline_secondary_memory_needed): Return true for moves from SSE class
+	registers for !TARGET_INTER_UNIT_MOVES_FROM_VEC targets and for moves
+	to SSE class registers for !TARGET_INTER_UNIT_MOVES_TO_VEC targets.
+	* config/i386/constraints.md (Yi, Ym): Depend on
+	TARGET_INTER_UNIT_MOVES_TO_VEC.
+	(Yj, Yn): New constraints.
+	* config/i386/i386.md (*movdi_internal): Change constraints of
+	operand 1 from Yi to Yj and from Ym to Yn.
+	(*movsi_internal): Ditto.
+	(*movdf_internal): Ditto.
+	(*movsf_internal): Ditto.
+	(*float<SWI48x:mode><X87MODEF:mode>2_1): Use
+	TARGET_INTER_UNIT_MOVES_TO_VEC instead of TARGET_INTER_UNIT_MOVES.
+	(*float<SWI48x:mode><X87MODEF:mode>2_1 splitters): Ditto.
+	(floatdi<X87MODEF:mode>2_i387_with_xmm): Ditto.
+	(floatdi<X87MODEF:mode>2_i387_with_xmm splitters): Ditto.
+	* config/i386/sse.md (movdi_to_sse): Ditto.
+	(sse2_stored): Change constraint of operand 1 from Yi to Yj.
+	Use TARGET_INTER_UNIT_MOVES_FROM_VEC instead of
+	TARGET_INTER_UNIT_MOVES.
+	(sse_storeq_rex64): Change constraint of operand 1 from Yi to Yj.
+	(sse_storeq_rex64 splitter): Use TARGET_INTER_UNIT_MOVES_FROM_VEC
+	instead of TARGET_INTER_UNIT_MOVES.
+	* config/i386/mmx.md (*mov<mode>_internal): Change constraint of
+	operand 1 from Yi to Yj and from Ym to Yn.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-simd-builtins.def (vec_unpacks_hi_): New.
+	(float_truncate_hi_): Likewise.
+	(float_extend_lo_): Likewise.
+	(float_truncate_lo_): Likewise.
+	* config/aarch64/aarch64-simd.md (vec_unpacks_lo_v4sf): New.
+	(aarch64_float_extend_lo_v2df): Likewise.
+	(vec_unpacks_hi_v4sf): Likewise.
+	(aarch64_float_truncate_lo_v2sf): Likewise.
+	(aarch64_float_truncate_hi_v4sf): Likewise.
+	(vec_pack_trunc_v2df): Likewise.
+	(vec_pack_trunc_df): Likewise.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-builtins.c
+	(aarch64_fold_builtin): Fold float conversions.
+	* config/aarch64/aarch64-simd-builtins.def
+	(floatv2si, floatv4si, floatv2di): New.
+	(floatunsv2si, floatunsv4si, floatunsv2di): Likewise.
+	* config/aarch64/aarch64-simd.md
+	(<optab><fcvt_target><VDQF:mode>2): New, expands to float and floatuns.
+	* config/aarch64/iterators.md (FLOATUORS): New.
+	(optab): Add float, floatuns.
+	(su_optab): Likewise.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-builtins.c
+	(aarch64_builtin_vectorized_function): Use new names for
+	fcvt builtins.
+	* config/aarch64/aarch64-simd-builtins.def (fcvtzs): Split as...
+	(lbtruncv2sf, lbtruncv4sf, lbtruncv2df): ...This.
+	(fcvtzu): Split as...
+	(lbtruncuv2sf, lbtruncuv4sf, lbtruncuv2df): ...This.
+	(fcvtas): Split as...
+	(lroundv2sf, lroundv4sf, lroundv2df, lroundsf, lrounddf): ...This.
+	(fcvtau): Split as...
+	(lrounduv2sf, lrounduv4sf, lrounduv2df, lroundusf, lroundudf): ...This.
+	(fcvtps): Split as...
+	(lceilv2sf, lceilv4sf, lceilv2df): ...This.
+	(fcvtpu): Split as...
+	(lceiluv2sf, lceiluv4sf, lceiluv2df, lceilusf, lceiludf): ...This.
+	(fcvtms): Split as...
+	(lfloorv2sf, lfloorv4sf, lfloorv2df): ...This.
+	(fcvtmu): Split as...
+	(lflooruv2sf, lflooruv4sf, lflooruv2df, lfloorusf, lfloorudf): ...This.
+	(lfrintnv2sf, lfrintnv4sf, lfrintnv2df, lfrintnsf, lfrintndf): New.
+	(lfrintnuv2sf, lfrintnuv4sf, lfrintnuv2df): Likewise.
+	(lfrintnusf, lfrintnudf): Likewise.
+	* config/aarch64/aarch64-simd.md
+	(l<fcvt_pattern><su_optab><fcvt_target><VDQF:mode>2): Convert to
+	define_insn.
+	(aarch64_fcvt<frint_suffix><su><mode>): Remove.
+	* config/aarch64/iterators.md (FCVT): Include UNSPEC_FRINTN.
+	(fcvt_pattern): Likewise.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-simd.md
+	(l<fcvt_pattern><su_optab><fcvt_target><VDQF:mode>2): Rename to...
+	(l<fcvt_pattern><su_optab><VDQF:mode><fcvt_target>2): ... This.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/arm_neon.h (vrndq<a,m,n,p>_f<32, 64>): Rename to...
+	(vrnd<a,m,n,p>q_f<32, 64>): ...This, implement using builtin.
+	(vrnd<a,m,n,p>_f32): Implement using builtins.
+	(vrnd<i,x><q>_f<32, 64>): New.
+
+2013-04-29  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-builtins.c
+	(aarch64_builtin_vectorized_function): Fold to standard pattern names.
+	* config/aarch64/aarch64-simd-builtins.def (frintn): New.
+	(frintz): Rename to...
+	(btrunc): ...this.
+	(frintp): Rename to...
+	(ceil): ...this.
+	(frintm): Rename to...
+	(floor): ...this.
+	(frinti): Rename to...
+	(nearbyint): ...this.
+	(frintx): Rename to...
+	(rint): ...this.
+	(frinta): Rename to...
+	(round): ...this.
+	* config/aarch64/aarch64-simd.md
+	(aarch64_frint<frint_suffix><mode>): Delete.
+	(<frint_pattern><mode>2): Convert to insn.
+	* config/aarch64/aarch64.md (unspec): Add UNSPEC_FRINTN.
+	* config/aarch64/iterators.md (FRINT): Add UNSPEC_FRINTN.
+	(frint_pattern): Likewise.
+	(frint_suffix): Likewise.
+
+2013-04-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/57081
+	* loop-init.c: Include tree-flow.h.
+	(loop_optimizer_finalize): Free number of iteration estimates.
+	* Makefile.in (loop-init.o): Add $(TREE_FLOW_H) dependency.
+
+2013-04-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/57083
+	* tree-vrp.c (extract_range_from_binary_expr_1): For LSHIFT_EXPR with
+	non-singleton shift count range, zero extend low_bound for uns case.
+
+	* config/i386/predicates.md (general_vector_operand): New predicate.
+	* config/i386/i386.c (const_vector_equal_evenodd_p): New function.
+	(ix86_expand_mul_widen_evenodd): Force op1 resp. op2 into register
+	if they aren't nonimmediate operands.  If their original values
+	satisfy const_vector_equal_evenodd_p, don't shift them.
+	* config/i386/sse.md (mul<mode>3): Use general_vector_operand
+	predicates.  For the SSE4.1 case force operands[{1,2}] into registers
+	if not nonimmediate_operand.
+	(vec_widen_smult_even_v4si): Use nonimmediate_operand predicates
+	instead of register_operand.
+	(vec_widen_<s>mult_odd_<mode>): Use general_vector_operand predicates.
+
+2013-04-28  Eric Botcazou  <ebotcazou@gcc.gnu.org>
+
+	* stor-layout.c (finalize_size_functions): Allocate a structure and
+	reset cfun before dumping the functions.
+
 2013-04-27  Jakub Jelinek  <jakub@redhat.com>
 
 	* config/i386/i386.c (ix86_expand_call): Make cregs_size unsigned.

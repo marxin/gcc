@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "flags.h"
 #include "df.h"
 #include "ggc.h"
+#include "tree-flow.h"
 
 
 /* Apply FLAGS to the loop state.  */
@@ -142,6 +143,8 @@ loop_optimizer_finalize (void)
   if (loops_state_satisfies_p (LOOPS_HAVE_RECORDED_EXITS))
     release_recorded_exits ();
 
+  free_numbers_of_iterations_estimates ();
+
   /* If we should preserve loop structure, do not free it but clear
      flags that advanced properties are there as we are not preserving
      that in full.  */
@@ -248,7 +251,7 @@ fix_loop_structure (bitmap changed_bbs)
 
   /* Remember the number of loops so we can return how many new loops
      flow_loops_find discovered.  */
-  old_nloops = number_of_loops ();
+  old_nloops = number_of_loops (cfun);
 
   /* Re-compute loop structure in-place.  */
   flow_loops_find (current_loops);
@@ -266,10 +269,10 @@ fix_loop_structure (bitmap changed_bbs)
     }
 
   /* Finally free deleted loops.  */
-  FOR_EACH_VEC_ELT (*get_loops (), i, loop)
+  FOR_EACH_VEC_ELT (*get_loops (cfun), i, loop)
     if (loop && loop->header == NULL)
       {
-	(*get_loops ())[i] = NULL;
+	(*get_loops (cfun))[i] = NULL;
 	flow_loop_free (loop);
       }
 
@@ -284,7 +287,7 @@ fix_loop_structure (bitmap changed_bbs)
 
   timevar_pop (TV_LOOP_INIT);
 
-  return number_of_loops () - old_nloops;
+  return number_of_loops (cfun) - old_nloops;
 }
 
 /* Gate for the RTL loop superpass.  The actual passes are subpasses.
@@ -423,7 +426,7 @@ gate_rtl_move_loop_invariants (void)
 static unsigned int
 rtl_move_loop_invariants (void)
 {
-  if (number_of_loops () > 1)
+  if (number_of_loops (cfun) > 1)
     move_loop_invariants ();
   return 0;
 }
@@ -460,7 +463,7 @@ gate_rtl_unswitch (void)
 static unsigned int
 rtl_unswitch (void)
 {
-  if (number_of_loops () > 1)
+  if (number_of_loops (cfun) > 1)
     unswitch_loops ();
   return 0;
 }
@@ -496,7 +499,7 @@ gate_rtl_unroll_and_peel_loops (void)
 static unsigned int
 rtl_unroll_and_peel_loops (void)
 {
-  if (number_of_loops () > 1)
+  if (number_of_loops (cfun) > 1)
     {
       int flags = 0;
       if (dump_file)
@@ -550,7 +553,7 @@ static unsigned int
 rtl_doloop (void)
 {
 #ifdef HAVE_doloop_end
-  if (number_of_loops () > 1)
+  if (number_of_loops (cfun) > 1)
     doloop_optimize_loops ();
 #endif
   return 0;
