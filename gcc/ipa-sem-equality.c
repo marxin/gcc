@@ -572,6 +572,7 @@ static bool
 check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 {
   enum tree_code tc1, tc2;
+  unsigned length1, length2, i;
 
   if (t1 == NULL && t2 == NULL)
     return true;
@@ -588,11 +589,18 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   switch (tc1)
     {
     case CONSTRUCTOR:
-      gcc_assert (vec_safe_length (CONSTRUCTOR_ELTS (t1)) == 0);
-      gcc_assert (vec_safe_length (CONSTRUCTOR_ELTS (t2)) == 0);
+      length1 = vec_safe_length (CONSTRUCTOR_ELTS (t1));
+      length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
 
-      return (vec_safe_length (CONSTRUCTOR_ELTS (t1)) == 0
-              && vec_safe_length (CONSTRUCTOR_ELTS (t2)) == 0);
+      if (length1 != length2)
+        return false;
+
+      for (i = 0; i < length1; i++)
+        if (!check_operand (CONSTRUCTOR_ELT (t1, i)->value,
+          CONSTRUCTOR_ELT (t2, i)->value, d, func1, func2))
+            return false;
+
+      return true;
     case VAR_DECL:
     case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
