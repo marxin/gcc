@@ -61,6 +61,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "cfgloop.h"
 #include "tree-ssa-sccvn.h"
+#include "gimple-pretty-print.h"
 #include "coverage.h"
 #include "hash-table.h"
 #include "except.h"
@@ -587,6 +588,9 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   switch (tc1)
     {
     case CONSTRUCTOR:
+      gcc_assert (vec_safe_length (CONSTRUCTOR_ELTS (t1)) == 0);
+      gcc_assert (vec_safe_length (CONSTRUCTOR_ELTS (t2)) == 0);
+
       return (vec_safe_length (CONSTRUCTOR_ELTS (t1)) == 0
               && vec_safe_length (CONSTRUCTOR_ELTS (t2)) == 0);
     case VAR_DECL:
@@ -883,7 +887,12 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
         break;
       case GIMPLE_RESX:
       case GIMPLE_ASM:
-        /* TODO: add debug print */
+        if (dump_file)
+          {
+            fprintf (dump_file, "Not supported gimple statement reached:\n");
+            print_gimple_stmt (dump_file, s1, 0, TDF_DETAILS);
+          }
+     
         return false;
       default:
         return false;
