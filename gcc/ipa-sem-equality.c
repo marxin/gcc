@@ -717,18 +717,25 @@ check_ssa_cond (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   return check_operand (t1, t2, d, func1, func2);
 }
 
+/* Returns true if labels T1 and T2 collate in functions FUNC1 and FUNC2.
+   Function dictionary D is reposponsible for all correspondence checks.  */
+
+static bool
+check_tree_ssa_label (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
+{
+  return check_operand (t1, t2, d, func1, func2);
+}
+
 /* Returns true if labels G1 and G2 collate in functions FUNC1 and FUNC2.
    Function dictionary D is reposponsible for all correspondence checks.  */
 
 static bool
 check_ssa_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 {
-  tree label1, label2;
+  tree t1 = gimple_label_label (g1);
+  tree t2 = gimple_label_label (g2);
 
-  label1 = gimple_label_label (g1);
-  label2 = gimple_label_label (g2);
-
-  return check_operand (label1, label2, d, func1, func2);
+  return check_tree_ssa_label (t1, t2, d, func1, func2);
 }
 
 /* Switch checking function takes switch statements G1 and G2 and process
@@ -880,6 +887,8 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
           return false;
         break;
       case GIMPLE_DEBUG:
+      case GIMPLE_RESX:
+      case GIMPLE_EH_DISPATCH:
         break;
       case GIMPLE_LABEL:
         if (!check_ssa_label (s1, s2, d, func1, func2))
@@ -893,7 +902,6 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
         if (!check_ssa_goto (s1, s2, d, func1, func2))
           return false;
         break;
-      case GIMPLE_RESX:
       case GIMPLE_ASM:
         if (dump_file)
           {
@@ -978,6 +986,142 @@ bb_dict_test (int* bb_dict, int source, int target)
     return bb_dict[source] == target;
 }
 
+/* Iterates all tree types in T1 and T2 and returns true if all types
+   are compatible. */
+
+static bool compare_type_lists (tree t1, tree t2)
+{
+  gcc_assert (t1);
+  gcc_assert (t2);
+
+  t1 = TREE_VALUE (t1);
+  t2 = TREE_VALUE (t2);
+
+  while (t1 != NULL && t2 != NULL)
+    {
+      if (!types_compatible_p (t1, t2))
+        return false;
+
+      t1 = TREE_CHAIN (t1);
+      t2 = TREE_CHAIN (t2);
+    }
+
+  return !(t1 != NULL || t2 != NULL);
+}
+
+/* Returns true if both exception handindling trees are equal. */
+
+static bool
+compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
+  tree func1, tree func2)
+{
+  eh_landing_pad lp1, lp2;
+  eh_catch c1, c2;
+
+  while (1)
+    {
+      if (!r1 && !r2)
+        return true;
+
+      if (!r1 || !r2)
+        return false;
+
+      if (r1->index != r2->index || r1->type != r2->type)
+        return false;
+
+      /* Landing pads comparison */
+      lp1 = r1->landing_pads;
+      lp2 = r2->landing_pads;
+
+      while (lp1 && lp2)
+        {
+          if (lp1->index != lp2->index)
+            return false;
+
+          // TODO: post_landing_pad
+
+          lp1 = lp1->next_lp;
+          lp2 = lp2->next_lp;
+        }
+      
+      if (lp1 || lp2)
+        return false;
+
+      switch (r1->type)
+        {
+        case ERT_TRY:
+          c1 = r1->u.eh_try.first_catch;
+          c2 = r2->u.eh_try.first_catch;
+                    
+          while (c1 && c2)
+            {
+              /* Catch label checking */
+              if (c1->label && c2->label)
+                {
+                  if (!check_tree_ssa_label (c1->label, c2->label, d, func1, func2))                  
+                    return false;
+                }
+              else if (c1->label || c2->label)
+                return false;
+
+              /* Type list checking */
+              if (!compare_type_lists (c1->type_list, c2->type_list))
+                return false;
+
+              c1 = c1->next_catch;
+              c2 = c2->next_catch;
+            }
+
+          break;
+
+        case ERT_ALLOWED_EXCEPTIONS:
+          // TODO: filter?
+          if (!compare_type_lists (r1->u.allowed.type_list, r2->u.allowed.type_list))
+            return false;
+
+          break;
+        default:
+          break;
+        }
+
+      /* If there are sub-regions, process them.  */
+      if ((!r1->inner && r2->inner) || (!r1->next_peer && r2->next_peer))
+        return false;
+
+      if (r1->inner)
+        {
+          r1 = r1->inner;
+          r2 = r2->inner;
+        }
+
+      /* If there are peers, process them.  */
+      else if (r1->next_peer)
+        {
+      	  r1 = r1->next_peer;
+          r2 = r2->next_peer;
+        }
+      /* Otherwise, step back up the tree to the next peer.  */
+      else
+        {
+          do
+            {
+              r1 = r1->outer;
+              r2 = r2->outer;
+
+              /* All nodes have been visited. */
+              if (!r1 && !r2)
+                return true;
+            }
+            while (r1->next_peer == NULL);
+
+          r1 = r1->next_peer;
+          r2 = r2->next_peer;
+        }
+    }
+
+  return false;
+}
+
 /* Main comparison called for semantic function struct F1 and F2 returns
    true if functions are considered semantically equal.  */
 
@@ -992,10 +1136,6 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   unsigned int i;
   func_dict_t func_dict;
   bool result = true;
-
-  /* Exception handling regions are not supported by the pass.  */
-  if (f1->region_tree != NULL || f2->region_tree != NULL)
-    return false;
 
   if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count
     || f1->edge_count != f2->edge_count
@@ -1032,11 +1172,18 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   func_dict_init (&func_dict, f1->ssa_names_size, f2->ssa_names_size);
 
+  /* Exception handling regions comparison.  */
+  if (!compare_eh_regions (f1->region_tree, f2->region_tree,
+                           &func_dict, f1->func_decl, f2->func_decl))
+    return false;
+
+
   /* Checking all basic blocks.  */
   for (i = 0; i < f1->bb_count; ++i)
     if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], &func_dict,
       f1->func_decl, f2->func_decl))
       {
+        fprintf (stderr, "XXX: %i\n", i);
         result = false;
         goto free_func_dict;
       }
@@ -1145,7 +1292,7 @@ semantic_equality (void)
           {
             result = compare_functions (f1, f);
 
-            /* fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different"); */
+            fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
 
             if (result)
               {
