@@ -820,6 +820,14 @@ check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
   return check_operand (dest1, dest2, d, func1, func2);
 }
 
+/* Returns true if resx gimples G1 and G2 are corresponding
+   in both function. */
+static bool
+check_ssa_resx (gimple g1, gimple g2)
+{
+  return gimple_resx_region (g1) == gimple_resx_region (g2);
+}
+
 /* Returns for a given GSI statement first nondebug statement.  */
 
 static void iterate_nondebug_stmt (gimple_stmt_iterator &gsi)
@@ -887,8 +895,11 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
           return false;
         break;
       case GIMPLE_DEBUG:
-      case GIMPLE_RESX:
       case GIMPLE_EH_DISPATCH:
+        break;
+      case GIMPLE_RESX:
+        if (!check_ssa_resx (s1, s2))
+          return false;
         break;
       case GIMPLE_LABEL:
         if (!check_ssa_label (s1, s2, d, func1, func2))
@@ -991,22 +1002,32 @@ bb_dict_test (int* bb_dict, int source, int target)
 
 static bool compare_type_lists (tree t1, tree t2)
 {
-  gcc_assert (t1);
-  gcc_assert (t2);
+  tree tv1, tv2;
+  enum tree_code tc1, tc2;
 
-  t1 = TREE_VALUE (t1);
-  t2 = TREE_VALUE (t2);
+  if (!t1 && !t2)
+    return true;
 
   while (t1 != NULL && t2 != NULL)
     {
-      if (!types_compatible_p (t1, t2))
+      tv1 = TREE_VALUE (t1);
+      tv2 = TREE_VALUE (t2);
+
+      tc1 = TREE_CODE (tv1);
+      tc2 = TREE_CODE (tv2);
+
+      if (tc1 == NOP_EXPR && tc2 == NOP_EXPR)
+        {}
+      else if (tc1 == NOP_EXPR || tc2 == NOP_EXPR)
+        return false;
+      else if (!types_compatible_p (tv1, tv2))
         return false;
 
       t1 = TREE_CHAIN (t1);
       t2 = TREE_CHAIN (t2);
     }
 
-  return !(t1 != NULL || t2 != NULL);
+  return !(t1 || t2);
 }
 
 /* Returns true if both exception handindling trees are equal. */
@@ -1017,6 +1038,7 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
 {
   eh_landing_pad lp1, lp2;
   eh_catch c1, c2;
+  tree t1, t2;
 
   while (1)
     {
@@ -1038,7 +1060,20 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
           if (lp1->index != lp2->index)
             return false;
 
-          // TODO: post_landing_pad
+          /* Comparison of post landing pads. */
+          if (lp1->post_landing_pad && lp2->post_landing_pad)
+            {
+              t1 = lp1->post_landing_pad;
+              t2 = lp2->post_landing_pad;
+
+              gcc_assert (TREE_CODE (t1) == LABEL_DECL);
+              gcc_assert (TREE_CODE (t2) == LABEL_DECL);
+
+              if (!check_tree_ssa_label (t1, t2, d, func1, func2))
+                return false;
+           }
+          else if (lp1->post_landing_pad || lp2->post_landing_pad)
+            return false;
 
           lp1 = lp1->next_lp;
           lp2 = lp2->next_lp;
@@ -1075,7 +1110,10 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
           break;
 
         case ERT_ALLOWED_EXCEPTIONS:
-          // TODO: filter?
+          // TODO: is it correct ?
+          if (r1->u.allowed.filter != r2->u.allowed.filter)
+            return false;
+          
           if (!compare_type_lists (r1->u.allowed.type_list, r2->u.allowed.type_list))
             return false;
 
@@ -1177,13 +1215,11 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
                            &func_dict, f1->func_decl, f2->func_decl))
     return false;
 
-
   /* Checking all basic blocks.  */
   for (i = 0; i < f1->bb_count; ++i)
     if(!compare_bb (f1->bb_sorted[i], f2->bb_sorted[i], &func_dict,
       f1->func_decl, f2->func_decl))
       {
-        fprintf (stderr, "XXX: %i\n", i);
         result = false;
         goto free_func_dict;
       }
@@ -1292,7 +1328,7 @@ semantic_equality (void)
           {
             result = compare_functions (f1, f);
 
-            fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different");
+            /* fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different"); */
 
             if (result)
               {

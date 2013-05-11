@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASEDIR=$(dirname $0)
-COMPILER="$BASEDIR/../../../objdir/gcc/xgcc -B $BASEDIR/../../../objdir/gcc/ -fipa-sem-equality"
+COMPILER="$BASEDIR/../../../objdir/gcc/xg++ -c -B $BASEDIR/../../../objdir/gcc/ -fipa-sem-equality"
 
 echo "IPA semantic equality tests"
 
