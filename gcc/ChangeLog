@@ -1,3 +1,214 @@
+2013-05-14  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64-simd.md
+	(aarch64_vcond_internal<mode>): Rename to...
+	(aarch64_vcond_internal<mode><mode>): ...This, for integer modes.
+	(aarch64_vcond_internal<VDQF_COND:mode><VDQF:mode>): ...This for
+	float modes. Clarify all iterator modes.
+	(vcond<mode><mode>): Use new name for vcond expanders.
+	(vcond<v_cmp_result><mode>): Likewise.
+	(vcondu<mode><mode>: Likewise.
+	* config/aarch64/iterators.md (VDQF_COND): New.
+
+2013-05-14  Marc Glisse  <marc.glisse@inria.fr>
+
+	PR bootstrap/57266
+	* fold-const.c (fold_binary_loc) <shift>: Use an unsigned
+	variable for the shift amount. Check that we shift by non-negative
+	amounts.
+
+2013-05-14  Chung-Lin Tang  <cltang@codesourcery.com>
+
+	PR target/42017
+	* config/arm/arm.h (EPILOGUE_USES): Only return true
+	for LR_REGNUM after epilogue_completed.
+
+2013-05-14  Joern Rennecke <joern.rennecke@embecosm.com>
+
+	* config/avr/avr.c (avr_encode_section_info): Bail out if the type
+        is error_mark_node.
+
+2013-05-14  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR target/57261
+	* configure.ac (gcc_cv_ld_as_needed): Disable before Solaris 11
+	and Solaris 11+/x86 with gld.
+	* configure: Regenerate.
+
+2013-05-14  Jakub Jelinek  <jakub@redhat.com>
+
+	* expmed.c (expand_shift_1): Canonicalize rotates by
+	constant bitsize / 2 to bitsize - 1.
+	* simplify-rt.x (simplify_binary_operation_1) <case ROTATE,
+	case ROTATERT>: Likewise.
+
+	Revert:
+	2013-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/i386/i386.md (rotateinv): New code attr.
+	(*<rotate_insn><mode>3_1, *<rotate_insn>si3_1_zext,
+	*<rotate_insn>qi3_1_slp): Emit rorl %eax instead of
+	roll $31, %eax, etc.
+
+2013-05-14  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/57235
+	* tree-eh.c (sink_clobbers): Give up for successors with
+	multiple predecessors and no virtual uses.
+
+2013-05-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config/sparc/sp64-elf.h (CPP_SUBTARGET_SPEC): Delete.
+	* config/sparc/openbsd64.h (CPP_SUBTARGET_SPEC): Likewise.
+
+2013-05-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/57251
+	* expr.c (expand_expr_real_2) <case WIDEN_MULT_EXPR>: Handle
+	the case when both op0 and op1 have VOIDmode.
+
+2013-05-14  Kaushik Phatak  <kaushik.phatak@kpitcummins.com>
+
+	* config/rl78/rl78.md(mulsi3_g13): Add additional 'nop' required
+	in multiply-accumulate mode.
+
+2013-05-13  Guozhi Wei  <carrot@google.com>
+
+	* dwarf2asm.c (dw2_output_indirect_constant_1): Mark new decl STATIC.
+
+2013-05-13  Kai Tietz  <ktietz@redhat.com>
+
+	PR target/56975
+	* config/i386/cygming.h (TARGET_PECOFF): Define as true.
+	* config/i386/i386.h (TARGET_PECOFF): Define by default
+	as false.
+	(PIC_OFFSET_TABLE_REGNUM): Use TARGET_PECOFF.
+	* config/i386/i386.c (ix86_option_override_internal):
+	Likewise.
+	(ix86_expand_prologue): Likewise.
+	(ix86_expand_split_stack_prologue): Likewise.
+	(legitimate_pic_address_disp_p): Likewise.
+	(legitimize_pic_address): Likewise.
+	(legitimize_tls_address): Likewise.
+	(legitimize_pe_coff_symbol): Likewise.
+	(output_pic_addr_const): Likewise.
+	(construct_plt_address): Likewise.
+	(ix86_expand_call): Likewise.
+	(x86_output_mi_thunk): Likewise.
+	(x86_function_profiler): Likewise.
+
+2013-05-13  Sofiane Naci  <sofiane.naci@arm.com>
+
+	* config/aarch64/aarch64-simd.md (aarch64_simd_mov<mode>): Group
+	similar switch cases.
+	(aarch64_simd_mov): Rename to aarch64_split_simd_mov. Update.
+	(aarch64_simd_mov_to_<mode>low): Delete.
+	(aarch64_simd_mov_to_<mode>high): Delete.
+	(move_lo_quad_<mode>): Add w<-r alternative.
+	(aarch64_simd_move_hi_quad_<mode>): Likewise.
+	(aarch64_simd_mov_from_*): Update type attribute.
+	* config/aarch64/aarch64.c (aarch64_split_simd_move): Refacror switch
+	statement.
+
+2013-05-13  Jan Hubicka  <jh@suse.cz>
+
+	* mode-switching.c (optimize_mode_switching): Set correct RTL profile.
+	* config/i386/i386.c (ix86_compute_frame_layout,
+	ix86_expand_epilogue, emit_i387_cw_initialization, ix86_expand_vector_move_misalign,
+	ix86_fp_comparison_strategy, ix86_local_alignment): Fix use of size/speed predicates.
+
+2013-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/45216
+	PR tree-optimization/57157
+	* tree-ssa-forwprop.c (simplify_rotate): Only recognize
+	the (-Y) & (B - 1) variant if OP is |.
+	* expmed.c (expand_shift_1): For rotations by const0_rtx just
+	return shifted.  Use (-op1) & (prec - 1) as other_amount
+	instead of prec - op1.
+
+2013-05-13  Martin Jambor  <mjambor@suse.cz>
+
+	PR middle-end/42371
+	* ipa-prop.h (IPA_UNDESCRIBED_USE): New macro.
+	(ipa_constant_data): New type.
+	(ipa_jump_func): Use ipa_constant_data to hold information about
+	constant jump functions.
+	(ipa_get_jf_constant): Adjust to jump function type changes.
+	(ipa_get_jf_constant_rdesc): New function.
+	(ipa_param_descriptor): New field controlled_uses.
+	(ipa_get_controlled_uses): New function.
+	(ipa_set_controlled_uses): Likewise.
+	* ipa-ref.h (ipa_find_reference): Declare.
+	* ipa-prop.c (ipa_cst_ref_desc): New type.
+	(ipa_print_node_jump_functions_for_edge): Adjust for jump function type
+	changes.
+	(ipa_set_jf_constant): Likewise.  Also create reference descriptions.
+	New parameter cs.  Adjust all callers.
+	(ipa_analyze_params_uses): Detect uncontrolled and controlled uses.
+	(remove_described_reference): New function.
+	(jfunc_rdesc_usable): Likewise.
+	(try_make_edge_direct_simple_call): Decrement controlled use count,
+	attempt to remove reference if it hits zero.
+	(combine_controlled_uses_counters): New function.
+	(propagate_controlled_uses): Likewise.
+	(ipa_propagate_indirect_call_infos): Call propagate_controlled_uses.
+	(ipa_edge_duplication_hook): Duplicate reference descriptions.
+	(ipa_print_node_params): Print described use counter.
+	(ipa_write_jump_function): Adjust to jump function type changes.
+	(ipa_read_jump_function): New parameter CS, pass it to
+	ipa_set_jf_constant.  Adjust caller.
+	(ipa_write_node_info): Stream controlled use count
+	(ipa_read_node_info): Likewise.
+	* cgraph.c (cgraph_mark_address_taken_node): Bail out instead of
+	asserting.
+	* ipa-cp.c (ipcp_discover_new_direct_edges): Decrement controlled use
+	count.  Remove cloning-added reference if it reaches zero.
+	* ipa-ref.c (ipa_find_reference): New function.
+
+2013-05-13  Ganesh Gopalasubramanian  <Ganesh.Gopalasubramanian@amd.com>
+
+	* config/i386/i386.c (processor_target_table): Modified default 
+	alignment values for AMD BD and BT architectures.
+
+2013-05-13  Marc Glisse  <marc.glisse@inria.fr>
+
+	* tree-vect-generic.c (uniform_vector_p): Move ...
+	* tree.c (uniform_vector_p): ... here.
+	* tree.h (uniform_vector_p): Declare it.
+	* fold-const.c (fold_binary_loc) <shift>: Turn the second argument
+	into a scalar.
+
+2013-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/57230
+	* tree-ssa-strlen.c (handle_char_store): Record length for
+	array store from STRING_CST.
+
+	PR tree-optimization/57230
+	* tree-ssa-strlen.c (handle_char_store): Add missing integer_zerop
+	check.
+
+2013-05-12  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* config/epiphany/epiphany.c (epiphany_init): Check size of
+	NUM_MODES_FOR_MODE_SWITCHING.
+	(epiphany_expand_prologue):
+	Remove CONFIG_REGNUM initial value handling code.
+	(epiphany_optimize_mode_switching): Handle EPIPHANY_MSW_ENTITY_CONFIG.
+	(epiphany_mode_needed, epiphany_mode_entry_exit): Likewise.
+	(emit_set_fp_mode, epiphany_mode_after): Likewise.
+	(epiphany_mode_needed) <Handle EPIPHANY_MSW_ENTITY_AND>:
+	Don't return 1 for FP_MODE_NONE.
+	* config/epiphany/epiphany.h (NUM_MODES_FOR_MODE_SWITCHING):
+	Add value for EPIPHANY_MSW_ENTITY_CONFIG.
+	(EPIPHANY_MSW_ENTITY_CONFIG, EPIPHANY_MSW_ENTITY_NUM): Define.
+	* config/epiphany/epiphany.md (save_config): New pattern.
+
+2013-05-12  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (*zero_extendsidi2): Add *x->?r alternative.
+
 2013-05-10  Uros Bizjak  <ubizjak@gmail.com>
 
 	* config/i386/i386.md (memory): Handle sseishft1.
