@@ -11747,6 +11747,11 @@ case $use_collect2 in
     ;;
 esac
 
+cat >>confdefs.h <<_ACEOF
+#define FRPLUGINSONAME "${host_function_reordering_plugin_soname}"
+_ACEOF
+
+
 
 cat >>confdefs.h <<_ACEOF
 #define LTOPLUGINSONAME "${host_lto_plugin_soname}"

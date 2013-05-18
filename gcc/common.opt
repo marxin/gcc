@@ -1745,6 +1745,16 @@ freorder-functions
 Common Report Var(flag_reorder_functions) Optimization
 Reorder functions to improve code placement
 
+freorder-functions=
+Common Joined RejectNegative Enum(function_reorder) Var(flag_reorder_functions) Init(0) Optimization
+-freorder-functions=[callgraph] Select the scheme for function reordering. This invokes a linker plugin.  Generate .gnu.callgraph.text sections listing callees and edge counts.
+
+Enum
+Name(function_reorder) Type(int) UnknownError(unrecognized function reorder value %qs)
+
+EnumValue
+Enum(function_reorder) String(callgraph) Value(2)
+
 frerun-cse-after-loop
 Common Report Var(flag_rerun_cse_after_loop) Optimization
 Add a common subexpression elimination pass after loop optimizations

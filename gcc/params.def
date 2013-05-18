@@ -1020,6 +1020,15 @@ DEFPARAM (PARAM_MAX_SLSR_CANDIDATE_SCAN,
 	  "strength reduction",
 	  50, 1, 999999)
 
+/* Only output those call graph edges in .gnu.callgraph.text sections
+   whose count is greater than this value. */
+DEFPARAM (PARAM_GNU_CGRAPH_SECTION_EDGE_THRESHOLD,
+	  "gnu-cgraph-section-edge-threshold",
+	  "minimum call graph edge count for inclusion in "
+          ".gnu.callgraph.text section",
+	  0, 0, 0)
+
+
 /*
 Local variables:
 mode:c

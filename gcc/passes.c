@@ -327,11 +327,18 @@ static struct gimple_opt_pass pass_all_early_optimizations =
  }
 };
 
+/* Decides if the cgraph callee edges are being cleaned up for the
+ * last time.  */
+bool cgraph_callee_edges_final_cleanup = false;
+
 /* Gate: execute, or not, all of the non-trivial optimizations.  */
 
 static bool
 gate_all_optimizations (void)
 {
+  /* The cgraph callee edges can be cleaned up for the last time.  */
+  cgraph_callee_edges_final_cleanup = true;
+
   return optimize >= 1 && !optimize_debug;
 }
 
