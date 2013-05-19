@@ -1,3 +1,32 @@
+2013-05-19  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* config/mips/mips.h (BASE_INSN_LENGTH, NOP_INSN_LENGTH): New macros.
+	* config/mips/mips.c (mips_symbol_insns, mips_address_insns)
+	(mips_const_insns, mips_split_const_insns, mips_load_store_insns)
+	(mips_idiv_insns): Update the comments to say that the returned
+	instruction counts are in units of BASE_INSN_LENGTH.
+	(mips_adjust_insn_length): Multiply the mips_load_label_num_insns
+	by BASE_INSN_LENGTH rather than 4.  Add the jump separately,
+	using 2 rather than 4 as the length of indirect MIPS16 and
+	microMIPS jumps.  Use NOP_INSN_LENGTH rather than 4 as the
+	length of a NOP.  Don't divide MIPS16 lengths by 2.
+	(mips16_split_long_branches): Assume a branch is long if the
+	length is greater than 4 rather than 8.
+	* config/mips/mips.md (length): Give MIPS16 lengths directly,
+	rather than multiplying them by 2.  Multiply instruction counts
+	by BASE_INSN_LENGTH rather than 4.
+	(*jump_mips16, tls_get_tp_mips16_<mode>)
+	(*tls_get_tp_mips16_call_<mode>): Divide lengths by 2.
+
+2013-05-19  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* config/mips/mips.md (extended_mips16): Remove branch case.
+	(length): Remove duplicated extended_mips16 test.
+
+2013-05-19  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* config/mips/t-sde: Don't build 64-bit microMIPS multilibs.
+
 2013-05-18  Richard Sandiford  <rdsandiford@googlemail.com>
 
 	* recog.h (Recog_data): Rename to...
@@ -32,7 +61,8 @@
 	* lto-symtab.c (lto_symtab_merge_cgraph_nodes): Resolve cross module
 	weakrefs.
 	* cgraph.c (dump_cgraph_node): Do not ice on unresolved alias.
-	* cgraphunit.c (handle_alias_pairs): Store target of unresolved weakrefs.
+	* cgraphunit.c (handle_alias_pairs): Store target of unresolved
+	weakrefs.
 	(output_weakrefs): Update.
 
 2013-05-17  Po-Chun Chang  <pchang9@cs.wisc.edu>
@@ -185,7 +215,6 @@
 
 	* Makefile.in (tree-switch-conversion.o): Depend on $(OPTABS_H).
 
->>>>>>> .r199043
 2013-05-16  Uros Bizjak  <ubizjak@gmail.com>
 
 	* config/i386/driver-i386.c (host_detect_local_cpu): Determine
