@@ -44678,7 +44678,7 @@ stage2-start::
 	mv stage1-lto-plugin prev-lto-plugin || test -f stage1-lean 
 @endif lto-plugin
 @if function_reordering_plugin
-	cd $(HOST_SUBDIR); [ -d stage2-function_reordering_plugin ] || \
+	@cd $(HOST_SUBDIR); [ -d stage2-function_reordering_plugin ] || \
 	 mkdir stage2-function_reordering_plugin; \
 	mv stage2-function_reordering_plugin function_reordering_plugin  ; \
 	mv stage1-function_reordering_plugin prev-function_reordering_plugin || test -f stage1-lean
@@ -45768,7 +45768,7 @@ stageprofile-start::
 	mv stage1-lto-plugin prev-lto-plugin || test -f stage1-lean 
 @endif lto-plugin
 @if function_reordering_plugin
-@cd $(HOST_SUBDIR); [ -d stageprofile-function_reordering_plugin ] || \
+	@cd $(HOST_SUBDIR); [ -d stageprofile-function_reordering_plugin ] || \
 	mkdir stageprofile-function_reordering_plugin; \
 	mv stageprofile-function_reordering_plugin function_reordering_plugin  ; \
 	mv stage1-function_reordering_plugin prev-function_reordering_plugin || test -f stage1-lean
