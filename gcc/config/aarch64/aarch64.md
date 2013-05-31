@@ -858,9 +858,8 @@
 			  (const_int 16)
 			  (match_operand:GPI 1 "const_int_operand" "n"))
 	(match_operand:GPI 2 "const_int_operand" "n"))]
-  "INTVAL (operands[1]) < GET_MODE_BITSIZE (<MODE>mode)
-   && INTVAL (operands[1]) % 16 == 0
-   && UINTVAL (operands[2]) <= 0xffff"
+  "UINTVAL (operands[1]) < GET_MODE_BITSIZE (<MODE>mode)
+   && UINTVAL (operands[1]) % 16 == 0"
   "movk\\t%<w>0, %X2, lsl %1"
   [(set_attr "v8type" "movk")
    (set_attr "mode" "<MODE>")]
@@ -3160,6 +3159,50 @@
 			 (match_operand 3 "const_int_operand" "n")))]
   ""
   "<su>bfx\\t%<w>0, %<w>1, %3, %2"
+  [(set_attr "v8type" "bfm")
+   (set_attr "mode" "<MODE>")]
+)
+
+;; Bitfield Insert (insv)
+(define_expand "insv<mode>"
+  [(set (zero_extract:GPI (match_operand:GPI 0 "register_operand")
+			  (match_operand 1 "const_int_operand")
+			  (match_operand 2 "const_int_operand"))
+	(match_operand:GPI 3 "general_operand"))]
+  ""
+{
+  unsigned HOST_WIDE_INT width = UINTVAL (operands[1]);
+  unsigned HOST_WIDE_INT pos = UINTVAL (operands[2]);
+  rtx value = operands[3];
+
+  if (width == 0 || (pos + width) > GET_MODE_BITSIZE (<MODE>mode))
+    FAIL;
+
+  if (CONST_INT_P (value))
+    {
+      unsigned HOST_WIDE_INT mask = ((unsigned HOST_WIDE_INT)1 << width) - 1;
+
+      /* Prefer AND/OR for inserting all zeros or all ones.  */
+      if ((UINTVAL (value) & mask) == 0
+	   || (UINTVAL (value) & mask) == mask)
+	FAIL;
+
+      /* 16-bit aligned 16-bit wide insert is handled by insv_imm.  */
+      if (width == 16 && (pos % 16) == 0)
+	DONE;
+    }
+  operands[3] = force_reg (<MODE>mode, value);
+})
+
+(define_insn "*insv_reg<mode>"
+  [(set (zero_extract:GPI (match_operand:GPI 0 "register_operand" "+r")
+			  (match_operand 1 "const_int_operand" "n")
+			  (match_operand 2 "const_int_operand" "n"))
+	(match_operand:GPI 3 "register_operand" "r"))]
+  "!(UINTVAL (operands[1]) == 0
+     || (UINTVAL (operands[2]) + UINTVAL (operands[1])
+	 > GET_MODE_BITSIZE (<MODE>mode)))"
+  "bfi\\t%<w>0, %<w>3, %2, %1"
   [(set_attr "v8type" "bfm")
    (set_attr "mode" "<MODE>")]
 )
