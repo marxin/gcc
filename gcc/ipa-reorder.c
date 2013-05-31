@@ -56,7 +56,7 @@ typedef struct partition *partition_ptr;
 static bool
 cgraph_node_will_be_output_p (struct cgraph_node *node)
 {
-  return (node->analyzed && !node->global.inlined_to);
+  return (node->symbol.analyzed && !node->global.inlined_to);
 }
 
 static void
