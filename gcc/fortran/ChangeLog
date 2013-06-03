@@ -1,3 +1,26 @@
+2013-06-01  Janus Weil  <janus@gcc.gnu.org>
+	    Mikael Morin  <mikael@gcc.gnu.org>
+
+	* error.c (get_terminal_width): Only limit the width if we're
+	outputting to a terminal. Try to determine width via ioctl.
+
+2013-06-01  Tobias Burnus  <burnus@net-b.de>
+
+	* decl.c (add_global_entry): Take locus.
+	(gfc_match_entry): Update call.
+	(gfc_match_end): Better error location.
+	* parse.c (parse_block_data, parse_module, add_global_procedure,
+	add_global_program): Use better locus data.
+
+2013-05-31  Tobias Burnus  <burnus@net-b.de>
+
+	PR fortran/57456
+	* trans-array.c (gfc_array_init_size): Use passed type spec,
+	when available.
+	(gfc_array_allocate): Pass typespec on.
+	* trans-array.h (gfc_array_allocate): Update prototype.
+	* trans-stmt.c (gfc_trans_allocate): Pass typespec on.
+
 2013-05-31  Janus Weil  <janus@gcc.gnu.org>
 
 	PR fortran/54190
