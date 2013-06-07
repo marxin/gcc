@@ -1,3 +1,40 @@
+2013-06-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/55520
+	* semantics.c (add_capture): Diagnose capture of variable-size
+	type that is not a C++1y array of runtime bound.
+
+	* decl.c (grokdeclarator): Keep a decl with error type.
+	(grokfield, grokbitfield): Likewise.
+	* pt.c (instantiate_class_template_1): Likewise.
+	(tsubst_decl): Drop redundant error.
+	* class.c (walk_subobject_offsets): Handle erroneous fields.
+	* typeck2.c (process_init_constructor_record): Likewise.
+
+2013-06-05  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/51908
+	* parser.c (cp_parser_postfix_expression [RID_*CAST]): Set
+	parser->in_type_id_in_expr_p before calling cp_parser_type_id.
+
+2013-06-03  Jan Hubicka  <jh@suse.cz>
+
+	* decl2.c (maybe_make_one_only): Use forced_by_abi instead of
+	mark_decl_referenced.
+	(mark_needed): Likewise.
+
+2013-06-03  Jason Merrill  <jason@redhat.com>
+
+	* class.c (mark_type_abi_tags): New.
+	(check_abi_tags): Use it.
+
+2013-06-03  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/57419
+	* decl2.c (mark_used): Add overload taking a tsubst_flags_t too.
+	* semantics.c (finish_qualified_id_expr): Use it.
+	* cp-tree.h: Update.
+
 2013-06-01  Jan Hubicka  <jh@suse.cz>
 
 	* decl2.c (cp_write_global_declarations): Replace same_body_alias
