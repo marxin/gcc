@@ -10,7 +10,7 @@ echo "a) POSITIVE tests"
 for i in $BASEDIR/*_eq.c
 do
   echo -n "   `basename $i`"
-  if $COMPILER $i 2>&1 | grep EQUAL > /dev/null
+  if $COMPILER $i 2>&1 | grep HIT > /dev/null
   then
     echo -e " \e[1;32m[OK]\e[00m"
   else
@@ -23,7 +23,7 @@ echo "b) NEGATIVE tests"
 for i in $BASEDIR/*_diff.c
 do
   echo -n "   `basename $i`"
-  if $COMPILER $i 2>&1 | grep different > /dev/null
+  if $COMPILER $i 2>&1 | grep -v HIT > /dev/null
   then
     echo -e " \e[1;32m[OK]\e[00m"
   else

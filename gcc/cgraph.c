@@ -590,14 +590,10 @@ cgraph_same_body_alias (struct cgraph_node *decl_node ATTRIBUTE_UNUSED, tree ali
     return NULL;
 
   n = cgraph_create_function_alias (alias, decl);
-<<<<<<< HEAD
-  n->same_body_alias = true;
-=======
   n->symbol.cpp_implicit_alias = true;
   if (cpp_implicit_aliases_done)
     symtab_resolve_alias ((symtab_node)n,
 			  (symtab_node)cgraph_get_node (decl));
->>>>>>> parent/master
   return n;
 }
 

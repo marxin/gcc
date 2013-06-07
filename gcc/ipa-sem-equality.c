@@ -112,9 +112,6 @@ typedef struct edge_pair
   edge target;
 } edge_pair_t;
 
-static sem_func_t **sem_functions;
-static unsigned int sem_function_count;
-
 /* Hash table struct used for a pair of declarations.  */
 
 struct decl_var_hash: typed_noop_remove <decl_pair_t>
@@ -235,13 +232,16 @@ sem_func_var_hash::hash (const sem_func_t *f)
   hash = iterative_hash_object (f->edge_count, hash);
   hash = iterative_hash_object (f->cfg_checksum, hash);
 
-  for(i = 0; i < f->arg_count; ++i)
+  for (i = 0; i < f->arg_count; ++i)
     hash = iterative_hash_object (f->arg_types[i], hash);
 
   hash = iterative_hash_object (f->result_type, hash);
 
-  for(i = 0; i < f->bb_count; ++i)
+  for (i = 0; i < f->bb_count; ++i)
     hash = iterative_hash_object (f->bb_sizes[i], hash);
+
+  for (i = 0; i < f->bb_count; ++i)
+    hash = iterative_hash_object (f->bb_sorted[i]->hashcode, hash);
 
   return hash;
 }
@@ -315,7 +315,7 @@ func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
 static bool
 visit_function (struct cgraph_node *node, sem_func_t *f)
 {
-  tree fndecl, fnargs, parm, result;
+  tree fndecl, fnargs, parm, result, funcdecl;
   unsigned int param_num, gimple_count, bb_count;
   struct function *my_function;
   gimple_stmt_iterator gsi;
@@ -375,11 +375,18 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
           stmt = gsi_stmt (gsi);
           code = (hashval_t) gimple_code (stmt);
 
-          /* We ignore all debug statements. */
+          /* We ignore all debug statements.  */
           if (code != GIMPLE_DEBUG) 
           {
             gimple_count++;
             gcode_hash = iterative_hash_object (code, gcode_hash);
+
+            /* More precise hash could be enhanced by function call.  */            
+            if (code == GIMPLE_CALL && !gimple_call_internal_p (stmt))
+            {
+              funcdecl = gimple_call_fndecl (stmt);
+              gcode_hash = iterative_hash_object (funcdecl, gcode_hash);
+            }
           }
         }
 
@@ -1284,15 +1291,133 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
 /* Two semantically equal function are merged.  */
 
-/*
 static void
 merge_functions (sem_func_t *original, sem_func_t *alias)
 {
+  return;
+
   cgraph_release_function_body (alias->node);
   cgraph_reset_node (alias->node);
   cgraph_create_function_alias (alias->func_decl, original->func_decl);
 }
-*/
+
+/* Group of functions F having the same hash is printed to dump_file.  */
+
+static void
+dump_sem_group (sem_func_t *f)
+{
+  fprintf (dump_file, "  semantic group %12u:", sem_func_var_hash::hash (f));
+
+  while (f)
+  {
+    fprintf (dump_file, " %s", cgraph_node_name (f->node));
+    f = f->next;
+  }
+  
+  fputc ('\n', dump_file);
+}
+
+/* All functions with the same hash are iterated and compared
+ * for semantic equality. If a hit is encountered, we merge the function
+ * and remove entry from linked list.  */
+
+static void
+compare_groups (hash_table <sem_func_var_hash> *func_hash)
+{
+  sem_func_t *f1, *f2, *f2prev;
+  size_t single_count = 0;
+  unsigned int funccount = 0;
+  unsigned int eqcount = 0;
+  bool result;
+ 
+  for (hash_table <sem_func_var_hash>::iterator it = func_hash->begin ();
+     it != func_hash->end (); ++it)
+  {
+    f1 = &(*it);
+    
+    if (!f1->next)
+      single_count++;
+  }
+
+  if (dump_file)
+    {
+      fputs ("Candidate groups:\n", dump_file);
+
+      for (hash_table <sem_func_var_hash>::iterator it = func_hash->begin ();
+           it != func_hash->end (); ++it)
+        {
+          f1 = &(*it);
+
+          if (f1->next)
+            dump_sem_group (f1);
+        }
+    }
+
+  if (dump_file)
+    fputs ("\nEqual functions\n", dump_file);
+
+  for (hash_table <sem_func_var_hash>::iterator it = func_hash->begin ();
+       it != func_hash->end (); ++it)
+    {
+      f1 = &(*it);
+
+      funccount++;
+
+      if (!f1->next)
+        single_count;
+    
+      while (f1->next)
+      {
+        f2 = f1->next;
+        f2prev = f1;
+
+        while (f2)
+        {
+          funccount++;
+
+          result = compare_functions (f1, f2);
+
+          if (result)
+          {
+            eqcount++;
+
+            /* Node must be skipped for the next time.  */
+            f2prev->next = f2->next;
+
+            if (dump_file)
+            {
+              fprintf(dump_file, "HIT:%s:%s\n",
+                cgraph_node_name (f1->node), cgraph_node_name (f2->node));
+
+              dump_function_to_file (f1->func_decl, dump_file, TDF_DETAILS);
+              dump_function_to_file (f2->func_decl, dump_file, TDF_DETAILS);
+            }
+
+            /* Equal function merge */
+            merge_functions (f1, f2);
+          }
+          else
+            f2prev = f2prev->next;
+
+          f2 = f2->next;
+        }
+
+        if (f1->next)
+          f1 = f1->next;
+      }
+    }
+
+  if (dump_file)
+    {
+      fputs ("Statistics\n\n", dump_file);
+      fprintf (dump_file, "Functions: %lu\n", funccount);
+      fprintf (dump_file, "Candidate groups: %lu, single groups: %lu\n",
+               func_hash->elements() - single_count, single_count);
+      fprintf (dump_file, "Average group size: %f\n", 1.f * funccount
+                          / (func_hash->elements() - single_count));
+      fprintf (dump_file, "Semantic equal functions: %lu\n\n", eqcount);
+    }
+}
 
 /* IPA semantic equality pass entry point.  */
 
@@ -1307,7 +1432,6 @@ semantic_equality (void)
   bool merged = false;
   hash_table <sem_func_var_hash> sem_function_hash;
 
-  sem_functions = XNEWVEC (sem_func_t *, cgraph_n_nodes);
   sem_function_hash.create (nnodes);
 
   FOR_EACH_DEFINED_FUNCTION (node)
@@ -1319,54 +1443,17 @@ semantic_equality (void)
       detected = visit_function (node, f);
       if (detected)
         {
-          sem_functions[sem_function_count++] = f;
-
           slot = sem_function_hash.find_slot (f, INSERT);
-          f1 = *slot;
-
-          while(f1)
-          {
-            result = compare_functions (f1, f);
-
-            /* fprintf (stderr, " (%s)\n", result ? "EQUAL" : "different"); */
-
-            if (result)
-              {
-                if (dump_file)
-                {
-                  fprintf (dump_file, "IPA_SEM_EQ HIT:%s:%s\n",
-                    cgraph_node_name (f->node), cgraph_node_name (f1->node));
-
-                  if (dump_file && (dump_flags & TDF_DETAILS))
-                  {
-                    dump_function_to_file (f1->func_decl, dump_file, TDF_DETAILS);
-                    dump_function_to_file (f->func_decl, dump_file, TDF_DETAILS);
-                  }
-                }
-                /* Experimental merging of two functions.  */
-                /* merge_functions (f, f1); */
-
-                merged = true;
-                break;
-              }
-
-            f1 = f1->next;
-          }
-
-          if (merged)
-            free (f);
-          else
-            {
-              f1 = (sem_func_t *) *slot;
-              f->next = f1;
-              *slot = f;
-            }
+          
+          f1 = (sem_func_t *) *slot;
+          f->next = f1;
+          *slot = f;
         }
       else
         free (f);
     }
 
-  free (sem_functions);
+  compare_groups (&sem_function_hash);
 
   sem_function_hash.dispose();
 

@@ -1384,6 +1384,7 @@ init_optimization_passes (void)
      compiled unit.  */
   p = &all_late_ipa_passes;
   NEXT_PASS (pass_ipa_pta);
+  NEXT_PASS (pass_ipa_sem_equality);
   *p = NULL;
 
   /* These passes are run after IPA passes on every function that is being
