@@ -1182,6 +1182,8 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   func_dict_t func_dict;
   bool result = true;
 
+  gcc_assert (f1->func_decl != f2->func_decl);
+
   if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count
     || f1->edge_count != f2->edge_count
       || f1->cfg_checksum != f2->cfg_checksum)
@@ -1330,15 +1332,6 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
   unsigned int eqcount = 0;
   bool result;
  
-  for (hash_table <sem_func_var_hash>::iterator it = func_hash->begin ();
-     it != func_hash->end (); ++it)
-  {
-    f1 = &(*it);
-    
-    if (!f1->next)
-      single_count++;
-  }
-
   if (dump_file)
     {
       fputs ("Candidate groups:\n", dump_file);
@@ -1364,7 +1357,7 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
       funccount++;
 
       if (!f1->next)
-        single_count;
+        single_count++;
     
       while (f1->next)
       {
@@ -1410,12 +1403,14 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
   if (dump_file)
     {
       fputs ("Statistics\n\n", dump_file);
-      fprintf (dump_file, "Functions: %lu\n", funccount);
+      fprintf (dump_file, "Functions: %u\n", funccount);
       fprintf (dump_file, "Candidate groups: %lu, single groups: %lu\n",
                func_hash->elements() - single_count, single_count);
-      fprintf (dump_file, "Average group size: %f\n", 1.f * funccount
-                          / (func_hash->elements() - single_count));
-      fprintf (dump_file, "Semantic equal functions: %lu\n\n", eqcount);
+      fprintf (dump_file, "Average group size: %.2f\n", 1.f * funccount
+               / (func_hash->elements() - single_count));
+      fprintf (dump_file, "Semantic equal functions: %u\n", eqcount);
+      fprintf (dump_file, "Fraction of all functions: %.2f%%\n\n",
+               100.f * eqcount / funccount);
     }
 }
 
@@ -1424,19 +1419,17 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
 static unsigned int
 semantic_equality (void)
 {
-  bool result, detected;
+  bool detected;
   sem_func_t *f, *f1;
   struct cgraph_node *node;
   unsigned int nnodes = 0;
   sem_func_t **slot;
-  bool merged = false;
   hash_table <sem_func_var_hash> sem_function_hash;
 
   sem_function_hash.create (nnodes);
 
   FOR_EACH_DEFINED_FUNCTION (node)
     {
-      merged = false;
       f = XNEW (sem_func_t);
       f->next = NULL;
 
