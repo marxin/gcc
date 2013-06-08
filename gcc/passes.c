@@ -1384,6 +1384,7 @@ init_optimization_passes (void)
      compiled unit.  */
   p = &all_late_ipa_passes;
   NEXT_PASS (pass_ipa_pta);
+  NEXT_PASS (pass_ipa_sem_equality);
   *p = NULL;
 
   /* These passes are run after IPA passes on every function that is being
@@ -1711,7 +1712,7 @@ do_per_function (void (*callback) (void *data), void *data)
     {
       struct cgraph_node *node;
       FOR_EACH_DEFINED_FUNCTION (node)
-	if (gimple_has_body_p (node->symbol.decl)
+	if (node->symbol.analyzed && gimple_has_body_p (node->symbol.decl)
 	    && (!node->clone_of || node->symbol.decl != node->clone_of->symbol.decl))
 	  {
 	    push_cfun (DECL_STRUCT_FUNCTION (node->symbol.decl));
@@ -2463,6 +2464,7 @@ ipa_write_summaries (void)
   lto_symtab_encoder_t encoder;
   int i, order_pos;
   struct varpool_node *vnode;
+  struct cgraph_node *node;
   struct cgraph_node **order;
 
   if (!flag_generate_lto || seen_error ())
@@ -2498,9 +2500,11 @@ ipa_write_summaries (void)
         lto_set_symtab_encoder_in_partition (encoder, (symtab_node)node);
     }
 
+  FOR_EACH_DEFINED_FUNCTION (node)
+    if (node->symbol.alias)
+      lto_set_symtab_encoder_in_partition (encoder, (symtab_node)node);
   FOR_EACH_DEFINED_VARIABLE (vnode)
-    if ((!vnode->symbol.alias || vnode->alias_of))
-      lto_set_symtab_encoder_in_partition (encoder, (symtab_node)vnode);
+    lto_set_symtab_encoder_in_partition (encoder, (symtab_node)vnode);
 
   ipa_write_summaries_1 (compute_ltrans_boundary (encoder));
 
