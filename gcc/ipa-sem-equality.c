@@ -65,6 +65,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "coverage.h"
 #include "hash-table.h"
 #include "except.h"
+#include "lto-streamer.h"
+#include "data-streamer.h"
+#include "tree-streamer.h"
 
 /* Forward struct declaration.  */
 typedef struct sem_bb sem_bb_t;
@@ -122,6 +125,37 @@ struct decl_var_hash: typed_noop_remove <decl_pair_t>
   static inline int equal (const value_type *, const compare_type *);  
 };
 
+static vec<hashval_t> sem_func_hash;
+
+// TODO: remove
+/* Return true if tree node T is written to various tables.  For these
+   nodes, we sometimes want to write their phyiscal representation
+   (via lto_output_tree), and sometimes we need to emit an index
+   reference into a table (via lto_output_tree_ref).  */
+
+static bool
+tree_is_indexable (tree t)
+{
+  if (TREE_CODE (t) == PARM_DECL)
+    return true;
+  else if (TREE_CODE (t) == VAR_DECL && decl_function_context (t)
+	   && !TREE_STATIC (t))
+    return false;
+  /* Variably modified types need to be streamed alongside function
+     bodies because they can refer to local entities.  Together with
+     them we have to localize their members as well.
+     ???  In theory that includes non-FIELD_DECLs as well.  */
+  else if (TYPE_P (t)
+	   && variably_modified_type_p (t, NULL_TREE))
+    return false;
+  else if (TREE_CODE (t) == FIELD_DECL
+	   && variably_modified_type_p (DECL_CONTEXT (t), NULL_TREE))
+    return false;
+  else
+    return (TYPE_P (t) || DECL_P (t) || TREE_CODE (t) == SSA_NAME);
+}
+
+
 /* Hash compute function returns hash for a given declaration pair.  */
 
 inline hashval_t
@@ -163,6 +197,33 @@ edge_var_hash::equal (const edge_pair_t *pair1, const edge_pair_t *pair2)
 {
   return pair1->source == pair2->source;
 }
+
+typedef struct func_node
+{
+  hashval_t hash;
+  vec<void *> members;
+} func_node_t;
+
+struct func_node_var_hash: typed_noop_remove <func_node_t>
+{
+  typedef func_node_t value_type;
+  typedef func_node_t compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+};
+
+inline hashval_t
+func_node_var_hash::hash (const func_node_t *func)
+{
+  return func->hash;
+}
+
+inline int
+func_node_var_hash::equal (const func_node_t *f1, const func_node_t *f2)
+{
+  return f1->hash == f2->hash;
+}
+
 
 /* Struct used for all kind of function dictionaries like
    SSA names, call graph edges and all kind of declarations.  */
@@ -232,10 +293,10 @@ sem_func_var_hash::hash (const sem_func_t *f)
   hash = iterative_hash_object (f->edge_count, hash);
   hash = iterative_hash_object (f->cfg_checksum, hash);
 
-  for (i = 0; i < f->arg_count; ++i)
-    hash = iterative_hash_object (f->arg_types[i], hash);
-
-  hash = iterative_hash_object (f->result_type, hash);
+  // TODO
+  //for (i = 0; i < f->arg_count; ++i)
+  //  hash = iterative_hash_object (f->arg_types[i], hash);
+  //hash = iterative_hash_object (f->result_type, hash);
 
   for (i = 0; i < f->bb_count; ++i)
     hash = iterative_hash_object (f->bb_sizes[i], hash);
@@ -312,10 +373,10 @@ func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
    about a function NODE and save them to a structure used for a further analysis.
    Successfull parsing fills F and returns true.  */
 
-static bool
-visit_function (struct cgraph_node *node, sem_func_t *f)
+static sem_func_t *
+visit_function (struct cgraph_node *node)
 {
-  tree fndecl, fnargs, parm, result, funcdecl;
+  tree fndecl, fnargs, parm, result;
   unsigned int param_num, gimple_count, bb_count;
   struct function *my_function;
   gimple_stmt_iterator gsi;
@@ -323,12 +384,22 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   basic_block bb;
   sem_bb_t *sem_bb;
   hashval_t gcode_hash, code;
+  sem_func_t *f = XNEW(sem_func_t);
 
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
 
   if (!cgraph_function_with_gimple_body_p (node))
-    return false;
+  {
+    fprintf(stderr, "... gimple_body\n");
+    goto cleanup;
+  }
+
+  if (!my_function)
+  {
+    fprintf(stderr, "... my_function == NULL\n");
+    goto cleanup;
+  }
 
   f->ssa_names_size = SSANAMES (my_function)->length ();
   f->node = node;
@@ -381,12 +452,15 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
             gimple_count++;
             gcode_hash = iterative_hash_object (code, gcode_hash);
 
-            /* More precise hash could be enhanced by function call.  */            
+            /* More precise hash could be enhanced by function call.  */
+            // TODO: remove
+            /*
             if (code == GIMPLE_CALL && !gimple_call_internal_p (stmt))
             {
               funcdecl = gimple_call_fndecl (stmt);
               gcode_hash = iterative_hash_object (funcdecl, gcode_hash);
             }
+            */
           }
         }
 
@@ -403,7 +477,11 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
       f->bb_sorted[bb_count++] = sem_bb;
     }
 
-  return true;
+  return f;
+
+  cleanup:
+    free (f);
+    return NULL;
 }
 
 /* Declaration comparer- global declarations are comparer for a pointer equality,
@@ -1296,8 +1374,6 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 static void
 merge_functions (sem_func_t *original, sem_func_t *alias)
 {
-  return;
-
   cgraph_release_function_body (alias->node);
   cgraph_reset_node (alias->node);
   cgraph_create_function_alias (alias->func_decl, original->func_decl);
@@ -1416,9 +1492,361 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
 
 /* IPA semantic equality pass entry point.  */
 
+static inline bool
+has_function_hash (struct cgraph_node *node)
+{
+  if (!sem_func_hash.exists ()
+      || sem_func_hash.length () <= (unsigned int)node->uid)
+    return false;
+
+  return sem_func_hash[node->uid] != 0;
+}
+
+static inline void
+set_function_hash (struct cgraph_node *node, hashval_t hash)
+{
+  if (!sem_func_hash.exists ()
+      || sem_func_hash.length () <= (unsigned int)node->uid)
+    sem_func_hash.safe_grow_cleared (node->uid + 1);
+  sem_func_hash[node->uid] = hash;
+}
+
+static inline hashval_t
+get_function_hash (struct cgraph_node *node)
+{
+  if (!sem_func_hash.exists ()
+      || sem_func_hash.length () <= (unsigned int)node->uid
+      || !sem_func_hash[node->uid])
+    return 0;
+
+ return sem_func_hash[node->uid];
+}
+
+static void
+generate_summary (void)
+{
+  hashval_t hash;
+  sem_func_t *f;
+  struct cgraph_node *node;
+
+  FOR_EACH_DEFINED_FUNCTION (node)
+    {
+      f = visit_function (node);
+      if (f)
+      {
+        hash = sem_func_var_hash::hash (f);
+        set_function_hash (node, hash);
+      }
+    }
+}
+
+static void
+sem_equality_write_summary (void)
+{
+  struct cgraph_node *node;
+  struct lto_simple_output_block *ob
+    = lto_create_simple_output_block (LTO_section_ipa_pure_const);
+  unsigned int count = 0;
+  lto_symtab_encoder_iterator lsei;
+  lto_symtab_encoder_t encoder;
+
+  encoder = lto_get_out_decl_state ()->symtab_node_encoder;
+
+  for (lsei = lsei_start_function_in_partition (encoder); !lsei_end_p (lsei);
+       lsei_next_function_in_partition (&lsei))
+    {
+      node = lsei_cgraph_node (lsei);
+      if (node->symbol.definition && has_function_hash (node))
+	      count++;
+    }
+
+  streamer_write_uhwi_stream (ob->main_stream, count);
+
+  /* Process all of the functions.  */
+  for (lsei = lsei_start_function_in_partition (encoder); !lsei_end_p (lsei);
+       lsei_next_function_in_partition (&lsei))
+    {
+      node = lsei_cgraph_node (lsei);
+      if (node->symbol.definition && has_function_hash (node))
+        {
+          hashval_t hash = get_function_hash(node);
+          int node_ref;
+          lto_symtab_encoder_t encoder;
+
+          hash = get_function_hash (node);
+
+          encoder = ob->decl_state->symtab_node_encoder;
+          node_ref = lto_symtab_encoder_encode (encoder, (symtab_node)node);
+          streamer_write_uhwi_stream (ob->main_stream, node_ref);
+
+          streamer_write_uhwi_stream (ob->main_stream, hash);
+        }
+    }
+
+  lto_destroy_simple_output_block (ob);
+}
+
+
+static hash_table <func_node_var_hash> func_node_hash;
+
+static void
+sem_equality_write_osummary (void)
+{
+  struct cgraph_node *node;
+  struct lto_simple_output_block *ob
+    = lto_create_simple_output_block (LTO_section_ipa_pure_const);
+  unsigned int count = 0;
+  lto_symtab_encoder_iterator lsei;
+  lto_symtab_encoder_t encoder;
+
+  encoder = lto_get_out_decl_state ()->symtab_node_encoder;
+
+  for (lsei = lsei_start_function_in_partition (encoder); !lsei_end_p (lsei);
+       lsei_next_function_in_partition (&lsei))
+    {
+      node = lsei_cgraph_node (lsei);
+      if (node->symbol.definition && has_function_hash (node))
+	      count++;
+    }
+
+  streamer_write_uhwi_stream (ob->main_stream, count);
+
+  /* Process all of the functions.  */
+  for (lsei = lsei_start_function_in_partition (encoder); !lsei_end_p (lsei);
+       lsei_next_function_in_partition (&lsei))
+    {
+      node = lsei_cgraph_node (lsei);
+      if (node->symbol.definition && has_function_hash (node))
+        {
+          int node_ref;
+          lto_symtab_encoder_t encoder;
+
+          encoder = ob->decl_state->symtab_node_encoder;
+          node_ref = lto_symtab_encoder_encode (encoder, (symtab_node)node);
+          
+          streamer_write_uhwi_stream (ob->main_stream, node_ref);
+          streamer_write_uhwi_stream (ob->main_stream, get_function_hash (node));
+        }
+    }
+
+  lto_destroy_simple_output_block (ob);
+}
+
+static void
+sem_equality_read_osummary (void)
+{
+  struct lto_file_decl_data **file_data_vec = lto_get_file_decl_data ();
+  struct lto_file_decl_data *file_data;
+  unsigned int j = 0;
+  unsigned int hash;
+
+  func_node_hash.create (16);
+
+  while ((file_data = file_data_vec[j++]))
+    {
+      const char *data;
+      size_t len;
+      struct lto_input_block *ib
+        = lto_create_simple_input_block (file_data,
+					 LTO_section_ipa_pure_const,
+					 &data, &len);
+      if (ib)
+  {
+	  unsigned int i;
+	  unsigned int count = streamer_read_uhwi (ib);
+
+	  for (i = 0; i < count; i++)
+	    {
+	      unsigned int index;
+	      struct cgraph_node *node;
+        hashval_t hash;
+	      lto_symtab_encoder_t encoder;
+
+	      index = streamer_read_uhwi (ib);
+	      encoder = file_data->symtab_node_encoder;
+	      node = cgraph (lto_symtab_encoder_deref (encoder, index));
+	      hash = streamer_read_uhwi (ib);
+
+        func_node_t func;
+        func.hash = hash;
+
+        func_node_t **slot = func_node_hash.find_slot (&func, INSERT);
+
+        if (*slot)
+          (*slot)->members.safe_push (node);
+        else
+        {
+          func_node_t *f = XCNEW (func_node_t);
+
+          f->hash = hash;
+          f->members.safe_push (node);
+          *slot = f;
+        }
+	    }
+
+	  lto_destroy_simple_input_block (file_data,
+					  LTO_section_ipa_pure_const,
+					  ib, data, len);
+	}
+    }
+}
+
+static void
+sem_equality_read_summary (void)
+{
+  struct lto_file_decl_data **file_data_vec = lto_get_file_decl_data ();
+  struct lto_file_decl_data *file_data;
+  unsigned int j = 0;
+
+  while ((file_data = file_data_vec[j++]))
+    {
+      const char *data;
+      size_t len;
+      struct lto_input_block *ib
+        = lto_create_simple_input_block (file_data,
+					 LTO_section_ipa_pure_const,
+					 &data, &len);
+      if (ib)
+  {
+	  unsigned int i;
+	  unsigned int count = streamer_read_uhwi (ib);
+
+	  for (i = 0; i < count; i++)
+	    {
+	      unsigned int index;
+	      struct cgraph_node *node;
+        hashval_t hash;
+	      lto_symtab_encoder_t encoder;
+
+	      index = streamer_read_uhwi (ib);
+	      encoder = file_data->symtab_node_encoder;
+	      node = cgraph (lto_symtab_encoder_deref (encoder, index));
+
+        hash = streamer_read_uhwi (ib);
+
+	      set_function_hash (node, hash);        
+
+	      if (dump_file)
+          {
+            // TODO
+          }
+	    }
+
+	  lto_destroy_simple_input_block (file_data,
+					  LTO_section_ipa_pure_const,
+					  ib, data, len);
+	}
+    }
+}
+
+static unsigned int
+group_functions (void)
+{
+  struct cgraph_node *node;
+  func_node_t **slot;
+  func_node_t *f, *f1;
+
+  func_node_hash.create (16);
+
+  FOR_EACH_DEFINED_FUNCTION (node)
+    {
+      hashval_t hash = get_function_hash (node);
+
+      if (hash == 0)
+        continue;
+
+      f = XCNEW(func_node_t);
+
+      f->hash = hash;
+
+      slot = func_node_hash.find_slot (f, INSERT);
+      f1 = (func_node_t *) *slot;      
+
+      if (f1)
+        f1->members.safe_push (node);
+      else
+        {
+          f->members.safe_push (node);
+          *slot = f;
+        }
+    }
+
+  return 0;
+}
+
+static void
+clear_func_in_members (vec<void *> &members, struct cgraph_node *node)
+{
+  for (unsigned int i = 0; i < members.length(); i++)
+    if (members[i] == node)
+      {
+        members[i] = NULL;
+        return;
+      }
+}
+
+static unsigned int
+transform (struct cgraph_node *node)
+{
+  func_node_t **slot;
+  func_node_t f, *func;
+  struct cgraph_node *node2;
+  bool result;
+
+  sem_func_t *parsed_function = visit_function (node);
+
+  if(!parsed_function)
+  {} // TODO
+
+  hashval_t hash = sem_func_var_hash::hash (parsed_function);
+
+  f.hash = hash;
+
+  slot = func_node_hash.find_slot (&f, NO_INSERT);
+
+  if (slot)
+  {
+    func = *slot;
+
+    clear_func_in_members (func->members, node);
+
+    for (unsigned int i = 0; i < func->members.length(); i++)
+      {
+        node2 = (struct cgraph_node *) func->members[i];
+
+        if (!node2)
+          continue;
+
+        result = compare_functions (parsed_function, visit_function (node2));
+
+        if (result)
+          {
+            fprintf (stderr, "HIT found %s/%s\n", cgraph_node_name (node), 
+                 cgraph_node_name (node2));
+
+            struct cgraph_edge *caller = node->callers;
+            struct cgraph_edge *edge2;
+
+            while (caller)
+            {
+              edge2 = caller->next_caller;
+              cgraph_redirect_edge_callee (caller, node2);
+
+              caller = edge2;
+            }
+
+            return 0;
+          }
+      }
+  }
+
+  return 0;
+}
+
 static unsigned int
 semantic_equality (void)
 {
+  /*
   bool detected;
   sem_func_t *f, *f1;
   struct cgraph_node *node;
@@ -1449,7 +1877,7 @@ semantic_equality (void)
   compare_groups (&sem_function_hash);
 
   sem_function_hash.dispose();
-
+*/
   return 0; 
 }
 
@@ -1461,22 +1889,31 @@ gate_sem_equality (void)
   return flag_ipa_sem_equality;
 }
 
-struct simple_ipa_opt_pass pass_ipa_sem_equality =
+struct ipa_opt_pass_d pass_ipa_sem_equality =
 {
  {
-  SIMPLE_IPA_PASS,
-  "sem-equality",         /* name */
-  OPTGROUP_IPA,           /* optinfo_flags */
-  gate_sem_equality,      /* gate */
-  semantic_equality,      /* execute */
-  NULL,                   /* sub */
-  NULL,                   /* next */
-  0,                      /* static_pass_number */
-  TV_IPA_SEM_EQUALITY,    /* tv_id */
-  0,                      /* properties_required */
-  0,                      /* properties_provided */
-  0,                      /* properties_destroyed */
-  0,                      /* todo_flags_start */
-  0                       /* todo_flags_finish */
- }
+  IPA_PASS,
+  "sem-equality",           /* name */
+  OPTGROUP_IPA,             /* optinfo_flags */
+  gate_sem_equality,        /* gate */
+  group_functions,          /* execute */
+  NULL,                     /* sub */
+  NULL,                     /* next */
+  0,                        /* static_pass_number */
+  TV_IPA_SEM_EQUALITY,      /* tv_id */
+  0,                        /* properties_required */
+  0,                        /* properties_provided */
+  0,                        /* properties_destroyed */
+  0,                        /* todo_flags_start */
+  0                         /* todo_flags_finish */
+ },
+ generate_summary,          /* generate_summary */
+ sem_equality_write_summary,/* write_summary */
+ sem_equality_read_summary,	/* read_summary */
+ sem_equality_write_osummary,/* write_optimization_summary */
+ sem_equality_read_osummary,/* read_optimization_summary */
+ NULL,                      /* stmt_fixup */
+ 0,                         /* TODOs */
+ transform,                 /* function_transform */
+ NULL                       /* variable_transform */
 };
