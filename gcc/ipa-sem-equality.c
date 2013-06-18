@@ -92,6 +92,7 @@ typedef struct sem_func
 } sem_func_t;
 
 /* Basic block struct for sematic equality pass.  */
+
 typedef struct sem_bb
 {
   basic_block bb;
@@ -125,36 +126,8 @@ struct decl_var_hash: typed_noop_remove <decl_pair_t>
   static inline int equal (const value_type *, const compare_type *);  
 };
 
+/* Vector with computed hash values for functions.  */
 static vec<hashval_t> sem_func_hash;
-
-// TODO: remove
-/* Return true if tree node T is written to various tables.  For these
-   nodes, we sometimes want to write their phyiscal representation
-   (via lto_output_tree), and sometimes we need to emit an index
-   reference into a table (via lto_output_tree_ref).  */
-
-static bool
-tree_is_indexable (tree t)
-{
-  if (TREE_CODE (t) == PARM_DECL)
-    return true;
-  else if (TREE_CODE (t) == VAR_DECL && decl_function_context (t)
-	   && !TREE_STATIC (t))
-    return false;
-  /* Variably modified types need to be streamed alongside function
-     bodies because they can refer to local entities.  Together with
-     them we have to localize their members as well.
-     ???  In theory that includes non-FIELD_DECLs as well.  */
-  else if (TYPE_P (t)
-	   && variably_modified_type_p (t, NULL_TREE))
-    return false;
-  else if (TREE_CODE (t) == FIELD_DECL
-	   && variably_modified_type_p (DECL_CONTEXT (t), NULL_TREE))
-    return false;
-  else
-    return (TYPE_P (t) || DECL_P (t) || TREE_CODE (t) == SSA_NAME);
-}
-
 
 /* Hash compute function returns hash for a given declaration pair.  */
 
@@ -224,6 +197,9 @@ func_node_var_hash::equal (const func_node_t *f1, const func_node_t *f2)
   return f1->hash == f2->hash;
 }
 
+/* Hash table of hash values, where all functions having the same hash
+ * reside together in vector.  */
+static hash_table <func_node_var_hash> func_node_hash;
 
 /* Struct used for all kind of function dictionaries like
    SSA names, call graph edges and all kind of declarations.  */
@@ -292,11 +268,6 @@ sem_func_var_hash::hash (const sem_func_t *f)
   hash = iterative_hash_object (f->bb_count, hash);
   hash = iterative_hash_object (f->edge_count, hash);
   hash = iterative_hash_object (f->cfg_checksum, hash);
-
-  // TODO
-  //for (i = 0; i < f->arg_count; ++i)
-  //  hash = iterative_hash_object (f->arg_types[i], hash);
-  //hash = iterative_hash_object (f->result_type, hash);
 
   for (i = 0; i < f->bb_count; ++i)
     hash = iterative_hash_object (f->bb_sizes[i], hash);
@@ -389,17 +360,8 @@ visit_function (struct cgraph_node *node)
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
 
-  if (!cgraph_function_with_gimple_body_p (node))
-  {
-    fprintf(stderr, "... gimple_body\n");
+  if (!cgraph_function_with_gimple_body_p (node) || !my_function)
     goto cleanup;
-  }
-
-  if (!my_function)
-  {
-    fprintf(stderr, "... my_function == NULL\n");
-    goto cleanup;
-  }
 
   f->ssa_names_size = SSANAMES (my_function)->length ();
   f->node = node;
@@ -1379,118 +1341,58 @@ merge_functions (sem_func_t *original, sem_func_t *alias)
   cgraph_create_function_alias (alias->func_decl, original->func_decl);
 }
 
-/* Group of functions F having the same hash is printed to dump_file.  */
+/* Dump called after WPA stage.  */
 
 static void
-dump_sem_group (sem_func_t *f)
+dump_execute_results (void)
 {
-  fprintf (dump_file, "  semantic group %12u:", sem_func_var_hash::hash (f));
-
-  while (f)
-  {
-    fprintf (dump_file, " %s", cgraph_node_name (f->node));
-    f = f->next;
-  }
-  
-  fputc ('\n', dump_file);
-}
-
-/* All functions with the same hash are iterated and compared
- * for semantic equality. If a hit is encountered, we merge the function
- * and remove entry from linked list.  */
-
-static void
-compare_groups (hash_table <sem_func_var_hash> *func_hash)
-{
-  sem_func_t *f1, *f2, *f2prev;
+  func_node_t *func;
   size_t single_count = 0;
   unsigned int funccount = 0;
-  unsigned int eqcount = 0;
-  bool result;
  
   if (dump_file)
     {
       fputs ("Candidate groups:\n", dump_file);
 
-      for (hash_table <sem_func_var_hash>::iterator it = func_hash->begin ();
-           it != func_hash->end (); ++it)
+      for (hash_table <func_node_var_hash>::iterator it = func_node_hash.begin ();
+           it != func_node_hash.end (); ++it)
         {
-          f1 = &(*it);
+          func = &(*it);
 
-          if (f1->next)
-            dump_sem_group (f1);
-        }
-    }
+          fprintf (dump_file, "%12u:", func->hash);
 
-  if (dump_file)
-    fputs ("\nEqual functions\n", dump_file);
-
-  for (hash_table <sem_func_var_hash>::iterator it = func_hash->begin ();
-       it != func_hash->end (); ++it)
-    {
-      f1 = &(*it);
-
-      funccount++;
-
-      if (!f1->next)
-        single_count++;
-    
-      while (f1->next)
-      {
-        f2 = f1->next;
-        f2prev = f1;
-
-        while (f2)
-        {
-          funccount++;
-
-          result = compare_functions (f1, f2);
-
-          if (result)
-          {
-            eqcount++;
-
-            /* Node must be skipped for the next time.  */
-            f2prev->next = f2->next;
-
-            if (dump_file)
+          for (unsigned int i = 0; i < func->members.length (); i++)
             {
-              fprintf(dump_file, "HIT:%s:%s\n",
-                cgraph_node_name (f1->node), cgraph_node_name (f2->node));
-
-              dump_function_to_file (f1->func_decl, dump_file, TDF_DETAILS);
-              dump_function_to_file (f2->func_decl, dump_file, TDF_DETAILS);
+              struct cgraph_node *n = (struct cgraph_node *)func->members[i];
+              fprintf (dump_file, " %s", cgraph_node_name (n));
             }
 
-            /* Equal function merge */
-            merge_functions (f1, f2);
-          }
-          else
-            f2prev = f2prev->next;
+          funccount += func->members.length ();
 
-          f2 = f2->next;
+          if (func->members.length() == 1)
+            single_count++;
+
+          fputc ('\n', dump_file);
         }
 
-        if (f1->next)
-          f1 = f1->next;
-      }
+      fputc ('\n', dump_file);
     }
 
   if (dump_file)
     {
-      fputs ("Statistics\n\n", dump_file);
-      fprintf (dump_file, "Functions: %u\n", funccount);
-      fprintf (dump_file, "Candidate groups: %lu, single groups: %lu\n",
-               func_hash->elements() - single_count, single_count);
-      fprintf (dump_file, "Average group size: %.2f\n", 1.f * funccount
-               / (func_hash->elements() - single_count));
-      fprintf (dump_file, "Semantic equal functions: %u\n", eqcount);
-      fprintf (dump_file, "Fraction of all functions: %.2f%%\n\n",
-               100.f * eqcount / funccount);
-    }
+      fputs ("Statistics:\n", dump_file);
+      fprintf (dump_file, "  functions: %u\n", funccount);
+      fprintf (dump_file, "  candidate groups: %lu\n",
+               func_node_hash.elements() - single_count);
+      fprintf (dump_file, "  single groups: %lu\n", single_count);
+      fprintf (dump_file, "  average group size: %.2f\n\n",
+               1.f * (funccount - single_count)
+               / (func_node_hash.elements() - single_count));
+      }
 }
 
-/* IPA semantic equality pass entry point.  */
+/* Checks if function NODE is presented in the vector of computed
+ * hash values and returns true in such case.  */
 
 static inline bool
 has_function_hash (struct cgraph_node *node)
@@ -1502,6 +1404,8 @@ has_function_hash (struct cgraph_node *node)
   return sem_func_hash[node->uid] != 0;
 }
 
+/* Stores computed hash for function NODE.  */
+
 static inline void
 set_function_hash (struct cgraph_node *node, hashval_t hash)
 {
@@ -1510,6 +1414,9 @@ set_function_hash (struct cgraph_node *node, hashval_t hash)
     sem_func_hash.safe_grow_cleared (node->uid + 1);
   sem_func_hash[node->uid] = hash;
 }
+
+/* Loads saved hash value for function NODE if exists,
+ * returns 0 otherwise.  */
 
 static inline hashval_t
 get_function_hash (struct cgraph_node *node)
@@ -1522,6 +1429,9 @@ get_function_hash (struct cgraph_node *node)
  return sem_func_hash[node->uid];
 }
 
+/* LGEN generate summary visits every function and computes
+ * hash value that is independent on LTO.  */
+
 static void
 generate_summary (void)
 {
@@ -1529,16 +1439,30 @@ generate_summary (void)
   sem_func_t *f;
   struct cgraph_node *node;
 
+  if (dump_file)
+    fputs ("Generate summary:\n", dump_file);
+
   FOR_EACH_DEFINED_FUNCTION (node)
     {
       f = visit_function (node);
+
       if (f)
       {
         hash = sem_func_var_hash::hash (f);
         set_function_hash (node, hash);
+
+        if (dump_file)
+          fprintf (dump_file, "  function: %s, with hash: %u\n",
+                   cgraph_node_name (node), hash);
       }
     }
+
+  if (dump_file)
+    fputc ('\n', dump_file);
 }
+
+/* Write summary function stores for each function node corresponding
+ * computed hash value.  */
 
 static void
 sem_equality_write_summary (void)
@@ -1586,9 +1510,6 @@ sem_equality_write_summary (void)
   lto_destroy_simple_output_block (ob);
 }
 
-
-static hash_table <func_node_var_hash> func_node_hash;
-
 static void
 sem_equality_write_osummary (void)
 {
@@ -1632,13 +1553,14 @@ sem_equality_write_osummary (void)
   lto_destroy_simple_output_block (ob);
 }
 
+/* Read summary function loads computed hash value for each function node.  */
+
 static void
 sem_equality_read_osummary (void)
 {
   struct lto_file_decl_data **file_data_vec = lto_get_file_decl_data ();
   struct lto_file_decl_data *file_data;
   unsigned int j = 0;
-  unsigned int hash;
 
   func_node_hash.create (16);
 
@@ -1707,35 +1629,30 @@ sem_equality_read_summary (void)
 					 LTO_section_ipa_pure_const,
 					 &data, &len);
       if (ib)
-  {
-	  unsigned int i;
-	  unsigned int count = streamer_read_uhwi (ib);
+        {
+          unsigned int i;
+          unsigned int count = streamer_read_uhwi (ib);
 
-	  for (i = 0; i < count; i++)
-	    {
-	      unsigned int index;
-	      struct cgraph_node *node;
-        hashval_t hash;
-	      lto_symtab_encoder_t encoder;
+          for (i = 0; i < count; i++)
+            {
+              unsigned int index;
+              struct cgraph_node *node;
+              hashval_t hash;
+              lto_symtab_encoder_t encoder;
 
-	      index = streamer_read_uhwi (ib);
-	      encoder = file_data->symtab_node_encoder;
-	      node = cgraph (lto_symtab_encoder_deref (encoder, index));
+              index = streamer_read_uhwi (ib);
+              encoder = file_data->symtab_node_encoder;
+              node = cgraph (lto_symtab_encoder_deref (encoder, index));
 
-        hash = streamer_read_uhwi (ib);
+              hash = streamer_read_uhwi (ib);
 
-	      set_function_hash (node, hash);        
+              set_function_hash (node, hash);        
+            }
 
-	      if (dump_file)
-          {
-            // TODO
-          }
-	    }
-
-	  lto_destroy_simple_input_block (file_data,
-					  LTO_section_ipa_pure_const,
-					  ib, data, len);
-	}
+          lto_destroy_simple_input_block (file_data,
+                  LTO_section_ipa_pure_const,
+                  ib, data, len);
+	      }
     }
 }
 
@@ -1771,6 +1688,9 @@ group_functions (void)
         }
     }
 
+  if (dump_file)
+    dump_execute_results ();
+
   return 0;
 }
 
@@ -1792,14 +1712,13 @@ transform (struct cgraph_node *node)
   func_node_t f, *func;
   struct cgraph_node *node2;
   bool result;
+  sem_func_t *semfunc, *semfunc2;
 
-  sem_func_t *parsed_function = visit_function (node);
+  semfunc = visit_function (node);
 
-  if(!parsed_function)
-  {} // TODO
+  gcc_assert (semfunc);
 
-  hashval_t hash = sem_func_var_hash::hash (parsed_function);
-
+  hashval_t hash = sem_func_var_hash::hash (semfunc);
   f.hash = hash;
 
   slot = func_node_hash.find_slot (&f, NO_INSERT);
@@ -1817,12 +1736,30 @@ transform (struct cgraph_node *node)
         if (!node2)
           continue;
 
-        result = compare_functions (parsed_function, visit_function (node2));
+        semfunc2 = visit_function (node2);
+
+        if (!semfunc || !semfunc2)
+          {
+            fprintf (stderr, "Visit function was not successfull: %p/%p\n",
+                     semfunc, semfunc2);
+
+            continue;
+          }
+
+        result = compare_functions (semfunc, semfunc2);
 
         if (result)
           {
-            fprintf (stderr, "HIT found %s/%s\n", cgraph_node_name (node), 
-                 cgraph_node_name (node2));
+            if (true)
+            {
+              fprintf (stderr, "Equal functions found: %s/%s\n",
+                       cgraph_node_name (node), 
+                       cgraph_node_name (node2));
+
+              // TODO
+              dump_function_to_file (semfunc->func_decl, stderr, TDF_DETAILS);
+              dump_function_to_file (semfunc2->func_decl, stderr, TDF_DETAILS);
+            }
 
             struct cgraph_edge *caller = node->callers;
             struct cgraph_edge *edge2;
@@ -1837,48 +1774,14 @@ transform (struct cgraph_node *node)
 
             return 0;
           }
+          else
+            fprintf (stderr, "Compared but different: %s/%s\n",
+              cgraph_node_name (node),
+              cgraph_node_name (node2));
       }
   }
 
   return 0;
-}
-
-static unsigned int
-semantic_equality (void)
-{
-  /*
-  bool detected;
-  sem_func_t *f, *f1;
-  struct cgraph_node *node;
-  unsigned int nnodes = 0;
-  sem_func_t **slot;
-  hash_table <sem_func_var_hash> sem_function_hash;
-
-  sem_function_hash.create (nnodes);
-
-  FOR_EACH_DEFINED_FUNCTION (node)
-    {
-      f = XNEW (sem_func_t);
-      f->next = NULL;
-
-      detected = visit_function (node, f);
-      if (detected)
-        {
-          slot = sem_function_hash.find_slot (f, INSERT);
-          
-          f1 = (sem_func_t *) *slot;
-          f->next = f1;
-          *slot = f;
-        }
-      else
-        free (f);
-    }
-
-  compare_groups (&sem_function_hash);
-
-  sem_function_hash.dispose();
-*/
-  return 0; 
 }
 
 /* IPA pass gate function.  */
