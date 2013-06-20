@@ -2687,6 +2687,7 @@ const_ok_for_dimode_op (HOST_WIDE_INT i, enum rtx_code code)
     {
     case AND:
     case IOR:
+    case XOR:
       return (const_ok_for_op (hi_val, code) || hi_val == 0xFFFFFFFF)
               && (const_ok_for_op (lo_val, code) || lo_val == 0xFFFFFFFF);
     case PLUS:
@@ -7862,7 +7863,7 @@ arm_rtx_costs_1 (rtx x, enum rtx_code outer, int* total, bool speed)
 	  && GET_CODE (SET_SRC (x)) == VEC_SELECT)
 	{
 	  *total = rtx_cost (SET_DEST (x), code, 0, speed);
-	  if (!neon_vector_mem_operand (SET_DEST (x), 2))
+	  if (!neon_vector_mem_operand (SET_DEST (x), 2, true))
 	    *total += COSTS_N_INSNS (1);
 	  return true;
 	}
@@ -7873,7 +7874,7 @@ arm_rtx_costs_1 (rtx x, enum rtx_code outer, int* total, bool speed)
 	{
 	  rtx mem = XEXP (XEXP (SET_SRC (x), 0), 0);
 	  *total = rtx_cost (mem, code, 0, speed);
-	  if (!neon_vector_mem_operand (mem, 2))
+	  if (!neon_vector_mem_operand (mem, 2, true))
 	    *total += COSTS_N_INSNS (1);
 	  return true;
 	}
@@ -10045,7 +10046,7 @@ arm_coproc_mem_operand (rtx op, bool wb)
     2 - Element/structure loads (vld1)
  */
 int
-neon_vector_mem_operand (rtx op, int type)
+neon_vector_mem_operand (rtx op, int type, bool strict)
 {
   rtx ind;
 
@@ -10057,7 +10058,7 @@ neon_vector_mem_operand (rtx op, int type)
 	  || reg_mentioned_p (virtual_outgoing_args_rtx, op)
 	  || reg_mentioned_p (virtual_stack_dynamic_rtx, op)
 	  || reg_mentioned_p (virtual_stack_vars_rtx, op)))
-    return FALSE;
+    return !strict;
 
   /* Constants are converted into offsets from labels.  */
   if (!MEM_P (op))
@@ -10167,7 +10168,7 @@ coproc_secondary_reload_class (enum machine_mode mode, rtx x, bool wb)
     {
       if (!TARGET_NEON_FP16)
 	return GENERAL_REGS;
-      if (s_register_operand (x, mode) || neon_vector_mem_operand (x, 2))
+      if (s_register_operand (x, mode) || neon_vector_mem_operand (x, 2, true))
 	return NO_REGS;
       return GENERAL_REGS;
     }
