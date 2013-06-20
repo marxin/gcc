@@ -1406,7 +1406,8 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
       fprintf (dump_file, "Functions: %u\n", funccount);
       fprintf (dump_file, "Candidate groups: %lu, single groups: %lu\n",
                func_hash->elements() - single_count, single_count);
-      fprintf (dump_file, "Average group size: %.2f\n", 1.f * funccount
+      fprintf (dump_file, "Average group size: %.2f\n",
+               1.f * (funccount - single_count)
                / (func_hash->elements() - single_count));
       fprintf (dump_file, "Semantic equal functions: %u\n", eqcount);
       fprintf (dump_file, "Fraction of all functions: %.2f%%\n\n",
