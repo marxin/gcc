@@ -394,6 +394,7 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple stmt)
 
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
+  case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 2;
 	  break;
 
@@ -1808,6 +1809,25 @@ gimple_indirect_call_to_profile (gimple stmt, histogram_values *values)
   return;
 }
 
+static void
+gimple_time_to_profile (gimple stmt, histogram_values *values)
+{
+  tree retval;
+
+  if (gimple_code (stmt) != GIMPLE_RETURN)
+    return;
+
+  values->reserve (3);
+
+  retval = gimple_return_retval (stmt);
+
+  values->quick_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE,
+						    stmt, retval));
+
+  return;
+}
+
+
 /* Find values inside STMT for that we want to measure histograms for
    string operations.  */
 static void
@@ -1852,6 +1872,7 @@ gimple_values_to_profile (gimple stmt, histogram_values *values)
   gimple_divmod_values_to_profile (stmt, values);
   gimple_stringops_values_to_profile (stmt, values);
   gimple_indirect_call_to_profile (stmt, values);
+  gimple_time_to_profile (stmt, values);
 }
 
 void
@@ -1863,6 +1884,22 @@ gimple_find_values_to_profile (histogram_values *values)
   histogram_value hist = NULL;
 
   values->create (0);
+
+/*
+  gimple target;
+
+  FOR_EACH_BB (bb)
+    for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+        {
+          target = gsi_stmt(gsi);
+          goto xxx;
+        }
+
+  xxx:
+  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE,
+						    target, 0));
+
+*/
   FOR_EACH_BB (bb)
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
       gimple_values_to_profile (gsi_stmt (gsi), values);
@@ -1890,6 +1927,10 @@ gimple_find_values_to_profile (histogram_values *values)
  	case HIST_TYPE_INDIR_CALL:
  	  hist->n_counters = 3;
 	  break;
+
+  case HIST_TYPE_TIME_PROFILE:
+    hist->n_counters = 3;
+    break;
 
 	case HIST_TYPE_AVERAGE:
 	  hist->n_counters = 2;

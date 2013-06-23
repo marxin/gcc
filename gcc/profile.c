@@ -179,6 +179,10 @@ instrument_values (histogram_values values)
  	  gimple_gen_ic_profiler (hist, t, 0);
   	  break;
 
+  case HIST_TYPE_TIME_PROFILE:
+	  gimple_gen_time_profiler (hist, t, 0);
+    break;
+
 	case HIST_TYPE_AVERAGE:
 	  gimple_gen_average_profiler (hist, t, 0);
 	  break;

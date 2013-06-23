@@ -46,19 +46,23 @@ static GTY(()) tree tree_interval_profiler_fn;
 static GTY(()) tree tree_pow2_profiler_fn;
 static GTY(()) tree tree_one_value_profiler_fn;
 static GTY(()) tree tree_indirect_call_profiler_fn;
+static GTY(()) tree tree_time_profiler_fn;
 static GTY(()) tree tree_average_profiler_fn;
 static GTY(()) tree tree_ior_profiler_fn;
-
+
 
 static GTY(()) tree ic_void_ptr_var;
 static GTY(()) tree ic_gcov_type_ptr_var;
 static GTY(()) tree ptr_void;
+
+static GTY(()) tree tp_counter_var;
 
 /* Do initialization work for the edge profiler.  */
 
 /* Add code:
    static gcov*	__gcov_indirect_call_counters; // pointer to actual counter
    static void*	__gcov_indirect_call_callee; // actual callee address
+   static int __gcov_time_profiler_counter; // actual number of called functions
 */
 static void
 init_ic_make_global_vars (void)
@@ -97,6 +101,28 @@ init_ic_make_global_vars (void)
   varpool_finalize_decl (ic_gcov_type_ptr_var);
 }
 
+static void
+init_tp_make_global_vars (void)
+{
+  tree gcov_type_int;
+
+  gcov_type_int = make_node (INTEGER_TYPE);
+
+  tp_counter_var
+    = build_decl (UNKNOWN_LOCATION, VAR_DECL,
+		  get_identifier ("__gcov_time_profiler_counter"),
+		  gcov_type_int);
+  TREE_STATIC (tp_counter_var) = 1;
+  TREE_PUBLIC (tp_counter_var) = 0;
+  DECL_ARTIFICIAL (tp_counter_var) = 1;
+  DECL_INITIAL (tp_counter_var) = 0;
+  if (targetm.have_tls)
+    DECL_TLS_MODEL (tp_counter_var) =
+      decl_default_tls_model (tp_counter_var);
+
+  varpool_finalize_decl (tp_counter_var);
+}
+
 /* Create the type and function decls for the interface with gcov.  */
 
 void
@@ -108,6 +134,7 @@ gimple_init_edge_profiler (void)
   tree gcov_type_ptr;
   tree ic_profiler_fn_type;
   tree average_profiler_fn_type;
+  tree time_profiler_fn_type;
 
   if (!gcov_type_node)
     {
@@ -169,6 +196,21 @@ gimple_init_edge_profiler (void)
 	= tree_cons (get_identifier ("leaf"), NULL,
 		     DECL_ATTRIBUTES (tree_indirect_call_profiler_fn));
 
+      /* void (*) (gcov_type *, gcov_type, void *)  */
+      time_profiler_fn_type
+	       = build_function_type_list (void_type_node,
+					  gcov_type_ptr, gcov_type_node,
+					  ptr_void, NULL_TREE);
+      tree_time_profiler_fn
+	      = build_fn_decl ("__gcov_time_profiler",
+				     time_profiler_fn_type);
+      TREE_NOTHROW (tree_time_profiler_fn) = 1;
+      DECL_ATTRIBUTES (tree_time_profiler_fn)
+	= tree_cons (get_identifier ("leaf"), NULL,
+		     DECL_ATTRIBUTES (tree_time_profiler_fn));
+
+      init_tp_make_global_vars ();
+
       /* void (*) (gcov_type *, gcov_type)  */
       average_profiler_fn_type
 	      = build_function_type_list (void_type_node,
@@ -194,6 +236,7 @@ gimple_init_edge_profiler (void)
       DECL_ASSEMBLER_NAME (tree_pow2_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_one_value_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_indirect_call_profiler_fn);
+      DECL_ASSEMBLER_NAME (tree_time_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_average_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_ior_profiler_fn);
     }
@@ -392,6 +435,22 @@ gimple_gen_ic_func_profiler (void)
   gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
 }
 
+void
+gimple_gen_time_profiler (histogram_value value, unsigned tag, unsigned base)
+{ 
+  gimple stmt = value->hvalue.stmt;
+  gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
+  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  gimple call;
+  tree val;
+
+  ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
+				      true, NULL_TREE, true, GSI_SAME_STMT);
+  val = prepare_instrumented_value (&gsi, value);
+  call = gimple_build_call (tree_time_profiler_fn, 2, ref_ptr, val);
+  gsi_insert_before (&gsi, call, GSI_NEW_STMT);
+}
+
 /* Output instructions as GIMPLE trees for code to find the most common value
    of a difference between two evaluations of an expression.
    VALUE is the expression whose value is profiled.  TAG is the tag of the
@@ -482,7 +541,7 @@ tree_profiling (void)
 
       if (! flag_branch_probabilities
 	  && flag_profile_values)
-	gimple_gen_ic_func_profiler ();
+          gimple_gen_ic_func_profiler ();
 
       if (flag_branch_probabilities
 	  && flag_profile_values

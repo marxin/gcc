@@ -32,6 +32,7 @@ enum hist_type
 			   difference between two evaluations of a value.  */
   HIST_TYPE_INDIR_CALL,   /* Tries to identify the function that is (almost)
 			    called in indirect call */
+  HIST_TYPE_TIME_PROFILE, /* Used for time profile */
   HIST_TYPE_AVERAGE,	/* Compute average value (sum of all values).  */
   HIST_TYPE_IOR,	/* Used to compute expected alignment.  */
   HIST_TYPE_MAX
@@ -95,6 +96,7 @@ extern void gimple_gen_pow2_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_one_value_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_ic_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_ic_func_profiler (void);
+extern void gimple_gen_time_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_const_delta_profiler (histogram_value,
 					     unsigned, unsigned);
 extern void gimple_gen_average_profiler (histogram_value, unsigned, unsigned);

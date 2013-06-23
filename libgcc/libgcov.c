@@ -1153,6 +1153,17 @@ __gcov_indirect_call_profiler (gcov_type* counter, gcov_type value,
 }
 #endif
 
+#ifdef L_gcov_time_profiler
+
+static int function_counter;
+
+void
+__gcov_time_profiler (gcov_type* counters, gcov_type value)
+{
+  if (counters[0] == 0)
+    counters[0] = function_counter++;
+}
+#endif
 
 #ifdef L_gcov_average_profiler
 /* Increase corresponding COUNTER by VALUE.  FIXME: Perhaps we want

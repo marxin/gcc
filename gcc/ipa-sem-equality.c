@@ -48,6 +48,18 @@ along with GCC; see the file COPYING3.  If not see
    decision. We either process function aliasing or a simple wrapper
    is constructed.  */
 
+/* TODO
+ *
+o assmble_thunk - prazdne telo a volani (3 fieldy na null a podstrcit deklaaraci)
+o node-symbol.addresstaken - zjisteni, zda se od toho vzala adresa
+o (address_taken_by_non_vtable_p || externally_visible) && !DECL_VIRTUAL(node->symbol.decl) - thunk (wrapper) modulo variadicke funkce
+o TREE_READONLY & neni vzata adresa nebo DECL_VIRTUAL, FOREACH_DEFINED_VARIABLE - porovnat
+o deklarace a funkce spolu mohou interferovat, je potreba mergovat (redukce kongruence konecnych automatu), 
+o TODO: dodelat pak konstruktory
+
+ *
+ */
+
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1296,11 +1308,12 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 static void
 merge_functions (sem_func_t *original, sem_func_t *alias)
 {
-  return;
+  // return;
 
   cgraph_release_function_body (alias->node);
   cgraph_reset_node (alias->node);
   cgraph_create_function_alias (alias->func_decl, original->func_decl);
+  symtab_resolve_alias ((symtab_node) alias->node, (symtab_node) original->node);
 }
 
 /* Group of functions F having the same hash is printed to dump_file.  */
@@ -1412,6 +1425,8 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
       fprintf (dump_file, "Semantic equal functions: %u\n", eqcount);
       fprintf (dump_file, "Fraction of all functions: %.2f%%\n\n",
                100.f * eqcount / funccount);
+
+      dump_cgraph (dump_file);
     }
 }
 
