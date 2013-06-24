@@ -1158,7 +1158,7 @@ __gcov_indirect_call_profiler (gcov_type* counter, gcov_type value,
 static int function_counter;
 
 void
-__gcov_time_profiler (gcov_type* counters, gcov_type value)
+__gcov_time_profiler (gcov_type* counters)
 {
   if (counters[0] == 0)
     counters[0] = function_counter++;

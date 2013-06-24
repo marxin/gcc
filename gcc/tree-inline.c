@@ -5211,6 +5211,7 @@ tree_function_versioning (tree old_decl, tree new_decl,
      debug stmts doesn't affect BB count, which may in the end cause
      codegen differences.  */
   bb = split_edge (single_succ_edge (ENTRY_BLOCK_PTR));
+
   while (init_stmts.length ())
     insert_init_stmt (&id, bb, init_stmts.pop ());
   update_clone_info (&id);

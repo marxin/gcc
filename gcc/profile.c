@@ -180,8 +180,13 @@ instrument_values (histogram_values values)
   	  break;
 
   case HIST_TYPE_TIME_PROFILE:
-	  gimple_gen_time_profiler (hist, t, 0);
-    break;
+    {
+      basic_block bb = split_edge (single_succ_edge (ENTRY_BLOCK_PTR));
+      gimple_stmt_iterator gsi = gsi_start_bb (bb);
+
+  	  gimple_gen_time_profiler (hist, t, 0, gsi);
+      break;
+    }
 
 	case HIST_TYPE_AVERAGE:
 	  gimple_gen_average_profiler (hist, t, 0);
@@ -1270,10 +1275,14 @@ branch_prob (void)
 	}
     }
 
+  // TODO: add new histogram
+  
+
+
   if (flag_profile_values)
     gimple_find_values_to_profile (&values);
 
-  if (flag_branch_probabilities)
+      if (flag_branch_probabilities)
     {
       compute_branch_probabilities (cfg_checksum, lineno_checksum);
       if (flag_profile_values)

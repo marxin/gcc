@@ -199,8 +199,7 @@ gimple_init_edge_profiler (void)
       /* void (*) (gcov_type *, gcov_type, void *)  */
       time_profiler_fn_type
 	       = build_function_type_list (void_type_node,
-					  gcov_type_ptr, gcov_type_node,
-					  ptr_void, NULL_TREE);
+					  gcov_type_ptr, NULL_TREE);
       tree_time_profiler_fn
 	      = build_fn_decl ("__gcov_time_profiler",
 				     time_profiler_fn_type);
@@ -436,18 +435,16 @@ gimple_gen_ic_func_profiler (void)
 }
 
 void
-gimple_gen_time_profiler (histogram_value value, unsigned tag, unsigned base)
+gimple_gen_time_profiler (histogram_value value, unsigned tag, unsigned base,
+                          gimple_stmt_iterator &gsi)
 { 
-  gimple stmt = value->hvalue.stmt;
-  gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
+  // TODO: split edge here
   tree ref_ptr = tree_coverage_counter_addr (tag, base);
   gimple call;
-  tree val;
 
   ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
 				      true, NULL_TREE, true, GSI_SAME_STMT);
-  val = prepare_instrumented_value (&gsi, value);
-  call = gimple_build_call (tree_time_profiler_fn, 2, ref_ptr, val);
+  call = gimple_build_call (tree_time_profiler_fn, 1, ref_ptr);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }
 

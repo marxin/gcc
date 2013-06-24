@@ -96,7 +96,8 @@ extern void gimple_gen_pow2_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_one_value_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_ic_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_ic_func_profiler (void);
-extern void gimple_gen_time_profiler (histogram_value, unsigned, unsigned);
+extern void gimple_gen_time_profiler (histogram_value, unsigned, unsigned,
+                                      gimple_stmt_iterator &);
 extern void gimple_gen_const_delta_profiler (histogram_value,
 					     unsigned, unsigned);
 extern void gimple_gen_average_profiler (histogram_value, unsigned, unsigned);
