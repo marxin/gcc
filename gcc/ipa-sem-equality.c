@@ -86,6 +86,7 @@ typedef struct sem_func
   unsigned ssa_names_size;
   sem_bb_t **bb_sorted;
   sem_func_t *next;
+  vec<tree> called_functions;
 } sem_func_t;
 
 /* Basic block struct for sematic equality pass.  */
@@ -327,6 +328,8 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   fndecl = node->symbol.decl;    
   my_function = DECL_STRUCT_FUNCTION (fndecl);
 
+  f->called_functions.create (0);
+
   if (!cgraph_function_with_gimple_body_p (node))
     return false;
 
@@ -385,7 +388,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
             if (code == GIMPLE_CALL && !gimple_call_internal_p (stmt))
             {
               funcdecl = gimple_call_fndecl (stmt);
-              gcode_hash = iterative_hash_object (funcdecl, gcode_hash);
+              f->called_functions.safe_push (funcdecl);
             }
           }
         }
@@ -639,8 +642,9 @@ check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   if (gimple_call_num_args (s1) != gimple_call_num_args (s2))
     return false;
 
-  if (!gimple_call_same_target_p (s1, s2))
-    return false;
+  // TODO: remove
+  // if (!gimple_call_same_target_p (s1, s2))
+  //  return false;
 
   /* Checking of argument.  */
   for (i = 0; i < gimple_call_num_args (s1); ++i)
@@ -1319,9 +1323,255 @@ dump_sem_group (sem_func_t *f)
   fputc ('\n', dump_file);
 }
 
+// TODO: START
+
+struct cong_item;
+struct cong_class;
+
+typedef struct cong_use
+{
+  unsigned int index;
+  vec<struct cong_item *> usage;
+} cong_use_t;
+
+struct cong_item_var_hash: typed_noop_remove <struct cong_item>
+{
+  typedef struct cong_item value_type;
+  typedef struct cong_item compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+};
+
+inline hashval_t
+cong_item_var_hash::hash (const struct cong_item *item)
+{
+  return 12345; //(hashval_t)(void *)item;
+}
+
+inline int
+cong_item_var_hash::equal (const struct cong_item *item1, const struct cong_item *item2)
+{
+  return item1 == item2;
+}
+
+struct cong_use_var_hash: typed_noop_remove <cong_use_t>
+{
+  typedef cong_use_t value_type;
+  typedef cong_use_t compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+};
+
+inline hashval_t
+cong_use_var_hash::hash (const cong_use_t *item)
+{
+  return item->index;
+}
+
+inline int
+cong_use_var_hash::equal (const cong_use_t *item1, const cong_use_t *item2)
+{
+  return item1->index == item2->index;
+}
+
+void
+cong_use_insert (hash_table <cong_use_var_hash> &hash, unsigned int index, const struct cong_item *item)
+{
+  cong_use_t **slot;
+  cong_use_t *usage = XNEW (cong_use_t);
+
+  if (!hash.is_created())
+    hash.create (2);
+
+  usage->index = index;
+  slot = hash.find_slot (usage, INSERT);
+
+  if (!(*slot))
+  {
+    *slot = usage;
+    usage->usage.create (2);
+  }
+  else
+  {
+    free (usage);
+    usage = *slot;
+  }
+
+ // TODO
+  // usage->usage.safe_push (item);
+}
+
+vec <struct cong_item *> *
+cong_use_find (struct cong_item *item, unsigned int index)
+{
+  cong_use_t use;
+  cong_use_t *result;
+
+  use.index = index;
+
+  //result = item->usage.find (&use);
+
+//  if (!result)
+    return NULL;
+
+//  return result->usage;
+}
+
+typedef struct cong_item
+{
+  unsigned int index;
+  unsigned int max_called_index;
+  sem_func_t *func;
+  struct cong_class *funcclass;
+  hash_table <cong_use_var_hash> usage;
+} cong_item_t;
+
+typedef struct cong_class
+{
+  unsigned int index;
+  unsigned int size;
+  hash_table <cong_item_var_hash> members;
+} cong_class_t;
+
+
+static hash_table <cong_item_var_hash> *
+cong_set_create (void)
+{
+  hash_table <cong_item_var_hash> *set = XNEW (hash_table <cong_item_var_hash>);
+  set->create (2);
+
+  return set;
+}
+
+static void
+cong_set_release (hash_table <cong_item_var_hash> *set)
+{
+  set->dispose ();
+  free (set);
+}
+
+static void
+cong_set_add (hash_table <cong_item_var_hash> *set, cong_item_t *item)
+{
+  cong_item_t **slot;
+
+  slot = set->find_slot (item, INSERT);
+  *slot = item;
+}
+
+static bool
+cong_set_contains (hash_table <cong_item_var_hash> *set, cong_item_t *item)
+{
+  return (set->find (item) != NULL);
+}
+
 /* All functions with the same hash are iterated and compared
  * for semantic equality. If a hit is encountered, we merge the function
  * and remove entry from linked list.  */
+
+static cong_item_t *
+create_cong_item (sem_func_t *f, unsigned int index)
+{
+  cong_item_t *item;
+
+  item = XNEW (cong_item_t);
+  item->func = f;
+  item->index = index;
+
+  return item;
+}
+
+static cong_item_t *
+find_func_by_decl (vec<cong_item_t *> &functions, tree func_decl)
+{
+  unsigned int i;
+
+  for(i = 0; i < functions.length (); ++i)
+    if (functions[i]->func->func_decl == func_decl)
+      return functions[i];
+
+  gcc_unreachable ();
+
+  return NULL;
+}
+
+static cong_item_t *
+find_func (vec<cong_item_t *> &functions, sem_func_t *func)
+{
+  unsigned int i;
+
+  for(i = 0; i < functions.length (); ++i)
+    if (functions[i]->func == func)
+      return functions[i];
+
+  gcc_unreachable ();
+
+  return NULL;
+}
+
+static void
+create_cong_calls (vec<cong_item_t *> &functions)
+{
+  unsigned int i, j;
+  sem_func_t *f;
+  cong_item_t *item;
+
+  for(i = 0; i < functions.length (); ++i)
+    {
+      f = functions[i]->func;
+
+      functions[i]->usage.create (0);
+
+      for (j = 0; j < f->called_functions.length (); ++j)
+        {
+          item = find_func_by_decl (functions, f->called_functions[j]);
+          cong_use_insert (functions[i]->usage, j, item);
+        }
+    }
+}
+
+static void
+do_congruence_step_index (vec<cong_class_t *> &classes, cong_class_t *d, unsigned int index)
+{
+  vec <hash_table<cong_item_var_hash> *> splitted;
+
+  splitted.create (classes.length ());
+
+  for (unsigned int i = 0; i < classes.length (); ++i)
+    splitted.safe_push (cong_set_create ());
+
+}
+
+
+static void
+do_congruence_step (vec<cong_class_t *> &classes, cong_class_t *d)
+{
+}
+
+static void
+dump_cong_classes (vec<cong_class_t *> &cong_classes)
+{
+  /*
+ // TODO
+  fprintf (stderr, "===\n");
+  for (unsigned i = 0; i < cong_classes.length (); ++i)
+  {
+    fprintf (stderr, "cong class with %u members:\n", cong_classes[i]->members.length ());
+
+    for (unsigned j = 0; j < cong_classes[i]->members.length (); ++j)
+    {
+      cong_item_t *item = cong_classes[i]->members[j];
+      fprintf(stderr, "  item: %u, name: %s\n", item->index, cgraph_node_name (item->func->node));
+
+      for(unsigned k = 0; k < item->called_func_list.length (); ++k)
+      {
+        cong_item_t *called = item->called_func_list[k];
+        fprintf(stderr, "    %u, name: %s\n", called->index, cgraph_node_name (called->func->node));
+      }
+    }
+  }
+  */
+}
 
 static void
 compare_groups (hash_table <sem_func_var_hash> *func_hash)
@@ -1331,7 +1581,31 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
   unsigned int funccount = 0;
   unsigned int eqcount = 0;
   bool result;
- 
+  cong_class_t *cclass;
+  cong_item_t *item;
+
+  vec<cong_item_t *> cong_functions;
+  vec<cong_class_t *> cong_classes;
+
+  cong_functions.create (0);
+  cong_classes.create (0);
+
+  for (hash_table <sem_func_var_hash>::iterator it = func_hash->begin ();
+       it != func_hash->end (); ++it)
+    {
+      f1 = &(*it);
+
+      while (f1)
+        {
+          cong_functions.safe_push (create_cong_item (f1, cong_functions.length ()));
+
+          f1 = f1->next;
+        }
+    }
+  
+  create_cong_calls (cong_functions);
+
+
   if (dump_file)
     {
       fputs ("Candidate groups:\n", dump_file);
@@ -1359,8 +1633,18 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
       if (!f1->next)
         single_count++;
     
-      while (f1->next)
+      while (f1)
       {
+        cclass = XNEW (cong_class_t);
+        cclass->members.create (1);
+        cclass->index = cong_classes.length ();
+
+        item = find_func (cong_functions, f1);
+        item->funcclass = cclass;
+
+        //cclass->members.safe_push (item);
+        //cong_classes.safe_push (cclass);
+
         f2 = f1->next;
         f2prev = f1;
 
@@ -1386,6 +1670,9 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
               dump_function_to_file (f2->func_decl, dump_file, TDF_DETAILS);
             }
 
+            item = find_func (cong_functions, f2);
+            //cclass->members.safe_push (item);
+
             /* Equal function merge */
             merge_functions (f1, f2);
           }
@@ -1395,11 +1682,33 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
           f2 = f2->next;
         }
 
-        if (f1->next)
-          f1 = f1->next;
+        f1 = f1->next;
       }
     }
 
+  dump_cong_classes (cong_classes); 
+/*
+  // TODO: congruence step
+  for (int i = 0; i < cong_classes.length (); ++i)
+    for (int j = 0; j < cong_classes[i]->members.length(); ++j)
+      for (int k = 0; k < cong_classes[i]->members.length(); ++k)
+      {
+        if (j == k)
+          continue;
+
+        cong_item_t *cong1 = cong_classes[i]->members[j];
+        cong_item_t *cong2 = cong_classes[i]->members[k];
+
+        for(int l = 0; l < cong1->called_func_list.length(); ++l)
+          if(cong1->called_func_list[l]->funcclass != cong2->called_func_list[l]->funcclass)
+          {
+            fprintf (stderr, "split found for class: %u\n", i);
+            goto aaa;
+          }
+      }
+
+  aaa:
+*/
   if (dump_file)
     {
       fputs ("Statistics\n\n", dump_file);
