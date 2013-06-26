@@ -62,7 +62,6 @@ static GTY(()) tree tp_counter_var;
 /* Add code:
    static gcov*	__gcov_indirect_call_counters; // pointer to actual counter
    static void*	__gcov_indirect_call_callee; // actual callee address
-   static int __gcov_time_profiler_counter; // actual number of called functions
 */
 static void
 init_ic_make_global_vars (void)
@@ -99,28 +98,6 @@ init_ic_make_global_vars (void)
       decl_default_tls_model (ic_gcov_type_ptr_var);
 
   varpool_finalize_decl (ic_gcov_type_ptr_var);
-}
-
-static void
-init_tp_make_global_vars (void)
-{
-  tree gcov_type_int;
-
-  gcov_type_int = make_node (INTEGER_TYPE);
-
-  tp_counter_var
-    = build_decl (UNKNOWN_LOCATION, VAR_DECL,
-		  get_identifier ("__gcov_time_profiler_counter"),
-		  gcov_type_int);
-  TREE_STATIC (tp_counter_var) = 1;
-  TREE_PUBLIC (tp_counter_var) = 0;
-  DECL_ARTIFICIAL (tp_counter_var) = 1;
-  DECL_INITIAL (tp_counter_var) = 0;
-  if (targetm.have_tls)
-    DECL_TLS_MODEL (tp_counter_var) =
-      decl_default_tls_model (tp_counter_var);
-
-  varpool_finalize_decl (tp_counter_var);
 }
 
 /* Create the type and function decls for the interface with gcov.  */
@@ -207,8 +184,6 @@ gimple_init_edge_profiler (void)
       DECL_ATTRIBUTES (tree_time_profiler_fn)
 	= tree_cons (get_identifier ("leaf"), NULL,
 		     DECL_ATTRIBUTES (tree_time_profiler_fn));
-
-      init_tp_make_global_vars ();
 
       /* void (*) (gcov_type *, gcov_type)  */
       average_profiler_fn_type

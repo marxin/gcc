@@ -193,7 +193,8 @@ instrument_values (histogram_values values)
 	  break;
 
 	case HIST_TYPE_IOR:
-	  gimple_gen_ior_profiler (hist, t, 0);
+    // TODO: gimp is causing problems
+	  // gimple_gen_ior_profiler (hist, t, 0);
 	  break;
 
 	default:
