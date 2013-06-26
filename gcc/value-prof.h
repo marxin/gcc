@@ -55,6 +55,7 @@ struct histogram_value_t
     } hvalue;
   enum hist_type type;			/* Type of information to measure.  */
   unsigned n_counters;			/* Number of required counters.  */
+  struct function *fun;
   union
     {
       struct

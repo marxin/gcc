@@ -192,6 +192,7 @@ gimple_add_histogram_value (struct function *fun, gimple stmt,
 {
   hist->hvalue.next = gimple_histogram_value (fun, stmt);
   set_histogram_value (fun, stmt, hist);
+  hist->fun = fun;
 }
 
 
@@ -395,7 +396,7 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple stmt)
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
   case HIST_TYPE_TIME_PROFILE:
-	  ncounters = 2;
+	  ncounters = 3;
 	  break;
 
 	case HIST_TYPE_SINGLE_VALUE:
@@ -493,7 +494,9 @@ visit_hist (void **slot, void *data)
 {
   struct pointer_set_t *visited = (struct pointer_set_t *) data;
   histogram_value hist = *(histogram_value *) slot;
-  if (!pointer_set_contains (visited, hist))
+
+  if (!pointer_set_contains (visited, hist)
+      && hist->type != HIST_TYPE_TIME_PROFILE)
     {
       error ("dead histogram");
       dump_histogram_value (stderr, hist);
@@ -1809,26 +1812,6 @@ gimple_indirect_call_to_profile (gimple stmt, histogram_values *values)
   return;
 }
 
-static void
-gimple_time_to_profile (gimple stmt, histogram_values *values)
-{
-  return;
-  tree retval;
-
-  if (gimple_code (stmt) != GIMPLE_RETURN)
-    return;
-
-  values->reserve (3);
-
-  retval = gimple_return_retval (stmt);
-
-  values->quick_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE,
-						    stmt, retval));
-
-  return;
-}
-
-
 /* Find values inside STMT for that we want to measure histograms for
    string operations.  */
 static void
@@ -1873,7 +1856,6 @@ gimple_values_to_profile (gimple stmt, histogram_values *values)
   gimple_divmod_values_to_profile (stmt, values);
   gimple_stringops_values_to_profile (stmt, values);
   gimple_indirect_call_to_profile (stmt, values);
-  gimple_time_to_profile (stmt, values);
 }
 
 void

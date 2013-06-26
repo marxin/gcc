@@ -438,7 +438,6 @@ void
 gimple_gen_time_profiler (histogram_value value, unsigned tag, unsigned base,
                           gimple_stmt_iterator &gsi)
 { 
-  // TODO: split edge here
   tree ref_ptr = tree_coverage_counter_addr (tag, base);
   gimple call;
 

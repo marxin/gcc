@@ -900,6 +900,13 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       hist->hvalue.counters =  XNEWVEC (gcov_type, hist->n_counters);
       for (j = 0; j < hist->n_counters; j++)
 	hist->hvalue.counters[j] = aact_count[j];
+
+      if (hist->type == HIST_TYPE_TIME_PROFILE)
+        {
+          hist->fun->tp_first_run = hist->hvalue.counters[0];
+          hist->fun->tp_called_once = hist->hvalue.counters[0] > 0
+            && hist->hvalue.counters[0] == hist->hvalue.counters[1];
+        }
     }
 
   for (t = 0; t < GCOV_N_VALUE_COUNTERS; t++)

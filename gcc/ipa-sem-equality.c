@@ -342,6 +342,9 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   if (!cgraph_function_with_gimple_body_p (node))
     return false;
 
+  fprintf (stderr, "Function: %s, first run: %u, called once: %u\n", cgraph_node_name (node),
+           my_function->tp_first_run, my_function->tp_called_once);
+
   f->ssa_names_size = SSANAMES (my_function)->length ();
   f->node = node;
 
