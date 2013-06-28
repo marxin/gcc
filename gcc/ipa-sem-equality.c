@@ -73,6 +73,7 @@ typedef struct sem_func sem_func_t;
 /* Function struct for sematic equality pass.  */
 typedef struct sem_func
 {
+  unsigned int index;
   struct cgraph_node *node;
   tree func_decl;
   eh_region region_tree;
@@ -87,6 +88,7 @@ typedef struct sem_func
   sem_bb_t **bb_sorted;
   sem_func_t *next;
   vec<tree> called_functions;
+  hashval_t hash;
 } sem_func_t;
 
 /* Basic block struct for sematic equality pass.  */
@@ -112,6 +114,8 @@ typedef struct edge_pair
   edge source;
   edge target;
 } edge_pair_t;
+
+static vec<sem_func_t *> semantic_functions;
 
 /* Hash table struct used for a pair of declarations.  */
 
@@ -224,27 +228,7 @@ struct sem_func_var_hash: typed_noop_remove <sem_func_t>
 inline hashval_t
 sem_func_var_hash::hash (const sem_func_t *f)
 {
-  unsigned int i;
-
-  hashval_t hash = 0;
-  
-  hash = iterative_hash_object (f->arg_count, hash);
-  hash = iterative_hash_object (f->bb_count, hash);
-  hash = iterative_hash_object (f->edge_count, hash);
-  hash = iterative_hash_object (f->cfg_checksum, hash);
-
-  for (i = 0; i < f->arg_count; ++i)
-    hash = iterative_hash_object (f->arg_types[i], hash);
-
-  hash = iterative_hash_object (f->result_type, hash);
-
-  for (i = 0; i < f->bb_count; ++i)
-    hash = iterative_hash_object (f->bb_sizes[i], hash);
-
-  for (i = 0; i < f->bb_count; ++i)
-    hash = iterative_hash_object (f->bb_sorted[i]->hashcode, hash);
-
-  return hash;
+  return f->hash;
 }
 
 /* Returns zero if F1 and F2 are equal semantic functions.  */
@@ -285,6 +269,40 @@ bb_hash (const void *basic_block)
   return hash;
 }
 
+/* Module independent semantic equality computation function.  */
+hashval_t
+independent_hash (sem_func_t *f)
+{
+  unsigned int i;
+  hashval_t hash;
+  
+  hash = iterative_hash_object (f->arg_count, hash);
+  hash = iterative_hash_object (f->bb_count, hash);
+  hash = iterative_hash_object (f->edge_count, hash);
+  hash = iterative_hash_object (f->cfg_checksum, hash);
+
+  for (i = 0; i < f->bb_count; ++i)
+    hash = iterative_hash_object (f->bb_sizes[i], hash);
+
+  for (i = 0; i < f->bb_count; ++i)
+    hash = iterative_hash_object (f->bb_sorted[i]->hashcode, hash);
+
+  return hash;
+}
+
+hashval_t
+hash_for_trees (sem_func_t *f)
+{
+  hashval_t hash = 0;
+
+  for (unsigned int i = 0; i < f->arg_count; i++)
+    hash = iterative_hash_object (f->arg_types [i], hash);
+
+  hash = iterative_hash_object (f->result_type, hash);
+
+  return hash;
+}
+
 /* Checks two SSA names SSA1 and SSA2 from a different functions and returns true
    if equal. Function dictionary D is equired for a correct comparison. */
 
@@ -309,6 +327,27 @@ func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
   return true;
 }
 
+static void
+parse_semfunc_trees (sem_func_t *f)
+{
+  unsigned int param_num;
+  tree result;
+  tree fnargs = DECL_ARGUMENTS (f->func_decl);
+
+  f->arg_types = XNEWVEC (tree, f->arg_count);
+
+  for (tree parm = fnargs; parm; parm = DECL_CHAIN (parm))
+    f->arg_types[param_num++] = TYPE_CANONICAL (DECL_ARG_TYPE (parm));
+
+  /* Function result type.  */
+  result = DECL_RESULT (f->func_decl);
+
+  if (result)
+    f->result_type = TYPE_CANONICAL (TREE_TYPE (result));
+  else
+    f->result_type = NULL;
+}
+
 /* Semantic equality visit function loads all basic informations 
    about a function NODE and save them to a structure used for a further analysis.
    Successfull parsing fills F and returns true.  */
@@ -316,9 +355,9 @@ func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
 static bool
 visit_function (struct cgraph_node *node, sem_func_t *f)
 {
-  tree fndecl, fnargs, parm, result, funcdecl;
+  tree fndecl, fnargs, parm, funcdecl;
   unsigned int param_num, gimple_count, bb_count;
-  struct function *my_function;
+  struct function *func;
   gimple_stmt_iterator gsi;
   gimple stmt;
   basic_block bb;
@@ -326,18 +365,18 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   hashval_t gcode_hash, code;
 
   fndecl = node->symbol.decl;    
-  my_function = DECL_STRUCT_FUNCTION (fndecl);
+  func = DECL_STRUCT_FUNCTION (fndecl);
 
   f->called_functions.create (0);
 
   if (!cgraph_function_with_gimple_body_p (node))
     return false;
 
-  f->ssa_names_size = SSANAMES (my_function)->length ();
+  f->ssa_names_size = SSANAMES (func)->length ();
   f->node = node;
 
   f->func_decl = fndecl;
-  f->region_tree = my_function->eh->region_tree;
+  f->region_tree = func->eh->region_tree;
   fnargs = DECL_ARGUMENTS (fndecl);
 
   /* iterating all function arguments.  */
@@ -346,29 +385,18 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     param_num++;
 
   f->arg_count = param_num;
-  f->arg_types = XNEWVEC (tree, param_num);
-
-  param_num = 0;
-  for (parm = fnargs; parm; parm = DECL_CHAIN (parm))
-    f->arg_types[param_num++] = TYPE_CANONICAL (DECL_ARG_TYPE (parm));
-
-  /* Function result type.  */
-  result = DECL_RESULT (fndecl);
-
-  if (result)
-    f->result_type = TYPE_CANONICAL (TREE_TYPE (DECL_RESULT (fndecl)));
 
   /* basic block iteration.  */
-  f->bb_count = n_basic_blocks_for_function (my_function) - 2;
+  f->bb_count = n_basic_blocks_for_function (func) - 2;
 
-  f->edge_count = n_edges_for_function (my_function);
+  f->edge_count = n_edges_for_function (func);
   f->bb_sizes = XNEWVEC (unsigned int, f->bb_count);
 
   f->bb_sorted = XNEWVEC (sem_bb_t *, f->bb_count);
-  f->cfg_checksum = coverage_compute_cfg_checksum_fn (my_function);
+  f->cfg_checksum = coverage_compute_cfg_checksum_fn (func);
 
   bb_count = 0;
-  FOR_EACH_BB_FN (bb, my_function)
+  FOR_EACH_BB_FN (bb, func)
     {
       gimple_count = 0;
       gcode_hash = 0;
@@ -1334,26 +1362,6 @@ typedef struct cong_use
   vec<struct cong_item *> usage;
 } cong_use_t;
 
-struct cong_item_var_hash: typed_noop_remove <struct cong_item>
-{
-  typedef struct cong_item value_type;
-  typedef struct cong_item compare_type;
-  static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);  
-};
-
-inline hashval_t
-cong_item_var_hash::hash (const struct cong_item *item)
-{
-  return 12345; //(hashval_t)(void *)item;
-}
-
-inline int
-cong_item_var_hash::equal (const struct cong_item *item1, const struct cong_item *item2)
-{
-  return item1 == item2;
-}
-
 struct cong_use_var_hash: typed_noop_remove <cong_use_t>
 {
   typedef cong_use_t value_type;
@@ -1374,208 +1382,374 @@ cong_use_var_hash::equal (const cong_use_t *item1, const cong_use_t *item2)
   return item1->index == item2->index;
 }
 
-void
-cong_use_insert (hash_table <cong_use_var_hash> &hash, unsigned int index, const struct cong_item *item)
-{
-  cong_use_t **slot;
-  cong_use_t *usage = XNEW (cong_use_t);
-
-  if (!hash.is_created())
-    hash.create (2);
-
-  usage->index = index;
-  slot = hash.find_slot (usage, INSERT);
-
-  if (!(*slot))
-  {
-    *slot = usage;
-    usage->usage.create (2);
-  }
-  else
-  {
-    free (usage);
-    usage = *slot;
-  }
-
- // TODO
-  // usage->usage.safe_push (item);
-}
-
-vec <struct cong_item *> *
-cong_use_find (struct cong_item *item, unsigned int index)
-{
-  cong_use_t use;
-  cong_use_t *result;
-
-  use.index = index;
-
-  //result = item->usage.find (&use);
-
-//  if (!result)
-    return NULL;
-
-//  return result->usage;
-}
-
 typedef struct cong_item
 {
   unsigned int index;
-  unsigned int max_called_index;
   sem_func_t *func;
-  struct cong_class *funcclass;
+  struct cong_class *parent_class;
+  bitmap usage_bitmap;
   hash_table <cong_use_var_hash> usage;
+  unsigned int usage_count;
 } cong_item_t;
 
 typedef struct cong_class
 {
   unsigned int index;
   unsigned int size;
-  hash_table <cong_item_var_hash> members;
+  vec <cong_item_t *> *members;
 } cong_class_t;
 
+static vec<cong_class_t *> congruence_classes;
+static vec<cong_item_t *> congruence_items;
 
-static hash_table <cong_item_var_hash> *
-cong_set_create (void)
+void
+cong_usage_insert (struct cong_item *source, unsigned int index,
+                 struct cong_item *item)
 {
-  hash_table <cong_item_var_hash> *set = XNEW (hash_table <cong_item_var_hash>);
-  set->create (2);
+  cong_use_t **slot;
+  cong_use_t *u = XNEW (cong_use_t);
 
-  return set;
+  if (!source->usage.is_created())
+    source->usage.create (2);
+
+  u->index = index;
+  slot = source->usage.find_slot (u, INSERT);
+
+  if (!(*slot))
+  {
+    *slot = u;
+    u->usage.create (2);
+  }
+  else
+  {
+    XDELETE (u);
+    u = *slot;
+  }
+
+  u->usage.safe_push (item);
+
+  bitmap_set_bit (source->usage_bitmap, index);
+  source->usage_count++;
 }
 
-static void
-cong_set_release (hash_table <cong_item_var_hash> *set)
+vec <cong_item_t *> *
+cong_use_find (cong_item_t *item, unsigned int index)
 {
-  set->dispose ();
-  free (set);
+  cong_use_t use;
+  cong_use_t *result;
+
+  use.index = index;
+
+  result = item->usage.find (&use);
+
+  if (!result)
+    return NULL;
+
+  return &result->usage;
 }
 
-static void
-cong_set_add (hash_table <cong_item_var_hash> *set, cong_item_t *item)
-{
-  cong_item_t **slot;
-
-  slot = set->find_slot (item, INSERT);
-  *slot = item;
-}
-
-static bool
-cong_set_contains (hash_table <cong_item_var_hash> *set, cong_item_t *item)
-{
-  return (set->find (item) != NULL);
-}
 
 /* All functions with the same hash are iterated and compared
  * for semantic equality. If a hit is encountered, we merge the function
  * and remove entry from linked list.  */
 
-static cong_item_t *
-create_cong_item (sem_func_t *f, unsigned int index)
+static void
+dump_cong_classes (void)
 {
-  cong_item_t *item;
+  fprintf (stderr, "\n=== Congruence classes dump ===\n");
+  for (unsigned i = 0; i < congruence_classes.length (); ++i)
+  {
+    fprintf (stderr, " class: %u:\n", i);
 
-  item = XNEW (cong_item_t);
-  item->func = f;
-  item->index = index;
+    for (unsigned j = 0; j < congruence_classes[i]->members->length (); ++j)
+    {
+      cong_item_t *item = (*congruence_classes[i]->members)[j];
+      fprintf (stderr, "  %s (%u)\n", cgraph_node_name (item->func->node), item->index);
 
-  return item;
+      for (hash_table <cong_use_var_hash>::iterator it = item->usage.begin ();
+           it != item->usage.end (); ++it)
+        {
+          cong_use_t *use = &(*it);
+
+          for (unsigned int k = 0; k < use->usage.length (); k++)
+            {
+              cong_item_t *item2 = use->usage[k];
+              fprintf (stderr, "   used in: %s, as an argument: %u\n",
+                       cgraph_node_name (item2->func->node), use->index);
+            }
+        }
+    }
+  }
 }
 
-static cong_item_t *
-find_func_by_decl (vec<cong_item_t *> &functions, tree func_decl)
+static void
+redirect_cong_item_parents (cong_class_t *c)
 {
-  unsigned int i;
-
-  for(i = 0; i < functions.length (); ++i)
-    if (functions[i]->func->func_decl == func_decl)
-      return functions[i];
-
-  gcc_unreachable ();
-
-  return NULL;
+  for (unsigned int i = 0; i < c->members->length (); i++)
+    (*c->members)[i]->parent_class = c;
 }
 
-static cong_item_t *
-find_func (vec<cong_item_t *> &functions, sem_func_t *func)
+static void
+insert_cong_item_to_group (cong_item_t *f)
 {
-  unsigned int i;
+  cong_class_t *c;
 
-  for(i = 0; i < functions.length (); ++i)
-    if (functions[i]->func == func)
-      return functions[i];
+  for (unsigned int j = 0; j < congruence_classes.length (); j++)
+    {
+      c = congruence_classes [j];
 
-  gcc_unreachable ();
+      if ((*c->members)[0]->func->hash == f->func->hash
+          && compare_functions ((*c->members)[0]->func, f->func))
+          {
+            f->parent_class = c;
+            (*c->members).safe_push (f);
+            return;
+          }
+    }
+
+  /* New group should be created.  */
+  c = XCNEW (cong_class_t);
+  c->index = congruence_classes.length ();
+  c->members = XCNEW(vec<cong_item_t *>);
+  c->members->create (4);
+  c->members->safe_push (f);
+  f->parent_class = c;
+
+  congruence_classes.safe_push (c);
+}
+
+static sem_func_t *
+find_func_by_decl (tree decl)
+{
+  for (unsigned int i = 0; i < semantic_functions.length (); i++)
+    if (semantic_functions[i]->func_decl == decl)
+      return semantic_functions[i];
 
   return NULL;
 }
 
 static void
-create_cong_calls (vec<cong_item_t *> &functions)
+build_cong_classes (void)
 {
-  unsigned int i, j;
-  sem_func_t *f;
   cong_item_t *item;
+  cong_class_t *c;
 
-  for(i = 0; i < functions.length (); ++i)
+  congruence_classes.create (16);
+  congruence_items.create (16);
+
+  /* Cong item structure is allocated for each function.  */
+  for (unsigned int i = 0; i < semantic_functions.length (); i++)
     {
-      f = functions[i]->func;
+      item = XCNEW (cong_item_t);
+      item->index = i;
+      item->func = semantic_functions[i];
+      item->usage_bitmap = BITMAP_GGC_ALLOC ();
+      item->usage.create (4);
 
-      functions[i]->usage.create (0);
+      congruence_items.safe_push (item);
+    }
 
-      for (j = 0; j < f->called_functions.length (); ++j)
+  /* All cong items are placed to corresponding groups that are allocated.  */
+  for (unsigned int i = 0; i < congruence_items.length (); i++)
+    insert_cong_item_to_group (congruence_items [i]);
+
+  /* Function usage is constructed.  */
+  for (unsigned int i = 0; i < congruence_items.length (); i++)
+    {
+      item = congruence_items[i];
+
+      for (unsigned int j = 0; j < item->func->called_functions.length (); j++)
         {
-          item = find_func_by_decl (functions, f->called_functions[j]);
-          cong_use_insert (functions[i]->usage, j, item);
+          sem_func_t *sf = find_func_by_decl (item->func->called_functions[j]);
+          cong_item_t *item2 =
+            congruence_items[sf->index];
+
+          cong_usage_insert(item2, j, item);
         }
     }
 }
 
 static void
-do_congruence_step_index (vec<cong_class_t *> &classes, cong_class_t *d, unsigned int index)
+copy_class_vector (vec <cong_class_t *> &source, vec <cong_class_t *> &dest)
 {
-  vec <hash_table<cong_item_var_hash> *> splitted;
+  dest.create (source.length ());
 
-  splitted.create (classes.length ());
-
-  for (unsigned int i = 0; i < classes.length (); ++i)
-    splitted.safe_push (cong_set_create ());
-
-}
-
-
-static void
-do_congruence_step (vec<cong_class_t *> &classes, cong_class_t *d)
-{
+  for (unsigned int i = 0; i < source.length (); i++)
+    dest.quick_push (source[i]);
 }
 
 static void
-dump_cong_classes (vec<cong_class_t *> &cong_classes)
+add_to_worklist (vec <cong_class_t *> &worklist, cong_class_t *c)
 {
-  /*
- // TODO
-  fprintf (stderr, "===\n");
-  for (unsigned i = 0; i < cong_classes.length (); ++i)
-  {
-    fprintf (stderr, "cong class with %u members:\n", cong_classes[i]->members.length ());
+  for (unsigned int i = 0; i < worklist.length (); i++)
+    if (worklist[i] == c)
+      return;
 
-    for (unsigned j = 0; j < cong_classes[i]->members.length (); ++j)
+  worklist.safe_push (c);
+}
+
+typedef struct cong_info
+{
+  bitmap bm;
+  unsigned int count;
+} cong_info_t;
+
+static bool
+do_cong_step_for_index (cong_class *c, unsigned int index, vec <cong_class_t *> &worklist)
+{
+  volatile unsigned int i, j;
+  cong_use_t *use;
+  cong_info_t *split[2];
+
+  unsigned int conglength = congruence_classes.length ();
+
+  for (int i = 0; i < 2; i++)
     {
-      cong_item_t *item = cong_classes[i]->members[j];
-      fprintf(stderr, "  item: %u, name: %s\n", item->index, cgraph_node_name (item->func->node));
+      split[i] = XNEWVEC (cong_info_t, conglength);
 
-      for(unsigned k = 0; k < item->called_func_list.length (); ++k)
-      {
-        cong_item_t *called = item->called_func_list[k];
-        fprintf(stderr, "    %u, name: %s\n", called->index, cgraph_node_name (called->func->node));
-      }
+      for (j = 0; j < conglength; j++)
+        split[i][j].bm = BITMAP_GGC_ALLOC ();
     }
-  }
-  */
+
+  for (unsigned int i = 0; i < c->members->length (); i++)
+    {
+      cong_use_t u;
+      u.index = index;
+
+      use = (*c->members)[i]->usage.find (&u);
+      if (use)
+        for (unsigned int j = 0; j < use->usage.length (); j++)
+          {
+            cong_item_t *source = use->usage[j];
+            cong_class_t *sc = source->parent_class;
+            unsigned int target = sc == c ? 0 : 1;
+            cong_info_t *info = &split[target][sc->index];
+
+            bitmap_set_bit (info->bm, source->index);
+            info->count++;
+          }
+    }
+
+  /* New split for each existing group is tested.  */
+  for (i = 0; i < conglength; i++)
+    {
+      cong_info_t *hit = NULL;
+
+      for (unsigned int j = 0; j < 2; j++)
+        if (split[j][i].count > 0 &&
+          split[j][i].count < congruence_classes[i]->members->length ())
+          {
+            hit = &split[j][i];
+            debug_bitmap (hit->bm);
+            break;
+          }
+    
+      if (hit)
+        {
+          unsigned int index, small, large;
+          bitmap_iterator bi;
+          vec<cong_item_t *> *swap;
+
+          unsigned int usage_count[2];
+          vec<cong_item_t *> *new_members[2];
+
+          for (unsigned int k = 0; k < 2; k++)
+            {
+              usage_count[k] = 0;
+              new_members[k] = XNEW (vec<cong_item_t *>);
+              new_members[k]->create (4); // TODO
+            }
+
+          for (unsigned int l = 0;
+               l < congruence_classes[i]->members->length (); l++)
+            {
+              unsigned int c = bitmap_bit_p (hit->bm, (*congruence_classes[i]->members)[l]->index) ? 0 : 1;
+              usage_count[c] += (*congruence_classes[i]->members)[l]->usage_count;
+              new_members[c]->safe_push ((*congruence_classes[i]->members)[l]);
+            }
+
+          gcc_assert (new_members[0]->length () > 0);
+          gcc_assert (new_members[1]->length () > 0);
+
+          small = usage_count[0] < usage_count[1] ? 0 : 1;
+          large = (small + 1) % 2;
+
+          /* Existing group is replaced with new member list.  */
+          congruence_classes[i]->members->release ();
+          XDELETE (congruence_classes[i]->members);
+
+          congruence_classes[i]->members = new_members[small];
+
+          /* New group is created and added to list of congruent classes.  */
+          cong_class_t *newclass = XCNEW (cong_class_t);          
+          newclass->index = congruence_classes.length ();
+          newclass->members = new_members[large];
+
+          redirect_cong_item_parents (newclass);
+          congruence_classes.safe_push (newclass);
+
+          add_to_worklist (worklist, small == 0 ? congruence_classes[i] : congruence_classes.last ());
+        }
+    }
+
+   XDELETEVEC (split[0]);
+   XDELETEVEC (split[1]);
+}
+
+static void
+check_cong_class (void)
+{
+  for (unsigned int i = 0; i < congruence_classes.length (); i++)
+    for (unsigned int j = 0; j < (*congruence_classes[i]->members).length (); j++)
+    {
+      cong_item_t *item = (*congruence_classes[i]->members)[j];
+
+      gcc_assert (item->parent_class == congruence_classes[i]);
+    }
+}
+
+static void
+process_congruence_step (vec<cong_class_t *> &worklist, cong_class *c)
+{
+  bitmap_iterator bi;
+  unsigned int i;
+
+  bitmap usage = BITMAP_GGC_ALLOC ();
+
+  for (unsigned int i = 0; i < c->members->length (); i++)
+    bitmap_ior_into (usage, (*c->members)[i]->usage_bitmap);
+
+  EXECUTE_IF_SET_IN_BITMAP (usage, 0, i, bi)
+    {
+      do_cong_step_for_index (c, i, worklist);
+      check_cong_class ();
+      dump_cong_classes();
+    }
+}
+
+static void
+process_congruence_reduction (void)
+{
+  vec <cong_class_t *> worklist;
+  worklist.create (congruence_classes.length ());
+
+  copy_class_vector (congruence_classes, worklist);
+
+  while (!worklist.is_empty ())
+    {
+      cong_class_t *c = worklist.pop ();
+
+      fprintf (stderr, "Congruence step for class: %u\n", c->index);
+      process_congruence_step (worklist, c);
+    }
+
+  worklist.release ();
 }
 
 static void
 compare_groups (hash_table <sem_func_var_hash> *func_hash)
 {
+  /*
   sem_func_t *f1, *f2, *f2prev;
   size_t single_count = 0;
   unsigned int funccount = 0;
@@ -1602,7 +1776,8 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
           f1 = f1->next;
         }
     }
-  
+ 
+  return;
   create_cong_calls (cong_functions);
 
 
@@ -1658,7 +1833,6 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
           {
             eqcount++;
 
-            /* Node must be skipped for the next time.  */
             f2prev->next = f2->next;
 
             if (dump_file)
@@ -1673,7 +1847,6 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
             item = find_func (cong_functions, f2);
             //cclass->members.safe_push (item);
 
-            /* Equal function merge */
             merge_functions (f1, f2);
           }
           else
@@ -1687,6 +1860,7 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
     }
 
   dump_cong_classes (cong_classes); 
+  */
 /*
   // TODO: congruence step
   for (int i = 0; i < cong_classes.length (); ++i)
@@ -1708,7 +1882,6 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
       }
 
   aaa:
-*/
   if (dump_file)
     {
       fputs ("Statistics\n\n", dump_file);
@@ -1722,9 +1895,42 @@ compare_groups (hash_table <sem_func_var_hash> *func_hash)
       fprintf (dump_file, "Fraction of all functions: %.2f%%\n\n",
                100.f * eqcount / funccount);
     }
+*/
 }
 
 /* IPA semantic equality pass entry point.  */
+
+static void
+visit_all_functions (void)
+{
+  struct cgraph_node *node;
+  sem_func_t *f;
+
+  FOR_EACH_DEFINED_FUNCTION (node)
+    {
+      f = XNEW (sem_func_t);
+      f->next = NULL;
+
+      if (visit_function (node, f))
+        {
+          f->index = semantic_functions.length ();
+          semantic_functions.safe_push (f);
+        }
+      else
+        XDELETE (f);
+    }
+}
+
+static void
+enhance_hash_for_trees (sem_func_t *f)
+{
+  hashval_t hash = 0;
+
+  parse_semfunc_trees (f);
+
+  hash = hash_for_trees (f);
+  f->hash = iterative_hash_object (f->hash, hash);
+}
 
 static unsigned int
 semantic_equality (void)
@@ -1734,31 +1940,30 @@ semantic_equality (void)
   struct cgraph_node *node;
   unsigned int nnodes = 0;
   sem_func_t **slot;
-  hash_table <sem_func_var_hash> sem_function_hash;
+  
+  /* LGEN phase: all functions are visited and independent is computed.  */
 
-  sem_function_hash.create (nnodes);
+  // TODO: find correct number
+  semantic_functions.create (16);
+  visit_all_functions ();
 
-  FOR_EACH_DEFINED_FUNCTION (node)
-    {
-      f = XNEW (sem_func_t);
-      f->next = NULL;
+  for (unsigned int i = 0; i < semantic_functions.length (); i++)
+    semantic_functions[i]->hash = independent_hash (semantic_functions[i]);
 
-      detected = visit_function (node, f);
-      if (detected)
-        {
-          slot = sem_function_hash.find_slot (f, INSERT);
-          
-          f1 = (sem_func_t *) *slot;
-          f->next = f1;
-          *slot = f;
-        }
-      else
-        free (f);
-    }
+  /* WPA phase: trees are merged, we can compare function declarations
+   * and result type.  */
 
-  compare_groups (&sem_function_hash);
+  for (unsigned int i = 0; i < semantic_functions.length (); i++)
+    enhance_hash_for_trees (semantic_functions[i]);
 
-  sem_function_hash.dispose();
+  /* LTRANS phase: functions are splitted to groups according to deep
+   * equality comparison. Last step is congruence calculation.  */
+
+  build_cong_classes ();
+  dump_cong_classes ();
+
+  process_congruence_reduction ();
+  dump_cong_classes ();
 
   return 0; 
 }
