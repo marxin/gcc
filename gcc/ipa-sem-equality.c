@@ -169,6 +169,35 @@ edge_var_hash::equal (const edge_pair_t *pair1, const edge_pair_t *pair2)
   return pair1->source == pair2->source;
 }
 
+/* Structure used for fast set look up for tree to sem_func_t assignment.  */
+
+typedef struct tree_semfunc
+{
+  tree decl;
+  sem_func_t *func;
+} tree_semfunc_t;
+
+struct tree_semfunc_var_hash: typed_noop_remove <tree_semfunc_t>
+{
+  typedef tree_semfunc_t value_type;
+  typedef tree_semfunc_t compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+};
+
+inline hashval_t
+tree_semfunc_var_hash::hash (const tree_semfunc_t *t)
+{
+  return (uintptr_t) t->decl;
+}
+
+inline int
+tree_semfunc_var_hash::equal (const tree_semfunc_t *t1,
+                              const tree_semfunc_t *t2)
+{
+  return t1->decl == t2->decl;
+}
+
 /* Struct used for all kind of function dictionaries like
    SSA names, call graph edges and all kind of declarations.  */
 
@@ -1449,6 +1478,9 @@ static vec<cong_item_t *> congruence_items;
 /* Global list of all congruence classes.  */
 static vec<cong_class_t *> congruence_classes;
 
+/* Global hash for fast tree to sem_func_t translation.  */
+static hash_table<tree_semfunc_var_hash> tree_decl_hash;
+
 /* SOURCE item is used in cungruence item ITEM. The item is used
  * at position INDEX in that congruence item.  */
 
@@ -1575,17 +1607,39 @@ insert_cong_item_to_group (cong_item_t *f)
   congruence_classes.safe_push (c);
 }
 
+static void
+build_tree_decl_hash (void)
+{
+  tree_semfunc_t *item;
+  tree_semfunc_t **slot;
+
+  tree_decl_hash.create (16);
+
+  for (unsigned int i = 0; i < semantic_functions.length (); i++)
+    {
+      item = XNEW (tree_semfunc_t);
+      item->decl = semantic_functions[i]->func_decl;
+      item->func = semantic_functions[i];
+
+      slot = tree_decl_hash.find_slot (item, INSERT);
+      *slot = item;
+    }
+}
+
 /* Function declaration DECL is searched in a collection of all
  * semantic functions.  */
 
 static sem_func_t *
 find_func_by_decl (tree decl)
 {
-  for (unsigned int i = 0; i < semantic_functions.length (); i++)
-    if (semantic_functions[i]->func_decl == decl)
-      return semantic_functions[i];
+  tree_semfunc_t item;
+  tree_semfunc_t *found;
 
-  return NULL;
+  item.decl = decl;
+
+  found = tree_decl_hash.find (&item);
+
+  return found ? found->func : NULL;
 }
 
 /* Congruence classes creation function. All existing semantic function
@@ -1663,7 +1717,9 @@ typedef struct cong_info
  * to WORKLIST.  */
 
 static bool
-do_cong_step_for_index (cong_class *c, unsigned int index, hash_table<cong_class_var_hash> &worklist)
+do_cong_step_for_index (cong_class *c, unsigned int index,
+                        hash_table<cong_class_var_hash> &worklist,
+                        bitmap_obstack &bmstack)
 {
   unsigned int i, j;
   cong_use_t *use;
@@ -1677,7 +1733,7 @@ do_cong_step_for_index (cong_class *c, unsigned int index, hash_table<cong_class
       split[i] = XCNEWVEC (cong_info_t, conglength);
 
       for (j = 0; j < conglength; j++)
-        split[i][j].bm = BITMAP_GGC_ALLOC ();
+        split[i][j].bm = BITMAP_ALLOC (&bmstack);
     }
 
   for (unsigned int i = 0; i < c->members->length (); i++)
@@ -1711,6 +1767,8 @@ do_cong_step_for_index (cong_class *c, unsigned int index, hash_table<cong_class
             hit = &split[j][i];
             break;
           }
+        else
+          BITMAP_FREE (split[j][i].bm);
     
       if (hit)
         {
@@ -1756,6 +1814,8 @@ do_cong_step_for_index (cong_class *c, unsigned int index, hash_table<cong_class
 
           add_to_worklist (worklist, small == 0 ? congruence_classes[i] : congruence_classes.last ());
 
+          BITMAP_FREE (hit->bm);
+
           result = true;
         }
     }
@@ -1766,44 +1826,32 @@ do_cong_step_for_index (cong_class *c, unsigned int index, hash_table<cong_class
    return result;
 }
 
-/* All invariants for contruence classes are validated.  */
-
-static void
-check_cong_class (void)
-{
-  for (unsigned int i = 0; i < congruence_classes.length (); i++)
-    for (unsigned int j = 0; j < (*congruence_classes[i]->members).length (); j++)
-    {
-      cong_item_t *item = (*congruence_classes[i]->members)[j];
-
-      gcc_assert (item->parent_class == congruence_classes[i]);
-    }
-}
-
 /* Congruence class C from WORKLIST could cause a split in the list
  * of existing groups.  */
 
 static void
-process_congruence_step (hash_table<cong_class_var_hash> &worklist, cong_class *c)
+process_congruence_step (hash_table<cong_class_var_hash> &worklist,
+                         cong_class *c, bitmap_obstack &bmstack)
 {
   bitmap_iterator bi;
   unsigned int i;
 
-  bitmap usage = BITMAP_GGC_ALLOC ();
+  bitmap usage = BITMAP_ALLOC (&bmstack);
 
   for (unsigned int i = 0; i < c->members->length (); i++)
     bitmap_ior_into (usage, (*c->members)[i]->usage_bitmap);
 
   EXECUTE_IF_SET_IN_BITMAP (usage, 0, i, bi)
     {
-      do_cong_step_for_index (c, i, worklist);
-      check_cong_class ();
+      do_cong_step_for_index (c, i, worklist, bmstack);
 
       /* TODO: remove
       if (ischange)
         dump_cong_classes();
       */
     }
+
+  BITMAP_FREE (usage);
 }
 
 /* Congruence reduction execution function.  */
@@ -1811,21 +1859,29 @@ process_congruence_step (hash_table<cong_class_var_hash> &worklist, cong_class *
 static void
 process_congruence_reduction (void)
 {
+  bitmap_obstack bmstack;
+
+  bitmap_obstack_initialize (&bmstack);
+
   hash_table<cong_class_var_hash> worklist;
   worklist.create (congruence_classes.length ());
 
   for (unsigned int i = 0; i < congruence_classes.length (); i++)
     add_to_worklist (worklist, congruence_classes[i]);
 
+  unsigned int xx = 0;
   while (worklist.elements ())
     {
+      fprintf (dump_file, "%u,%u\n", xx++, worklist.elements());
       cong_class_t *c = &(*worklist.begin ());
       worklist.remove_elt (c);
 
-      process_congruence_step (worklist, c);
-    }
+      process_congruence_step (worklist, c, bmstack);
+    }  
 
   worklist.dispose ();
+
+  bitmap_obstack_release (&bmstack);
 }
 
 static void
@@ -1937,11 +1993,18 @@ semantic_equality (void)
   
   /* LGEN phase: all functions are visited and independent is computed.  */
 
+  fprintf (dump_file, "going to visit all function\n");
+
   semantic_functions.create (16);
   visit_all_functions ();
+  build_tree_decl_hash ();
+
+  fprintf (dump_file, "all functions visited\n");
 
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     semantic_functions[i]->hash = independent_hash (semantic_functions[i]);
+
+  fprintf (dump_file, "simple hash computed\n");
 
   /* WPA phase: trees are merged, we can compare function declarations
    * and result type.  */
@@ -1949,21 +2012,31 @@ semantic_equality (void)
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     enhance_hash_for_trees (semantic_functions[i]);
 
+  fprintf (dump_file, "hash enhanced\n");
   /* LTRANS phase: functions are splitted to groups according to deep
    * equality comparison. Last step is congruence calculation.  */
 
   build_cong_classes ();
+
+  for(unsigned int i = 0; i < congruence_items.length(); i++)
+    fprintf (dump_file, "func: %u, usage: %u, calls: %u\n",
+             i, congruence_items[i]->usage_count, congruence_items[i]->func->called_functions.length());
   
   /* TODO: remove */
   /* dump_cong_classes ();
    */
   groupcount = congruence_classes.length ();
 
+  fprintf (dump_file, "conguence started\n");
   process_congruence_reduction ();
+  fprintf (dump_file, "conguence finished\n");
   
   merge_groups (groupcount);
+  fprintf (dump_file, "groups merged\n");
 
   congruence_clean_up ();
+
+  // TODO: clean up tree decl hash
 
   return 0; 
 }
