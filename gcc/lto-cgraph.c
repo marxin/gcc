@@ -970,7 +970,7 @@ input_node (struct lto_file_decl_data *file_data,
     {
       node = cgraph_clone_node (cgraph (nodes[clone_ref]), fn_decl,
 				0, CGRAPH_FREQ_BASE, false,
-				vNULL, false);
+				vNULL, false, NULL);
     }
   else
     {
@@ -1471,8 +1471,6 @@ input_symtab (void)
   struct lto_file_decl_data *file_data;
   unsigned int j = 0;
   struct cgraph_node *node;
-
-  cgraph_state = CGRAPH_STATE_IPA_SSA;
 
   while ((file_data = file_data_vec[j++]))
     {
