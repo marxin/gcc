@@ -73,31 +73,50 @@ typedef struct sem_func sem_func_t;
 /* Function struct for sematic equality pass.  */
 typedef struct sem_func
 {
+  /* Global unique function index.  */
   unsigned int index;
+  /* Call graph structure reference.  */
   struct cgraph_node *node;
+  /* Function declaration tree node.  */
   tree func_decl;
+  /* Exception handling region tree.  */
   eh_region region_tree;
+  /* Result type tree node.  */
   tree result_type;
+  /* Array of argument tree types.  */
   tree *arg_types;
+  /* Number of function arguments.  */
   unsigned int arg_count;
+  /* Basic block count.  */
   unsigned int bb_count;
+  /* Total amount of edges in the function.  */
   unsigned int edge_count;
+  /* Array of sizes of all basic blocks.  */
   unsigned int *bb_sizes;
+  /* Control flow graph checksum.  */
   unsigned cfg_checksum;
+  /* Total number of SSA names used in the function.  */
   unsigned ssa_names_size;
+  /* Array of structures for all basic blocks.  */
   sem_bb_t **bb_sorted;
-  sem_func_t *next;
+  /* Vector for all calls done by the function.  */
   vec<tree> called_functions;
+  /* Computed semantic function hash value.  */
   hashval_t hash;
 } sem_func_t;
 
 /* Basic block struct for sematic equality pass.  */
 typedef struct sem_bb
 {
+  /* Basic block the structure belongs to.  */
   basic_block bb;
+  /* Reference to the semantic function the basic block belongs to.  */
   sem_func_t *func;
+  /* Number of all statements in the basic block.  */
   unsigned stmt_count;
+  /* Number of edges connected to the block.  */
   unsigned edge_count;
+  /* Comptuted hash value for basic block.  */
   hashval_t hashcode;
 } sem_bb_t;
 
@@ -115,6 +134,7 @@ typedef struct edge_pair
   edge target;
 } edge_pair_t;
 
+/* Global vector for all semantic functions.  */
 static vec<sem_func_t *> semantic_functions;
 
 /* Hash table struct used for a pair of declarations.  */
@@ -209,7 +229,6 @@ typedef struct func_dict
   hash_table <edge_var_hash> edge_hash;
 } func_dict_t;
 
-
 /* Function dictionary initializer, all members of D are itiliazed.
    Arrays for SSA names are allocated according to SSA_NAMES_SIZE1 and
    SSA_NAMES_SIZE2 arguments.  */
@@ -240,40 +259,14 @@ func_dict_free (func_dict_t *d)
   d->edge_hash.dispose ();
 }
 
-/* Hash table struct used for a pair of semantic functions.  */
-
-struct sem_func_var_hash: typed_noop_remove <sem_func_t>
-{
-  typedef sem_func_t value_type;
-  typedef sem_func_t compare_type;
-  static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);  
-  static inline void remove (value_type *);
-};
-
-/* Hash compute function returns hash for a given semantic function
-   struct F.  */
-
-inline hashval_t
-sem_func_var_hash::hash (const sem_func_t *f)
-{
-  return f->hash;
-}
-
-/* Returns zero if F1 and F2 are equal semantic functions.  */
-
-inline int
-sem_func_var_hash::equal (const value_type *f1, const compare_type *f2)
-{
-  return sem_func_var_hash::hash (f1) == sem_func_var_hash::hash (f2);
-}
-
-/* Releases semantic function dictionary item F.  */
+/* Releases memory for a semantic function F.  */
 
 inline void
-sem_func_var_hash::remove (value_type *f)
+sem_func_free (sem_func_t *f)
 {
   unsigned int i;
+
+  f.called_functions.dispose ();
 
   for (i = 0; i < f->bb_count; ++i)
     free (f->bb_sorted[i]);
@@ -299,6 +292,7 @@ bb_hash (const void *basic_block)
 }
 
 /* Module independent semantic equality computation function.  */
+
 hashval_t
 independent_hash (sem_func_t *f)
 {
@@ -319,6 +313,9 @@ independent_hash (sem_func_t *f)
   return hash;
 }
 
+/* Independent hash value for semantic function F is enhanced for all
+ * known trees that live in global context.  */
+
 hashval_t
 hash_for_trees (sem_func_t *f)
 {
@@ -332,8 +329,9 @@ hash_for_trees (sem_func_t *f)
   return hash;
 }
 
-/* Checks two SSA names SSA1 and SSA2 from a different functions and returns true
-   if equal. Function dictionary D is equired for a correct comparison. */
+/* Checks two SSA names SSA1 and SSA2 from a different functions and
+ * returns true if equal. Function dictionary D is equired for a correct
+ * comparison.  */
 
 static bool
 func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
@@ -355,6 +353,9 @@ func_dict_ssa_lookup (func_dict_t *d, tree ssa1, tree ssa2)
 
   return true;
 }
+
+/* In global context all known trees are visited
+ * for given semantic function F.  */
 
 static void
 parse_semfunc_trees (sem_func_t *f)
@@ -378,8 +379,8 @@ parse_semfunc_trees (sem_func_t *f)
 }
 
 /* Semantic equality visit function loads all basic informations 
-   about a function NODE and save them to a structure used for a further analysis.
-   Successfull parsing fills F and returns true.  */
+   about a function NODE and save them to a structure used for a further
+   analysis. Successfull parsing fills F and returns true.  */
 
 static bool
 visit_function (struct cgraph_node *node, sem_func_t *f)
@@ -1171,7 +1172,8 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
               /* Catch label checking */
               if (c1->label && c2->label)
                 {
-                  if (!check_tree_ssa_label (c1->label, c2->label, d, func1, func2))                  
+                  if (!check_tree_ssa_label (c1->label, c2->label,
+                                             d, func1, func2))
                     return false;
                 }
               else if (c1->label || c2->label)
@@ -1192,7 +1194,8 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
           if (r1->u.allowed.filter != r2->u.allowed.filter)
             return false;
           
-          if (!compare_type_lists (r1->u.allowed.type_list, r2->u.allowed.type_list))
+          if (!compare_type_lists (r1->u.allowed.type_list,
+                                   r2->u.allowed.type_list))
             return false;
 
           break;
@@ -1467,7 +1470,8 @@ cong_class_var_hash::hash (const cong_class_t *item)
 
 /* Equal function compares pointer addresses.  */
 inline int
-cong_class_var_hash::equal (const cong_class_t *item1, const cong_class_t *item2)
+cong_class_var_hash::equal (const cong_class_t *item1,
+                            const cong_class_t *item2)
 {
   return item1 == item2;
 }
@@ -1546,7 +1550,8 @@ dump_cong_classes (void)
     for (unsigned j = 0; j < congruence_classes[i]->members->length (); ++j)
     {
       cong_item_t *item = (*congruence_classes[i]->members)[j];
-      fprintf (stderr, "   %s (%u)\n", cgraph_node_name (item->func->node), item->index);
+      fprintf (stderr, "   %s (%u)\n", cgraph_node_name (item->func->node),
+               item->index);
 
       for (hash_table <cong_use_var_hash>::iterator it = item->usage.begin ();
            it != item->usage.end (); ++it)
@@ -1847,7 +1852,9 @@ do_cong_step_for_index (cong_class *c, unsigned int index,
         for (unsigned int j = 0;
              j < congruence_classes[ci]->members->length (); j++)
           {
-            unsigned int c = bitmap_bit_p (entry->bm, (*congruence_classes[ci]->members)[j]->index) ? 0 : 1;
+            unsigned int c = bitmap_bit_p (entry->bm,
+              (*congruence_classes[ci]->members)[j]->index) ? 0 : 1;
+
             usage_count[c] += (*congruence_classes[ci]->members)[j]->usage_count;
             new_members[c]->safe_push ((*congruence_classes[ci]->members)[j]);
           }
@@ -1856,7 +1863,7 @@ do_cong_step_for_index (cong_class *c, unsigned int index,
         gcc_assert (new_members[1]->length () > 0);
 
         small = usage_count[0] < usage_count[1] ? 0 : 1;
-        large = (small + 1) % 2;
+        large = small == 0 ? 1 : 0;
 
         /* Existing group is replaced with new member list.  */
         congruence_classes[ci]->members->release ();
@@ -1872,7 +1879,8 @@ do_cong_step_for_index (cong_class *c, unsigned int index,
         redirect_cong_item_parents (newclass);
         congruence_classes.safe_push (newclass);
 
-        add_to_worklist (worklist, small == 0 ? congruence_classes[ci] : congruence_classes.last ());
+        add_to_worklist (worklist, small == 0
+          ? congruence_classes[ci] : congruence_classes.last ());
 
         result = true;
       }
@@ -1945,19 +1953,23 @@ merge_groups (unsigned int groupcount_before)
 {
   cong_class_t *c;
   sem_func_t *f1, *f2;
+  unsigned int func_count = semantic_functions.length ();
   unsigned int groupcount_after = congruence_classes.length ();
   unsigned int fcount = semantic_functions.length ();
+  unsigned int equal = congruence_items.length ()
+                       - congruence_classes.length ();
 
   if (dump_file)
     {
+      fprintf (dump_file, "\nFunction count: %u\n", func_count);
       fprintf (dump_file, "Congruent classes before: %u, after: %u\n",
                groupcount_before, groupcount_after);
       fprintf (dump_file, "Average class size before: %.2f, after: %.2f\n",
                1.0f * fcount / groupcount_before,
                1.0f * fcount / groupcount_after);
-      fprintf (dump_file, "Equal functions: %u\n\n",
-               congruence_items.length () - congruence_classes.length ());
-
+      fprintf (dump_file, "Equal functions: %u\n\n", equal);
+      fprintf (dump_file, "Fraction of visited functions: .2f%%\n",
+               100f * (equal - fcount) / fcount);
     }
 
   for (unsigned int i = 0; i < congruence_classes.length (); i++)
@@ -2017,7 +2029,6 @@ visit_all_functions (void)
   FOR_EACH_DEFINED_FUNCTION (node)
     {
       f = XNEW (sem_func_t);
-      f->next = NULL;
 
       if (visit_function (node, f))
         {
@@ -2065,26 +2076,27 @@ semantic_equality (void)
   /* LTRANS phase: functions are splitted to groups according to deep
    * equality comparison. Last step is congruence calculation.  */
 
+  /* List of all congruent functions is constructed.  */
   build_cong_classes ();
 
-  /* TODO: remove */
-  /*
-  for(unsigned int i = 0; i < congruence_items.length(); i++)
-    fprintf (dump_file, "func: %u, usage: %u, calls: %u\n",
-             i, congruence_items[i]->usage_count, congruence_items[i]->func->called_functions.length());
-  */
-
-  /* TODO: remove */
-  // dump_cong_classes ();
+  /* Amount of groups before contruence reductions is started */
   groupcount = congruence_classes.length ();
 
+  /* Main congruence execution function.  */
   process_congruence_reduction ();
-  
+ 
+  /* All functions that are in the same groups could be merged.  */
   merge_groups (groupcount);
 
+  /* Release of all data structures connected to contruence algorithm.  */
   congruence_clean_up ();
 
-  // TODO: clean up tree decl hash
+  for (unsigned int i = 0; i < semantic_functions.length (); i++)
+    sem_func_free (&semantic_functions[i]);
+
+  semantic_functions.release ();
+
+  tree_decl_hash.dispose ();
 
   return 0; 
 }
