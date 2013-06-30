@@ -1371,7 +1371,7 @@ init_optimization_passes (void)
   NEXT_PASS (pass_ipa_inline);
   NEXT_PASS (pass_ipa_pure_const);
   NEXT_PASS (pass_ipa_reference);
-  NEXT_PASS (pass_ipa_sem_equality);
+  // NEXT_PASS (pass_ipa_sem_equality);
   *p = NULL;
 
   p = &all_lto_gen_passes;
