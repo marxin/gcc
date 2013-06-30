@@ -569,7 +569,10 @@ void
 Assignment_statement::do_determine_types()
 {
   this->lhs_->determine_type_no_context();
-  Type_context context(this->lhs_->type(), false);
+  Type* rhs_context_type = this->lhs_->type();
+  if (rhs_context_type->is_sink_type())
+    rhs_context_type = NULL;
+  Type_context context(rhs_context_type, false);
   this->rhs_->determine_type(&context);
 }
 
@@ -1959,10 +1962,15 @@ Thunk_statement::is_simple(Function_type* fntype) const
 	      && results->begin()->type()->points_to() == NULL)))
     return false;
 
-  // If this calls something which is not a simple function, then we
+  // If this calls something that is not a simple function, then we
   // need a thunk.
   Expression* fn = this->call_->call_expression()->fn();
-  if (fn->interface_field_reference_expression() != NULL)
+  if (fn->func_expression() == NULL)
+    return false;
+
+  // If the function uses a closure, then we need a thunk.  FIXME: We
+  // could accept a zero argument function with a closure.
+  if (fn->func_expression()->closure() != NULL)
     return false;
 
   return true;
@@ -2502,7 +2510,11 @@ Thunk_statement::get_fn_and_arg(Expression** pfn, Expression** parg)
 
   Call_expression* ce = this->call_->call_expression();
 
-  *pfn = ce->fn();
+  Expression* fn = ce->fn();
+  Func_expression* fe = fn->func_expression();
+  go_assert(fe != NULL);
+  *pfn = Expression::make_func_code_reference(fe->named_object(),
+					      fe->location());
 
   const Expression_list* args = ce->args();
   if (args == NULL || args->empty())
@@ -2804,6 +2816,28 @@ Statement::make_return_statement(Expression_list* vals,
 				 Location location)
 {
   return new Return_statement(vals, location);
+}
+
+// Make a statement that returns the result of a call expression.
+
+Statement*
+Statement::make_return_from_call(Call_expression* call, Location location)
+{
+  size_t rc = call->result_count();
+  if (rc == 0)
+    return Statement::make_statement(call, true);
+  else
+    {
+      Expression_list* vals = new Expression_list();
+      if (rc == 1)
+	vals->push_back(call);
+      else
+	{
+	  for (size_t i = 0; i < rc; ++i)
+	    vals->push_back(Expression::make_call_result(call, i));
+	}
+      return Statement::make_return_statement(vals, location);
+    }
 }
 
 // A break or continue statement.
