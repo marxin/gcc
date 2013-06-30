@@ -1546,8 +1546,12 @@ dump_cgraph_node (FILE *f, struct cgraph_node *node)
     fprintf (f, " only_called_at_exit");
   if (node->tm_clone)
     fprintf (f, " tm_clone");
+  if (node->tp_called_once)
+    fprintf (f, " called_once");
 
   fprintf (f, "\n");
+
+  fprintf (f, "  First run: %u\n", node->tp_first_run);
 
   if (node->thunk.thunk_p)
     {
