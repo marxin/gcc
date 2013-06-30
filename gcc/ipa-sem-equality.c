@@ -1706,11 +1706,77 @@ add_to_worklist (hash_table<cong_class_var_hash> &worklist, cong_class_t *c)
 }
 
 /* Basic structure monitoring usage of items in a group.  */
-typedef struct cong_info
+typedef struct cong_info_entry
 {
   bitmap bm;
   unsigned int count;
+} cong_info_entry_t;
+
+typedef struct cong_info
+{
+  unsigned int index;
+  cong_info_entry_t split[2];
 } cong_info_t;
+
+struct cong_info_var_hash: typed_noop_remove <cong_info_t>
+{
+  typedef cong_info_t value_type;
+  typedef cong_info_t compare_type;
+  static inline hashval_t hash (const value_type *);
+  static inline int equal (const value_type *, const compare_type *);  
+  static inline void remove (value_type *);
+};
+
+inline hashval_t
+cong_info_var_hash::hash (const cong_info_t *item)
+{
+  return item->index;
+}
+
+/* Equal function compares pointer addresses.  */
+inline int
+cong_info_var_hash::equal (const cong_info_t *item1, const cong_info_t *item2)
+{
+  return item1->index == item2->index;
+}
+
+inline void
+cong_info_var_hash::remove (cong_info_t *item)
+{
+  for (unsigned int i = 0; i < 2; i++)
+    BITMAP_FREE (item->split[i].bm);
+
+  free (item);
+}
+
+static cong_info_t *
+find_info_for_index (hash_table<cong_info_var_hash> &htable,
+                     unsigned int index, bitmap_obstack &bmstack)
+{
+  cong_info_t **slot;
+  cong_info_t info;  
+  info.index = index;
+
+  slot = htable.find_slot (&info, INSERT);
+
+  if (*slot)
+    return *slot;
+  else
+    {
+      cong_info_t *new_info = XNEW (cong_info_t);
+      new_info->index = index;
+
+      for (unsigned int i = 0; i < 2; i++)        
+        {
+          new_info->split[i].count = 0;
+          new_info->split[i].bm = BITMAP_ALLOC (&bmstack);
+        }
+
+      *slot = new_info;
+
+      return new_info;
+    }
+}
 
 /* We iterate all members of congruence class C and mark all groups that
  * use as INDEX-th item a congruence item from C. Splitted groups are added
@@ -1721,20 +1787,11 @@ do_cong_step_for_index (cong_class *c, unsigned int index,
                         hash_table<cong_class_var_hash> &worklist,
                         bitmap_obstack &bmstack)
 {
-  unsigned int i, j;
   cong_use_t *use;
-  cong_info_t *split[2];
   bool result = false;
 
-  unsigned int conglength = congruence_classes.length ();
-
-  for (int i = 0; i < 2; i++)
-    {
-      split[i] = XCNEWVEC (cong_info_t, conglength);
-
-      for (j = 0; j < conglength; j++)
-        split[i][j].bm = BITMAP_ALLOC (&bmstack);
-    }
+  hash_table<cong_info_var_hash> info_hash;
+  info_hash.create (4);
 
   for (unsigned int i = 0; i < c->members->length (); i++)
     {
@@ -1748,82 +1805,82 @@ do_cong_step_for_index (cong_class *c, unsigned int index,
             cong_item_t *source = use->usage[j];
             cong_class_t *sc = source->parent_class;
             unsigned int target = sc == c ? 0 : 1;
-            cong_info_t *info = &split[target][sc->index];
 
-            bitmap_set_bit (info->bm, source->index);
-            info->count++;
+            cong_info_t *info = find_info_for_index (info_hash, sc->index,
+                                                     bmstack);
+
+            bitmap_set_bit (info->split[target].bm, source->index);
+            info->split[target].count++;
           }
     }
 
-  /* New split for each existing group is tested.  */
-  for (i = 0; i < conglength; i++)
-    {
-      cong_info_t *hit = NULL;
+  /* New split for each existing groups is tested.  */
+  for (hash_table<cong_info_var_hash>::iterator it = info_hash.begin ();
+       it != info_hash.end (); ++it)
+  {
+    cong_info_entry_t *entry = NULL;
+    cong_info_t *info = &(*it);
+    unsigned int ci = info->index;
 
-      for (unsigned int j = 0; j < 2; j++)
-        if (split[j][i].count > 0 &&
-          split[j][i].count < congruence_classes[i]->members->length ())
-          {
-            hit = &split[j][i];
-            break;
-          }
-        else
-          BITMAP_FREE (split[j][i].bm);
-    
-      if (hit)
+    for (unsigned int i = 0; i < 2; i++)
+      if (info->split[i].count > 0
+          && info->split[i].count < congruence_classes[ci]->members->length ())
         {
-          unsigned int small, large;
-
-          unsigned int usage_count[2];
-          vec<cong_item_t *> *new_members[2];
-
-          for (unsigned int k = 0; k < 2; k++)
-            {
-              usage_count[k] = 0;
-              new_members[k] = XNEW (vec<cong_item_t *>);
-              new_members[k]->create (2);
-            }
-
-          for (unsigned int l = 0;
-               l < congruence_classes[i]->members->length (); l++)
-            {
-              unsigned int c = bitmap_bit_p (hit->bm, (*congruence_classes[i]->members)[l]->index) ? 0 : 1;
-              usage_count[c] += (*congruence_classes[i]->members)[l]->usage_count;
-              new_members[c]->safe_push ((*congruence_classes[i]->members)[l]);
-            }
-
-          gcc_assert (new_members[0]->length () > 0);
-          gcc_assert (new_members[1]->length () > 0);
-
-          small = usage_count[0] < usage_count[1] ? 0 : 1;
-          large = (small + 1) % 2;
-
-          /* Existing group is replaced with new member list.  */
-          congruence_classes[i]->members->release ();
-          XDELETE (congruence_classes[i]->members);
-
-          congruence_classes[i]->members = new_members[small];
-
-          /* New group is created and added to list of congruent classes.  */
-          cong_class_t *newclass = XCNEW (cong_class_t);          
-          newclass->index = congruence_classes.length ();
-          newclass->members = new_members[large];
-
-          redirect_cong_item_parents (newclass);
-          congruence_classes.safe_push (newclass);
-
-          add_to_worklist (worklist, small == 0 ? congruence_classes[i] : congruence_classes.last ());
-
-          BITMAP_FREE (hit->bm);
-
-          result = true;
+          entry = &info->split[i];
+          break;
         }
-    }
 
-   XDELETEVEC (split[0]);
-   XDELETEVEC (split[1]);
-   
-   return result;
+    if (entry)
+      {
+        unsigned int small, large;
+
+        unsigned int usage_count[2];
+        vec<cong_item_t *> *new_members[2];
+
+        for (unsigned int j = 0; j < 2; j++)
+          {
+            usage_count[j] = 0;
+            new_members[j] = XNEW (vec<cong_item_t *>);
+            new_members[j]->create (2);
+          }
+
+        for (unsigned int j = 0;
+             j < congruence_classes[ci]->members->length (); j++)
+          {
+            unsigned int c = bitmap_bit_p (entry->bm, (*congruence_classes[ci]->members)[j]->index) ? 0 : 1;
+            usage_count[c] += (*congruence_classes[ci]->members)[j]->usage_count;
+            new_members[c]->safe_push ((*congruence_classes[ci]->members)[j]);
+          }
+
+        gcc_assert (new_members[0]->length () > 0);
+        gcc_assert (new_members[1]->length () > 0);
+
+        small = usage_count[0] < usage_count[1] ? 0 : 1;
+        large = (small + 1) % 2;
+
+        /* Existing group is replaced with new member list.  */
+        congruence_classes[ci]->members->release ();
+        XDELETE (congruence_classes[ci]->members);
+
+        congruence_classes[ci]->members = new_members[small];
+
+        /* New group is created and added to list of congruent classes.  */
+        cong_class_t *newclass = XCNEW (cong_class_t);          
+        newclass->index = congruence_classes.length ();
+        newclass->members = new_members[large];
+
+        redirect_cong_item_parents (newclass);
+        congruence_classes.safe_push (newclass);
+
+        add_to_worklist (worklist, small == 0 ? congruence_classes[ci] : congruence_classes.last ());
+
+        result = true;
+      }
+  }
+
+  info_hash.dispose ();
+
+  return result;
 }
 
 /* Congruence class C from WORKLIST could cause a split in the list
@@ -1843,7 +1900,7 @@ process_congruence_step (hash_table<cong_class_var_hash> &worklist,
 
   EXECUTE_IF_SET_IN_BITMAP (usage, 0, i, bi)
     {
-      do_cong_step_for_index (c, i, worklist, bmstack);
+      bool ischange = do_cong_step_for_index (c, i, worklist, bmstack);
 
       /* TODO: remove
       if (ischange)
@@ -1872,9 +1929,8 @@ process_congruence_reduction (void)
   unsigned int xx = 0;
   while (worklist.elements ())
     {
-      fprintf (dump_file, "%u,%u\n", xx++, worklist.elements());
       cong_class_t *c = &(*worklist.begin ());
-      worklist.remove_elt (c);
+      worklist.remove_elt (c);      
 
       process_congruence_step (worklist, c, bmstack);
     }  
@@ -1993,18 +2049,12 @@ semantic_equality (void)
   
   /* LGEN phase: all functions are visited and independent is computed.  */
 
-  fprintf (dump_file, "going to visit all function\n");
-
   semantic_functions.create (16);
   visit_all_functions ();
   build_tree_decl_hash ();
 
-  fprintf (dump_file, "all functions visited\n");
-
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     semantic_functions[i]->hash = independent_hash (semantic_functions[i]);
-
-  fprintf (dump_file, "simple hash computed\n");
 
   /* WPA phase: trees are merged, we can compare function declarations
    * and result type.  */
@@ -2012,27 +2062,25 @@ semantic_equality (void)
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     enhance_hash_for_trees (semantic_functions[i]);
 
-  fprintf (dump_file, "hash enhanced\n");
   /* LTRANS phase: functions are splitted to groups according to deep
    * equality comparison. Last step is congruence calculation.  */
 
   build_cong_classes ();
 
+  /* TODO: remove */
+  /*
   for(unsigned int i = 0; i < congruence_items.length(); i++)
     fprintf (dump_file, "func: %u, usage: %u, calls: %u\n",
              i, congruence_items[i]->usage_count, congruence_items[i]->func->called_functions.length());
-  
+  */
+
   /* TODO: remove */
-  /* dump_cong_classes ();
-   */
+  // dump_cong_classes ();
   groupcount = congruence_classes.length ();
 
-  fprintf (dump_file, "conguence started\n");
   process_congruence_reduction ();
-  fprintf (dump_file, "conguence finished\n");
   
   merge_groups (groupcount);
-  fprintf (dump_file, "groups merged\n");
 
   congruence_clean_up ();
 
