@@ -974,6 +974,37 @@ __gcov_merge_ior (gcov_type *counters, unsigned n_counters)
 }
 #endif
 
+#ifdef L_gcov_merge_tp
+void
+__gcov_merge_tp (gcov_type *counters, unsigned n_counters)
+{
+  unsigned i, n_measures;
+  gcov_type first_run, called_once;
+  unsigned int total_calls = 0;
+  unsigned int nonzero_calls = 0;
+
+  gcc_assert (!(n_counters % 2));
+  n_measures = n_counters / 2;
+  for (i = 0; i < n_measures; i++, counters += 2)
+    {
+      first_run = gcov_read_counter ();
+      called_once = gcov_read_counter ();
+
+      if (first_run > 0)
+        {
+          total_calls += first_run;
+          nonzero_calls++;
+        }
+
+      if (called_once)
+        counters[1] = called_once;
+    }
+
+  counters[0] = total_calls / nonzero_calls;
+}
+#endif /* L_gcov_merge_add */
+
+
 #ifdef L_gcov_merge_single
 /* The profile merging function for choosing the most common value.
    It is given an array COUNTERS of N_COUNTERS old counters and it
@@ -1160,13 +1191,13 @@ static int function_counter = 1;
 void
 __gcov_time_profiler (gcov_type* counters)
 {
+  /* counters[1] indicates if the function is visited more than once.  */
+  if (counters[0])
+    counters[1] = 1;
+
+  /* counters[0] indicates a first visit of the function.  */
   if (counters[0] == 0)
-    counters[0] = function_counter;
-
-  counters[1] = function_counter;
-  counters[2]++;
-
-  function_counter++;
+    counters[0] = function_counter++;
 }
 #endif
 

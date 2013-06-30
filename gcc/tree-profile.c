@@ -210,7 +210,7 @@ gimple_init_edge_profiler (void)
       DECL_ASSEMBLER_NAME (tree_pow2_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_one_value_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_indirect_call_profiler_fn);
-      DECL_ASSEMBLER_NAME (tree_time_profiler_fn);
+//      DECL_ASSEMBLER_NAME (tree_time_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_average_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_ior_profiler_fn);
     }
@@ -408,6 +408,7 @@ gimple_gen_ic_func_profiler (void)
   stmt2 = gimple_build_assign (ic_void_ptr_var, void0);
   gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
 }
+
 
 void
 gimple_gen_time_profiler (histogram_value value, unsigned tag, unsigned base,

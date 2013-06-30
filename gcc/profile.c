@@ -179,6 +179,14 @@ instrument_values (histogram_values values)
  	  gimple_gen_ic_profiler (hist, t, 0);
   	  break;
 
+	case HIST_TYPE_AVERAGE:
+	  gimple_gen_average_profiler (hist, t, 0);
+	  break;
+
+	case HIST_TYPE_IOR:
+	  gimple_gen_ior_profiler (hist, t, 0);
+	  break;
+
   case HIST_TYPE_TIME_PROFILE:
     {
       basic_block bb = split_edge (single_succ_edge (ENTRY_BLOCK_PTR));
@@ -187,15 +195,6 @@ instrument_values (histogram_values values)
   	  gimple_gen_time_profiler (hist, t, 0, gsi);
       break;
     }
-
-	case HIST_TYPE_AVERAGE:
-	  gimple_gen_average_profiler (hist, t, 0);
-	  break;
-
-	case HIST_TYPE_IOR:
-    // TODO: gimp is causing problems
-	  // gimple_gen_ior_profiler (hist, t, 0);
-	  break;
 
 	default:
 	  gcc_unreachable ();
@@ -906,8 +905,7 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
         {
           fprintf (stderr, "XXXXXX: value hit: %u\n", hist->hvalue.counters[0]);
           hist->fun->tp_first_run = hist->hvalue.counters[0];
-          hist->fun->tp_called_once = hist->hvalue.counters[0] > 0
-            && hist->hvalue.counters[0] == hist->hvalue.counters[1];
+          hist->fun->tp_called_once = hist->hvalue.counters[1] > 0;
         }
     }
 

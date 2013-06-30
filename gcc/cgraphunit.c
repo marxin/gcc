@@ -1686,6 +1686,8 @@ expand_all_functions (void)
   order_pos = ipa_reverse_postorder (order);
   gcc_assert (order_pos == cgraph_n_nodes);
 
+  fprintf (stderr, "expand_all_functions called for: %u\n", cgraph_n_nodes);
+
   /* Garbage collector may remove inline clones we eliminate during
      optimization.  So we must be sure to not reference them.  */
   for (i = 0; i < order_pos; i++)

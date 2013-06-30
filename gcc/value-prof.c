@@ -298,7 +298,6 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	}
       fprintf (dump_file, ".\n");
       break;
-
     case HIST_TYPE_IOR:
       fprintf (dump_file, "IOR value ");
       if (hist->hvalue.counters)
@@ -308,7 +307,6 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	}
       fprintf (dump_file, ".\n");
       break;
-
     case HIST_TYPE_CONST_DELTA:
       fprintf (dump_file, "Constant delta ");
       if (hist->hvalue.counters)
@@ -396,7 +394,7 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple stmt)
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
   case HIST_TYPE_TIME_PROFILE:
-	  ncounters = 3;
+	  ncounters = 2;
 	  break;
 
 	case HIST_TYPE_SINGLE_VALUE:
@@ -1868,6 +1866,7 @@ gimple_find_values_to_profile (histogram_values *values)
 
   tree func_decl = cfun->decl;
   values->create (0);
+
   values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE, 0, 0));
 
   FOR_EACH_BB (bb)
@@ -1899,7 +1898,7 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
   case HIST_TYPE_TIME_PROFILE:
-    hist->n_counters = 3;
+    hist->n_counters = 2;
     break;
 
 	case HIST_TYPE_AVERAGE:

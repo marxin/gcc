@@ -32,9 +32,9 @@ enum hist_type
 			   difference between two evaluations of a value.  */
   HIST_TYPE_INDIR_CALL,   /* Tries to identify the function that is (almost)
 			    called in indirect call */
-  HIST_TYPE_TIME_PROFILE, /* Used for time profile */
   HIST_TYPE_AVERAGE,	/* Compute average value (sum of all values).  */
   HIST_TYPE_IOR,	/* Used to compute expected alignment.  */
+  HIST_TYPE_TIME_PROFILE, /* Used for time profile */
   HIST_TYPE_MAX
 };
 
