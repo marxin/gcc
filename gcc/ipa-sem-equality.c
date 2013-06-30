@@ -1963,7 +1963,7 @@ merge_groups (unsigned int groupcount_before)
                1.0f * fcount / groupcount_after);
       fprintf (dump_file, "Equal functions: %u\n\n", equal);
       fprintf (dump_file, "Fraction of visited functions: %.2f%%\n",
-               100.0f * (equal - fcount) / fcount);
+               100.0f * equal / fcount);
     }
 
   for (unsigned int i = 0; i < congruence_classes.length (); i++)
