@@ -266,7 +266,7 @@ sem_func_free (sem_func_t *f)
 {
   unsigned int i;
 
-  f.called_functions.dispose ();
+  f->called_functions.release ();
 
   for (i = 0; i < f->bb_count; ++i)
     free (f->bb_sorted[i]);
@@ -1908,12 +1908,7 @@ process_congruence_step (hash_table<cong_class_var_hash> &worklist,
 
   EXECUTE_IF_SET_IN_BITMAP (usage, 0, i, bi)
     {
-      bool ischange = do_cong_step_for_index (c, i, worklist, bmstack);
-
-      /* TODO: remove
-      if (ischange)
-        dump_cong_classes();
-      */
+      do_cong_step_for_index (c, i, worklist, bmstack);
     }
 
   BITMAP_FREE (usage);
@@ -1934,7 +1929,6 @@ process_congruence_reduction (void)
   for (unsigned int i = 0; i < congruence_classes.length (); i++)
     add_to_worklist (worklist, congruence_classes[i]);
 
-  unsigned int xx = 0;
   while (worklist.elements ())
     {
       cong_class_t *c = &(*worklist.begin ());
@@ -1968,8 +1962,8 @@ merge_groups (unsigned int groupcount_before)
                1.0f * fcount / groupcount_before,
                1.0f * fcount / groupcount_after);
       fprintf (dump_file, "Equal functions: %u\n\n", equal);
-      fprintf (dump_file, "Fraction of visited functions: .2f%%\n",
-               100f * (equal - fcount) / fcount);
+      fprintf (dump_file, "Fraction of visited functions: %.2f%%\n",
+               100.0f * (equal - fcount) / fcount);
     }
 
   for (unsigned int i = 0; i < congruence_classes.length (); i++)
@@ -2092,7 +2086,7 @@ semantic_equality (void)
   congruence_clean_up ();
 
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
-    sem_func_free (&semantic_functions[i]);
+    sem_func_free (semantic_functions[i]);
 
   semantic_functions.release ();
 
