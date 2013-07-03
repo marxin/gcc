@@ -856,6 +856,7 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
   gcov_type *histogram_counts[GCOV_N_VALUE_COUNTERS];
   gcov_type *act_count[GCOV_N_VALUE_COUNTERS];
   gcov_type *aact_count;
+  struct cgraph_node *node;
 
   for (t = 0; t < GCOV_N_VALUE_COUNTERS; t++)
     n_histogram_counters[t] = 0;
@@ -903,9 +904,10 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 
       if (hist->type == HIST_TYPE_TIME_PROFILE)
         {
-          fprintf (stderr, "XXXXXX: value hit: %u\n", hist->hvalue.counters[0]);
-          hist->fun->tp_first_run = hist->hvalue.counters[0];
-          hist->fun->tp_called_once = hist->hvalue.counters[1] > 0;
+          node = cgraph_get_node (hist->fun->decl);
+
+          node->tp_first_run = hist->hvalue.counters[0];
+          node->tp_not_called_once = hist->hvalue.counters[1] > 0;
         }
     }
 

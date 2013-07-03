@@ -535,10 +535,6 @@ struct GTY(()) function {
   /* Value histograms attached to particular statements.  */
   htab_t GTY((skip)) value_histograms;
 
-  unsigned int tp_first_run;
-
-  bool tp_called_once;
-
   /* For function.c.  */
 
   /* Points to the FUNCTION_DECL of this function.  */

@@ -379,8 +379,6 @@ lto_output_node (struct lto_simple_output_block *ob, struct cgraph_node *node,
   int i;
   bool alias_p;
   struct function *func;
-  unsigned int tp_first_run = 0;
-  bool tp_called_once = false;
 
   boundary_p = !lto_symtab_encoder_in_partition_p (encoder, (symtab_node)node);
 
@@ -464,19 +462,10 @@ lto_output_node (struct lto_simple_output_block *ob, struct cgraph_node *node,
     ref = LCC_NOT_FOUND;
   streamer_write_hwi_stream (ob->main_stream, ref);
 
-  /* Time profiler data */
-  func = DECL_STRUCT_FUNCTION (node->symbol.decl);
-  if (func)
-    {
-      tp_first_run = func->tp_first_run;
-      tp_called_once = func->tp_called_once;
-      fprintf (stderr, "cgraph streamed for: %s to slim: %u\n", cgraph_node_name (node), func->tp_first_run); 
-    }
-
-  streamer_write_hwi_stream (ob->main_stream, tp_first_run); 
+  streamer_write_hwi_stream (ob->main_stream, node->tp_first_run); 
 
   bp = bitpack_create (ob->main_stream);
-  bp_pack_value (&bp, tp_called_once, 1);
+  bp_pack_value (&bp, node->tp_not_called_once, 1);
   bp_pack_value (&bp, node->local.local, 1);
   bp_pack_value (&bp, node->symbol.externally_visible, 1);
   bp_pack_value (&bp, node->symbol.definition, 1);
@@ -1019,7 +1008,7 @@ input_node (struct lto_file_decl_data *file_data,
   bp = streamer_read_bitpack (ib);
 
   /* Time profiler */
-  node->tp_called_once = bp_unpack_value (&bp, 1);
+  node->tp_not_called_once = bp_unpack_value (&bp, 1);
 
   input_overwrite_node (file_data, node, tag, &bp);
 

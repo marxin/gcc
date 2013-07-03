@@ -974,34 +974,23 @@ __gcov_merge_ior (gcov_type *counters, unsigned n_counters)
 }
 #endif
 
+
 #ifdef L_gcov_merge_tp
+
+/* The profile merging function just takes last values written to file.  */
+
 void
 __gcov_merge_tp (gcov_type *counters, unsigned n_counters)
 {
-  unsigned i, n_measures;
-  gcov_type first_run, called_once;
-  unsigned int total_calls = 0;
-  unsigned int nonzero_calls = 0;
+  unsigned int i;
 
-  gcc_assert (!(n_counters % 2));
-  n_measures = n_counters / 2;
-  for (i = 0; i < n_measures; i++, counters += 2)
-    {
-      first_run = gcov_read_counter ();
-      called_once = gcov_read_counter ();
-
-      if (first_run > 0)
-        {
-          total_calls += first_run;
-          nonzero_calls++;
-        }
-
-      if (called_once)
-        counters[1] = called_once;
-    }
-
-  counters[0] = total_calls / nonzero_calls;
+  for (i = 0; i < n_counters; i += 2)
+  {
+    counters[0] = gcov_read_counter();
+    counters[1] = gcov_read_counter();
+  }
 }
+
 #endif /* L_gcov_merge_add */
 
 
@@ -1197,7 +1186,10 @@ __gcov_time_profiler (gcov_type* counters)
 
   /* counters[0] indicates a first visit of the function.  */
   if (counters[0] == 0)
+  {
+    fprintf (stderr, "tp: %u\n", function_counter);
     counters[0] = function_counter++;
+  }
 }
 #endif
 
