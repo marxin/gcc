@@ -1186,10 +1186,7 @@ __gcov_time_profiler (gcov_type* counters)
 
   /* counters[0] indicates a first visit of the function.  */
   if (counters[0] == 0)
-  {
-    fprintf (stderr, "tp: %u\n", function_counter);
     counters[0] = function_counter++;
-  }
 }
 #endif
 
