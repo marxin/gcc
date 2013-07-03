@@ -1692,13 +1692,6 @@ expand_all_functions (void)
     if (order[i]->tp_first_run)
       ordercount++;
 
-  /*
-    fprintf (stderr, "function: %s, %u, order: %u, called once: %u\n",
-             cgraph_node_name(order[i]), i, order[i]->tp_first_run,
-             order[i]->tp_first_run && !order[i]->tp_not_called_once);
-  */
-
-
   fprintf (stderr, "expand_all_functions called for: %u/%u\n", ordercount, cgraph_n_nodes);
 
   /* Garbage collector may remove inline clones we eliminate during

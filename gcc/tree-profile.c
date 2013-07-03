@@ -210,7 +210,7 @@ gimple_init_edge_profiler (void)
       DECL_ASSEMBLER_NAME (tree_pow2_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_one_value_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_indirect_call_profiler_fn);
-//      DECL_ASSEMBLER_NAME (tree_time_profiler_fn);
+      DECL_ASSEMBLER_NAME (tree_time_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_average_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_ior_profiler_fn);
     }
