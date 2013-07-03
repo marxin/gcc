@@ -1370,6 +1370,9 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 static void
 merge_functions (sem_func_t *original, sem_func_t *alias)
 {
+  /* Function node aliasing still face some gcc_assert. */
+  return;
+
   struct cgraph_edge *caller = alias->node->callers;
   struct cgraph_edge *edge2;
 
@@ -1537,20 +1540,24 @@ cong_use_find (cong_item_t *item, unsigned int index)
   return &result->usage;
 }
 
-/* Congruence class sump.  */
+/* Congruence class dump.  */
 
+/*
 static void
 dump_cong_classes (void)
 {
-  fprintf (stderr, "\nCongruence classes dump\n");
+  if (!dump_file)
+    return;
+
+  fprintf (dump_file, "\nCongruence classes dump\n");
   for (unsigned i = 0; i < congruence_classes.length (); ++i)
   {
-    fprintf (stderr, " class %u:\n", i);
+    fprintf (dump_file, " class %u:\n", i);
 
     for (unsigned j = 0; j < congruence_classes[i]->members->length (); ++j)
     {
       cong_item_t *item = (*congruence_classes[i]->members)[j];
-      fprintf (stderr, "   %s (%u)\n", cgraph_node_name (item->func->node),
+      fprintf (dump_file, "   %s (%u)\n", cgraph_node_name (item->func->node),
                item->index);
 
       for (hash_table <cong_use_var_hash>::iterator it = item->usage.begin ();
@@ -1561,13 +1568,14 @@ dump_cong_classes (void)
           for (unsigned int k = 0; k < use->usage.length (); k++)
             {
               cong_item_t *item2 = use->usage[k];
-              fprintf (stderr, "     used in: %s (%u)\n",
+              fprintf (dump_file, "     used in: %s (%u)\n",
                        cgraph_node_name (item2->func->node), use->index);
             }
         }
     }
   }
 }
+*/
 
 /* After new congruence class C is created, we have to redirect
  * all members to the class.  */
@@ -1981,14 +1989,15 @@ merge_groups (unsigned int groupcount_before)
 
           if (dump_file)
             {
-              fprintf(dump_file, "Semantic equality hit:%s:%s\n",
+              fprintf (dump_file, "Semantic equality hit:%s:%s\n",
                 cgraph_node_name (f1->node), cgraph_node_name (f2->node));
 
               dump_function_to_file (f1->func_decl, dump_file, TDF_DETAILS);
               dump_function_to_file (f2->func_decl, dump_file, TDF_DETAILS);
+
             }
 
-          // merge_functions (f1, f2);          
+          merge_functions (f1, f2);          
         }
     }
 }
@@ -2052,6 +2061,10 @@ semantic_equality (void)
 {
   unsigned int groupcount;
   
+  /* Semantic equality pass will be rewritten to a normal IPA pass, so that
+   * all following steps are grouped to future pass phases: LGEN, WPA and
+   * LTRANS.  */
+
   /* LGEN phase: all functions are visited and independent is computed.  */
 
   semantic_functions.create (16);
