@@ -1370,23 +1370,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 static void
 merge_functions (sem_func_t *original, sem_func_t *alias)
 {
-  /* Function node aliasing still face some gcc_assert. */
-  return;
-
-  struct cgraph_edge *caller = alias->node->callers;
-  struct cgraph_edge *edge2;
-
-  while (caller)
-    {
-      edge2 = caller->next_caller;
-      cgraph_redirect_edge_callee (caller, original->node);
-
-      caller = edge2;
-    }
-
   cgraph_release_function_body (alias->node);
   cgraph_reset_node (alias->node);
   cgraph_create_function_alias (alias->func_decl, original->func_decl);   
+  symtab_resolve_alias ((symtab_node) alias->node, (symtab_node) original->node);  
 }
 
 /* All functions that could be at the end pass considered to be equal
@@ -1994,10 +1981,9 @@ merge_groups (unsigned int groupcount_before)
 
               dump_function_to_file (f1->func_decl, dump_file, TDF_DETAILS);
               dump_function_to_file (f2->func_decl, dump_file, TDF_DETAILS);
-
             }
 
-          merge_functions (f1, f2);          
+          merge_functions (f1, f2);
         }
     }
 }
