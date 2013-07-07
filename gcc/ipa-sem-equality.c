@@ -1028,6 +1028,9 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
   si2 = gsi_start_phis (bb2);
   for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1); gsi_next (&si1))
   {
+    if (gsi_end_p (si2))
+      return false;
+
     phi1 = gsi_stmt (si1);
     phi2 = gsi_stmt (si2);
 
@@ -1051,9 +1054,6 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
       if (!check_edges (e1, e2, d))
         return false;
     }
-
-    if (gsi_end_p (si2))
-      return false;
 
     gsi_next (&si2);
   }
@@ -1375,32 +1375,39 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 
   if (dump_file)
     {
-      fprintf (dump_file, "Semantic equality hit:%s:%s\n",
+      fprintf (dump_file, "Semantic equality hit:%s -> %s\n",
                cgraph_node_name (original), cgraph_node_name (alias));
+       fprintf (dump_file, "Assembler function names:%s -> %s\n",
+               cgraph_node_asm_name (original), cgraph_node_asm_name (alias));
+   }
 
-      dump_function_to_file (original_func->func_decl, dump_file, TDF_DETAILS);
-      dump_function_to_file (alias_func->func_decl, dump_file, TDF_DETAILS);
-    }
+  if (dump_file)
+  {
+    dump_function_to_file (original_func->func_decl, dump_file, TDF_DETAILS);
+    dump_function_to_file (alias_func->func_decl, dump_file, TDF_DETAILS);
+  }
 
-  /*
   if (DECL_VIRTUAL_P (original->symbol.decl) || DECL_VIRTUAL_P (alias->symbol.decl))
     {
       if (dump_file)
-        fprintf(dump_file, " (virtual function, skipping merging)\n");
+        fprintf(dump_file, "Virtual function, merge skipped.\n\n");
     }
   else if (original->symbol.address_taken || original->symbol.externally_visible
            || alias->symbol.address_taken || alias->symbol.externally_visible)
     {
       if (dump_file)
-        fprintf (dump_file, " (thunk function should be created)\n");
+        fprintf (dump_file, "Thunk function should be created.\n\n");
     }
   else
-  */
+  {
+    if (dump_file)
+      fprintf (dump_file, "Alias has been created.\n\n");
 
-  cgraph_release_function_body (alias);
-  cgraph_reset_node (alias);
-  cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
-  symtab_resolve_alias ((symtab_node) alias, (symtab_node) original);  
+    cgraph_release_function_body (alias);
+    cgraph_reset_node (alias);
+    cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
+    symtab_resolve_alias ((symtab_node) alias, (symtab_node) original);  
+  }
 }
 
 /* All functions that could be at the end pass considered to be equal
