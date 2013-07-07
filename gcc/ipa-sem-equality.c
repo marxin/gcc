@@ -1368,12 +1368,39 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 /* Two semantically equal function are merged.  */
 
 static void
-merge_functions (sem_func_t *original, sem_func_t *alias)
+merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 {
-  cgraph_release_function_body (alias->node);
-  cgraph_reset_node (alias->node);
-  cgraph_create_function_alias (alias->func_decl, original->func_decl);   
-  symtab_resolve_alias ((symtab_node) alias->node, (symtab_node) original->node);  
+  struct cgraph_node *original = original_func->node;
+  struct cgraph_node *alias = alias_func->node;
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "Semantic equality hit:%s:%s\n",
+               cgraph_node_name (original), cgraph_node_name (alias));
+
+      dump_function_to_file (original_func->func_decl, dump_file, TDF_DETAILS);
+      dump_function_to_file (alias_func->func_decl, dump_file, TDF_DETAILS);
+    }
+
+  /*
+  if (DECL_VIRTUAL_P (original->symbol.decl) || DECL_VIRTUAL_P (alias->symbol.decl))
+    {
+      if (dump_file)
+        fprintf(dump_file, " (virtual function, skipping merging)\n");
+    }
+  else if (original->symbol.address_taken || original->symbol.externally_visible
+           || alias->symbol.address_taken || alias->symbol.externally_visible)
+    {
+      if (dump_file)
+        fprintf (dump_file, " (thunk function should be created)\n");
+    }
+  else
+  */
+
+  cgraph_release_function_body (alias);
+  cgraph_reset_node (alias);
+  cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
+  symtab_resolve_alias ((symtab_node) alias, (symtab_node) original);  
 }
 
 /* All functions that could be at the end pass considered to be equal
@@ -1973,17 +2000,8 @@ merge_groups (unsigned int groupcount_before)
       for (unsigned int j = 1; j < c->members->length (); j++)
         {
           f2 = (*c->members)[j]->func;
-
-          if (dump_file)
-            {
-              fprintf (dump_file, "Semantic equality hit:%s:%s\n",
-                cgraph_node_name (f1->node), cgraph_node_name (f2->node));
-
-              dump_function_to_file (f1->func_decl, dump_file, TDF_DETAILS);
-              dump_function_to_file (f2->func_decl, dump_file, TDF_DETAILS);
-            }
-
-          merge_functions (f1, f2);
+          
+          merge_functions (f1, f2);          
         }
     }
 }
