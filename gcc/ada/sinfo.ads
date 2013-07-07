@@ -1539,6 +1539,10 @@ package Sinfo is
    --      Used by processing for Pre/Postcondition pragmas to store a list of
    --      pragmas associated with the spec of a subprogram (see Sem_Prag for
    --      details).
+   --
+   --      Used by processing for pragma SPARK_Mode to store multiple pragmas
+   --      the apply to the same construct. These are visible/private mode for
+   --      a package spec and declarative/statement mode for package body.
 
    --  Next_Rep_Item (Node5-Sem)
    --    Present in pragma nodes, attribute definition nodes, enumeration rep
@@ -7225,7 +7229,8 @@ package Sinfo is
       --  Sprint syntax: labelname : label;
 
       --  N_Implicit_Label_Declaration
-      --  Sloc points to the << of the label
+      --  Sloc points to the << token for a statement identifier, or to the
+      --    LOOP, DECLARE, or BEGIN token for a loop or block identifier
       --  Defining_Identifier (Node1)
       --  Label_Construct (Node2-Sem)
 

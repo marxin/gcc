@@ -213,6 +213,11 @@ package body Sem_Prag is
    --  original one, following the renaming chain) is returned. Otherwise the
    --  entity is returned unchanged. Should be in Einfo???
 
+   function Get_SPARK_Mode_Id (N : Name_Id) return SPARK_Mode_Id;
+   --  Subsidiary to the analysis of pragma SPARK_Mode as well as subprogram
+   --  Get_SPARK_Mode_Id. Convert a name into a corresponding value of type
+   --  SPARK_Mode_Id.
+
    function Original_Name (N : Node_Id) return Name_Id;
    --  N is a pragma node or aspect specification node. This function returns
    --  the name of the pragma or aspect in original source form, taking into
@@ -1749,6 +1754,9 @@ package body Sem_Prag is
             --  accessparameter of type access-to-T is interpreted as having
             --  type access-to-T'Class. This ensures the expression is well-
             --  defined for a primitive subprogram of a type descended from T.
+            --  Note that this replacement is not done for selector names in
+            --  parameter associations. These carry an entity for reference
+            --  purposes, but semantically they are just identifiers.
 
             -------------
             -- Get_ACW --
@@ -1790,6 +1798,9 @@ package body Sem_Prag is
                  and then Present (Entity (N))
                  and then Is_Formal (Entity (N))
                  and then Nkind (Parent (N)) /= N_Type_Conversion
+                 and then
+                   (Nkind (Parent (N)) /= N_Parameter_Association
+                     or else N /= Selector_Name (Parent (N)))
                then
                   if Etype (Entity (N)) = T then
                      Typ := Class_Wide_Type (T);
@@ -3740,7 +3751,6 @@ package body Sem_Prag is
       begin
          --  First check pragma arguments
 
-         GNAT_Pragma;
          Check_At_Least_N_Arguments (2);
          Check_At_Most_N_Arguments (4);
          Check_Arg_Order
@@ -5289,7 +5299,6 @@ package body Sem_Prag is
 
       procedure Process_Disable_Enable_Atomic_Sync (Nam : Name_Id) is
       begin
-         GNAT_Pragma;
          Check_No_Identifiers;
          Check_At_Most_N_Arguments (1);
 
@@ -5992,6 +6001,8 @@ package body Sem_Prag is
       begin
          Check_No_Identifiers;
          Check_At_Least_N_Arguments (1);
+
+         --  Check all arguments are names of generic units or instances
 
          Arg := Arg1;
          while Present (Arg) loop
@@ -9650,8 +9661,8 @@ package body Sem_Prag is
          --  pragma Check_Name (check_IDENTIFIER);
 
          when Pragma_Check_Name =>
-            Check_No_Identifiers;
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_Valid_Configuration_Pragma;
             Check_Arg_Count (1);
             Check_Arg_Is_Identifier (Arg1);
@@ -10076,11 +10087,19 @@ package body Sem_Prag is
             if Nkind (Subp_Decl) = N_Subprogram_Body then
                Analyze_Contract_Cases_In_Decl_Part (N);
 
+            --  When Contract_Cases applies to a subprogram compilation unit,
+            --  the corresponding pragma is placed after the unit's declaration
+            --  node and needs to be analyzed immediately.
+
+            elsif Nkind (Subp_Decl) = N_Subprogram_Declaration
+              and then Nkind (Parent (Subp_Decl)) = N_Compilation_Unit
+            then
+               Analyze_Contract_Cases_In_Decl_Part (N);
+            end if;
+
             --  Chain the pragma on the contract for further processing
 
-            else
-               Add_Contract_Item (N, Subp_Id);
-            end if;
+            Add_Contract_Item (N, Subp_Id);
          end Contract_Cases;
 
          ----------------
@@ -10294,7 +10313,7 @@ package body Sem_Prag is
 
             if Warn_On_Obsolescent_Feature then
                Error_Msg_N
-                 ("'G'N'A'T pragma cpp'_virtual is now obsolete and has no "
+                 ("'G'N'A'T pragma Cpp'_Virtual is now obsolete and has no "
                   & "effect?j?", N);
             end if;
          end CPP_Virtual;
@@ -10309,7 +10328,7 @@ package body Sem_Prag is
 
             if Warn_On_Obsolescent_Feature then
                Error_Msg_N
-                 ("'G'N'A'T pragma cpp'_vtable is now obsolete and has no "
+                 ("'G'N'A'T pragma Cpp'_Vtable is now obsolete and has no "
                   & "effect?j?", N);
             end if;
          end CPP_Vtable;
@@ -10584,11 +10603,19 @@ package body Sem_Prag is
             if Nkind (Subp_Decl) = N_Subprogram_Body then
                Analyze_Depends_In_Decl_Part (N);
 
+            --  When Depends applies to a subprogram compilation unit, the
+            --  corresponding pragma is placed after the unit's declaration
+            --  node and needs to be analyzed immediately.
+
+            elsif Nkind (Subp_Decl) = N_Subprogram_Declaration
+              and then Nkind (Parent (Subp_Decl)) = N_Compilation_Unit
+            then
+               Analyze_Depends_In_Decl_Part (N);
+            end if;
+
             --  Chain the pragma on the contract for further processing
 
-            else
-               Add_Contract_Item (N, Subp_Id);
-            end if;
+            Add_Contract_Item (N, Subp_Id);
          end Depends;
 
          ---------------------
@@ -10661,6 +10688,7 @@ package body Sem_Prag is
          --  pragma Disable_Atomic_Synchronization [(Entity)];
 
          when Pragma_Disable_Atomic_Synchronization =>
+            GNAT_Pragma;
             Process_Disable_Enable_Atomic_Sync (Name_Suppress);
 
          -------------------
@@ -11092,6 +11120,7 @@ package body Sem_Prag is
          --  pragma Enable_Atomic_Synchronization [(Entity)];
 
          when Pragma_Enable_Atomic_Synchronization =>
+            GNAT_Pragma;
             Process_Disable_Enable_Atomic_Sync (Name_Unsuppress);
 
          ------------
@@ -11592,6 +11621,18 @@ package body Sem_Prag is
             end case;
          end External_Name_Casing;
 
+         ---------------
+         -- Fast_Math --
+         ---------------
+
+         --  pragma Fast_Math;
+
+         when Pragma_Fast_Math =>
+            GNAT_Pragma;
+            Check_No_Identifiers;
+            Check_Valid_Configuration_Pragma;
+            Fast_Math := True;
+
          --------------------------
          -- Favor_Top_Level --
          --------------------------
@@ -11622,18 +11663,6 @@ package body Sem_Prag is
                   Get_Pragma_Arg (Arg1));
             end if;
          end Favor_Top_Level;
-
-         ---------------
-         -- Fast_Math --
-         ---------------
-
-         --  pragma Fast_Math;
-
-         when Pragma_Fast_Math =>
-            GNAT_Pragma;
-            Check_No_Identifiers;
-            Check_Valid_Configuration_Pragma;
-            Fast_Math := True;
 
          ---------------------------
          -- Finalize_Storage_Only --
@@ -11825,11 +11854,19 @@ package body Sem_Prag is
             if Nkind (Subp_Decl) = N_Subprogram_Body then
                Analyze_Global_In_Decl_Part (N);
 
+            --  When Global applies to a subprogram compilation unit, the
+            --  corresponding pragma is placed after the unit's declaration
+            --  node and needs to be analyzed immediately.
+
+            elsif Nkind (Subp_Decl) = N_Subprogram_Declaration
+              and then Nkind (Parent (Subp_Decl)) = N_Compilation_Unit
+            then
+               Analyze_Global_In_Decl_Part (N);
+            end if;
+
             --  Chain the pragma on the contract for further processing
 
-            else
-               Add_Contract_Item (N, Subp_Id);
-            end if;
+            Add_Contract_Item (N, Subp_Id);
          end Global;
 
          -----------
@@ -11959,6 +11996,7 @@ package body Sem_Prag is
             Ent : Entity_Id;
 
          begin
+            GNAT_Pragma;
             Check_No_Identifiers;
 
             --  Form with no arguments
@@ -13339,8 +13377,8 @@ package body Sem_Prag is
             --  abstract. ???
 
             if not Is_Tagged_Type (Typ) or else not Is_Abstract_Type (Typ) then
-               Error_Pragma_Arg ("pragma% requires an abstract "
-                 & "tagged type", Arg1);
+               Error_Pragma_Arg
+                 ("pragma% requires an abstract tagged type", Arg1);
 
             elsif not Has_Discriminants (Typ)
               or else Ekind (Etype (First_Discriminant (Typ)))
@@ -14471,6 +14509,41 @@ package body Sem_Prag is
             Optimize_Alignment_Local := True;
          end Optimize_Alignment;
 
+         -------------
+         -- Ordered --
+         -------------
+
+         --  pragma Ordered (first_enumeration_subtype_LOCAL_NAME);
+
+         when Pragma_Ordered => Ordered : declare
+            Assoc   : constant Node_Id := Arg1;
+            Type_Id : Node_Id;
+            Typ     : Entity_Id;
+
+         begin
+            GNAT_Pragma;
+            Check_No_Identifiers;
+            Check_Arg_Count (1);
+            Check_Arg_Is_Local_Name (Arg1);
+
+            Type_Id := Get_Pragma_Arg (Assoc);
+            Find_Type (Type_Id);
+            Typ := Entity (Type_Id);
+
+            if Typ = Any_Type then
+               return;
+            else
+               Typ := Underlying_Type (Typ);
+            end if;
+
+            if not Is_Enumeration_Type (Typ) then
+               Error_Pragma ("pragma% must specify enumeration type");
+            end if;
+
+            Check_First_Subtype (Arg1);
+            Set_Has_Pragma_Ordered (Base_Type (Typ));
+         end Ordered;
+
          -------------------
          -- Overflow_Mode --
          -------------------
@@ -14551,43 +14624,17 @@ package body Sem_Prag is
             end if;
          end Overflow_Mode;
 
+         --------------------------
+         -- Overriding Renamings --
+         --------------------------
+
+         --  pragma Overriding_Renamings;
+
          when Pragma_Overriding_Renamings =>
-            Overriding_Renamings := True;
-
-         -------------
-         -- Ordered --
-         -------------
-
-         --  pragma Ordered (first_enumeration_subtype_LOCAL_NAME);
-
-         when Pragma_Ordered => Ordered : declare
-            Assoc   : constant Node_Id := Arg1;
-            Type_Id : Node_Id;
-            Typ     : Entity_Id;
-
-         begin
             GNAT_Pragma;
-            Check_No_Identifiers;
-            Check_Arg_Count (1);
-            Check_Arg_Is_Local_Name (Arg1);
-
-            Type_Id := Get_Pragma_Arg (Assoc);
-            Find_Type (Type_Id);
-            Typ := Entity (Type_Id);
-
-            if Typ = Any_Type then
-               return;
-            else
-               Typ := Underlying_Type (Typ);
-            end if;
-
-            if not Is_Enumeration_Type (Typ) then
-               Error_Pragma ("pragma% must specify enumeration type");
-            end if;
-
-            Check_First_Subtype (Arg1);
-            Set_Has_Pragma_Ordered (Base_Type (Typ));
-         end Ordered;
+            Check_Arg_Count (0);
+            Check_Valid_Configuration_Pragma;
+            Overriding_Renamings := True;
 
          ----------
          -- Pack --
@@ -15022,7 +15069,7 @@ package body Sem_Prag is
 
          --  pragma Predicate
          --    ([Entity =>] type_LOCAL_NAME,
-         --     [Check  =>] EXPRESSION);
+         --     [Check  =>] boolean_EXPRESSION);
 
          when Pragma_Predicate => Predicate : declare
             Type_Id : Node_Id;
@@ -15452,8 +15499,10 @@ package body Sem_Prag is
             GNAT_Pragma;
             Check_Arg_Count (0);
 
-            if In_Extended_Main_Source_Unit (N) then
-               Propagate_Exceptions := True;
+            if Warn_On_Obsolescent_Feature then
+               Error_Msg_N
+                 ("'G'N'A'T pragma Propagate'_Exceptions is now obsolete " &
+                  "and has no effect?j?", N);
             end if;
 
          ------------------
@@ -16042,6 +16091,8 @@ package body Sem_Prag is
          -- Short_Circuit_And_Or --
          --------------------------
 
+         --  pragma Short_Circuit_And_Or;
+
          when Pragma_Short_Circuit_And_Or =>
             GNAT_Pragma;
             Check_Arg_Count (0);
@@ -16052,7 +16103,9 @@ package body Sem_Prag is
          -- Share_Generic --
          -------------------
 
-         --  pragma Share_Generic (NAME {, NAME});
+         --  pragma Share_Generic (GNAME {, GNAME});
+
+         --  GNAME ::= generic_unit_NAME | generic_instance_NAME
 
          when Pragma_Share_Generic =>
             GNAT_Pragma;
@@ -16266,6 +16319,351 @@ package body Sem_Prag is
 
          when Pragma_Source_Reference =>
             GNAT_Pragma;
+
+         ----------------
+         -- SPARK_Mode --
+         ----------------
+
+         --  pragma SPARK_Mode (On | Off | Auto);
+
+         when Pragma_SPARK_Mode => SPARK_Mod : declare
+            procedure Chain_Pragma (Context : Entity_Id; Prag : Node_Id);
+            --  Associate a SPARK_Mode pragma with the context where it lives.
+            --  If the context is a package spec or a body, the routine checks
+            --  the consistency between modes of visible/private declarations
+            --  and body declarations/statements.
+
+            procedure Check_Conformance
+              (Governing_Id : Entity_Id;
+               New_Id       : Entity_Id);
+            --  Verify the "monotonicity" of SPARK modes between two entities.
+            --  The order of modes is Off < Auto < On. Governing_Id establishes
+            --  the mode of the context. New_Id attempts to redefine the known
+            --  mode.
+
+            procedure Check_Pragma_Conformance
+              (Governing_Mode : Node_Id;
+               New_Mode       : Node_Id);
+            --  Verify the "monotonicity" of two SPARK_Mode pragmas. The order
+            --  of modes is Off < Auto < On. Governing_Mode is the established
+            --  mode dictated by the context. New_Mode attempts to redefine the
+            --  governing mode.
+
+            function Get_SPARK_Mode_Name (Id : SPARK_Mode_Id) return Name_Id;
+            --  Convert a value of type SPARK_Mode_Id into a corresponding name
+
+            procedure Redefinition_Error (Mode : SPARK_Mode_Id);
+            --  Emit an error on an attempt to redefine existing mode Mode. The
+            --  message is associated with the first argument of the current
+            --  pragma.
+
+            procedure Redefinition_Error (Prag : Node_Id);
+            --  Emit an error on an attempt to redefine the mode of Prag. The
+            --  message is associated with the first argument of the current
+            --  pragma.
+
+            ------------------
+            -- Chain_Pragma --
+            ------------------
+
+            procedure Chain_Pragma (Context : Entity_Id; Prag : Node_Id) is
+               Existing_Prag : constant Node_Id :=
+                                 SPARK_Mode_Pragmas (Context);
+            begin
+               --  The context does not have a prior mode defined
+
+               if No (Existing_Prag) then
+                  Set_SPARK_Mode_Pragmas (Context, Prag);
+
+               --  Chain the new mode on the list of SPARK_Mode pragmas. Verify
+               --  the consistency between the existing mode and the new one.
+
+               else
+                  Set_Next_Pragma (Existing_Prag, Prag);
+
+                  Check_Pragma_Conformance
+                    (Governing_Mode => Existing_Prag,
+                     New_Mode       => Prag);
+               end if;
+            end Chain_Pragma;
+
+            -----------------------
+            -- Check_Conformance --
+            -----------------------
+
+            procedure Check_Conformance
+              (Governing_Id : Entity_Id;
+               New_Id       : Entity_Id)
+            is
+               Gov_Prag : constant Node_Id :=
+                            SPARK_Mode_Pragmas (Governing_Id);
+               New_Prag : constant Node_Id := SPARK_Mode_Pragmas (New_Id);
+
+            begin
+               --  Nothing to do when one or both entities lack a mode
+
+               if No (Gov_Prag) or else No (New_Prag) then
+                  return;
+               end if;
+
+               --  Do not compare the modes of a package spec and body when the
+               --  spec mode appears in the private part. In this case the spec
+               --  mode does not affect the body.
+
+               if Ekind_In (Governing_Id, E_Generic_Package, E_Package)
+                 and then Ekind (New_Id) = E_Package_Body
+                 and then Is_Private_SPARK_Mode (Gov_Prag)
+               then
+                  null;
+
+               --  Test the pragmas
+
+               else
+                  Check_Pragma_Conformance
+                    (Governing_Mode => Gov_Prag,
+                     New_Mode       => New_Prag);
+               end if;
+            end Check_Conformance;
+
+            ------------------------------
+            -- Check_Pragma_Conformance --
+            ------------------------------
+
+            procedure Check_Pragma_Conformance
+              (Governing_Mode : Node_Id;
+               New_Mode       : Node_Id)
+            is
+               Gov_M : constant SPARK_Mode_Id :=
+                         Get_SPARK_Mode_Id (Governing_Mode);
+               New_M : constant SPARK_Mode_Id := Get_SPARK_Mode_Id (New_Mode);
+
+            begin
+               --  The new mode is less restrictive than the established mode
+
+               if Gov_M < New_M then
+                  Error_Msg_Name_1 := Get_SPARK_Mode_Name (New_M);
+                  Error_Msg_N ("cannot define 'S'P'A'R'K mode %", New_Mode);
+
+                  Error_Msg_Name_1 := Get_SPARK_Mode_Name (Gov_M);
+                  Error_Msg_Sloc   := Sloc (Governing_Mode);
+                  Error_Msg_N
+                    ("\mode is less restrictive than mode % defined #",
+                     New_Mode);
+               end if;
+            end Check_Pragma_Conformance;
+
+            -------------------------
+            -- Get_SPARK_Mode_Name --
+            -------------------------
+
+            function Get_SPARK_Mode_Name (Id : SPARK_Mode_Id) return Name_Id is
+            begin
+               if Id = SPARK_On then
+                  return Name_On;
+               elsif Id = SPARK_Off then
+                  return Name_Off;
+               elsif Id = SPARK_Auto then
+                  return Name_Auto;
+
+               --  Mode "None" should never be used in error message generation
+
+               else
+                  raise Program_Error;
+               end if;
+            end Get_SPARK_Mode_Name;
+
+            ------------------------
+            -- Redefinition_Error --
+            ------------------------
+
+            procedure Redefinition_Error (Mode : SPARK_Mode_Id) is
+            begin
+               Error_Msg_Name_1 := Get_SPARK_Mode_Name (Mode);
+               Error_Msg_N
+                 ("cannot redefine 'S'P'A'R'K mode, already set to %", Arg1);
+            end Redefinition_Error;
+
+            ------------------------
+            -- Redefinition_Error --
+            ------------------------
+
+            procedure Redefinition_Error (Prag : Node_Id) is
+               Mode : constant Name_Id :=
+                        Chars (Get_Pragma_Arg (First
+                         (Pragma_Argument_Associations (Prag))));
+            begin
+               Error_Msg_Name_1 := Mode;
+               Error_Msg_Sloc   := Sloc (Prag);
+               Error_Msg_N
+                 ("cannot redefine 'S'P'A'R'K mode, already set to % #", Arg1);
+            end Redefinition_Error;
+
+            --  Local variables
+
+            Body_Id   : Entity_Id;
+            Context   : Node_Id;
+            Mode      : Name_Id;
+            Mode_Id   : SPARK_Mode_Id;
+            Spec_Id   : Entity_Id;
+            Stmt      : Node_Id;
+            Unit_Prag : Node_Id;
+
+         --  Start of processing for SPARK_Mode
+
+         begin
+            GNAT_Pragma;
+            Check_No_Identifiers;
+            Check_At_Most_N_Arguments (1);
+
+            --  Check the legality of the mode
+
+            if Arg_Count = 1 then
+               Check_Arg_Is_One_Of (Arg1, Name_On, Name_Off, Name_Auto);
+               Mode := Chars (Get_Pragma_Arg (Arg1));
+
+            --  A SPARK_Mode without an argument defaults to "On"
+
+            else
+               Mode := Name_On;
+            end if;
+
+            Mode_Id := Get_SPARK_Mode_Id (Mode);
+            Context := Parent (N);
+
+            --  The pragma appears in a configuration file
+
+            if No (Context) then
+               Check_Valid_Configuration_Pragma;
+
+               --  Set the global mode
+
+               if Global_SPARK_Mode = None then
+                  Global_SPARK_Mode := Mode_Id;
+
+               --  Catch an attempt to redefine an existing global mode by
+               --  using multiple configuration files.
+
+               elsif Global_SPARK_Mode /= Mode_Id then
+                  Redefinition_Error (Global_SPARK_Mode);
+               end if;
+
+            --  When the pragma is placed before the declaration of a unit, it
+            --  configures the whole unit.
+
+            elsif Nkind (Context) = N_Compilation_Unit then
+               Check_Valid_Configuration_Pragma;
+
+               Unit_Prag := SPARK_Mode_Pragma (Current_Sem_Unit);
+
+               --  Set the unit mode
+
+               if No (Unit_Prag) then
+                  Set_SPARK_Mode_Pragma (Current_Sem_Unit, N);
+
+               --  Catch an attempt to redefine the unit mode by using multiple
+               --  pragmas declared in the same region.
+
+               else
+                  Redefinition_Error (Unit_Prag);
+               end if;
+
+            --  The pragma applies to a [library unit] subprogram or package
+
+            else
+               --  Mode "Auto" cannot be used in nested subprograms or packages
+
+               if Mode_Id = SPARK_Auto then
+                  Error_Pragma_Arg
+                    ("mode `Auto` can only apply to the configuration variant "
+                     & "of pragma %", Arg1);
+               end if;
+
+               --  Verify the placement of the pragma with respect to package
+               --  or subprogram declarations and detect duplicates.
+
+               Stmt := Prev (N);
+               while Present (Stmt) loop
+
+                  --  Skip prior pragmas, but check for duplicates
+
+                  if Nkind (Stmt) = N_Pragma then
+                     if Pragma_Name (Stmt) = Pname then
+                        Error_Msg_Name_1 := Pname;
+                        Error_Msg_Sloc   := Sloc (Stmt);
+                        Error_Msg_N
+                          ("pragma % duplicates pragma declared #", N);
+                     end if;
+
+                  --  Skip internally generated code
+
+                  elsif not Comes_From_Source (Stmt) then
+                     null;
+
+                  --  The pragma applies to a package or subprogram declaration
+
+                  elsif Nkind_In (Stmt, N_Generic_Package_Declaration,
+                                        N_Generic_Subprogram_Declaration,
+                                        N_Package_Declaration,
+                                        N_Subprogram_Declaration)
+                  then
+                     Spec_Id := Defining_Unit_Name (Specification (Stmt));
+                     Chain_Pragma (Spec_Id, N);
+                     return;
+
+                  --  The pragma does not apply to a legal construct, issue an
+                  --  error and stop the analysis.
+
+                  else
+                     Pragma_Misplaced;
+                     exit;
+                  end if;
+
+                  Stmt := Prev (Stmt);
+               end loop;
+
+               --  If we get here, then we ran out of preceding statements. The
+               --  pragma is immediately within a body.
+
+               if Nkind_In (Context, N_Package_Body,
+                                     N_Subprogram_Body)
+               then
+                  Spec_Id := Corresponding_Spec (Context);
+
+                  if Nkind (Context) = N_Subprogram_Body then
+                     Context := Specification (Context);
+                  end if;
+
+                  Body_Id := Defining_Unit_Name (Context);
+
+                  Chain_Pragma (Body_Id, N);
+                  Check_Conformance (Spec_Id, Body_Id);
+
+               --  The pragma is at the top level of a package spec
+
+               elsif Nkind (Context) = N_Package_Specification then
+                  Spec_Id := Defining_Unit_Name (Context);
+                  Chain_Pragma (Spec_Id, N);
+
+               --  The pragma applies to the statements of a package body
+
+               elsif Nkind (Context) = N_Handled_Sequence_Of_Statements
+                 and then Nkind (Parent (Context)) = N_Package_Body
+               then
+                  Context := Parent (Context);
+                  Spec_Id := Corresponding_Spec (Context);
+                  Body_Id := Defining_Unit_Name (Context);
+
+                  Chain_Pragma (Body_Id, N);
+                  Check_Conformance (Spec_Id, Body_Id);
+
+               --  The pragma does not apply to a legal construct, issue an
+               --  error.
+
+               else
+                  Pragma_Misplaced;
+               end if;
+            end if;
+         end SPARK_Mod;
 
          --------------------------------
          -- Static_Elaboration_Desired --
@@ -16890,6 +17288,7 @@ package body Sem_Prag is
          --  MODE_TYPE ::= Nominal | Robustness
 
          when Pragma_Test_Case =>
+            GNAT_Pragma;
             Check_Test_Case;
 
          --------------------------
@@ -18219,6 +18618,43 @@ package body Sem_Prag is
       return Result;
    end Get_Base_Subprogram;
 
+   -----------------------
+   -- Get_SPARK_Mode_Id --
+   -----------------------
+
+   function Get_SPARK_Mode_Id (N : Name_Id) return SPARK_Mode_Id is
+   begin
+      if N = Name_On then
+         return SPARK_On;
+      elsif N = Name_Off then
+         return SPARK_Off;
+      elsif N = Name_Auto then
+         return SPARK_Auto;
+
+      --  Any other argument is erroneous
+
+      else
+         raise Program_Error;
+      end if;
+   end Get_SPARK_Mode_Id;
+
+   -----------------------
+   -- Get_SPARK_Mode_Id --
+   -----------------------
+
+   function Get_SPARK_Mode_Id (N : Node_Id) return SPARK_Mode_Id is
+      Mode : Node_Id;
+
+   begin
+      pragma Assert
+        (Nkind (N) = N_Pragma
+          and then Present (Pragma_Argument_Associations (N)));
+
+      Mode := First (Pragma_Argument_Associations (N));
+
+      return Get_SPARK_Mode_Id (Chars (Get_Pragma_Arg (Mode)));
+   end Get_SPARK_Mode_Id;
+
    ----------------
    -- Initialize --
    ----------------
@@ -18283,10 +18719,32 @@ package body Sem_Prag is
    --  Start of processing for Is_Config_Static_String
 
    begin
-
       Name_Len := 0;
+
       return Add_Config_Static_String (Arg);
    end Is_Config_Static_String;
+
+   -------------------------------
+   -- Is_Elaboration_SPARK_Mode --
+   -------------------------------
+
+   function Is_Elaboration_SPARK_Mode (N : Node_Id) return Boolean is
+   begin
+      pragma Assert
+        (Nkind (N) = N_Pragma
+          and then Pragma_Name (N) = Name_SPARK_Mode
+          and then Is_List_Member (N));
+
+      --  Pragma SPARK_Mode affects the elaboration of a package body when it
+      --  appears in the statement part of the body.
+
+      return
+         Present (Parent (N))
+           and then Nkind (Parent (N)) = N_Handled_Sequence_Of_Statements
+           and then List_Containing (N) = Statements (Parent (N))
+           and then Present (Parent (Parent (N)))
+           and then Nkind (Parent (Parent (N))) = N_Package_Body;
+   end Is_Elaboration_SPARK_Mode;
 
    -----------------------------------------
    -- Is_Non_Significant_Pragma_Reference --
@@ -18475,6 +18933,7 @@ package body Sem_Prag is
       Pragma_Source_File_Name               => -1,
       Pragma_Source_File_Name_Project       => -1,
       Pragma_Source_Reference               => -1,
+      Pragma_SPARK_Mode                     =>  0,
       Pragma_Storage_Size                   => -1,
       Pragma_Storage_Unit                   => -1,
       Pragma_Static_Elaboration_Desired     => -1,
@@ -18632,6 +19091,26 @@ package body Sem_Prag is
          return False;
       end if;
    end Is_Pragma_String_Literal;
+
+   ---------------------------
+   -- Is_Private_SPARK_Mode --
+   ---------------------------
+
+   function Is_Private_SPARK_Mode (N : Node_Id) return Boolean is
+   begin
+      pragma Assert
+        (Nkind (N) = N_Pragma
+          and then Pragma_Name (N) = Name_SPARK_Mode
+          and then Is_List_Member (N));
+
+      --  For pragma SPARK_Mode to be private, it has to appear in the private
+      --  declarations of a package.
+
+      return
+        Present (Parent (N))
+          and then Nkind (Parent (N)) = N_Package_Specification
+          and then List_Containing (N) = Private_Declarations (Parent (N));
+   end Is_Private_SPARK_Mode;
 
    -----------------------------
    -- Is_Valid_Assertion_Kind --
