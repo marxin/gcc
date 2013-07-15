@@ -1284,10 +1284,6 @@ branch_prob (void)
 	}
     }
 
-  // TODO: add new histogram
-  
-
-
   if (flag_profile_values)
     gimple_find_values_to_profile (&values);
 

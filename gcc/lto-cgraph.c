@@ -1005,6 +1005,9 @@ input_node (struct lto_file_decl_data *file_data,
 
   node->tp_first_run = streamer_read_uhwi (ib);
 
+  /* TODO: remove tp_first_run */
+  // node->symbol.order = node->tp_first_run;
+
   bp = streamer_read_bitpack (ib);
 
   /* Time profiler */

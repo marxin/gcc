@@ -326,9 +326,6 @@ struct GTY(()) cgraph_node {
   unsigned tp_not_called_once : 1;
 
   unsigned int tp_first_run;
-
-  int order;
-  PTR GTY ((skip (""))) aux;
 };
 
 
