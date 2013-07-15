@@ -48,8 +48,6 @@ along with GCC; see the file COPYING3.  If not see
    decision. We either process function aliasing or a simple wrapper
    is constructed.  */
 
-/* #define SELF_CHECK */
-
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -702,8 +700,6 @@ find_func_by_decl (tree decl);
 static bool
 check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
 {
-  return true;
-
   unsigned i;
   tree t1, t2;
 
@@ -1260,9 +1256,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   func_dict_t func_dict;
   bool result = true;
 
-#ifndef SELF_CHECK
   gcc_assert (f1->func_decl != f2->func_decl);
-#endif
 
   if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count
     || f1->edge_count != f2->edge_count
@@ -2054,12 +2048,6 @@ visit_all_functions (void)
         {
           f->index = semantic_functions.length ();
           semantic_functions.safe_push (f);
-
-#ifdef SELF_CHECK
-          parse_semfunc_trees (f);
-          bool r = compare_functions (f, f);
-          gcc_assert (r);
-#endif
         }
       else
         XDELETE (f);
