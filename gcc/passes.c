@@ -1359,7 +1359,6 @@ init_optimization_passes (void)
     }
   NEXT_PASS (pass_ipa_increase_alignment);
   NEXT_PASS (pass_ipa_tm);
-  NEXT_PASS (pass_ipa_sem_equality);
   NEXT_PASS (pass_ipa_lower_emutls);
   *p = NULL;
 
@@ -1368,7 +1367,6 @@ init_optimization_passes (void)
   NEXT_PASS (pass_ipa_profile);
   NEXT_PASS (pass_ipa_cp);
   NEXT_PASS (pass_ipa_cdtor_merge);
-  NEXT_PASS (pass_ipa_func_reorder);
   NEXT_PASS (pass_ipa_inline);
   NEXT_PASS (pass_ipa_pure_const);
   NEXT_PASS (pass_ipa_reference);
@@ -1384,7 +1382,6 @@ init_optimization_passes (void)
      compiled unit.  */
   p = &all_late_ipa_passes;
   NEXT_PASS (pass_ipa_pta);
-  NEXT_PASS (pass_ipa_sem_equality);
   *p = NULL;
 
   /* These passes are run after IPA passes on every function that is being
