@@ -1747,6 +1747,15 @@ output_in_order (void)
   max = symtab_order;
   nodes = XCNEWVEC (struct cgraph_order_sort, max);
 
+  unsigned int ordercount = 0;
+
+  FOR_EACH_DEFINED_FUNCTION (pf)
+    if (pf->tp_first_run)
+      ordercount++;
+
+  fprintf (stderr, "output_in_order called for: %u/%u\n", ordercount, cgraph_n_nodes);
+
+
   FOR_EACH_DEFINED_FUNCTION (pf)
     {
       if (pf->process && !pf->thunk.thunk_p && !pf->symbol.alias)

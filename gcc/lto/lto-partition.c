@@ -390,6 +390,14 @@ node_cmp (const void *pa, const void *pb)
 {
   const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
   const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
+  
+  if (a->tp_first_run && b->tp_first_run)
+    return a->tp_first_run - b->tp_first_run;
+  else if(a->tp_first_run)
+    return -1;
+  else if (b->tp_first_run)
+    return 1;
+
   return b->symbol.order - a->symbol.order;
 }
 
@@ -482,9 +490,14 @@ lto_balanced_map (void)
     }
   free (postorder);
 
+  fprintf (stderr, "lto_balanced_map: flag_toplevel_reorder: %u\n", flag_toplevel_reorder);
   if (!flag_toplevel_reorder)
     {
+      fprintf (stderr, "lto_balanced_map: sorting by tp_first_run!\n");
       qsort (order, n_nodes, sizeof (struct cgraph_node *), node_cmp);
+
+      for(i = 0; i < n_nodes; i++)
+        fprintf (stderr, "lto_balanced_map: node: %d, %s\n", order[i]->tp_first_run, cgraph_node_name (order[i]));
 
       FOR_EACH_VARIABLE (vnode)
 	if (get_symbol_class ((symtab_node) vnode) == SYMBOL_PARTITION)

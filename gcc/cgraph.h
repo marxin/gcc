@@ -325,7 +325,7 @@ struct GTY(()) cgraph_node {
   unsigned dispatcher_function : 1;
   unsigned tp_not_called_once : 1;
 
-  unsigned int tp_first_run;
+  int tp_first_run;
 };
 
 
