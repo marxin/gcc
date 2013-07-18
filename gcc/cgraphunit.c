@@ -1667,24 +1667,27 @@ expand_function (struct cgraph_node *node)
    to use subsections to make the output functions appear in top-down
    order).  */
 
+static int
+node_cmp (const void *pa, const void *pb)
+{
+  const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
+  const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
+
+  return b->tp_first_run - a->tp_first_run;
+}
+
 static void
 expand_all_functions (void)
 {
   struct cgraph_node *node;
   struct cgraph_node **order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  struct cgraph_node *pf;
+  unsigned int expanded_func_count = 0, profiled_func_count = 0;
   int order_pos, new_order_pos = 0;
   int i;
 
   order_pos = ipa_reverse_postorder (order);
   gcc_assert (order_pos == cgraph_n_nodes);
-
-  unsigned int ordercount = 0;
-
-  for(unsigned int i = 0; i < cgraph_n_nodes; i++)
-    if (order[i]->tp_first_run)
-      ordercount++;
-
-  fprintf (stderr, "expand_all_functions called for: %u/%u\n", ordercount, cgraph_n_nodes);
 
   /* Garbage collector may remove inline clones we eliminate during
      optimization.  So we must be sure to not reference them.  */
@@ -1692,15 +1695,25 @@ expand_all_functions (void)
     if (order[i]->process)
       order[new_order_pos++] = order[i];
 
+  // TODO
+  // qsort (order, new_order_pos, sizeof (struct cgraph_node *), node_cmp);
+
   for (i = new_order_pos - 1; i >= 0; i--)
     {
       node = order[i];
       if (node->process)
 	{
+     expanded_func_count++;
+     if(node->tp_first_run)
+       profiled_func_count++;
+
 	  node->process = 0;
 	  expand_function (node);
 	}
     }
+
+  fprintf (stderr, "expand_all_functions processed: %u/%u\n", profiled_func_count, expanded_func_count);
+
   cgraph_process_new_functions ();
 
   free (order);
@@ -1754,7 +1767,6 @@ output_in_order (void)
       ordercount++;
 
   fprintf (stderr, "output_in_order called for: %u/%u\n", ordercount, cgraph_n_nodes);
-
 
   FOR_EACH_DEFINED_FUNCTION (pf)
     {
@@ -2035,6 +2047,7 @@ compile (void)
 #endif
 
   cgraph_state = CGRAPH_STATE_EXPANSION;
+
   if (!flag_toplevel_reorder)
     output_in_order ();
   else
