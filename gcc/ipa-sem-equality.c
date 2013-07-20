@@ -1387,16 +1387,24 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
     dump_function_to_file (alias_func->func_decl, dump_file, TDF_DETAILS);
   }
 
-  if (DECL_VIRTUAL_P (original->symbol.decl) || DECL_VIRTUAL_P (alias->symbol.decl))
-    {
-      if (dump_file)
-        fprintf(dump_file, "Virtual function, merge skipped.\n\n");
-    }
-  else if (original->symbol.address_taken || original->symbol.externally_visible
+  if (original->symbol.address_taken || original->symbol.externally_visible
            || alias->symbol.address_taken || alias->symbol.externally_visible)
     {
       if (dump_file)
-        fprintf (dump_file, "Thunk function should be created.\n\n");
+        fprintf (dump_file, "Thunk should be created.\n\n");
+
+      // TODO: fix me
+      return;
+
+      cgraph_release_function_body (alias);
+      cgraph_reset_node (alias);
+      cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
+      cgraph_add_thunk (NULL, alias_func->func_decl, NULL, false, 0, 0, NULL, original_func->func_decl);
+      cgraph_create_edge (alias_func->node, original_func->node,
+                          NULL, 0, CGRAPH_FREQ_BASE);
+      alias_func->node->thunk.alias = NULL;
+      alias_func->node->symbol.definition = true;
+
     }
   else
   {
@@ -2063,8 +2071,11 @@ enhance_hash_for_trees (sem_func_t *f)
 
   parse_semfunc_trees (f);
 
+  // TODO: fix me
+  return;
+
   hash = hash_for_trees (f);
-  f->hash = iterative_hash_object (f->hash, hash);
+  f->hash = iterative_hash_hashval_t (f->hash, hash);
 }
 
 static unsigned int
