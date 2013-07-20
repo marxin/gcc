@@ -388,7 +388,6 @@ extern struct ipa_opt_pass_d pass_ipa_lto_finish_out;
 extern struct simple_ipa_opt_pass pass_ipa_tm;
 extern struct ipa_opt_pass_d pass_ipa_profile;
 extern struct ipa_opt_pass_d pass_ipa_cdtor_merge;
-extern struct ipa_opt_pass_d pass_ipa_func_reorder;
 
 extern struct gimple_opt_pass pass_cleanup_cfg_post_optimizing;
 extern struct gimple_opt_pass pass_init_datastructures;
