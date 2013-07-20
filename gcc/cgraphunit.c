@@ -1682,7 +1682,7 @@ expand_all_functions (void)
   struct cgraph_node *node;
   struct cgraph_node **order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
   struct cgraph_node *pf;
-  unsigned int expanded_func_count = 0, profiled_func_count = 0;
+  unsigned int expanded_func_count = 0, profiled_func_count = 0, total_profiled_func_count = 0;
   int order_pos, new_order_pos = 0;
   int i;
 
@@ -1695,24 +1695,32 @@ expand_all_functions (void)
     if (order[i]->process)
       order[new_order_pos++] = order[i];
 
-  // TODO
-  // qsort (order, new_order_pos, sizeof (struct cgraph_node *), node_cmp);
+  qsort (order, new_order_pos, sizeof (struct cgraph_node *), node_cmp);
 
   for (i = new_order_pos - 1; i >= 0; i--)
     {
       node = order[i];
+
+      if (node->tp_first_run)
+        total_profiled_func_count++;
+
       if (node->process)
 	{
      expanded_func_count++;
      if(node->tp_first_run)
        profiled_func_count++;
 
+    fprintf (stderr, "FINAL:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
 	  node->process = 0;
 	  expand_function (node);
 	}
+  else
+    fprintf (stderr, "WTF: %s\n", cgraph_node_asm_name (node));
     }
 
-  fprintf (stderr, "expand_all_functions processed: %u/%u\n", profiled_func_count, expanded_func_count);
+  fprintf (stderr, "expand_all_functions processed: %u/%u [%u/%u]\n",
+           profiled_func_count, expanded_func_count,
+           total_profiled_func_count, cgraph_n_nodes);
 
   cgraph_process_new_functions ();
 

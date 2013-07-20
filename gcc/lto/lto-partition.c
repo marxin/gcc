@@ -275,9 +275,11 @@ add_symbol_to_partition (ltrans_partition part, symtab_node node)
 
      Be lax about comdats; they may or may not be duplicated and we may
      end up in need to duplicate keyed comdat because it has unkeyed alias.  */
+
   gcc_assert (get_symbol_class (node) == SYMBOL_DUPLICATE
 	      || DECL_COMDAT (node->symbol.decl)
 	      || !symbol_partitioned_p (node));
+
   add_symbol_to_partition_1 (part, node);
 }
 
@@ -391,14 +393,12 @@ node_cmp (const void *pa, const void *pb)
   const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
   const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
 
-  /*
   if (a->tp_first_run && b->tp_first_run)
     return a->tp_first_run - b->tp_first_run;
   else if(a->tp_first_run)
     return -1;
   else if (b->tp_first_run)
     return 1;
-  */
 
   return b->symbol.order - a->symbol.order;
 }
@@ -492,13 +492,12 @@ lto_balanced_map (void)
     }
   free (postorder);
 
-  fprintf (stderr, "lto_balanced_map: flag_toplevel_reorder: %u\n", flag_toplevel_reorder);
-
-  for(i = 0; i < n_nodes; i++)
-    fprintf (stderr, "lto_balanced_map: node: %d, %s\n", order[i]->tp_first_run, cgraph_node_name (order[i]));
 
   fprintf (stderr, "lto_balanced_map: sorting by tp_first_run!\n");
   qsort (order, n_nodes, sizeof (struct cgraph_node *), node_cmp);
+
+  for(i = 0; i < n_nodes; i++)
+    fprintf (stderr, "lto_balanced_map: node:%s:%u\n", cgraph_node_asm_name (order[i]), order[i]->tp_first_run);
 
   if (!flag_toplevel_reorder)
     {
