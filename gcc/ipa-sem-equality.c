@@ -1390,21 +1390,20 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
   if (original->symbol.address_taken || original->symbol.externally_visible
            || alias->symbol.address_taken || alias->symbol.externally_visible)
     {
+      // TODO: fixme
+      return;
+
       if (dump_file)
         fprintf (dump_file, "Thunk should be created.\n\n");
 
-      // TODO: fix me
-      return;
-
       cgraph_release_function_body (alias);
       cgraph_reset_node (alias);
-      cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
+      alias_func->node->symbol.definition = true;
+      alias_func->node->thunk.alias = NULL;
+
       cgraph_add_thunk (NULL, alias_func->func_decl, NULL, false, 0, 0, NULL, original_func->func_decl);
       cgraph_create_edge (alias_func->node, original_func->node,
                           NULL, 0, CGRAPH_FREQ_BASE);
-      alias_func->node->thunk.alias = NULL;
-      alias_func->node->symbol.definition = true;
-
     }
   else
   {

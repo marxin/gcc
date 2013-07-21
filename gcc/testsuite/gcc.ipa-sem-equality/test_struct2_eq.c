@@ -1,11 +1,11 @@
 struct A
 {
-  int a, b, c;
+  int a, b, c, d;
 };
 
 struct B
 {
-  int x, y; 
+  int x, y, z;
 };
 
 int foo(struct A *a)
@@ -17,7 +17,7 @@ int foo(struct A *a)
 
 int bar(struct B *b)
 {
-  b->y = 1;
+  b->z = 1;
 
   return 123;
 }

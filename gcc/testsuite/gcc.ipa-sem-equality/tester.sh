@@ -7,7 +7,7 @@ echo "IPA semantic equality tests"
 
 echo "a) POSITIVE tests"
 
-for i in $BASEDIR/*_eq.c
+for i in $BASEDIR/*_eq.c*
 do
   echo -n "   `basename $i`"
   bname="`basename $i`.0*i.sem-equality"
@@ -22,7 +22,7 @@ done
 
 echo "b) NEGATIVE tests"
 
-for i in $BASEDIR/*_diff.c
+for i in $BASEDIR/*_diff.c*
 do
   echo -n "   `basename $i`"
   bname="`basename $i`.0*i.sem-equality"
@@ -32,5 +32,5 @@ do
   else
     echo -e " \e[1;32m[OK]\e[00m"
   fi
-  rm $bname
+  # rm $bname
 done
