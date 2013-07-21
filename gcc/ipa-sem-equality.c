@@ -94,7 +94,7 @@ typedef struct sem_func
   /* Array of sizes of all basic blocks.  */
   unsigned int *bb_sizes;
   /* Control flow graph checksum.  */
-  unsigned cfg_checksum;
+  hashval_t cfg_checksum;
   /* Total number of SSA names used in the function.  */
   unsigned ssa_names_size;
   /* Array of structures for all basic blocks.  */
@@ -189,45 +189,29 @@ edge_var_hash::equal (const edge_pair_t *pair1, const edge_pair_t *pair2)
   return pair1->source == pair2->source;
 }
 
-/* Structure used for fast set look up for tree to sem_func_t assignment.  */
-
-typedef struct tree_semfunc
-{
-  tree decl;
-  sem_func_t *func;
-} tree_semfunc_t;
-
-struct tree_semfunc_var_hash: typed_noop_remove <tree_semfunc_t>
-{
-  typedef tree_semfunc_t value_type;
-  typedef tree_semfunc_t compare_type;
-  static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);  
-};
-
-inline hashval_t
-tree_semfunc_var_hash::hash (const tree_semfunc_t *t)
-{
-  return (uintptr_t) t->decl;
-}
-
-inline int
-tree_semfunc_var_hash::equal (const tree_semfunc_t *t1,
-                              const tree_semfunc_t *t2)
-{
-  return t1->decl == t2->decl;
-}
-
 /* Struct used for all kind of function dictionaries like
    SSA names, call graph edges and all kind of declarations.  */
 
 typedef struct func_dict
 {
-  int *source;
-  int *target;
+  vec<int> source;
+  vec<int> target;
   hash_table <decl_var_hash> decl_hash;
   hash_table <edge_var_hash> edge_hash;
 } func_dict_t;
+
+/* Allocates and initializes VECTOR with N items of SSA_NAMES.  */
+
+static void
+init_ssa_names_vec (vec<int> &vector, unsigned n)
+{
+  unsigned i;
+
+  vector.create (n);
+
+  for (i = 0; i < n; i++)
+    vector.safe_push (-1);
+}
 
 /* Function dictionary initializer, all members of D are itiliazed.
    Arrays for SSA names are allocated according to SSA_NAMES_SIZE1 and
@@ -237,11 +221,8 @@ static void
 func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
                 unsigned ssa_names_size2) 
 {
-  d->source = XNEWVEC (int, ssa_names_size1);
-  d->target = XNEWVEC (int, ssa_names_size2);
-
-  memset (d->source, -1, ssa_names_size1 * sizeof (int));
-  memset (d->target, -1, ssa_names_size2 * sizeof (int));
+  init_ssa_names_vec (d->source, ssa_names_size1);
+  init_ssa_names_vec (d->target, ssa_names_size2);
 
   d->decl_hash.create (10);
   d->edge_hash.create (10);
@@ -252,8 +233,8 @@ func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
 static void
 func_dict_free (func_dict_t *d)
 {
-  free (d->source);
-  free (d->target);
+  d->source.release ();
+  d->target.release ();
 
   d->decl_hash.dispose ();
   d->edge_hash.dispose ();
@@ -393,6 +374,8 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   basic_block bb;
   sem_bb_t *sem_bb;
   hashval_t gcode_hash, code;
+  edge_iterator ei;
+  edge e;
 
   fndecl = node->symbol.decl;    
   func = DECL_STRUCT_FUNCTION (fndecl);
@@ -430,6 +413,10 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
     {
       gimple_count = 0;
       gcode_hash = 0;
+
+      for (ei = ei_start (bb->preds); ei_cond (ei, &e); ei_next (&ei))
+        f->cfg_checksum = iterative_hash_host_wide_int (e->flags,
+                                                        f->cfg_checksum);
 
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
         {
@@ -513,6 +500,9 @@ check_edges (edge e1, edge e2, func_dict_t *d)
   edge_pair_t **slot;
   bool r;
   edge_pair_t *edge_pair, *slot_edge_pair;
+
+  if (e1->flags != e2->flags)
+    return false;
 
   edge_pair = XNEW (edge_pair_t);
   edge_pair->source = e1;
@@ -674,6 +664,7 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
       return true;
     case VAR_DECL:
     case LABEL_DECL:
+    case PARM_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     case SSA_NAME:
       return function_check_ssa_names (d, t1, t2, func1, func2); 
@@ -909,7 +900,7 @@ check_ssa_resx (gimple g1, gimple g2)
 
 /* Returns for a given GSI statement first nondebug statement.  */
 
-static void iterate_nondebug_stmt (gimple_stmt_iterator &gsi)
+static void gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
 {
   gimple s;
 
@@ -946,8 +937,8 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
 
   for (i = 0; i < bb1->stmt_count; i++)
   {
-    iterate_nondebug_stmt (gsi1);
-    iterate_nondebug_stmt (gsi2);
+    gsi_next_nondebug_stmt (gsi1);
+    gsi_next_nondebug_stmt (gsi2);
 
     s1 = gsi_stmt (gsi1);
     s2 = gsi_stmt (gsi2);
@@ -1001,6 +992,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
      
         return false;
       default:
+        gcc_unreachable ();
         return false;
       }
 
@@ -1190,7 +1182,6 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
           break;
 
         case ERT_ALLOWED_EXCEPTIONS:
-          // TODO: is it correct ?
           if (r1->u.allowed.filter != r2->u.allowed.filter)
             return false;
           
@@ -1418,8 +1409,8 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 }
 
 /* All functions that could be at the end pass considered to be equal
- * are deployed to congruence classes. The algorithm for congruence reduction
- * is based of finite-state machine minimalization with O(N log N).  */
+   are deployed to congruence classes. The algorithm for congruence reduction
+   is based of finite-state machine minimalization with O(N log N).  */
 
 /* Predefined structures.  */
 struct cong_item;
@@ -1496,7 +1487,7 @@ struct cong_class_var_hash: typed_noop_remove <cong_class_t>
 inline hashval_t
 cong_class_var_hash::hash (const cong_class_t *item)
 {
-  return (uintptr_t)item;
+  return htab_hash_pointer (item);
 }
 
 /* Equal function compares pointer addresses.  */
@@ -1514,7 +1505,7 @@ static vec<cong_item_t *> congruence_items;
 static vec<cong_class_t *> congruence_classes;
 
 /* Global hash for fast tree to sem_func_t translation.  */
-static hash_table<tree_semfunc_var_hash> tree_decl_hash;
+static pointer_map<sem_func_t *> tree_decl_map;
 
 /* SOURCE item is used in cungruence item ITEM. The item is used
  * at position INDEX in that congruence item.  */
@@ -1649,21 +1640,18 @@ insert_cong_item_to_group (cong_item_t *f)
 }
 
 static void
-build_tree_decl_hash (void)
+build_tree_decl_map (void)
 {
-  tree_semfunc_t *item;
-  tree_semfunc_t **slot;
-
-  tree_decl_hash.create (16);
+  bool existed_p;
+  sem_func_t **slot;
 
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     {
-      item = XNEW (tree_semfunc_t);
-      item->decl = semantic_functions[i]->func_decl;
-      item->func = semantic_functions[i];
+      slot = tree_decl_map.insert (semantic_functions[i]->func_decl,
+                                   &existed_p);
 
-      slot = tree_decl_hash.find_slot (item, INSERT);
-      *slot = item;
+      gcc_assert (!existed_p);
+      *slot = semantic_functions[i];
     }
 }
 
@@ -1673,14 +1661,11 @@ build_tree_decl_hash (void)
 static sem_func_t *
 find_func_by_decl (tree decl)
 {
-  tree_semfunc_t item;
-  tree_semfunc_t *found;
+  sem_func_t **slot;
 
-  item.decl = decl;
+  slot = tree_decl_map.contains (decl);
 
-  found = tree_decl_hash.find (&item);
-
-  return found ? found->func : NULL;
+  return slot == NULL ? NULL : *slot;
 }
 
 /* Congruence classes creation function. All existing semantic function
@@ -2090,7 +2075,7 @@ semantic_equality (void)
 
   semantic_functions.create (16);
   visit_all_functions ();
-  build_tree_decl_hash ();
+  build_tree_decl_map ();
 
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     semantic_functions[i]->hash = independent_hash (semantic_functions[i]);
@@ -2123,8 +2108,6 @@ semantic_equality (void)
     sem_func_free (semantic_functions[i]);
 
   semantic_functions.release ();
-
-  tree_decl_hash.dispose ();
 
   return 0; 
 }

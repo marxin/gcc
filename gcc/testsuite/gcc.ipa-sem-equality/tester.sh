@@ -32,5 +32,5 @@ do
   else
     echo -e " \e[1;32m[OK]\e[00m"
   fi
-  # rm $bname
+  rm $bname
 done
