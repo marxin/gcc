@@ -539,7 +539,7 @@ coverage_compute_lineno_checksum (void)
   return chksum;
 }
 
-/* Compute cfg checksum for the current function.
+/* Compute cfg checksum for the function FN given as argument.
    The checksum is calculated carefully so that
    source code changes that doesn't affect the control flow graph
    won't change the checksum.
@@ -550,14 +550,7 @@ coverage_compute_lineno_checksum (void)
    but the compiler won't detect the change and use the wrong profile data.  */
 
 unsigned
-coverage_compute_cfg_checksum (void)
-{
-  return coverage_compute_cfg_checksum_fn (cfun);
-}
-
-/* Compute cfg checksum for the function given as argument. */
-unsigned
-coverage_compute_cfg_checksum_fn (struct function *fn)
+coverage_compute_cfg_checksum (struct function *fn)
 {
   basic_block bb;
   unsigned chksum = n_basic_blocks_for_function (fn);

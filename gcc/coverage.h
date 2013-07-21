@@ -32,11 +32,8 @@ extern int coverage_begin_function (unsigned, unsigned);
 /* Complete the coverage information for the current function.  */
 extern void coverage_end_function (unsigned, unsigned);
 
-/* Compute the control flow checksum for the current function.  */
-extern unsigned coverage_compute_cfg_checksum (void);
-
 /* Compute the control flow checksum for the function given as argument.  */
-extern unsigned coverage_compute_cfg_checksum_fn (struct function *);
+extern unsigned coverage_compute_cfg_checksum (struct function *);
 
 /* Compute the line number checksum for the current function.  */
 extern unsigned coverage_compute_lineno_checksum (void);

@@ -423,7 +423,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   f->bb_sizes = XNEWVEC (unsigned int, f->bb_count);
 
   f->bb_sorted = XNEWVEC (sem_bb_t *, f->bb_count);
-  f->cfg_checksum = coverage_compute_cfg_checksum_fn (func);
+  f->cfg_checksum = coverage_compute_cfg_checksum (func);
 
   bb_count = 0;
   FOR_EACH_BB_FN (bb, func)
@@ -1390,11 +1390,11 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
   if (original->symbol.address_taken || original->symbol.externally_visible
            || alias->symbol.address_taken || alias->symbol.externally_visible)
     {
-      // TODO: fixme
-      return;
-
       if (dump_file)
         fprintf (dump_file, "Thunk should be created.\n\n");
+
+      // TODO: fixme
+      return;
 
       cgraph_release_function_body (alias);
       cgraph_reset_node (alias);
