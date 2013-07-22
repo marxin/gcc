@@ -614,14 +614,18 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     case SSA_NAME:
       return function_check_ssa_names (d, t1, t2, func1, func2);
     case INTEGER_CST:
+    case STRING_CST:
       return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case FUNCTION_DECL:
     case FIELD_DECL:
+    case PARM_DECL:
+    case RESULT_DECL:
       return t1 == t2;
     case VAR_DECL:
     case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     default:
+      gcc_unreachable ();
       return false;
     }
 }
@@ -1382,19 +1386,19 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
            || alias->symbol.address_taken || alias->symbol.externally_visible)
     {
       if (dump_file)
-        fprintf (dump_file, "Thunk should be created.\n\n");
-
-      // TODO: fixme
-      return;
+        fprintf (dump_file, "Thunk has be created.\n\n");
 
       cgraph_release_function_body (alias);
       cgraph_reset_node (alias);
-      alias_func->node->symbol.definition = true;
-      alias_func->node->thunk.alias = NULL;
+      allocate_struct_function (alias_func->node->symbol.decl, false);
+      set_cfun (NULL);
 
-      cgraph_add_thunk (NULL, alias_func->func_decl, NULL, false, 0, 0, NULL, original_func->func_decl);
+      alias_func->node->symbol.definition = true;
+      alias_func->node->thunk.thunk_p = true;
+      alias_func->node->thunk.alias = original_func->node->symbol.decl;
       cgraph_create_edge (alias_func->node, original_func->node,
                           NULL, 0, CGRAPH_FREQ_BASE);
+      alias_func->node->thunk.alias = NULL;
     }
   else
   {
