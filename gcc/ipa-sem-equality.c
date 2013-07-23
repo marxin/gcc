@@ -693,7 +693,7 @@ static sem_func_t *
 find_func_by_decl (tree decl);
 
 static bool
-check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
+check_gimple_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
 {
   unsigned i;
   tree t1, t2;
@@ -734,7 +734,7 @@ check_ssa_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
    dictionary D.  */
 
 static bool
-check_ssa_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
+check_gimple_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
 {
   tree arg1, arg2;
   enum tree_code code1, code2;
@@ -768,7 +768,7 @@ check_ssa_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
    from FUNC2 do correspond. Collation is based on function dictionary D.  */
 
 static bool
-check_ssa_cond (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
+check_gimple_cond (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
 {
   tree t1, t2;
   enum tree_code code1, code2;
@@ -804,7 +804,7 @@ check_tree_ssa_label (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
    Function dictionary D is reposponsible for all correspondence checks.  */
 
 static bool
-check_ssa_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
+check_gimple_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 {
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
@@ -817,7 +817,7 @@ check_ssa_label (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
    statements must come from functions FUNC1 and FUNC2.  */
 
 static bool
-check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
+check_gimple_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 {
   unsigned lsize1, lsize2, i;
   tree t1, t2, low1, low2, high1, high2;
@@ -862,7 +862,7 @@ check_ssa_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
    equal if types in function dictionary D do collate.  */
 
 static bool
-check_ssa_return (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
+check_gimple_return (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 {
   tree t1, t2;
 
@@ -881,7 +881,7 @@ check_ssa_return (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
    dictionary D.  */
 
 static bool
-check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
+check_gimple_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 {
   tree dest1, dest2;
 
@@ -897,7 +897,7 @@ check_ssa_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 /* Returns true if resx gimples G1 and G2 are corresponding
    in both function. */
 static bool
-check_ssa_resx (gimple g1, gimple g2)
+check_gimple_resx (gimple g1, gimple g2)
 {
   return gimple_resx_region (g1) == gimple_resx_region (g2);
 }
@@ -953,38 +953,38 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
     switch (gimple_code (s1))
       {
       case GIMPLE_CALL:
-        if (!check_ssa_call (s1, s2, d, func1, func2))
+        if (!check_gimple_call (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_ASSIGN:
-        if (!check_ssa_assign (s1, s2, d, func1, func2))
+        if (!check_gimple_assign (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_COND:
-        if (!check_ssa_cond (s1, s2, d, func1, func2))
+        if (!check_gimple_cond (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_SWITCH:
-        if (!check_ssa_switch (s1, s2, d, func1, func2))
+        if (!check_gimple_switch (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_DEBUG:
       case GIMPLE_EH_DISPATCH:
         break;
       case GIMPLE_RESX:
-        if (!check_ssa_resx (s1, s2))
+        if (!check_gimple_resx (s1, s2))
           return false;
         break;
       case GIMPLE_LABEL:
-        if (!check_ssa_label (s1, s2, d, func1, func2))
+        if (!check_gimple_label (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_RETURN:
-        if (!check_ssa_return (s1, s2, d, func1, func2))
+        if (!check_gimple_return (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_GOTO:
-        if (!check_ssa_goto (s1, s2, d, func1, func2))
+        if (!check_gimple_goto (s1, s2, d, func1, func2))
           return false;
         break;
       case GIMPLE_ASM:
@@ -1370,9 +1370,9 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 
   if (dump_file)
     {
-      fprintf (dump_file, "Semantic equality hit:%s -> %s\n",
+      fprintf (dump_file, "Semantic equality hit:%s->%s\n",
                cgraph_node_name (original), cgraph_node_name (alias));
-       fprintf (dump_file, "Assembler function names:%s -> %s\n",
+       fprintf (dump_file, "Assembler function names:%s->%s\n",
                cgraph_node_asm_name (original), cgraph_node_asm_name (alias));
    }
 
@@ -1386,7 +1386,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
            || alias->symbol.address_taken || alias->symbol.externally_visible)
     {
       if (dump_file)
-        fprintf (dump_file, "Thunk has be created.\n\n");
+        fprintf (dump_file, "Thunk has been created.\n\n");
 
       tree result = DECL_RESULT (alias->symbol.decl);
 
