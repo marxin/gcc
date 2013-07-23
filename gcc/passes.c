@@ -327,6 +327,37 @@ static struct gimple_opt_pass pass_all_early_optimizations =
  }
 };
 
+/* early fixup pass gate function.  This fixup should be used whenever
+   some late IPA pass is used.  TODO: probably this should be handled by
+   properties.  */
+
+static bool
+gate_late_local_fixup (void)
+{
+  return flag_ipa_sem_equality || flag_ipa_pta;
+}
+
+static struct simple_ipa_opt_pass pass_all_late_local_fixups =
+{
+ {
+  SIMPLE_IPA_PASS,
+  "*late_fixups",			/* name */
+  OPTGROUP_NONE,                        /* optinfo_flags */
+  gate_late_local_fixup,		/* gate */
+  NULL,					/* execute */
+  NULL,					/* sub */
+  NULL,					/* next */
+  0,					/* static_pass_number */
+  TV_NONE,				/* tv_id */
+  0,					/* properties_required */
+  0,					/* properties_provided */
+  0,					/* properties_destroyed */
+  0,					/* todo_flags_start */
+  TODO_remove_functions			/* todo_flags_finish */
+ }
+};
+
+
 /* Gate: execute, or not, all of the non-trivial optimizations.  */
 
 static bool

@@ -327,7 +327,7 @@ cgraph_process_new_functions (void)
 		 to expand OMP.  */
 	      || !optimize)
 	    execute_pass_list (pass_early_local_passes.pass.sub);
-	  else
+	  else if (inline_summary_vec != NULL)
 	    compute_inline_parameters (node, true);
 	  free_dominance_info (CDI_POST_DOMINATORS);
 	  free_dominance_info (CDI_DOMINATORS);
@@ -1513,7 +1513,7 @@ expand_thunk (struct cgraph_node *node)
       /* Since we want to emit the thunk, we explicitly mark its name as
 	 referenced.  */
       node->thunk.thunk_p = false;
-      cgraph_node_remove_callees (node);
+      rebuild_cgraph_edges ();
       cgraph_add_new_function (thunk_fndecl, true);
       bitmap_obstack_release (NULL);
     }

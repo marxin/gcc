@@ -120,6 +120,20 @@ along with GCC; see the file COPYING3.  If not see
      passes are executed after partitioning and thus see just parts of the
      compiled unit.  */
   INSERT_PASSES_AFTER (all_late_ipa_passes)
+  /* Late fixups, if enabled, will apply all transformations of real IPA
+     passes.  This allows late IPA passes to not have to worry about
+     preserving information passed by IPA passes down to transform
+     functions.  When adding new late IPA pass, modify gate of
+     pass_all_late_local_fixups to be enabled with your pass.  */
+  NEXT_PASS (pass_all_late_local_fixups);
+  PUSH_INSERT_PASSES_WITHIN (pass_all_late_local_fixups)
+    NEXT_PASS (pass_fixup_cfg);
+    NEXT_PASS (pass_rename_ssa_copies);
+    NEXT_PASS (pass_copy_prop);
+    NEXT_PASS (pass_ccp);
+    NEXT_PASS (pass_cd_dce);
+    NEXT_PASS (pass_rebuild_cgraph_edges);
+  POP_INSERT_PASSES ()
   NEXT_PASS (pass_ipa_pta);
   NEXT_PASS (pass_ipa_sem_equality);
   TERMINATE_PASS_LIST ()
