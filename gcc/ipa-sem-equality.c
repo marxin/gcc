@@ -474,6 +474,9 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
     return t1 == t2; /* global variable declaration.  */
 
+  if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
+    return false;
+
   slot = d->decl_hash.find_slot (decl_pair, INSERT);
 
   slot_decl_pair = (decl_pair_t *) *slot;
@@ -574,7 +577,12 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
 {
   tree base1, base2, x1, x2, y1, y2;
   HOST_WIDE_INT offset1, offset2;
-  
+
+   /* TODO: We need to compare alias classes for loads & stores.
+     We also need to care about type based devirtualization.  */
+  if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
+    return false;
+ 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
 
@@ -594,7 +602,25 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     {
     case ARRAY_REF:
     case ARRAY_RANGE_REF:
-    case COMPONENT_REF:
+    {
+      x1 = TREE_OPERAND (t1, 0);
+      x2 = TREE_OPERAND (t2, 0);
+      y1 = TREE_OPERAND (t1, 1);
+      y2 = TREE_OPERAND (t2, 1);
+
+      if (!compare_handled_component (array_ref_low_bound (t1),
+				      array_ref_low_bound (t2),
+				      d, func1, func2))
+        return false;
+      if (!compare_handled_component (array_ref_element_size (t1),
+				      array_ref_element_size (t2),
+				      d, func1, func2))
+        return false;
+      if (!compare_handled_component (x1, x2, d, func1, func2))
+        return false;
+      return compare_handled_component (y1, y2, d, func1, func2);
+    }
+
     case MEM_REF:
     {
       x1 = TREE_OPERAND (t1, 0);
@@ -602,8 +628,21 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       y1 = TREE_OPERAND (t1, 1);
       y2 = TREE_OPERAND (t2, 1);
 
+      if (!compare_handled_component (x1, x2, d, func1, func2))
+        return false;
+
+      /* Type of the offset on MEM_REF does not matter.  */
+      return tree_to_double_int (y1) == tree_to_double_int (y2);
+    }
+    case COMPONENT_REF:
+    {
+      x1 = TREE_OPERAND (t1, 0);
+      x2 = TREE_OPERAND (t2, 0);
+      y1 = TREE_OPERAND (t1, 1);
+      y2 = TREE_OPERAND (t2, 1);
+
       return (compare_handled_component (x1, x2, d, func1, func2)
-              && compare_handled_component (y1, y2, d, func1, func2));
+	            && compare_handled_component (y1, y2, d, func1, func2));
     }
     case ADDR_EXPR:
     {
@@ -614,17 +653,20 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     case SSA_NAME:
       return function_check_ssa_names (d, t1, t2, func1, func2);
     case INTEGER_CST:
+      return (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+              && tree_to_double_int (t1) == tree_to_double_int (t2));
     case STRING_CST:
       return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case FUNCTION_DECL:
     case FIELD_DECL:
-    case PARM_DECL:
     case RESULT_DECL:
       return t1 == t2;
     case VAR_DECL:
+    case PARM_DECL:
     case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     default:
+      debug_tree (t1);
       gcc_unreachable ();
       return false;
     }
@@ -638,6 +680,7 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 {
   enum tree_code tc1, tc2;
   unsigned length1, length2, i;
+  bool ret;
 
   if (t1 == NULL && t2 == NULL)
     return true;
@@ -667,11 +710,14 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 
       return true;
     case VAR_DECL:
-    case LABEL_DECL:
     case PARM_DECL:
+    case LABEL_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     case SSA_NAME:
       return function_check_ssa_names (d, t1, t2, func1, func2); 
+    case INTEGER_CST:
+      return (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+              && tree_to_double_int (t1) == tree_to_double_int (t2));
     default:
       break;
     }
@@ -679,9 +725,19 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   if ((handled_component_p (t1) && handled_component_p (t1))
     || tc1 == ADDR_EXPR || tc1 == MEM_REF || tc1 == REALPART_EXPR
       || tc1 == IMAGPART_EXPR)
-    return compare_handled_component (t1, t2, d, func1, func2);
+    ret = compare_handled_component (t1, t2, d, func1, func2);
   else /* COMPLEX_CST, VECTOR_CST compared correctly here.  */
-    return operand_equal_p (t1, t2, OEP_ONLY_CONST);
+    ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
+
+#if 0
+  if (!ret)
+    {
+      debug_tree (t1);
+      debug_tree (t2);
+    }
+#endif
+
+  return ret;
 }
 
 /* Call comparer takes statements S1 from a function FUNC1 and S2 from
@@ -723,10 +779,7 @@ check_gimple_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
-  if (t1 == NULL_TREE && t2 == NULL_TREE)
-    return true;
-  else
-    return check_operand (t1, t2, d, func1, func2);
+  return check_operand (t1, t2, d, func1, func2);
 }
 
 /* Functions FUNC1 and FUNC2 are considered equal if assignment statements
@@ -853,6 +906,8 @@ check_gimple_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func
          || (high1 && high2
              && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
       return false;
+    
+    /* TODO: Compare labels.  */
   }
 
   return true;
@@ -996,6 +1051,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
      
         return false;
       default:
+        debug_gimple_stmt (s1);
         gcc_unreachable ();
         return false;
       }
@@ -1194,8 +1250,15 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
             return false;
 
           break;
-        default:
+        case ERT_CLEANUP:
           break;
+        case ERT_MUST_NOT_THROW:
+          /* FIXME: better DECL comparing?  */
+          if (r1->u.must_not_throw.failure_decl != r1->u.must_not_throw.failure_decl)
+            return false;
+          break;
+        default:
+          gcc_unreachable ();
         }
 
       /* If there are sub-regions, process them.  */
@@ -1253,8 +1316,9 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   gcc_assert (f1->func_decl != f2->func_decl);
 
-  if (f1->arg_count != f2->arg_count || f1->bb_count != f2->bb_count
-    || f1->edge_count != f2->edge_count
+  if (f1->arg_count != f2->arg_count
+      || f1->bb_count != f2->bb_count
+      || f1->edge_count != f2->edge_count
       || f1->cfg_checksum != f2->cfg_checksum)
     return false;
 
@@ -1366,7 +1430,14 @@ static void
 merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 {
   struct cgraph_node *original = original_func->node;
+  struct cgraph_node *local_original = original;
   struct cgraph_node *alias = alias_func->node;
+  bool original_address_matters;
+  bool alias_address_matters;
+  bool create_thunk;
+  bool create_alias;
+  bool redirect_callers;
+  bool original_discardable = false;
 
   if (dump_file)
     {
@@ -1382,35 +1453,148 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
     dump_function_to_file (alias_func->func_decl, dump_file, TDF_DETAILS);
   }
 
-  if (original->symbol.address_taken || original->symbol.externally_visible
-           || alias->symbol.address_taken || alias->symbol.externally_visible)
+  /* TODO: 
+     tak jsem si uvedomil, ze ne vsechny funkce jsou stejne dobre jako
+     volba originalu.  Original musi byt
+     !DECL_SECTION_NAME || DECL_HAS_IMPLICIT_SECTION_NAME_P
+     a idealne neprojde temi testy na original_discardable.
+
+     nejlepsi jsou deklarace co projdou decl_binds_to_current_def_p
+     horsi targetm.binds_local_p a nejhorsi ty zbyle. Asi bychom meli
+     z bucketu vybrat nejlepsi kandidaty a z nich lexikograficky
+     nejmensiho (aby rozhodnuti sedely mezi unitama).  */
+
+  /* Do not attempt to mix functions from different user sections;
+     we never knows what user intends with those.  */
+  if (((DECL_SECTION_NAME (original->symbol.decl)
+        && !DECL_HAS_IMPLICIT_SECTION_NAME_P (original->symbol.decl))
+       || (DECL_SECTION_NAME (alias->symbol.decl)
+           && !DECL_HAS_IMPLICIT_SECTION_NAME_P (alias->symbol.decl)))
+      && DECL_SECTION_NAME (original->symbol.decl)
+         != DECL_SECTION_NAME (alias->symbol.decl))
     {
       if (dump_file)
-        fprintf (dump_file, "Thunk has been created.\n\n");
+        fprintf (dump_file,
+                 "Not unifying; original and alias are in different sections.\n\n");
+      return;
+    }
+ 
+  /* See if original is in a section that can be discarded if the main
+     symbol is not used.  */
+  if (DECL_EXTERNAL (original->symbol.decl))
+    original_discardable = true;
+  if (original->symbol.resolution == LDPR_PREEMPTED_REG
+      || original->symbol.resolution == LDPR_PREEMPTED_IR)
+    original_discardable = true;
+  if (DECL_ONE_ONLY (original->symbol.decl)
+      && original->symbol.resolution != LDPR_PREVAILING_DEF
+      && original->symbol.resolution != LDPR_PREVAILING_DEF_IRONLY
+      && original->symbol.resolution != LDPR_PREVAILING_DEF_IRONLY_EXP)
+    original_discardable = true;
 
-      tree result = DECL_RESULT (alias->symbol.decl);
+  /* If original can be discarded and replaced by an different (semantically
+     equivalent) implementation, we risk creation of cycles from
+     wrappers of equivalent functions.  Do not attempt to unify for now.  */
+  if (original_discardable
+      && (DECL_COMDAT_GROUP (original->symbol.decl)
+	  != DECL_COMDAT_GROUP (alias->symbol.decl)))
+    {
+      if (dump_file)
+        fprintf (dump_file, "Not unifying; risk of creation of cycle.\n\n");
+      return;
+    }
 
-      cgraph_release_function_body (alias);
-      cgraph_reset_node (alias);
-      allocate_struct_function (alias_func->node->symbol.decl, false);
-      set_cfun (NULL);
-      DECL_RESULT (alias->symbol.decl) = result;
+  /* See if original and/or alias ddress can be compared for equality.  */
+  original_address_matters
+     = (!DECL_VIRTUAL_P (original->symbol.decl)
+	&& (original->symbol.externally_visible
+	    || address_taken_from_non_vtable_p ((symtab_node)original)));
+  alias_address_matters
+     = (!DECL_VIRTUAL_P (alias->symbol.decl)
+	&& (alias->symbol.externally_visible
+	    || address_taken_from_non_vtable_p ((symtab_node)alias)));
 
-      alias_func->node->symbol.definition = true;
-      alias_func->node->thunk.thunk_p = true;
-      cgraph_create_edge (alias_func->node, original_func->node,
-                          NULL, 0, CGRAPH_FREQ_BASE);
+  /* If alias and original can be compared for address equality, we need
+     to create a thunk.  Also we can not create extra aliases into discardable
+     section (or we risk link failures when section is discarded).  */
+  if ((original_address_matters
+      && alias_address_matters)
+      || original_discardable)
+    {
+      create_thunk = true;
+      create_alias = false;
+      /* When both alias and original are not overwritable, we can save
+         the extra thunk wrapper for direct calls.  */
+      redirect_callers
+        = (!original_discardable
+	   && cgraph_function_body_availability (alias) > AVAIL_OVERWRITABLE
+	   && cgraph_function_body_availability (original) > AVAIL_OVERWRITABLE);
     }
   else
-  {
-    if (dump_file)
-      fprintf (dump_file, "Alias has been created.\n\n");
+    {
+      create_alias = true;
+      create_alias = true;
+      redirect_callers = false;
+    }
 
-    cgraph_release_function_body (alias);
-    cgraph_reset_node (alias);
-    cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
-    symtab_resolve_alias ((symtab_node) alias, (symtab_node) original);  
-  }
+  /* We want thunk to always jump to the local function body
+     unless the body is comdat and may be optimized out.  */
+  if ((create_thunk || redirect_callers)
+      && (!original_discardable
+	  || (DECL_COMDAT_GROUP (original->symbol.decl)
+	      && (DECL_COMDAT_GROUP (original->symbol.decl)
+		  == DECL_COMDAT_GROUP (alias->symbol.decl)))))
+    local_original
+      = cgraph (symtab_nonoverwritable_alias ((symtab_node) original));
+
+  if (create_thunk)
+    {
+      /* Preserve DECL_RESULT so we get right by reference flag.  */
+      tree result = DECL_RESULT (alias->symbol.decl);
+
+      /* Remove the function's body.  */
+      cgraph_release_function_body (alias);
+      cgraph_reset_node (alias);
+
+      DECL_RESULT (alias->symbol.decl) = result;
+      allocate_struct_function (alias_func->node->symbol.decl, false);
+      set_cfun (NULL);
+	
+      /* Turn alias into thunk and expand it into GIMPLE representation.  */
+      alias->symbol.definition = true;
+      alias->thunk.thunk_p = true;
+      cgraph_create_edge (alias, local_original,
+                          NULL, 0, CGRAPH_FREQ_BASE);
+      expand_thunk (alias);
+      if (dump_file)
+        fprintf (dump_file, "Thunk has been created.\n\n");
+    }
+  /* If the condtion above is not met, we are lucky and can turn the
+     function into real alias.  */
+  else if (create_alias)
+    {
+      /* Remove the function's body.  */
+      cgraph_release_function_body (alias);
+      cgraph_reset_node (alias);
+      /* Create the alias.  */
+      cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
+      symtab_resolve_alias ((symtab_node) alias, (symtab_node) original);  
+      if (dump_file)
+        fprintf (dump_file, "Alias has been created.\n\n");
+    }
+  if (redirect_callers)
+    {
+      /* If alias is non-overwritable then
+         all direct calls are safe to be redirected to the original.  */
+      bool redirected = false;
+      while (alias->callers)
+        {
+          cgraph_redirect_edge_callee (alias->callers, local_original);
+          redirected = true;
+        }
+      if (dump_file && redirected)
+        fprintf (dump_file, "Local calls has been redirected.\n\n");
+    }
 }
 
 /* All functions that could be at the end pass considered to be equal

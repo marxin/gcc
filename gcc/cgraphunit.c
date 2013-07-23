@@ -1506,9 +1506,9 @@ expand_thunk (struct cgraph_node *node)
 
       delete_unreachable_blocks ();
       update_ssa (TODO_update_ssa);
-//#ifdef ENABLE_CHECKING
+#ifdef ENABLE_CHECKING
       verify_flow_info ();      
-//#endif
+#endif
 
       /* Since we want to emit the thunk, we explicitly mark its name as
 	 referenced.  */
