@@ -1,3 +1,242 @@
+2013-07-22  Bill Schmidt  <wschmidt@vnet.linux.ibm.com>
+	    Anton Blanchard <anton@au1.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_expand_vector_init): Fix
+	endianness when selecting field to splat.
+
+2013-07-22  Eric Christopher  <echristo@gmail.com>
+
+	* dwarf2out.c (die_odr_checksum): New function to use
+	CHECKSUM_ macros and ULEB128 for DIE tag.
+	(generate_type_signature): Use.
+	
+2013-07-22  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config.gcc (sparc*-*-*): Accept leon3 processor.
+	(sparc-leon*-*): Merge with sparc*-*-* and add leon3 support.
+	* doc/invoke.texi (SPARC Options): Adjust -mfix-ut699 entry.
+	* config/sparc/sparc-opts.h (enum processor_type): Add PROCESSOR_LEON3.
+	* config/sparc/sparc.opt (enum processor_type): Add leon3.
+	(mfix-ut699): Adjust comment.
+	* config/sparc/sparc.h (TARGET_CPU_leon3): New define.
+	(CPP_CPU32_DEFAULT_SPEC): Add leon3 support.
+	(CPP_CPU_SPEC): Likewise.
+	(ASM_CPU_SPEC): Likewise.
+	* config/sparc/sparc.c (leon3_cost): New constant.
+	(sparc_option_override): Add leon3 support.
+	(mem_ref): New function.
+	(sparc_gate_work_around_errata): Return true if -mfix-ut699 is enabled.
+	(sparc_do_work_around_errata): Look into the instruction in the delay
+	slot and adjust accordingly.  Add fix for the data cache nullify issues
+	of the UT699.  Change insertion position for the NOP.
+	* config/sparc/leon.md (leon_fpalu, leon_fpmds, write_buf): Delete.
+	(leon3_load): New reservation.
+	(leon_store): Bump latency to 2.
+	(grfpu): New automaton.
+	(grfpu_alu): New unit.
+	(grfpu_ds): Likewise.
+	(leon_fp_alu): Adjust.
+	(leon_fp_mult): Delete.
+	(leon_fp_div): Split into leon_fp_divs and leon_fp_divd.
+	(leon_fp_sqrt): Split into leon_fp_sqrts and leon_fp_sqrtd.
+	* config/sparc/sparc.md (cpu): Add leon3.
+	* config/sparc/sync.md (atomic_exchangesi): Disable if -mfix-ut699.
+	(swapsi): Likewise.
+	(atomic_test_and_set): Likewise.
+	(ldstub): Likewise.
+
+2013-07-22  Jürgen Urban  <JuergenUrban@gmx.de>
+
+	* config.gcc (mips*-*-*): Add --with-fpu support.  Make single the
+	default for R5900 targets.
+	* config/mips/mips.h (OPTION_DEFAULT_SPECS): Handle --with-fpu.
+	(ISA_HAS_LDC1_SDC1): Set to false for TARGET_MIPS5900.
+	* config/mips/mips.c (mips_option_override): Report an error for
+	-march=r5900 -mhard-float -mdouble-float.  Use spu_single_format
+	for -march=r5900 -mhard-float.
+
+2013-07-22  Chang  <pchang9@cs.wisc.edu>
+
+	* df-problems.c (can_move_insns_across): Exit loop once we
+	find a non-fixed, non-global register.
+
+	* ipa-pure-const.c (propagate_nothrow): Exit loop after
+	setting can_throw.
+
+	* omega.c (omega_eliminate_red): Break after setting red_found.
+	(omega_problem_has_red_equations): Similarly after setting found.
+	(omega_query_variable): Similarly after setting coupled.
+
+2013-07-22  Marek Polacek  <polacek@redhat.com>
+
+	* gimplify.c: Don't include gimple.h twice.
+
+2013-07-22  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/arm/constraints.md (Pd): Allow TARGET_THUMB
+	instead of TARGET_THUMB1.
+	(Pz): New constraint.
+	* config/arm/arm.md (arm_addsi3): Add alternatives for 16-bit
+	encodings.
+	(compare_negsi_si): Likewise.
+	(compare_addsi2_op0): Likewise.
+	(compare_addsi2_op1): Likewise.
+	(addsi3_carryin_<optab>): Likewise.
+	(addsi3_carryin_alt2_<optab>): Likewise.
+	(addsi3_carryin_shift_<optab>): Disable cond_exec variant
+	for arm_restrict_it.
+	(subsi3_carryin): Likewise.
+	(arm_subsi3_insn): Add alternatives for 16-bit encoding.
+	(minmax_arithsi): Disable for arm_restrict_it.
+	(minmax_arithsi_non_canon): Adjust for arm_restrict_it.
+	(satsi_<SAT:code>): Disable cond_exec variant for arm_restrict_it.
+	(satsi_<SAT:code>_shift): Likewise.
+	(arm_shiftsi3): Add alternative for 16-bit encoding.
+	(arm32_movhf): Disable for arm_restrict_it.
+	(arm_cmpdi_unsigned): Add alternatives for 16-bit encoding.
+	(arm_movtas_ze): Disable cond_exec variant for arm_restrict_it.
+
+2013-07-22  Sofiane Naci  <sofiane.naci@arm.com>
+
+	* config/arm/arm.md (attribute "insn"): Delete.
+	(attribute "type"): Add "mov_imm", "mov_reg", "mov_shift",
+	"mov_shift_reg", "mvn_imm", "mvn_reg", "mvn_shift" and "mvn_shift_reg".
+	(not_shiftsi): Update for attribute change.
+	(not_shiftsi_compare0): Likewise.
+	(not_shiftsi_compare0_scratch): Likewise.
+	(arm_one_cmplsi2): Likewise.
+	(thumb1_one_cmplsi2): Likewise.
+	(notsi_compare0): Likewise.
+	(notsi_compare0_scratch): Likewise.
+	(thumb1_movdi_insn): Likewise.
+	(arm_movsi_insn): Likewise.
+	(movhi_insn_arch4): Likewise.
+	(movhi_bytes): Likewise.
+	(arm_movqi_insn): Likewise.
+	(thumb1_movqi_insn): Likewise.
+	(arm32_movhf): Likewise.
+	(thumb1_movhf): Likewise.
+	(arm_movsf_soft_insn): Likewise.
+	(thumb1_movsf_insn): Likewise.
+	(thumb_movdf_insn): Likewise.
+	(movsicc_insn): Likewise.
+	(movsfcc_soft_insn): Likewise.
+	(and_scc): Likewise.
+	(cond_move): Likewise.
+	(if_move_not): Likewise.
+	(if_not_move): Likewise.
+	(if_shift_move): Likewise.
+	(if_move_shift): Likewise.
+	(if_shift_shift): Likewise.
+	(if_not_arith): Likewise.
+	(if_arith_not): Likewise.
+	(cond_move_not): Likewise.
+	* config/arm/neon.md (neon_mov<mode>): Update for attribute change.
+	(neon_mov<mode>): Likewise.
+	* config/arm/vfp.md (arm_movsi_vfp): Update for attribute change.
+	(thumb2_movsi_vfp): Likewise.
+	(movsf_vfp): Likewise.
+	(thumb2_movsf_vfp): Likewise.
+	* config/arm/arm.c (xscale_sched_adjust_cost): Update for attribute
+	change.
+	(cortexa7_older_only): Likewise.
+	(cortexa7_younger): Likewise.
+	* config/arm/arm1020e.md (1020alu_op): Update for attribute change.
+	(1020alu_shift_op): Likewise.
+	(1020alu_shift_reg_op): Likewise.
+	* config/arm/arm1026ejs.md (alu_op): Update for attribute change.
+	(alu_shift_op): Likewise.
+	(alu_shift_reg_op): Likewise.
+	* config/arm/arm1136jfs.md (11_alu_op): Update for attribute change.
+	(11_alu_shift_op): Likewise.
+	(11_alu_shift_reg_op): Likewise.
+	* config/arm/arm926ejs.md (9_alu_op): Update for attribute change.
+	(9_alu_shift_reg_op): Likewise.
+	* config/arm/cortex-a15.md (cortex_a15_alu): Update for attribute
+	change.
+	(cortex_a15_alu_shift): Likewise.
+	(cortex_a15_alu_shift_reg): Likewise.
+	* config/arm/cortex-a5.md (cortex_a5_alu): Update for attribute change.
+	(cortex_a5_alu_shift): Likewise.
+	* config/arm/cortex-a53.md (cortex_a53_alu): Update for attribute
+	change.
+	(cortex_a53_alu_shift): Likewise.
+	* config/arm/cortex-a7.md (cortex_a7_alu_imm): Update for attribute
+	change.
+	(cortex_a7_alu_reg): Likewise.
+	(cortex_a7_alu_shift): Likewise.
+	* config/arm/cortex-a8.md (cortex_a8_alu): Update for attribute change.
+	(cortex_a8_alu_shift): Likewise.
+	(cortex_a8_alu_shift_reg): Likewise.
+	(cortex_a8_mov): Likewise.
+	* config/arm/cortex-a9.md (cortex_a9_dp): Update for attribute change.
+	(cortex_a9_dp_shift): Likewise.
+	* config/arm/cortex-m4.md (cortex_m4_alu): Update for attribute change.
+	* config/arm/cortex-r4.md (cortex_r4_alu): Update for attribute change.
+	(cortex_r4_mov): Likewise.
+	(cortex_r4_alu_shift): Likewise.
+	(cortex_r4_alu_shift_reg): Likewise.
+	* config/arm/fa526.md (526_alu_op): Update for attribute change.
+	(526_alu_shift_op): Likewise.
+	* config/arm/fa606te.md (606te_alu_op): Update for attribute change.
+	* config/arm/fa626te.md (626te_alu_op): Update for attribute change.
+	(626te_alu_shift_op): Likewise.
+	* config/arm/fa726te.md (726te_shift_op): Update for attribute change.
+	(726te_alu_op): Likewise.
+	(726te_alu_shift_op): Likewise.
+	(726te_alu_shift_reg_op): Likewise.
+	* config/arm/fmp626.md (mp626_alu_op): Update for attribute change.
+	(mp626_alu_shift_op): Likewise.
+	* config/arm/marvell-pj4.md (pj4_alu_e1): Update for attribute change.
+	(pj4_alu_e1_conds): Likewise.
+	(pj4_alu): Likewise.
+	(pj4_alu_conds): Likewise.
+	(pj4_shift): Likewise.
+	(pj4_shift_conds): Likewise.
+	(pj4_alu_shift): Likewise.
+	(pj4_alu_shift_conds): Likewise.
+
+2013-07-22  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/arm/predicates.md (shiftable_operator_strict_it):
+	New predicate.
+	* config/arm/thumb2.md (thumb_andsi_not_shiftsi_si):
+	Disable cond_exec version for arm_restrict_it.
+	(thumb2_smaxsi3): Convert to generate cond_exec.
+	(thumb2_sminsi3): Likewise.
+	(thumb32_umaxsi3): Likewise.
+	(thumb2_uminsi3): Likewise.
+	(thumb2_abssi2): Adjust constraints for arm_restrict_it.
+	(thumb2_neg_abssi2): Likewise.
+	(thumb2_mov_scc): Add alternative for 16-bit encoding.
+	(thumb2_movsicc_insn): Adjust alternatives.
+	(thumb2_mov_negscc): Disable for arm_restrict_it.
+	(thumb2_mov_negscc_strict_it): New pattern.
+	(thumb2_mov_notscc_strict_it): New pattern.
+	(thumb2_mov_notscc): Disable for arm_restrict_it.
+	(thumb2_ior_scc): Likewise.
+	(thumb2_ior_scc_strict_it): New pattern.
+	(thumb2_cond_move): Adjust for arm_restrict_it.
+	(thumb2_cond_arith): Disable for arm_restrict_it.
+	(thumb2_cond_arith_strict_it): New pattern.
+	(thumb2_cond_sub): Adjust for arm_restrict_it.
+	(thumb2_movcond): Likewise.
+	(thumb2_extendqisi_v6): Disable cond_exec variant for arm_restrict_it.
+	(thumb2_zero_extendhisi2_v6): Likewise.
+	(thumb2_zero_extendqisi2_v6): Likewise.
+	(orsi_notsi_si): Likewise.
+	(orsi_not_shiftsi_si): Likewise.
+
+2013-07-22  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/avr.c (avr_out_xload): No SBIS around LPM so that
+	instruction sequence is 1 byte shorter.
+
+2013-07-22  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (nonlocal_goto_receiver): Delete insn if
+	it is not needed after split.
+
 2013-07-20  Iain Sandoe  <iain@codesourcery.com>
 
 	PR target/51784
@@ -7,7 +246,7 @@
 	(ix86_save_reg): If the function contains a nonlocal label, save the
 	PIC base reg.
 	* config/darwin-protos.h (machopic_should_output_picbase_label): New.
-	* gcc/config/darwin.c (emitted_pic_label_num): New GTY. 
+	* gcc/config/darwin.c (emitted_pic_label_num): New GTY.
 	(update_pic_label_number_if_needed): New.
 	(machopic_output_function_base_name): Adjust for nonlocal receiver
 	case.
@@ -107,15 +346,16 @@
 	(arm_extendqisi2addsi): Likewise.
 	(clzsi2): Update for attribute changes.
 	(rbitsi2): Likewise.
-	* config/arm/arm-fixed.md (arm_ssatsihi_shift): Delete "insn" attribute.
+	* config/arm/arm-fixed.md (arm_ssatsihi_shift): Delete "insn"
+	attribute.
 	(arm_usatsihi): Likewise.
 	* config/arm/cortex-a8.md (cortex_a8_alu): Update for attribute change.
 
 2013-07-18  Sofiane Naci  <sofiane.naci@arm.com>
 
 	* config/arm/arm.md (attribute "type"): Rename "simple_alu_imm" to
-	"arlo_imm".  Rename "alu_reg" to "arlo_reg".  Rename "simple_alu_shift" to
-	"extend".  Split "alu_shift" into "shift" and "arlo_shift".  Split
+	"arlo_imm".  Rename "alu_reg" to "arlo_reg".  Rename "simple_alu_shift"
+	to "extend".  Split "alu_shift" into "shift" and "arlo_shift".  Split
 	"alu_shift_reg" into "shift_reg" and "arlo_shift_reg".  List types
 	in alphabetical order.
 	(attribute "core_cycles"): Update for attribute changes.
@@ -216,8 +456,8 @@
 	(shiftsi3_compare0_scratch): Likewise.
 	* config/arm/neon.md (neon_mov<mode>): Update for attribute changes.
 	(neon_mov<mode>): Likewise.
-	* config/arm/thumb2.md (thumb_andsi_not_shiftsi_si): Update for attribute
-	changes.
+	* config/arm/thumb2.md (thumb_andsi_not_shiftsi_si): Update for
+	attribute changes.
 	(thumb2_movsi_insn): Likewise.
 	(thumb2_cmpsi_neg_shiftsi): Likewise.
 	(thumb2_extendqisi_v6): Likewise.
@@ -240,10 +480,12 @@
 	(11_alu_shift_reg_op): Likewise.
 	* config/arm/arm926ejs.md (9_alu_op): Update for attribute changes.
 	(9_alu_shift_reg_op): Likewise.
-	* config/arm/cortex-a15.md (cortex_a15_alu): Update for attribute changes.
+	* config/arm/cortex-a15.md (cortex_a15_alu): Update for attribute
+	changes.
 	(cortex_a15_alu_shift): Likewise.
 	(cortex_a15_alu_shift_reg): Likewise.
-	* config/arm/cortex-a5.md (cortex_a5_alu): Update for attribute changes.
+	* config/arm/cortex-a5.md (cortex_a5_alu): Update for attribute
+	changes.
 	(cortex_a5_alu_shift): Likewise.
 	* config/arm/cortex-a53.md (cortex_a53_alu) : Update for attribute
 	changes.
@@ -252,14 +494,17 @@
 	changes.
 	(cortex_a7_alu_reg): Likewise.
 	(cortex_a7_alu_shift): Likewise.
-	* config/arm/cortex-a8.md (cortex_a8_alu): Update for attribute changes.
+	* config/arm/cortex-a8.md (cortex_a8_alu): Update for attribute
+	changes.
 	(cortex_a8_alu_shift): Likewise.
 	(cortex_a8_alu_shift_reg): Likewise.
 	(cortex_a8_mov): Likewise.
 	* config/arm/cortex-a9.md (cortex_a9_dp): Update for attribute changes.
 	(cortex_a9_dp_shift): Likewise.
-	* config/arm/cortex-m4.md (cortex_m4_alu): Update for attribute changes.
-	* config/arm/cortex-r4.md (cortex_r4_alu): Update for attribute changes.
+	* config/arm/cortex-m4.md (cortex_m4_alu): Update for attribute
+	changes.
+	* config/arm/cortex-r4.md (cortex_r4_alu): Update for attribute
+	changes.
 	(cortex_r4_mov): Likewise.
 	(cortex_r4_alu_shift): Likewise.
 	(cortex_r4_alu_shift_reg): Likewise.
@@ -282,7 +527,8 @@
 	(pj4_shift_conds): Likewise.
 	(pj4_alu_shift): Likewise.
 	(pj4_alu_shift_conds): Likewise.
-	* config/arm/arm.c (xscale_sched_adjust_cost): Update for attribute changes.
+	* config/arm/arm.c (xscale_sched_adjust_cost): Update for attribute
+	changes.
 	(cortexa7_older_only): Likewise.
 	(cortexa7_younger): Likewise.
 
@@ -384,7 +630,8 @@
 	(htm_init_builtins): Likewise.
 	(rs6000_expand_builtin): Add support for HTM builtin functions.
 	(rs6000_init_builtins): Likewise.
-	(rs6000_invalid_builtin, rs6000_opt_mask): Add support for -mhtm option.
+	(rs6000_invalid_builtin, rs6000_opt_mask): Add support for -mhtm
+	option.
 	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Add support for -mhtm.
 	(TARGET_HTM, MASK_HTM): Define macros.
 	(FIRST_PSEUDO_REGISTER): Adjust for new HTM SPR registers.
@@ -498,8 +745,7 @@
 
 2013-07-10  Vladimir Makarov  <vmakarov@redhat.com>
 
-	* lra-constraints.c (curr_insn_transform): Switch off optional
-	reloads.
+	* lra-constraints.c (curr_insn_transform): Switch off optional reloads.
 
 2013-07-10  Joseph Myers  <joseph@codesourcery.com>
 
@@ -1568,7 +1814,7 @@
 	SSA names into the expanded expression that take part in
 	abnormal coalescing.
 
-2013-06-19    <singhai@google.com>
+2013-06-19  Sharad Singhai  <singhai@google.com>
 
 	* gcov.c (print_usage): Handle new option.
 	(process_args): Ditto.
@@ -4411,7 +4657,7 @@
 	* gcse.c (compute_ld_motion_mems): If a non-simple MEM is
 	found in a REG_EQUAL note, invalidate it.
 
-2013-05-17   Easwaran Raman  <eraman@google.com>
+2013-05-17  Easwaran Raman  <eraman@google.com>
 
 	* tree-ssa-reassoc.c (find_insert_point): New function.
 	(insert_stmt_after): Likewise.
@@ -9317,7 +9563,7 @@
 	* configure.ac: Likewise
 	* configure: Regenerated.
 
-2013-03-27 Kai Tietz  <ktietz@redhat.com>
+2013-03-27  Kai Tietz  <ktietz@redhat.com>
 
 	* config/i386/cygwin-stdint.h: Add support for cygwin x64 target.
 	* config/i386/t-cygwin-w64: New file.

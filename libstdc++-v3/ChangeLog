@@ -1,3 +1,28 @@
+2013-07-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* include/std/random: Add back <cstdio> include.
+	* src/c++11/random.cc: Don't include <cstdio> here.
+
+2013-07-22  Jason Merrill  <jason@redhat.com>
+
+	PR libstdc++/57914
+	* libsupc++/atexit_thread.cc (run): Delete cleanup elts.
+
+2013-07-22  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/57920
+	* src/c++11/random.cc (random_device::_M_getval): If possible, use
+	read instead of std::fread.
+	* include/std/random: Do not include <cstdio> unnecessarily.
+
+2013-07-21  Tim Shen  <timshen91@gmail.com>
+
+	Partially implement regex_search.
+	* include/bits/regex.h: regex_search.
+	* include/bits/regex_grep_matcher.h: _M_search_from_first.
+	* include/bits/regex_grep_matcher.tcc: Implement it.
+	* testsuite/28_regex/algorithms/regex_search/basic/string_01.cc: New.
+
 2013-07-21  Jonathan Wakely  <jwakely.gcc@gmail.com>
 
 	PR libstdc++/54352
