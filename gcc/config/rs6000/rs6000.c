@@ -2966,7 +2966,10 @@ rs6000_option_override_internal (bool global_init_p)
 	  if (rs6000_isa_flags_explicit & OPTION_MASK_VSX)
 	    msg = N_("-mvsx requires hardware floating point");
 	  else
-	    rs6000_isa_flags &= ~ OPTION_MASK_VSX;
+	    {
+	      rs6000_isa_flags &= ~ OPTION_MASK_VSX;
+	      rs6000_isa_flags_explicit |= OPTION_MASK_VSX;
+	    }
 	}
       else if (TARGET_PAIRED_FLOAT)
 	msg = N_("-mvsx and -mpaired are incompatible");
@@ -2993,6 +2996,16 @@ rs6000_option_override_internal (bool global_init_p)
 	  rs6000_isa_flags_explicit |= OPTION_MASK_VSX;
 	}
     }
+
+  /* If hard-float/altivec/vsx were explicitly turned off then don't allow
+     the -mcpu setting to enable options that conflict. */
+  if ((!TARGET_HARD_FLOAT || !TARGET_ALTIVEC || !TARGET_VSX)
+      && (rs6000_isa_flags_explicit & (OPTION_MASK_SOFT_FLOAT
+				       | OPTION_MASK_ALTIVEC
+				       | OPTION_MASK_VSX)) != 0)
+    rs6000_isa_flags &= ~((OPTION_MASK_P8_VECTOR | OPTION_MASK_CRYPTO
+			   | OPTION_MASK_DIRECT_MOVE)
+		         & ~rs6000_isa_flags_explicit);
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "before defaults", rs6000_isa_flags);
@@ -5164,6 +5177,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
      of 64-bit items is not supported on Altivec.  */
   if (all_same && GET_MODE_SIZE (inner_mode) <= 4)
     {
+      rtx field;
       mem = assign_stack_temp (mode, GET_MODE_SIZE (inner_mode));
       emit_move_insn (adjust_address_nv (mem, inner_mode, 0),
 		      XVECEXP (vals, 0, 0));
@@ -5174,9 +5188,11 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 					      gen_rtx_SET (VOIDmode,
 							   target, mem),
 					      x)));
+      field = (BYTES_BIG_ENDIAN ? const0_rtx
+	       : GEN_INT (GET_MODE_NUNITS (mode) - 1));
       x = gen_rtx_VEC_SELECT (inner_mode, target,
 			      gen_rtx_PARALLEL (VOIDmode,
-						gen_rtvec (1, const0_rtx)));
+						gen_rtvec (1, field)));
       emit_insn (gen_rtx_SET (VOIDmode, target,
 			      gen_rtx_VEC_DUPLICATE (mode, x)));
       return;
@@ -14583,7 +14599,7 @@ rs6000_check_sdmode (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
 /* Classify a register type.  Because the FMRGOW/FMRGEW instructions only work
    on traditional floating point registers, and the VMRGOW/VMRGEW instructions
    only work on the traditional altivec registers, note if an altivec register
-   was choosen.  */
+   was chosen.  */
 
 static enum rs6000_reg_type
 register_to_reg_type (rtx reg, bool *is_altivec)
