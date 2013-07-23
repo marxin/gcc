@@ -1388,17 +1388,18 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
       if (dump_file)
         fprintf (dump_file, "Thunk has be created.\n\n");
 
+      tree result = DECL_RESULT (alias->symbol.decl);
+
       cgraph_release_function_body (alias);
       cgraph_reset_node (alias);
       allocate_struct_function (alias_func->node->symbol.decl, false);
       set_cfun (NULL);
+      DECL_RESULT (alias->symbol.decl) = result;
 
       alias_func->node->symbol.definition = true;
       alias_func->node->thunk.thunk_p = true;
-      alias_func->node->thunk.alias = original_func->node->symbol.decl;
       cgraph_create_edge (alias_func->node, original_func->node,
                           NULL, 0, CGRAPH_FREQ_BASE);
-      alias_func->node->thunk.alias = NULL;
     }
   else
   {

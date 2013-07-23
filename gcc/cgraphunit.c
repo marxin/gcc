@@ -1324,8 +1324,8 @@ thunk_adjust (gimple_stmt_iterator * bsi,
 
 /* Produce assembler for thunk NODE.  */
 
-static void
-assemble_thunk (struct cgraph_node *node)
+void
+expand_thunk (struct cgraph_node *node)
 {
   bool this_adjusting = node->thunk.this_adjusting;
   HOST_WIDE_INT fixed_offset = node->thunk.fixed_offset;
@@ -1417,7 +1417,9 @@ assemble_thunk (struct cgraph_node *node)
       /* Build call to the function being thunked.  */
       if (!VOID_TYPE_P (restype))
 	{
-	  if (!is_gimple_reg_type (restype))
+	  if (DECL_BY_REFERENCE (resdecl))
+	    restmp = gimple_fold_indirect_ref (resdecl);
+	  else if (!is_gimple_reg_type (restype))
 	    {
 	      restmp = resdecl;
 	      add_local_decl (cfun, restmp);
@@ -1443,10 +1445,16 @@ assemble_thunk (struct cgraph_node *node)
       vargs.release ();
       gimple_call_set_from_thunk (call, true);
       if (restmp)
+      {
         gimple_call_set_lhs (call, restmp);
+        gcc_assert (useless_type_conversion_p (TREE_TYPE (restmp),
+        TREE_TYPE (TREE_TYPE (alias))));
+      }
+
       gsi_insert_after (&bsi, call, GSI_NEW_STMT);
 
-      if (restmp && !this_adjusting)
+      if (restmp && !this_adjusting
+          && (fixed_offset || virtual_offset))
         {
 	  tree true_label = NULL_TREE;
 
@@ -1498,6 +1506,9 @@ assemble_thunk (struct cgraph_node *node)
 
       delete_unreachable_blocks ();
       update_ssa (TODO_update_ssa);
+#ifdef ENABLE_CHECKING
+      verify_flow_info ();
+#endif
 
       /* Since we want to emit the thunk, we explicitly mark its name as
 	 referenced.  */
@@ -1526,7 +1537,7 @@ assemble_thunks_and_aliases (struct cgraph_node *node)
 
 	e = e->next_caller;
 	assemble_thunks_and_aliases (thunk);
-        assemble_thunk (thunk);
+        expand_thunk (thunk);
       }
     else
       e = e->next_caller;
