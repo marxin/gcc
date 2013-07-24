@@ -627,10 +627,24 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       x2 = TREE_OPERAND (t2, 0);
       y1 = TREE_OPERAND (t1, 1);
       y2 = TREE_OPERAND (t2, 1);
+      /* See if operand is an memory access (the test originate from
+         gimple_load_p).
+
+          In this case the alias set of the function being replaced must
+          be subset of the alias set of the other function.  At the moment
+          we seek for equivalency classes, so simply require inclussion in
+          both directions.  */
+      if (flag_strict_aliasing)
+        {
+          alias_set_type s1 = get_deref_alias_set (TREE_TYPE (y1));
+          alias_set_type s2 = get_deref_alias_set (TREE_TYPE (y2));
+          if (!alias_set_subset_of (s1, s2)
+              || !alias_set_subset_of (s2, s1))
+            return false;
+        }
 
       if (!compare_handled_component (x1, x2, d, func1, func2))
-        return false;
-
+	return false;
       /* Type of the offset on MEM_REF does not matter.  */
       return tree_to_double_int (y1) == tree_to_double_int (y2);
     }
@@ -659,11 +673,11 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case FUNCTION_DECL:
     case FIELD_DECL:
-    case RESULT_DECL:
       return t1 == t2;
     case VAR_DECL:
     case PARM_DECL:
     case LABEL_DECL:
+    case RESULT_DECL:
       return check_declaration (t1, t2, d, func1, func2);
     default:
       debug_tree (t1);
@@ -681,6 +695,7 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   enum tree_code tc1, tc2;
   unsigned length1, length2, i;
   bool ret;
+  tree base;
 
   if (t1 == NULL && t2 == NULL)
     return true;
@@ -1259,6 +1274,7 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
           break;
         default:
           gcc_unreachable ();
+          break;
         }
 
       /* If there are sub-regions, process them.  */
@@ -1313,6 +1329,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   unsigned int i;
   func_dict_t func_dict;
   bool result = true;
+  tree arg1, arg2;
 
   gcc_assert (f1->func_decl != f2->func_decl);
 
@@ -1342,6 +1359,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
       if (get_attribute_name (decl1) != get_attribute_name (decl2))
         return false;
+      /* TODO: compare parameters.  */
 
       decl1 = TREE_CHAIN (decl1);
       decl2 = TREE_CHAIN (decl2);
@@ -1351,6 +1369,9 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
     return false;
 
   func_dict_init (&func_dict, f1->ssa_names_size, f2->ssa_names_size);
+  for (arg1 = DECL_ARGUMENTS (f1->func_decl), arg2 = DECL_ARGUMENTS (f2->func_decl);
+       arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
+     check_declaration (arg1, arg2, &func_dict, f1->func_decl, f2->func_decl);
 
   /* Exception handling regions comparison.  */
   if (!compare_eh_regions (f1->region_tree, f2->region_tree,
@@ -1465,7 +1486,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
      nejmensiho (aby rozhodnuti sedely mezi unitama).  */
 
   /* Do not attempt to mix functions from different user sections;
-     we never knows what user intends with those.  */
+     we do not know what user intends with those.  */
   if (((DECL_SECTION_NAME (original->symbol.decl)
         && !DECL_HAS_IMPLICIT_SECTION_NAME_P (original->symbol.decl))
        || (DECL_SECTION_NAME (alias->symbol.decl)
@@ -1492,7 +1513,8 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
       && original->symbol.resolution != LDPR_PREVAILING_DEF_IRONLY_EXP)
     original_discardable = true;
 
-  /* If original can be discarded and replaced by an different (semantically
+#if 0
+    /* If original can be discarded and replaced by an different (semantically
      equivalent) implementation, we risk creation of cycles from
      wrappers of equivalent functions.  Do not attempt to unify for now.  */
   if (original_discardable
@@ -1503,6 +1525,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
         fprintf (dump_file, "Not unifying; risk of creation of cycle.\n\n");
       return;
     }
+#endif
 
   /* See if original and/or alias ddress can be compared for equality.  */
   original_address_matters
@@ -1521,7 +1544,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
       && alias_address_matters)
       || original_discardable)
     {
-      create_thunk = true;
+      create_thunk = !stdarg_p (TREE_TYPE (alias->symbol.decl));
       create_alias = false;
       /* When both alias and original are not overwritable, we can save
          the extra thunk wrapper for direct calls.  */
@@ -1589,9 +1612,13 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
       bool redirected = false;
       while (alias->callers)
         {
-          cgraph_redirect_edge_callee (alias->callers, local_original);
-          redirected = true;
-        }
+	  struct cgraph_edge *e = alias->callers;
+	  cgraph_redirect_edge_callee (e, local_original);
+          push_cfun (DECL_STRUCT_FUNCTION (e->caller->symbol.decl));
+	  cgraph_redirect_edge_call_stmt_to_callee (e);
+	  pop_cfun ();
+	  redirected = true;
+	}
       if (dump_file && redirected)
         fprintf (dump_file, "Local calls has been redirected.\n\n");
     }
@@ -2325,6 +2352,6 @@ struct simple_ipa_opt_pass pass_ipa_sem_equality =
   0,                      /* properties_provided */
   0,                      /* properties_destroyed */
   0,                      /* todo_flags_start */
-  0                       /* todo_flags_finish */
+  TODO_update_ssa         /* todo_flags_finish */
  }
 };

@@ -11,7 +11,6 @@ for i in $BASEDIR/*_eq.c*
 do
   echo -n "   `basename $i`"
   bname="`basename $i`.0*i.sem-equality"
-  echo $COMPILER $i
   if $COMPILER $i 2>&1 && grep hit $bname > /dev/null
   then
     echo -e " \e[1;32m[OK]\e[00m"
