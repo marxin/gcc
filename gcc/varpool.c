@@ -255,10 +255,11 @@ varpool_add_new_variable (tree decl)
 enum availability
 cgraph_variable_initializer_availability (struct varpool_node *node)
 {
-  gcc_assert (cgraph_function_flags_ready);
   if (!node->symbol.definition)
     return AVAIL_NOT_AVAILABLE;
   if (!TREE_PUBLIC (node->symbol.decl))
+    return AVAIL_AVAILABLE;
+  if (DECL_VIRTUAL_P (node->symbol.decl))
     return AVAIL_AVAILABLE;
   /* If the variable can be overwritten, return OVERWRITABLE.  Takes
      care of at least one notable extension - the COMDAT variables
