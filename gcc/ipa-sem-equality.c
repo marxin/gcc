@@ -1072,8 +1072,10 @@ gsi_next_nonvirtual_phi (gimple_stmt_iterator &it)
 
   while (virtual_operand_p (gimple_phi_result (phi)))
   {
-    gsi_next (&it);    
-    gcc_assert (!gsi_end_p (it));
+    gsi_next (&it);
+
+    if (gsi_end_p (it))
+      return;
 
     phi = gsi_stmt (it);
   }
@@ -1202,8 +1204,14 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
 
   si2 = gsi_start_phis (bb2);
   for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1);
-       gsi_next_nonvirtual_phi (si1))
+       gsi_next (&si1))
   {
+    gsi_next_nonvirtual_phi (si1);
+    gsi_next_nonvirtual_phi (si2);
+
+    if (gsi_end_p (si1) && gsi_end_p (si2))
+      break;
+
     if (gsi_end_p (si2))
       EXIT_FALSE ();
 
@@ -1231,7 +1239,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
         EXIT_FALSE ();
     }
 
-    gsi_next_nonvirtual_phi (si2);
+    gsi_next (&si2);
   }
 
   return true;
