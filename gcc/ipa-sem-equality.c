@@ -489,14 +489,14 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   return true;
 }
 
-/* Declaration comparer- global declarations are comparer for a pointer equality,
+/* Declaration comparer- global declarations are compared for a pointer equality,
    local one are stored in the function dictionary.  */
 
 static bool
 check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 {
   decl_pair_t **slot;
-  bool r;
+  bool ret;
   decl_pair_t *decl_pair, *slot_decl_pair;
 
   decl_pair = XNEW (decl_pair_t);
@@ -504,10 +504,13 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   decl_pair->target = t2;
 
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
-    return t1 == t2; /* global variable declaration.  */
+    {
+      ret = t1 == t2; /* global variable declaration.  */
+      EXIT_DEBUG (ret);
+    }
 
   if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
-    return false;
+    EXIT_FALSE ();
 
   slot = d->decl_hash.find_slot (decl_pair, INSERT);
 
@@ -515,10 +518,10 @@ check_declaration (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
 
   if (slot_decl_pair)
     {
-      r = decl_pair->target == slot_decl_pair->target;
+      ret = decl_pair->target == slot_decl_pair->target;
       free (decl_pair);
 
-      return r;
+      EXIT_DEBUG (ret);
     }
   else
     *slot = decl_pair;
@@ -568,9 +571,10 @@ function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
                           tree func2)
 {
   tree b1, b2;
+  bool ret;
 
   if (!func_dict_ssa_lookup (d, t1, t2))
-    return false;
+    EXIT_FALSE ();
 
   if (SSA_NAME_IS_DEFAULT_DEF (t1))
     {
@@ -582,14 +586,24 @@ function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
         return true;
 
       if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
-        return false;
+        EXIT_FALSE ();
 
       switch (TREE_CODE (b1))
         {
         case VAR_DECL:
         case PARM_DECL:
         case RESULT_DECL:
-          return check_declaration (b1, b2, d, func1, func2);
+          ret = check_declaration (b1, b2, d, func1, func2);
+
+#if 0
+          if (!ret && dump_file)
+            {
+              print_node (dump_file, "", b1, 0);
+              print_node (dump_file, "", b2, 0);
+            }
+#endif
+
+          EXIT_DEBUG (ret);
         default:
           gcc_unreachable ();
           return false;
@@ -785,9 +799,11 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
     case VAR_DECL:
     case PARM_DECL:
     case LABEL_DECL:
-      return check_declaration (t1, t2, d, func1, func2);
+      ret = check_declaration (t1, t2, d, func1, func2);
+      EXIT_DEBUG (ret);
     case SSA_NAME:
-      return function_check_ssa_names (d, t1, t2, func1, func2); 
+      ret = function_check_ssa_names (d, t1, t2, func1, func2); 
+      EXIT_DEBUG (ret);
     case INTEGER_CST:
       ret = (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
              && tree_to_double_int (t1) == tree_to_double_int (t2));
@@ -1033,7 +1049,8 @@ check_gimple_resx (gimple g1, gimple g2)
 
 /* Returns for a given GSI statement first nondebug statement.  */
 
-static void gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
+static void 
+gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
 {
   gimple s;
 
@@ -1045,6 +1062,20 @@ static void gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
     gcc_assert (!gsi_end_p (gsi));
 
     s = gsi_stmt (gsi);
+  }
+}
+
+static void
+gsi_next_nonvirtual_phi (gimple_stmt_iterator &it)
+{
+  gimple phi = gsi_stmt (it);
+
+  while (virtual_operand_p (gimple_phi_result (phi)))
+  {
+    gsi_next (&it);    
+    gcc_assert (!gsi_end_p (it));
+
+    phi = gsi_stmt (it);
   }
 }
 
@@ -1170,7 +1201,8 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
   edge e1, e2;
 
   si2 = gsi_start_phis (bb2);
-  for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1); gsi_next (&si1))
+  for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1);
+       gsi_next_nonvirtual_phi (si1))
   {
     if (gsi_end_p (si2))
       EXIT_FALSE ();
@@ -1199,7 +1231,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
         EXIT_FALSE ();
     }
 
-    gsi_next (&si2);
+    gsi_next_nonvirtual_phi (si2);
   }
 
   return true;
@@ -1395,15 +1427,6 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
 /* Main comparison called for semantic function struct F1 and F2 returns
    true if functions are considered semantically equal.  */
 
-// TODO
-#define EXIT_FALSE \
-  do \
-    { \
-      result = false; \
-      goto exit_label; \
-    } \
-  while (false);
-
 static bool
 compare_functions (sem_func_t *f1, sem_func_t *f2)
 {
@@ -1420,25 +1443,27 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   gcc_assert (f1->func_decl != f2->func_decl);
 
   // TODO: remove
+  /*
   if (strcmp (cgraph_node_asm_name (f1->node), "gimp_operation_anti_erase_mode_process") == 0)
   {
     int a = 2;
   }
+  */
 
   if (f1->arg_count != f2->arg_count
       || f1->bb_count != f2->bb_count
       || f1->edge_count != f2->edge_count
       || f1->cfg_checksum != f2->cfg_checksum)
-    EXIT_FALSE;
+    EXIT_FALSE();
 
   /* Result type checking.  */
   if (f1->result_type != f2->result_type)
-    EXIT_FALSE;
+    EXIT_FALSE();
 
   /* Checking types of arguments.  */
   for (i = 0; i < f1->arg_count; ++i)
     if (!types_compatible_p (f1->arg_types[i], f2->arg_types[i]))
-      EXIT_FALSE;
+      EXIT_FALSE();
 
   /* Checking function arguments.  */
   decl1 = DECL_ATTRIBUTES (f1->node->symbol.decl);
@@ -1447,10 +1472,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   while (decl1)
     {
       if (decl2 == NULL)
-        EXIT_FALSE;
+        EXIT_FALSE();
 
       if (get_attribute_name (decl1) != get_attribute_name (decl2))
-        EXIT_FALSE;
+        EXIT_FALSE();
 
       /* TODO: compare parameters.  */
 
@@ -1459,7 +1484,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
     }
 
   if (decl1 != decl2)
-    EXIT_FALSE;
+    EXIT_FALSE();
 
   func_dict_init (&func_dict, f1->ssa_names_size, f2->ssa_names_size);
   for (arg1 = DECL_ARGUMENTS (f1->func_decl), arg2 = DECL_ARGUMENTS (f2->func_decl);
@@ -1469,7 +1494,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   /* Exception handling regions comparison.  */
   if (!compare_eh_regions (f1->region_tree, f2->region_tree,
                            &func_dict, f1->func_decl, f2->func_decl))
-    EXIT_FALSE;
+    EXIT_FALSE();
 
   /* Checking all basic blocks.  */
   for (i = 0; i < f1->bb_count; ++i)
