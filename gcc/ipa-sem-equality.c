@@ -66,6 +66,36 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-table.h"
 #include "except.h"
 
+// TODO
+#define DEBUG_MESSAGE(message) \
+  do \
+  { \
+    if (dump_file) \
+      fprintf (dump_file, "\nDebug message in func: %s, with message: %s, line: %d\n", __func__, message, __LINE__); \
+  } \
+  while (false);
+
+#define EXIT_FALSE_WITH_MSG(message) \
+  do \
+  { \
+    if (dump_file) \
+      fprintf (dump_file, "\nFalse returned from func: %s, with message: %s, line: %d\n", __func__, message, __LINE__); \
+    return false; \
+  } \
+  while (false);
+
+#define EXIT_FALSE() \
+  EXIT_FALSE_WITH_MSG("")
+
+#define EXIT_DEBUG(result) \
+  do \
+  { \
+    if (!result && dump_file) \
+      fprintf (dump_file, "\nFalse returned from func: %s, on line: %d\n", __func__, __LINE__); \
+    return result; \
+  } \
+  while (false);
+
 #define IPA_SEM_EQUALITY_DEBUGGING 1
 
 /* Forward struct declaration.  */
@@ -579,11 +609,12 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
 {
   tree base1, base2, x1, x2, y1, y2;
   HOST_WIDE_INT offset1, offset2;
+  bool ret;
 
    /* TODO: We need to compare alias classes for loads & stores.
      We also need to care about type based devirtualization.  */
   if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
-    return false;
+    EXIT_FALSE_WITH_MSG ("");
  
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
@@ -591,14 +622,14 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
   if (base1 && base2)
     {
       if (offset1 != offset2)
-        return false;
+        EXIT_FALSE_WITH_MSG ("");
 
       t1 = base1;
       t2 = base2;
     }
   
   if (TREE_CODE (t1) != TREE_CODE (t2))
-    return false;
+    EXIT_FALSE_WITH_MSG ("");
 
   switch (TREE_CODE (t1))
     {
@@ -613,13 +644,13 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       if (!compare_handled_component (array_ref_low_bound (t1),
 				      array_ref_low_bound (t2),
 				      d, func1, func2))
-        return false;
+        EXIT_FALSE_WITH_MSG ("");
       if (!compare_handled_component (array_ref_element_size (t1),
 				      array_ref_element_size (t2),
 				      d, func1, func2))
-        return false;
+        EXIT_FALSE_WITH_MSG ("");
       if (!compare_handled_component (x1, x2, d, func1, func2))
-        return false;
+        EXIT_FALSE_WITH_MSG ("");
       return compare_handled_component (y1, y2, d, func1, func2);
     }
 
@@ -640,13 +671,17 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
         {
           alias_set_type s1 = get_deref_alias_set (TREE_TYPE (y1));
           alias_set_type s2 = get_deref_alias_set (TREE_TYPE (y2));
-          if (!alias_set_subset_of (s1, s2)
-              || !alias_set_subset_of (s2, s1))
-            return false;
+
+          if (dump_file && s1 != s2)
+              fprintf (dump_file, "Alias set comparison returns false: %d/%d\n",
+                       s1, s2);
+
+          if (s1 != s2)
+            EXIT_FALSE_WITH_MSG ("");
         }
 
       if (!compare_handled_component (x1, x2, d, func1, func2))
-	return false;
+        EXIT_FALSE_WITH_MSG ("");
       /* Type of the offset on MEM_REF does not matter.  */
       return tree_to_double_int (y1) == tree_to_double_int (y2);
     }
@@ -657,36 +692,57 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       y1 = TREE_OPERAND (t1, 1);
       y2 = TREE_OPERAND (t2, 1);
 
-      return (compare_handled_component (x1, x2, d, func1, func2)
-	            && compare_handled_component (y1, y2, d, func1, func2));
+      ret = compare_handled_component (x1, x2, d, func1, func2)
+	            && compare_handled_component (y1, y2, d, func1, func2);
+
+      EXIT_DEBUG (ret);
     }
     case ADDR_EXPR:
     {
       x1 = TREE_OPERAND (t1, 0);
       x2 = TREE_OPERAND (t2, 0);
-      return compare_handled_component (x1, x2, d, func1, func2);
+      
+      ret = compare_handled_component (x1, x2, d, func1, func2);
+      EXIT_DEBUG (ret);
     }
     case SSA_NAME:
-      return function_check_ssa_names (d, t1, t2, func1, func2);
+    {
+      ret = function_check_ssa_names (d, t1, t2, func1, func2);
+      EXIT_DEBUG (ret);
+    }
     case INTEGER_CST:
-      return (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
-              && tree_to_double_int (t1) == tree_to_double_int (t2));
+    {
+      ret = types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+              && tree_to_double_int (t1) == tree_to_double_int (t2);
+
+      EXIT_DEBUG (ret);
+    }
     case STRING_CST:
-      return operand_equal_p (t1, t2, OEP_ONLY_CONST);
+    {
+      ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
+      EXIT_DEBUG (ret);
+    }
     case FUNCTION_DECL:
     case FIELD_DECL:
-      return t1 == t2;
+    {
+      ret = t1 == t2;
+      EXIT_DEBUG (ret);
+    }
     case VAR_DECL:
     case PARM_DECL:
     case LABEL_DECL:
     case RESULT_DECL:
-      return check_declaration (t1, t2, d, func1, func2);
+    {
+      ret = check_declaration (t1, t2, d, func1, func2);
+      EXIT_DEBUG (ret);
+    }
     default:
       debug_tree (t1);
       gcc_unreachable ();
       return false;
     }
 }
+
 
 /* Operand comparison function takes operand T1 from a function FUNC1 and
    compares it to a given operand T2 from a function FUNC2.  */
@@ -703,13 +759,13 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
     return true;
 
   if (t1 == NULL || t2 == NULL)
-    return false;
+    EXIT_FALSE_WITH_MSG ("");
 
   tc1 = TREE_CODE (t1);
   tc2 = TREE_CODE (t2);
 
   if (tc1 != tc2)
-    return false;
+    EXIT_FALSE_WITH_MSG ("");
 
   switch (tc1)
     {
@@ -718,12 +774,12 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
       length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
 
       if (length1 != length2)
-        return false;
+        EXIT_FALSE_WITH_MSG ("");
 
       for (i = 0; i < length1; i++)
         if (!check_operand (CONSTRUCTOR_ELT (t1, i)->value,
           CONSTRUCTOR_ELT (t2, i)->value, d, func1, func2))
-            return false;
+            EXIT_FALSE_WITH_MSG ("");
 
       return true;
     case VAR_DECL:
@@ -733,8 +789,9 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
     case SSA_NAME:
       return function_check_ssa_names (d, t1, t2, func1, func2); 
     case INTEGER_CST:
-      return (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
-              && tree_to_double_int (t1) == tree_to_double_int (t2));
+      ret = (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+             && tree_to_double_int (t1) == tree_to_double_int (t2));
+      EXIT_DEBUG (ret);
     default:
       break;
     }
@@ -746,15 +803,15 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   else /* COMPLEX_CST, VECTOR_CST compared correctly here.  */
     ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
 
-#if 0
-  if (!ret)
+#if 1
+  if (!ret && dump_file)
     {
-      debug_tree (t1);
-      debug_tree (t2);
+      print_node (dump_file, "\n", t1, 0);
+      print_node (dump_file, "\n", t2, 0);
     }
 #endif
 
-  return ret;
+  EXIT_DEBUG (ret);
 }
 
 /* Call comparer takes statements S1 from a function FUNC1 and S2 from
@@ -1024,7 +1081,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
   gimple s1, s2;
 
   if (bb1->stmt_count != bb2->stmt_count || bb1->edge_count != bb2->edge_count)
-    return false;
+    EXIT_FALSE ();
 
   gsi1 = gsi_start_bb (bb1->bb);
   gsi2 = gsi_start_bb (bb2->bb);
@@ -1038,7 +1095,7 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
     s2 = gsi_stmt (gsi2);
 
     if (gimple_code (s1) != gimple_code (s2))
-      return false;
+      EXIT_FALSE ();
 
     switch (gimple_code (s1))
       {
@@ -1083,8 +1140,8 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
             fprintf (dump_file, "Not supported gimple statement reached:\n");
             print_gimple_stmt (dump_file, s1, 0, TDF_DETAILS);
           }
-     
-        return false;
+
+        EXIT_FALSE();
       default:
         debug_gimple_stmt (s1);
         gcc_unreachable ();
@@ -1116,7 +1173,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
   for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1); gsi_next (&si1))
   {
     if (gsi_end_p (si2))
-      return false;
+      EXIT_FALSE ();
 
     phi1 = gsi_stmt (si1);
     phi2 = gsi_stmt (si2);
@@ -1125,7 +1182,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
     size2 = gimple_phi_num_args (phi2);
 
     if (size1 != size2)
-      return false;
+      EXIT_FALSE ();
 
     for (i = 0; i < size1; ++i)
     {
@@ -1133,13 +1190,13 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
       t2 = gimple_phi_arg (phi2, i)->def;
 
       if (!check_operand (t1, t2, d, func1, func2))
-          return false;
+        EXIT_FALSE ();
 
       e1 = gimple_phi_arg_edge (phi1, i);
       e2 = gimple_phi_arg_edge (phi2, i);
 
       if (!check_edges (e1, e2, d))
-        return false;
+        EXIT_FALSE ();
     }
 
     gsi_next (&si2);
@@ -1420,8 +1477,12 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
       f1->func_decl, f2->func_decl))
       {
         result = false;
+        if (dump_file)
+          fprintf (dump_file, "TODO: BB comparison\n");
         goto free_func_dict;
       }
+
+  DEBUG_MESSAGE ("All BBs are equal\n");
 
   /* Basic block edges check.  */
   for (i = 0; i < f1->bb_count; ++i)
@@ -1441,24 +1502,28 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
           if (!bb_dict_test (bb_dict, e1->src->index, e2->src->index))
             {
               result = false;
+              DEBUG_MESSAGE ("edge comparison returns false");
               goto free_bb_dict;
             }
 
           if (!bb_dict_test (bb_dict, e1->dest->index, e2->dest->index))
             {
               result = false;
+              DEBUG_MESSAGE ("edge comparison returns false");
               goto free_bb_dict;
             }
 
           if (e1->flags != e2->flags)
             {
               result = false;
+              DEBUG_MESSAGE ("edge comparison returns false");
               goto free_bb_dict;
             }
 
           if (!check_edges (e1, e2, &func_dict))
             {
               result = false;
+              DEBUG_MESSAGE ("edge comparison returns false");
               goto free_bb_dict;
             }
 
@@ -1470,7 +1535,10 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   for (i = 0; i < f1->bb_count; ++i)
     if (!compare_phi_nodes (f1->bb_sorted[i]->bb, f2->bb_sorted[i]->bb,
         &func_dict, f1->func_decl, f2->func_decl))
+    {
       result = false;
+      DEBUG_MESSAGE ("PHI node comparison returns false");
+    }
 
   free_bb_dict:
     free (bb_dict);
@@ -1480,7 +1548,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   exit_label:
     if (dump_file)
-      fprintf (dump_file, "compare_functions called for:%s:%s, result:%u",
+      fprintf (dump_file, "compare_functions called for:%s:%s, result:%u\n\n",
                cgraph_node_asm_name (f1->node),
                cgraph_node_asm_name (f2->node),
                result);
