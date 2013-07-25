@@ -851,9 +851,15 @@ check_gimple_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   t2 = gimple_call_fndecl (s2);
 
   /* Function pointer variables are not supported yet.  */ 
-  if (t1 == NULL || t2 == NULL || (find_func_by_decl (t1) == NULL &&
-      find_func_by_decl (t2) == NULL && t1 != t2))
-    return false;
+  if (t1 == NULL || t2 == NULL)
+    {
+      if (!check_operand (t1, t2, d, func1, func2))
+        EXIT_FALSE();
+    }
+  else
+    if (find_func_by_decl (t1) == NULL &&
+        find_func_by_decl (t2) == NULL && t1 != t2)
+      return false;
 
   /* Checking of argument.  */
   for (i = 0; i < gimple_call_num_args (s1); ++i)
