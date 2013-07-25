@@ -1705,18 +1705,19 @@ expand_all_functions (void)
         total_profiled_func_count++;
 
       if (node->process)
-	{
-     expanded_func_count++;
-     if(node->tp_first_run)
-       profiled_func_count++;
+        {
+           expanded_func_count++;
+           if(node->tp_first_run)
+             profiled_func_count++;
+        }
 
     /*
     fprintf (stderr, "Final order:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
     */
 
-	  node->process = 0;
-	  expand_function (node);
-	}
+	    node->process = 0;
+  	  expand_function (node);
+	  }
 
   fprintf (stderr, "expand_all_functions processed: %u/%u\n",
            profiled_func_count, expanded_func_count);
