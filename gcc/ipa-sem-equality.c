@@ -66,6 +66,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-table.h"
 #include "except.h"
 
+#define IPA_SEM_EQUALITY_DEBUGGING 1
+
 /* Forward struct declaration.  */
 typedef struct sem_bb sem_bb_t;
 typedef struct sem_func sem_func_t;
@@ -989,6 +991,24 @@ static void gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
   }
 }
 
+// TODO
+#ifdef IPA_SEM_EQUALITY_DEBUGGING
+#define DIFFERENT_STATEMENT(s1, s2, code) \
+  do \
+  { \
+    if (dump_file) \
+      { \
+        fprintf (dump_file, "Different statement for code: %s\n", code); \
+        print_gimple_stmt (dump_file, s1, 0, TDF_DETAILS); \
+        print_gimple_stmt (dump_file, s2, 0, TDF_DETAILS); \
+      } \
+    return false; \
+  } \
+  while (false);
+#else
+#define DIFFERENT_STATEMENT(s1, s2, code) return false;
+#endif
+
 /* Basic block comparison for blocks BB1 and BB2 that are a part of functions
    FUNC1 and FUNC2 uses function dictionary D as a collation lookup data
    structure. All statements are iterated, type distinguished and
@@ -1024,38 +1044,38 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
       {
       case GIMPLE_CALL:
         if (!check_gimple_call (s1, s2, d, func1, func2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_CALL");
         break;
       case GIMPLE_ASSIGN:
         if (!check_gimple_assign (s1, s2, d, func1, func2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_ASSIGN");
         break;
       case GIMPLE_COND:
         if (!check_gimple_cond (s1, s2, d, func1, func2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_COND");
         break;
       case GIMPLE_SWITCH:
         if (!check_gimple_switch (s1, s2, d, func1, func2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_SWITCH");
         break;
       case GIMPLE_DEBUG:
       case GIMPLE_EH_DISPATCH:
         break;
       case GIMPLE_RESX:
         if (!check_gimple_resx (s1, s2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_RESX");
         break;
       case GIMPLE_LABEL:
         if (!check_gimple_label (s1, s2, d, func1, func2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_LABEL");
         break;
       case GIMPLE_RETURN:
         if (!check_gimple_return (s1, s2, d, func1, func2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_RETURN");
         break;
       case GIMPLE_GOTO:
         if (!check_gimple_goto (s1, s2, d, func1, func2))
-          return false;
+          DIFFERENT_STATEMENT (s1, s2, "GIMPLE_GOTO");
         break;
       case GIMPLE_ASM:
         if (dump_file)
@@ -1318,6 +1338,15 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
 /* Main comparison called for semantic function struct F1 and F2 returns
    true if functions are considered semantically equal.  */
 
+// TODO
+#define EXIT_FALSE \
+  do \
+    { \
+      result = false; \
+      goto exit_label; \
+    } \
+  while (false);
+
 static bool
 compare_functions (sem_func_t *f1, sem_func_t *f2)
 {
@@ -1333,20 +1362,27 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
   gcc_assert (f1->func_decl != f2->func_decl);
 
+  // TODO: remove
+  if (strcmp (cgraph_node_asm_name (f1->node), "gimp_operation_anti_erase_mode_process") == 0)
+  {
+    int a = 2;
+    fprintf (stderr, "I WAS THERE\n");
+  }
+
   if (f1->arg_count != f2->arg_count
       || f1->bb_count != f2->bb_count
       || f1->edge_count != f2->edge_count
       || f1->cfg_checksum != f2->cfg_checksum)
-    return false;
+    EXIT_FALSE;
 
   /* Result type checking.  */
   if (f1->result_type != f2->result_type)
-    return false;
+    EXIT_FALSE;
 
   /* Checking types of arguments.  */
   for (i = 0; i < f1->arg_count; ++i)
     if (!types_compatible_p (f1->arg_types[i], f2->arg_types[i]))
-      return false;
+      EXIT_FALSE;
 
   /* Checking function arguments.  */
   decl1 = DECL_ATTRIBUTES (f1->node->symbol.decl);
@@ -1355,10 +1391,11 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   while (decl1)
     {
       if (decl2 == NULL)
-        return false;
+        EXIT_FALSE;
 
       if (get_attribute_name (decl1) != get_attribute_name (decl2))
-        return false;
+        EXIT_FALSE;
+
       /* TODO: compare parameters.  */
 
       decl1 = TREE_CHAIN (decl1);
@@ -1366,7 +1403,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
     }
 
   if (decl1 != decl2)
-    return false;
+    EXIT_FALSE;
 
   func_dict_init (&func_dict, f1->ssa_names_size, f2->ssa_names_size);
   for (arg1 = DECL_ARGUMENTS (f1->func_decl), arg2 = DECL_ARGUMENTS (f2->func_decl);
@@ -1376,7 +1413,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   /* Exception handling regions comparison.  */
   if (!compare_eh_regions (f1->region_tree, f2->region_tree,
                            &func_dict, f1->func_decl, f2->func_decl))
-    return false;
+    EXIT_FALSE;
 
   /* Checking all basic blocks.  */
   for (i = 0; i < f1->bb_count; ++i)
@@ -1442,7 +1479,14 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   free_func_dict:
     func_dict_free (&func_dict);
 
-  return result;
+  exit_label:
+    if (dump_file)
+      fprintf (dump_file, "compare_functions called for:%s:%s, result:%u",
+               cgraph_node_asm_name (f1->node),
+               cgraph_node_asm_name (f2->node),
+               result);
+
+    return result;
 }
 
 /* Two semantically equal function are merged.  */
@@ -2281,6 +2325,7 @@ enhance_hash_for_trees (sem_func_t *f)
 static unsigned int
 semantic_equality (void)
 {
+  sem_func_t *f;
   unsigned int groupcount;
   
   /* Semantic equality pass will be rewritten to a normal IPA pass, so that
@@ -2301,6 +2346,14 @@ semantic_equality (void)
 
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     enhance_hash_for_trees (semantic_functions[i]);
+
+  if (dump_file)
+    for (unsigned int i = 0; i < semantic_functions.length (); i++)
+      {
+        f = semantic_functions[i];
+        fprintf (dump_file, "Visited function: %s, with hash: %u\n",
+                 cgraph_node_asm_name (f->node), f->hash);
+      }
 
   /* LTRANS phase: functions are splitted to groups according to deep
    * equality comparison. Last step is congruence calculation.  */
