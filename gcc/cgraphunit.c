@@ -1710,17 +1710,16 @@ expand_all_functions (void)
      if(node->tp_first_run)
        profiled_func_count++;
 
-    fprintf (stderr, "FINAL:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
+    /*
+    fprintf (stderr, "Final order:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
+    */
+
 	  node->process = 0;
 	  expand_function (node);
 	}
-  else
-    fprintf (stderr, "WTF: %s\n", cgraph_node_asm_name (node));
-    }
 
-  fprintf (stderr, "expand_all_functions processed: %u/%u [%u/%u]\n",
-           profiled_func_count, expanded_func_count,
-           total_profiled_func_count, cgraph_n_nodes);
+  fprintf (stderr, "expand_all_functions processed: %u/%u\n",
+           profiled_func_count, expanded_func_count);
 
   cgraph_process_new_functions ();
 
