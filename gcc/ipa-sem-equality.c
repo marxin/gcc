@@ -66,20 +66,22 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-table.h"
 #include "except.h"
 
+#define IPA_SEM_EQUALITY_DEBUGGING 1
+
 // TODO
 #define DEBUG_MESSAGE(message) \
   do \
   { \
-    if (dump_file) \
-      fprintf (dump_file, "\nDebug message in func: %s, with message: %s, line: %d\n", __func__, message, __LINE__); \
+    if (dump_file && (dump_flags & TDF_DETAILS)) \
+      fprintf (dump_file, "Debug message: %s (%s:%u)\n", message, __func__, __LINE__); \
   } \
   while (false);
 
 #define EXIT_FALSE_WITH_MSG(message) \
   do \
   { \
-    if (dump_file) \
-      fprintf (dump_file, "\nFalse returned from func: %s, with message: %s, line: %d\n", __func__, message, __LINE__); \
+    if (dump_file && (dump_flags & TDF_DETAILS)) \
+      fprintf (dump_file, "False returned: '%s' (%s:%u)\n", message, __func__, __LINE__); \
     return false; \
   } \
   while (false);
@@ -90,13 +92,28 @@ along with GCC; see the file COPYING3.  If not see
 #define EXIT_DEBUG(result) \
   do \
   { \
-    if (!result && dump_file) \
-      fprintf (dump_file, "\nFalse returned from func: %s, on line: %d\n", __func__, __LINE__); \
+    if (!result && dump_file && (dump_flags & TDF_DETAILS)) \
+      fprintf (dump_file, "False returned (%s:%u)\n", __func__, __LINE__); \
     return result; \
   } \
   while (false);
 
-#define IPA_SEM_EQUALITY_DEBUGGING 1
+#ifdef IPA_SEM_EQUALITY_DEBUGGING
+#define DIFFERENT_STATEMENT(s1, s2, code) \
+  do \
+  { \
+    if (dump_file && (dump_flags & TDF_DETAILS)) \
+      { \
+        fprintf (dump_file, "Different statement for code: %s:\n", code); \
+        print_gimple_stmt (dump_file, s1, 3, TDF_DETAILS); \
+        print_gimple_stmt (dump_file, s2, 3, TDF_DETAILS); \
+      } \
+    return false; \
+  } \
+  while (false);
+#else
+#define DIFFERENT_STATEMENT(s1, s2, code) return false;
+#endif
 
 /* Forward struct declaration.  */
 typedef struct sem_bb sem_bb_t;
@@ -598,8 +615,8 @@ function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
 #if 0
           if (!ret && dump_file)
             {
-              print_node (dump_file, "", b1, 0);
-              print_node (dump_file, "", b2, 0);
+              print_node (dump_file, "", b1, 3);
+              print_node (dump_file, "", b2, 3);
             }
 #endif
 
@@ -819,11 +836,11 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   else /* COMPLEX_CST, VECTOR_CST compared correctly here.  */
     ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
 
-#if 1
+#if 0
   if (!ret && dump_file)
     {
-      print_node (dump_file, "\n", t1, 0);
-      print_node (dump_file, "\n", t2, 0);
+      print_node (dump_file, "\n", t1, 3);
+      print_node (dump_file, "\n", t2, 3);
     }
 #endif
 
@@ -1074,7 +1091,13 @@ gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
 static void
 gsi_next_nonvirtual_phi (gimple_stmt_iterator &it)
 {
-  gimple phi = gsi_stmt (it);
+  gimple phi;
+
+  if (gsi_end_p (it))
+    return;
+
+  phi = gsi_stmt (it);
+  gcc_assert (phi != NULL);
 
   while (virtual_operand_p (gimple_phi_result (phi)))
   {
@@ -1086,24 +1109,6 @@ gsi_next_nonvirtual_phi (gimple_stmt_iterator &it)
     phi = gsi_stmt (it);
   }
 }
-
-// TODO
-#ifdef IPA_SEM_EQUALITY_DEBUGGING
-#define DIFFERENT_STATEMENT(s1, s2, code) \
-  do \
-  { \
-    if (dump_file) \
-      { \
-        fprintf (dump_file, "Different statement for code: %s\n", code); \
-        print_gimple_stmt (dump_file, s1, 0, TDF_DETAILS); \
-        print_gimple_stmt (dump_file, s2, 0, TDF_DETAILS); \
-      } \
-    return false; \
-  } \
-  while (false);
-#else
-#define DIFFERENT_STATEMENT(s1, s2, code) return false;
-#endif
 
 /* Basic block comparison for blocks BB1 and BB2 that are a part of functions
    FUNC1 and FUNC2 uses function dictionary D as a collation lookup data
@@ -1208,6 +1213,9 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
   tree t1, t2;
   edge e1, e2;
 
+  gcc_assert (bb1 != NULL);
+  gcc_assert (bb2 != NULL);
+
   si2 = gsi_start_phis (bb2);
   for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1);
        gsi_next (&si1))
@@ -1218,7 +1226,7 @@ compare_phi_nodes (basic_block bb1, basic_block bb2, func_dict_t *d,
     if (gsi_end_p (si1) && gsi_end_p (si2))
       break;
 
-    if (gsi_end_p (si2))
+    if (gsi_end_p (si1) || gsi_end_p (si2))
       EXIT_FALSE ();
 
     phi1 = gsi_stmt (si1);
@@ -1584,7 +1592,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
     func_dict_free (&func_dict);
 
   exit_label:
-    if (dump_file)
+    if (dump_file && (dump_flags & TDF_DETAILS))
       fprintf (dump_file, "compare_functions called for:%s:%s, result:%u\n\n",
                cgraph_node_asm_name (f1->node),
                cgraph_node_asm_name (f2->node),
@@ -2451,13 +2459,17 @@ semantic_equality (void)
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     enhance_hash_for_trees (semantic_functions[i]);
 
-  if (dump_file)
-    for (unsigned int i = 0; i < semantic_functions.length (); i++)
-      {
-        f = semantic_functions[i];
-        fprintf (dump_file, "Visited function: %s, with hash: %u\n",
-                 cgraph_node_asm_name (f->node), f->hash);
-      }
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      for (unsigned int i = 0; i < semantic_functions.length (); i++)
+        {
+          f = semantic_functions[i];
+          fprintf (dump_file, "Visited function: %s, with hash: %u\n",
+                   cgraph_node_asm_name (f->node), f->hash);
+        }
+
+      fprintf (dump_file, "\n");
+    }
 
   /* LTRANS phase: functions are splitted to groups according to deep
    * equality comparison. Last step is congruence calculation.  */
