@@ -1366,7 +1366,6 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   if (strcmp (cgraph_node_asm_name (f1->node), "gimp_operation_anti_erase_mode_process") == 0)
   {
     int a = 2;
-    fprintf (stderr, "I WAS THERE\n");
   }
 
   if (f1->arg_count != f2->arg_count
