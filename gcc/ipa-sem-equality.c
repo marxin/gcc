@@ -1516,8 +1516,6 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
       f1->func_decl, f2->func_decl))
       {
         result = false;
-        if (dump_file)
-          fprintf (dump_file, "TODO: BB comparison\n");
         goto free_func_dict;
       }
 
