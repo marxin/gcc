@@ -741,6 +741,9 @@ varpool_externally_visible_p (struct varpool_node *vnode)
 bool
 can_replace_by_local_alias (symtab_node node)
 {
+  // TODO
+  return false;
+
   return (symtab_node_availability (node) > AVAIL_OVERWRITABLE
 	  && !DECL_EXTERNAL (node->symbol.decl)
 	  && (!DECL_ONE_ONLY (node->symbol.decl)
