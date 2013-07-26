@@ -680,10 +680,6 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
           alias_set_type s1 = get_deref_alias_set (TREE_TYPE (y1));
           alias_set_type s2 = get_deref_alias_set (TREE_TYPE (y2));
 
-          if (dump_file && s1 != s2)
-              fprintf (dump_file, "Alias set comparison returns false: %d/%d\n",
-                       s1, s2);
-
           if (s1 != s2)
             SE_EXIT_FALSE_WITH_MSG ("");
         }
