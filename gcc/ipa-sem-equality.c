@@ -736,6 +736,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     case PARM_DECL:
     case LABEL_DECL:
     case RESULT_DECL:
+    case CONST_DECL:
     {
       ret = check_declaration (t1, t2, d, func1, func2);
       SE_EXIT_DEBUG (ret);
