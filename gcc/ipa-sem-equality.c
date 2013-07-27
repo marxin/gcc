@@ -152,14 +152,14 @@ typedef struct sem_bb
 {
   /* Basic block the structure belongs to.  */
   basic_block bb;
-  /* Reference to the semantic function the basic block belongs to.  */
+  /* Reference to the semantic function this BB belongs to.  */
   sem_func_t *func;
-  /* Number of all statements in the basic block.  */
-  unsigned stmt_count;
+  /* Number of non-debug statements in the basic block.  */
+  unsigned nondbg_stmt_count;
   /* Number of edges connected to the block.  */
   unsigned edge_count;
-  /* Comptuted hash value for basic block.  */
-  hashval_t hashcode;
+  /* Computed hash value for basic block.  */
+  hashval_t hash;
 } sem_bb_t;
 
 /* Tree declaration used for hash table purpose.  */
@@ -233,12 +233,15 @@ edge_var_hash::equal (const edge_pair_t *pair1, const edge_pair_t *pair2)
 
 /* Struct used for all kind of function dictionaries like
    SSA names, call graph edges and all kind of declarations.  */
-
 typedef struct func_dict
 {
+  /* Source mapping of SSA names.  */
   vec<int> source;
+  /* Target mapping of SSA names.  */
   vec<int> target;
+  /* Hash table for correspondence declarations.  */
   hash_table <decl_var_hash> decl_hash;
+  /* Hash table for correspondence of edges.  */
   hash_table <edge_var_hash> edge_hash;
 } func_dict_t;
 
@@ -308,7 +311,7 @@ bb_hash (const void *basic_block)
 {
   const sem_bb_t *bb = (const sem_bb_t *) basic_block;
 
-  hashval_t hash = bb->stmt_count;
+  hashval_t hash = bb->nondbg_stmt_count;
   hash = iterative_hash_object (bb->edge_count, hash);
 
   return hash;
@@ -331,7 +334,7 @@ independent_hash (sem_func_t *f)
     hash = iterative_hash_object (f->bb_sizes[i], hash);
 
   for (i = 0; i < f->bb_count; ++i)
-    hash = iterative_hash_object (f->bb_sorted[i]->hashcode, hash);
+    hash = iterative_hash_object (f->bb_sorted[i]->hash, hash);
 
   return hash;
 }
@@ -393,7 +396,7 @@ static bool
 visit_function (struct cgraph_node *node, sem_func_t *f)
 {
   tree fndecl, fnargs, parm, funcdecl;
-  unsigned int param_num, gimple_count, bb_count;
+  unsigned int param_num, nondbg_stmt_count, bb_count;
   struct function *func;
   gimple_stmt_iterator gsi;
   gimple stmt;
@@ -437,7 +440,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   bb_count = 0;
   FOR_EACH_BB_FN (bb, func)
     {
-      gimple_count = 0;
+      nondbg_stmt_count = 0;
       gcode_hash = 0;
 
       for (ei = ei_start (bb->preds); ei_cond (ei, &e); ei_next (&ei))
@@ -452,7 +455,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
           /* We ignore all debug statements.  */
           if (code != GIMPLE_DEBUG) 
           {
-            gimple_count++;
+            nondbg_stmt_count++;
             gcode_hash = iterative_hash_object (code, gcode_hash);
 
             /* More precise hash could be enhanced by function call.  */            
@@ -467,15 +470,15 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
           }
         }
 
-      f->bb_sizes[bb_count] = gimple_count;
+      f->bb_sizes[bb_count] = nondbg_stmt_count;
 
       /* Inserting basic block to hash table.  */
       sem_bb = XNEW (sem_bb_t);
       sem_bb->bb = bb;
       sem_bb->func = f;
-      sem_bb->stmt_count = gimple_count;
+      sem_bb->nondbg_stmt_count = nondbg_stmt_count;
       sem_bb->edge_count = EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs);
-      sem_bb->hashcode = iterative_hash_object (gcode_hash, bb_hash (sem_bb));
+      sem_bb->hash = iterative_hash_object (gcode_hash, bb_hash (sem_bb));
 
       f->bb_sorted[bb_count++] = sem_bb;
     }
@@ -1098,13 +1101,14 @@ compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, func_dict_t *d,
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
 
-  if (bb1->stmt_count != bb2->stmt_count || bb1->edge_count != bb2->edge_count)
+  if (bb1->nondbg_stmt_count != bb2->nondbg_stmt_count
+      || bb1->edge_count != bb2->edge_count)
     SE_EXIT_FALSE ();
 
   gsi1 = gsi_start_bb (bb1->bb);
   gsi2 = gsi_start_bb (bb2->bb);
 
-  for (i = 0; i < bb1->stmt_count; i++)
+  for (i = 0; i < bb1->nondbg_stmt_count; i++)
   {
     gsi_next_nondebug_stmt (gsi1);
     gsi_next_nondebug_stmt (gsi2);
