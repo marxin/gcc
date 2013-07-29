@@ -564,7 +564,7 @@ check_edges (edge e1, edge e2, func_dict_t *d)
    FUNC2. Function dictionary D is responsible for a correspondence.  */
 
 static bool
-function_check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
+check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
                           tree func2)
 {
   tree b1, b2;
@@ -714,7 +714,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     }
     case SSA_NAME:
     {
-      ret = function_check_ssa_names (d, t1, t2, func1, func2);
+      ret = check_ssa_names (d, t1, t2, func1, func2);
       SE_EXIT_DEBUG (ret);
     }
     case INTEGER_CST:
@@ -796,7 +796,7 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
       ret = check_declaration (t1, t2, d, func1, func2);
       SE_EXIT_DEBUG (ret);
     case SSA_NAME:
-      ret = function_check_ssa_names (d, t1, t2, func1, func2); 
+      ret = check_ssa_names (d, t1, t2, func1, func2); 
       SE_EXIT_DEBUG (ret);
     case INTEGER_CST:
       ret = (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
