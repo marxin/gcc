@@ -907,7 +907,7 @@ check_gimple_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func
   return true;
 }
 
-/* Returns true if conditions S1 comming from a function FUNC1 and S2 comming
+/* Returns true if conditions S1 coming from a function FUNC1 and S2 comming
    from FUNC2 do correspond. Collation is based on function dictionary D.  */
 
 static bool
@@ -1377,7 +1377,6 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
         case ERT_CLEANUP:
           break;
         case ERT_MUST_NOT_THROW:
-          /* FIXME: better DECL comparing?  */
           if (r1->u.must_not_throw.failure_decl != r1->u.must_not_throw.failure_decl)
             return false;
           break;
