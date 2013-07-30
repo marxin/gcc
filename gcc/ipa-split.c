@@ -1538,7 +1538,8 @@ execute_split_functions (void)
      then inlining would still benefit.  */
   if ((!node->callers || !node->callers->next_caller)
       && !node->symbol.address_taken
-      && (!flag_lto || !node->symbol.externally_visible))
+      && (!(flag_lto || flag_branch_probabilities || profile_arc_flag)
+          || !node->symbol.externally_visible))
     {
       if (dump_file)
 	fprintf (dump_file, "Not splitting: not called directly "

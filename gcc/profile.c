@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dumpfile.h"
 
 #include "profile.h"
+#include "tree-dump.h"
 
 struct bb_info {
   unsigned int count_valid : 1;
@@ -521,6 +522,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
   gcov_type *exec_counts = get_exec_counts (cfg_checksum, lineno_checksum);
   int inconsistent = 0;
 
+  return;
   /* Very simple sanity checks so we catch bugs in our profiling code.  */
   if (!profile_info)
     return;
@@ -895,19 +897,30 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       t = (int) hist->type;
 
       aact_count = act_count[t];
-      act_count[t] += hist->n_counters;
+
+      if (act_count[t])
+        act_count[t] += hist->n_counters;
 
       gimple_add_histogram_value (cfun, stmt, hist);
       hist->hvalue.counters =  XNEWVEC (gcov_type, hist->n_counters);
       for (j = 0; j < hist->n_counters; j++)
-	hist->hvalue.counters[j] = aact_count[j];
+        if (aact_count[t])
+          hist->hvalue.counters[j] = aact_count[j];
+        else
+          hist->hvalue.counters[j] = 0;
 
       if (hist->type == HIST_TYPE_TIME_PROFILE)
         {
           node = cgraph_get_node (hist->fun->decl);
 
-          node->tp_first_run = hist->hvalue.counters[0];
-          node->tp_not_called_once = hist->hvalue.counters[1] > 0;
+          if (hist->hvalue.counters[2])
+          {            
+            node->tp_first_run = hist->hvalue.counters[0] / hist->hvalue.counters[2];
+            // node->tp_called_once = hist->hvalue.counters[1] > 0;
+          }
+
+          if (node->tp_first_run)
+            fprintf (stderr, "HISTREAD:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
         }
     }
 
@@ -1189,6 +1202,17 @@ branch_prob (void)
      various transformations.  */
   cfg_checksum = coverage_compute_cfg_checksum ();
   lineno_checksum = coverage_compute_lineno_checksum ();
+
+//  fprintf (stderr, "GEN: %s: lineno_checksum==%d, cfg_checksum==%d\n", cgraph_node_asm_name (cgraph_get_node(cfun->decl)), lineno_checksum, cfg_checksum);
+//  if (cfg_checksum == 581811514 || cfg_checksum == -1031538902 || cfg_checksum == -18923212)
+//  
+  /*
+  if (strcmp("_Z22js_CreateThisFromTraceP9JSContextP8JSObjectj", cgraph_node_asm_name (cgraph_get_node(cfun->decl))) == 0)
+  {
+    fprintf (stderr, "CFG == %d, LINENO == %d\n", cfg_checksum, lineno_checksum);
+    dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
+    gcc_assert(false);
+  }*/
 
   /* Write the data from which gcov can reconstruct the basic block
      graph and function line numbers (the gcno file).  */

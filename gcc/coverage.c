@@ -357,7 +357,7 @@ get_coverage_counts (unsigned counter, unsigned expected,
        final executable.  Silently fail, because there's nothing we
        can do about it.  */
     return NULL;
-  
+
   if (entry->cfg_checksum != cfg_checksum
       || entry->summary.num != expected)
     {
@@ -368,7 +368,7 @@ get_coverage_counts (unsigned counter, unsigned expected,
       warning_printed =
 	warning_at (input_location, OPT_Wcoverage_mismatch,
 		    "the control flow of function %qE does not match "
-		    "its profile data (counter %qs)", id, ctr_names[counter]);
+		    "its profile data (counter %qs), [%d:%d] [lineno:%d:%d]", id, ctr_names[counter], entry->cfg_checksum, cfg_checksum, entry->lineno_checksum, lineno_checksum);
       if (warning_printed)
 	{
 	 inform (input_location, "use -Wno-error=coverage-mismatch to tolerate "
@@ -386,14 +386,17 @@ get_coverage_counts (unsigned counter, unsigned expected,
 			"this can result in poorly optimized code");
 	    }
 	}
-
+ 
       return NULL;
-    }
+  }
   else if (entry->lineno_checksum != lineno_checksum)
     {
+      fprintf (stderr, "checksum: %d, %d\n", entry->lineno_checksum, lineno_checksum);
       warning (0, "source locations for function %qE have changed,"
 	       " the profile data may be out of date",
 	       DECL_ASSEMBLER_NAME (current_function_decl));
+
+      return NULL;
     }
 
   if (summary)
@@ -535,6 +538,8 @@ coverage_compute_lineno_checksum (void)
   chksum = coverage_checksum_string (chksum, xloc.file);
   chksum = coverage_checksum_string
     (chksum, IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (current_function_decl)));
+
+  // fprintf (stderr, "LINENO: %d, %s, %s\n", xloc.line, xloc.file, IDENTIFIER_POINTER(DECL_ASSEMBLER_NAME(current_function_decl)));
 
   return chksum;
 }

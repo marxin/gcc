@@ -988,6 +988,8 @@ __gcov_merge_tp (gcov_type *counters, unsigned n_counters)
   {
     counters[0] = gcov_read_counter();
     counters[1] = gcov_read_counter();
+
+    fprintf (stderr, "__gcov_merge_tp:%d\n", counters[0]);
   }
 }
 
@@ -1175,18 +1177,26 @@ __gcov_indirect_call_profiler (gcov_type* counter, gcov_type value,
 
 #ifdef L_gcov_time_profiler
 
-static int function_counter = 1;
+static int function_counter = 0;
 
 void
 __gcov_time_profiler (gcov_type* counters)
 {
-  /* counters[1] indicates if the function is visited more than once.  */
-  if (counters[0])
-    counters[1] = 1;
+  function_counter++;
 
   /* counters[0] indicates a first visit of the function.  */
   if (counters[0] == 0)
-    counters[0] = function_counter++;
+  {
+    counters[0] = function_counter;
+    fprintf (stderr, "__gcov_time_profiler:%d\n", counters[0]);
+  }
+
+  /* counters[1] is last visit of the function.  */
+  counters[1] = function_counter;
+
+  /* counters[2] indicated if visited */
+  if (counters[2] == 0)
+    counters[2] = 1;
 }
 #endif
 
