@@ -704,10 +704,12 @@ lto_balanced_map (void)
     best_varpool_pos = varpool_pos;
 	}
       if (cgraph_dump_file)
-	fprintf (cgraph_dump_file, "Step %i: added %s/%i, size %i, cost %i/%i "
+	fprintf (cgraph_dump_file, "Step %i: added %s/%i [time: %d], size %i, cost %i/%i "
 		 "best %i/%i, step %i\n", i,
-		 cgraph_node_name (order[i]), order[i]->symbol.order,
-		 partition->insns, cost, internal,
+		 cgraph_node_asm_name (order[i]), order[i]->symbol.order,
+		 partition->insns,
+     order[i]->tp_first_run,
+     cost, internal,
 		 best_cost, best_internal, best_i);
       /* Partition is too large, unwind into step when best cost was reached and
 	 start new partition.  */

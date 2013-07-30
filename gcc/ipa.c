@@ -1463,6 +1463,7 @@ cgraph_build_static_cdtor_1 (char which, tree body, int priority, bool final)
 
   set_cfun (NULL);
   current_function_decl = NULL;
+  cgraph_get_node (decl)->tp_first_run = 1;
 }
 
 /* Generate and emit a static constructor or destructor.  WHICH must

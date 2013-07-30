@@ -358,6 +358,7 @@ get_coverage_counts (unsigned counter, unsigned expected,
        can do about it.  */
     return NULL;
 
+  /*
   if (entry->cfg_checksum != cfg_checksum
       || entry->summary.num != expected)
     {
@@ -388,8 +389,9 @@ get_coverage_counts (unsigned counter, unsigned expected,
 	}
  
       return NULL;
-  }
-  else if (entry->lineno_checksum != lineno_checksum)
+  }*/
+
+  if (entry->lineno_checksum != lineno_checksum)
     {
       fprintf (stderr, "checksum: %d, %d\n", entry->lineno_checksum, lineno_checksum);
       warning (0, "source locations for function %qE have changed,"

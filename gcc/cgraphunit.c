@@ -1673,7 +1673,14 @@ node_cmp (const void *pa, const void *pb)
   const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
   const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
 
-  return b->tp_first_run - a->tp_first_run;
+  if (a->tp_first_run && b->tp_first_run)
+    return b->tp_first_run - a->tp_first_run;
+  else if(a->tp_first_run)
+    return -1;
+  else if (b->tp_first_run)
+    return 1;
+
+  return 0;
 }
 
 static void
@@ -1711,9 +1718,7 @@ expand_all_functions (void)
              profiled_func_count++;
         }
 
-    /*
-    fprintf (stderr, "Final order:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
-    */
+      fprintf (stderr, "Final order:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
 
 	    node->process = 0;
   	  expand_function (node);
