@@ -523,7 +523,7 @@ ipa_discover_readonly_nonaddressable_vars (void)
 }
 
 /* Return true when there is a reference to node and it is not vtable.  */
-static bool
+bool
 address_taken_from_non_vtable_p (symtab_node node)
 {
   int i;
