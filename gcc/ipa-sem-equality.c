@@ -601,7 +601,6 @@ check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
 
           SE_EXIT_DEBUG (ret);
         default:
-          gcc_unreachable ();
           return false;
         }
     }
