@@ -744,8 +744,6 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       SE_EXIT_DEBUG (ret);
     }
     default:
-      debug_tree (t1);
-      gcc_unreachable ();
       return false;
     }
 }
