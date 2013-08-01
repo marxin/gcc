@@ -391,6 +391,7 @@ get_coverage_counts (unsigned counter, unsigned expected,
       return NULL;
   }*/
 
+  /*
   if (entry->lineno_checksum != lineno_checksum)
     {
       fprintf (stderr, "checksum: %d, %d\n", entry->lineno_checksum, lineno_checksum);
@@ -400,6 +401,7 @@ get_coverage_counts (unsigned counter, unsigned expected,
 
       return NULL;
     }
+  */
 
   if (summary)
     *summary = &entry->summary;

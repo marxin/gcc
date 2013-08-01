@@ -914,7 +914,8 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
           node = cgraph_get_node (hist->fun->decl);
 
           if (hist->hvalue.counters[2])
-          {            
+          {
+            gcc_assert (node->tp_first_run == 0);
             node->tp_first_run = hist->hvalue.counters[0] / hist->hvalue.counters[2];
             // node->tp_called_once = hist->hvalue.counters[1] > 0;
           }
