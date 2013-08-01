@@ -578,7 +578,6 @@ check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
       b1 = SSA_NAME_VAR (t1);
       b2 = SSA_NAME_VAR (t2);
 
-      /* TODO: simplify? */
       if (b1 == NULL && b2 == NULL)
         return true;
 
@@ -1690,7 +1689,6 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
     }
   else
     {
-      create_alias = true;
       create_alias = true;
       redirect_callers = false;
     }

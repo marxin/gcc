@@ -128,10 +128,12 @@ along with GCC; see the file COPYING3.  If not see
   NEXT_PASS (pass_all_late_local_fixups);
   PUSH_INSERT_PASSES_WITHIN (pass_all_late_local_fixups)
     NEXT_PASS (pass_fixup_cfg);
+    /*
     NEXT_PASS (pass_rename_ssa_copies);
     NEXT_PASS (pass_copy_prop);
     NEXT_PASS (pass_ccp);
     NEXT_PASS (pass_cd_dce);
+    */
     NEXT_PASS (pass_rebuild_cgraph_edges);
   POP_INSERT_PASSES ()
   NEXT_PASS (pass_ipa_pta);
