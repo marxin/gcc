@@ -1307,8 +1307,6 @@ cgraph_release_function_body (struct cgraph_node *node)
       DECL_STRUCT_FUNCTION (node->symbol.decl) = NULL;
     }
   DECL_SAVED_TREE (node->symbol.decl) = NULL;
-  if (!node->abstract_and_needed && cgraph_state != CGRAPH_STATE_PARSING)
-    DECL_RESULT (node->symbol.decl) = NULL;
   /* If the node is abstract and needed, then do not clear DECL_INITIAL
      of its associated function function declaration because it's
      needed to emit debug info later.  */
@@ -1681,6 +1679,7 @@ enum availability
 cgraph_function_body_availability (struct cgraph_node *node)
 {
   enum availability avail;
+  gcc_assert (cgraph_function_flags_ready);
   if (!node->symbol.analyzed)
     avail = AVAIL_NOT_AVAILABLE;
   else if (node->local.local)
