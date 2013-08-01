@@ -323,8 +323,7 @@ struct GTY(()) cgraph_node {
   unsigned tm_clone : 1;
   /* True if this decl is a dispatcher for function versions.  */
   unsigned dispatcher_function : 1;
-
-  unsigned tp_not_called_once : 1;
+  /* Indicates an average first run of the function.  */
   int tp_first_run;
 };
 

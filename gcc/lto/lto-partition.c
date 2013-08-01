@@ -393,12 +393,8 @@ node_cmp (const void *pa, const void *pb)
   const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
   const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
 
-  if (a->tp_first_run && b->tp_first_run)
+  if (a->tp_first_run || b->tp_first_run)
     return a->tp_first_run - b->tp_first_run;
-  else if(a->tp_first_run)
-    return -1;
-  else if (b->tp_first_run)
-    return 1;
 
   return b->symbol.order - a->symbol.order;
 }
