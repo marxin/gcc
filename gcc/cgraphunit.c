@@ -322,10 +322,7 @@ cgraph_process_new_functions (void)
 	    analyze_function (node);
 	  push_cfun (DECL_STRUCT_FUNCTION (fndecl));
 	  if ((cgraph_state == CGRAPH_STATE_IPA_SSA
-	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl)))
-	      /* When not optimizing, be sure we run early local passes anyway
-		 to expand OMP.  */
-	      || !optimize)
+	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl))))
 	    execute_pass_list (pass_early_local_passes.pass.sub);
 	  else if (inline_summary_vec != NULL)
 	    compute_inline_parameters (node, true);
