@@ -1321,12 +1321,11 @@ cgraph_release_function_body (struct cgraph_node *node)
       DECL_RESULT (node->symbol.decl) = NULL;
       DECL_ARGUMENTS (node->symbol.decl) = NULL;
     }
-<<<<<<< HEAD
+
   DECL_SAVED_TREE (node->symbol.decl) = NULL;
   if (!node->abstract_and_needed && cgraph_state != CGRAPH_STATE_PARSING)
     DECL_RESULT (node->symbol.decl) = NULL;
-=======
->>>>>>> parent/master
+
   /* If the node is abstract and needed, then do not clear DECL_INITIAL
      of its associated function function declaration because it's
      needed to emit debug info later.  */
