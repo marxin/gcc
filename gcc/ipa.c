@@ -523,7 +523,7 @@ ipa_discover_readonly_nonaddressable_vars (void)
 }
 
 /* Return true when there is a reference to node and it is not vtable.  */
-bool
+static bool
 address_taken_from_non_vtable_p (symtab_node node)
 {
   int i;
@@ -734,50 +734,6 @@ varpool_externally_visible_p (struct varpool_node *vnode)
   return false;
 }
 
-/* Return true if reference to NODE can be replaced by a local alias.
-   Local aliases save dynamic linking overhead and enable more optimizations.
- */
-
-bool
-can_replace_by_local_alias (symtab_node node)
-{
-  // TODO
-  return false;
-
-  return (symtab_node_availability (node) > AVAIL_OVERWRITABLE
-	  && !DECL_EXTERNAL (node->symbol.decl)
-	  && (!DECL_ONE_ONLY (node->symbol.decl)
-	      || node->symbol.resolution == LDPR_PREVAILING_DEF
-	      || node->symbol.resolution == LDPR_PREVAILING_DEF_IRONLY
-	      || node->symbol.resolution == LDPR_PREVAILING_DEF_IRONLY_EXP));
-}
-
-/* In virtual tables we can replace references by local aliases.   */
-
-static tree
-update_vtable_references (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
-{
-  switch (TREE_CODE (*tp))
-    {
-    case VAR_DECL:
-      if (DECL_VIRTUAL_P (*tp)
-	  && can_replace_by_local_alias (symtab_get_node (*tp)))
-	*tp = symtab_nonoverwritable_alias (symtab_get_node (*tp))->symbol.decl;
-      *walk_subtrees = 0;
-    case FUNCTION_DECL:
-      if (can_replace_by_local_alias (symtab_get_node (*tp)))
-	*tp = symtab_nonoverwritable_alias (symtab_get_node (*tp))->symbol.decl;
-      *walk_subtrees = 0;
-    default:
-      if (IS_TYPE_OR_DECL_P (*tp))
-	{
-	  *walk_subtrees = 0;
-	  break;
-	}
-    }
-  return NULL;
-}
-
 /* Mark visibility of all functions.
 
    A local function is one whose calls can occur only in the current
@@ -899,36 +855,7 @@ function_and_variable_visibility (bool whole_program)
 	}
     }
   FOR_EACH_DEFINED_FUNCTION (node)
-    {
-      node->local.local = cgraph_local_node_p (node);
-
-      /* If we know that function can not be overwritten by a different semantics
-	 and moreover its section can not be discarded, replace all direct calls
-	 by calls to an nonoverwritable alias.  This make dynamic linking
-	 cheaper and enable more optimization.
-
-	 TODO: We can also update virtual tables.  */
-      if (node->callers && can_replace_by_local_alias ((symtab_node)node))
-	{
-	  struct cgraph_node *alias = cgraph (symtab_nonoverwritable_alias ((symtab_node) node));
-
-	  if (alias != node)
-	    {
-	      while (node->callers)
-		{
-		  struct cgraph_edge *e = node->callers;
-
-		  cgraph_redirect_edge_callee (e, alias);
-		  if (!flag_wpa)
-		    {
-		      push_cfun (DECL_STRUCT_FUNCTION (e->caller->symbol.decl));
-		      cgraph_redirect_edge_call_stmt_to_callee (e);
-		      pop_cfun ();
-		    }
-		}
-	    }
-	}
-    }
+    node->local.local = cgraph_local_node_p (node);
   FOR_EACH_VARIABLE (vnode)
     {
       /* weak flag makes no sense on local variables.  */
@@ -982,14 +909,6 @@ function_and_variable_visibility (bool whole_program)
 	  if (vnode->symbol.same_comdat_group)
 	    symtab_dissolve_same_comdat_group_list ((symtab_node) vnode);
 	  vnode->symbol.resolution = LDPR_PREVAILING_DEF_IRONLY;
-	}
-      if (DECL_VIRTUAL_P (vnode->symbol.decl)
-	  && !DECL_EXTERNAL (vnode->symbol.decl))
-	{
-          struct pointer_set_t *visited_nodes = pointer_set_create ();
-	  walk_tree (&DECL_INITIAL (vnode->symbol.decl),
-		     update_vtable_references, NULL, visited_nodes);
-	  pointer_set_destroy (visited_nodes);
 	}
     }
 
