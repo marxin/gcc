@@ -578,7 +578,6 @@ check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
       b1 = SSA_NAME_VAR (t1);
       b2 = SSA_NAME_VAR (t2);
 
-      /* TODO: simplify? */
       if (b1 == NULL && b2 == NULL)
         return true;
 
@@ -996,8 +995,6 @@ check_gimple_switch (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func
          || (high1 && high2
              && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
       return false;
-    
-    /* TODO: Compare labels.  */
   }
 
   return true;
@@ -1478,8 +1475,6 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
       if (get_attribute_name (decl1) != get_attribute_name (decl2))
         SE_CF_EXIT_FALSE();
 
-      /* TODO: compare parameters.  */
-
       decl1 = TREE_CHAIN (decl1);
       decl2 = TREE_CHAIN (decl2);
     }
@@ -1608,17 +1603,6 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
     dump_function_to_file (original_func->func_decl, dump_file, TDF_DETAILS);
     dump_function_to_file (alias_func->func_decl, dump_file, TDF_DETAILS);
   }
-
-  /* TODO: 
-     tak jsem si uvedomil, ze ne vsechny funkce jsou stejne dobre jako
-     volba originalu.  Original musi byt
-     !DECL_SECTION_NAME || DECL_HAS_IMPLICIT_SECTION_NAME_P
-     a idealne neprojde temi testy na original_discardable.
-
-     nejlepsi jsou deklarace co projdou decl_binds_to_current_def_p
-     horsi targetm.binds_local_p a nejhorsi ty zbyle. Asi bychom meli
-     z bucketu vybrat nejlepsi kandidaty a z nich lexikograficky
-     nejmensiho (aby rozhodnuti sedely mezi unitama).  */
 
   /* Do not attempt to mix functions from different user sections;
      we do not know what user intends with those.  */
