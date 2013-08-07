@@ -458,8 +458,9 @@ extern ipa_opt_pass_d *make_pass_ipa_inline (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_free_lang_data (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_free_inline_summary (gcc::context
 							       *ctxt);
-extern ipa_opt_pass_d *make_pass_ipa_cp (gcc::context *ctxt);
+extern ipa_opt_pass_d *make_pass_ipa_sem_equality (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_reference (gcc::context *ctxt);
+extern ipa_opt_pass_d *make_pass_ipa_cp (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_pure_const (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_pta (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_lto_finish_out (gcc::context *ctxt);

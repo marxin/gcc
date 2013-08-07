@@ -1665,9 +1665,13 @@ group_functions (void)
 
   func_node_hash.create (16);
 
+  fprintf (stderr, "==wpa==\n");
+
   FOR_EACH_DEFINED_FUNCTION (node)
     {
       hashval_t hash = get_function_hash (node);
+
+      fprintf (stderr, "WPA seen: %s, hash: %u, visit: %p\n", cgraph_node_name (node), hash, visit_function(node));
 
       if (hash == 0)
         continue;
@@ -1792,31 +1796,49 @@ gate_sem_equality (void)
   return flag_ipa_sem_equality;
 }
 
-struct ipa_opt_pass_d pass_ipa_sem_equality =
+
+namespace {
+
+const pass_data pass_data_ipa_sem_equality =
 {
- {
   IPA_PASS,
   "sem-equality",           /* name */
   OPTGROUP_IPA,             /* optinfo_flags */
-  gate_sem_equality,        /* gate */
-  group_functions,          /* execute */
-  NULL,                     /* sub */
-  NULL,                     /* next */
-  0,                        /* static_pass_number */
+  true,                     /* has_gate */
+  true,                     /* has_execute */
   TV_IPA_SEM_EQUALITY,      /* tv_id */
   0,                        /* properties_required */
   0,                        /* properties_provided */
   0,                        /* properties_destroyed */
   0,                        /* todo_flags_start */
-  0                         /* todo_flags_finish */
- },
- generate_summary,          /* generate_summary */
- sem_equality_write_summary,/* write_summary */
- sem_equality_read_summary,	/* read_summary */
- sem_equality_write_osummary,/* write_optimization_summary */
- sem_equality_read_osummary,/* read_optimization_summary */
- NULL,                      /* stmt_fixup */
- 0,                         /* TODOs */
- transform,                 /* function_transform */
- NULL                       /* variable_transform */
+  0,                        /* todo_flags_finish */
 };
+
+class pass_ipa_sem_equality : public ipa_opt_pass_d
+{
+public:
+  pass_ipa_sem_equality(gcc::context *ctxt)
+    : ipa_opt_pass_d(pass_data_ipa_sem_equality, ctxt,
+      generate_summary, /* generate_summary */
+      sem_equality_write_summary, /* write_summary */
+      sem_equality_read_summary, /* read_summary */
+      sem_equality_write_osummary, /* write_optimization_summary */
+      sem_equality_read_osummary, /* read_optimization_summary */
+      NULL, /* stmt_fixup */
+      0, /* TODOs */
+      transform, /* function_transform */
+      NULL) /* variable_transform */
+  {}
+
+  /* opt_pass methods: */
+  bool gate () { return gate_sem_equality (); }
+  unsigned int execute () { return group_functions (); }
+}; // class pass_ipa_sem_equality
+
+} // anon namespace
+
+ipa_opt_pass_d *
+make_pass_ipa_sem_equality (gcc::context *ctxt)
+{
+  return new pass_ipa_sem_equality (ctxt);
+}
