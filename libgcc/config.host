@@ -197,7 +197,7 @@ case ${host} in
   ;;
 *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-knetbsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu)
   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
-  extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+  extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o vtv_start.o vtv_end.o vtv_start_preinit.o vtv_end_preinit.o"
   ;;
 *-*-lynxos*)
   tmake_file="$tmake_file t-lynx $cpu_type/t-crtstuff t-crtstuff-pic t-libgcc-pic"
@@ -869,7 +869,7 @@ powerpc-*-netbsd*)
 	tmake_file="$tmake_file rs6000/t-netbsd rs6000/t-crtstuff"
 	;;
 powerpc-*-eabispe*)
-	tmake_file="${tmake_file} rs6000/t-ppccomm rs6000/t-savresfgpr rs6000/t-crtstuff t-crtstuff-pic"
+	tmake_file="${tmake_file} rs6000/t-ppccomm rs6000/t-savresfgpr rs6000/t-crtstuff t-crtstuff-pic t-fdpbit"
 	extra_parts="$extra_parts crtbegin.o crtend.o crtbeginS.o crtendS.o crtbeginT.o ecrti.o ecrtn.o ncrti.o ncrtn.o"
 	;;
 powerpc-*-eabisimaltivec*)

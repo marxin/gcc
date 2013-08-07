@@ -1228,7 +1228,7 @@ simplify_operand_subreg (int nop, enum machine_mode reg_mode)
       if (get_reload_reg (curr_static_id->operand[nop].type, reg_mode, reg,
 			  rclass, "subreg reg", &new_reg))
 	{
-	  bitmap_set_bit (&lra_optional_reload_pseudos, REGNO (new_reg));
+	  bitmap_set_bit (&lra_subreg_reload_pseudos, REGNO (new_reg));
 	  if (type != OP_OUT
 	      || GET_MODE_SIZE (GET_MODE (reg)) > GET_MODE_SIZE (mode))
 	    {
@@ -1892,7 +1892,7 @@ process_alt_operands (int only_alternative)
 
 	      /* For asms, verify that the class for this alternative is possible
 		 for the mode that is specified.  */
-	      if (!no_regs_p && REG_P (op) && INSN_CODE (curr_insn) < 0)
+	      if (!no_regs_p && INSN_CODE (curr_insn) < 0)
 		{
 		  int i;
 		  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
@@ -1940,7 +1940,8 @@ process_alt_operands (int only_alternative)
 		      && ira_class_hard_regs_num[this_alternative] > 0
 		      && ! HARD_REGNO_MODE_OK (ira_class_hard_regs
 					       [this_alternative][0],
-					       GET_MODE (op)))
+					       GET_MODE
+					       (*curr_id->operand_loc[nop])))
 		    goto fail;
 		  losers++;
 		}
@@ -3183,6 +3184,8 @@ curr_insn_transform (void)
 
   for (i = 0; i < n_operands; i++)
     {
+      int regno;
+      bool optional_p = false;
       rtx old, new_reg;
       rtx op = *curr_id->operand_loc[i];
 
@@ -3205,7 +3208,22 @@ curr_insn_transform (void)
 		   current one.  */
 		reg_renumber[regno] = -1;
 	    }
-	  continue;
+	  /* We can do an optional reload.  If the pseudo got a hard
+	     reg, we might improve the code through inheritance.  If
+	     it does not get a hard register we coalesce memory/memory
+	     moves later.  Ignore move insns to avoid cycling.  */
+	  if (0 && ! lra_simple_p
+	      && lra_undo_inheritance_iter < LRA_MAX_INHERITANCE_PASSES
+	      && goal_alt[i] != NO_REGS && REG_P (op)
+	      && (regno = REGNO (op)) >= FIRST_PSEUDO_REGISTER
+	      && reg_renumber[regno] < 0
+	      && (curr_insn_set == NULL_RTX
+		  || !(REG_P (SET_SRC (curr_insn_set))
+		       || MEM_P (SET_SRC (curr_insn_set))
+		       || GET_CODE (SET_SRC (curr_insn_set)) == SUBREG)))
+	    optional_p = true;
+	  else
+	    continue;
 	}
 
       /* Operands that match previous ones have already been handled.  */
@@ -3328,6 +3346,21 @@ curr_insn_transform (void)
 	/* We must generate code in any case when function
 	   process_alt_operands decides that it is possible.  */
 	gcc_unreachable ();
+      if (optional_p)
+	{
+	  lra_assert (REG_P (op));
+	  regno = REGNO (op);
+	  op = *curr_id->operand_loc[i]; /* Substitution.  */
+	  if (GET_CODE (op) == SUBREG)
+	    op = SUBREG_REG (op);
+	  gcc_assert (REG_P (op) && (int) REGNO (op) >= new_regno_start);
+	  bitmap_set_bit (&lra_optional_reload_pseudos, REGNO (op));
+	  lra_reg_info[REGNO (op)].restore_regno = regno;
+	  if (lra_dump_file != NULL)
+	    fprintf (lra_dump_file,
+		     "      Making reload reg %d for reg %d optional\n",
+		     REGNO (op), regno);
+	}
     }
   if (before != NULL_RTX || after != NULL_RTX
       || max_regno_before != max_reg_num ())
@@ -3567,6 +3600,40 @@ init_insn_rhs_dead_pseudo_p (int regno)
   return false;
 }
 
+/* Return TRUE if REGNO has a reverse equivalence.  The equivalence is
+   reverse only if we have one init insn with given REGNO as a
+   source.  */
+static bool
+reverse_equiv_p (int regno)
+{
+  rtx insns, set;
+
+  if ((insns = ira_reg_equiv[regno].init_insns) == NULL_RTX)
+    return false;
+  if (! INSN_P (XEXP (insns, 0))
+      || XEXP (insns, 1) != NULL_RTX)
+    return false;
+  if ((set = single_set (XEXP (insns, 0))) == NULL_RTX)
+    return false;
+  return REG_P (SET_SRC (set)) && (int) REGNO (SET_SRC (set)) == regno;
+}
+
+/* Return TRUE if REGNO was reloaded in an equivalence init insn.  We
+   call this function only for non-reverse equivalence.  */
+static bool
+contains_reloaded_insn_p (int regno)
+{
+  rtx set;
+  rtx list = ira_reg_equiv[regno].init_insns;
+
+  for (; list != NULL_RTX; list = XEXP (list, 1))
+    if ((set = single_set (XEXP (list, 0))) == NULL_RTX
+	|| ! REG_P (SET_DEST (set))
+	|| (int) REGNO (SET_DEST (set)) != regno)
+      return true;
+  return false;
+}
+
 /* Entry function of LRA constraint pass.  Return true if the
    constraint pass did change the code.	 */
 bool
@@ -3610,7 +3677,6 @@ lra_constraints (bool first_p)
 	else if ((x = get_equiv_substitution (reg)) != reg)
 	  {
 	    bool pseudo_p = contains_reg_p (x, false, false);
-	    rtx set, insns;
 
 	    /* After RTL transformation, we can not guarantee that
 	       pseudo in the substitution was not reloaded which might
@@ -3642,13 +3708,13 @@ lra_constraints (bool first_p)
 		   removed the insn.  When the equiv can be a
 		   constant, the right hand side of the init insn can
 		   be a pseudo.  */
-		|| (! ((insns = ira_reg_equiv[i].init_insns) != NULL_RTX
-		       && INSN_P (XEXP (insns, 0))
-		       && XEXP (insns, 1) == NULL_RTX
-		       && (set = single_set (XEXP (insns, 0))) != NULL_RTX
-		       && REG_P (SET_SRC (set))
-		       && (int) REGNO (SET_SRC (set)) == i)
-		    && init_insn_rhs_dead_pseudo_p (i))
+		|| (! reverse_equiv_p (i)
+		    && (init_insn_rhs_dead_pseudo_p (i)
+			/* If we reloaded the pseudo in an equivalence
+			   init insn, we can not remove the equiv init
+			   insns and the init insns might write into
+			   const memory in this case.  */
+			|| contains_reloaded_insn_p (i)))
 		/* Prevent access beyond equivalent memory for
 		   paradoxical subregs.  */
 		|| (MEM_P (x)
@@ -4171,7 +4237,7 @@ need_for_call_save_p (int regno)
 	       PSEUDO_REGNO_MODE (regno), reg_renumber[regno])));
 }
 
-/* Global registers occuring in the current EBB.  */
+/* Global registers occurring in the current EBB.  */
 static bitmap_head ebb_global_regs;
 
 /* Return true if we need a split for hard register REGNO or pseudo
@@ -5273,6 +5339,100 @@ remove_inheritance_pseudos (bitmap remove_pseudos)
   return change_p;
 }
 
+/* If optional reload pseudos failed to get a hard register or was not
+   inherited, it is better to remove optional reloads.  We do this
+   transformation after undoing inheritance to figure out necessity to
+   remove optional reloads easier.  Return true if we do any
+   change.  */
+static bool
+undo_optional_reloads (void)
+{
+  bool change_p;
+  unsigned int regno, uid;
+  bitmap_iterator bi, bi2;
+  rtx insn, set, src, dest;
+  bitmap_head removed_optional_reload_pseudos, insn_bitmap;
+
+  bitmap_initialize (&removed_optional_reload_pseudos, &reg_obstack);
+  bitmap_copy (&removed_optional_reload_pseudos, &lra_optional_reload_pseudos);
+  EXECUTE_IF_SET_IN_BITMAP (&lra_optional_reload_pseudos, 0, regno, bi)
+    if (reg_renumber[regno] >= 0)
+      EXECUTE_IF_SET_IN_BITMAP (&lra_reg_info[regno].insn_bitmap, 0, uid, bi2)
+	{
+	  insn = lra_insn_recog_data[uid]->insn;
+	  if ((set = single_set (insn)) == NULL_RTX)
+	    continue;
+	  src = SET_SRC (set);
+	  dest = SET_DEST (set);
+	  if (! REG_P (src) || ! REG_P (dest))
+	    continue;
+	  if ((REGNO (src) == regno
+	       && lra_reg_info[regno].restore_regno != (int) REGNO (dest))
+	      || (REGNO (dest) == regno
+		  && lra_reg_info[regno].restore_regno != (int) REGNO (src)))
+	    {
+	      /* Optional reload was inherited.  Keep it.  */
+	      bitmap_clear_bit (&removed_optional_reload_pseudos, regno);
+	      if (lra_dump_file != NULL)
+		fprintf (lra_dump_file, "Keep optional reload reg %d\n", regno);
+	    }
+	}
+  change_p = ! bitmap_empty_p (&removed_optional_reload_pseudos);
+  bitmap_initialize (&insn_bitmap, &reg_obstack);
+  EXECUTE_IF_SET_IN_BITMAP (&removed_optional_reload_pseudos, 0, regno, bi)
+    {
+      if (lra_dump_file != NULL)
+	fprintf (lra_dump_file, "Remove optional reload reg %d\n", regno);
+      bitmap_copy (&insn_bitmap, &lra_reg_info[regno].insn_bitmap);
+      EXECUTE_IF_SET_IN_BITMAP (&insn_bitmap, 0, uid, bi2)
+	{
+	  insn = lra_insn_recog_data[uid]->insn;
+	  if ((set = single_set (insn)) != NULL_RTX)
+	    {
+	      src = SET_SRC (set);
+	      dest = SET_DEST (set);
+	      if (REG_P (src) && REG_P (dest)
+		  && ((REGNO (src) == regno
+		       && (lra_reg_info[regno].restore_regno
+			   == (int) REGNO (dest)))
+		      || (REGNO (dest) == regno
+			  && (lra_reg_info[regno].restore_regno
+			      == (int) REGNO (src)))))
+		{
+		  if (lra_dump_file != NULL)
+		    {
+		      fprintf (lra_dump_file, "  Deleting move %u\n",
+			       INSN_UID (insn));
+		      dump_insn_slim (lra_dump_file, insn);
+		    }
+		  lra_set_insn_deleted (insn);
+		  continue;
+		}
+	      /* We should not worry about generation memory-memory
+		 moves here as if the corresponding inheritance did
+		 not work (inheritance pseudo did not get a hard reg),
+		 we remove the inheritance pseudo and the optional
+		 reload.  */
+	    }
+	  substitute_pseudo (&insn, regno,
+			     regno_reg_rtx[lra_reg_info[regno].restore_regno]);
+	  lra_update_insn_regno_info (insn);
+	  if (lra_dump_file != NULL)
+	    {
+	      fprintf (lra_dump_file,
+		       "  Restoring original insn:\n");
+	      dump_insn_slim (lra_dump_file, insn);
+	    }
+	}
+    }
+  /* Clear restore_regnos.  */
+  EXECUTE_IF_SET_IN_BITMAP (&lra_optional_reload_pseudos, 0, regno, bi)
+    lra_reg_info[regno].restore_regno = -1;
+  bitmap_clear (&insn_bitmap);
+  bitmap_clear (&removed_optional_reload_pseudos);
+  return change_p;
+}
+
 /* Entry function for undoing inheritance/split transformation.	 Return true
    if we did any RTL change in this pass.  */
 bool
@@ -5335,5 +5495,6 @@ lra_undo_inheritance (void)
     lra_reg_info[regno].restore_regno = -1;
   EXECUTE_IF_SET_IN_BITMAP (&lra_split_regs, 0, regno, bi)
     lra_reg_info[regno].restore_regno = -1;
+  change_p = undo_optional_reloads () || change_p;
   return change_p;
 }
