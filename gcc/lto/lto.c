@@ -3020,17 +3020,36 @@ cmp_partitions_size (const void *a, const void *b)
 static int
 cmp_partitions_order (const void *a, const void *b)
 {
-  const struct ltrans_partition_def *pa
-     = *(struct ltrans_partition_def *const *)a;
-  const struct ltrans_partition_def *pb
-     = *(struct ltrans_partition_def *const *)b;
-  int ordera = -1, orderb = -1;
+const struct ltrans_partition_def *pa
+= *(struct ltrans_partition_def *const *)a;
+const struct ltrans_partition_def *pb
+= *(struct ltrans_partition_def *const *)b;
+int ordera = -1, orderb = -1;
 
-  if (lto_symtab_encoder_size (pa->encoder))
-    ordera = lto_symtab_encoder_deref (pa->encoder, 0)->symbol.order;
-  if (lto_symtab_encoder_size (pb->encoder))
-    orderb = lto_symtab_encoder_deref (pb->encoder, 0)->symbol.order;
-  return orderb - ordera;
+symtab_node nodea = (symtab_node)a;
+symtab_node nodeb = (symtab_node)b;
+
+struct cgraph_node *cnodea;
+struct cgraph_node *cnodeb;
+
+if ((cnodea = dyn_cast <cgraph_node> (nodea)) && (cnodeb = dyn_cast<cgraph_node> (nodeb)) &&
+(cnodea->tp_first_run || cnodeb->tp_first_run))
+{
+if (cnodea->tp_first_run && cnodeb->tp_first_run)
+return cnodea->tp_first_run - cnodeb->tp_first_run;
+else if(cnodea->tp_first_run)
+return -1;
+else if (cnodeb->tp_first_run)
+return 1;
+}
+
+if (lto_symtab_encoder_size (pa->encoder))
+ordera = lto_symtab_encoder_deref (pa->encoder, 0)->symbol.order;
+if (lto_symtab_encoder_size (pb->encoder))
+orderb = lto_symtab_encoder_deref (pb->encoder, 0)->symbol.order;
+
+
+return orderb - ordera;
 }
 
 /* Write all output files in WPA mode and the file with the list of
@@ -3082,9 +3101,14 @@ lto_wpa_write_files (void)
   /* Sort partitions by size so small ones are compiled last.
      FIXME: Even when not reordering we may want to output one list for parallel make
      and other for final link command.  */
+  /*
   ltrans_partitions.qsort (flag_toplevel_reorder
 			   ? cmp_partitions_size
 			   : cmp_partitions_order);
+  */
+
+  // ltrans_partitions.qsort (cmp_partitions_order);
+
   for (i = 0; i < n_sets; i++)
     {
       size_t len;

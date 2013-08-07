@@ -975,25 +975,6 @@ __gcov_merge_ior (gcov_type *counters, unsigned n_counters)
 #endif
 
 
-#ifdef L_gcov_merge_tp
-
-/* The profile merging function just takes last values written to file.  */
-
-void
-__gcov_merge_tp (gcov_type *counters, unsigned n_counters)
-{
-  unsigned int i;
-
-  for (i = 0; i < n_counters; i += 2)
-  {
-    counters[0] = gcov_read_counter();
-    counters[1] = gcov_read_counter();
-  }
-}
-
-#endif /* L_gcov_merge_add */
-
-
 #ifdef L_gcov_merge_single
 /* The profile merging function for choosing the most common value.
    It is given an array COUNTERS of N_COUNTERS old counters and it

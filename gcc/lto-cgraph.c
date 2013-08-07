@@ -467,7 +467,6 @@ lto_output_node (struct lto_simple_output_block *ob, struct cgraph_node *node,
   streamer_write_hwi_stream (ob->main_stream, node->tp_first_run); 
 
   bp = bitpack_create (ob->main_stream);
-  bp_pack_value (&bp, node->tp_not_called_once, 1);
   bp_pack_value (&bp, node->local.local, 1);
   bp_pack_value (&bp, node->symbol.externally_visible, 1);
   bp_pack_value (&bp, node->symbol.definition, 1);
@@ -1008,13 +1007,7 @@ input_node (struct lto_file_decl_data *file_data,
 
   node->tp_first_run = streamer_read_uhwi (ib);
 
-  /* TODO: remove tp_first_run */
-  // node->symbol.order = node->tp_first_run;
-
   bp = streamer_read_bitpack (ib);
-
-  /* Time profiler */
-  node->tp_not_called_once = bp_unpack_value (&bp, 1);
 
   input_overwrite_node (file_data, node, tag, &bp);
 

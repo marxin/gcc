@@ -1685,7 +1685,7 @@ expand_all_functions (void)
   struct cgraph_node *node;
   struct cgraph_node **order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
   struct cgraph_node *pf;
-  unsigned int expanded_func_count = 0, profiled_func_count = 0, total_profiled_func_count = 0;
+  unsigned int expanded_func_count = 0, profiled_func_count = 0;
   int order_pos, new_order_pos = 0;
   int i;
 
@@ -1713,17 +1713,14 @@ expand_all_functions (void)
      if(node->tp_first_run)
        profiled_func_count++;
 
-    fprintf (stderr, "FINAL:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
+    // fprintf (stderr, "FINAL:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
 	  node->process = 0;
 	  expand_function (node);
 	}
-  else
-    fprintf (stderr, "WTF: %s\n", cgraph_node_asm_name (node));
     }
 
-  fprintf (stderr, "expand_all_functions processed: %u/%u [%u/%u]\n",
-           profiled_func_count, expanded_func_count,
-           total_profiled_func_count, cgraph_n_nodes);
+  fprintf (stderr, "expand_all_functions processed: %u/%u\n",
+           profiled_func_count, expanded_func_count);
 
   cgraph_process_new_functions ();
 
@@ -1770,14 +1767,6 @@ output_in_order (void)
 
   max = symtab_order;
   nodes = XCNEWVEC (struct cgraph_order_sort, max);
-
-  unsigned int ordercount = 0;
-
-  FOR_EACH_DEFINED_FUNCTION (pf)
-    if (pf->tp_first_run)
-      ordercount++;
-
-  fprintf (stderr, "output_in_order called for: %u/%u\n", ordercount, cgraph_n_nodes);
 
   FOR_EACH_DEFINED_FUNCTION (pf)
     {
