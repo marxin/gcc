@@ -1564,8 +1564,6 @@ dump_cgraph_node (FILE *f, struct cgraph_node *node)
     fprintf (f, " only_called_at_exit");
   if (node->tm_clone)
     fprintf (f, " tm_clone");
-  if (node->tp_not_called_once)
-    fprintf (f, " not_called_once");
 
   fprintf (f, "\n");
 
