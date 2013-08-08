@@ -363,7 +363,8 @@ typedef unsigned HOST_WIDEST_INT gcov_type_unsigned;
 				 "__gcov_merge_delta",  \
 				 "__gcov_merge_single", \
 				 "__gcov_merge_add",	\
-				 "__gcov_merge_ior"}
+				 "__gcov_merge_ior",  \
+         "__gcov_merge_add"}
 
 /* Convert a counter index to a tag.  */
 #define GCOV_TAG_FOR_COUNTER(COUNT)				\

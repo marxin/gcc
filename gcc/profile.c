@@ -912,7 +912,6 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
           node = cgraph_get_node (hist->fun->decl);
 
           node->tp_first_run = hist->hvalue.counters[0];
-          node->tp_not_called_once = hist->hvalue.counters[1] > 0;
 
           fprintf (stderr, "SETTING: %u, %s\n", node->tp_first_run, cgraph_node_asm_name (node));
         }

@@ -1704,9 +1704,6 @@ expand_all_functions (void)
     {
       node = order[i];
 
-      if (node->tp_first_run)
-        total_profiled_func_count++;
-
       if (node->process)
 	{
      expanded_func_count++;
