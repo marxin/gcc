@@ -4544,7 +4544,9 @@ aapcs_vfp_allocate (CUMULATIVE_ARGS *pcum, enum machine_mode mode,
     if (((pcum->aapcs_vfp_regs_free >> regno) & mask) == mask)
       {
 	pcum->aapcs_vfp_reg_alloc = mask << regno;
-	if (mode == BLKmode || (mode == TImode && !TARGET_NEON))
+	if (mode == BLKmode
+	    || (mode == TImode && ! TARGET_NEON)
+	    || ! arm_hard_regno_mode_ok (FIRST_VFP_REGNUM + regno, mode))
 	  {
 	    int i;
 	    int rcount = pcum->aapcs_vfp_rcount;
@@ -14360,6 +14362,16 @@ thumb2_reorg (void)
 				   && IN_RANGE (INTVAL (op1), -7, 7))
 			    action = CONV;
 			}
+		      /* ADCS <Rd>, <Rn>  */
+		      else if (GET_CODE (XEXP (src, 0)) == PLUS
+			      && rtx_equal_p (XEXP (XEXP (src, 0), 0), dst)
+			      && low_register_operand (XEXP (XEXP (src, 0), 1),
+						       SImode)
+			      && COMPARISON_P (op1)
+			      && cc_register (XEXP (op1, 0), VOIDmode)
+			      && maybe_get_arm_condition_code (op1) == ARM_CS
+			      && XEXP (op1, 1) == const0_rtx)
+		        action = CONV;
 		      break;
 
 		    case MINUS:
