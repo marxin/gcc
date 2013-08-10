@@ -496,11 +496,14 @@ lto_balanced_map (void)
   free (postorder);
 
 
-  fprintf (stderr, "lto_balanced_map: sorting by tp_first_run!\n");
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, "Sorting by time profiler:\n");
+
   qsort (order, n_nodes, sizeof (struct cgraph_node *), node_cmp);
 
-  for(i = 0; i < n_nodes; i++)
-    fprintf (stderr, "lto_balanced_map: node:%s:%u\n", cgraph_node_asm_name (order[i]), order[i]->tp_first_run);
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    for(i = 0; i < n_nodes; i++)
+      fprintf (dump_file, "Balanced map symbol order:%s:%u\n", cgraph_node_asm_name (order[i]), order[i]->tp_first_run);
 
   if (!flag_toplevel_reorder)
     {

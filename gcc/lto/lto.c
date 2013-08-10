@@ -3053,13 +3053,9 @@ lto_wpa_write_files (void)
      and other for final link command.  */
   
   if (!flag_toplevel_reorder || !flag_profile_use)
-  {
     ltrans_partitions.qsort (flag_toplevel_reorder
 	  		   ? cmp_partitions_size
 		  	   : cmp_partitions_order);
-
-    gcc_assert (false);
-  }
 
   for (i = 0; i < n_sets; i++)
     {
