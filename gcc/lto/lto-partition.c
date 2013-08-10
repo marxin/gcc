@@ -399,10 +399,9 @@ node_cmp (const void *pa, const void *pb)
 
   if (a->tp_first_run && b->tp_first_run)
     return a->tp_first_run - b->tp_first_run;
-  else if(a->tp_first_run)
-    return -1;
-  else if (b->tp_first_run)
-    return 1;
+
+  if (a->tp_first_run || b->tp_first_run)
+    return b->tp_first_run - a->tp_first_run;
 
   return b->symbol.order - a->symbol.order;
 }
