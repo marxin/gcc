@@ -921,7 +921,7 @@ rename_statics (lto_symtab_encoder_t encoder, symtab_node node)
 	    || lto_symtab_encoder_lookup (encoder, s) != LCC_NOT_FOUND))
       {
         if (privatize_symbol_name (s))
-	  /* Re-start from beggining since we do not know how many symbols changed a name.  */
+	  /* Re-start from beginning since we do not know how many symbols changed a name.  */
 	  s = symtab_node_for_asm (name);
         else s = s->symbol.next_sharing_asm_name;
       }
