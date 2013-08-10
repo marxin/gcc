@@ -55,8 +55,6 @@ static GTY(()) tree ic_void_ptr_var;
 static GTY(()) tree ic_gcov_type_ptr_var;
 static GTY(()) tree ptr_void;
 
-static GTY(()) tree tp_counter_var;
-
 /* Do initialization work for the edge profiler.  */
 
 /* Add code:

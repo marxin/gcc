@@ -1731,19 +1731,18 @@ expand_all_functions (void)
      if(node->tp_first_run)
        profiled_func_count++;
 
-    // fprintf (stderr, "FINAL:%u:%s\n", node->tp_first_run, cgraph_node_asm_name (node));
 	  node->process = 0;
 	  expand_function (node);
 	}
     }
 
-  fprintf (stderr, "expand_all_functions processed: %u/%u\n",
-           profiled_func_count, expanded_func_count);
+  if (cgraph_dump_file)
+    fprintf (cgraph_dump_file, "Expanded functions with time profile:%u/%u\n",
+             profiled_func_count, expanded_func_count);
 
   cgraph_process_new_functions ();
 
   free (order);
-
 }
 
 /* This is used to sort the node types by the cgraph order number.  */

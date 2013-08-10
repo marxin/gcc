@@ -871,7 +871,7 @@ may_need_named_section_p (lto_symtab_encoder_t encoder, symtab_node node)
    of the same name in partition ENCODER (or in whole compilation unit if
    ENCODER is NULL) and if so, mangle the statics.  Always mangle all
    conflicting statics, so we reduce changes of silently miscompiling
-   asm statemnets refering to them by symbol name.  */
+   asm statements refering to them by symbol name.  */
 
 static void
 rename_statics (lto_symtab_encoder_t encoder, symtab_node node)

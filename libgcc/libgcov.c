@@ -1180,7 +1180,7 @@ __gcov_time_profiler (gcov_type* counters)
     counters[1] = 1;
 
   /* counters[0] indicates a first visit of the function.  */
-  if (counters[0] == 0)
+  if (!counters[0])
     counters[0] = function_counter++;
 }
 #endif
