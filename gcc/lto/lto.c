@@ -3052,7 +3052,7 @@ lto_wpa_write_files (void)
      FIXME: Even when not reordering we may want to output one list for parallel make
      and other for final link command.  */
   
-  if (!flag_toplevel_reorder || !flag_profile_use)
+  if (!flag_profile_reorder_functions || !flag_profile_use)
     ltrans_partitions.qsort (flag_toplevel_reorder
 	  		   ? cmp_partitions_size
 		  	   : cmp_partitions_order);

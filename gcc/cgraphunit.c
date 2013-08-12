@@ -1719,7 +1719,8 @@ expand_all_functions (void)
     if (order[i]->process)
       order[new_order_pos++] = order[i];
 
-  qsort (order, new_order_pos, sizeof (struct cgraph_node *), node_cmp);
+  if (flag_profile_reorder_functions && in_lto_p)
+    qsort (order, new_order_pos, sizeof (struct cgraph_node *), node_cmp);
 
   for (i = new_order_pos - 1; i >= 0; i--)
     {
@@ -1736,7 +1737,7 @@ expand_all_functions (void)
 	}
     }
 
-  if (cgraph_dump_file)
+  if (cgraph_dump_file && flag_profile_reorder_functions && in_lto_p)
     fprintf (cgraph_dump_file, "Expanded functions with time profile:%u/%u\n",
              profiled_func_count, expanded_func_count);
 

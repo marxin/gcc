@@ -1601,6 +1601,8 @@ common_handle_option (struct gcc_options *opts,
 	opts->x_flag_vect_cost_model = value;
       if (!opts_set->x_flag_tree_loop_distribute_patterns)
 	opts->x_flag_tree_loop_distribute_patterns = value;
+      if (!opts_set->x_flag_profile_reorder_functions)
+	opts->x_flag_profile_reorder_functions = value;
       break;
 
     case OPT_fprofile_generate_:
@@ -1614,6 +1616,8 @@ common_handle_option (struct gcc_options *opts,
 	opts->x_flag_profile_values = value;
       if (!opts_set->x_flag_inline_functions)
 	opts->x_flag_inline_functions = value;
+      if (!opts_set->x_flag_profile_reorder_functions)
+	opts->x_flag_profile_reorder_functions = value;
       /* FIXME: Instrumentation we insert makes ipa-reference bitmaps
 	 quadratic.  Disable the pass until better memory representation
 	 is done.  */

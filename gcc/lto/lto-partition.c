@@ -397,11 +397,8 @@ node_cmp (const void *pa, const void *pb)
   const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
   const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
 
-  if (a->tp_first_run && b->tp_first_run)
+  if (flag_profile_reorder_functions)
     return a->tp_first_run - b->tp_first_run;
-
-  if (a->tp_first_run || b->tp_first_run)
-    return b->tp_first_run - a->tp_first_run;
 
   return b->symbol.order - a->symbol.order;
 }
@@ -495,13 +492,9 @@ lto_balanced_map (void)
     }
   free (postorder);
 
-
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "Sorting by time profiler:\n");
-
   qsort (order, n_nodes, sizeof (struct cgraph_node *), node_cmp);
 
-  if (cgraph_dump_file)
+  if (cgraph_dump_file && flag_profile_reorder_functions)
     for(i = 0; i < n_nodes; i++)
       fprintf (cgraph_dump_file, "Balanced map symbol order:%s:%u\n", cgraph_node_asm_name (order[i]), order[i]->tp_first_run);
 
