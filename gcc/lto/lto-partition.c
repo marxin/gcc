@@ -398,7 +398,13 @@ node_cmp (const void *pa, const void *pb)
   const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
 
   if (flag_profile_reorder_functions)
-    return a->tp_first_run - b->tp_first_run;
+  {
+    if (a->tp_first_run && b->tp_first_run)
+      return a->tp_first_run - b->tp_first_run;
+
+    if (a->tp_first_run || b->tp_first_run)
+      return b->tp_first_run - a->tp_first_run;
+  }
 
   return b->symbol.order - a->symbol.order;
 }

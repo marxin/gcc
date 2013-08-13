@@ -1737,6 +1737,10 @@ expand_all_functions (void)
 	}
     }
 
+    // TODO:Martin
+    fprintf (stderr, "Expanded functions with time profile:%u/%u\n",
+             profiled_func_count, expanded_func_count);
+
   if (cgraph_dump_file && flag_profile_reorder_functions && in_lto_p)
     fprintf (cgraph_dump_file, "Expanded functions with time profile:%u/%u\n",
              profiled_func_count, expanded_func_count);
