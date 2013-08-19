@@ -886,7 +886,10 @@ cont:
 	  new_argv[i++] = NULL;
 	  pex = collect_execute (CONST_CAST (char **, new_argv));
 	  collect_wait (new_argv[0], pex);
-	  maybe_unlink_file (makefile);
+
+    // TODO: Martin
+	  //maybe_unlink_file (makefile);
+    fprintf (stderr, "makefile: %s\n", makefile);
 	  makefile = NULL;
 	  for (i = 0; i < nr; ++i)
 	    maybe_unlink_file (input_names[i]);
