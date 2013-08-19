@@ -1,3 +1,122 @@
+2013-08-19  Peter Bergner  <bergner@vnet.ibm.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	* builtins.def (BUILT_IN_FABSD32): New DFP ABS builtin.
+	(BUILT_IN_FABSD64): Likewise.
+	(BUILT_IN_FABSD128): Likewise.
+	* builtins.c (expand_builtin): Add support for new DFP ABS builtins.
+	(fold_builtin_1): Likewise.
+	* config/rs6000/dfp.md (*negtd2_fpr): Handle non-overlapping destination
+	and source operands.
+	(*abstd2_fpr): Likewise.
+	(*nabstd2_fpr): Likewise.
+
+2013-08-19  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* config/mips/mips.c (mips_adjust_insn_length): Add checks for
+	JUMP_P and INSN_P.
+
+2013-08-19  Aldy Hernandez  <aldyh@redhat.com>
+
+	* doc/invoke.texi (-fcilkplus): Clarify that implementation is
+	incomplete.
+
+2013-08-19  Alexander Ivchenko  <alexander.ivchenko@intel.com>
+
+	* target.def (TARGET_LIBC_HAS_FUNCTION): New target hook.
+	* builtins.c (default_libc_has_function): New.
+	(gnu_libc_has_function): Ditto.
+	(no_c99_libc_has_function): Ditto.
+	(expand_builtin_cexpi): Using new target hook TARGET_LIBC_HAS_FUNCTION
+	instead of TARGET_HAS_SINCOS and TARGET_C99_FUNCTIONS.
+	(fold_builtin_sincos): Likewise.
+	(fold_builtin_cexp): Likewise.
+	* builtins.def (DEF_C94_BUILTIN): Likewise.
+	(DEF_C99_BUILTIN): Likewise.
+	(DEF_C99_C90RES_BUILTIN): Likewise.
+	(DEF_C99_COMPL_BUILTIN): New define. Change all complex c99 builtin
+	definitions to using this define.
+	* config/darwin-protos.h (darwin_libc_has_function): New.
+	* config/darwin.c: (darwin_libc_has_function: Ditto.
+	* config/alpha/linux.h: Remove TARGET_C99_FUNCTIONS and
+	TARGET_HAS_SINCOS. Redefine TARGET_LIBC_HAS_FUNCTION.
+	* config/darwin.h: Ditto.
+	* config/elfos.h: Ditto.
+	* config/freebsd.h: Ditto.
+	* config/i386/cygming.h: Ditto.
+	* config/i386/djgpp.h: Ditto.
+	* config/i386/i386-interix.h: Ditto.
+	* config/microblaze/microblaze.h: Ditto.
+	* config/mmix/mmix.h: Ditto.
+	* config/gnu-user.h: Ditto.
+	* config/ia64/hpux.h: Ditto.
+	* config/pa/pa-hpux.h: Ditto.
+	* config/pdp11/pdp11.h: Ditto.
+	* config/picochip/picochip.h: Ditto.
+	* config/linux.h: Ditto.
+	* config/netbsd.h: Ditto.
+	* config/openbsd.h: Ditto.
+	* config/rs6000/aix43.h: Ditto.
+	* config/rs6000/aix51.h: Ditto.
+	* config/rs6000/aix52.h: Ditto.
+	* config/rs6000/aix53.h: Ditto.
+	* config/rs6000/aix61.h: Ditto.
+	* config/rs6000/darwin.h: Ditto.
+	* config/rs6000/linux.h: Ditto.
+	* config/rs6000/linux64.h: Ditto.
+	* config/s390/tpf.h: Ditto.
+	* config/sol2-10.h: Ditto.
+	* config/sol2.h: Ditto.
+	* config/vms/vms.h: Ditto.
+	* config/vxworks.h: Ditto.
+	* config/linux-android.c (linux_android_libc_has_function):
+	New linux-specific implementation of TARGET_LIBC_HAS_FUNCTION.
+	* config/linux-protos.h (linux_android_libc_has_function):
+	New declaration.
+	* config/i386/i386.c (ix86_libc_has_function): New.
+	* config/i386/i386-protos.h
+	(ix86_libc_has_function): New declaration.
+	* config/i386/i386.md
+	("isinfxf2"): Change condition for TARGET_LIBC_HAS_FUNCTION.
+	("isinf<mode>2): Likewise.
+	* convert.c (convert_to_integer): Using new target hook
+	TARGET_LIBC_HAS_FUNCTION istead of TARGET_HAS_SINCOS and
+	TARGET_C99_FUNCTIONS.
+	* fortran/f95-lang.c (gfc_init_builtin_functions): Ditto.
+	* tree-ssa-math-opts.c (execute_cse_sincos): Ditto.
+	* coretypes.h (function_class): New enum for different
+	classes of functions.
+	* defaults.h: Remove TARGET_C99_FUNCTIONS and TARGET_HAS_SINCOS.
+	* doc/tm.texi.in (TARGET_C99_FUNCTIONS): Remove documentation.
+	(TARGET_HAS_SINCOS): Likewise.
+	(TARGET_LIBC_HAS_FUNCTION): New.
+	* doc/tm.texi: Regenerated.
+	* targhooks.h (default_libc_has_function): New declaration.
+	(no_c99_libc_has_function): Ditto.
+	(gnu_libc_has_function): Ditto.
+	* system.h: Add the poisoning of TARGET_C99_FUNCTIONS
+	and TARGET_HAS_SINCOS.
+
+2013-08-18  Jan Hubicka  <jh@suse.cz>
+
+	* Makeifle-in (ipa-devirt.o): New.
+	(GTFILES): Add ipa-utils.h and ipa-devirt.c
+	* cgraphunit.c (decide_is_symbol_needed): Do not care about virtuals.
+	(analyze_functions): Look into possible targets of polymorphic call.
+	* dumpfile.c (dump_files): Add type-inheritance dump.
+	* dumpfile.h (TDI_inheritance): New.
+	* ipa-devirt.c: New file.
+	* ipa-utils.h (odr_type_d): Forward declare.
+	(odr_type): New type.
+	(build_type_inheritance_graph): Declare.
+	(possible_polymorphic_call_targets): Declare and introduce inline
+	variant when only edge is pased.
+	(dump_possible_polymorphic_call_targets): Likewise.
+	* timevar.def (TV_IPA_INHERITANCE, TV_IPA_VIRTUAL_CALL): New.
+	* tree.c (type_in_anonymous_namespace_p): Break out from ...
+	(types_same_for_odr): ... here.
+	* tree.h (type_in_anonymous_namespace_p): Declare.
+
 2013-08-18  Jakub Jelinek  <jakub@redhat.com>
 
 	PR tree-optimization/58006
@@ -12741,21 +12860,21 @@
 
 2013-03-27  Alexander Ivchenko  <alexander.ivchenko@intel.com>
 
-	* target.def (TARGET_HAS_IFUNC_P): New target hook.
-	* doc/tm.texi.in (TARGET_HAS_IFUNC_P): New.
-	* doc/tm.texi: Regenerate.
-	* targhooks.h (default_has_ifunc_p): New.
-	* targhooks.c (default_has_ifunc_p): Ditto.
-	* config/linux-protos.h: New file.
-	* config/linux-android.h (TARGET_HAS_IFUNC_P): Using version of
+	* gcc/target.def (TARGET_HAS_IFUNC_P): New target hook.
+	* gcc/doc/tm.texi.in (TARGET_HAS_IFUNC_P): New.
+	* gcc/doc/tm.texi: Regenerate.
+	* gcc/targhooks.h (default_has_ifunc_p): New.
+	* gcc/targhooks.c (default_has_ifunc_p): Ditto.
+	* gcc/config/linux-protos.h: New file.
+	* gcc/config/linux-android.h (TARGET_HAS_IFUNC_P): Using version of
 	this hook for linux which disables support of indirect functions in
 	android.
-	* config/linux-android.c: New file.
-	* config/t-linux-android.c: Ditto.
-	* config.gcc: Added new object file linux-android.o.
-	* config/i386/i386.c (ix86_get_function_versions_dispatcher):
+	* gcc/config/linux-android.c: New file.
+	* gcc/config/t-linux-android.c: Ditto.
+	* gcc/config.gcc: Added new object file linux-android.o.
+	* gcc/config/i386/i386.c (ix86_get_function_versions_dispatcher):
 	Using TARGET_HAS_IFUNC hook instead of HAVE_GNU_INDIRECT_FUNCTION.
-	* varasm.c (do_assemble_alias): Likewise.
+	* gcc/varasm.c (do_assemble_alias): Likewise.
 	* configure.ac: Define HAVE_GNU_INDIRECT_FUNCTION as zero if the target
 	doesn't support indirect functions.
 	* configure: Regenerate.
