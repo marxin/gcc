@@ -12798,6 +12798,7 @@ fold_binary_loc (location_t loc,
       /* If this is an equality comparison of the address of two non-weak,
 	 unaliased symbols neither of which are extern (since we do not
 	 have access to attributes for externs), then we know the result.  */
+   /*
       if (TREE_CODE (arg0) == ADDR_EXPR
 	  && VAR_OR_FUNCTION_DECL_P (TREE_OPERAND (arg0, 0))
 	  && ! DECL_WEAK (TREE_OPERAND (arg0, 0))
@@ -12810,7 +12811,7 @@ fold_binary_loc (location_t loc,
 	  && ! lookup_attribute ("alias",
 				 DECL_ATTRIBUTES (TREE_OPERAND (arg1, 0)))
 	  && ! DECL_EXTERNAL (TREE_OPERAND (arg1, 0)))
-	{
+	{*/
 	  /* We know that we're looking at the address of two
 	     non-weak, unaliased, static _DECL nodes.
 
@@ -12822,11 +12823,11 @@ fold_binary_loc (location_t loc,
 	     C equality test.  It can in fact return false for two
 	     objects which would test as equal using the C equality
 	     operator.  */
-	  bool equal = TREE_OPERAND (arg0, 0) == TREE_OPERAND (arg1, 0);
+	  /*bool equal = TREE_OPERAND (arg0, 0) == TREE_OPERAND (arg1, 0);
 	  return constant_boolean_node (equal
 				        ? code == EQ_EXPR : code != EQ_EXPR,
 				        type);
-	}
+	}*/
 
       /* If this is an EQ or NE comparison of a constant with a PLUS_EXPR or
 	 a MINUS_EXPR of a constant, we can convert it into a comparison with

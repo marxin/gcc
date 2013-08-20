@@ -4903,6 +4903,7 @@ modify_function (struct cgraph_node *node, ipa_parm_adjustment_vec adjustments)
   sra_ipa_reset_debug_stmts (adjustments);
   convert_callers (new_node, node->symbol.decl, adjustments);
   cgraph_make_node_local (new_node);
+
   return cfg_changed;
 }
 
