@@ -1093,6 +1093,7 @@ cgraph_turn_edge_to_speculative (struct cgraph_edge *e,
 			      IPA_REF_ADDR, e->call_stmt);
   ref->lto_stmt_uid = e->lto_stmt_uid;
   ref->speculative = e->speculative;
+  n2->symbol.address_taken = true;
   return e2;
 }
 
