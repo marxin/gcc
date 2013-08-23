@@ -1149,6 +1149,19 @@ cgraph_speculative_call_info (struct cgraph_edge *e,
 	reference = ref;
 	break;
       }
+
+  if (!reference)
+  {
+    fprintf (stderr, "CALLER\n");
+    dump_cgraph_node (stderr, e->caller); 
+    fprintf (stderr, "CALLEE\n");
+    dump_cgraph_node (stderr, e->callee); 
+
+    for (i = 0; ipa_ref_list_reference_iterate (&e->caller->symbol.ref_list, i, ref); i++)
+      fprintf (stderr, "xxx: %u\n", i);
+  }
+
+  gcc_assert (reference);
 }
 
 /* Redirect callee of E to N.  The function does not update underlying
