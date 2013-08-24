@@ -1,3 +1,71 @@
+2013-08-23  Gabriel Dos Reis  <gdr@integrable-solutiobs.net>
+
+	* cp-objcp-common.c (cxx_initialize_diagnostics): Call a
+	destructor for the early printer.
+	* error.c (type_to_string): Use pp_buffer.
+
+2013-08-22  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/56380
+	* class.c (check_field_decls): Check for const mutable and const
+	reference data members.
+
+2013-08-22  Gabriel Dos Reis  <gdr@integrable-solutions.net>
+
+	* error.c (init_error): Remove calls to pp_construct and
+	pp_cxx_pretty_printer_init.  Initialize cxx_pp with placement-new.
+	* cxx-pretty-print.h (cxx_pretty_printer::cxx_pretty_printer): Declare.
+	(cxx_pretty_printer_init): Remove.
+	* cxx-pretty-print.c (cxx_pretty_printer::cxx_pretty_printer):
+	Rename from cxx_pretty_printer_init.  Adjust.
+	* cp-objcp-common.c (cxx_initialize_diagnostics): Simplify
+	initialization of C++ diagnostics pretty printer.
+
+2013-08-21  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* call.c (build_new_method_call_1): Use INDIRECT_REF_P.
+	* cp-tree.h (REFERENCE_REF_P): Likewise.
+	* semantics.c (finish_offsetof): Likewise.
+
+2013-08-21  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/56130
+	* semantics.c (finish_id_expression): Handle deprecated references.
+
+2013-08-20  Jason Merrill  <jason@redhat.com>
+
+	PR c++/58119
+	* cvt.c (build_expr_type_conversion): Don't complain about a
+	template that can't match the desired type category.
+
+2013-08-20  Gabriel Dos Reis  <gdr@integrable-solutions.net>
+
+	* error.c (pp_ggc_formatted_text): New.
+	(type_as_string): Use it in lieu of pp_formatted_text.
+	(type_as_string_translate): Likewise.
+	(expr_as_string): Likewise.
+	(decl_as_string): Likewise.
+	(decl_as_string_translate): Likewise.
+	(lang_decl_name): Likewise.
+	(decl_to_string): Likewise.
+	(expr_to_string): Likewise.
+	(fndecl_to_string): Likewise.
+	(parm_to_string): Likewise.
+	(type_to_string): Likewise.
+	(args_to_string): Likewise.
+	(subst_to_string): Likewise.
+
+2013-08-19  Balaji V. Iyer  <balaji.v.iyer@intel.com>
+
+	PR c/57490
+	* cp-array-notation.c (cp_expand_cond_array_notations): Added a
+	check for truth values.
+	(expand_array_notation_exprs): Added truth values case.  Removed an
+	unwanted else.  Added for-loop to walk through subtrees in default
+	case.
+	* call.c (build_cxx_call): Inherited the type of the array notation for
+	certain built-in array notation functions.
+
 2013-08-19  Paolo Carlini  <paolo.carlini@oracle.com>
 
 	* parser.c (cp_parser_lambda_introducer, cp_parser_decltype_expr):
