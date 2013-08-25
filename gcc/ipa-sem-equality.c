@@ -2455,22 +2455,39 @@ gate_sem_equality (void)
   return flag_ipa_sem_equality;
 }
 
-struct simple_ipa_opt_pass pass_ipa_sem_equality =
+namespace {
+
+const pass_data pass_data_ipa_sem_equality =
 {
- {
   SIMPLE_IPA_PASS,
-  "sem-equality",         /* name */
-  OPTGROUP_IPA,           /* optinfo_flags */
-  gate_sem_equality,      /* gate */
-  semantic_equality,      /* execute */
-  NULL,                   /* sub */
-  NULL,                   /* next */
-  0,                      /* static_pass_number */
-  TV_IPA_SEM_EQUALITY,    /* tv_id */
-  0,                      /* properties_required */
-  0,                      /* properties_provided */
-  0,                      /* properties_destroyed */
-  0,                      /* todo_flags_start */
-  TODO_update_ssa         /* todo_flags_finish */
- }
+  "sem-equality",           /* name */
+  OPTGROUP_IPA,             /* optinfo_flags */
+  true,                     /* has_gate */
+  true,                     /* has_execute */
+  TV_IPA_SEM_EQUALITY,      /* tv_id */
+  0,                        /* properties_required */
+  0,                        /* properties_provided */
+  0,                        /* properties_destroyed */
+  0,                        /* todo_flags_start */
+  0,                        /* todo_flags_finish */
 };
+
+class pass_ipa_sem_equality : public simple_ipa_opt_pass
+{
+public:
+  pass_ipa_sem_equality(gcc::context *ctxt)
+    : simple_ipa_opt_pass(pass_data_ipa_sem_equality, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  bool gate () { return gate_sem_equality (); }
+  unsigned int execute () { return semantic_equality(); }
+}; // class pass_ipa_sem_equality
+
+} // anon namespace
+
+simple_ipa_opt_pass *
+make_pass_ipa_sem_equality (gcc::context *ctxt)
+{
+  return new pass_ipa_sem_equality (ctxt);
+}

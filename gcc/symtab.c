@@ -1098,8 +1098,5 @@ symtab_nonoverwritable_alias (symtab_node node)
   symtab_resolve_alias (new_node, node);  
   return new_node;
 }
-<<<<<<< HEAD
 
-=======
->>>>>>> parent/master
 #include "gt-symtab.h"

@@ -572,12 +572,12 @@ coverage_compute_profile_id (struct cgraph_node *n)
    but the compiler won't detect the change and use the wrong profile data.  */
 
 unsigned
-coverage_compute_cfg_checksum (void)
+coverage_compute_cfg_checksum (struct function *fn)
 {
   basic_block bb;
-  unsigned chksum = n_basic_blocks;
+  unsigned chksum = n_basic_blocks_for_function (fn);
 
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, fn)
     {
       edge e;
       edge_iterator ei;
