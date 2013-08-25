@@ -194,6 +194,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "except.h"
 #include "cfgloop.h"
 #include "regset.h"     /* FIXME: For reg_obstack.  */
+#include "context.h"
+#include "pass_manager.h"
 
 /* Queue of cgraph nodes scheduled to be added into cgraph.  This is a
    secondary queue used during optimization to accommodate passes that
@@ -232,10 +234,6 @@ decide_is_symbol_needed (symtab_node node)
 
   if (!node->symbol.definition)
     return false;
-
-  /* Devirtualization may access these.  */
-  if (DECL_VIRTUAL_P (decl) && optimize)
-    return true;
 
   if (DECL_EXTERNAL (decl))
     return false;
@@ -321,9 +319,9 @@ cgraph_process_new_functions (void)
 	  if (!node->symbol.analyzed)
 	    analyze_function (node);
 	  push_cfun (DECL_STRUCT_FUNCTION (fndecl));
-	  if ((cgraph_state == CGRAPH_STATE_IPA_SSA
-	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl))))
-	    execute_pass_list (pass_early_local_passes.pass.sub);
+	  if (cgraph_state == CGRAPH_STATE_IPA_SSA
+	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl)))
+	    g->get_passes ()->execute_early_local_passes ();
 	  else if (inline_summary_vec != NULL)
 	    compute_inline_parameters (node, true);
 	  free_dominance_info (CDI_POST_DOMINATORS);
@@ -402,17 +400,20 @@ referred_to_p (symtab_node node)
 }
 
 /* DECL has been parsed.  Take it, queue it, compile it at the whim of the
-   logic in effect.  If NESTED is true, then our caller cannot stand to have
+   logic in effect.  If NO_COLLECT is true, then our caller cannot stand to have
    the garbage collector run at the moment.  We would need to either create
    a new GC context, or just not compile right now.  */
 
 void
-cgraph_finalize_function (tree decl, bool nested)
+cgraph_finalize_function (tree decl, bool no_collect)
 {
   struct cgraph_node *node = cgraph_get_create_node (decl);
 
   if (node->symbol.definition)
     {
+      /* Nested functions should only be defined once.  */
+      gcc_assert (!DECL_CONTEXT (decl)
+		  || TREE_CODE (DECL_CONTEXT (decl)) !=	FUNCTION_DECL);
       cgraph_reset_node (node);
       node->local.redefined_extern_inline = true;
     }
@@ -451,7 +452,7 @@ cgraph_finalize_function (tree decl, bool nested)
   if (warn_unused_parameter)
     do_warn_unused_parameter (decl);
 
-  if (!nested)
+  if (!no_collect)
     ggc_collect ();
 
   if (cgraph_state == CGRAPH_STATE_CONSTRUCTION
@@ -475,6 +476,7 @@ cgraph_finalize_function (tree decl, bool nested)
 void
 cgraph_add_new_function (tree fndecl, bool lowered)
 {
+  gcc::pass_manager *passes = g->get_passes ();
   struct cgraph_node *node;
   switch (cgraph_state)
     {
@@ -505,8 +507,8 @@ cgraph_add_new_function (tree fndecl, bool lowered)
 	    push_cfun (DECL_STRUCT_FUNCTION (fndecl));
 	    gimple_register_cfg_hooks ();
 	    bitmap_obstack_initialize (NULL);
-	    execute_pass_list (all_lowering_passes);
-	    execute_pass_list (pass_early_local_passes.pass.sub);
+	    execute_pass_list (passes->all_lowering_passes);
+	    passes->execute_early_local_passes ();
 	    bitmap_obstack_release (NULL);
 	    pop_cfun ();
 
@@ -531,7 +533,7 @@ cgraph_add_new_function (tree fndecl, bool lowered)
 	gimple_register_cfg_hooks ();
 	bitmap_obstack_initialize (NULL);
 	if (!gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl)))
-	  execute_pass_list (pass_early_local_passes.pass.sub);
+	  g->get_passes ()->execute_early_local_passes ();
 	bitmap_obstack_release (NULL);
 	pop_cfun ();
 	expand_function (node);
@@ -637,7 +639,7 @@ analyze_function (struct cgraph_node *node)
 
 	  gimple_register_cfg_hooks ();
 	  bitmap_obstack_initialize (NULL);
-	  execute_pass_list (all_lowering_passes);
+	  execute_pass_list (g->get_passes ()->all_lowering_passes);
 	  free_dominance_info (CDI_POST_DOMINATORS);
 	  free_dominance_info (CDI_DOMINATORS);
 	  compact_blocks ();
@@ -832,6 +834,7 @@ analyze_functions (void)
   struct cgraph_node *first_handled = first_analyzed;
   static struct varpool_node *first_analyzed_var;
   struct varpool_node *first_handled_var = first_analyzed_var;
+  struct pointer_set_t *reachable_call_targets = pointer_set_create ();
 
   symtab_node node, next;
   int i;
@@ -847,6 +850,8 @@ analyze_functions (void)
     FOR_EACH_SYMBOL (node)
       if (node->symbol.cpp_implicit_alias)
 	  fixup_same_cpp_alias_visibility (node, symtab_alias_target (node));
+  if (optimize && flag_devirtualize)
+    build_type_inheritance_graph ();
 
   /* Analysis adds static variables that in turn adds references to new functions.
      So we need to iterate the process until it stabilize.  */
@@ -869,6 +874,8 @@ analyze_functions (void)
 	      changed = true;
 	      if (cgraph_dump_file)
 		fprintf (cgraph_dump_file, " %s", symtab_node_asm_name (node));
+	      if (!changed && cgraph_dump_file)
+		fprintf (cgraph_dump_file, "\n");
 	    }
 	  if (node == (symtab_node)first_analyzed
 	      || node == (symtab_node)first_analyzed_var)
@@ -913,6 +920,76 @@ analyze_functions (void)
 	      for (edge = cnode->callees; edge; edge = edge->next_callee)
 		if (edge->callee->symbol.definition)
 		   enqueue_node ((symtab_node)edge->callee);
+	      if (optimize && flag_devirtualize)
+		{
+		  struct cgraph_edge *next;
+	          for (edge = cnode->indirect_calls; edge; edge = next)
+		    {
+		      next = edge->next_callee;
+		      if (edge->indirect_info->polymorphic)
+			{
+			  unsigned int i;
+			  void *cache_token;
+			  bool final;
+			  vec <cgraph_node *>targets
+			    = possible_polymorphic_call_targets
+				(edge, &final, &cache_token);
+
+			  if (!pointer_set_insert (reachable_call_targets,
+						   cache_token))
+			    {
+			      if (cgraph_dump_file)
+				dump_possible_polymorphic_call_targets 
+				  (cgraph_dump_file, edge);
+
+			      for (i = 0; i < targets.length(); i++)
+				{
+				  /* Do not bother to mark virtual methods in anonymous namespace;
+				     either we will find use of virtual table defining it, or it is
+				     unused.  */
+				  if (targets[i]->symbol.definition
+				      && TREE_CODE
+					  (TREE_TYPE (targets[i]->symbol.decl))
+					   == METHOD_TYPE
+				      && !type_in_anonymous_namespace_p
+					   (method_class_type
+					     (TREE_TYPE (targets[i]->symbol.decl))))
+				  enqueue_node ((symtab_node) targets[i]);
+				}
+			    }
+
+			  /* Very trivial devirtualization; when the type is
+			     final or anonymous (so we know all its derivation)
+			     and there is only one possible virtual call target,
+			     make the edge direct.  */
+			  if (final)
+			    {
+			      gcc_assert (targets.length());
+			      if (targets.length() == 1)
+				{
+				  if (cgraph_dump_file)
+				    {
+				      fprintf (cgraph_dump_file,
+					       "Devirtualizing call: ");
+				      print_gimple_stmt (cgraph_dump_file,
+							 edge->call_stmt, 0,
+							 TDF_SLIM);
+				    }
+				  cgraph_make_edge_direct (edge, targets[0]);
+				  cgraph_redirect_edge_call_stmt_to_callee (edge);
+				  if (cgraph_dump_file)
+				    {
+				      fprintf (cgraph_dump_file,
+					       "Devirtualized as: ");
+				      print_gimple_stmt (cgraph_dump_file,
+							 edge->call_stmt, 0,
+							 TDF_SLIM);
+				    }
+				}
+			    }
+			}
+		    }
+		}
 
 	      /* If decl is a clone of an abstract function,
 	      mark that abstract function so that we don't release its body.
@@ -922,7 +999,7 @@ analyze_functions (void)
 		{
 		  struct cgraph_node *origin_node
 	    	  = cgraph_get_node (DECL_ABSTRACT_ORIGIN (decl));
-		  origin_node->abstract_and_needed = true;
+		  origin_node->used_as_abstract_origin = true;
 		}
 	    }
 	  else
@@ -946,6 +1023,8 @@ analyze_functions (void)
           cgraph_process_new_functions ();
 	}
     }
+  if (optimize && flag_devirtualize)
+    update_type_inheritance_graph ();
 
   /* Collect entry points to the unit.  */
   if (cgraph_dump_file)
@@ -993,12 +1072,13 @@ analyze_functions (void)
       dump_symtab (cgraph_dump_file);
     }
   bitmap_obstack_release (NULL);
+  pointer_set_destroy (reachable_call_targets);
   ggc_collect ();
 }
 
 /* Translate the ugly representation of aliases as alias pairs into nice
    representation in callgraph.  We don't handle all cases yet,
-   unforutnately.  */
+   unfortunately.  */
 
 static void
 handle_alias_pairs (void)
@@ -1010,10 +1090,11 @@ handle_alias_pairs (void)
     {
       symtab_node target_node = symtab_node_for_asm (p->target);
 
-      /* Weakrefs with target not defined in current unit are easy to handle; they
-	 behave just as external variables except we need to note the alias flag
-	 to later output the weakref pseudo op into asm file.  */
-      if (!target_node && lookup_attribute ("weakref", DECL_ATTRIBUTES (p->decl)) != NULL)
+      /* Weakrefs with target not defined in current unit are easy to handle:
+	 they behave just as external variables except we need to note the
+	 alias flag to later output the weakref pseudo op into asm file.  */
+      if (!target_node
+	  && lookup_attribute ("weakref", DECL_ATTRIBUTES (p->decl)) != NULL)
 	{
 	  symtab_node node = symtab_get_node (p->decl);
 	  if (node)
@@ -1028,6 +1109,9 @@ handle_alias_pairs (void)
       else if (!target_node)
 	{
 	  error ("%q+D aliased to undefined symbol %qE", p->decl, p->target);
+	  symtab_node node = symtab_get_node (p->decl);
+	  if (node)
+	    node->symbol.alias = false;
 	  alias_pairs->unordered_remove (i);
 	  continue;
 	}
@@ -1575,6 +1659,7 @@ expand_function (struct cgraph_node *node)
   announce_function (decl);
   node->process = 0;
   gcc_assert (node->lowered);
+  cgraph_get_body (node);
 
   /* Generate RTL for the body of DECL.  */
 
@@ -1602,7 +1687,7 @@ expand_function (struct cgraph_node *node)
   /* Signal the start of passes.  */
   invoke_plugin_callbacks (PLUGIN_ALL_PASSES_START, NULL);
 
-  execute_pass_list (all_passes);
+  execute_pass_list (g->get_passes ()->all_passes);
 
   /* Signal the end of passes.  */
   invoke_plugin_callbacks (PLUGIN_ALL_PASSES_END, NULL);
@@ -1670,6 +1755,7 @@ expand_function (struct cgraph_node *node)
   /* Eliminate all call edges.  This is important so the GIMPLE_CALL no longer
      points to the dead function body.  */
   cgraph_node_remove_callees (node);
+  ipa_remove_all_references (&node->symbol.ref_list);
 }
 
 
@@ -1821,6 +1907,8 @@ output_in_order (void)
 static void
 ipa_passes (void)
 {
+  gcc::pass_manager *passes = g->get_passes ();
+
   set_cfun (NULL);
   current_function_decl = NULL;
   gimple_register_cfg_hooks ();
@@ -1830,7 +1918,7 @@ ipa_passes (void)
 
   if (!in_lto_p)
     {
-      execute_ipa_pass_list (all_small_ipa_passes);
+      execute_ipa_pass_list (passes->all_small_ipa_passes);
       if (seen_error ())
 	return;
     }
@@ -1857,14 +1945,15 @@ ipa_passes (void)
       cgraph_process_new_functions ();
 
       execute_ipa_summary_passes
-	((struct ipa_opt_pass_d *) all_regular_ipa_passes);
+	((struct ipa_opt_pass_d *) passes->all_regular_ipa_passes);
     }
 
   /* Some targets need to handle LTO assembler output specially.  */
   if (flag_generate_lto)
     targetm.asm_out.lto_start ();
 
-  execute_ipa_summary_passes ((struct ipa_opt_pass_d *) all_lto_gen_passes);
+  execute_ipa_summary_passes ((struct ipa_opt_pass_d *)
+			      passes->all_lto_gen_passes);
 
   if (!in_lto_p)
     ipa_write_summaries ();
@@ -1873,7 +1962,7 @@ ipa_passes (void)
     targetm.asm_out.lto_end ();
 
   if (!flag_ltrans && (in_lto_p || !flag_lto || flag_fat_lto_objects))
-    execute_ipa_pass_list (all_regular_ipa_passes);
+    execute_ipa_pass_list (passes->all_regular_ipa_passes);
   invoke_plugin_callbacks (PLUGIN_ALL_IPA_PASSES_END, NULL);
 
   bitmap_obstack_release (NULL);
@@ -1999,7 +2088,7 @@ compile (void)
 
   cgraph_materialize_all_clones ();
   bitmap_obstack_initialize (NULL);
-  execute_ipa_pass_list (all_late_ipa_passes);
+  execute_ipa_pass_list (g->get_passes ()->all_late_ipa_passes);
   symtab_remove_unreachable_nodes (true, dump_file);
 #ifdef ENABLE_CHECKING
   verify_symtab ();

@@ -539,7 +539,29 @@ coverage_compute_lineno_checksum (void)
   return chksum;
 }
 
-/* Compute cfg checksum for the function FN given as argument.
+/* Compute profile ID.  This is better to be unique in whole program.  */
+
+unsigned
+coverage_compute_profile_id (struct cgraph_node *n)
+{
+  expanded_location xloc
+    = expand_location (DECL_SOURCE_LOCATION (n->symbol.decl));
+  unsigned chksum = xloc.line;
+
+  chksum = coverage_checksum_string (chksum, xloc.file);
+  chksum = coverage_checksum_string
+    (chksum, IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (n->symbol.decl)));
+  if (first_global_object_name)
+    chksum = coverage_checksum_string
+      (chksum, first_global_object_name);
+  chksum = coverage_checksum_string
+    (chksum, aux_base_name);
+
+  /* Non-negative integers are hopefully small enough to fit in all targets.  */
+  return chksum & 0x7fffffff;
+}
+
+/* Compute cfg checksum for the current function.
    The checksum is calculated carefully so that
    source code changes that doesn't affect the control flow graph
    won't change the checksum.
@@ -550,12 +572,12 @@ coverage_compute_lineno_checksum (void)
    but the compiler won't detect the change and use the wrong profile data.  */
 
 unsigned
-coverage_compute_cfg_checksum (struct function *fn)
+coverage_compute_cfg_checksum (void)
 {
   basic_block bb;
-  unsigned chksum = n_basic_blocks_for_function (fn);
+  unsigned chksum = n_basic_blocks;
 
-  FOR_EACH_BB_FN (bb, fn)
+  FOR_EACH_BB (bb)
     {
       edge e;
       edge_iterator ei;
@@ -568,6 +590,7 @@ coverage_compute_cfg_checksum (struct function *fn)
 
   return chksum;
 }
+
 /* Begin output to the notes file for the current function.
    Writes the function header. Returns nonzero if data should be output.  */
 

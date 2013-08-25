@@ -1056,6 +1056,10 @@ symtab_nonoverwritable_alias_1 (symtab_node node, void *data)
   return false;
 }
 
+/* If NODE can not be overwriten by static or dynamic linker to point to different
+   definition, return NODE. Otherwise look for alias with such property and if
+   none exists, introduce new one.  */
+
 symtab_node
 symtab_nonoverwritable_alias (symtab_node node)
 {
@@ -1094,5 +1098,8 @@ symtab_nonoverwritable_alias (symtab_node node)
   symtab_resolve_alias (new_node, node);  
   return new_node;
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> parent/master
 #include "gt-symtab.h"

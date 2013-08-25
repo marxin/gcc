@@ -29,10 +29,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-iterator.h"
 #include "diagnostic.h"
 
-/* Translate if being used for diagnostics, but not for dump files or
-   __PRETTY_FUNCTION.  */
-#define M_(msgid) (pp_translate_identifiers (pp) ? _(msgid) : (msgid))
-
 /* The pretty-printer code is primarily designed to closely follow
    (GNU) C and C++ grammars.  That is to be contrasted with spaghetti
    codes we used to have in the past.  Following a structured
@@ -43,7 +39,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #define pp_c_maybe_whitespace(PP)            \
    do {                                      \
-     if (pp_base (PP)->padding == pp_before) \
+     if ((PP)->padding == pp_before) \
        pp_c_whitespace (PP);                 \
    } while (0)
 
@@ -75,98 +71,98 @@ void
 pp_c_whitespace (c_pretty_printer *pp)
 {
   pp_space (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_left_paren (c_pretty_printer *pp)
 {
   pp_left_paren (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_right_paren (c_pretty_printer *pp)
 {
   pp_right_paren (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_left_brace (c_pretty_printer *pp)
 {
   pp_left_brace (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_right_brace (c_pretty_printer *pp)
 {
   pp_right_brace (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_left_bracket (c_pretty_printer *pp)
 {
   pp_left_bracket (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_right_bracket (c_pretty_printer *pp)
 {
   pp_right_bracket (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_dot (c_pretty_printer *pp)
 {
   pp_dot (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_ampersand (c_pretty_printer *pp)
 {
   pp_ampersand (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_star (c_pretty_printer *pp)
 {
   pp_star (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_arrow (c_pretty_printer *pp)
 {
   pp_arrow (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_semicolon (c_pretty_printer *pp)
 {
   pp_semicolon (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_complement (c_pretty_printer *pp)
 {
   pp_complement (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 void
 pp_c_exclamation (c_pretty_printer *pp)
 {
   pp_exclamation (pp);
-  pp_base (pp)->padding = pp_none;
+  pp->padding = pp_none;
 }
 
 /* Print out the external representation of QUALIFIERS.  */
@@ -341,7 +337,7 @@ pp_c_type_specifier (c_pretty_printer *pp, tree t)
   switch (code)
     {
     case ERROR_MARK:
-      pp_c_ws_string (pp, M_("<type-error>"));
+      pp->translate_string ("<type-error>");
       break;
 
     case IDENTIFIER_NODE:
@@ -370,7 +366,7 @@ pp_c_type_specifier (c_pretty_printer *pp, tree t)
 	      pp_c_type_specifier (pp, t);
 	      if (TYPE_PRECISION (t) != prec)
 		{
-		  pp_string (pp, ":");
+		  pp_colon (pp);
 		  pp_decimal_int (pp, prec);
 		}
 	    }
@@ -379,21 +375,21 @@ pp_c_type_specifier (c_pretty_printer *pp, tree t)
 	      switch (code)
 		{
 		case INTEGER_TYPE:
-		  pp_string (pp, (TYPE_UNSIGNED (t)
-				  ? M_("<unnamed-unsigned:")
-				  : M_("<unnamed-signed:")));
+		  pp->translate_string (TYPE_UNSIGNED (t)
+                                        ? "<unnamed-unsigned:"
+                                        : "<unnamed-signed:");
 		  break;
 		case REAL_TYPE:
-		  pp_string (pp, M_("<unnamed-float:"));
+		  pp->translate_string ("<unnamed-float:");
 		  break;
 		case FIXED_POINT_TYPE:
-		  pp_string (pp, M_("<unnamed-fixed:"));
+		  pp->translate_string ("<unnamed-fixed:");
 		  break;
 		default:
 		  gcc_unreachable ();
 		}
 	      pp_decimal_int (pp, prec);
-	      pp_string (pp, ">");
+	      pp_greater (pp);
 	    }
 	}
       break;
@@ -402,7 +398,7 @@ pp_c_type_specifier (c_pretty_printer *pp, tree t)
       if (DECL_NAME (t))
 	pp_id_expression (pp, t);
       else
-	pp_c_ws_string (pp, M_("<typedef-error>"));
+	pp->translate_string ("<typedef-error>");
       break;
 
     case UNION_TYPE:
@@ -415,12 +411,12 @@ pp_c_type_specifier (c_pretty_printer *pp, tree t)
       else if (code == ENUMERAL_TYPE)
 	pp_c_ws_string (pp, "enum");
       else
-	pp_c_ws_string (pp, M_("<tag-error>"));
+	pp->translate_string ("<tag-error>");
 
       if (TYPE_NAME (t))
 	pp_id_expression (pp, TYPE_NAME (t));
       else
-	pp_c_ws_string (pp, M_("<anonymous>"));
+	pp->translate_string ("<anonymous>");
       break;
 
     default:
@@ -703,7 +699,7 @@ pp_c_direct_declarator (c_pretty_printer *pp, tree t)
     case FUNCTION_DECL:
       pp_c_space_for_pointer_operator (pp, TREE_TYPE (TREE_TYPE (t)));
       pp_c_tree_decl_identifier (pp, t);
-      if (pp_c_base (pp)->flags & pp_c_flag_abstract)
+      if (pp->flags & pp_c_flag_abstract)
 	pp_abstract_declarator (pp, TREE_TYPE (t));
       else
 	{
@@ -920,7 +916,7 @@ pp_c_integer_constant (c_pretty_printer *pp, tree i)
       HOST_WIDE_INT high = TREE_INT_CST_HIGH (i);
       if (tree_int_cst_sgn (i) < 0)
 	{
-	  pp_character (pp, '-');
+	  pp_minus (pp);
 	  high = ~high + !low;
 	  low = -low;
 	}
@@ -1130,7 +1126,7 @@ pp_c_complex_expr (c_pretty_printer *pp, tree e)
       character-constant   */
 
 void
-pp_c_constant (c_pretty_printer *pp, tree e)
+c_pretty_printer::constant (tree e)
 {
   const enum tree_code code = TREE_CODE (e);
 
@@ -1140,38 +1136,38 @@ pp_c_constant (c_pretty_printer *pp, tree e)
       {
 	tree type = TREE_TYPE (e);
 	if (type == boolean_type_node)
-	  pp_c_bool_constant (pp, e);
+	  pp_c_bool_constant (this, e);
 	else if (type == char_type_node)
-	  pp_c_character_constant (pp, e);
+	  pp_c_character_constant (this, e);
 	else if (TREE_CODE (type) == ENUMERAL_TYPE
-		 && pp_c_enumeration_constant (pp, e))
+		 && pp_c_enumeration_constant (this, e))
 	  ;
 	else
-	  pp_c_integer_constant (pp, e);
+	  pp_c_integer_constant (this, e);
       }
       break;
 
     case REAL_CST:
-      pp_c_floating_constant (pp, e);
+      pp_c_floating_constant (this, e);
       break;
 
     case FIXED_CST:
-      pp_c_fixed_constant (pp, e);
+      pp_c_fixed_constant (this, e);
       break;
 
     case STRING_CST:
-      pp_c_string_literal (pp, e);
+      pp_c_string_literal (this, e);
       break;
 
     case COMPLEX_CST:
       /* Sometimes, we are confused and we think a complex literal
          is a constant.  Such thing is a compound literal which
          grammatically belongs to postfix-expr production.  */
-      pp_c_compound_literal (pp, e);
+      pp_c_compound_literal (this, e);
       break;
 
     default:
-      pp_unsupported_tree (pp, e);
+      pp_unsupported_tree (this, e);
       break;
     }
 }
@@ -1184,7 +1180,16 @@ pp_c_ws_string (c_pretty_printer *pp, const char *str)
 {
   pp_c_maybe_whitespace (pp);
   pp_string (pp, str);
-  pp_base (pp)->padding = pp_before;
+  pp->padding = pp_before;
+}
+
+void
+c_pretty_printer::translate_string (const char *gmsgid)
+{
+  if (pp_translate_identifiers (this))
+    pp_c_ws_string (this, _(gmsgid));
+  else
+    pp_c_ws_string (this, gmsgid);
 }
 
 /* Pretty-print an IDENTIFIER_NODE, which may contain UTF-8 sequences
@@ -1196,7 +1201,7 @@ pp_c_identifier (c_pretty_printer *pp, const char *id)
 {
   pp_c_maybe_whitespace (pp);
   pp_identifier (pp, id);
-  pp_base (pp)->padding = pp_before;
+  pp->padding = pp_before;
 }
 
 /* Pretty-print a C primary-expression.
@@ -1225,18 +1230,18 @@ pp_c_primary_expression (c_pretty_printer *pp, tree e)
       break;
 
     case ERROR_MARK:
-      pp_c_ws_string (pp, M_("<erroneous-expression>"));
+      pp->translate_string ("<erroneous-expression>");
       break;
 
     case RESULT_DECL:
-      pp_c_ws_string (pp, M_("<return-value>"));
+      pp->translate_string ("<return-value>");
       break;
 
     case INTEGER_CST:
     case REAL_CST:
     case FIXED_CST:
     case STRING_CST:
-      pp_c_constant (pp, e);
+      pp_constant (pp, e);
       break;
 
     case TARGET_EXPR:
@@ -1357,7 +1362,7 @@ pp_c_initializer_list (c_pretty_printer *pp, tree e)
 	      {
 		pp_c_left_bracket (pp);
 		if (TREE_PURPOSE (init))
-		  pp_c_constant (pp, TREE_PURPOSE (init));
+		  pp_constant (pp, TREE_PURPOSE (init));
 		pp_c_right_bracket (pp);
 	      }
 	    pp_c_whitespace (pp);
@@ -1422,7 +1427,7 @@ pp_c_brace_enclosed_initializer_list (c_pretty_printer *pp, tree l)
        identifier  */
 
 void
-pp_c_id_expression (c_pretty_printer *pp, tree t)
+c_pretty_printer::id_expression (tree t)
 {
   switch (TREE_CODE (t))
     {
@@ -1433,15 +1438,15 @@ pp_c_id_expression (c_pretty_printer *pp, tree t)
     case FUNCTION_DECL:
     case FIELD_DECL:
     case LABEL_DECL:
-      pp_c_tree_decl_identifier (pp, t);
+      pp_c_tree_decl_identifier (this, t);
       break;
 
     case IDENTIFIER_NODE:
-      pp_c_tree_identifier (pp, t);
+      pp_c_tree_identifier (this, t);
       break;
 
     default:
-      pp_unsupported_tree (pp, t);
+      pp_unsupported_tree (this, t);
       break;
     }
 }
@@ -1645,7 +1650,7 @@ pp_c_postfix_expression (c_pretty_printer *pp, tree e)
     case ADDR_EXPR:
       if (TREE_CODE (TREE_OPERAND (e, 0)) == FUNCTION_DECL)
 	{
-	  pp_c_id_expression (pp, TREE_OPERAND (e, 0));
+          pp_id_expression (pp, TREE_OPERAND (e, 0));
 	  break;
 	}
       /* else fall through.  */
@@ -1920,9 +1925,9 @@ pp_c_relational_expression (c_pretty_printer *pp, tree e)
       else if (code == GT_EXPR)
 	pp_greater (pp);
       else if (code == LE_EXPR)
-	pp_string (pp, "<=");
+	pp_less_equal (pp);
       else if (code == GE_EXPR)
-	pp_string (pp, ">=");
+	pp_greater_equal (pp);
       pp_c_whitespace (pp);
       pp_c_shift_expression (pp, TREE_OPERAND (e, 1));
       break;
@@ -2032,7 +2037,7 @@ pp_c_logical_and_expression (c_pretty_printer *pp, tree e)
     {
       pp_c_logical_and_expression (pp, TREE_OPERAND (e, 0));
       pp_c_whitespace (pp);
-      pp_string (pp, "&&");
+      pp_ampersand_ampersand (pp);
       pp_c_whitespace (pp);
       pp_c_inclusive_or_expression (pp, TREE_OPERAND (e, 1));
     }
@@ -2052,7 +2057,7 @@ pp_c_logical_or_expression (c_pretty_printer *pp, tree e)
     {
       pp_c_logical_or_expression (pp, TREE_OPERAND (e, 0));
       pp_c_whitespace (pp);
-      pp_string (pp, "||");
+      pp_bar_bar (pp);
       pp_c_whitespace (pp);
       pp_c_logical_and_expression (pp, TREE_OPERAND (e, 1));
     }
@@ -2155,7 +2160,7 @@ pp_c_expression (c_pretty_printer *pp, tree e)
 	  && !DECL_ARTIFICIAL (SSA_NAME_VAR (e)))
 	pp_c_expression (pp, SSA_NAME_VAR (e));
       else
-	pp_c_ws_string (pp, M_("<unknown>"));
+	pp->translate_string ("<unknown>");
       break;
 
     case POSTINCREMENT_EXPR:
@@ -2312,45 +2317,41 @@ pp_c_statement (c_pretty_printer *pp, tree stmt)
   if (pp_needs_newline (pp))
     pp_newline_and_indent (pp, 0);
 
-  dump_generic_node (pp_base (pp), stmt, pp_indentation (pp), 0, true);
+  dump_generic_node (pp, stmt, pp_indentation (pp), 0, true);
 }
 
 
 /* Initialize the PRETTY-PRINTER for handling C codes.  */
 
-void
-pp_c_pretty_printer_init (c_pretty_printer *pp)
+c_pretty_printer::c_pretty_printer ()
+  : pretty_printer ()
 {
-  pp->offset_list               = 0;
+  offset_list               = 0;
+  flags			= 0;
+  declaration               = pp_c_declaration;
+  declaration_specifiers    = pp_c_declaration_specifiers;
+  declarator                = pp_c_declarator;
+  direct_declarator         = pp_c_direct_declarator;
+  type_specifier_seq        = pp_c_specifier_qualifier_list;
+  abstract_declarator       = pp_c_abstract_declarator;
+  direct_abstract_declarator = pp_c_direct_abstract_declarator;
+  ptr_operator              = pp_c_pointer;
+  parameter_list            = pp_c_parameter_type_list;
+  type_id                   = pp_c_type_id;
+  simple_type_specifier     = pp_c_type_specifier;
+  function_specifier        = pp_c_function_specifier;
+  storage_class_specifier   = pp_c_storage_class_specifier;
 
-  pp->flags			= 0;
+  statement                 = pp_c_statement;
 
-  pp->declaration               = pp_c_declaration;
-  pp->declaration_specifiers    = pp_c_declaration_specifiers;
-  pp->declarator                = pp_c_declarator;
-  pp->direct_declarator         = pp_c_direct_declarator;
-  pp->type_specifier_seq        = pp_c_specifier_qualifier_list;
-  pp->abstract_declarator       = pp_c_abstract_declarator;
-  pp->direct_abstract_declarator = pp_c_direct_abstract_declarator;
-  pp->ptr_operator              = pp_c_pointer;
-  pp->parameter_list            = pp_c_parameter_type_list;
-  pp->type_id                   = pp_c_type_id;
-  pp->simple_type_specifier     = pp_c_type_specifier;
-  pp->function_specifier        = pp_c_function_specifier;
-  pp->storage_class_specifier   = pp_c_storage_class_specifier;
-
-  pp->statement                 = pp_c_statement;
-
-  pp->constant                  = pp_c_constant;
-  pp->id_expression             = pp_c_id_expression;
-  pp->primary_expression        = pp_c_primary_expression;
-  pp->postfix_expression        = pp_c_postfix_expression;
-  pp->unary_expression          = pp_c_unary_expression;
-  pp->initializer               = pp_c_initializer;
-  pp->multiplicative_expression = pp_c_multiplicative_expression;
-  pp->conditional_expression    = pp_c_conditional_expression;
-  pp->assignment_expression     = pp_c_assignment_expression;
-  pp->expression                = pp_c_expression;
+  primary_expression        = pp_c_primary_expression;
+  postfix_expression        = pp_c_postfix_expression;
+  unary_expression          = pp_c_unary_expression;
+  initializer               = pp_c_initializer;
+  multiplicative_expression = pp_c_multiplicative_expression;
+  conditional_expression    = pp_c_conditional_expression;
+  assignment_expression     = pp_c_assignment_expression;
+  expression                = pp_c_expression;
 }
 
 
@@ -2359,22 +2360,12 @@ pp_c_pretty_printer_init (c_pretty_printer *pp)
 void
 print_c_tree (FILE *file, tree t)
 {
-  static c_pretty_printer pp_rec;
-  static bool initialized = 0;
-  c_pretty_printer *pp = &pp_rec;
+  c_pretty_printer pp;
 
-  if (!initialized)
-    {
-      initialized = 1;
-      pp_construct (pp_base (pp), NULL, 0);
-      pp_c_pretty_printer_init (pp);
-      pp_needs_newline (pp) = true;
-    }
-  pp_base (pp)->buffer->stream = file;
-
-  pp_statement (pp, t);
-
-  pp_newline_and_flush (pp);
+  pp_needs_newline (&pp) = true;
+  pp.buffer->stream = file;
+  pp_statement (&pp, t);
+  pp_newline_and_flush (&pp);
 }
 
 /* Print the tree T in full, on stderr.  */
