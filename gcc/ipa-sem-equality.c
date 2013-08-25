@@ -601,7 +601,6 @@ check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
 
           SE_EXIT_DEBUG (ret);
         default:
-          gcc_unreachable ();
           return false;
         }
     }
@@ -744,8 +743,6 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       SE_EXIT_DEBUG (ret);
     }
     default:
-      debug_tree (t1);
-      gcc_unreachable ();
       return false;
     }
 }
