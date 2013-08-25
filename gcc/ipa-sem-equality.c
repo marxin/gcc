@@ -601,6 +601,8 @@ check_ssa_names (func_dict_t *d, tree t1, tree t2, tree func1,
 
           SE_EXIT_DEBUG (ret);
         default:
+          // TODO: remove after development
+          gcc_unreachable ();
           return false;
         }
     }
@@ -742,7 +744,10 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       ret = check_declaration (t1, t2, d, func1, func2);
       SE_EXIT_DEBUG (ret);
     }
-    default:
+    default:    
+      // TODO: remove after development
+      debug_tree (t1);
+      gcc_unreachable ();
       return false;
     }
 }
