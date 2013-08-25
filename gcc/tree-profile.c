@@ -54,19 +54,22 @@ static GTY(()) tree tree_ior_profiler_fn;
 static GTY(()) tree ic_void_ptr_var;
 static GTY(()) tree ic_gcov_type_ptr_var;
 static GTY(()) tree ptr_void;
+static GTY(()) tree tp_function_counter_var;
 
 /* Do initialization work for the edge profiler.  */
 
 /* Add code:
    __thread gcov*	__gcov_indirect_call_counters; // pointer to actual counter
-   __thread  void*	__gcov_indirect_call_callee; // actual callee address
+   __thread void*	__gcov_indirect_call_callee; // actual callee address
+   __thread int __gcov_function_counter; // time profiler function counter
 */
 static void
 init_ic_make_global_vars (void)
 {
-  tree  gcov_type_ptr;
+  tree gcov_type_ptr;
+  tree gcov_type_int;
 
-  ptr_void = build_pointer_type (void_type_node);
+  ptr_void = build_pointer_type (void_type_node); 
 
   /* Workaround for binutils bug 14342.  Once it is fixed, remove lto path.  */
   if (flag_lto)
@@ -98,7 +101,7 @@ init_ic_make_global_vars (void)
 
   varpool_finalize_decl (ic_void_ptr_var);
 
-  gcov_type_ptr = build_pointer_type (get_gcov_type ());
+  gcov_type_ptr = build_pointer_type (get_gcov_type ());  
   /* Workaround for binutils bug 14342.  Once it is fixed, remove lto path.  */
   if (flag_lto)
     {
@@ -128,6 +131,27 @@ init_ic_make_global_vars (void)
       decl_default_tls_model (ic_gcov_type_ptr_var);
 
   varpool_finalize_decl (ic_gcov_type_ptr_var);
+
+  /* Time profiler function counter.  */
+  /*
+  gcov_type_int = build_one_cst (wint_type_node);
+
+  tp_function_counter_var 
+	  = build_decl (UNKNOWN_LOCATION, VAR_DECL,
+		      get_identifier ("__gcov_time_profiler"),
+		      gcov_type_int);
+
+  TREE_PUBLIC (tp_function_counter_var) = 1;
+  DECL_EXTERNAL (tp_function_counter_var) = 1;
+  TREE_STATIC (tp_function_counter_var) = 1;
+  DECL_ARTIFICIAL (tp_function_counter_var) = 1;
+  DECL_INITIAL (tp_function_counter_var) = 1;
+  if (targetm.have_tls)
+    DECL_TLS_MODEL (tp_function_counter_var) =
+      decl_default_tls_model (tp_function_counter_var);
+
+  varpool_finalize_decl (tp_function_counter_var);
+  */
 }
 
 /* Create the type and function decls for the interface with gcov.  */

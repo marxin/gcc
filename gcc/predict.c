@@ -231,11 +231,19 @@ maybe_hot_edge_p (edge e)
 bool
 probably_never_executed_bb_p (struct function *fun, const_basic_block bb)
 {
+  struct cgraph_node *node;
+
   gcc_checking_assert (fun);
+
+  node = cgraph_get_node (fun->decl);  
+
+  if (node->tp_first_run)
+    return false;
+
   if (profile_info && flag_branch_probabilities)
     return ((bb->count + profile_info->runs / 2) / profile_info->runs) == 0;
   if ((!profile_info || !flag_branch_probabilities)
-      && (cgraph_get_node (fun->decl)->frequency
+      && (node->frequency
 	  == NODE_FREQUENCY_UNLIKELY_EXECUTED))
     return true;
   return false;
