@@ -27,10 +27,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "cxx-pretty-print.h"
 #include "tree-pretty-print.h"
 
-/* Translate if being used for diagnostics, but not for dump files or
-   __PRETTY_FUNCTION.  */
-#define M_(msgid) (pp_translate_identifiers (pp) ? _(msgid) : (msgid))
-
 static void pp_cxx_unqualified_id (cxx_pretty_printer *, tree);
 static void pp_cxx_nested_name_specifier (cxx_pretty_printer *, tree);
 static void pp_cxx_qualified_id (cxx_pretty_printer *, tree);
@@ -149,7 +145,7 @@ pp_cxx_unqualified_id (cxx_pretty_printer *pp, tree t)
   switch (code)
     {
     case RESULT_DECL:
-      pp_cxx_ws_string (pp, M_("<return-value>"));
+      pp->translate_string ("<return-value>");
       break;
 
     case OVERLOAD:
@@ -168,7 +164,7 @@ pp_cxx_unqualified_id (cxx_pretty_printer *pp, tree t)
 
     case IDENTIFIER_NODE:
       if (t == NULL)
-	pp_cxx_ws_string (pp, M_("<unnamed>"));
+	pp->translate_string ("<unnamed>");
       else if (IDENTIFIER_TYPENAME_P (t))
 	pp_cxx_conversion_function_id (pp, t);
       else
@@ -321,8 +317,8 @@ pp_cxx_qualified_id (cxx_pretty_printer *pp, tree t)
 }
 
 
-static void
-pp_cxx_constant (cxx_pretty_printer *pp, tree t)
+void
+cxx_pretty_printer::constant (tree t)
 {
   switch (TREE_CODE (t))
     {
@@ -330,23 +326,23 @@ pp_cxx_constant (cxx_pretty_printer *pp, tree t)
       {
 	const bool in_parens = PAREN_STRING_LITERAL_P (t);
 	if (in_parens)
-	  pp_cxx_left_paren (pp);
-	pp_c_constant (pp, t);
+	  pp_cxx_left_paren (this);
+	c_pretty_printer::constant (t);
 	if (in_parens)
-	  pp_cxx_right_paren (pp);
+	  pp_cxx_right_paren (this);
       }
       break;
 
     case INTEGER_CST:
       if (NULLPTR_TYPE_P (TREE_TYPE (t)))
 	{
-	  pp_string (pp, "nullptr");
+	  pp_string (this, "nullptr");
 	  break;
 	}
       /* else fall through.  */
 
     default:
-      pp_c_constant (pp, t);
+      c_pretty_printer::constant (t);
       break;
     }
 }
@@ -355,15 +351,15 @@ pp_cxx_constant (cxx_pretty_printer *pp, tree t)
       unqualified-id
       qualified-id   */
 
-static inline void
-pp_cxx_id_expression (cxx_pretty_printer *pp, tree t)
+void
+cxx_pretty_printer::id_expression (tree t)
 {
   if (TREE_CODE (t) == OVERLOAD)
     t = OVL_CURRENT (t);
   if (DECL_P (t) && DECL_CONTEXT (t))
-    pp_cxx_qualified_id (pp, t);
+    pp_cxx_qualified_id (this, t);
   else
-    pp_cxx_unqualified_id (pp, t);
+    pp_cxx_unqualified_id (this, t);
 }
 
 /* user-defined literal:
@@ -372,8 +368,8 @@ pp_cxx_id_expression (cxx_pretty_printer *pp, tree t)
 void
 pp_cxx_userdef_literal (cxx_pretty_printer *pp, tree t)
 {
-  pp_cxx_constant (pp, USERDEF_LITERAL_VALUE (t));
-  pp_cxx_id_expression (pp, USERDEF_LITERAL_SUFFIX_ID (t));
+  pp_constant (pp, USERDEF_LITERAL_VALUE (t));
+  pp_id_expression (pp, USERDEF_LITERAL_SUFFIX_ID (t));
 }
 
 
@@ -420,7 +416,7 @@ pp_cxx_primary_expression (cxx_pretty_printer *pp, tree t)
     case REAL_CST:
     case COMPLEX_CST:
     case STRING_CST:
-      pp_cxx_constant (pp, t);
+      pp_constant (pp, t);
       break;
 
     case USERDEF_LITERAL:
@@ -436,7 +432,7 @@ pp_cxx_primary_expression (cxx_pretty_printer *pp, tree t)
     case OVERLOAD:
     case CONST_DECL:
     case TEMPLATE_DECL:
-      pp_cxx_id_expression (pp, t);
+      pp_id_expression (pp, t);
       break;
 
     case RESULT_DECL:
@@ -1041,7 +1037,7 @@ pp_cxx_expression (cxx_pretty_printer *pp, tree t)
     case INTEGER_CST:
     case REAL_CST:
     case COMPLEX_CST:
-      pp_cxx_constant (pp, t);
+      pp_constant (pp, t);
       break;
 
     case USERDEF_LITERAL:
@@ -1543,14 +1539,14 @@ pp_cxx_direct_declarator (cxx_pretty_printer *pp, tree t)
 	       parameter pack.  */
 	    pp_cxx_ws_string (pp, "...");
 		      
-	  pp_cxx_id_expression (pp, DECL_NAME (t));
+	  pp_id_expression (pp, DECL_NAME (t));
 	}
       pp_cxx_abstract_declarator (pp, TREE_TYPE (t));
       break;
 
     case FUNCTION_DECL:
       pp_cxx_space_for_pointer_operator (pp, TREE_TYPE (TREE_TYPE (t)));
-      pp_cxx_id_expression (pp, t);
+      pp_id_expression (pp, t);
       pp_cxx_parameter_declaration_clause (pp, t);
 
       if (DECL_NONSTATIC_MEMBER_FUNCTION_P (t))
@@ -2154,7 +2150,7 @@ pp_cxx_canonical_template_parameter (cxx_pretty_printer *pp, tree parm)
     parm = TEMPLATE_TYPE_PARM_INDEX (parm);
 
   pp_cxx_begin_template_argument_list (pp);
-  pp_cxx_ws_string (pp, M_("template-parameter-"));
+  pp->translate_string ("template-parameter-");
   pp_wide_integer (pp, TEMPLATE_PARM_LEVEL (parm));
   pp_minus (pp);
   pp_wide_integer (pp, TEMPLATE_PARM_IDX (parm) + 1);
@@ -2452,8 +2448,6 @@ cxx_pretty_printer::cxx_pretty_printer ()
 
   /* pp->statement = (pp_fun) pp_cxx_statement;  */
 
-  constant = (pp_fun) pp_cxx_constant;
-  id_expression = (pp_fun) pp_cxx_id_expression;
   primary_expression = (pp_fun) pp_cxx_primary_expression;
   postfix_expression = (pp_fun) pp_cxx_postfix_expression;
   unary_expression = (pp_fun) pp_cxx_unary_expression;
