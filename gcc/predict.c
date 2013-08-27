@@ -163,7 +163,7 @@ maybe_hot_count_p (struct function *fun, gcov_type count)
   if (fun && profile_status_for_function (fun) != PROFILE_READ)
     return true;
   /* Code executed at most once is not hot.  */
-  if (profile_info->runs >= count)
+  if (count <= 1)
     return false;
   return (count >= get_hot_bb_threshold ());
 }
@@ -241,7 +241,7 @@ probably_never_executed_bb_p (struct function *fun, const_basic_block bb)
     return false;
 
   if (profile_info && flag_branch_probabilities)
-    return ((bb->count + profile_info->runs / 2) / profile_info->runs) == 0;
+    return bb->count == 0;
   if ((!profile_info || !flag_branch_probabilities)
       && (node->frequency
 	  == NODE_FREQUENCY_UNLIKELY_EXECUTED))
