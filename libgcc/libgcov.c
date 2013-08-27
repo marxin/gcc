@@ -80,6 +80,7 @@ void __gcov_merge_delta (gcov_type *counters  __attribute__ ((unused)),
 #include <sys/stat.h>
 #endif
 
+extern int gcov_in_fork ATTRIBUTE_HIDDEN;
 extern void gcov_clear (void) ATTRIBUTE_HIDDEN;
 extern void gcov_exit (void) ATTRIBUTE_HIDDEN;
 extern int gcov_dump_complete ATTRIBUTE_HIDDEN;
@@ -349,6 +350,12 @@ gcov_compute_histogram (struct gcov_summary *sum)
         }
     }
 }
+
+/* On fork() invocation we write data into stream, clear them, and continue
+   executing both processes.  We do not want to count the continuing procsses
+   as num_run as otherwise we would consider functions called once each run
+   as called just with priority 1/3.  */
+int gcov_in_fork;
 
 /* Dump the coverage counts. We merge with existing counts when
    possible, to avoid growing the .da files ad infinitum. We use this
@@ -692,13 +699,17 @@ gcov_exit (void)
 
 	  if (gi_ptr->merge[t_ix])
 	    {
-	      if (!cs_prg->runs++)
+	      int first_run = !cs_prg->runs;
+
+	      if (!gcov_in_fork)
+		cs_prg->runs++;
+	      if (first_run)
 	        cs_prg->num = cs_tprg->num;
 	      cs_prg->sum_all += cs_tprg->sum_all;
 	      if (cs_prg->run_max < cs_tprg->run_max)
 		cs_prg->run_max = cs_tprg->run_max;
 	      cs_prg->sum_max += cs_tprg->run_max;
-              if (cs_prg->runs == 1)
+              if (first_run)
                 memcpy (cs_prg->histogram, cs_tprg->histogram,
                         sizeof (gcov_bucket_type) * GCOV_HISTOGRAM_SIZE);
               else
@@ -1253,6 +1264,7 @@ __gcov_fork (void)
   pid_t pid;
   extern __gthread_mutex_t __gcov_flush_mx;
   __gcov_flush ();
+  gcov_in_fork = 1;
   pid = fork ();
   if (pid == 0)
     __GTHREAD_MUTEX_INIT_FUNCTION (&__gcov_flush_mx);
