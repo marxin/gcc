@@ -1404,17 +1404,18 @@ gimple_ic (gimple icall_stmt, struct cgraph_node *direct_call,
       gimple_stmt_iterator psi;
 
       add_stmt_to_eh_lp (dcall_stmt, lp_nr);
+
       FOR_EACH_EDGE (e_eh, ei, icall_bb->succs)
-	if (e_eh->flags & EDGE_EH)
-	  break;
-      e = make_edge (dcall_bb, e_eh->dest, EDGE_EH);
-      for (psi = gsi_start_phis (e_eh->dest);
-	   !gsi_end_p (psi); gsi_next (&psi))
-	{
-	  gimple phi = gsi_stmt (psi);
-	  SET_USE (PHI_ARG_DEF_PTR_FROM_EDGE (phi, e),
-		   PHI_ARG_DEF_FROM_EDGE (phi, e_eh));
-	}
+      {
+        e = make_edge (dcall_bb, e_eh->dest, EDGE_EH);
+        for (psi = gsi_start_phis (e_eh->dest);
+             !gsi_end_p (psi); gsi_next (&psi))
+          {
+            gimple phi = gsi_stmt (psi);
+            SET_USE (PHI_ARG_DEF_PTR_FROM_EDGE (phi, e),
+               PHI_ARG_DEF_FROM_EDGE (phi, e_eh));
+          }
+      }
     }
 
   return dcall_stmt;
