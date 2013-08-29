@@ -28,9 +28,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "hashtab.h"
 #include "plugin-api.h"
 #include "lto-streamer.h"
+#include "ipa-inline.h"
 
 /* Vector to keep track of external variables we've seen so far.  */
 vec<tree, va_gc> *lto_global_var_decls;
+
+/* SRC and DST are going to be merged.  Take SRC's profile and merge it into
+   DST so it is not going to be lost.  Destroy SRC's body on the way.  */
 
 static void
 cgraph_merge_profile (struct cgraph_node *dst,
@@ -65,13 +69,22 @@ cgraph_merge_profile (struct cgraph_node *dst,
       struct lto_in_decl_state temp;
       struct lto_in_decl_state *state;
 
+      /* We are going to move the decl, we want to remove its file decl data.
+	 and link these with the new decl. */
       temp.fn_decl = src->symbol.decl;
       slot = htab_find_slot (src->symbol.lto_file_data->function_decl_states,
 			     &temp, NO_INSERT);
       state = (lto_in_decl_state *)*slot;
       htab_clear_slot (src->symbol.lto_file_data->function_decl_states, slot);
+      gcc_assert (state);
 
+      /* Duplicate the decl and be sure it does not link into body of DST.  */
       src->symbol.decl = copy_node (src->symbol.decl);
+      DECL_STRUCT_FUNCTION (src->symbol.decl) = NULL;
+      DECL_ARGUMENTS (src->symbol.decl) = NULL;
+      DECL_INITIAL (src->symbol.decl) = NULL;
+      DECL_RESULT (src->symbol.decl) = NULL;
+      DECL_ORIGIN (src->symbol.decl) == dst->symbol.decl;
 
       /* Associate the decl state with new declaration, so LTO streamer
  	 can look it up.  */
@@ -80,7 +93,6 @@ cgraph_merge_profile (struct cgraph_node *dst,
 			     state, INSERT);
       gcc_assert (!*slot);
       *slot = state;
-      gcc_assert (*slot);
     }
   cgraph_get_body (src);
   cgraph_get_body (dst);
@@ -184,7 +196,8 @@ cgraph_merge_profile (struct cgraph_node *dst,
 			     (dst->symbol.decl,
 			      gimple_bb (e->call_stmt));
 	}
-       cgraph_release_function_body (src);
+      cgraph_release_function_body (src);
+      inline_update_overall_summary (dst);
     }
   /* TODO: if there is no match, we can scale up.  */
   src->symbol.decl = oldsrcdecl;
@@ -239,6 +252,7 @@ lto_cgraph_replace_node (struct cgraph_node *node,
   ipa_clone_referring ((symtab_node)prevailing_node, &node->symbol.ref_list);
 
   cgraph_merge_profile (prevailing_node, node);
+  lto_free_function_in_decl_state_for_node ((symtab_node)node);
 
   if (node->symbol.decl != prevailing_node->symbol.decl)
     cgraph_release_function_body (node);
@@ -796,6 +810,9 @@ lto_symtab_prevailing_decl (tree decl)
   /* Likewise builtins are their own prevailing decl.  This preserves
      non-builtin vs. builtin uses from compile-time.  */
   if (TREE_CODE (decl) == FUNCTION_DECL && DECL_BUILT_IN (decl))
+    return decl;
+
+  if (!DECL_ASSEMBLER_NAME_SET_P (decl))
     return decl;
 
   /* Ensure DECL_ASSEMBLER_NAME will not set assembler name.  */

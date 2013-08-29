@@ -393,12 +393,12 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple stmt)
 
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
+  case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 2;
 	  break;
 
 	case HIST_TYPE_SINGLE_VALUE:
 	case HIST_TYPE_INDIR_CALL:
-  case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 3;
 	  break;
 
@@ -1950,7 +1950,7 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
   case HIST_TYPE_TIME_PROFILE:
-    hist->n_counters = 3;
+    hist->n_counters = 2;
     break;
 
 	case HIST_TYPE_AVERAGE:

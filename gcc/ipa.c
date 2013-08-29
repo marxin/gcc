@@ -1540,6 +1540,7 @@ ipa_profile (void)
 			 control flow goes to this particular implementation
 			 of N2.  Speculate on the local alias to allow inlining.
 		       */
+          /*
 		      if (!symtab_can_be_discarded ((symtab_node) n2))
 			n2 = cgraph (symtab_nonoverwritable_alias ((symtab_node)n2));
 		      nconverted++;
@@ -1550,6 +1551,7 @@ ipa_profile (void)
 			 apply_scale (e->frequency,
 				      e->indirect_info->common_target_probability));
 		      update = true;
+          */
 		    }
 		}
 	      else

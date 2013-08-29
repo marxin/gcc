@@ -80,7 +80,9 @@ void __gcov_merge_delta (gcov_type *counters  __attribute__ ((unused)),
 #include <sys/stat.h>
 #endif
 
-extern int gcov_in_fork ATTRIBUTE_HIDDEN;
+extern gcov_type function_counter ATTRIBUTE_HIDDEN;
+
+extern gcov_type last_flush_time ATTRIBUTE_HIDDEN;
 extern void gcov_clear (void) ATTRIBUTE_HIDDEN;
 extern void gcov_exit (void) ATTRIBUTE_HIDDEN;
 extern int gcov_dump_complete ATTRIBUTE_HIDDEN;
@@ -355,7 +357,9 @@ gcov_compute_histogram (struct gcov_summary *sum)
    executing both processes.  We do not want to count the continuing procsses
    as num_run as otherwise we would consider functions called once each run
    as called just with priority 1/3.  */
-int gcov_in_fork;
+gcov_type last_flush_time;
+
+gcov_type function_counter;
 
 /* Dump the coverage counts. We merge with existing counts when
    possible, to avoid growing the .da files ad infinitum. We use this
@@ -383,6 +387,7 @@ gcov_exit (void)
   size_t prefix_length;
   char *gi_filename, *gi_filename_up;
   gcov_unsigned_t crc32 = 0;
+  gcov_type **counters_buffer;
 
   /* Prevent the counters from being dumped a second time on exit when the
      application already wrote out the profile using __gcov_dump().  */
@@ -601,7 +606,11 @@ gcov_exit (void)
 
 	    next_summary:;
 	    }
-	  
+
+          counters_buffer = malloc (gi_ptr->n_functions * sizeof (gcov_type *));
+          fprintf (stderr, "allocating for: %u functions\n", gi_ptr->n_functions);
+          memset (counters_buffer, 0, gi_ptr->n_functions * sizeof (gcov_type *));
+	 
 	  /* Merge execution counts for each function.  */
 	  for (f_ix = 0; (unsigned)f_ix != gi_ptr->n_functions;
 	       f_ix++, tag = gcov_read_unsigned ())
@@ -631,6 +640,7 @@ gcov_exit (void)
 					    gi_ptr, fn_tail, f_ix);
 		  if (!fn_tail)
 		    goto read_mismatch;
+
 		  continue;
 		}
 
@@ -647,6 +657,7 @@ gcov_exit (void)
 		goto read_mismatch;
 	      
 	      ci_ptr = gfi_ptr->ctrs;
+
 	      for (t_ix = 0; t_ix < GCOV_COUNTERS; t_ix++)
 		{
 		  gcov_merge_fn merge = gi_ptr->merge[t_ix];
@@ -654,17 +665,28 @@ gcov_exit (void)
 		  if (!merge)
 		    continue;
 
+                  if (merge == __gcov_merge_time_profile && ci_ptr->num)
+                    {
+                      counters_buffer[f_ix] = malloc (ci_ptr->num * sizeof (gcov_type));
+                      memcpy (counters_buffer[f_ix], ci_ptr->values, ci_ptr->num * sizeof (gcov_type));
+                      fprintf (stderr, "saving %u to buffer at index: %u\n", ci_ptr->num, f_ix);
+                    }
+
 		  tag = gcov_read_unsigned ();
 		  length = gcov_read_unsigned ();
 		  if (tag != GCOV_TAG_FOR_COUNTER (t_ix)
 		      || length != GCOV_TAG_COUNTER_LENGTH (ci_ptr->num))
 		    goto read_mismatch;
+
 		  (*merge) (ci_ptr->values, ci_ptr->num);
 		  ci_ptr++;
 		}
+
 	      if ((error = gcov_is_error ()))
 		goto read_error;
 	    }
+
+            free (counters_buffer);
 
 	  if (tag)
 	    {
@@ -701,7 +723,7 @@ gcov_exit (void)
 	    {
 	      int first_run = !cs_prg->runs;
 
-	      if (!gcov_in_fork)
+	      if (!last_flush_time)
 		cs_prg->runs++;
 	      if (first_run)
 	        cs_prg->num = cs_tprg->num;
@@ -806,9 +828,12 @@ gcov_exit (void)
 	  gcov_write_unsigned (gfi_ptr->cfg_checksum);
 
 	  ci_ptr = gfi_ptr->ctrs;
+
 	  for (t_ix = 0; t_ix < GCOV_COUNTERS; t_ix++)
 	    {
-	      if (!gi_ptr->merge[t_ix])
+	      gcov_merge_fn merge = gi_ptr->merge[t_ix];
+
+	      if (!merge)
 		continue;
 
 	      n_counts = ci_ptr->num;
@@ -817,11 +842,21 @@ gcov_exit (void)
 	      gcov_type *c_ptr = ci_ptr->values;
 	      while (n_counts--)
 		gcov_write_counter (*c_ptr++);
+
+        if (counters_buffer && merge == __gcov_merge_time_profile && counters_buffer[f_ix])
+          {
+            fprintf (stderr, "restoring %u items at index: %u\n", ci_ptr->num, f_ix);
+            memcpy (ci_ptr->values, counters_buffer[f_ix], ci_ptr->num * sizeof (gcov_type));
+            free (counters_buffer[f_ix]);
+          }
+
 	      ci_ptr++;
 	    }
 	  if (buffered)
 	    fn_buffer = free_fn_data (gi_ptr, fn_buffer, GCOV_COUNTERS);
 	}
+
+      free (counters_buffer);
 
       gcov_write_unsigned (0);
 
@@ -835,6 +870,10 @@ gcov_exit (void)
 		   "profiling:%s:Error writing\n",
 		   gi_filename);
     }
+
+  last_flush_time = ++function_counter;
+
+  gcov_clear ();
 }
 
 /* Reset all counters to zero.  */
@@ -858,6 +897,10 @@ gcov_clear (void)
 	  const struct gcov_ctr_info *ci_ptr = gfi_ptr->ctrs;
 	  for (t_ix = 0; t_ix != GCOV_COUNTERS; t_ix++)
 	    {
+              /* Time profiler.  */
+              if (t_ix == GCOV_TIME_PROFILER)
+                continue;
+
 	      if (!gi_ptr->merge[t_ix])
 		continue;
 	      
@@ -923,7 +966,6 @@ __gcov_flush (void)
   __gthread_mutex_lock (&__gcov_flush_mx);
 
   gcov_exit ();
-  gcov_clear ();
 
   __gthread_mutex_unlock (&__gcov_flush_mx);
 }
@@ -984,6 +1026,29 @@ __gcov_merge_ior (gcov_type *counters, unsigned n_counters)
     *counters |= gcov_read_counter ();
 }
 #endif
+
+#ifdef L_gcov_merge_time_profile
+void
+__gcov_merge_time_profile (gcov_type *counters, unsigned n_counters)
+{
+  unsigned int i;
+
+  for (i = 0; i < n_counters; i += 2)
+    {
+      fprintf (stderr, "merging with last_flush_time: %d\n", last_flush_time);
+      if (counters[i] >= last_flush_time)
+        {
+          counters[i] += gcov_read_counter ();
+          counters[i + 1] += gcov_read_counter ();
+        }
+      else
+      {
+        counters[i] = gcov_read_counter(); 
+        counters[i + 1] = gcov_read_counter(); 
+      }
+    }
+}
+#endif /* L_gcov_merge_time_profile */
 
 
 #ifdef L_gcov_merge_single
@@ -1217,18 +1282,15 @@ __gcov_indirect_call_profiler_v2 (gcov_type value, void* cur_func)
 
 #ifdef L_gcov_time_profiler
 
-static int function_counter = 1;
-
 void
 __gcov_time_profiler (gcov_type* counters)
 {
   /* counters[1] indicates if the function is visited more than once.  */
-  if (counters[0])
-    counters[1] = 1;
+  counters[1] = 1;
 
   /* counters[0] indicates a first visit of the function.  */
   if (!counters[0])
-    counters[0] = function_counter++;
+    counters[0] = ++function_counter;
 }
 #endif
 
@@ -1263,8 +1325,10 @@ __gcov_fork (void)
 {
   pid_t pid;
   extern __gthread_mutex_t __gcov_flush_mx;
+
+  fprintf (stderr, "__gcov_fork called\n");
+
   __gcov_flush ();
-  gcov_in_fork = 1;
   pid = fork ();
   if (pid == 0)
     __GTHREAD_MUTEX_INIT_FUNCTION (&__gcov_flush_mx);

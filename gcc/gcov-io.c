@@ -68,7 +68,7 @@ gcov_open (const char *name, int mode)
 #if IN_LIBGCOV
   const int mode = 0;
 #endif
-#if GCOV_LOCKED
+#if GCOV_LOCKED  
   struct flock s_flock;
   int fd;
 

@@ -284,7 +284,11 @@ input_gimple_stmt (struct lto_input_block *ib, struct data_in *data_in,
     }
   else if (code == GIMPLE_LABEL)
     gcc_assert (emit_label_in_global_context_p (gimple_label_label (stmt))
-	        || DECL_CONTEXT (gimple_label_label (stmt)) == fn->decl);
+	        || DECL_CONTEXT (gimple_label_label (stmt)) == fn->decl
+		/* Do not sanity check before decl merging is completed.
+		   This is needed for profile merging during symtab
+		   resolution.  */
+		|| cgraph_state == CGRAPH_LTO_STREAMING);
   else if (code == GIMPLE_ASM)
     {
       unsigned i;

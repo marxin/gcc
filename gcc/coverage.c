@@ -368,7 +368,7 @@ get_coverage_counts (unsigned counter, unsigned expected,
       warning_printed =
 	warning_at (input_location, OPT_Wcoverage_mismatch,
 		    "the control flow of function %qE does not match "
-		    "its profile data (counter %qs)", id, ctr_names[counter], entry->cfg_checksum, cfg_checksum, entry->lineno_checksum, lineno_checksum);
+		    "its profile data (counter %qs)", id, ctr_names[counter]);
       if (warning_printed)
 	{
 	 inform (input_location, "use -Wno-error=coverage-mismatch to tolerate "
