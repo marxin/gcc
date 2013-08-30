@@ -82,10 +82,10 @@ void __gcov_merge_delta (gcov_type *counters  __attribute__ ((unused)),
 
 extern gcov_type function_counter ATTRIBUTE_HIDDEN;
 
-extern gcov_type last_flush_time ATTRIBUTE_HIDDEN;
 extern void gcov_clear (void) ATTRIBUTE_HIDDEN;
 extern void gcov_exit (void) ATTRIBUTE_HIDDEN;
 extern int gcov_dump_complete ATTRIBUTE_HIDDEN;
+extern gcov_type gcov_merged ATTRIBUTE_HIDDEN;
 
 #ifdef L_gcov
 #include "gcov-io.c"
@@ -357,8 +357,8 @@ gcov_compute_histogram (struct gcov_summary *sum)
    executing both processes.  We do not want to count the continuing procsses
    as num_run as otherwise we would consider functions called once each run
    as called just with priority 1/3.  */
-gcov_type last_flush_time;
 
+gcov_type gcov_merged;
 gcov_type function_counter;
 
 /* Dump the coverage counts. We merge with existing counts when
@@ -387,7 +387,6 @@ gcov_exit (void)
   size_t prefix_length;
   char *gi_filename, *gi_filename_up;
   gcov_unsigned_t crc32 = 0;
-  gcov_type **counters_buffer;
 
   /* Prevent the counters from being dumped a second time on exit when the
      application already wrote out the profile using __gcov_dump().  */
@@ -607,10 +606,6 @@ gcov_exit (void)
 	    next_summary:;
 	    }
 
-          counters_buffer = malloc (gi_ptr->n_functions * sizeof (gcov_type *));
-          fprintf (stderr, "allocating for: %u functions\n", gi_ptr->n_functions);
-          memset (counters_buffer, 0, gi_ptr->n_functions * sizeof (gcov_type *));
-	 
 	  /* Merge execution counts for each function.  */
 	  for (f_ix = 0; (unsigned)f_ix != gi_ptr->n_functions;
 	       f_ix++, tag = gcov_read_unsigned ())
@@ -665,19 +660,13 @@ gcov_exit (void)
 		  if (!merge)
 		    continue;
 
-                  if (merge == __gcov_merge_time_profile && ci_ptr->num)
-                    {
-                      counters_buffer[f_ix] = malloc (ci_ptr->num * sizeof (gcov_type));
-                      memcpy (counters_buffer[f_ix], ci_ptr->values, ci_ptr->num * sizeof (gcov_type));
-                      fprintf (stderr, "saving %u to buffer at index: %u\n", ci_ptr->num, f_ix);
-                    }
-
 		  tag = gcov_read_unsigned ();
 		  length = gcov_read_unsigned ();
 		  if (tag != GCOV_TAG_FOR_COUNTER (t_ix)
 		      || length != GCOV_TAG_COUNTER_LENGTH (ci_ptr->num))
 		    goto read_mismatch;
 
+      gcov_merged = 1;
 		  (*merge) (ci_ptr->values, ci_ptr->num);
 		  ci_ptr++;
 		}
@@ -685,8 +674,6 @@ gcov_exit (void)
 	      if ((error = gcov_is_error ()))
 		goto read_error;
 	    }
-
-            free (counters_buffer);
 
 	  if (tag)
 	    {
@@ -723,8 +710,7 @@ gcov_exit (void)
 	    {
 	      int first_run = !cs_prg->runs;
 
-	      if (!last_flush_time)
-		cs_prg->runs++;
+		    cs_prg->runs++;
 	      if (first_run)
 	        cs_prg->num = cs_tprg->num;
 	      cs_prg->sum_all += cs_tprg->sum_all;
@@ -839,15 +825,18 @@ gcov_exit (void)
 	      n_counts = ci_ptr->num;
 	      gcov_write_tag_length (GCOV_TAG_FOR_COUNTER (t_ix),
 				     GCOV_TAG_COUNTER_LENGTH (n_counts));
-	      gcov_type *c_ptr = ci_ptr->values;
-	      while (n_counts--)
-		gcov_write_counter (*c_ptr++);
 
-        if (counters_buffer && merge == __gcov_merge_time_profile && counters_buffer[f_ix])
+	      gcov_type *c_ptr = ci_ptr->values;
+        gcov_type value;
+	      while (n_counts--)
           {
-            fprintf (stderr, "restoring %u items at index: %u\n", ci_ptr->num, f_ix);
-            memcpy (ci_ptr->values, counters_buffer[f_ix], ci_ptr->num * sizeof (gcov_type));
-            free (counters_buffer[f_ix]);
+            value = *c_ptr++;
+
+            /* Time profile must be stored with an appropriate value.  */
+            if (t_ix == GCOV_TIME_PROFILER && value < 0)
+              value *= -1;
+
+            gcov_write_counter (value);
           }
 
 	      ci_ptr++;
@@ -855,8 +844,6 @@ gcov_exit (void)
 	  if (buffered)
 	    fn_buffer = free_fn_data (gi_ptr, fn_buffer, GCOV_COUNTERS);
 	}
-
-      free (counters_buffer);
 
       gcov_write_unsigned (0);
 
@@ -870,8 +857,6 @@ gcov_exit (void)
 		   "profiling:%s:Error writing\n",
 		   gi_filename);
     }
-
-  last_flush_time = ++function_counter;
 
   gcov_clear ();
 }
@@ -897,14 +882,28 @@ gcov_clear (void)
 	  const struct gcov_ctr_info *ci_ptr = gfi_ptr->ctrs;
 	  for (t_ix = 0; t_ix != GCOV_COUNTERS; t_ix++)
 	    {
-              /* Time profiler.  */
-              if (t_ix == GCOV_TIME_PROFILER)
-                continue;
-
 	      if (!gi_ptr->merge[t_ix])
 		continue;
 	      
-	      memset (ci_ptr->values, 0, sizeof (gcov_type) * ci_ptr->num);
+        /* If the function was called before fork, we set counters to
+         * special values: values = {0, 1}. This means we do not want
+         * set time profile for the function and we don't want to
+         * merge such profile.
+         *
+         * Corner case: Let's imaging function foo that is first time
+         * called after fork. After we launch first instrumented run,
+         * counters will be like {X, 1}. If we run the binary for the second
+         * time, after fork is executed, the counter will be merged to {X, 1}
+         * and we need additional information if the function was called
+         * before fork, or the counter was loaded from file.  */
+        if (t_ix == GCOV_TIME_PROFILER && (ci_ptr->values[1] < 0 || (ci_ptr->values[1] == 1 && !gcov_merged)))
+        {
+          ci_ptr->values[0] = 0;
+          ci_ptr->values[1] = 1;
+        }
+        else
+	        memset (ci_ptr->values, 0, sizeof (gcov_type) * ci_ptr->num);
+
 	      ci_ptr++;
 	    }
 	}
@@ -1035,14 +1034,20 @@ __gcov_merge_time_profile (gcov_type *counters, unsigned n_counters)
 
   for (i = 0; i < n_counters; i += 2)
     {
-      fprintf (stderr, "merging with last_flush_time: %d\n", last_flush_time);
-      if (counters[i] >= last_flush_time)
+      /* We merge the counter if first run value is collected and the number
+         or runs equals one.  */
+      if (counters[i] && counters[i + 1] == 1)
         {
           counters[i] += gcov_read_counter ();
           counters[i + 1] += gcov_read_counter ();
+
+          /* We indicate with a negative value that the function was called in this run.
+           * Having that information, we can distunguish functions called before fork.  */
+          counters[i + 1] *= -1;
         }
       else
       {
+        /* Otherwise, we just save existing merged value.  */
         counters[i] = gcov_read_counter(); 
         counters[i + 1] = gcov_read_counter(); 
       }
@@ -1285,12 +1290,11 @@ __gcov_indirect_call_profiler_v2 (gcov_type value, void* cur_func)
 void
 __gcov_time_profiler (gcov_type* counters)
 {
-  /* counters[1] indicates if the function is visited more than once.  */
-  counters[1] = 1;
-
-  /* counters[0] indicates a first visit of the function.  */
-  if (!counters[0])
+  if (!counters[0] && !counters[1])
+  {
     counters[0] = ++function_counter;
+    counters[1] = 1;
+  }
 }
 #endif
 
@@ -1332,6 +1336,9 @@ __gcov_fork (void)
   pid = fork ();
   if (pid == 0)
     __GTHREAD_MUTEX_INIT_FUNCTION (&__gcov_flush_mx);
+
+  gcov_merged = 1;
+
   return pid;
 }
 #endif
