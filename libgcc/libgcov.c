@@ -1290,6 +1290,9 @@ __gcov_indirect_call_profiler_v2 (gcov_type value, void* cur_func)
 void
 __gcov_time_profiler (gcov_type* counters)
 {
+  /* First counters present information about the first run
+   * of an application. Special value {0,1} prevents to set up
+   * time profile counter.  */
   if (!counters[0] && !counters[1])
   {
     counters[0] = ++function_counter;
@@ -1336,8 +1339,6 @@ __gcov_fork (void)
   pid = fork ();
   if (pid == 0)
     __GTHREAD_MUTEX_INIT_FUNCTION (&__gcov_flush_mx);
-
-  gcov_merged = 1;
 
   return pid;
 }
