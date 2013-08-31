@@ -29,6 +29,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "plugin-api.h"
 #include "lto-streamer.h"
 #include "ipa-utils.h"
+#include "ipa-inline.h"
 
 /* Vector to keep track of external variables we've seen so far.  */
 vec<tree, va_gc> *lto_global_var_decls;
