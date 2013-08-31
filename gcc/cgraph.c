@@ -2347,6 +2347,9 @@ cgraph_propagate_frequency_1 (struct cgraph_node *node, void *data)
 bool
 cgraph_propagate_frequency (struct cgraph_node *node)
 {
+  if (node->count || node->tp_first_run)
+    return false;
+
   struct cgraph_propagate_frequency_data d = {true, true, true, true};
   bool changed = false;
 
