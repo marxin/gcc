@@ -1,3 +1,57 @@
+2013-09-01  Jan Hubicka  <jh@suse.cz>
+
+	* Makefile.in: Add ipa-profile.o
+	(ipa.o, ipa-devrit.o, ipa-inline-analysis.o): Adjust dependencies.
+	* cgraph.c (struct cgraph_propagate_frequency_data,
+	cgraph_propagate_frequency_1, cgraph_propagate_frequency): Move to
+	ipa-profile.c; replace cgraph_ by ipa_ prefix.
+	* cgraph.h (cgraph_propagate_frequency): Remove.
+	* ipa-inline-analysis.c: Include ipa-utils.h; drop duplicated cfgloop.h.
+	(inline_update_callee_summaries): Update.
+	* ipa-profile.c: New file.
+	* ipa-utils.h (ipa_propagate_frequency): Declare.
+	* ipa.c: Do not include pointer-set.h, hash-table.h, lto-streamer.h,
+	data-streamer.h, value-prof.h
+	(symtab_remove_unreachable_nodes): Update profile.
+	(struct histogram_entry, histogram, histogram_pool, histogram_hash,
+	account_time_size, cmp_counts, dump_histogram,
+	ipa_profile_generate_summary, ipa_profile_write_summary,
+	ipa_profile_read_summary, ipa_profile, gate_ipa_profile,
+	pass_data_ipa_profile, pass_ipa_profile, make_pass_ipa_profile):
+	Move to ipa-profile.c
+
+2013-09-01  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md: Allow "const 0" operand 1 in "scc" insns.
+
+2013-09-01  Jan Hubicka  <jh@suse.cz>
+
+	* common.opt (fdevirtualize-speculatively): New function.
+	* invoke.texi (fdevirtualize-speculatively): Document.
+	* ipa-devirt.c: Include ipa-inline.h
+	(likely_target_p): New function.
+	(ipa_devirt): New function.
+	(gate_ipa_devirt): New function.
+	(pass_data_ipa_devirt): New static var.
+	(pass_ipa_devirt): Likewise.
+	(make_pass_ipa_devirt): New function.
+	* opts.c (default_options): Add OPT_fdevirtualize_speculatively.
+	(common_handle_option): Disable devirtualization when
+	value range profiling is available.
+	* passes.def (pass_ipa_devirt): Add.
+	* timever.def (TV_IPA_DEVIRT): New timevar.
+	* tree-pass.h (make_pass_ipa_devirt): 
+
+2013-09-01  Iain Sandoe  <iain@codesourcery.com>
+
+	* config/darwin.h (LINK_COMMAND_SPEC_A): Revise sanitizer specs to
+	include sanitize(undefined).
+
+2013-08-31  Jan Hubicka  <jh@suse.cz>
+
+	* bulitins.c (expand_builtin): Do not early exit for gcov
+	instrumented functions.
+
 2013-08-31  Marek Polacek  <polacek@redhat.com>
 
 	* ubsan.c: Include tm_p.h.
