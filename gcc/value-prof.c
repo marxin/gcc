@@ -333,6 +333,15 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	}
       fprintf (dump_file, ".\n");
       break;
+    case HIST_TYPE_TIME_PROFILE:
+      fprintf (dump_file, "Time profile ");
+      if (hist->hvalue.counters)
+      {
+        fprintf (dump_file, "time:"HOST_WIDEST_INT_PRINT_DEC,
+                 (HOST_WIDEST_INT) hist->hvalue.counters[0]);
+      }
+      fprintf (dump_file, ".\n");
+      break;
     case HIST_TYPE_MAX:
       gcc_unreachable ();
    }
@@ -393,7 +402,6 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple stmt)
 
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
-  case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 2;
 	  break;
 
@@ -407,6 +415,7 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple stmt)
 	  break;
 
 	case HIST_TYPE_IOR:
+  case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 1;
 	  break;
 	case HIST_TYPE_MAX:
@@ -1954,7 +1963,7 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
   case HIST_TYPE_TIME_PROFILE:
-    hist->n_counters = 2;
+    hist->n_counters = 1;
     break;
 
 	case HIST_TYPE_AVERAGE:
