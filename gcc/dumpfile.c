@@ -262,10 +262,10 @@ dump_loc (int dump_kind, FILE *dfile, source_location loc)
   if (dump_kind)
     {
       if (LOCATION_LOCUS (loc) > BUILTINS_LOCATION)
-        fprintf (dfile, "\n%s:%d:%d: note: ", LOCATION_FILE (loc),
+        fprintf (dfile, "%s:%d:%d: note: ", LOCATION_FILE (loc),
                  LOCATION_LINE (loc), LOCATION_COLUMN (loc));
       else if (current_function_decl)
-        fprintf (dfile, "\n%s:%d:%d: note: ",
+        fprintf (dfile, "%s:%d:%d: note: ",
                  DECL_SOURCE_FILE (current_function_decl),
                  DECL_SOURCE_LINE (current_function_decl),
                  DECL_SOURCE_COLUMN (current_function_decl));
@@ -450,7 +450,9 @@ dump_finish (int phase)
   if (phase < 0)
     return;
   dfi = get_dump_file_info (phase);
-  if (dfi->pstream)
+  if (dfi->pstream && (!dfi->pfilename
+                       || (strcmp("stderr", dfi->pfilename) != 0
+                           && strcmp("stdout", dfi->pfilename) != 0)))
     fclose (dfi->pstream);
 
   if (dfi->alt_stream && strcmp("stderr", dfi->alt_filename) != 0

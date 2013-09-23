@@ -44,7 +44,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "basic-block.h"
 #include "tree-mudflap.h"
-#include "tree-flow.h"
+#include "tree-ssa.h"
 #include "value-prof.h"
 #include "diagnostic-core.h"
 #include "builtins.h"
@@ -62,7 +62,7 @@ struct target_builtins *this_target_builtins = &default_target_builtins;
 #endif
 
 /* Define the names of the builtin function types and codes.  */
-const char *const built_in_class_names[4]
+const char *const built_in_class_names[BUILT_IN_LAST]
   = {"NOT_BUILT_IN", "BUILT_IN_FRONTEND", "BUILT_IN_MD", "BUILT_IN_NORMAL"};
 
 #define DEF_BUILTIN(X, N, C, T, LT, B, F, NA, AT, IM, COND) #X,
@@ -1967,7 +1967,8 @@ expand_errno_check (tree exp, rtx target)
       rtx errno_rtx
 	  = gen_rtx_MEM (word_mode, gen_rtx_SYMBOL_REF (Pmode, "errno"));
 #endif
-      emit_move_insn (errno_rtx, GEN_INT (TARGET_EDOM));
+      emit_move_insn (errno_rtx,
+		      gen_int_mode (TARGET_EDOM, GET_MODE (errno_rtx)));
       emit_label (lab);
       return;
     }
@@ -4862,8 +4863,8 @@ round_trampoline_addr (rtx tramp)
 
   /* Round address up to desired boundary.  */
   temp = gen_reg_rtx (Pmode);
-  addend = GEN_INT (TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT - 1);
-  mask = GEN_INT (-TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT);
+  addend = gen_int_mode (TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT - 1, Pmode);
+  mask = gen_int_mode (-TRAMPOLINE_ALIGNMENT / BITS_PER_UNIT, Pmode);
 
   temp  = expand_simple_binop (Pmode, PLUS, tramp, addend,
 			       temp, 0, OPTAB_LIB_WIDEN);
@@ -10312,7 +10313,10 @@ fold_builtin_0 (location_t loc, tree fndecl, bool ignore ATTRIBUTE_UNUSED)
       return fold_builtin_classify_type (NULL_TREE);
 
     case BUILT_IN_UNREACHABLE:
-      if (flag_sanitize & SANITIZE_UNREACHABLE)
+      if (flag_sanitize & SANITIZE_UNREACHABLE
+	  && (current_function_decl == NULL
+	      || !lookup_attribute ("no_sanitize_undefined",
+				    DECL_ATTRIBUTES (current_function_decl))))
 	return ubsan_instrument_unreachable (loc);
       break;
 

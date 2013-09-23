@@ -17,6 +17,33 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+/* ipa-profile pass implements the following analysis propagating profille
+   inter-procedurally.
+
+   - Count histogram construction.  This is a histogram analyzing how much
+     time is spent executing statements with a given execution count read
+     from profile feedback. This histogram is complette only with LTO,
+     otherwise it contains information only about the current unit.
+
+     Similar histogram is also estimated by coverage runtime.  This histogram
+     is not dependent on LTO, but it suffers from various defects; first
+     gcov runtime is not weighting individual basic block by estimated execution
+     time and second the merging of multiple runs makes assumption that the
+     histogram distribution did not change.  Consequentely histogram constructed
+     here may be more precise.
+
+     The information is used to set hot/cold thresholds.
+   - Next speculative indirect call resolution is performed:  the local
+     profile pass assigns profile-id to each function and provide us with a
+     histogram specifying the most common target.  We look up the callgraph
+     node corresponding to the target and produce a speculative call.
+
+     This call may or may not survive through IPA optimization based on decision
+     of inliner. 
+   - Finally we propagate the following flags: unlikely executed, executed
+     once, executed at startup and executed at exit.  These flags are used to
+     control code size/performance threshold and and code placement (by producing
+     .text.unlikely/.text.hot/.text.startup/.text.exit subsections).  */
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -344,15 +371,17 @@ ipa_propagate_frequency_1 (struct cgraph_node *node, void *data)
   return edge != NULL;
 }
 
+/* Return ture if NODE contains hot calls.  */
+
 bool
-hot_call_p (struct cgraph_node *node)
+contains_hot_call_p (struct cgraph_node *node)
 {
   struct cgraph_edge *e;
   for (e = node->callees; e; e = e->next_callee)
     if (cgraph_maybe_hot_edge_p (e))
       return true;
     else if (!e->inline_failed
-	     && hot_call_p (e->callee))
+	     && contains_hot_call_p (e->callee))
       return true;
   for (e = node->indirect_calls; e; e = e->next_callee)
     if (cgraph_maybe_hot_edge_p (e))
@@ -406,7 +435,7 @@ ipa_propagate_frequency (struct cgraph_node *node)
       if (node->count >= get_hot_bb_threshold ())
 	hot = true;
       if (!hot)
-	hot |= hot_call_p (node);
+	hot |= contains_hot_call_p (node);
       if (hot)
 	{
 	  if (node->frequency != NODE_FREQUENCY_HOT)
@@ -415,7 +444,7 @@ ipa_propagate_frequency (struct cgraph_node *node)
 		fprintf (dump_file, "Node %s promoted to hot.\n",
 			 cgraph_node_name (node));
 	      node->frequency = NODE_FREQUENCY_HOT;
-        return true;
+	      return true;
 	    }
 	  return false;
 	}
@@ -597,7 +626,13 @@ ipa_profile (void)
 			 of N2.  Speculate on the local alias to allow inlining.
 		       */
 		      if (!symtab_can_be_discarded ((symtab_node) n2))
-			n2 = cgraph (symtab_nonoverwritable_alias ((symtab_node)n2));
+			{
+			  cgraph_node *alias;
+			  alias = cgraph (symtab_nonoverwritable_alias
+					   ((symtab_node)n2));
+			  if (alias)
+			    n2 = alias;
+			}
 		      nconverted++;
 		      cgraph_turn_edge_to_speculative
 			(e, n2,

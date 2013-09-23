@@ -108,7 +108,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "cgraph.h"
 #include "ipa-prop.h"
-#include "tree-flow.h"
+#include "tree-ssa.h"
 #include "tree-pass.h"
 #include "flags.h"
 #include "diagnostic.h"
@@ -1484,6 +1484,7 @@ ipa_get_indirect_edge_target_1 (struct cgraph_edge *ie,
   HOST_WIDE_INT token, anc_offset;
   tree otr_type;
   tree t;
+  tree target;
 
   if (param_index == -1
       || known_vals.length () <= (unsigned int) param_index)
@@ -1552,7 +1553,7 @@ ipa_get_indirect_edge_target_1 (struct cgraph_edge *ie,
       binfo = get_binfo_at_offset (binfo, anc_offset, otr_type);
       if (!binfo)
 	return NULL_TREE;
-      return gimple_get_virt_method_for_binfo (token, binfo);
+      target = gimple_get_virt_method_for_binfo (token, binfo);
     }
   else
     {
@@ -1561,8 +1562,15 @@ ipa_get_indirect_edge_target_1 (struct cgraph_edge *ie,
       binfo = get_binfo_at_offset (t, anc_offset, otr_type);
       if (!binfo)
 	return NULL_TREE;
-      return gimple_get_virt_method_for_binfo (token, binfo);
+      target = gimple_get_virt_method_for_binfo (token, binfo);
     }
+#ifdef ENABLE_CHECKING
+  if (target)
+    gcc_assert (possible_polymorphic_call_target_p
+		 (ie, cgraph_get_node (target)));
+#endif
+
+  return target;
 }
 
 
@@ -2113,23 +2121,17 @@ propagate_constants_topo (struct topo_info *topo)
 
   for (i = topo->nnodes - 1; i >= 0; i--)
     {
+      unsigned j;
       struct cgraph_node *v, *node = topo->order[i];
-      struct ipa_dfs_info *node_dfs_info;
+      vec<cgraph_node_ptr> cycle_nodes = ipa_get_nodes_in_cycle (node);
 
-      if (!cgraph_function_with_gimple_body_p (node))
-	continue;
-
-      node_dfs_info = (struct ipa_dfs_info *) node->symbol.aux;
       /* First, iteratively propagate within the strongly connected component
 	 until all lattices stabilize.  */
-      v = node_dfs_info->next_cycle;
-      while (v)
-	{
+      FOR_EACH_VEC_ELT (cycle_nodes, j, v)
+	if (cgraph_function_with_gimple_body_p (v))
 	  push_node_to_stack (topo, v);
-	  v = ((struct ipa_dfs_info *) v->symbol.aux)->next_cycle;
-	}
 
-      v = node;
+      v = pop_node_from_stack (topo);
       while (v)
 	{
 	  struct cgraph_edge *cs;
@@ -2144,19 +2146,18 @@ propagate_constants_topo (struct topo_info *topo)
       /* Afterwards, propagate along edges leading out of the SCC, calculates
 	 the local effects of the discovered constants and all valid values to
 	 their topological sort.  */
-      v = node;
-      while (v)
-	{
-	  struct cgraph_edge *cs;
+      FOR_EACH_VEC_ELT (cycle_nodes, j, v)
+	if (cgraph_function_with_gimple_body_p (v))
+	  {
+	    struct cgraph_edge *cs;
 
-	  estimate_local_effects (v);
-	  add_all_node_vals_to_toposort (v);
-	  for (cs = v->callees; cs; cs = cs->next_callee)
-	    if (!edge_within_scc (cs))
-	      propagate_constants_accross_call (cs);
-
-	  v = ((struct ipa_dfs_info *) v->symbol.aux)->next_cycle;
-	}
+	    estimate_local_effects (v);
+	    add_all_node_vals_to_toposort (v);
+	    for (cs = v->callees; cs; cs = cs->next_callee)
+	      if (!edge_within_scc (cs))
+		propagate_constants_accross_call (cs);
+	  }
+      cycle_nodes.release ();
     }
 }
 

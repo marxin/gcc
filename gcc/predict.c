@@ -50,7 +50,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "target.h"
 #include "cfgloop.h"
-#include "tree-flow.h"
+#include "tree-ssa.h"
 #include "ggc.h"
 #include "tree-pass.h"
 #include "tree-scalar-evolution.h"
@@ -235,13 +235,23 @@ probably_never_executed_bb_p (struct function *fun, const_basic_block bb)
 
   gcc_checking_assert (fun);
 
-  node = cgraph_get_node (fun->decl);  
+  if (profile_status_for_function (fun) == PROFILE_READ)
+    {
+      if ((bb->count * 4 + profile_info->runs / 2) / profile_info->runs > 0)
+	return false;
+      if (!bb->frequency)
+	return true;
+      if (!ENTRY_BLOCK_PTR->frequency)
+	return false;
+      if (ENTRY_BLOCK_PTR->count && ENTRY_BLOCK_PTR->count < REG_BR_PROB_BASE)
+	{
+	  return (RDIV (bb->frequency * ENTRY_BLOCK_PTR->count,
+		        ENTRY_BLOCK_PTR->frequency)
+		  < REG_BR_PROB_BASE / 4);
+	}
+      return true;
+    }
 
-  if (node->tp_first_run)
-    return false;
-
-  if (profile_info && flag_branch_probabilities)
-    return bb->count == 0;
   if ((!profile_info || !flag_branch_probabilities)
       && (node->frequency
 	  == NODE_FREQUENCY_UNLIKELY_EXECUTED))
@@ -2890,6 +2900,7 @@ compute_function_frequency (void)
         node->frequency = NODE_FREQUENCY_EXECUTED_ONCE;
       return;
     }
+
   /* Only first time try to drop function into unlikely executed.
      After inlining the roundoff errors may confuse us.
      Ipa-profile pass will drop functions only called from unlikely
