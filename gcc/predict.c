@@ -253,8 +253,8 @@ probably_never_executed_bb_p (struct function *fun, const_basic_block bb)
     }
 
   if ((!profile_info || !flag_branch_probabilities)
-      && (node->frequency
-	  == NODE_FREQUENCY_UNLIKELY_EXECUTED))
+    && (cgraph_get_node (fun->decl)->frequency
+        == NODE_FREQUENCY_UNLIKELY_EXECUTED))
     return true;
   return false;
 }

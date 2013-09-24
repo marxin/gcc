@@ -915,6 +915,9 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       
           node->tp_first_run = hist->hvalue.counters[0];
 
+          // TODO
+          fprintf (stderr, "Read tp_first_run:%s:%d\n", cgraph_node_asm_name (node), node->tp_first_run);
+
           if (dump_file)
             fprintf (dump_file, "Read tp_first_run: %d\n", node->tp_first_run);
         }

@@ -31,9 +31,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-utils.h"
 #include "ipa-inline.h"
 
-/* Vector to keep track of external variables we've seen so far.  */
-vec<tree, va_gc> *lto_global_var_decls;
-
 /* SRC and DST are going to be merged.  Take SRC's profile and merge it into
    DST so it is not going to be lost.  Destroy SRC's body on the way.  */
 
