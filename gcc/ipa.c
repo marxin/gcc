@@ -726,7 +726,7 @@ comdat_can_be_unshared_p (symtab_node node)
 
 static bool
 cgraph_externally_visible_p (struct cgraph_node *node,
-			     bool whole_program)
+			     bool whole_program, bool late)
 {
   if (!node->symbol.definition)
     return false;
@@ -760,10 +760,14 @@ cgraph_externally_visible_p (struct cgraph_node *node,
      This improves code quality and we know we will duplicate them at most twice
      (in the case that we are not using plugin and link with object file
       implementing same COMDAT)  */
-  if ((in_lto_p || whole_program)
-      && DECL_COMDAT (node->symbol.decl)
-      && comdat_can_be_unshared_p ((symtab_node) node))
-    return false;
+  if ((in_lto_p || whole_program || (profile_arc_flag && late))
+     && DECL_COMDAT (node->symbol.decl)
+     && comdat_can_be_unshared_p ((symtab_node) node))
+    {
+      gcc_checking_assert (cgraph_function_body_availability (node)
+			   > AVAIL_OVERWRITABLE);
+      return false;
+    }
 
   /* When doing link time optimizations, hidden symbols become local.  */
   if (in_lto_p
@@ -876,7 +880,7 @@ can_replace_by_local_alias (symtab_node node)
    via visibilities for the backend point of view.  */
 
 static unsigned int
-function_and_variable_visibility (bool whole_program)
+function_and_variable_visibility (bool whole_program, bool late)
 {
   struct cgraph_node *node;
   struct varpool_node *vnode;
@@ -934,7 +938,7 @@ function_and_variable_visibility (bool whole_program)
       	          || TREE_PUBLIC (node->symbol.decl)
 		  || node->symbol.weakref
 		  || DECL_EXTERNAL (node->symbol.decl));
-      if (cgraph_externally_visible_p (node, whole_program))
+      if (cgraph_externally_visible_p (node, whole_program, late))
         {
 	  gcc_assert (!node->global.inlined_to);
 	  node->symbol.externally_visible = true;
@@ -948,7 +952,7 @@ function_and_variable_visibility (bool whole_program)
 	  && node->symbol.definition && !node->symbol.weakref
 	  && !DECL_EXTERNAL (node->symbol.decl))
 	{
-	  gcc_assert (whole_program || in_lto_p
+	  gcc_assert (whole_program || in_lto_p || profile_arc_flag
 		      || !TREE_PUBLIC (node->symbol.decl));
 	  node->symbol.unique_name = ((node->symbol.resolution == LDPR_PREVAILING_DEF_IRONLY
 				      || node->symbol.resolution == LDPR_PREVAILING_DEF_IRONLY_EXP)
@@ -1099,7 +1103,7 @@ function_and_variable_visibility (bool whole_program)
 static unsigned int
 local_function_and_variable_visibility (void)
 {
-  return function_and_variable_visibility (flag_whole_program && !flag_lto);
+  return function_and_variable_visibility (flag_whole_program && !flag_lto, false);
 }
 
 namespace {
@@ -1200,7 +1204,7 @@ gate_whole_program_function_and_variable_visibility (void)
 static unsigned int
 whole_program_function_and_variable_visibility (void)
 {
-  function_and_variable_visibility (flag_whole_program);
+  function_and_variable_visibility (flag_whole_program, true);
   if (optimize)
     ipa_discover_readonly_nonaddressable_vars ();
   return 0;
