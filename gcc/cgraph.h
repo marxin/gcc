@@ -248,18 +248,6 @@ struct GTY(()) cgraph_clone_info
   bitmap combined_args_to_skip;
 };
 
-/* Helper macros for manipulation of order variable in cgraph_node.  */
-
-#define TP_THRESHOLD  (INT_MAX/2)
-
-#define SET_TP_VALUE(node, val) \
-  node->order = TP_THRESHOLD + val
-
-#define TP_HAS_VALUE(node) (node->order > TP_THRESHOLD)
-
-#define GET_TP_VALUE(node) \
-  TP_HAS_VALUE(node) ? (node->order - TP_THRESHOLD) : node->order
-
 /* The cgraph data structure.
    Each function decl has assigned cgraph_node listing callees and callers.  */
 

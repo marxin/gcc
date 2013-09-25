@@ -54,7 +54,6 @@ static GTY(()) tree tree_ior_profiler_fn;
 static GTY(()) tree ic_void_ptr_var;
 static GTY(()) tree ic_gcov_type_ptr_var;
 static GTY(()) tree ptr_void;
-static GTY(()) tree tp_function_counter_var;
 
 /* Do initialization work for the edge profiler.  */
 
@@ -131,27 +130,6 @@ init_ic_make_global_vars (void)
       decl_default_tls_model (ic_gcov_type_ptr_var);
 
   varpool_finalize_decl (ic_gcov_type_ptr_var);
-
-  /* Time profiler function counter.  */
-  /*
-  gcov_type_int = build_one_cst (wint_type_node);
-
-  tp_function_counter_var 
-	  = build_decl (UNKNOWN_LOCATION, VAR_DECL,
-		      get_identifier ("__gcov_time_profiler"),
-		      gcov_type_int);
-
-  TREE_PUBLIC (tp_function_counter_var) = 1;
-  DECL_EXTERNAL (tp_function_counter_var) = 1;
-  TREE_STATIC (tp_function_counter_var) = 1;
-  DECL_ARTIFICIAL (tp_function_counter_var) = 1;
-  DECL_INITIAL (tp_function_counter_var) = 1;
-  if (targetm.have_tls)
-    DECL_TLS_MODEL (tp_function_counter_var) =
-      decl_default_tls_model (tp_function_counter_var);
-
-  varpool_finalize_decl (tp_function_counter_var);
-  */
 }
 
 /* Create the type and function decls for the interface with gcov.  */

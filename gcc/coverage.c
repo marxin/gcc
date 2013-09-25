@@ -403,8 +403,6 @@ get_coverage_counts (unsigned counter, unsigned expected,
       warning (0, "source locations for function %qE have changed,"
 	       " the profile data may be out of date",
 	       DECL_ASSEMBLER_NAME (current_function_decl));
-
-      return NULL;
     }
 
   if (summary)

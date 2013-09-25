@@ -1074,8 +1074,6 @@ cgraph_turn_edge_to_speculative (struct cgraph_edge *e,
   struct ipa_ref *ref;
   struct cgraph_edge *e2;
 
-  return false;
-
   if (dump_file)
     {
       fprintf (dump_file, "Indirect call -> speculative call"

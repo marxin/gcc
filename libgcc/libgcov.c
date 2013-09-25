@@ -1287,8 +1287,6 @@ __gcov_fork (void)
   pid_t pid;
   extern __gthread_mutex_t __gcov_flush_mx;
 
-  fprintf (stderr, "__gcov_fork called\n");
-
   __gcov_flush ();
   pid = fork ();
   if (pid == 0)
