@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "tree.h"
 #include "cgraph.h"
 #include "tree-pass.h"
 #include "gimple.h"
@@ -173,7 +174,7 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
   if (!pointer_set_insert (reachable_call_targets,
 			   cache_token))
     {
-      for (i = 0; i < targets.length(); i++)
+      for (i = 0; i < targets.length (); i++)
 	{
 	  struct cgraph_node *n = targets[i];
 
@@ -204,7 +205,7 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
      make the edge direct.  */
   if (final)
     {
-      if (targets.length() <= 1)
+      if (targets.length () <= 1)
 	{
 	  cgraph_node *target, *node = edge->caller;
 	  if (targets.length () == 1)
@@ -886,7 +887,7 @@ function_and_variable_visibility (bool whole_program, bool late)
   struct varpool_node *vnode;
 
   /* All aliases should be procssed at this point.  */
-  gcc_checking_assert (!alias_pairs || !alias_pairs->length());
+  gcc_checking_assert (!alias_pairs || !alias_pairs->length ());
 
   FOR_EACH_FUNCTION (node)
     {
@@ -1126,8 +1127,9 @@ const pass_data pass_data_ipa_function_and_variable_visibility =
 class pass_ipa_function_and_variable_visibility : public simple_ipa_opt_pass
 {
 public:
-  pass_ipa_function_and_variable_visibility(gcc::context *ctxt)
-    : simple_ipa_opt_pass(pass_data_ipa_function_and_variable_visibility, ctxt)
+  pass_ipa_function_and_variable_visibility (gcc::context *ctxt)
+    : simple_ipa_opt_pass (pass_data_ipa_function_and_variable_visibility,
+			   ctxt)
   {}
 
   /* opt_pass methods: */
@@ -1174,8 +1176,8 @@ const pass_data pass_data_ipa_free_inline_summary =
 class pass_ipa_free_inline_summary : public simple_ipa_opt_pass
 {
 public:
-  pass_ipa_free_inline_summary(gcc::context *ctxt)
-    : simple_ipa_opt_pass(pass_data_ipa_free_inline_summary, ctxt)
+  pass_ipa_free_inline_summary (gcc::context *ctxt)
+    : simple_ipa_opt_pass (pass_data_ipa_free_inline_summary, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -1230,17 +1232,17 @@ const pass_data pass_data_ipa_whole_program_visibility =
 class pass_ipa_whole_program_visibility : public ipa_opt_pass_d
 {
 public:
-  pass_ipa_whole_program_visibility(gcc::context *ctxt)
-    : ipa_opt_pass_d(pass_data_ipa_whole_program_visibility, ctxt,
-		     NULL, /* generate_summary */
-		     NULL, /* write_summary */
-		     NULL, /* read_summary */
-		     NULL, /* write_optimization_summary */
-		     NULL, /* read_optimization_summary */
-		     NULL, /* stmt_fixup */
-		     0, /* function_transform_todo_flags_start */
-		     NULL, /* function_transform */
-		     NULL) /* variable_transform */
+  pass_ipa_whole_program_visibility (gcc::context *ctxt)
+    : ipa_opt_pass_d (pass_data_ipa_whole_program_visibility, ctxt,
+		      NULL, /* generate_summary */
+		      NULL, /* write_summary */
+		      NULL, /* read_summary */
+		      NULL, /* write_optimization_summary */
+		      NULL, /* read_optimization_summary */
+		      NULL, /* stmt_fixup */
+		      0, /* function_transform_todo_flags_start */
+		      NULL, /* function_transform */
+		      NULL) /* variable_transform */
   {}
 
   /* opt_pass methods: */
@@ -1563,17 +1565,17 @@ const pass_data pass_data_ipa_cdtor_merge =
 class pass_ipa_cdtor_merge : public ipa_opt_pass_d
 {
 public:
-  pass_ipa_cdtor_merge(gcc::context *ctxt)
-    : ipa_opt_pass_d(pass_data_ipa_cdtor_merge, ctxt,
-		     NULL, /* generate_summary */
-		     NULL, /* write_summary */
-		     NULL, /* read_summary */
-		     NULL, /* write_optimization_summary */
-		     NULL, /* read_optimization_summary */
-		     NULL, /* stmt_fixup */
-		     0, /* function_transform_todo_flags_start */
-		     NULL, /* function_transform */
-		     NULL) /* variable_transform */
+  pass_ipa_cdtor_merge (gcc::context *ctxt)
+    : ipa_opt_pass_d (pass_data_ipa_cdtor_merge, ctxt,
+		      NULL, /* generate_summary */
+		      NULL, /* write_summary */
+		      NULL, /* read_summary */
+		      NULL, /* write_optimization_summary */
+		      NULL, /* read_optimization_summary */
+		      NULL, /* stmt_fixup */
+		      0, /* function_transform_todo_flags_start */
+		      NULL, /* function_transform */
+		      NULL) /* variable_transform */
   {}
 
   /* opt_pass methods: */

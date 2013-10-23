@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "tree.h"
 #include "hash-table.h"
 #include "tree-ssa.h"
 #include "tree-pass.h"
@@ -2098,8 +2099,8 @@ const pass_data pass_data_strlen =
 class pass_strlen : public gimple_opt_pass
 {
 public:
-  pass_strlen(gcc::context *ctxt)
-    : gimple_opt_pass(pass_data_strlen, ctxt)
+  pass_strlen (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_strlen, ctxt)
   {}
 
   /* opt_pass methods: */

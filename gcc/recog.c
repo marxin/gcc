@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "tree.h"
 #include "rtl-error.h"
 #include "tm_p.h"
 #include "insn-config.h"
@@ -3801,14 +3802,14 @@ const pass_data pass_data_peephole2 =
 class pass_peephole2 : public rtl_opt_pass
 {
 public:
-  pass_peephole2(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_peephole2, ctxt)
+  pass_peephole2 (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_peephole2, ctxt)
   {}
 
   /* opt_pass methods: */
   /* The epiphany backend creates a second instance of this pass, so we need
      a clone method.  */
-  opt_pass * clone () { return new pass_peephole2 (ctxt_); }
+  opt_pass * clone () { return new pass_peephole2 (m_ctxt); }
   bool gate () { return gate_handle_peephole2 (); }
   unsigned int execute () { return rest_of_handle_peephole2 (); }
 
@@ -3849,14 +3850,14 @@ const pass_data pass_data_split_all_insns =
 class pass_split_all_insns : public rtl_opt_pass
 {
 public:
-  pass_split_all_insns(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_split_all_insns, ctxt)
+  pass_split_all_insns (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_split_all_insns, ctxt)
   {}
 
   /* opt_pass methods: */
   /* The epiphany backend creates a second instance of this pass, so
      we need a clone method.  */
-  opt_pass * clone () { return new pass_split_all_insns (ctxt_); }
+  opt_pass * clone () { return new pass_split_all_insns (m_ctxt); }
   unsigned int execute () { return rest_of_handle_split_all_insns (); }
 
 }; // class pass_split_all_insns
@@ -3900,8 +3901,8 @@ const pass_data pass_data_split_after_reload =
 class pass_split_after_reload : public rtl_opt_pass
 {
 public:
-  pass_split_after_reload(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_split_after_reload, ctxt)
+  pass_split_after_reload (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_split_after_reload, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -3962,8 +3963,8 @@ const pass_data pass_data_split_before_regstack =
 class pass_split_before_regstack : public rtl_opt_pass
 {
 public:
-  pass_split_before_regstack(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_split_before_regstack, ctxt)
+  pass_split_before_regstack (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_split_before_regstack, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -4021,8 +4022,8 @@ const pass_data pass_data_split_before_sched2 =
 class pass_split_before_sched2 : public rtl_opt_pass
 {
 public:
-  pass_split_before_sched2(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_split_before_sched2, ctxt)
+  pass_split_before_sched2 (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_split_before_sched2, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -4071,8 +4072,8 @@ const pass_data pass_data_split_for_shorten_branches =
 class pass_split_for_shorten_branches : public rtl_opt_pass
 {
 public:
-  pass_split_for_shorten_branches(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_split_for_shorten_branches, ctxt)
+  pass_split_for_shorten_branches (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_split_for_shorten_branches, ctxt)
   {}
 
   /* opt_pass methods: */

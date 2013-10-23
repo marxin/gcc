@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "machmode.h"
 #include "tm.h"
+#include "tree.h"
 #include "rtl.h"
 #include "tm_p.h"
 #include "flags.h"
@@ -1709,8 +1710,8 @@ const pass_data pass_data_lower_subreg =
 class pass_lower_subreg : public rtl_opt_pass
 {
 public:
-  pass_lower_subreg(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_lower_subreg, ctxt)
+  pass_lower_subreg (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_lower_subreg, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -1748,8 +1749,8 @@ const pass_data pass_data_lower_subreg2 =
 class pass_lower_subreg2 : public rtl_opt_pass
 {
 public:
-  pass_lower_subreg2(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_lower_subreg2, ctxt)
+  pass_lower_subreg2 (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_lower_subreg2, ctxt)
   {}
 
   /* opt_pass methods: */

@@ -903,12 +903,16 @@ edge_badness (struct cgraph_edge *edge, bool dump)
     {
       sreal tmp, relbenefit_real, growth_real;
       int relbenefit = relative_time_benefit (callee_info, edge, edge_time);
+      /* Capping edge->count to max_count. edge->count can be larger than
+	 max_count if an inline adds new edges which increase max_count
+	 after max_count is computed.  */
+      int edge_count = edge->count > max_count ? max_count : edge->count;
 
-      sreal_init(&relbenefit_real, relbenefit, 0);
-      sreal_init(&growth_real, growth, 0);
+      sreal_init (&relbenefit_real, relbenefit, 0);
+      sreal_init (&growth_real, growth, 0);
 
       /* relative_edge_count.  */
-      sreal_init (&tmp, edge->count, 0);
+      sreal_init (&tmp, edge_count, 0);
       sreal_div (&tmp, &tmp, &max_count_real);
 
       /* relative_time_benefit.  */
@@ -921,16 +925,14 @@ edge_badness (struct cgraph_edge *edge, bool dump)
 
       badness = -1 * sreal_to_int (&tmp);
  
-      /* Be sure that insanity of the profile won't lead to increasing counts
-	 in the scalling and thus to overflow in the computation above.  */
-      gcc_assert (max_count >= edge->count);
       if (dump)
 	{
 	  fprintf (dump_file,
-		   "      %i (relative %f): profile info. Relative count %f"
+		   "      %i (relative %f): profile info. Relative count %f%s"
 		   " * Relative benefit %f\n",
 		   (int) badness, (double) badness / INT_MIN,
-		   (double) edge->count / max_count,
+		   (double) edge_count / max_count,
+		   edge->count > max_count ? " (capped to max_count)" : "",
 		   relbenefit * 100.0 / RELATIVE_TIME_BENEFIT_RANGE);
 	}
     }
@@ -1962,14 +1964,15 @@ ipa_inline (void)
 {
   struct cgraph_node *node;
   int nnodes;
-  struct cgraph_node **order =
-    XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  struct cgraph_node **order;
   int i;
   int cold;
   bool remove_functions = false;
 
   if (!optimize)
     return 0;
+
+  order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
 
   if (in_lto_p && optimize)
     ipa_update_after_lto_read ();
@@ -2311,8 +2314,8 @@ const pass_data pass_data_early_inline =
 class pass_early_inline : public gimple_opt_pass
 {
 public:
-  pass_early_inline(gcc::context *ctxt)
-    : gimple_opt_pass(pass_data_early_inline, ctxt)
+  pass_early_inline (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_early_inline, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -2361,17 +2364,17 @@ const pass_data pass_data_ipa_inline =
 class pass_ipa_inline : public ipa_opt_pass_d
 {
 public:
-  pass_ipa_inline(gcc::context *ctxt)
-    : ipa_opt_pass_d(pass_data_ipa_inline, ctxt,
-		     inline_generate_summary, /* generate_summary */
-		     inline_write_summary, /* write_summary */
-		     inline_read_summary, /* read_summary */
-		     NULL, /* write_optimization_summary */
-		     NULL, /* read_optimization_summary */
-		     NULL, /* stmt_fixup */
-		     0, /* function_transform_todo_flags_start */
-		     inline_transform, /* function_transform */
-		     NULL) /* variable_transform */
+  pass_ipa_inline (gcc::context *ctxt)
+    : ipa_opt_pass_d (pass_data_ipa_inline, ctxt,
+		      inline_generate_summary, /* generate_summary */
+		      inline_write_summary, /* write_summary */
+		      inline_read_summary, /* read_summary */
+		      NULL, /* write_optimization_summary */
+		      NULL, /* read_optimization_summary */
+		      NULL, /* stmt_fixup */
+		      0, /* function_transform_todo_flags_start */
+		      inline_transform, /* function_transform */
+		      NULL) /* variable_transform */
   {}
 
   /* opt_pass methods: */

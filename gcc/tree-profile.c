@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "profile.h"
 #include "target.h"
+#include "tree-cfgcleanup.h"
 
 static GTY(()) tree gcov_type_node;
 static GTY(()) tree tree_interval_profiler_fn;
@@ -660,7 +661,7 @@ tree_profiling (void)
       pop_cfun ();
     }
 
-  del_node_map();
+  del_node_map ();
   return 0;
 }
 
@@ -694,8 +695,8 @@ const pass_data pass_data_ipa_tree_profile =
 class pass_ipa_tree_profile : public simple_ipa_opt_pass
 {
 public:
-  pass_ipa_tree_profile(gcc::context *ctxt)
-    : simple_ipa_opt_pass(pass_data_ipa_tree_profile, ctxt)
+  pass_ipa_tree_profile (gcc::context *ctxt)
+    : simple_ipa_opt_pass (pass_data_ipa_tree_profile, ctxt)
   {}
 
   /* opt_pass methods: */
