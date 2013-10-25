@@ -1,3 +1,52 @@
+2013-10-25  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/debug/formatter.h (__check_singular): Add const on
+	iterator reference.
+	* include/debug/functions.h (__check_singular): Likewise.
+	(__check_singular(const _Safe_iterator<_Ite, _Seq>&)): Delete.
+	(__check_dereferenceable(const _Ite&)): Add const on iterator
+	reference.
+	(__check_dereferenceable(const _Safe_local_iterator<>&)): New.
+	* include/debug/safe_iterator.h (__check_singular_aux): Review
+	comment.
+	* testsuite/23_containers/vector/debug/debug_functions.cc: New.
+	* testsuite/23_containers/unordered_set/debug/debug_functions.cc:
+	New.
+
+2013-10-23  Chris Jefferson  <chris@bubblescope.net>
+	    Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* testsuite/util/testsuite_containergen.h: New.
+	* testsuite/util/testsuite_iterators.h (test_container<>::val): Add.
+	* testsuite/25_algorithms/nth_element/random_test.cc: New, use the
+	above.
+	* testsuite/25_algorithms/partial_sort/random_test.cc: Likewise.
+	* testsuite/25_algorithms/partial_sort_copy/random_test.cc: Likewise.
+	* testsuite/25_algorithms/sort/random_test.cc: Likewise.
+
+2013-10-23  Jason Merrill  <jason@redhat.com>
+
+	* include/bits/hashtable.h (_Hashtable): Force EBO for _Hash_code_base.
+
+2013-10-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR libstdc++/58850
+	* include/std/chrono (minutes, hours): Change typedefs to uniformly
+	use int64_t.
+	* testsuite/20_util/duration/arithmetic/58850.cc: New.
+
+2013-10-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* testsuite/decimal/pr58815.cc: Fix thinko.
+
+2013-10-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR libstdc++/58815
+	* include/decimal/decimal (decimal32::operator long long(),
+	decimal64::operator long long(), decimal128::operator long long()):
+	Add in c++11 mode per n3407.
+	* testsuite/decimal/pr58815.cc: New.
+
 2013-10-22  Edward Smith-Rowland  <3dw4rd@verizon.net>
 
 	* include/bits/basic_string.h (operator""s): Remove space between quotes
@@ -2592,7 +2641,7 @@
 	* config/abi/pre/gnu.ver: Add new symbols.
 	* config/abi/pre/gnu-versioned-namespace.ver: Add new symbols.
 
-2013-05-08  Andoni Morales Alastruey <ylatuya@gmail.com>
+2013-05-08  Andoni Morales Alastruey  <ylatuya@gmail.com>
 
 	PR libstdc++/57212
 	* include/Makefile.am (_GLIBCXX___MINGW32_GLIBCXX___): Modify

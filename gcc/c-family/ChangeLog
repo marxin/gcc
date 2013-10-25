@@ -1,3 +1,13 @@
+2013-10-24  Tobias Burnus  <burnus@net-b.de>
+
+	PR other/33426
+	* c-pragma.c (init_pragma) Add #pragma ivdep handling.
+	* c-pragma.h (pragma_kind): Add PRAGMA_IVDEP.
+
+2013-10-23  Jason Merrill  <jason@redhat.com>
+
+	* c-format.c (gcc_cxxdiag_char_table): Add %X.
+
 2013-10-11  Jakub Jelinek  <jakub@redhat.com>
 
 	* c-common.h (omp_clause_mask::operator !=): New method.
@@ -390,7 +400,7 @@
 	* c-family/array-notation-common.c (length_mismatch_in_expr_p): Delete
 	unused variables l_length and l_node.
 
-2013-07-04  Joern Rennecke <joern.rennecke@embecosm.com>
+2013-07-04  Joern Rennecke  <joern.rennecke@embecosm.com>
 
 	PR c/57821
 	* c-common.c (complete_array_type): Delay folding first index
