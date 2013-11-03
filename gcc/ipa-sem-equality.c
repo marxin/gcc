@@ -53,18 +53,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
-#include "tree-flow.h"
 #include "tree-pass.h"
 #include "tree-dump.h"
+#include "tree-cfg.h"
 #include "langhooks.h"
 #include "gimple.h"
 #include "cgraph.h"
 #include "cfgloop.h"
 #include "tree-ssa-sccvn.h"
-#include "gimple-pretty-print.h"
+#include "tree-ssanames.h"
 #include "coverage.h"
 #include "hash-table.h"
 #include "except.h"
+#include "gimple-ssa.h"
+#include "gimple-pretty-print.h"
+#include "tree-dfa.h"
 
 #define SE_DUMP_MESSAGE(message) \
   do \
@@ -406,7 +409,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   edge_iterator ei;
   edge e;
 
-  fndecl = node->symbol.decl;    
+  fndecl = node->decl;
   func = DECL_STRUCT_FUNCTION (fndecl);
 
   f->called_functions.create (0);
@@ -764,7 +767,6 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
   enum tree_code tc1, tc2;
   unsigned length1, length2, i;
   bool ret;
-  tree base;
 
   if (t1 == NULL && t2 == NULL)
     return true;
@@ -1468,8 +1470,8 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
       SE_CF_EXIT_FALSE();
 
   /* Checking function arguments.  */
-  decl1 = DECL_ATTRIBUTES (f1->node->symbol.decl);
-  decl2 = DECL_ATTRIBUTES (f2->node->symbol.decl);
+  decl1 = DECL_ATTRIBUTES (f1->node->decl);
+  decl2 = DECL_ATTRIBUTES (f2->node->decl);
 
   while (decl1)
     {
@@ -1610,12 +1612,12 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 
   /* Do not attempt to mix functions from different user sections;
      we do not know what user intends with those.  */
-  if (((DECL_SECTION_NAME (original->symbol.decl)
-        && !DECL_HAS_IMPLICIT_SECTION_NAME_P (original->symbol.decl))
-       || (DECL_SECTION_NAME (alias->symbol.decl)
-           && !DECL_HAS_IMPLICIT_SECTION_NAME_P (alias->symbol.decl)))
-      && DECL_SECTION_NAME (original->symbol.decl)
-         != DECL_SECTION_NAME (alias->symbol.decl))
+  if (((DECL_SECTION_NAME (original->decl)
+        && !DECL_HAS_IMPLICIT_SECTION_NAME_P (original->decl))
+       || (DECL_SECTION_NAME (alias->decl)
+           && !DECL_HAS_IMPLICIT_SECTION_NAME_P (alias->decl)))
+      && DECL_SECTION_NAME (original->decl)
+         != DECL_SECTION_NAME (alias->decl))
     {
       if (dump_file)
         fprintf (dump_file,
@@ -1625,15 +1627,15 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
  
   /* See if original is in a section that can be discarded if the main
      symbol is not used.  */
-  if (DECL_EXTERNAL (original->symbol.decl))
+  if (DECL_EXTERNAL (original->decl))
     original_discardable = true;
-  if (original->symbol.resolution == LDPR_PREEMPTED_REG
-      || original->symbol.resolution == LDPR_PREEMPTED_IR)
+  if (original->resolution == LDPR_PREEMPTED_REG
+      || original->resolution == LDPR_PREEMPTED_IR)
     original_discardable = true;
-  if (DECL_ONE_ONLY (original->symbol.decl)
-      && original->symbol.resolution != LDPR_PREVAILING_DEF
-      && original->symbol.resolution != LDPR_PREVAILING_DEF_IRONLY
-      && original->symbol.resolution != LDPR_PREVAILING_DEF_IRONLY_EXP)
+  if (DECL_ONE_ONLY (original->decl)
+      && original->resolution != LDPR_PREVAILING_DEF
+      && original->resolution != LDPR_PREVAILING_DEF_IRONLY
+      && original->resolution != LDPR_PREVAILING_DEF_IRONLY_EXP)
     original_discardable = true;
 
 #if 0
@@ -1641,8 +1643,8 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
      equivalent) implementation, we risk creation of cycles from
      wrappers of equivalent functions.  Do not attempt to unify for now.  */
   if (original_discardable
-      && (DECL_COMDAT_GROUP (original->symbol.decl)
-	  != DECL_COMDAT_GROUP (alias->symbol.decl)))
+      && (DECL_COMDAT_GROUP (original->decl)
+	  != DECL_COMDAT_GROUP (alias->decl)))
     {
       if (dump_file)
         fprintf (dump_file, "Not unifying; risk of creation of cycle.\n\n");
@@ -1652,13 +1654,13 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 
   /* See if original and/or alias ddress can be compared for equality.  */
   original_address_matters
-     = (!DECL_VIRTUAL_P (original->symbol.decl)
-	&& (original->symbol.externally_visible
-	    || address_taken_from_non_vtable_p ((symtab_node)original)));
+     = (!DECL_VIRTUAL_P (original->decl)
+	&& (original->externally_visible
+	    || address_taken_from_non_vtable_p (original)));
   alias_address_matters
-     = (!DECL_VIRTUAL_P (alias->symbol.decl)
-	&& (alias->symbol.externally_visible
-	    || address_taken_from_non_vtable_p ((symtab_node)alias)));
+     = (!DECL_VIRTUAL_P (alias->decl)
+	&& (alias->externally_visible
+	    || address_taken_from_non_vtable_p (alias)));
 
   /* If alias and original can be compared for address equality, we need
      to create a thunk.  Also we can not create extra aliases into discardable
@@ -1667,7 +1669,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
       && alias_address_matters)
       || original_discardable)
     {
-      create_thunk = !stdarg_p (TREE_TYPE (alias->symbol.decl));
+      create_thunk = !stdarg_p (TREE_TYPE (alias->decl));
       create_alias = false;
       /* When both alias and original are not overwritable, we can save
          the extra thunk wrapper for direct calls.  */
@@ -1687,31 +1689,31 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
      unless the body is comdat and may be optimized out.  */
   if ((create_thunk || redirect_callers)
       && (!original_discardable
-	  || (DECL_COMDAT_GROUP (original->symbol.decl)
-	      && (DECL_COMDAT_GROUP (original->symbol.decl)
-		  == DECL_COMDAT_GROUP (alias->symbol.decl)))))
+	  || (DECL_COMDAT_GROUP (original->decl)
+	      && (DECL_COMDAT_GROUP (original->decl)
+		  == DECL_COMDAT_GROUP (alias->decl)))))
     local_original
-      = cgraph (symtab_nonoverwritable_alias ((symtab_node) original));
+      = cgraph (symtab_nonoverwritable_alias (original));
 
   if (create_thunk)
     {
       /* Preserve DECL_RESULT so we get right by reference flag.  */
-      tree result = DECL_RESULT (alias->symbol.decl);
+      tree result = DECL_RESULT (alias->decl);
 
       /* Remove the function's body.  */
       cgraph_release_function_body (alias);
       cgraph_reset_node (alias);
 
-      DECL_RESULT (alias->symbol.decl) = result;
-      allocate_struct_function (alias_func->node->symbol.decl, false);
+      DECL_RESULT (alias->decl) = result;
+      allocate_struct_function (alias_func->node->decl, false);
       set_cfun (NULL);
 	
       /* Turn alias into thunk and expand it into GIMPLE representation.  */
-      alias->symbol.definition = true;
+      alias->definition = true;
       alias->thunk.thunk_p = true;
       cgraph_create_edge (alias, local_original,
                           NULL, 0, CGRAPH_FREQ_BASE);
-      expand_thunk (alias);
+      expand_thunk (alias, true);
       if (dump_file)
         fprintf (dump_file, "Thunk has been created.\n\n");
     }
@@ -1725,7 +1727,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 
       /* Create the alias.  */
       cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
-      symtab_resolve_alias ((symtab_node) alias, (symtab_node) original);  
+      symtab_resolve_alias (alias, original);  
       if (dump_file)
         fprintf (dump_file, "Alias has been created.\n\n");
     }
@@ -1738,7 +1740,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
         {
 	  struct cgraph_edge *e = alias->callers;
 	  cgraph_redirect_edge_callee (e, local_original);
-          push_cfun (DECL_STRUCT_FUNCTION (e->caller->symbol.decl));
+          push_cfun (DECL_STRUCT_FUNCTION (e->caller->decl));
 	  cgraph_redirect_edge_call_stmt_to_callee (e);
 	  pop_cfun ();
 	  redirected = true;
