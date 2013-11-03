@@ -1,4 +1,5 @@
 -- { dg-do compile }
+-- { dg-skip-if "missing alias support" { *-*-darwin* hppa*-*-hpux* } }
 
 package Linker_Alias is
 

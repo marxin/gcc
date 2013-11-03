@@ -28,7 +28,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "function.h"
 #include "expr.h"
 #include "langhooks.h"
-#include "tree-flow.h"
+#include "bitmap.h"
+#include "gimple.h"
+#include "gimple-ssa.h"
+#include "cgraph.h"
+#include "tree-cfg.h"
+#include "tree-phinodes.h"
+#include "ssa-iterators.h"
+#include "tree-ssanames.h"
+#include "tree-dfa.h"
+#include "tree-ssa.h"
 #include "tree-pass.h"
 #include "except.h"
 #include "flags.h"
@@ -40,13 +49,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-inline.h"
 #include "value-prof.h"
 #include "target.h"
-#include "ssaexpand.h"
-#include "bitmap.h"
+#include "tree-ssa-live.h"
+#include "tree-outof-ssa.h"
 #include "sbitmap.h"
 #include "cfgloop.h"
 #include "regs.h" /* For reg_renumber.  */
 #include "insn-attr.h" /* For INSN_SCHEDULING.  */
 #include "asan.h"
+#include "tree-ssa-address.h"
 
 /* This variable holds information helping the rewriting of SSA trees
    into RTL.  */
@@ -569,7 +579,7 @@ add_partitioned_vars_to_ptset (struct pt_solution *pt,
       || pt->vars == NULL
       /* The pointed-to vars bitmap is shared, it is enough to
 	 visit it once.  */
-      || pointer_set_insert(visited, pt->vars))
+      || pointer_set_insert (visited, pt->vars))
     return;
 
   bitmap_clear (temp);
@@ -764,7 +774,7 @@ partition_stack_vars (void)
 	     sizes, as the shorter vars wouldn't be adequately protected.
 	     Don't do that for "large" (unsupported) alignment objects,
 	     those aren't protected anyway.  */
-	  if (flag_asan && isize != jsize
+	  if ((flag_sanitize & SANITIZE_ADDRESS) && isize != jsize
 	      && ialign * BITS_PER_UNIT <= MAX_SUPPORTED_STACK_ALIGNMENT)
 	    break;
 
@@ -940,7 +950,7 @@ expand_stack_vars (bool (*pred) (size_t), struct stack_vars_data *data)
       alignb = stack_vars[i].alignb;
       if (alignb * BITS_PER_UNIT <= MAX_SUPPORTED_STACK_ALIGNMENT)
 	{
-	  if (flag_asan && pred)
+	  if ((flag_sanitize & SANITIZE_ADDRESS) && pred)
 	    {
 	      HOST_WIDE_INT prev_offset = frame_offset;
 	      tree repr_decl = NULL_TREE;
@@ -1110,7 +1120,7 @@ defer_stack_allocation (tree var, bool toplevel)
   /* If stack protection is enabled, *all* stack variables must be deferred,
      so that we can re-order the strings to the top of the frame.
      Similarly for Address Sanitizer.  */
-  if (flag_stack_protect || flag_asan)
+  if (flag_stack_protect || (flag_sanitize & SANITIZE_ADDRESS))
     return true;
 
   /* We handle "large" alignment via dynamic allocation.  We want to handle
@@ -1131,7 +1141,9 @@ defer_stack_allocation (tree var, bool toplevel)
      other hand, we don't want the function's stack frame size to
      get completely out of hand.  So we avoid adding scalars and
      "small" aggregates to the list at all.  */
-  if (optimize == 0 && tree_low_cst (DECL_SIZE_UNIT (var), 1) < 32)
+  if (optimize == 0
+      && (tree_low_cst (DECL_SIZE_UNIT (var), 1)
+          < PARAM_VALUE (PARAM_MIN_SIZE_FOR_STACK_SHARING)))
     return false;
 
   return true;
@@ -1184,7 +1196,7 @@ expand_one_var (tree var, bool toplevel, bool really_expand)
     {
       /* stack_alignment_estimated shouldn't change after stack
          realign decision made */
-      gcc_assert(!crtl->stack_realign_processed);
+      gcc_assert (!crtl->stack_realign_processed);
       crtl->stack_alignment_estimated = align;
     }
 
@@ -1497,7 +1509,7 @@ estimated_stack_frame_size (struct cgraph_node *node)
   HOST_WIDE_INT size = 0;
   size_t i;
   tree var;
-  struct function *fn = DECL_STRUCT_FUNCTION (node->symbol.decl);
+  struct function *fn = DECL_STRUCT_FUNCTION (node->decl);
 
   push_cfun (fn);
 
@@ -1723,7 +1735,7 @@ expand_used_vars (void)
 
     case SPCT_FLAG_DEFAULT:
       if (cfun->calls_alloca || has_protected_decls)
-	create_stack_guard();
+	create_stack_guard ();
       break;
 
     default:
@@ -1753,7 +1765,7 @@ expand_used_vars (void)
 	    expand_stack_vars (stack_protect_decl_phase_2, &data);
 	}
 
-      if (flag_asan)
+      if (flag_sanitize & SANITIZE_ADDRESS)
 	/* Phase 3, any partitions that need asan protection
 	   in addition to phase 1 and 2.  */
 	expand_stack_vars (asan_decl_phase_3, &data);
@@ -1770,7 +1782,7 @@ expand_used_vars (void)
 	  var_end_seq
 	    = asan_emit_stack_protection (virtual_stack_vars_rtx,
 					  data.asan_vec.address (),
-					  data.asan_decl_vec. address(),
+					  data.asan_decl_vec. address (),
 					  data.asan_vec.length ());
 	}
 
@@ -3154,7 +3166,12 @@ expand_debug_expr (tree exp)
 	  && GET_MODE (op0) != VOIDmode && GET_MODE (op1) != VOIDmode
 	  && GET_MODE (op0) != GET_MODE (op1))
 	{
-	  if (GET_MODE_BITSIZE (GET_MODE (op0)) < GET_MODE_BITSIZE (GET_MODE (op1)))
+	  if (GET_MODE_BITSIZE (GET_MODE (op0)) < GET_MODE_BITSIZE (GET_MODE (op1))
+	      /* If OP0 is a partial mode, then we must truncate, even if it has
+		 the same bitsize as OP1 as GCC's representation of partial modes
+		 is opaque.  */
+	      || (GET_MODE_CLASS (GET_MODE (op0)) == MODE_PARTIAL_INT
+		  && GET_MODE_BITSIZE (GET_MODE (op0)) == GET_MODE_BITSIZE (GET_MODE (op1))))
 	    op1 = simplify_gen_unary (TRUNCATE, GET_MODE (op0), op1,
 				      GET_MODE (op1));
 	  else
@@ -4773,14 +4790,18 @@ gimple_expand_cfg (void)
 	  if (e->insns.r)
 	    {
 	      rebuild_jump_labels_chain (e->insns.r);
-	      /* Avoid putting insns before parm_birth_insn.  */
+	      /* Put insns after parm birth, but before
+		 NOTE_INSNS_FUNCTION_BEG.  */
 	      if (e->src == ENTRY_BLOCK_PTR
-		  && single_succ_p (ENTRY_BLOCK_PTR)
-		  && parm_birth_insn)
+		  && single_succ_p (ENTRY_BLOCK_PTR))
 		{
 		  rtx insns = e->insns.r;
 		  e->insns.r = NULL_RTX;
-		  emit_insn_after_noloc (insns, parm_birth_insn, e->dest);
+		  if (NOTE_P (parm_birth_insn)
+		      && NOTE_KIND (parm_birth_insn) == NOTE_INSN_FUNCTION_BEG)
+		    emit_insn_before_noloc (insns, parm_birth_insn, e->dest);
+		  else
+		    emit_insn_after_noloc (insns, parm_birth_insn, e->dest);
 		}
 	      else
 		commit_one_edge_insertion (e);
@@ -4929,8 +4950,8 @@ const pass_data pass_data_expand =
 class pass_expand : public rtl_opt_pass
 {
 public:
-  pass_expand(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_expand, ctxt)
+  pass_expand (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_expand, ctxt)
   {}
 
   /* opt_pass methods: */

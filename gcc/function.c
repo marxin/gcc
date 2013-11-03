@@ -1520,7 +1520,7 @@ instantiate_virtual_regs_in_insn (rtx insn)
 
 	  for_each_rtx (&SET_SRC (set), instantiate_virtual_regs_in_rtx, NULL);
 	  x = simplify_gen_binary (PLUS, GET_MODE (new_rtx), SET_SRC (set),
-				   GEN_INT (-offset));
+				   gen_int_mode (-offset, GET_MODE (new_rtx)));
 	  x = force_operand (x, new_rtx);
 	  if (x != new_rtx)
 	    emit_move_insn (new_rtx, x);
@@ -1544,9 +1544,10 @@ instantiate_virtual_regs_in_insn (rtx insn)
 	{
 	  start_sequence ();
 
-	  x = expand_simple_binop (GET_MODE (SET_DEST (set)), PLUS,
-				   new_rtx, GEN_INT (offset), SET_DEST (set),
-				   1, OPTAB_LIB_WIDEN);
+	  x = expand_simple_binop (GET_MODE (SET_DEST (set)), PLUS, new_rtx,
+				   gen_int_mode (offset,
+						 GET_MODE (SET_DEST (set))),
+				   SET_DEST (set), 1, OPTAB_LIB_WIDEN);
 	  if (x != SET_DEST (set))
 	    emit_move_insn (SET_DEST (set), x);
 
@@ -1666,8 +1667,8 @@ instantiate_virtual_regs_in_insn (rtx insn)
 		 to see if (plus new offset) is a valid before we put
 		 this through expand_simple_binop.  */
 	      x = expand_simple_binop (GET_MODE (x), PLUS, new_rtx,
-				       GEN_INT (offset), NULL_RTX,
-				       1, OPTAB_LIB_WIDEN);
+				       gen_int_mode (offset, GET_MODE (x)),
+				       NULL_RTX, 1, OPTAB_LIB_WIDEN);
 	      seq = get_insns ();
 	      end_sequence ();
 	      emit_insn_before (seq, insn);
@@ -1681,9 +1682,10 @@ instantiate_virtual_regs_in_insn (rtx insn)
 	  if (offset != 0)
 	    {
 	      start_sequence ();
-	      new_rtx = expand_simple_binop (GET_MODE (new_rtx), PLUS, new_rtx,
-					 GEN_INT (offset), NULL_RTX,
-					 1, OPTAB_LIB_WIDEN);
+	      new_rtx = expand_simple_binop
+		(GET_MODE (new_rtx), PLUS, new_rtx,
+		 gen_int_mode (offset, GET_MODE (new_rtx)),
+		 NULL_RTX, 1, OPTAB_LIB_WIDEN);
 	      seq = get_insns ();
 	      end_sequence ();
 	      emit_insn_before (seq, insn);
@@ -1968,8 +1970,8 @@ const pass_data pass_data_instantiate_virtual_regs =
 class pass_instantiate_virtual_regs : public rtl_opt_pass
 {
 public:
-  pass_instantiate_virtual_regs(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_instantiate_virtual_regs, ctxt)
+  pass_instantiate_virtual_regs (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_instantiate_virtual_regs, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -2076,7 +2078,7 @@ aggregate_value_p (const_tree exp, const_tree fntype)
 bool
 use_register_for_decl (const_tree decl)
 {
-  if (!targetm.calls.allocate_stack_slots_for_args())
+  if (!targetm.calls.allocate_stack_slots_for_args ())
     return true;
 
   /* Honor volatile.  */
@@ -2386,7 +2388,7 @@ assign_parm_find_data_types (struct assign_parm_data_all *all, tree parm,
     {
       passed_type = nominal_type = build_pointer_type (passed_type);
       data->passed_pointer = true;
-      passed_mode = nominal_mode = Pmode;
+      passed_mode = nominal_mode = TYPE_MODE (nominal_type);
     }
 
   /* Find mode as it is passed by the ABI.  */
@@ -3101,17 +3103,27 @@ assign_parm_setup_reg (struct assign_parm_data_all *all, tree parm,
     emit_move_insn (parmreg, validated_mem);
 
   /* If we were passed a pointer but the actual value can safely live
-     in a register, put it in one.  */
-  if (data->passed_pointer
-      && TYPE_MODE (TREE_TYPE (parm)) != BLKmode
-      /* If by-reference argument was promoted, demote it.  */
-      && (TYPE_MODE (TREE_TYPE (parm)) != GET_MODE (DECL_RTL (parm))
-	  || use_register_for_decl (parm)))
+     in a register, retrieve it and use it directly.  */
+  if (data->passed_pointer && TYPE_MODE (TREE_TYPE (parm)) != BLKmode)
     {
       /* We can't use nominal_mode, because it will have been set to
 	 Pmode above.  We must use the actual mode of the parm.  */
-      parmreg = gen_reg_rtx (TYPE_MODE (TREE_TYPE (parm)));
-      mark_user_reg (parmreg);
+      if (use_register_for_decl (parm))
+	{
+	  parmreg = gen_reg_rtx (TYPE_MODE (TREE_TYPE (parm)));
+	  mark_user_reg (parmreg);
+	}
+      else
+	{
+	  int align = STACK_SLOT_ALIGNMENT (TREE_TYPE (parm),
+					    TYPE_MODE (TREE_TYPE (parm)),
+					    TYPE_ALIGN (TREE_TYPE (parm)));
+	  parmreg
+	    = assign_stack_local (TYPE_MODE (TREE_TYPE (parm)),
+				  GET_MODE_SIZE (TYPE_MODE (TREE_TYPE (parm))),
+				  align);
+	  set_mem_attributes (parmreg, parm, 1);
+	}
 
       if (GET_MODE (parmreg) != GET_MODE (DECL_RTL (parm)))
 	{
@@ -4116,12 +4128,11 @@ void
 reorder_blocks (void)
 {
   tree block = DECL_INITIAL (current_function_decl);
-  vec<tree> block_stack;
 
   if (block == NULL_TREE)
     return;
 
-  block_stack.create (10);
+  stack_vec<tree, 10> block_stack;
 
   /* Reset the TREE_ASM_WRITTEN bit for all blocks.  */
   clear_block_marks (block);
@@ -4133,8 +4144,6 @@ reorder_blocks (void)
   /* Recreate the block tree from the note nesting.  */
   reorder_blocks_1 (get_insns (), block, &block_stack);
   BLOCK_SUBBLOCKS (block) = blocks_nreverse_all (BLOCK_SUBBLOCKS (block));
-
-  block_stack.release ();
 }
 
 /* Helper function for reorder_blocks.  Reset TREE_ASM_WRITTEN.  */
@@ -7010,8 +7019,8 @@ const pass_data pass_data_leaf_regs =
 class pass_leaf_regs : public rtl_opt_pass
 {
 public:
-  pass_leaf_regs(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_leaf_regs, ctxt)
+  pass_leaf_regs (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_leaf_regs, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -7067,8 +7076,8 @@ const pass_data pass_data_thread_prologue_and_epilogue =
 class pass_thread_prologue_and_epilogue : public rtl_opt_pass
 {
 public:
-  pass_thread_prologue_and_epilogue(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_thread_prologue_and_epilogue, ctxt)
+  pass_thread_prologue_and_epilogue (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_thread_prologue_and_epilogue, ctxt)
   {}
 
   /* opt_pass methods: */
@@ -7286,8 +7295,8 @@ const pass_data pass_data_match_asm_constraints =
 class pass_match_asm_constraints : public rtl_opt_pass
 {
 public:
-  pass_match_asm_constraints(gcc::context *ctxt)
-    : rtl_opt_pass(pass_data_match_asm_constraints, ctxt)
+  pass_match_asm_constraints (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_match_asm_constraints, ctxt)
   {}
 
   /* opt_pass methods: */

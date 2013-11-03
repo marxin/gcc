@@ -49,7 +49,7 @@ class pass_manager
 public:
   void *operator new (size_t sz);
 
-  pass_manager(context *ctxt);
+  pass_manager (context *ctxt);
 
   void register_pass (struct register_pass_info *pass_info);
   void register_one_dump_file (struct opt_pass *pass);
@@ -74,6 +74,7 @@ public:
     return pass_mode_switching_1;
   }
   opt_pass *get_pass_peephole2 () const { return pass_peephole2_1; }
+  opt_pass *get_pass_profile () const { return pass_profile_1; }
 
 public:
   /* The root of the compilation pass tree, once constructed.  */
@@ -96,7 +97,7 @@ private:
   void register_dump_files (struct opt_pass *pass, int properties);
 
 private:
-  context *ctxt_;
+  context *m_ctxt;
 
   /* References to all of the individual passes.
      These fields are generated via macro expansion.

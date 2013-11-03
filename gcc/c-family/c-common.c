@@ -39,7 +39,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic.h"
 #include "tree-iterator.h"
 #include "hashtab.h"
-#include "tree-mudflap.h"
 #include "opts.h"
 #include "cgraph.h"
 #include "target-def.h"
@@ -311,6 +310,8 @@ static tree handle_no_sanitize_address_attribute (tree *, tree, tree,
 						  int, bool *);
 static tree handle_no_address_safety_analysis_attribute (tree *, tree, tree,
 							 int, bool *);
+static tree handle_no_sanitize_undefined_attribute (tree *, tree, tree, int,
+						    bool *);
 static tree handle_noinline_attribute (tree *, tree, tree, int, bool *);
 static tree handle_noclone_attribute (tree *, tree, tree, int, bool *);
 static tree handle_leaf_attribute (tree *, tree, tree, int, bool *);
@@ -369,6 +370,13 @@ static tree ignore_attribute (tree *, tree, tree, int, bool *);
 static tree handle_no_split_stack_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fnspec_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_unused_attribute (tree *, tree, tree, int, bool *);
+static tree handle_returns_nonnull_attribute (tree *, tree, tree, int, bool *);
+static tree handle_omp_declare_simd_attribute (tree *, tree, tree, int,
+					       bool *);
+static tree handle_omp_declare_target_attribute (tree *, tree, tree, int,
+						 bool *);
+static tree handle_bnd_variable_size_attribute (tree *, tree, tree, int, bool *);
+static tree handle_bnd_legacy (tree *, tree, tree, int, bool *);
 
 static void check_function_nonnull (tree, int, tree *);
 static void check_nonnull_arg (void *, tree, unsigned HOST_WIDE_INT);
@@ -403,6 +411,8 @@ const struct c_common_resword c_common_reswords[] =
   { "_Alignof",		RID_ALIGNOF,   D_CONLY },
   { "_Bool",		RID_BOOL,      D_CONLY },
   { "_Complex",		RID_COMPLEX,	0 },
+  { "_Cilk_spawn",      RID_CILK_SPAWN, 0 },
+  { "_Cilk_sync",       RID_CILK_SYNC,  0 },
   { "_Imaginary",	RID_IMAGINARY, D_CONLY },
   { "_Decimal32",       RID_DFLOAT32,  D_CONLY | D_EXT },
   { "_Decimal64",       RID_DFLOAT64,  D_CONLY | D_EXT },
@@ -722,6 +732,9 @@ const struct attribute_spec c_common_attribute_table[] =
   { "no_sanitize_address",    0, 0, true, false, false,
 			      handle_no_sanitize_address_attribute,
 			      false },
+  { "no_sanitize_undefined",  0, 0, true, false, false,
+			      handle_no_sanitize_undefined_attribute,
+			      false },
   { "warning",		      1, 1, true,  false, false,
 			      handle_error_attribute, false },
   { "error",		      1, 1, true,  false, false,
@@ -742,6 +755,16 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_fnspec_attribute, false },
   { "warn_unused",            0, 0, false, false, false,
 			      handle_warn_unused_attribute, false },
+  { "returns_nonnull",        0, 0, false, true, true,
+			      handle_returns_nonnull_attribute, false },
+  { "omp declare simd",       0, -1, true,  false, false,
+			      handle_omp_declare_simd_attribute, false },
+  { "omp declare target",     0, 0, true, false, false,
+			      handle_omp_declare_target_attribute, false },
+  { "bnd_variable_size",      0, 0, true,  false, false,
+			      handle_bnd_variable_size_attribute, false },
+  { "bnd_legacy",             0, 0, true, false, false,
+			      handle_bnd_legacy, false },
   { NULL,                     0, 0, false, false, false, NULL, false }
 };
 
@@ -2199,6 +2222,14 @@ check_main_parameter_types (tree decl)
 	     "%q+D takes only zero or two arguments", decl);
 }
 
+/* vector_targets_convertible_p is used for vector pointer types.  The
+   callers perform various checks that the qualifiers are satisfactory,
+   while OTOH vector_targets_convertible_p ignores the number of elements
+   in the vectors.  That's fine with vector pointers as we can consider,
+   say, a vector of 8 elements as two consecutive vectors of 4 elements,
+   and that does not require and conversion of the pointer values.
+   In contrast, vector_types_convertible_p and
+   vector_types_compatible_elements_p are used for vector value types.  */
 /* True if pointers to distinct types T1 and T2 can be converted to
    each other without an explicit cast.  Only returns true for opaque
    vector types.  */
@@ -2213,6 +2244,17 @@ vector_targets_convertible_p (const_tree t1, const_tree t2)
   return false;
 }
 
+/* vector_types_convertible_p is used for vector value types.
+   It could in principle call vector_targets_convertible_p as a subroutine,
+   but then the check for vector type would be duplicated with its callers,
+   and also the purpose of vector_targets_convertible_p would become
+   muddled.
+   Where vector_types_convertible_p returns true, a conversion might still be
+   needed to make the types match.
+   In contrast, vector_targets_convertible_p is used for vector pointer
+   values, and vector_types_compatible_elements_p is used specifically
+   in the context for binary operators, as a check if use is possible without
+   conversion.  */
 /* True if vector types T1 and T2 can be converted to each other
    without an explicit cast.  If EMIT_LAX_NOTE is true, and T1 and T2
    can only be converted with -flax-vector-conversions yet that is not
@@ -5030,6 +5072,7 @@ enum c_builtin_type
 #define DEF_FUNCTION_TYPE_5(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5) NAME,
 #define DEF_FUNCTION_TYPE_6(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6) NAME,
 #define DEF_FUNCTION_TYPE_7(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7) NAME,
+#define DEF_FUNCTION_TYPE_8(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8) NAME,
 #define DEF_FUNCTION_TYPE_VAR_0(NAME, RETURN) NAME,
 #define DEF_FUNCTION_TYPE_VAR_1(NAME, RETURN, ARG1) NAME,
 #define DEF_FUNCTION_TYPE_VAR_2(NAME, RETURN, ARG1, ARG2) NAME,
@@ -5048,6 +5091,7 @@ enum c_builtin_type
 #undef DEF_FUNCTION_TYPE_5
 #undef DEF_FUNCTION_TYPE_6
 #undef DEF_FUNCTION_TYPE_7
+#undef DEF_FUNCTION_TYPE_8
 #undef DEF_FUNCTION_TYPE_VAR_0
 #undef DEF_FUNCTION_TYPE_VAR_1
 #undef DEF_FUNCTION_TYPE_VAR_2
@@ -5130,6 +5174,10 @@ c_define_builtins (tree va_list_ref_type_node, tree va_list_arg_type_node)
 #define DEF_FUNCTION_TYPE_7(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 			    ARG6, ARG7)					\
   def_fn_type (ENUM, RETURN, 0, 7, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7);
+#define DEF_FUNCTION_TYPE_8(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
+			    ARG6, ARG7, ARG8)				\
+  def_fn_type (ENUM, RETURN, 0, 8, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6,	\
+	       ARG7, ARG8);
 #define DEF_FUNCTION_TYPE_VAR_0(ENUM, RETURN) \
   def_fn_type (ENUM, RETURN, 1, 0);
 #define DEF_FUNCTION_TYPE_VAR_1(ENUM, RETURN, ARG1) \
@@ -5180,8 +5228,8 @@ c_define_builtins (tree va_list_ref_type_node, tree va_list_arg_type_node)
 
   build_common_builtin_nodes ();
 
-  if (flag_mudflap)
-    mudflap_init ();
+  if (flag_enable_cilkplus)
+    cilk_init_builtins ();
 }
 
 /* Like get_identifier, but avoid warnings about null arguments when
@@ -6553,6 +6601,22 @@ handle_no_address_safety_analysis_attribute (tree *node, tree name, tree, int,
       = tree_cons (get_identifier ("no_sanitize_address"),
 		   NULL_TREE, DECL_ATTRIBUTES (*node));
   *no_add_attrs = true;
+  return NULL_TREE;
+}
+
+/* Handle a "no_sanitize_undefined" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_no_sanitize_undefined_attribute (tree *node, tree name, tree, int,
+				      bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+
   return NULL_TREE;
 }
 
@@ -7960,6 +8024,38 @@ handle_fnspec_attribute (tree *node ATTRIBUTE_UNUSED, tree ARG_UNUSED (name),
   return NULL_TREE;
 }
 
+/* Handle a "bnd_variable_size" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_bnd_variable_size_attribute (tree *node, tree name, tree ARG_UNUSED (args),
+				    int ARG_UNUSED (flags), bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FIELD_DECL)
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
+/* Handle a "bnd_legacy" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_bnd_legacy (tree *node, tree name, tree ARG_UNUSED (args),
+		   int ARG_UNUSED (flags), bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
 /* Handle a "warn_unused" attribute; arguments as in
    struct attribute_spec.handler.  */
 
@@ -7978,6 +8074,24 @@ handle_warn_unused_attribute (tree *node, tree name,
       *no_add_attrs = true;
     }
 
+  return NULL_TREE;
+}
+
+/* Handle an "omp declare simd" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_omp_declare_simd_attribute (tree *, tree, tree, int, bool *)
+{
+  return NULL_TREE;
+}
+
+/* Handle an "omp declare target" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_omp_declare_target_attribute (tree *, tree, tree, int, bool *)
+{
   return NULL_TREE;
 }
 
@@ -8974,7 +9088,7 @@ handle_optimize_attribute (tree *node, tree name, tree args,
       /* Parse options, and update the vector.  */
       parse_optimize_options (args, true);
       DECL_FUNCTION_SPECIFIC_OPTIMIZATION (*node)
-	= build_optimization_node ();
+	= build_optimization_node (&global_options);
 
       /* Restore current options.  */
       cl_optimization_restore (&global_options, &cur_opts);
@@ -9008,6 +9122,23 @@ handle_no_split_stack_attribute (tree *node, tree name,
 
   return NULL_TREE;
 }
+
+/* Handle a "returns_nonnull" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_returns_nonnull_attribute (tree *node, tree, tree, int,
+				  bool *no_add_attrs)
+{
+  // Even without a prototype we still have a return type we can check.
+  if (TREE_CODE (TREE_TYPE (*node)) != POINTER_TYPE)
+    {
+      error ("returns_nonnull attribute on a function not returning a pointer");
+      *no_add_attrs = true;
+    }
+  return NULL_TREE;
+}
+
 
 /* Check for valid arguments being passed to a function with FNTYPE.
    There are NARGS arguments in the array ARGARRAY.  */
@@ -10690,20 +10821,45 @@ resolve_overloaded_builtin (location_t loc, tree function,
     }
 }
 
-/* Ignoring their sign, return true if two scalar types are the same.  */
+/* vector_types_compatible_elements_p is used in type checks of vectors
+   values used as operands of binary operators.  Where it returns true, and
+   the other checks of the caller succeed (being vector types in he first
+   place, and matching number of elements), we can just treat the types
+   as essentially the same.
+   Contrast with vector_targets_convertible_p, which is used for vector
+   pointer types,  and vector_types_convertible_p, which will allow
+   language-specific matches under the control of flag_lax_vector_conversions,
+   and might still require a conversion.  */
+/* True if vector types T1 and T2 can be inputs to the same binary
+   operator without conversion.
+   We don't check the overall vector size here because some of our callers
+   want to give different error messages when the vectors are compatible
+   except for the element count.  */
+
 bool
-same_scalar_type_ignoring_signedness (tree t1, tree t2)
+vector_types_compatible_elements_p (tree t1, tree t2)
 {
+  bool opaque = TYPE_VECTOR_OPAQUE (t1) || TYPE_VECTOR_OPAQUE (t2);
+  t1 = TREE_TYPE (t1);
+  t2 = TREE_TYPE (t2);
+
   enum tree_code c1 = TREE_CODE (t1), c2 = TREE_CODE (t2);
 
   gcc_assert ((c1 == INTEGER_TYPE || c1 == REAL_TYPE || c1 == FIXED_POINT_TYPE)
 	      && (c2 == INTEGER_TYPE || c2 == REAL_TYPE
 		  || c2 == FIXED_POINT_TYPE));
 
+  t1 = c_common_signed_type (t1);
+  t2 = c_common_signed_type (t2);
   /* Equality works here because c_common_signed_type uses
      TYPE_MAIN_VARIANT.  */
-  return c_common_signed_type (t1)
-    == c_common_signed_type (t2);
+  if (t1 == t2)
+    return true;
+  if (opaque && c1 == c2
+      && (c1 == INTEGER_TYPE || c1 == REAL_TYPE)
+      && TYPE_PRECISION (t1) == TYPE_PRECISION (t2))
+    return true;
+  return false;
 }
 
 /* Check for missing format attributes on function pointers.  LTYPE is

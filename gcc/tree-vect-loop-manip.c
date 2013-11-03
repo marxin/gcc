@@ -28,7 +28,15 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "basic-block.h"
 #include "gimple-pretty-print.h"
-#include "tree-flow.h"
+#include "gimple.h"
+#include "gimple-ssa.h"
+#include "tree-cfg.h"
+#include "tree-phinodes.h"
+#include "ssa-iterators.h"
+#include "tree-ssanames.h"
+#include "tree-ssa-loop-manip.h"
+#include "tree-into-ssa.h"
+#include "tree-ssa.h"
 #include "tree-pass.h"
 #include "cfgloop.h"
 #include "diagnostic-core.h"
@@ -107,7 +115,7 @@ typedef struct
    with a PHI DEF that would soon become non-dominant, and when we got
    to the suitable one, it wouldn't have anything to substitute any
    more.  */
-static vec<adjust_info, va_stack> adjust_vec;
+static vec<adjust_info, va_heap> adjust_vec;
 
 /* Adjust any debug stmts that referenced AI->from values to use the
    loop-closed AI->to, if the references are dominated by AI->bb and
@@ -683,6 +691,7 @@ slpeel_make_loop_iterate_ntimes (struct loop *loop, tree niters)
 	dump_printf (MSG_NOTE, "\nloop at %s:%d: ", LOC_FILE (loop_loc),
 		     LOC_LINE (loop_loc));
       dump_gimple_stmt (MSG_NOTE, TDF_SLIM, cond_stmt, 0);
+      dump_printf (MSG_NOTE, "\n");
     }
   loop->nb_iterations = niters;
 }
@@ -922,10 +931,10 @@ set_prologue_iterations (basic_block bb_before_first_loop,
     unshare_expr (LOOP_VINFO_NITERS_UNCHANGED (loop_vec_info_for_loop (loop)));
 
   e = single_pred_edge (bb_before_first_loop);
-  cond_bb = split_edge(e);
+  cond_bb = split_edge (e);
 
   e = single_pred_edge (bb_before_first_loop);
-  then_bb = split_edge(e);
+  then_bb = split_edge (e);
   set_immediate_dominator (CDI_DOMINATORS, then_bb, cond_bb);
 
   e_false = make_single_succ_edge (cond_bb, bb_before_first_loop,
@@ -1124,7 +1133,7 @@ slpeel_tree_peel_loop_to_edge (struct loop *loop,
   if (MAY_HAVE_DEBUG_STMTS)
     {
       gcc_assert (!adjust_vec.exists ());
-      vec_stack_alloc (adjust_info, adjust_vec, 32);
+      adjust_vec.create (32);
     }
 
   if (e == exit_e)
@@ -1428,7 +1437,7 @@ vect_build_loop_niters (loop_vec_info loop_vinfo, gimple_seq seq)
  and places them at the loop preheader edge or in COND_EXPR_STMT_LIST
  if that is non-NULL.  */
 
-static void
+void
 vect_generate_tmps_on_preheader (loop_vec_info loop_vinfo,
 				 tree *ni_name_ptr,
 				 tree *ratio_mult_vf_name_ptr,
@@ -1552,7 +1561,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
   /* Analyze phi functions of the loop header.  */
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location, "vect_can_advance_ivs_p:");
+    dump_printf_loc (MSG_NOTE, vect_location, "vect_can_advance_ivs_p:\n");
   for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       tree evolution_part;
@@ -1562,6 +1571,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
 	{
           dump_printf_loc (MSG_NOTE, vect_location, "Analyze phi: ");
           dump_gimple_stmt (MSG_NOTE, TDF_SLIM, phi, 0);
+          dump_printf (MSG_NOTE, "\n");
 	}
 
       /* Skip virtual phi's. The data dependences that are associated with
@@ -1571,7 +1581,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-                             "virtual phi. skip.");
+                             "virtual phi. skip.\n");
 	  continue;
 	}
 
@@ -1581,7 +1591,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
         {
           if (dump_enabled_p ())
             dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-                             "reduc phi. skip.");
+                             "reduc phi. skip.\n");
           continue;
         }
 
@@ -1593,7 +1603,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
         {
 	  if (dump_enabled_p ())
 	    dump_printf (MSG_MISSED_OPTIMIZATION,
-			 "No access function or evolution.");
+			 "No access function or evolution.\n");
 	  return false;
         }
 
@@ -1682,6 +1692,7 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo, tree niters,
           dump_printf_loc (MSG_NOTE, vect_location,
                            "vect_update_ivs_after_vectorizer: phi: ");
 	  dump_gimple_stmt (MSG_NOTE, TDF_SLIM, phi, 0);
+          dump_printf (MSG_NOTE, "\n");
         }
 
       /* Skip virtual phi's.  */
@@ -1689,7 +1700,7 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo, tree niters,
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-                             "virtual phi. skip.");
+                             "virtual phi. skip.\n");
 	  continue;
 	}
 
@@ -1699,7 +1710,7 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo, tree niters,
         {
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-                             "reduc phi. skip.");
+                             "reduc phi. skip.\n");
           continue;
         }
 
@@ -1762,7 +1773,7 @@ vect_do_peeling_for_loop_bound (loop_vec_info loop_vinfo, tree *ratio,
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,
-                     "=== vect_do_peeling_for_loop_bound ===");
+                     "=== vect_do_peeling_for_loop_bound ===\n");
 
   initialize_original_copy_tables ();
 
@@ -1881,7 +1892,7 @@ vect_gen_niters_for_prolog_loop (loop_vec_info loop_vinfo, tree loop_niters, int
 
       if (dump_enabled_p ())
         dump_printf_loc (MSG_NOTE, vect_location,
-                         "known peeling = %d.", npeel);
+                         "known peeling = %d.\n", npeel);
 
       iters = build_int_cst (niters_type, npeel);
       *bound = LOOP_PEELING_FOR_ALIGNMENT (loop_vinfo);
@@ -1938,6 +1949,7 @@ vect_gen_niters_for_prolog_loop (loop_vec_info loop_vinfo, tree loop_niters, int
       dump_printf_loc (MSG_NOTE, vect_location,
                        "niters for prolog loop: ");
       dump_generic_expr (MSG_NOTE, TDF_SLIM, iters);
+      dump_printf (MSG_NOTE, "\n");
     }
 
   var = create_tmp_var (niters_type, "prolog_loop_niters");
@@ -1993,7 +2005,7 @@ vect_update_inits_of_drs (loop_vec_info loop_vinfo, tree niters)
  
  if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,
-                     "=== vect_update_inits_of_dr ===");
+                     "=== vect_update_inits_of_dr ===\n");
 
   FOR_EACH_VEC_ELT (datarefs, i, dr)
     vect_update_init_of_dr (dr, niters);
@@ -2021,8 +2033,9 @@ vect_do_peeling_for_alignment (loop_vec_info loop_vinfo,
   int bound = 0;
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location,
-                     "=== vect_do_peeling_for_alignment ===");
+    dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
+                     "loop peeled for vectorization to enhance"
+                     " alignment\n");
 
   initialize_original_copy_tables ();
 
@@ -2337,6 +2350,7 @@ vect_create_cond_for_alias_checks (loop_vec_info loop_vinfo, tree * cond_expr)
 	  dump_generic_expr (MSG_NOTE, TDF_SLIM, DR_REF (dr_a));
 	  dump_printf (MSG_NOTE, " and ");
 	  dump_generic_expr (MSG_NOTE, TDF_SLIM, DR_REF (dr_b));
+          dump_printf (MSG_NOTE, "\n");
 	}
 
       seg_a_min = addr_base_a;
@@ -2404,6 +2418,8 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
   unsigned prob = 4 * REG_BR_PROB_BASE / 5;
   gimple_seq gimplify_stmt_list = NULL;
   tree scalar_loop_iters = LOOP_VINFO_NITERS (loop_vinfo);
+  bool version_align = LOOP_REQUIRES_VERSIONING_FOR_ALIGNMENT (loop_vinfo);
+  bool version_alias = LOOP_REQUIRES_VERSIONING_FOR_ALIAS (loop_vinfo);
 
   if (check_profitability)
     {
@@ -2413,11 +2429,11 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 					  is_gimple_condexpr, NULL_TREE);
     }
 
-  if (LOOP_REQUIRES_VERSIONING_FOR_ALIGNMENT (loop_vinfo))
+  if (version_align)
     vect_create_cond_for_align_checks (loop_vinfo, &cond_expr,
 				       &cond_expr_stmt_list);
 
-  if (LOOP_REQUIRES_VERSIONING_FOR_ALIAS (loop_vinfo))
+  if (version_alias)
     vect_create_cond_for_alias_checks (loop_vinfo, &cond_expr);
 
   cond_expr = force_gimple_operand_1 (cond_expr, &gimplify_stmt_list,
@@ -2427,7 +2443,21 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
   initialize_original_copy_tables ();
   loop_version (loop, cond_expr, &condition_bb,
 		prob, prob, REG_BR_PROB_BASE - prob, true);
-  free_original_copy_tables();
+
+  if (LOCATION_LOCUS (vect_location) != UNKNOWN_LOC
+      && dump_enabled_p ())
+    {
+      if (version_alias)
+        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
+                         "loop versioned for vectorization because of "
+			 "possible aliasing\n");
+      if (version_align)
+        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
+                         "loop versioned for vectorization to enhance "
+			 "alignment\n");
+
+    }
+  free_original_copy_tables ();
 
   /* Loop versioning violates an assumption we try to maintain during
      vectorization - that the loop exit block has a single predecessor.
@@ -2453,6 +2483,73 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
       add_phi_arg (new_phi, arg, new_exit_e,
 		   gimple_phi_arg_location_from_edge (orig_phi, e));
       adjust_phi_and_debug_stmts (orig_phi, e, PHI_RESULT (new_phi));
+    }
+
+
+  /* Extract load statements on memrefs with zero-stride accesses.  */
+
+  if (LOOP_REQUIRES_VERSIONING_FOR_ALIAS (loop_vinfo))
+    {
+      /* In the loop body, we iterate each statement to check if it is a load.
+	 Then we check the DR_STEP of the data reference.  If DR_STEP is zero,
+	 then we will hoist the load statement to the loop preheader.  */
+
+      basic_block *bbs = LOOP_VINFO_BBS (loop_vinfo);
+      int nbbs = loop->num_nodes;
+
+      for (int i = 0; i < nbbs; ++i)
+	{
+	  for (gimple_stmt_iterator si = gsi_start_bb (bbs[i]);
+	       !gsi_end_p (si);)
+	    {
+	      gimple stmt = gsi_stmt (si);
+	      stmt_vec_info stmt_info = vinfo_for_stmt (stmt);
+	      struct data_reference *dr = STMT_VINFO_DATA_REF (stmt_info);
+
+	      if (is_gimple_assign (stmt)
+		  && (!dr
+		      || (DR_IS_READ (dr) && integer_zerop (DR_STEP (dr)))))
+		{
+		  bool hoist = true;
+		  ssa_op_iter iter;
+		  tree var;
+
+		  /* We hoist a statement if all SSA uses in it are defined
+		     outside of the loop.  */
+		  FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
+		    {
+		      gimple def = SSA_NAME_DEF_STMT (var);
+		      if (!gimple_nop_p (def)
+			  && flow_bb_inside_loop_p (loop, gimple_bb (def)))
+			{
+			  hoist = false;
+			  break;
+			}
+		    }
+
+		  if (hoist)
+		    {
+		      if (dr)
+			gimple_set_vuse (stmt, NULL);
+
+		      gsi_remove (&si, false);
+		      gsi_insert_on_edge_immediate (loop_preheader_edge (loop),
+						    stmt);
+
+		      if (dump_enabled_p ())
+			{
+			  dump_printf_loc
+			      (MSG_NOTE, vect_location,
+			       "hoisting out of the vectorized loop: ");
+			  dump_gimple_stmt (MSG_NOTE, TDF_SLIM, stmt, 0);
+			  dump_printf (MSG_NOTE, "\n");
+			}
+		      continue;
+		    }
+		}
+	      gsi_next (&si);
+	    }
+	}
     }
 
   /* End loop-exit-fixes after versioning.  */

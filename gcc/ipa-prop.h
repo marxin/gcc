@@ -20,10 +20,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef IPA_PROP_H
 #define IPA_PROP_H
 
-#include "tree.h"
 #include "vec.h"
 #include "cgraph.h"
-#include "gimple.h"
 #include "alloc-pool.h"
 
 /* The following definitions and interfaces are used by
@@ -117,7 +115,12 @@ struct GTY(()) ipa_pass_through_data
      aggregate part of the jump function (see description of
      ipa_agg_jump_function).  The flag is used only when the operation is
      NOP_EXPR.  */
-  bool agg_preserved;
+  unsigned agg_preserved : 1;
+
+  /* When set to true, we guarantee that, if there is a C++ object pointed to
+     by this object, it does not undergo dynamic type change in the course of
+     functions decribed by this jump function.  */
+  unsigned type_preserved : 1;
 };
 
 /* Structure holding data required to describe an ancestor pass-through
@@ -132,7 +135,11 @@ struct GTY(()) ipa_ancestor_jf_data
   /* Number of the caller's formal parameter being passed.  */
   int formal_id;
   /* Flag with the same meaning like agg_preserve in ipa_pass_through_data.  */
-  bool agg_preserved;
+  unsigned agg_preserved : 1;
+  /* When set to true, we guarantee that, if there is a C++ object pointed to
+     by this object, it does not undergo dynamic type change in the course of
+     functions decribed by this jump function.  */
+  unsigned type_preserved : 1;
 };
 
 /* An element in an aggegate part of a jump function describing a known value
@@ -264,13 +271,22 @@ ipa_get_jf_pass_through_operation (struct ipa_jump_func *jfunc)
   return jfunc->value.pass_through.operation;
 }
 
-/* Return the agg_preserved flag of a pass through jump functin JFUNC.  */
+/* Return the agg_preserved flag of a pass through jump function JFUNC.  */
 
 static inline bool
 ipa_get_jf_pass_through_agg_preserved (struct ipa_jump_func *jfunc)
 {
   gcc_checking_assert (jfunc->type == IPA_JF_PASS_THROUGH);
   return jfunc->value.pass_through.agg_preserved;
+}
+
+/* Return the type_preserved flag of a pass through jump function JFUNC.  */
+
+static inline bool
+ipa_get_jf_pass_through_type_preserved (struct ipa_jump_func *jfunc)
+{
+  gcc_checking_assert (jfunc->type == IPA_JF_PASS_THROUGH);
+  return jfunc->value.pass_through.type_preserved;
 }
 
 /* Return the offset of an ancestor jump function JFUNC.  */
@@ -301,13 +317,22 @@ ipa_get_jf_ancestor_formal_id (struct ipa_jump_func *jfunc)
   return jfunc->value.ancestor.formal_id;
 }
 
-/* Return the agg_preserved flag of an ancestor jump functin JFUNC.  */
+/* Return the agg_preserved flag of an ancestor jump function JFUNC.  */
 
 static inline bool
 ipa_get_jf_ancestor_agg_preserved (struct ipa_jump_func *jfunc)
 {
   gcc_checking_assert (jfunc->type == IPA_JF_ANCESTOR);
   return jfunc->value.ancestor.agg_preserved;
+}
+
+/* Return the type_preserved flag of an ancestor jump function JFUNC.  */
+
+static inline bool
+ipa_get_jf_ancestor_type_preserved (struct ipa_jump_func *jfunc)
+{
+  gcc_checking_assert (jfunc->type == IPA_JF_ANCESTOR);
+  return jfunc->value.ancestor.type_preserved;
 }
 
 /* Summary describing a single formal parameter.  */

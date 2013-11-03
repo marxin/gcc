@@ -578,13 +578,13 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	    case 6:
 	      if (model > 9)
 		/* Use the default detection procedure.  */
-		processor = PROCESSOR_GENERIC32;
+		processor = PROCESSOR_GENERIC;
 	      else if (model == 9)
 		cpu = "c3-2";
 	      else if (model >= 6)
 		cpu = "c3";
 	      else
-		processor = PROCESSOR_GENERIC32;
+		processor = PROCESSOR_GENERIC;
 	      break;
 	    case 5:
 	      if (has_3dnow)
@@ -592,11 +592,11 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	      else if (has_mmx)
 		cpu = "winchip2-c6";
 	      else
-		processor = PROCESSOR_GENERIC32;
+		processor = PROCESSOR_GENERIC;
 	      break;
 	    default:
 	      /* We have no idea.  */
-	      processor = PROCESSOR_GENERIC32;
+	      processor = PROCESSOR_GENERIC;
 	    }
 	}
     }
@@ -618,7 +618,7 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	  break;
 	default:
 	  /* We have no idea.  */
-	  processor = PROCESSOR_GENERIC32;
+	  processor = PROCESSOR_GENERIC;
 	}
     }
 
@@ -644,13 +644,18 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	  /* Atom.  */
 	  cpu = "atom";
 	  break;
+	case 0x0f:
+	  /* Merom.  */
+	case 0x17:
+	case 0x1d:
+	  /* Penryn.  */
+	  cpu = "core2";
+	  break;
 	case 0x1a:
 	case 0x1e:
 	case 0x1f:
 	case 0x2e:
 	  /* Nehalem.  */
-	  cpu = "corei7";
-	  break;
 	case 0x25:
 	case 0x2c:
 	case 0x2f:
@@ -662,20 +667,25 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	  /* Sandy Bridge.  */
 	  cpu = "corei7-avx";
 	  break;
-	case 0x17:
-	case 0x1d:
-	  /* Penryn.  */
-	  cpu = "core2";
+	case 0x3a:
+	case 0x3e:
+	  /* Ivy Bridge.  */
+	  cpu = "core-avx-i";
 	  break;
-	case 0x0f:
-	  /* Merom.  */
-	  cpu = "core2";
+	case 0x3c:
+	case 0x45:
+	case 0x46:
+	  /* Haswell.  */
+	  cpu = "core-avx2";
 	  break;
 	default:
 	  if (arch)
 	    {
 	      /* This is unknown family 0x6 CPU.  */
-	      if (has_avx)
+	      if (has_avx2)
+		/* Assume Haswell.  */
+		cpu = "core-avx2";
+	      else if (has_avx)
 		/* Assume Sandy Bridge.  */
 		cpu = "corei7-avx";
 	      else if (has_sse4_2)

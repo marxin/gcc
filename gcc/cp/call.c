@@ -6630,7 +6630,7 @@ mark_versions_used (tree fn)
   it_v = node_v->next;
   while (it_v != NULL)
     {
-      mark_used (it_v->this_node->symbol.decl);
+      mark_used (it_v->this_node->decl);
       it_v = it_v->next;
     }
 }
@@ -7112,8 +7112,9 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	mark_versions_used (fn);
     }
 
-  if (!already_used)
-    mark_used (fn);
+  if (!already_used
+      && !mark_used (fn))
+    return error_mark_node;
 
   if (DECL_VINDEX (fn) && (flags & LOOKUP_NONVIRTUAL) == 0
       /* Don't mess with virtual lookup in fold_non_dependent_expr; virtual
@@ -7441,6 +7442,14 @@ build_special_member_call (tree instance, tree name, vec<tree, va_gc> **args,
 
   if (allocated != NULL)
     release_tree_vector (allocated);
+
+  if ((complain & tf_error)
+      && (flags & LOOKUP_DELEGATING_CONS)
+      && name == complete_ctor_identifier 
+      && TREE_CODE (ret) == CALL_EXPR
+      && (DECL_ABSTRACT_ORIGIN (TREE_OPERAND (CALL_EXPR_FN (ret), 0))
+	  == current_function_decl))
+    error ("constructor delegates to itself");
 
   return ret;
 }
@@ -9265,6 +9274,9 @@ set_up_extended_ref_temp (tree decl, tree expr, vec<tree, va_gc> **cleanups,
 	    static_aggregates = tree_cons (NULL_TREE, var,
 					   static_aggregates);
 	}
+      else
+	/* Check whether the dtor is callable.  */
+	cxx_maybe_build_cleanup (var, tf_warning_or_error);
     }
 
   *initp = init;

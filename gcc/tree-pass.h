@@ -91,7 +91,8 @@ public:
   virtual opt_pass *clone ();
 
   /* If has_gate is set, this pass and all sub-passes are executed only if
-     the function returns true.  */
+     the function returns true.
+     The default implementation returns true.  */
   virtual bool gate ();
 
   /* This is the code to run.  If has_execute is false, then there should
@@ -101,7 +102,7 @@ public:
   virtual unsigned int execute ();
 
 protected:
-  opt_pass(const pass_data&, gcc::context *);
+  opt_pass (const pass_data&, gcc::context *);
 
 public:
   /* A list of sub-passes to run, dependent on gate predicate.  */
@@ -114,15 +115,15 @@ public:
   int static_pass_number;
 
 protected:
-  gcc::context *ctxt_;
+  gcc::context *m_ctxt;
 };
 
 /* Description of GIMPLE pass.  */
 class gimple_opt_pass : public opt_pass
 {
 protected:
-  gimple_opt_pass(const pass_data& data, gcc::context *ctxt)
-    : opt_pass(data, ctxt)
+  gimple_opt_pass (const pass_data& data, gcc::context *ctxt)
+    : opt_pass (data, ctxt)
   {
   }
 };
@@ -131,8 +132,8 @@ protected:
 class rtl_opt_pass : public opt_pass
 {
 protected:
-  rtl_opt_pass(const pass_data& data, gcc::context *ctxt)
-    : opt_pass(data, ctxt)
+  rtl_opt_pass (const pass_data& data, gcc::context *ctxt)
+    : opt_pass (data, ctxt)
   {
   }
 };
@@ -173,27 +174,26 @@ public:
   void (*variable_transform) (struct varpool_node *);
 
 protected:
-  ipa_opt_pass_d(const pass_data& data, gcc::context *ctxt,
-                 void (*generate_summary) (void),
-                 void (*write_summary) (void),
-                 void (*read_summary) (void),
-                 void (*write_optimization_summary) (void),
-                 void (*read_optimization_summary) (void),
-                 void (*stmt_fixup) (struct cgraph_node *, gimple *),
-                 unsigned int function_transform_todo_flags_start,
-                 unsigned int (*function_transform) (struct cgraph_node *),
-                 void (*variable_transform) (struct varpool_node *))
-    : opt_pass(data, ctxt),
-	       generate_summary(generate_summary),
-	       write_summary(write_summary),
-	       read_summary(read_summary),
-	       write_optimization_summary(write_optimization_summary),
-	       read_optimization_summary(read_optimization_summary),
-	       stmt_fixup(stmt_fixup),
-	       function_transform_todo_flags_start(
-	         function_transform_todo_flags_start),
-	       function_transform(function_transform),
-	       variable_transform(variable_transform)
+  ipa_opt_pass_d (const pass_data& data, gcc::context *ctxt,
+		  void (*generate_summary) (void),
+		  void (*write_summary) (void),
+		  void (*read_summary) (void),
+		  void (*write_optimization_summary) (void),
+		  void (*read_optimization_summary) (void),
+		  void (*stmt_fixup) (struct cgraph_node *, gimple *),
+		  unsigned int function_transform_todo_flags_start,
+		  unsigned int (*function_transform) (struct cgraph_node *),
+		  void (*variable_transform) (struct varpool_node *))
+    : opt_pass (data, ctxt),
+      generate_summary (generate_summary),
+      write_summary (write_summary),
+      read_summary (read_summary),
+      write_optimization_summary (write_optimization_summary),
+      read_optimization_summary (read_optimization_summary),
+      stmt_fixup (stmt_fixup),
+      function_transform_todo_flags_start (function_transform_todo_flags_start),
+      function_transform (function_transform),
+      variable_transform (variable_transform)
   {
   }
 };
@@ -203,8 +203,8 @@ protected:
 class simple_ipa_opt_pass : public opt_pass
 {
 protected:
-  simple_ipa_opt_pass(const pass_data& data, gcc::context *ctxt)
-    : opt_pass(data, ctxt)
+  simple_ipa_opt_pass (const pass_data& data, gcc::context *ctxt)
+    : opt_pass (data, ctxt)
   {
   }
 };
@@ -330,8 +330,14 @@ struct register_pass_info
   enum pass_positioning_ops pos_op; /* how to insert the new pass.  */
 };
 
-extern gimple_opt_pass *make_pass_mudflap_1 (gcc::context *ctxt);
-extern gimple_opt_pass *make_pass_mudflap_2 (gcc::context *ctxt);
+/* Registers a new pass.  Either fill out the register_pass_info or specify
+   the individual parameters.  The pass object is expected to have been
+   allocated using operator new and the pass manager takes the ownership of
+   the pass object.  */
+extern void register_pass (register_pass_info *);
+extern void register_pass (opt_pass* pass, pass_positioning_ops pos,
+			   const char* ref_pass_name, int ref_pass_inst_number);
+
 extern gimple_opt_pass *make_pass_asan (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_asan_O0 (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tsan (gcc::context *ctxt);
@@ -460,6 +466,7 @@ extern simple_ipa_opt_pass *make_pass_ipa_free_lang_data (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_free_inline_summary (gcc::context
 							       *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_cp (gcc::context *ctxt);
+extern ipa_opt_pass_d *make_pass_ipa_devirt (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_reference (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_pure_const (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_pta (gcc::context *ctxt);
@@ -518,7 +525,6 @@ extern rtl_opt_pass *make_pass_if_after_combine (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_ree (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_partition_blocks (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_match_asm_constraints (gcc::context *ctxt);
-extern rtl_opt_pass *make_pass_regmove (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_split_all_insns (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_fast_rtl_byte_dce (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_lower_subreg2 (gcc::context *ctxt);
@@ -595,7 +601,6 @@ extern void ipa_read_summaries (void);
 extern void ipa_read_optimization_summaries (void);
 extern void register_one_dump_file (struct opt_pass *);
 extern bool function_called_by_processed_nodes_p (void);
-extern void register_pass (struct register_pass_info *);
 
 /* Set to true if the pass is called the first time during compilation of the
    current function.  Note that using this information in the optimization
