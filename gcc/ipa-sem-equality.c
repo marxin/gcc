@@ -745,6 +745,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     case LABEL_DECL:
     case RESULT_DECL:
     case CONST_DECL:
+    case BIT_FIELD_REF:
     {
       ret = check_declaration (t1, t2, d, func1, func2);
       SE_EXIT_DEBUG (ret);
@@ -1591,9 +1592,10 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
   struct cgraph_node *alias = alias_func->node;
   bool original_address_matters;
   bool alias_address_matters;
-  bool create_thunk;
-  bool create_alias;
-  bool redirect_callers;
+
+  bool create_thunk = false;
+  bool create_alias = false;
+  bool redirect_callers = false;
   bool original_discardable = false;
 
   if (dump_file)
@@ -1697,6 +1699,8 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 
   if (create_thunk)
     {
+      return;
+
       /* Preserve DECL_RESULT so we get right by reference flag.  */
       tree result = DECL_RESULT (alias->decl);
 
