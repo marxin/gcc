@@ -1,3 +1,51 @@
+2013-11-04  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/58968
+	* gfortran.dg/pr58968.f: New
+
+2013-11-04  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/58979
+	* g++.dg/diagnostic/pr58979.C: New test.
+
+2013-11-04  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/iec-559-macros-1.c, gcc.dg/iec-559-macros-2.c,
+	gcc.dg/iec-559-macros-3.c, gcc.dg/iec-559-macros-4.c,
+	gcc.dg/iec-559-macros-5.c, gcc.dg/iec-559-macros-6.c,
+	gcc.dg/iec-559-macros-7.c, gcc.dg/iec-559-macros-8.c,
+	gcc.dg/iec-559-macros-9.c: New tests.
+
+2013-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/58946
+	* gcc.c-torture/compile/pr58946.c: New test.
+
+2013-11-03  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/52071
+	* g++.dg/parse/pr52071.C: New.
+
+2013-11-03  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/38313
+	* g++.dg/lookup/name-clash10.C: New.
+
+2013-11-03  Kugan Vivekanandarajah  <kuganv@linaro.org>
+
+	* gcc.target/arm/neon-vcond-gt.c: Scan for vbsl or vbit or vbif.
+	* gcc.target/arm/neon-vcond-ltgt.c: Scan for vbsl or vbit or vbif.
+	* gcc.target/arm/neon-vcond-unordered.c: Scan for vbsl or vbit or
+	vbif.
+
+2013-11-03  Marek Polacek  <polacek@redhat.com>
+
+	* g++.dg/ubsan/cxx1y-vla.C: New test.
+	* c-c++-common/ubsan/vla-3.c: New test.
+	* c-c++-common/ubsan/vla-2.c: New test.
+	* c-c++-common/ubsan/vla-4.c: New test.
+	* c-c++-common/ubsan/vla-1.c: New test.
+
 2013-11-02  Bill Schmidt  <wschmidt@vnet.linux.ibm.com>
 
 	* gcc.dg/vmx/vec-set.c: New.

@@ -1,3 +1,75 @@
+2013-11-04  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/58968
+	* lra-spills.c (return_regno_p): New function.
+	(lra_final_code_change): Use it.
+
+2013-11-04  Joseph Myers  <joseph@codesourcery.com>
+
+	* doc/cpp.texi (__GCC_IEC_559, __GCC_IEC_559_COMPLEX): Document
+	macros.
+	* target.def (float_exceptions_rounding_supported_p): New hook.
+	* targhooks.c (default_float_exceptions_rounding_supported_p): New
+	function.
+	* targhooks.h (default_float_exceptions_rounding_supported_p):
+	Declare.
+	* doc/tm.texi.in (TARGET_FLOAT_EXCEPTIONS_ROUNDING_SUPPORTED_P):
+	New @hook.
+	* doc/tm.texi: Regenerate.
+	* config.gcc (powerpc*-*-linux*): Set extra_objs.
+	* config/rs6000/rs6000-linux.c: New file.
+	* config/rs6000/rs6000-protos.h
+	(rs6000_linux_float_exceptions_rounding_supported_p): Declare.
+	* config/rs6000/linux.h
+	(TARGET_FLOAT_EXCEPTIONS_ROUNDING_SUPPORTED_P): New macro.
+	* config/rs6000/linux64.h
+	(TARGET_FLOAT_EXCEPTIONS_ROUNDING_SUPPORTED_P): Likewise.
+	* config/rs6000/t-linux (rs6000-linux.o): New rule.
+	* config/rs6000/t-linux64 (rs6000-linux.o): Likewise.
+
+2013-11-04  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	* config/rs6000/vsx.md (*vsx_le_perm_store_<mode> for VSX_D):
+	Replace the define_insn_and_split with a define_insn and two
+	define_splits, with the split after reload re-permuting the source
+	register to its original value.
+	(*vsx_le_perm_store_<mode> for VSX_W): Likewise.
+	(*vsx_le_perm_store_v8hi): Likewise.
+	(*vsx_le_perm_store_v16qi): Likewise.
+
+2013-11-04  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	* config/rs6000/vector.md (vec_pack_trunc_v2df):  Adjust for
+	little endian.
+
+2013-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/58946
+	* tree-ssa-reassoc.c (maybe_optimize_range_tests): Update all
+	bbs with bbinfo[idx].op != NULL before all blocks with
+	bbinfo[idx].op == NULL.
+
+2013-11-04  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* config/avr/avr-log.c (avr_double_int_pop_digit): Delete.
+	(avr_dump_double_int_hex): Likewise.
+	(avr_log_vadump): Remove %D and %X handling.
+	* config/avr/avr.c (avr_double_int_push_digit): Delete.
+	(avr_map_op_t): Change map from double_int to unsigned int.
+	(avr_map_op): Update accordingly.
+	(avr_map, avr_map_metric, avr_has_nibble_0xf, avr_map_decompose)
+	(avr_move_bits, avr_out_insert_bits, avr_fold_builtin): Operate on
+	unsigned ints rather than double_ints.
+
+2013-11-03  Marek Polacek  <polacek@redhat.com>
+
+	Implement -fsanitize=vla-bound.
+	* opts.c (common_handle_option): Handle vla-bound.
+	* sanitizer.def (BUILT_IN_UBSAN_HANDLE_VLA_BOUND_NOT_POSITIVE):
+	Define.
+	* flag-types.h (enum sanitize_code): Add SANITIZE_VLA.
+	* asan.c (initialize_sanitizer_builtins): Build BT_FN_VOID_PTR_PTR.
+
 2013-11-02  Bill Schmidt  <wschmidt@vnet.linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_expand_vector_set): Adjust for
