@@ -22,7 +22,8 @@ along with GCC; see the file COPYING3.  If not see
    The goal of this transformation is to discover functions which do have
    exactly the same semantics. For such function we could either create
    a virtual clone or do a simple function wrapper that will call
-   equivalent function.
+   equivalent function. If the function is just locally visible, all function
+   calls can be redirected.
 
    The algorithm basically consists of 3 stages. In the first, we calculate
    for each newly visited function a simple checksum that includes
@@ -33,7 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 
    Second, deep comparison phase, is based on further function collation.
    We traverse all basic blocks and each statement living in the block,
-   building bidictionaries of SSA names, function, parameter and variable
+   building bidictionaries of SSA names, functions, parameters and variable
    declarations. Corresponding statement types are mandatory, each statement
    operand must point to an appropriate one in a function we do
    comparison with.
@@ -107,6 +108,16 @@ along with GCC; see the file COPYING3.  If not see
     return false; \
   } \
   while (false);
+
+#define SE_CF_EXIT_FALSE() \
+do \
+{ \
+  if (dump_file && (dump_flags & TDF_DETAILS)) \
+    fprintf (dump_file, "False returned (%s:%u)\n", __func__, __LINE__); \
+  result = false; \
+  goto exit_label; \
+} \
+while (false);
 
 /* Forward struct declaration.  */
 typedef struct sem_bb sem_bb_t;
@@ -287,7 +298,7 @@ func_dict_free (func_dict_t *d)
 
 /* Releases memory for a semantic function F.  */
 
-inline void
+static inline void
 sem_func_free (sem_func_t *f)
 {
   unsigned int i;
@@ -319,7 +330,7 @@ bb_hash (const void *basic_block)
 
 /* Module independent semantic equality computation function.  */
 
-hashval_t
+static hashval_t
 independent_hash (sem_func_t *f)
 {
   unsigned int i;
@@ -1042,6 +1053,7 @@ check_gimple_goto (gimple g1, gimple g2, func_dict_t *d, tree func1, tree func2)
 
 /* Returns true if resx gimples G1 and G2 are corresponding
    in both function. */
+
 static bool
 check_gimple_resx (gimple g1, gimple g2)
 {
@@ -1256,7 +1268,8 @@ bb_dict_test (int* bb_dict, int source, int target)
 /* Iterates all tree types in T1 and T2 and returns true if all types
    are compatible. */
 
-static bool compare_type_lists (tree t1, tree t2)
+static bool
+compare_type_lists (tree t1, tree t2)
 {
   tree tv1, tv2;
   enum tree_code tc1, tc2;
@@ -1423,16 +1436,6 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
 
   return false;
 }
-
-#define SE_CF_EXIT_FALSE() \
-do \
-{ \
-  if (dump_file && (dump_flags & TDF_DETAILS)) \
-    fprintf (dump_file, "False returned (%s:%u)\n", __func__, __LINE__); \
-  result = false; \
-  goto exit_label; \
-} \
-while (false);
 
 /* Main comparison called for semantic function struct F1 and F2 returns
    true if functions are considered semantically equal.  */
@@ -1650,7 +1653,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
     }
 #endif
 
-  /* See if original and/or alias ddress can be compared for equality.  */
+  /* See if original and/or alias address can be compared for equality.  */
   original_address_matters
      = (!DECL_VIRTUAL_P (original->symbol.decl)
 	&& (original->symbol.externally_visible
@@ -1824,6 +1827,7 @@ struct cong_class_var_hash: typed_noop_remove <cong_class_t>
 };
 
 /* Hash for congruence class set is derived just from a pointer.  */
+
 inline hashval_t
 cong_class_var_hash::hash (const cong_class_t *item)
 {
@@ -1831,6 +1835,7 @@ cong_class_var_hash::hash (const cong_class_t *item)
 }
 
 /* Equal function compares pointer addresses.  */
+
 inline int
 cong_class_var_hash::equal (const cong_class_t *item1,
                             const cong_class_t *item2)
@@ -2100,6 +2105,7 @@ cong_info_var_hash::hash (const cong_info_t *item)
 }
 
 /* Equal function compares pointer addresses.  */
+
 inline int
 cong_info_var_hash::equal (const cong_info_t *item1, const cong_info_t *item2)
 {
@@ -2303,6 +2309,10 @@ process_congruence_reduction (void)
   bitmap_obstack_release (&bmstack);
 }
 
+/* Function iterates all congruence classes and merges all
+ * candidates that were proved to be samntically equivalent.
+ * If you add dump option, statististcs are showed.  */
+
 static void
 merge_groups (unsigned int groupcount_before)
 {
@@ -2385,6 +2395,8 @@ visit_all_functions (void)
         XDELETE (f);
     }
 }
+
+/* Semantic equality exection function.  */
 
 static unsigned int
 semantic_equality (void)
