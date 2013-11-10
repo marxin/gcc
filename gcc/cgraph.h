@@ -789,6 +789,7 @@ void ipa_record_stmt_references (struct cgraph_node *, gimple);
 
 /* In ipa.c  */
 bool symtab_remove_unreachable_nodes (bool, FILE *);
+bool address_taken_from_non_vtable_p (symtab_node *node);
 cgraph_node_set cgraph_node_set_new (void);
 cgraph_node_set_iterator cgraph_node_set_find (cgraph_node_set,
 					       struct cgraph_node *);
