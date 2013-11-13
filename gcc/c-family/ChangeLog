@@ -1,3 +1,70 @@
+2013-11-13  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-common.h (enum rid): Add RID_AUTO_TYPE.
+	* c-common.c (c_common_reswords): Add __auto_type.
+	(keyword_begins_type_specifier): Handle RID_AUTO_TYPE.
+
+2013-11-12  Andrew MacLeod  <amacleod@redhat.com>
+
+	* c-family/c-common.c: Include gimplify.h.
+	* c-family/c-gimplify.c: Likewise.
+	* c-family/cilk.c: Likewise.
+	* c-family/c-omp.c: Include gimple-expr.h instead of gimple.h.
+	* c-family/c-ubsan.c: Don't include gimple.h.
+
+2013-11-12  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-common.c (c_common_reswords): Add _Thread_local.
+
+2013-11-09  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-common.c (atomic_size_supported_p): New function.
+	(resolve_overloaded_atomic_exchange)
+	(resolve_overloaded_atomic_compare_exchange)
+	(resolve_overloaded_atomic_load, resolve_overloaded_atomic_store):
+	Use it instead of comparing size with a local list of sizes.
+
+2013-11-07  Andrew MacLeod  <amacleod@redhat.com>
+	    Joseph Myers  <joseph@codesourcery.com>
+
+	* c-common.h (enum rid): Add RID_ATOMIC.
+	* c-common.c (c_common_reswords): Add _Atomic.
+	(sync_resolve_params): Use TYPE_MAIN_VARIANT on pointer argument.
+	(keyword_is_type_qualifier): Accept RID_ATOMIC.
+	* c-format.c (check_format_types): Check for extra _Atomic
+	qualifiers in format argument.
+	* c-pretty-print.c (pp_c_cv_qualifiers): Handle atomic qualifier.
+	(pp_c_type_qualifier_list): Mention _Atomic in comment.
+
+2013-11-06  Tobias Burnus  <burnus@net-b.de>
+
+	* c-common.c (reason_option_codes_t): Add CPP_W_DATE_TIME.
+
+2013-11-06  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-opts.c (c_common_post_options): Set -ffp-contract=off in C
+	standards modes.
+	* c-cppbuiltin.c (cpp_iec_559_value): Consider -ffp-contract=fast
+	to mean lack of IEEE 754 support.
+
+2013-11-05  Tobias Burnus  <burnus@net-b.de>
+
+	* c.opt (-Wdate-time): New option
+	* c-opts.c (sanitize_cpp_opts): Pass on to libcpp.
+
+2013-11-05  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-cppbuiltin.c (cpp_iec_559_value): Test
+	flag_excess_precision_cmdline not flag_excess_precision.
+
+2013-11-05  Tobias Burnus  <burnus@net-b.de>
+
+	* c.opt (fopenmp-simd): New option.
+	* c-pragma.c (omp_pragmas): Move pragmas which can contain simd to ...
+	(omp_pragmas): ... this new struct.
+	(c_pp_lookup_pragma): Also walk omp_pragmas.
+	(init_pragma): Init pragmas for -fopenmp-simd.
+
 2013-11-04  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/58979

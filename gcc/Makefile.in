@@ -381,6 +381,7 @@ USER_H = $(srcdir)/ginclude/float.h \
 	 $(srcdir)/ginclude/stdfix.h \
 	 $(srcdir)/ginclude/stdnoreturn.h \
 	 $(srcdir)/ginclude/stdalign.h \
+	 $(srcdir)/ginclude/stdatomic.h \
 	 $(EXTRA_HEADERS)
 
 USER_H_INC_NEXT_PRE = @user_headers_inc_next_pre@
@@ -1230,10 +1231,12 @@ OBJS = \
 	ggc-common.o \
 	gimple.o \
 	gimple-builder.o \
+	gimple-expr.o \
 	gimple-iterator.o \
 	gimple-fold.o \
 	gimple-low.o \
 	gimple-pretty-print.o \
+	gimple-ssa-isolate-paths.o \
 	gimple-ssa-strength-reduction.o \
 	gimple-streamer-in.o \
 	gimple-streamer-out.o \
@@ -2258,7 +2261,7 @@ GTFILES = $(CPP_ID_DATA_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/tree-ssanames.c $(srcdir)/tree-eh.c $(srcdir)/tree-ssa-address.c \
   $(srcdir)/tree-cfg.c \
   $(srcdir)/tree-dfa.c \
-  $(srcdir)/tree-iterator.c $(srcdir)/gimplify.c \
+  $(srcdir)/tree-iterator.c $(srcdir)/gimple-expr.c \
   $(srcdir)/tree-chrec.h \
   $(srcdir)/tree-scalar-evolution.c \
   $(srcdir)/tree-ssa-operands.h \
@@ -2974,7 +2977,7 @@ gpl.pod: gpl_v3.texi
 
 mostlyclean: lang.mostlyclean
 	-rm -f $(MOSTLYCLEANFILES)
-	-rm -f *$(objext)
+	-rm -f *$(objext) c-family/*$(objext)
 	-rm -f *$(coverageexts)
 # Delete build programs
 	-rm -f build/*

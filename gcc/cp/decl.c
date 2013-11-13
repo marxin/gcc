@@ -5683,6 +5683,7 @@ check_initializer (tree decl, tree init, int flags, vec<tree, va_gc> **cleanups)
 	  && !(init && BRACE_ENCLOSED_INITIALIZER_P (init)
 	       && CP_AGGREGATE_TYPE_P (type)
 	       && (CLASS_TYPE_P (type)
+		   || !TYPE_NEEDS_CONSTRUCTING (type)
 		   || type_has_extended_temps (type))))
 	{
 	  init_code = build_aggr_init_full_exprs (decl, init, flags);
@@ -10380,33 +10381,11 @@ grokdeclarator (const cp_declarator *declarator,
 
       if (type_uses_auto (type))
 	{
-	  if (template_parm_flag)
-	    {
-	      error ("template parameter declared %<auto%>");
-	      type = error_mark_node;
-	    }
-	  else if (decl_context == CATCHPARM)
-	    {
-	      error ("catch parameter declared %<auto%>");
-	      type = error_mark_node;
-	    }
-	  else if (current_class_type && LAMBDA_TYPE_P (current_class_type))
-	    {
-	      if (cxx_dialect < cxx1y)
-		pedwarn (location_of (type), 0,
-			 "use of %<auto%> in lambda parameter declaration "
-			 "only available with "
-			 "-std=c++1y or -std=gnu++1y");
-	    }
-	  else if (cxx_dialect < cxx1y)
-	    pedwarn (location_of (type), 0,
-		     "use of %<auto%> in parameter declaration "
-		     "only available with "
-		     "-std=c++1y or -std=gnu++1y");
+	  if (cxx_dialect >= cxx1y)
+	    error ("%<auto%> parameter not permitted in this context");
 	  else
-	    pedwarn (location_of (type), OPT_Wpedantic,
-		     "ISO C++ forbids use of %<auto%> in parameter "
-		     "declaration");
+	    error ("parameter declared %<auto%>");
+	  type = error_mark_node;
 	}
 
       /* A parameter declared as an array of T is really a pointer to T.

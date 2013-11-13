@@ -22,7 +22,7 @@
 #include "coretypes.h"
 #include "hash-table.h"
 #include "tree.h"
-#include "gimple.h"
+#include "gimplify.h"
 #include "gimple-ssa.h"
 #include "cgraph.h"
 #include "tree-cfg.h"
@@ -590,6 +590,12 @@ diagnose_tm_1_op (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED,
     }
 
   return NULL_TREE;
+}
+
+static inline bool
+is_tm_safe_or_pure (const_tree x)
+{
+  return is_tm_safe (x) || is_tm_pure (x);
 }
 
 static tree

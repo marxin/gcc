@@ -29,7 +29,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "basic-block.h"
 #include "gimple-pretty-print.h"
-#include "gimple.h"
+#include "gimplify.h"
 #include "gimple-ssa.h"
 #include "tree-cfg.h"
 #include "tree-phinodes.h"
@@ -2104,7 +2104,6 @@ vectorizable_call (gimple stmt, gimple_stmt_iterator *gsi, gimple *vec_stmt,
   set_vinfo_for_stmt (stmt, NULL);
   STMT_VINFO_STMT (stmt_info) = new_stmt;
   gsi_replace (gsi, new_stmt, false);
-  SSA_NAME_DEF_STMT (gimple_assign_lhs (new_stmt)) = new_stmt;
 
   return true;
 }

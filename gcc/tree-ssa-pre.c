@@ -27,7 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "basic-block.h"
 #include "gimple-pretty-print.h"
 #include "tree-inline.h"
-#include "gimple.h"
+#include "gimplify.h"
 #include "gimple-ssa.h"
 #include "tree-cfg.h"
 #include "tree-phinodes.h"
@@ -4116,7 +4116,6 @@ eliminate_dom_walker::before_dom_children (basic_block b)
       if (!useless_type_conversion_p (TREE_TYPE (res), TREE_TYPE (sprime)))
 	sprime = fold_convert (TREE_TYPE (res), sprime);
       stmt = gimple_build_assign (res, sprime);
-      SSA_NAME_DEF_STMT (res) = stmt;
       gimple_set_plf (stmt, NECESSARY, gimple_plf (phi, NECESSARY));
 
       gsi2 = gsi_after_labels (b);

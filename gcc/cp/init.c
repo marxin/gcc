@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cp-tree.h"
 #include "flags.h"
 #include "target.h"
+#include "gimplify.h"
 
 static bool begin_init_stmts (tree *, tree *);
 static tree finish_init_stmts (bool, tree, tree);
@@ -2461,9 +2462,16 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
   if (vec_safe_is_empty (*placement) && TYPE_FOR_JAVA (elt_type))
     {
       tree class_addr;
-      tree class_decl = build_java_class_ref (elt_type);
+      tree class_decl;
       static const char alloc_name[] = "_Jv_AllocObject";
 
+      if (!MAYBE_CLASS_TYPE_P (elt_type))
+	{
+	  error ("%qT isn%'t a valid Java class type", elt_type);
+	  return error_mark_node;
+	}
+
+      class_decl = build_java_class_ref (elt_type);
       if (class_decl == error_mark_node)
 	return error_mark_node;
 

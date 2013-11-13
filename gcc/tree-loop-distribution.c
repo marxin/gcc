@@ -45,7 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
-#include "gimple.h"
+#include "gimplify.h"
 #include "gimple-ssa.h"
 #include "tree-cfg.h"
 #include "tree-phinodes.h"
@@ -1350,8 +1350,17 @@ pg_add_dependence_edges (struct graph *rdg, vec<loop_p> loops, int dir,
 	      }
 	    /* Known dependences can still be unordered througout the
 	       iteration space, see gcc.dg/tree-ssa/ldist-16.c.  */
-	    if (DDR_NUM_DIST_VECTS (ddr) == 0)
+	    if (DDR_NUM_DIST_VECTS (ddr) != 1)
 	      this_dir = 2;
+	    /* If the overlap is exact preserve stmt order.  */
+	    else if (lambda_vector_zerop (DDR_DIST_VECT (ddr, 0), 1))
+	      ;
+	    else
+	      {
+		/* Else as the distance vector is lexicographic positive
+		   swap the dependence direction.  */
+		this_dir = -this_dir;
+	      }
 	  }
 	else
 	  this_dir = 0;

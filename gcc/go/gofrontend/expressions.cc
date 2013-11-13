@@ -12,6 +12,7 @@
 #include "intl.h"
 #include "tree.h"
 #include "gimple.h"
+#include "gimplify.h"
 #include "tree-iterator.h"
 #include "convert.h"
 #include "real.h"
@@ -3351,9 +3352,10 @@ Type_conversion_expression::do_get_tree(Translate_context* context)
 	  return se->get_tree(context);
 	}
 
-      Call_expression* i2s_expr =
+      Expression* i2s_expr =
           Runtime::make_call(Runtime::INT_TO_STRING, this->location(), 1,
                              this->expr_);
+      i2s_expr = Expression::make_cast(type, i2s_expr, this->location());
       ret = i2s_expr->get_tree(context);
     }
   else if (type->is_string_type() && expr_type->is_slice_type())
@@ -3405,7 +3407,7 @@ Type_conversion_expression::do_get_tree(Translate_context* context)
       Type* e = type->array_type()->element_type()->forwarded();
       go_assert(e->integer_type() != NULL);
 
-      Call_expression* s2a_expr;
+      Expression* s2a_expr;
       if (e->integer_type()->is_byte())
         s2a_expr = Runtime::make_call(Runtime::STRING_TO_BYTE_ARRAY,
                                       this->location(), 1, this->expr_);
@@ -3415,6 +3417,8 @@ Type_conversion_expression::do_get_tree(Translate_context* context)
           s2a_expr = Runtime::make_call(Runtime::STRING_TO_INT_ARRAY,
                                         this->location(), 1, this->expr_);
 	}
+      s2a_expr = Expression::make_unsafe_cast(type, s2a_expr,
+					      this->location());
       ret = s2a_expr->get_tree(context);
     }
   else if ((type->is_unsafe_pointer_type()
@@ -3630,7 +3634,8 @@ class Unary_expression : public Expression
  public:
   Unary_expression(Operator op, Expression* expr, Location location)
     : Expression(EXPRESSION_UNARY, location),
-      op_(op), escapes_(true), create_temp_(false), expr_(expr)
+      op_(op), escapes_(true), create_temp_(false), expr_(expr),
+      issue_nil_check_(false)
   { }
 
   // Return the operator.
@@ -3716,6 +3721,10 @@ class Unary_expression : public Expression
   void
   do_dump_expression(Ast_dump_context*) const;
 
+  void
+  do_issue_nil_check()
+  { this->issue_nil_check_ = (this->op_ == OPERATOR_MULT); }
+
  private:
   // The unary operator to apply.
   Operator op_;
@@ -3727,6 +3736,9 @@ class Unary_expression : public Expression
   bool create_temp_;
   // The operand.
   Expression* expr_;
+  // Whether or not to issue a nil check for this expression if its address
+  // is being taken.
+  bool issue_nil_check_;
 };
 
 // If we are taking the address of a composite literal, and the
@@ -4104,7 +4116,10 @@ Unary_expression::do_check_types(Gogo*)
 	    this->report_error(_("invalid operand for unary %<&%>"));
 	}
       else
-	this->expr_->address_taken(this->escapes_);
+        {
+          this->expr_->address_taken(this->escapes_);
+          this->expr_->issue_nil_check();
+        }
       break;
 
     case OPERATOR_MULT:
@@ -4274,12 +4289,13 @@ Unary_expression::do_get_tree(Translate_context* context)
 	// If we are dereferencing the pointer to a large struct, we
 	// need to check for nil.  We don't bother to check for small
 	// structs because we expect the system to crash on a nil
-	// pointer dereference.
+	// pointer dereference.	 However, if we know the address of this
+	// expression is being taken, we must always check for nil.
 	tree target_type_tree = TREE_TYPE(TREE_TYPE(expr));
 	if (!VOID_TYPE_P(target_type_tree))
 	  {
 	    HOST_WIDE_INT s = int_size_in_bytes(target_type_tree);
-	    if (s == -1 || s >= 4096)
+	    if (s == -1 || s >= 4096 || this->issue_nil_check_)
 	      {
 		if (!DECL_P(expr))
 		  expr = save_expr(expr);
@@ -10399,6 +10415,10 @@ class Array_index_expression : public Expression
   do_address_taken(bool escapes)
   { this->array_->address_taken(escapes); }
 
+  void
+  do_issue_nil_check()
+  { this->array_->issue_nil_check(); }
+
   tree
   do_get_tree(Translate_context*);
 
@@ -13485,10 +13505,52 @@ class Composite_literal_expression : public Parser_expression
 int
 Composite_literal_expression::do_traverse(Traverse* traverse)
 {
-  if (this->vals_ != NULL
-      && this->vals_->traverse(traverse) == TRAVERSE_EXIT)
+  if (Type::traverse(this->type_, traverse) == TRAVERSE_EXIT)
     return TRAVERSE_EXIT;
-  return Type::traverse(this->type_, traverse);
+
+  // If this is a struct composite literal with keys, then the keys
+  // are field names, not expressions.  We don't want to traverse them
+  // in that case.  If we do, we can give an erroneous error "variable
+  // initializer refers to itself."  See bug482.go in the testsuite.
+  if (this->has_keys_ && this->vals_ != NULL)
+    {
+      // The type may not be resolvable at this point.
+      Type* type = this->type_;
+      while (true)
+	{
+	  if (type->classification() == Type::TYPE_NAMED)
+	    type = type->named_type()->real_type();
+	  else if (type->classification() == Type::TYPE_FORWARD)
+	    {
+	      Type* t = type->forwarded();
+	      if (t == type)
+		break;
+	      type = t;
+	    }
+	  else
+	    break;
+	}
+
+      if (type->classification() == Type::TYPE_STRUCT)
+	{
+	  Expression_list::iterator p = this->vals_->begin();
+	  while (p != this->vals_->end())
+	    {
+	      // Skip key.
+	      ++p;
+	      go_assert(p != this->vals_->end());
+	      if (Expression::traverse(&*p, traverse) == TRAVERSE_EXIT)
+		return TRAVERSE_EXIT;
+	      ++p;
+	    }
+	  return TRAVERSE_CONTINUE;
+	}
+    }
+
+  if (this->vals_ != NULL)
+    return this->vals_->traverse(traverse);
+
+  return TRAVERSE_CONTINUE;
 }
 
 // Lower a generic composite literal into a specific version based on

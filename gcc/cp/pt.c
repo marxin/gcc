@@ -42,6 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "timevar.h"
 #include "tree-iterator.h"
 #include "type-utils.h"
+#include "gimplify.h"
 
 /* The type of functions taking a tree, and some additional data, and
    returning an int.  */
@@ -7458,30 +7459,7 @@ lookup_template_class_1 (tree d1, tree arglist, tree in_decl, tree context,
 	context = global_namespace;
 
       /* Create the type.  */
-      if (TREE_CODE (template_type) == ENUMERAL_TYPE)
-	{
-	  if (!is_dependent_type)
-	    {
-	      set_current_access_from_decl (TYPE_NAME (template_type));
-	      t = start_enum (TYPE_IDENTIFIER (template_type), NULL_TREE,
-			      tsubst (ENUM_UNDERLYING_TYPE (template_type),
-				      arglist, complain, in_decl),
-			      SCOPED_ENUM_P (template_type), NULL);
-	    }
-	  else
-            {
-              /* We don't want to call start_enum for this type, since
-                 the values for the enumeration constants may involve
-                 template parameters.  And, no one should be interested
-                 in the enumeration constants for such a type.  */
-              t = cxx_make_type (ENUMERAL_TYPE);
-              SET_SCOPED_ENUM_P (t, SCOPED_ENUM_P (template_type));
-            }
-          SET_OPAQUE_ENUM_P (t, OPAQUE_ENUM_P (template_type));
-	  ENUM_FIXED_UNDERLYING_TYPE_P (t)
-	    = ENUM_FIXED_UNDERLYING_TYPE_P (template_type);
-	}
-      else if (DECL_ALIAS_TEMPLATE_P (gen_tmpl))
+      if (DECL_ALIAS_TEMPLATE_P (gen_tmpl))
 	{
 	  /* The user referred to a specialization of an alias
 	    template represented by GEN_TMPL.
@@ -7504,6 +7482,29 @@ lookup_template_class_1 (tree d1, tree arglist, tree in_decl, tree context,
 
 	  if (t == error_mark_node)
 	    return t;
+	}
+      else if (TREE_CODE (template_type) == ENUMERAL_TYPE)
+	{
+	  if (!is_dependent_type)
+	    {
+	      set_current_access_from_decl (TYPE_NAME (template_type));
+	      t = start_enum (TYPE_IDENTIFIER (template_type), NULL_TREE,
+			      tsubst (ENUM_UNDERLYING_TYPE (template_type),
+				      arglist, complain, in_decl),
+			      SCOPED_ENUM_P (template_type), NULL);
+	    }
+	  else
+            {
+              /* We don't want to call start_enum for this type, since
+                 the values for the enumeration constants may involve
+                 template parameters.  And, no one should be interested
+                 in the enumeration constants for such a type.  */
+              t = cxx_make_type (ENUMERAL_TYPE);
+              SET_SCOPED_ENUM_P (t, SCOPED_ENUM_P (template_type));
+            }
+          SET_OPAQUE_ENUM_P (t, OPAQUE_ENUM_P (template_type));
+	  ENUM_FIXED_UNDERLYING_TYPE_P (t)
+	    = ENUM_FIXED_UNDERLYING_TYPE_P (template_type);
 	}
       else if (CLASS_TYPE_P (template_type))
 	{
@@ -7661,7 +7662,8 @@ lookup_template_class_1 (tree d1, tree arglist, tree in_decl, tree context,
 	= tree_cons (arglist, t,
 		     DECL_TEMPLATE_INSTANTIATIONS (templ));
 
-      if (TREE_CODE (template_type) == ENUMERAL_TYPE && !is_dependent_type)
+      if (TREE_CODE (template_type) == ENUMERAL_TYPE && !is_dependent_type
+	  && !DECL_ALIAS_TEMPLATE_P (gen_tmpl))
 	/* Now that the type has been registered on the instantiations
 	   list, we set up the enumerators.  Because the enumeration
 	   constants may involve the enumeration type itself, we make
@@ -21628,6 +21630,58 @@ append_type_to_template_for_access_check (tree templ,
   append_type_to_template_for_access_check_1 (templ, type_decl,
 					      scope, location);
 }
+
+/* Convert the generic type parameters in PARM that match the types given in the
+   range [START_IDX, END_IDX) from the current_template_parms into generic type
+   packs.  */
+
+tree
+convert_generic_types_to_packs (tree parm, int start_idx, int end_idx)
+{
+  tree current = current_template_parms;
+  int depth = TMPL_PARMS_DEPTH (current);
+  current = INNERMOST_TEMPLATE_PARMS (current);
+  tree replacement = make_tree_vec (TREE_VEC_LENGTH (current));
+
+  for (int i = 0; i < start_idx; ++i)
+    TREE_VEC_ELT (replacement, i)
+      = TREE_TYPE (TREE_VALUE (TREE_VEC_ELT (current, i)));
+
+  for (int i = start_idx; i < end_idx; ++i)
+    {
+      /* Create a distinct parameter pack type from the current parm and add it
+	 to the replacement args to tsubst below into the generic function
+	 parameter.  */
+
+      tree o = TREE_TYPE (TREE_VALUE
+			  (TREE_VEC_ELT (current, i)));
+      tree t = copy_type (o);
+      TEMPLATE_TYPE_PARM_INDEX (t)
+	= reduce_template_parm_level (TEMPLATE_TYPE_PARM_INDEX (o),
+				      o, 0, 0, tf_none);
+      TREE_TYPE (TEMPLATE_TYPE_DECL (t)) = t;
+      TYPE_STUB_DECL (t) = TYPE_NAME (t) = TEMPLATE_TYPE_DECL (t);
+      TYPE_MAIN_VARIANT (t) = t;
+      TEMPLATE_TYPE_PARAMETER_PACK (t) = true;
+      TYPE_CANONICAL (t) = canonical_type_parameter (t);
+      TREE_VEC_ELT (replacement, i) = t;
+      TREE_VALUE (TREE_VEC_ELT (current, i)) = TREE_CHAIN (t);
+    }
+
+  for (int i = end_idx, e = TREE_VEC_LENGTH (current); i < e; ++i)
+    TREE_VEC_ELT (replacement, i)
+      = TREE_TYPE (TREE_VALUE (TREE_VEC_ELT (current, i)));
+
+  /* If there are more levels then build up the replacement with the outer
+     template parms.  */
+  if (depth > 1)
+    replacement = add_to_template_args (template_parms_to_args
+					(TREE_CHAIN (current_template_parms)),
+					replacement);
+
+  return tsubst (parm, replacement, tf_none, NULL_TREE);
+}
+
 
 /* Set up the hash tables for template instantiations.  */
 

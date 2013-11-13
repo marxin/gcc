@@ -27,7 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "function.h"
 #include "dumpfile.h"
 #include "bitmap.h"
-#include "gimple.h"
+#include "gimplify.h"
 #include "gimple-ssa.h"
 #include "tree-ssanames.h"
 #include "tree-into-ssa.h"
@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-utils.h"
 #include "gimple-pretty-print.h"
 #include "tree-ssa-address.h"
+#include "langhooks.h"
 
 /* Return true when DECL can be referenced from current unit.
    FROM_DECL (if non-null) specify constructor of variable DECL was taken from.
@@ -56,7 +57,7 @@ along with GCC; see the file COPYING3.  If not see
 	that has no corresponding callgraph/varpool node
 	declaring the body.  
      3) COMDAT functions referred by external vtables that
-        we devirtualize only during final copmilation stage.
+        we devirtualize only during final compilation stage.
         At this time we already decided that we will not output
         the function body and thus we can't reference the symbol
         directly.  */
@@ -195,7 +196,7 @@ canonicalize_constructor_val (tree cval, tree from_decl)
 	  /* Make sure we create a cgraph node for functions we'll reference.
 	     They can be non-existent if the reference comes from an entry
 	     of an external vtable for example.  */
-	  cgraph_get_create_real_symbol_node (base);
+	  cgraph_get_create_node (base);
 	}
       /* Fixup types in global initializers.  */
       if (TREE_TYPE (TREE_TYPE (cval)) != TREE_TYPE (TREE_OPERAND (cval, 0)))
@@ -205,6 +206,8 @@ canonicalize_constructor_val (tree cval, tree from_decl)
 	cval = fold_convert (TREE_TYPE (orig_cval), cval);
       return cval;
     }
+  if (TREE_OVERFLOW_P (cval))
+    return drop_tree_overflow (cval);
   return orig_cval;
 }
 

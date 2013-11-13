@@ -42,6 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "opts.h"
 #include "cgraph.h"
 #include "target-def.h"
+#include "gimplify.h"
 
 cpp_reader *parse_in;		/* Declared in c-pragma.h.  */
 
@@ -409,6 +410,7 @@ const struct c_common_resword c_common_reswords[] =
 {
   { "_Alignas",		RID_ALIGNAS,   D_CONLY },
   { "_Alignof",		RID_ALIGNOF,   D_CONLY },
+  { "_Atomic",		RID_ATOMIC,    D_CONLY },
   { "_Bool",		RID_BOOL,      D_CONLY },
   { "_Complex",		RID_COMPLEX,	0 },
   { "_Cilk_spawn",      RID_CILK_SPAWN, 0 },
@@ -423,6 +425,7 @@ const struct c_common_resword c_common_reswords[] =
   { "_Static_assert",   RID_STATIC_ASSERT, D_CONLY },
   { "_Noreturn",        RID_NORETURN,  D_CONLY },
   { "_Generic",         RID_GENERIC,   D_CONLY },
+  { "_Thread_local",    RID_THREAD,    D_CONLY },
   { "__FUNCTION__",	RID_FUNCTION_NAME, 0 },
   { "__PRETTY_FUNCTION__", RID_PRETTY_FUNCTION_NAME, 0 },
   { "__alignof",	RID_ALIGNOF,	0 },
@@ -431,6 +434,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__asm__",		RID_ASM,	0 },
   { "__attribute",	RID_ATTRIBUTE,	0 },
   { "__attribute__",	RID_ATTRIBUTE,	0 },
+  { "__auto_type",	RID_AUTO_TYPE,	D_CONLY },
   { "__bases",          RID_BASES, D_CXXONLY },
   { "__builtin_choose_expr", RID_CHOOSE_EXPR, D_CONLY },
   { "__builtin_complex", RID_BUILTIN_COMPLEX, D_CONLY },
@@ -9565,6 +9569,7 @@ static const struct reason_option_codes_t option_codes[] = {
   {CPP_W_INVALID_PCH,			OPT_Winvalid_pch},
   {CPP_W_WARNING_DIRECTIVE,		OPT_Wcpp},
   {CPP_W_LITERAL_SUFFIX,		OPT_Wliteral_suffix},
+  {CPP_W_DATE_TIME,			OPT_Wdate_time},
   {CPP_W_NONE,				0}
 };
 
@@ -10171,6 +10176,7 @@ sync_resolve_params (location_t loc, tree orig_function, tree function,
      call to check_function_arguments what ever type the user used.  */
   function_args_iter_next (&iter);
   ptype = TREE_TYPE (TREE_TYPE ((*params)[0]));
+  ptype = TYPE_MAIN_VARIANT (ptype);
 
   /* For the rest of the values, we need to cast these to FTYPE, so that we
      don't get warnings for passing pointer types, etc.  */
@@ -10400,6 +10406,27 @@ add_atomic_size_parameter (unsigned n, location_t loc, tree function,
 }
 
 
+/* Return whether atomic operations for naturally aligned N-byte
+   arguments are supported, whether inline or through libatomic.  */
+static bool
+atomic_size_supported_p (int n)
+{
+  switch (n)
+    {
+    case 1:
+    case 2:
+    case 4:
+    case 8:
+      return true;
+
+    case 16:
+      return targetm.scalar_mode_supported_p (TImode);
+
+    default:
+      return false;
+    }
+}
+
 /* This will process an __atomic_exchange function call, determine whether it
    needs to be mapped to the _N variation, or turned into a library call.
    LOC is the location of the builtin call.
@@ -10425,7 +10452,7 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
     }
 
   /* If not a lock-free size, change to the library generic format.  */
-  if (n != 1 && n != 2 && n != 4 && n != 8 && n != 16)
+  if (!atomic_size_supported_p (n))
     {
       *new_return = add_atomic_size_parameter (n, loc, function, params);
       return true;
@@ -10490,7 +10517,7 @@ resolve_overloaded_atomic_compare_exchange (location_t loc, tree function,
     }
 
   /* If not a lock-free size, change to the library generic format.  */
-  if (n != 1 && n != 2 && n != 4 && n != 8 && n != 16)
+  if (!atomic_size_supported_p (n))
     {
       /* The library generic format does not have the weak parameter, so 
 	 remove it from the param list.  Since a parameter has been removed,
@@ -10566,7 +10593,7 @@ resolve_overloaded_atomic_load (location_t loc, tree function,
     }
 
   /* If not a lock-free size, change to the library generic format.  */
-  if (n != 1 && n != 2 && n != 4 && n != 8 && n != 16)
+  if (!atomic_size_supported_p (n))
     {
       *new_return = add_atomic_size_parameter (n, loc, function, params);
       return true;
@@ -10626,7 +10653,7 @@ resolve_overloaded_atomic_store (location_t loc, tree function,
     }
 
   /* If not a lock-free size, change to the library generic format.  */
-  if (n != 1 && n != 2 && n != 4 && n != 8 && n != 16)
+  if (!atomic_size_supported_p (n))
     {
       *new_return = add_atomic_size_parameter (n, loc, function, params);
       return true;
@@ -11525,6 +11552,7 @@ keyword_begins_type_specifier (enum rid keyword)
 {
   switch (keyword)
     {
+    case RID_AUTO_TYPE:
     case RID_INT:
     case RID_CHAR:
     case RID_FLOAT:
@@ -11567,6 +11595,7 @@ keyword_is_type_qualifier (enum rid keyword)
     case RID_CONST:
     case RID_VOLATILE:
     case RID_RESTRICT:
+    case RID_ATOMIC:
       return true;
     default:
       return false;
