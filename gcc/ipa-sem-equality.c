@@ -425,10 +425,8 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 
   f->called_functions.create (0);
 
-  if (!cgraph_function_with_gimple_body_p (node))
+  if (!func || !cgraph_function_with_gimple_body_p (node))
     return false;
-
-  gcc_assert (func);
   
   f->ssa_names_size = SSANAMES (func)->length ();
   f->node = node;
