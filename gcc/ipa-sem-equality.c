@@ -1996,6 +1996,9 @@ build_tree_decl_map (void)
 
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     {
+      // TODO
+      fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", semantic_functions[i], i, cgraph_node_asm_name (semantic_functions[i]->node));
+
       slot = tree_decl_map.insert (semantic_functions[i]->func_decl,
                                    &existed_p);
 
