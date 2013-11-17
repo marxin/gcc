@@ -69,6 +69,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-ssa.h"
 #include "gimple-pretty-print.h"
 #include "tree-dfa.h"
+#include "gimple-iterator.h"
 
 #define SE_DUMP_MESSAGE(message) \
   do \
@@ -1997,7 +1998,7 @@ build_tree_decl_map (void)
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     {
       // TODO
-      fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", semantic_functions[i], i, cgraph_node_asm_name (semantic_functions[i]->node));
+      fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", (void *)semantic_functions[i], i, cgraph_node_asm_name (semantic_functions[i]->node));
 
       slot = tree_decl_map.insert (semantic_functions[i]->func_decl,
                                    &existed_p);
