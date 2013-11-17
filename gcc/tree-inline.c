@@ -34,7 +34,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "basic-block.h"
 #include "tree-iterator.h"
 #include "intl.h"
+#include "gimple.h"
 #include "gimplify.h"
+#include "gimple-iterator.h"
+#include "gimplify-me.h"
+#include "gimple-walk.h"
 #include "gimple-ssa.h"
 #include "tree-cfg.h"
 #include "tree-phinodes.h"
@@ -4500,21 +4504,6 @@ fold_marked_statements (int first, struct pointer_set_t *statements)
 		}
 	    }
       }
-}
-
-/* Return true if BB has at least one abnormal outgoing edge.  */
-
-static inline bool
-has_abnormal_outgoing_edge_p (basic_block bb)
-{
-  edge e;
-  edge_iterator ei;
-
-  FOR_EACH_EDGE (e, ei, bb->succs)
-    if (e->flags & EDGE_ABNORMAL)
-      return true;
-
-  return false;
 }
 
 /* Expand calls to inline functions in the body of FN.  */

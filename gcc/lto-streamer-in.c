@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "hashtab.h"
 #include "basic-block.h"
 #include "gimple.h"
+#include "gimple-iterator.h"
 #include "gimple-ssa.h"
 #include "tree-cfg.h"
 #include "tree-ssanames.h"
@@ -916,7 +917,8 @@ input_function (tree fn_decl, struct data_in *data_in,
   gimple_register_cfg_hooks ();
 
   node = cgraph_get_node (fn_decl);
-  gcc_checking_assert (node);
+  if (!node)
+    node = cgraph_create_node (fn_decl);
   input_struct_function_base (fn, data_in, ib);
   input_cfg (ib_cfg, fn, node->count_materialization_scale);
 

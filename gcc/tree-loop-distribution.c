@@ -45,7 +45,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
-#include "gimplify.h"
+#include "gimple.h"
+#include "gimple-iterator.h"
+#include "gimplify-me.h"
 #include "gimple-ssa.h"
 #include "tree-cfg.h"
 #include "tree-phinodes.h"
@@ -1722,8 +1724,7 @@ tree_loop_distribution (void)
 	      if (stmt_has_scalar_dependences_outside_loop (loop, stmt))
 		;
 	      /* Otherwise only distribute stores for now.  */
-	      else if (!gimple_assign_single_p (stmt)
-		       || is_gimple_reg (gimple_assign_lhs (stmt)))
+	      else if (!gimple_vdef (stmt))
 		continue;
 
 	      work_list.safe_push (stmt);
