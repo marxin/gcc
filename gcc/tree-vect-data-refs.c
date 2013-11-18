@@ -772,7 +772,7 @@ vect_compute_data_ref_alignment (struct data_reference *dr)
   /* Modulo alignment.  */
   misalign = size_binop (FLOOR_MOD_EXPR, misalign, alignment);
 
-  if (!host_integerp (misalign, 1))
+  if (!tree_fits_uhwi_p (misalign))
     {
       /* Negative or overflowed misalignment value.  */
       if (dump_enabled_p ())
@@ -960,7 +960,7 @@ vect_verify_datarefs_alignment (loop_vec_info loop_vinfo, bb_vec_info bb_vinfo)
 static bool
 not_size_aligned (tree exp)
 {
-  if (!host_integerp (TYPE_SIZE (TREE_TYPE (exp)), 1))
+  if (!tree_fits_uhwi_p (TYPE_SIZE (TREE_TYPE (exp))))
     return true;
 
   return (TREE_INT_CST_LOW (TYPE_SIZE (TREE_TYPE (exp)))
@@ -2544,11 +2544,11 @@ vect_analyze_data_ref_accesses (loop_vec_info loop_vinfo, bb_vec_info bb_vinfo)
 	  /* Check that the data-refs have the same constant size and step.  */
 	  tree sza = TYPE_SIZE_UNIT (TREE_TYPE (DR_REF (dra)));
 	  tree szb = TYPE_SIZE_UNIT (TREE_TYPE (DR_REF (drb)));
-	  if (!host_integerp (sza, 1)
-	      || !host_integerp (szb, 1)
+	  if (!tree_fits_uhwi_p (sza)
+	      || !tree_fits_uhwi_p (szb)
 	      || !tree_int_cst_equal (sza, szb)
-	      || !host_integerp (DR_STEP (dra), 0)
-	      || !host_integerp (DR_STEP (drb), 0)
+	      || !tree_fits_shwi_p (DR_STEP (dra))
+	      || !tree_fits_shwi_p (DR_STEP (drb))
 	      || !tree_int_cst_equal (DR_STEP (dra), DR_STEP (drb)))
 	    break;
 
@@ -2877,8 +2877,8 @@ vect_prune_runtime_alias_test_list (loop_vec_info loop_vinfo)
 	  if (!operand_equal_p (DR_BASE_ADDRESS (dr_a1->dr),
 				DR_BASE_ADDRESS (dr_a2->dr),
 				0)
-	      || !host_integerp (dr_a1->offset, 0)
-	      || !host_integerp (dr_a2->offset, 0))
+	      || !tree_fits_shwi_p (dr_a1->offset)
+	      || !tree_fits_shwi_p (dr_a2->offset))
 	    continue;
 
 	  HOST_WIDE_INT diff = TREE_INT_CST_LOW (dr_a2->offset) -
@@ -3069,9 +3069,9 @@ vect_check_gather (gimple stmt, loop_vec_info loop_vinfo, tree *basep,
 	    }
 	  break;
 	case MULT_EXPR:
-	  if (scale == 1 && host_integerp (op1, 0))
+	  if (scale == 1 && tree_fits_shwi_p (op1))
 	    {
-	      scale = tree_low_cst (op1, 0);
+	      scale = tree_to_shwi (op1);
 	      off = op0;
 	      continue;
 	    }
@@ -3268,7 +3268,7 @@ again:
 		      STRIP_NOPS (off);
 		      if (TREE_CODE (DR_INIT (newdr)) == INTEGER_CST
 			  && TREE_CODE (off) == MULT_EXPR
-			  && host_integerp (TREE_OPERAND (off, 1), 1))
+			  && tree_fits_uhwi_p (TREE_OPERAND (off, 1)))
 			{
 			  tree step = TREE_OPERAND (off, 1);
 			  off = TREE_OPERAND (off, 0);

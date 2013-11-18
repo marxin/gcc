@@ -2994,8 +2994,8 @@ process_constraint (constraint_t t)
 static HOST_WIDE_INT
 bitpos_of_field (const tree fdecl)
 {
-  if (!host_integerp (DECL_FIELD_OFFSET (fdecl), 0)
-      || !host_integerp (DECL_FIELD_BIT_OFFSET (fdecl), 0))
+  if (!tree_fits_shwi_p (DECL_FIELD_OFFSET (fdecl))
+      || !tree_fits_shwi_p (DECL_FIELD_BIT_OFFSET (fdecl)))
     return -1;
 
   return (TREE_INT_CST_LOW (DECL_FIELD_OFFSET (fdecl)) * BITS_PER_UNIT
@@ -3429,7 +3429,7 @@ get_constraint_for_1 (tree t, vec<ce_s> *results, bool address_p,
 		  && curr)
 		{
 		  unsigned HOST_WIDE_INT size;
-		  if (host_integerp (TYPE_SIZE (TREE_TYPE (t)), 1))
+		  if (tree_fits_uhwi_p (TYPE_SIZE (TREE_TYPE (t))))
 		    size = TREE_INT_CST_LOW (TYPE_SIZE (TREE_TYPE (t)));
 		  else
 		    size = -1;
@@ -5348,7 +5348,7 @@ push_fields_onto_fieldstack (tree type, vec<fieldoff_s> *fieldstack,
 	      }
 
 	    if (!DECL_SIZE (field)
-		|| !host_integerp (DECL_SIZE (field), 1))
+		|| !tree_fits_uhwi_p (DECL_SIZE (field)))
 	      has_unknown_size = true;
 
 	    /* If adjacent fields do not contain pointers merge them.  */
@@ -5624,7 +5624,7 @@ create_variable_info_for_1 (tree decl, const char *name)
   unsigned int i;
 
   if (!declsize
-      || !host_integerp (declsize, 1))
+      || !tree_fits_uhwi_p (declsize))
     {
       vi = new_var_info (decl, name);
       vi->offset = 0;
@@ -7158,7 +7158,7 @@ ipa_pta_execute (void)
       if (dump_file)
 	{
 	  fprintf (dump_file,
-		   "Generating constraints for %s", cgraph_node_name (node));
+		   "Generating constraints for %s", node->name ());
 	  if (DECL_ASSEMBLER_NAME_SET_P (node->decl))
 	    fprintf (dump_file, " (%s)",
 		     IDENTIFIER_POINTER

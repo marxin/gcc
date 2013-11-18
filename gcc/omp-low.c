@@ -58,6 +58,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "omp-low.h"
 #include "gimple-low.h"
 #include "tree-cfgcleanup.h"
+#include "tree-nested.h"
 
 
 /* Lowering of OpenMP parallel and workshare constructs proceeds in two
@@ -2289,8 +2290,8 @@ check_omp_nesting_restrictions (gimple stmt, omp_context *ctx)
 			: "#pragma omp cancellation point");
 	      return false;
 	    }
-	  switch (host_integerp (gimple_call_arg (stmt, 0), 0)
-		  ? tree_low_cst (gimple_call_arg (stmt, 0), 0)
+	  switch (tree_fits_shwi_p (gimple_call_arg (stmt, 0))
+		  ? tree_to_shwi (gimple_call_arg (stmt, 0))
 		  : 0)
 	    {
 	    case 1:
@@ -2953,7 +2954,7 @@ lower_rec_simd_input_clauses (tree new_var, omp_context *ctx, int &max_vf,
 				    OMP_CLAUSE_SAFELEN);
 	  if (c
 	      && compare_tree_int (OMP_CLAUSE_SAFELEN_EXPR (c), max_vf) == -1)
-	    max_vf = tree_low_cst (OMP_CLAUSE_SAFELEN_EXPR (c), 0);
+	    max_vf = tree_to_shwi (OMP_CLAUSE_SAFELEN_EXPR (c));
 	}
       if (max_vf > 1)
 	{
@@ -6768,12 +6769,11 @@ expand_omp_simd (struct omp_region *region, struct omp_for_data *fd)
       else
 	{
 	  safelen = OMP_CLAUSE_SAFELEN_EXPR (safelen);
-	  if (!host_integerp (safelen, 1)
-	      || (unsigned HOST_WIDE_INT) tree_low_cst (safelen, 1)
-		 > INT_MAX)
+	  if (!tree_fits_uhwi_p (safelen)
+	      || tree_to_uhwi (safelen) > INT_MAX)
 	    loop->safelen = INT_MAX;
 	  else
-	    loop->safelen = tree_low_cst (safelen, 1);
+	    loop->safelen = tree_to_uhwi (safelen);
 	  if (loop->safelen == 1)
 	    loop->safelen = 0;
 	}
@@ -7677,7 +7677,7 @@ expand_omp_atomic (struct omp_region *region)
   HOST_WIDE_INT index;
 
   /* Make sure the type is one of the supported sizes.  */
-  index = tree_low_cst (TYPE_SIZE_UNIT (type), 1);
+  index = tree_to_uhwi (TYPE_SIZE_UNIT (type));
   index = exact_log2 (index);
   if (index >= 0 && index <= 4)
     {
@@ -8831,7 +8831,7 @@ lower_omp_for_lastprivate (struct omp_for_data *fd, gimple_seq *body_p,
 
   /* When possible, use a strict equality expression.  This can let VRP
      type optimizations deduce the value and remove a copy.  */
-  if (host_integerp (fd->loop.step, 0))
+  if (tree_fits_shwi_p (fd->loop.step))
     {
       HOST_WIDE_INT step = TREE_INT_CST_LOW (fd->loop.step);
       if (step == 1 || step == -1)
@@ -8851,7 +8851,7 @@ lower_omp_for_lastprivate (struct omp_for_data *fd, gimple_seq *body_p,
       /* Optimize: v = 0; is usually cheaper than v = some_other_constant.  */
       vinit = fd->loop.n1;
       if (cond_code == EQ_EXPR
-	  && host_integerp (fd->loop.n2, 0)
+	  && tree_fits_shwi_p (fd->loop.n2)
 	  && ! integer_zerop (fd->loop.n2))
 	vinit = build_int_cst (TREE_TYPE (fd->loop.v), 0);
       else

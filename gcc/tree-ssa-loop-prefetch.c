@@ -1458,8 +1458,8 @@ add_subscript_strides (tree access_fn, unsigned stride,
       if ((unsigned) loop_depth (aloop) <= min_depth)
 	continue;
 
-      if (host_integerp (step, 0))
-	astep = tree_low_cst (step, 0);
+      if (tree_fits_shwi_p (step))
+	astep = tree_to_shwi (step);
       else
 	astep = L1_CACHE_LINE_SIZE;
 
@@ -1508,8 +1508,8 @@ self_reuse_distance (data_reference_p dr, unsigned *loop_sizes, unsigned n,
       if (TREE_CODE (ref) == ARRAY_REF)
 	{
 	  stride = TYPE_SIZE_UNIT (TREE_TYPE (ref));
-	  if (host_integerp (stride, 1))
-	    astride = tree_low_cst (stride, 1);
+	  if (tree_fits_uhwi_p (stride))
+	    astride = tree_to_uhwi (stride);
 	  else
 	    astride = L1_CACHE_LINE_SIZE;
 

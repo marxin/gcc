@@ -6125,10 +6125,10 @@ offsettable_ok_by_alignment (rtx op, HOST_WIDE_INT offset,
 	  if (!DECL_SIZE_UNIT (decl))
 	    return false;
 
-	  if (!host_integerp (DECL_SIZE_UNIT (decl), 1))
+	  if (!tree_fits_uhwi_p (DECL_SIZE_UNIT (decl)))
 	    return false;
 
-	  dsize = tree_low_cst (DECL_SIZE_UNIT (decl), 1);
+	  dsize = tree_to_uhwi (DECL_SIZE_UNIT (decl));
 	  if (dsize > 32768)
 	    return false;
 
@@ -6151,8 +6151,8 @@ offsettable_ok_by_alignment (rtx op, HOST_WIDE_INT offset,
 	  if (TREE_CODE (decl) == STRING_CST)
 	    dsize = TREE_STRING_LENGTH (decl);
 	  else if (TYPE_SIZE_UNIT (type)
-		   && host_integerp (TYPE_SIZE_UNIT (type), 1))
-	    dsize = tree_low_cst (TYPE_SIZE_UNIT (type), 1);
+		   && tree_fits_uhwi_p (TYPE_SIZE_UNIT (type)))
+	    dsize = tree_to_uhwi (TYPE_SIZE_UNIT (type));
 	  else
 	    return false;
 	  if (dsize > 32768)
@@ -8188,7 +8188,9 @@ rs6000_emit_move (rtx dest, rtx source, enum machine_mode mode)
 	}
       else if (INT_REGNO_P (REGNO (operands[1])))
 	{
-	  rtx mem = adjust_address_nv (operands[0], mode, 4);
+	  rtx mem = operands[0];
+	  if (BYTES_BIG_ENDIAN)
+	    mem = adjust_address_nv (mem, mode, 4);
 	  mem = eliminate_regs (mem, VOIDmode, NULL_RTX);
 	  emit_insn (gen_movsd_hardfloat (mem, operands[1]));
 	}
@@ -8211,7 +8213,9 @@ rs6000_emit_move (rtx dest, rtx source, enum machine_mode mode)
 	}
       else if (INT_REGNO_P (REGNO (operands[0])))
 	{
-	  rtx mem = adjust_address_nv (operands[1], mode, 4);
+	  rtx mem = operands[1];
+	  if (BYTES_BIG_ENDIAN)
+	    mem = adjust_address_nv (mem, mode, 4);
 	  mem = eliminate_regs (mem, VOIDmode, NULL_RTX);
 	  emit_insn (gen_movsd_hardfloat (operands[0], mem));
 	}
@@ -8549,18 +8553,18 @@ rs6000_aggregate_candidate (const_tree type, enum machine_mode *modep)
 	if (count == -1
 	    || !index
 	    || !TYPE_MAX_VALUE (index)
-	    || !host_integerp (TYPE_MAX_VALUE (index), 1)
+	    || !tree_fits_uhwi_p (TYPE_MAX_VALUE (index))
 	    || !TYPE_MIN_VALUE (index)
-	    || !host_integerp (TYPE_MIN_VALUE (index), 1)
+	    || !tree_fits_uhwi_p (TYPE_MIN_VALUE (index))
 	    || count < 0)
 	  return -1;
 
-	count *= (1 + tree_low_cst (TYPE_MAX_VALUE (index), 1)
-		      - tree_low_cst (TYPE_MIN_VALUE (index), 1));
+	count *= (1 + tree_to_uhwi (TYPE_MAX_VALUE (index))
+		      - tree_to_uhwi (TYPE_MIN_VALUE (index)));
 
 	/* There must be no padding.  */
-	if (!host_integerp (TYPE_SIZE (type), 1)
-	    || (tree_low_cst (TYPE_SIZE (type), 1)
+	if (!tree_fits_uhwi_p (TYPE_SIZE (type))
+	    || ((HOST_WIDE_INT) tree_to_uhwi (TYPE_SIZE (type))
 		!= count * GET_MODE_BITSIZE (*modep)))
 	  return -1;
 
@@ -8589,8 +8593,8 @@ rs6000_aggregate_candidate (const_tree type, enum machine_mode *modep)
 	  }
 
 	/* There must be no padding.  */
-	if (!host_integerp (TYPE_SIZE (type), 1)
-	    || (tree_low_cst (TYPE_SIZE (type), 1)
+	if (!tree_fits_uhwi_p (TYPE_SIZE (type))
+	    || ((HOST_WIDE_INT) tree_to_uhwi (TYPE_SIZE (type))
 		!= count * GET_MODE_BITSIZE (*modep)))
 	  return -1;
 
@@ -8621,8 +8625,8 @@ rs6000_aggregate_candidate (const_tree type, enum machine_mode *modep)
 	  }
 
 	/* There must be no padding.  */
-	if (!host_integerp (TYPE_SIZE (type), 1)
-	    || (tree_low_cst (TYPE_SIZE (type), 1)
+	if (!tree_fits_uhwi_p (TYPE_SIZE (type))
+	    || ((HOST_WIDE_INT) tree_to_uhwi (TYPE_SIZE (type))
 		!= count * GET_MODE_BITSIZE (*modep)))
 	  return -1;
 
@@ -9155,7 +9159,7 @@ rs6000_darwin64_record_arg_advance_recurse (CUMULATIVE_ARGS *cum,
 	mode = TYPE_MODE (ftype);
 
 	if (DECL_SIZE (f) != 0
-	    && host_integerp (bit_position (f), 1))
+	    && tree_fits_uhwi_p (bit_position (f)))
 	  bitpos += int_bit_position (f);
 
 	/* ??? FIXME: else assume zero offset.  */
@@ -9637,7 +9641,7 @@ rs6000_darwin64_record_arg_recurse (CUMULATIVE_ARGS *cum, const_tree type,
 	mode = TYPE_MODE (ftype);
 
 	if (DECL_SIZE (f) != 0
-	    && host_integerp (bit_position (f), 1))
+	    && tree_fits_uhwi_p (bit_position (f)))
 	  bitpos += int_bit_position (f);
 
 	/* ??? FIXME: else assume zero offset.  */
@@ -12382,8 +12386,8 @@ get_element_number (tree vec_type, tree arg)
 {
   unsigned HOST_WIDE_INT elt, max = TYPE_VECTOR_SUBPARTS (vec_type) - 1;
 
-  if (!host_integerp (arg, 1)
-      || (elt = tree_low_cst (arg, 1), elt > max))
+  if (!tree_fits_uhwi_p (arg)
+      || (elt = tree_to_uhwi (arg), elt > max))
     {
       error ("selector must be an integer constant in the range 0..%wi", max);
       return 0;
@@ -21439,7 +21443,7 @@ output_probe_stack_range (rtx reg1, rtx reg2)
 
 static rtx
 rs6000_frame_related (rtx insn, rtx reg, HOST_WIDE_INT val,
-		      rtx reg2, rtx rreg)
+		      rtx reg2, rtx rreg, rtx split_reg)
 {
   rtx real, temp;
 
@@ -21529,6 +21533,11 @@ rs6000_frame_related (rtx insn, rtx reg, HOST_WIDE_INT val,
 	    RTX_FRAME_RELATED_P (set) = 1;
 	  }
     }
+
+  /* If a store insn has been split into multiple insns, the
+     true source register is given by split_reg.  */
+  if (split_reg != NULL_RTX)
+    real = gen_rtx_SET (VOIDmode, SET_DEST (real), split_reg);
 
   RTX_FRAME_RELATED_P (insn) = 1;
   add_reg_note (insn, REG_FRAME_RELATED_EXPR, real);
@@ -21637,7 +21646,7 @@ emit_frame_save (rtx frame_reg, enum machine_mode mode,
   reg = gen_rtx_REG (mode, regno);
   insn = emit_insn (gen_frame_store (reg, frame_reg, offset));
   return rs6000_frame_related (insn, frame_reg, frame_reg_to_sp,
-			       NULL_RTX, NULL_RTX);
+			       NULL_RTX, NULL_RTX, NULL_RTX);
 }
 
 /* Emit an offset memory reference suitable for a frame store, while
@@ -22217,7 +22226,7 @@ rs6000_emit_prologue (void)
 
       insn = emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
       rs6000_frame_related (insn, frame_reg_rtx, sp_off - frame_off,
-			    treg, GEN_INT (-info->total_size));
+			    treg, GEN_INT (-info->total_size), NULL_RTX);
       sp_off = frame_off = info->total_size;
     }
 
@@ -22302,7 +22311,7 @@ rs6000_emit_prologue (void)
 
 	  insn = emit_move_insn (mem, reg);
 	  rs6000_frame_related (insn, frame_reg_rtx, sp_off - frame_off,
-				NULL_RTX, NULL_RTX);
+				NULL_RTX, NULL_RTX, NULL_RTX);
 	  END_USE (0);
 	}
     }
@@ -22358,7 +22367,7 @@ rs6000_emit_prologue (void)
 				     info->lr_save_offset,
 				     DFmode, sel);
       rs6000_frame_related (insn, ptr_reg, sp_off,
-			    NULL_RTX, NULL_RTX);
+			    NULL_RTX, NULL_RTX, NULL_RTX);
       if (lr)
 	END_USE (0);
     }
@@ -22437,7 +22446,7 @@ rs6000_emit_prologue (void)
 					 SAVRES_SAVE | SAVRES_GPR);
 
 	  rs6000_frame_related (insn, spe_save_area_ptr, sp_off - save_off,
-				NULL_RTX, NULL_RTX);
+				NULL_RTX, NULL_RTX, NULL_RTX);
 	}
 
       /* Move the static chain pointer back.  */
@@ -22487,7 +22496,7 @@ rs6000_emit_prologue (void)
 				     info->lr_save_offset + ptr_off,
 				     reg_mode, sel);
       rs6000_frame_related (insn, ptr_reg, sp_off - ptr_off,
-			    NULL_RTX, NULL_RTX);
+			    NULL_RTX, NULL_RTX, NULL_RTX);
       if (lr)
 	END_USE (0);
     }
@@ -22503,7 +22512,7 @@ rs6000_emit_prologue (void)
 			     info->gp_save_offset + frame_off + reg_size * i);
       insn = emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
       rs6000_frame_related (insn, frame_reg_rtx, sp_off - frame_off,
-			    NULL_RTX, NULL_RTX);
+			    NULL_RTX, NULL_RTX, NULL_RTX);
     }
   else if (!WORLD_SAVE_P (info))
     {
@@ -22826,7 +22835,7 @@ rs6000_emit_prologue (void)
 				     info->altivec_save_offset + ptr_off,
 				     0, V4SImode, SAVRES_SAVE | SAVRES_VR);
       rs6000_frame_related (insn, scratch_reg, sp_off - ptr_off,
-			    NULL_RTX, NULL_RTX);
+			    NULL_RTX, NULL_RTX, NULL_RTX);
       if (REGNO (frame_reg_rtx) == REGNO (scratch_reg))
 	{
 	  /* The oddity mentioned above clobbered our frame reg.  */
@@ -22842,7 +22851,7 @@ rs6000_emit_prologue (void)
       for (i = info->first_altivec_reg_save; i <= LAST_ALTIVEC_REGNO; ++i)
 	if (info->vrsave_mask & ALTIVEC_REG_BIT (i))
 	  {
-	    rtx areg, savereg, mem;
+	    rtx areg, savereg, mem, split_reg;
 	    int offset;
 
 	    offset = (info->altivec_save_offset + frame_off
@@ -22860,8 +22869,18 @@ rs6000_emit_prologue (void)
 
 	    insn = emit_move_insn (mem, savereg);
 
+	    /* When we split a VSX store into two insns, we need to make
+	       sure the DWARF info knows which register we are storing.
+	       Pass it in to be used on the appropriate note.  */
+	    if (!BYTES_BIG_ENDIAN
+		&& GET_CODE (PATTERN (insn)) == SET
+		&& GET_CODE (SET_SRC (PATTERN (insn))) == VEC_SELECT)
+	      split_reg = savereg;
+	    else
+	      split_reg = NULL_RTX;
+
 	    rs6000_frame_related (insn, frame_reg_rtx, sp_off - frame_off,
-				  areg, GEN_INT (offset));
+				  areg, GEN_INT (offset), split_reg);
 	  }
     }
 

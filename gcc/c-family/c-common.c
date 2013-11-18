@@ -6999,11 +6999,11 @@ get_priority (tree args, bool is_destructor)
 
   arg = TREE_VALUE (args);
   arg = default_conversion (arg);
-  if (!host_integerp (arg, /*pos=*/0)
+  if (!tree_fits_shwi_p (arg)
       || !INTEGRAL_TYPE_P (TREE_TYPE (arg)))
     goto invalid;
 
-  pri = tree_low_cst (arg, /*pos=*/0);
+  pri = tree_to_shwi (arg);
   if (pri < 0 || pri > MAX_INIT_PRIORITY)
     goto invalid;
 
@@ -8477,14 +8477,14 @@ handle_vector_size_attribute (tree *node, tree name, tree args,
 
   size = TREE_VALUE (args);
 
-  if (!host_integerp (size, 1))
+  if (!tree_fits_uhwi_p (size))
     {
       warning (OPT_Wattributes, "%qE attribute ignored", name);
       return NULL_TREE;
     }
 
   /* Get the vector size (in bytes).  */
-  vecsize = tree_low_cst (size, 1);
+  vecsize = tree_to_uhwi (size);
 
   /* We need to provide for vector pointers, vector arrays, and
      functions returning vectors.  For example:
@@ -8510,14 +8510,14 @@ handle_vector_size_attribute (tree *node, tree name, tree args,
       || (!SCALAR_FLOAT_MODE_P (orig_mode)
 	  && GET_MODE_CLASS (orig_mode) != MODE_INT
 	  && !ALL_SCALAR_FIXED_POINT_MODE_P (orig_mode))
-      || !host_integerp (TYPE_SIZE_UNIT (type), 1)
+      || !tree_fits_uhwi_p (TYPE_SIZE_UNIT (type))
       || TREE_CODE (type) == BOOLEAN_TYPE)
     {
       error ("invalid vector type for attribute %qE", name);
       return NULL_TREE;
     }
 
-  if (vecsize % tree_low_cst (TYPE_SIZE_UNIT (type), 1))
+  if (vecsize % tree_to_uhwi (TYPE_SIZE_UNIT (type)))
     {
       error ("vector size not an integral multiple of component size");
       return NULL;
@@ -8530,7 +8530,7 @@ handle_vector_size_attribute (tree *node, tree name, tree args,
     }
 
   /* Calculate how many units fit in the vector.  */
-  nunits = vecsize / tree_low_cst (TYPE_SIZE_UNIT (type), 1);
+  nunits = vecsize / tree_to_uhwi (TYPE_SIZE_UNIT (type));
   if (nunits & (nunits - 1))
     {
       error ("number of components of the vector not a power of two");
@@ -9721,8 +9721,7 @@ fold_offsetof_1 (tree expr)
 	  return error_mark_node;
 	}
       off = size_binop_loc (input_location, PLUS_EXPR, DECL_FIELD_OFFSET (t),
-			    size_int (tree_low_cst (DECL_FIELD_BIT_OFFSET (t),
-						    1)
+			    size_int (tree_to_uhwi (DECL_FIELD_BIT_OFFSET (t))
 				      / BITS_PER_UNIT));
       break;
 
@@ -10091,7 +10090,7 @@ complete_array_type (tree *ptype, tree initial_value, bool do_default)
     {
       error ("size of array is too large");
       /* If we proceed with the array type as it is, we'll eventually
-	 crash in tree_low_cst().  */
+	 crash in tree_to_[su]hwi().  */
       type = error_mark_node;
     }
 
@@ -10149,7 +10148,7 @@ sync_resolve_size (tree function, vec<tree, va_gc> *params)
   if (!INTEGRAL_TYPE_P (type) && !POINTER_TYPE_P (type))
     goto incompatible;
 
-  size = tree_low_cst (TYPE_SIZE_UNIT (type), 1);
+  size = tree_to_uhwi (TYPE_SIZE_UNIT (type));
   if (size == 1 || size == 2 || size == 4 || size == 8 || size == 16)
     return size;
 
@@ -10309,7 +10308,7 @@ get_atomic_generic_size (location_t loc, tree function,
       return 0;
     }
 
-  size_0 = tree_low_cst (TYPE_SIZE_UNIT (TREE_TYPE (type_0)), 1);
+  size_0 = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (type_0)));
 
   /* Zero size objects are not allowed.  */
   if (size_0 == 0)
@@ -10334,7 +10333,7 @@ get_atomic_generic_size (location_t loc, tree function,
 		    function);
 	  return 0;
 	}
-      size = tree_low_cst (TYPE_SIZE_UNIT (TREE_TYPE (type)), 1);
+      size = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (type)));
       if (size != size_0)
 	{
 	  error_at (loc, "size mismatch in argument %d of %qE", x + 1,
@@ -10349,7 +10348,7 @@ get_atomic_generic_size (location_t loc, tree function,
       tree p = (*params)[x];
       if (TREE_CODE (p) == INTEGER_CST)
         {
-	  int i = tree_low_cst (p, 1);
+	  int i = tree_to_uhwi (p);
 	  if (i < 0 || (i & MEMMODEL_MASK) >= MEMMODEL_LAST)
 	    {
 	      warning_at (loc, OPT_Winvalid_memory_model,
@@ -11243,24 +11242,24 @@ warn_for_sign_compare (location_t location,
       if (TREE_CODE (op1) == BIT_NOT_EXPR)
 	op1 = c_common_get_narrower (TREE_OPERAND (op1, 0), &unsignedp1);
 
-      if (host_integerp (op0, 0) || host_integerp (op1, 0))
+      if (tree_fits_shwi_p (op0) || tree_fits_shwi_p (op1))
         {
           tree primop;
           HOST_WIDE_INT constant, mask;
           int unsignedp;
           unsigned int bits;
 
-          if (host_integerp (op0, 0))
+          if (tree_fits_shwi_p (op0))
             {
               primop = op1;
               unsignedp = unsignedp1;
-              constant = tree_low_cst (op0, 0);
+              constant = tree_to_shwi (op0);
             }
           else
             {
               primop = op0;
               unsignedp = unsignedp0;
-              constant = tree_low_cst (op1, 0);
+              constant = tree_to_shwi (op1);
             }
 
           bits = TYPE_PRECISION (TREE_TYPE (primop));
@@ -11702,9 +11701,8 @@ convert_vector_to_pointer_for_subscript (location_t loc,
       tree type1;
 
       if (TREE_CODE (index) == INTEGER_CST)
-        if (!host_integerp (index, 1)
-            || ((unsigned HOST_WIDE_INT) tree_low_cst (index, 1)
-               >= TYPE_VECTOR_SUBPARTS (type)))
+        if (!tree_fits_uhwi_p (index)
+            || tree_to_uhwi (index) >= TYPE_VECTOR_SUBPARTS (type))
           warning_at (loc, OPT_Warray_bounds, "index value is out of bound");
 
       c_common_mark_addressable_vec (*vecp);

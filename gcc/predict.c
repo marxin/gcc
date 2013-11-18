@@ -1053,15 +1053,15 @@ strips_small_constant (tree t1, tree t2)
     return NULL;
   else if (TREE_CODE (t1) == SSA_NAME)
     ret = t1;
-  else if (host_integerp (t1, 0))
-    value = tree_low_cst (t1, 0);
+  else if (tree_fits_shwi_p (t1))
+    value = tree_to_shwi (t1);
   else
     return NULL;
 
   if (!t2)
     return ret;
-  else if (host_integerp (t2, 0))
-    value = tree_low_cst (t2, 0);
+  else if (tree_fits_shwi_p (t2))
+    value = tree_to_shwi (t2);
   else if (TREE_CODE (t2) == SSA_NAME)
     {
       if (ret)
@@ -1157,7 +1157,7 @@ is_comparison_with_loop_invariant_p (gimple stmt, struct loop *loop,
 	code = invert_tree_comparison (code, false);
       bound = iv0.base;
       base = iv1.base;
-      if (host_integerp (iv1.step, 0))
+      if (tree_fits_shwi_p (iv1.step))
 	step = iv1.step;
       else
 	return false;
@@ -1166,7 +1166,7 @@ is_comparison_with_loop_invariant_p (gimple stmt, struct loop *loop,
     {
       bound = iv1.base;
       base = iv0.base;
-      if (host_integerp (iv0.step, 0))
+      if (tree_fits_shwi_p (iv0.step))
 	step = iv0.step;
       else
 	return false;
@@ -1300,9 +1300,9 @@ predict_iv_comparison (struct loop *loop, basic_block bb,
 
   /* If loop bound, base and compare bound are all constants, we can
      calculate the probability directly.  */
-  if (host_integerp (loop_bound_var, 0)
-      && host_integerp (compare_var, 0)
-      && host_integerp (compare_base, 0))
+  if (tree_fits_shwi_p (loop_bound_var)
+      && tree_fits_shwi_p (compare_var)
+      && tree_fits_shwi_p (compare_base))
     {
       int probability;
       bool of, overflow = false;
@@ -1557,10 +1557,10 @@ predict_loops (void)
 
 	  if (TREE_CODE (niter) == INTEGER_CST)
 	    {
-	      if (host_integerp (niter, 1)
+	      if (tree_fits_uhwi_p (niter)
 		  && max
 		  && compare_tree_int (niter, max - 1) == -1)
-		nitercst = tree_low_cst (niter, 1) + 1;
+		nitercst = tree_to_uhwi (niter) + 1;
 	      else
 		nitercst = max;
 	      predictor = PRED_LOOP_ITERATIONS;
@@ -1674,7 +1674,7 @@ predict_loops (void)
 	  if (loop_bound_var)
 	    predict_iv_comparison (loop, bb, loop_bound_var, loop_iv_base,
 				   loop_bound_code,
-				   tree_low_cst (loop_bound_step, 0));
+				   tree_to_shwi (loop_bound_step));
 	}
 
       /* Free basic blocks from get_loop_body.  */
@@ -2782,7 +2782,7 @@ drop_profile (struct cgraph_node *node, gcov_type call_count)
   if (dump_file)
     fprintf (dump_file,
              "Dropping 0 profile for %s/%i. %s based on calls.\n",
-             cgraph_node_name (node), node->order,
+             node->name (), node->order,
              hot ? "Function is hot" : "Function is normal");
   /* We only expect to miss profiles for functions that are reached
      via non-zero call edges in cases where the function may have
@@ -2800,11 +2800,11 @@ drop_profile (struct cgraph_node *node, gcov_type call_count)
           if (dump_file)
             fprintf (dump_file,
                      "Missing counts for called function %s/%i\n",
-                     cgraph_node_name (node), node->order);
+                     node->name (), node->order);
         }
       else
         warning (0, "Missing counts for called function %s/%i",
-                 cgraph_node_name (node), node->order);
+                 node->name (), node->order);
     }
 
   profile_status_for_function (fn)

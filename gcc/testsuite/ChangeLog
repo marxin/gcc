@@ -1,3 +1,52 @@
+2013-11-18  Dominique d'Humieres  <dominiq@lps.ens.fr>
+
+	* c-c++-common/cilk-plus/PS/reduction-3.c: Use stdlib.h.
+	Remove spurious FIXME.
+
+2013-11-18  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* c-c++-common/cilk-plus/PS/body.c: Add fopenmp effective target check.
+
+2013-11-18  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/53473
+	* g++.dg/cpp0x/constexpr-noexcept7.C: New.
+
+2013-11-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/59125
+	PR tree-optimization/54570
+	* gcc.dg/builtin-object-size-8.c: Un-xfail.
+	* gcc.dg/builtin-object-size-14.c: New testcase.
+	* gcc.dg/strlenopt-14gf.c: Adjust.
+	* gcc.dg/strlenopt-1f.c: Likewise.
+	* gcc.dg/strlenopt-4gf.c: Likewise.
+
+2013-11-18  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/volatile11.adb: New test.
+	* gnat.dg/volatile11_pkg.ad[sb]: New helper.
+
+2013-11-18  Yury Gribov  <y.gribov@samsung.com>
+
+	PR sanitizer/59106
+	* c-c++-common/asan/pr59106.c: New test.
+
+2013-11-17  Jan Hubicka  <jh@suse.cz>
+
+	* gcc.target/i386/memcpy-2.c: New testcase.
+
+2013-11-17  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/59153
+	* gcc.target/i386/pr59153.c: New test.
+
+2013-11-17  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/59123
+	* g++.dg/cpp0x/constexpr-redeclaration1.C: New.
+	* g++.dg/cpp0x/constexpr-decl.C: Adjust.
+
 2013-11-16  Paolo Carlini  <paolo.carlini@oracle.com>
 
 	PR c++/29143
@@ -119,7 +168,7 @@
 2013-11-14  Richard Biener  <rguenther@suse.de>
 
 	* gcc.dg/tree-ssa/ssa-vrp-thread-1.c: Fix target selector.
- 
+
 2013-11-14  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* gnat.dg/specs/addr1.ads: XFAIL on x32.
@@ -160,7 +209,7 @@
 
 	PR tree-optimization/59102
 	* gcc.c-torture/compile/pr59102.c: New test.
-	 
+
 2013-11-13  Tom de Vries  <tom@codesourcery.com>
 
 	* gcc.dg/tail-merge-store.c: New test.
@@ -244,8 +293,7 @@
 2013-11-12  Joseph Myers  <joseph@codesourcery.com>
 
 	* gcc.dg/c90-thread-local-1.c, gcc.dg/c99-thread-local-1.c,
-	gcc.dg/c11-thread-local-1.c, gcc.dg/c11-thread-local-2.c: New
-	tests.
+	gcc.dg/c11-thread-local-1.c, gcc.dg/c11-thread-local-2.c: New tests.
 	* gcc.dg/tls/diag-2.c, objc.dg/tls/diag-2.m: Update expected
 	diagnostics.
 
@@ -271,7 +319,7 @@
 	PR c++/57734
 	* g++.dg/cpp0x/alias-decl-enum-1.C: New.
 
-2013-11-11  Martin Liska	<marxin.liska@gmail.com>
+2013-11-11  Martin Liska  <marxin.liska@gmail.com>
 
 	* gcc.dg/time-profiler-1.c: New test.
 	* gcc.dg/time-profiler-2.c: Ditto.
@@ -391,10 +439,10 @@
 
 	* gcc.dg/tree-ssa/loop-39.c: New test.
 
-        * gcc.dg/unroll_1.c: Add -fno-tree-vrp to dg-options.
-        * gcc.dg/unroll_2.c: Likewise.
-        * gcc.dg/unroll_3.c: Likewise.
-        * gcc.dg/unroll_4.c: Likewise.
+	* gcc.dg/unroll_1.c: Add -fno-tree-vrp to dg-options.
+	* gcc.dg/unroll_2.c: Likewise.
+	* gcc.dg/unroll_3.c: Likewise.
+	* gcc.dg/unroll_4.c: Likewise.
 	* gcc.dg/vrp90.c: New test.
 
 2013-11-07  Paolo Carlini  <paolo.carlini@oracle.com>

@@ -3662,9 +3662,9 @@ build_vec_init (tree base, tree maxindex, tree init,
 
   if (from_array
       || ((type_build_ctor_call (type) || init || explicit_value_init_p)
-	  && ! (host_integerp (maxindex, 0)
+	  && ! (tree_fits_shwi_p (maxindex)
 		&& (num_initialized_elts
-		    == tree_low_cst (maxindex, 0) + 1))))
+		    == tree_to_shwi (maxindex) + 1))))
     {
       /* If the ITERATOR is equal to -1, then we don't have to loop;
 	 we've already initialized all the elements.  */

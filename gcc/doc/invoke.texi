@@ -5260,9 +5260,44 @@ data race bugs.
 See @uref{http://code.google.com/p/data-race-test/wiki/ThreadSanitizer} for more details.
 
 @item -fsanitize=undefined
-Enable UndefinedBehaviorSanitizer, a fast undefined behavior detector
+Enable UndefinedBehaviorSanitizer, a fast undefined behavior detector.
 Various computations will be instrumented to detect undefined behavior
-at runtime, e.g.@: division by zero or various overflows.
+at runtime.  Current suboptions are:
+
+@itemize @bullet
+
+@item @option{-fsanitize=shift}
+
+This option enables checking that the result of a shift operation is
+not undefined.  Note that what exactly is considered undefined differs
+slightly between C and C++, as well as between ISO C90 and C99, etc.
+
+@item @option{-fsanitize=integer-divide-by-zero}
+
+Detect integer division by zero as well as @code{INT_MIN / -1} division.
+
+@item @option{-fsanitize=unreachable}
+
+With this option, the compiler will turn the @code{__builtin_unreachable}
+call into a diagnostics message call instead.  When reaching the
+@code{__builtin_unreachable} call, the behavior is undefined.
+
+@item @option{-fsanitize=vla-bound}
+
+This option instructs the compiler to check that the size of a variable
+length array is positive.  This option does not have any effect in
+@option{-std=c++1y} mode, as the standard requires the exception be thrown
+instead.
+
+@item @option{-fsanitize=null}
+
+This option enables pointer checking.  Particularly, the application
+built with this option turned on will issue an error message when it
+tries to dereference a NULL pointer, or if a reference (possibly an
+rvalue reference) is bound to a NULL pointer.
+
+@end itemize
+
 While @option{-ftrapv} causes traps for signed overflows to be emitted,
 @option{-fsanitize=undefined} gives a diagnostic message.
 This currently works only for the C family of languages.
@@ -14529,14 +14564,19 @@ supersets FMA4, AVX, XOP, LWP, AES, PCL_MUL, CX16, MMX, SSE, SSE2, SSE3, SSE4A,
 SSSE3, SSE4.1, SSE4.2, ABM and 64-bit instruction set extensions.)
 @item bdver2
 AMD Family 15h core based CPUs with x86-64 instruction set support.  (This
-supersets BMI, TBM, F16C, FMA, AVX, XOP, LWP, AES, PCL_MUL, CX16, MMX, SSE,
-SSE2, SSE3, SSE4A, SSSE3, SSE4.1, SSE4.2, ABM and 64-bit instruction set 
+supersets BMI, TBM, F16C, FMA, FMA4, AVX, XOP, LWP, AES, PCL_MUL, CX16, MMX,
+SSE, SSE2, SSE3, SSE4A, SSSE3, SSE4.1, SSE4.2, ABM and 64-bit instruction set 
 extensions.)
 @item bdver3
 AMD Family 15h core based CPUs with x86-64 instruction set support.  (This
-supersets BMI, TBM, F16C, FMA, AVX, XOP, LWP, AES, PCL_MUL, CX16, MMX, SSE,
-SSE2, SSE3, SSE4A, SSSE3, SSE4.1, SSE4.2, ABM and 64-bit instruction set 
-extensions.
+supersets BMI, TBM, F16C, FMA, FMA4, FSGSBASE, AVX, XOP, LWP, AES, 
+PCL_MUL, CX16, MMX, SSE, SSE2, SSE3, SSE4A, SSSE3, SSE4.1, SSE4.2, ABM and 
+64-bit instruction set extensions.
+@item bdver4
+AMD Family 15h core based CPUs with x86-64 instruction set support.  (This
+supersets BMI, BMI2, TBM, F16C, FMA, FMA4, FSGSBASE, AVX, AVX2, XOP, LWP, 
+AES, PCL_MUL, CX16, MOVBE, MMX, SSE, SSE2, SSE3, SSE4A, SSSE3, SSE4.1, 
+SSE4.2, ABM and 64-bit instruction set extensions.
 
 @item btver1
 CPUs based on AMD Family 14h cores with x86-64 instruction set support.  (This

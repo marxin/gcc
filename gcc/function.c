@@ -3813,8 +3813,8 @@ locate_and_pad_parm (enum machine_mode passed_mode, tree type, int in_regs,
   {
     tree s2 = sizetree;
     if (where_pad != none
-	&& (!host_integerp (sizetree, 1)
-	    || (tree_low_cst (sizetree, 1) * BITS_PER_UNIT) % round_boundary))
+	&& (!tree_fits_uhwi_p (sizetree)
+	    || (tree_to_uhwi (sizetree) * BITS_PER_UNIT) % round_boundary))
       s2 = round_up (s2, round_boundary / BITS_PER_UNIT);
     SUB_PARM_SIZE (locate->slot_offset, s2);
   }
@@ -3858,8 +3858,8 @@ locate_and_pad_parm (enum machine_mode passed_mode, tree type, int in_regs,
     pad_below (&locate->offset, passed_mode, sizetree);
 
   if (where_pad != none
-      && (!host_integerp (sizetree, 1)
-	  || (tree_low_cst (sizetree, 1) * BITS_PER_UNIT) % round_boundary))
+      && (!tree_fits_uhwi_p (sizetree)
+	  || (tree_to_uhwi (sizetree) * BITS_PER_UNIT) % round_boundary))
     sizetree = round_up (sizetree, round_boundary / BITS_PER_UNIT);
 
   ADD_PARM_SIZE (locate->size, sizetree);
