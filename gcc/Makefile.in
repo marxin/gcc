@@ -2002,11 +2002,6 @@ pass-instances.def: $(srcdir)/passes.def $(srcdir)/gen-pass-instances.awk
 	$(AWK) -f $(srcdir)/gen-pass-instances.awk \
 	  $(srcdir)/passes.def > pass-instances.def
 
-$(common_out_object_file): $(common_out_file) $(CONFIG_H) $(SYSTEM_H) \
-    coretypes.h $(COMMON_TARGET_H) $(COMMON_TARGET_DEF_H) $(PARAMS_H) \
-    $(DIAGNOSTIC_CORE_H) $(FLAGS_H) $(OPTS_H) $(TM_H) $(TM_P_H) $(MACHMODE_H)
-	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) \
-	  $< $(OUTPUT_OPTION)
 $(out_object_file): $(out_file)
 	$(COMPILE) $<
 	$(POSTCOMPILE)
