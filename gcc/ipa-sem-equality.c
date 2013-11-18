@@ -1577,8 +1577,8 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
   exit_label:
     if (dump_file && (dump_flags & TDF_DETAILS))
       fprintf (dump_file, "compare_functions called for:%s:%s, result:%u\n\n",
-               cgraph_node_asm_name (f1->node),
-               cgraph_node_asm_name (f2->node),
+               f1->node->name (),
+               f2->node->name (),
                result);
 
     return result;
@@ -1603,9 +1603,9 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
   if (dump_file)
     {
       fprintf (dump_file, "Semantic equality hit:%s->%s\n",
-               cgraph_node_name (original), cgraph_node_name (alias));
+               original->name (), alias->name ());
        fprintf (dump_file, "Assembler function names:%s->%s\n",
-               cgraph_node_asm_name (original), cgraph_node_asm_name (alias));
+               original->name (), alias->name ());
    }
 
   if (dump_file)
@@ -1998,7 +1998,7 @@ build_tree_decl_map (void)
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     {
       // TODO
-      fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", (void *)semantic_functions[i], i, cgraph_node_asm_name (semantic_functions[i]->node));
+      fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", (void *)semantic_functions[i], i, semantic_functions[i]->node->name ());
 
       slot = tree_decl_map.insert (semantic_functions[i]->func_decl,
                                    &existed_p);
@@ -2437,7 +2437,7 @@ semantic_equality (void)
         {
           f = semantic_functions[i];
           fprintf (dump_file, "Visited function: %s, with hash: %u\n",
-                   cgraph_node_asm_name (f->node), f->hash);
+                   f->node->name (), f->hash);
         }
 
       fprintf (dump_file, "\n");
