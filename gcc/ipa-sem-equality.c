@@ -444,7 +444,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   f->arg_count = param_num;
 
   /* basic block iteration.  */
-  f->bb_count = n_basic_blocks_for_function (func) - 2;
+  f->bb_count = n_basic_blocks_for_fn (func) - 2;
 
   f->edge_count = n_edges_for_function (func);
   f->bb_sizes = XNEWVEC (unsigned int, f->bb_count);
@@ -1997,9 +1997,6 @@ build_tree_decl_map (void)
 
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     {
-      // TODO
-      // fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", (void *)semantic_functions[i], i, semantic_functions[i]->node->name ());
-
       slot = tree_decl_map.insert (semantic_functions[i]->func_decl,
                                    &existed_p);
 

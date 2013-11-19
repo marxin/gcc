@@ -1393,7 +1393,7 @@ Common Report Var(flag_ipa_pure_const) Init(0) Optimization
 Discover pure and const functions
 
 fipa-sem-equality
-Common Report Var(flag_ipa_sem_equality) Iinit(1) Optimization
+Common Report Var(flag_ipa_sem_equality) Optimization
 Perform Semantic function equality
 
 fipa-reference
