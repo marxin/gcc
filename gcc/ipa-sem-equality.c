@@ -1998,7 +1998,7 @@ build_tree_decl_map (void)
   for (unsigned int i = 0; i < semantic_functions.length (); i++)
     {
       // TODO
-      fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", (void *)semantic_functions[i], i, semantic_functions[i]->node->name ());
+      // fprintf (stderr, "build_tree_decl_map:%p:%d:%s\n", (void *)semantic_functions[i], i, semantic_functions[i]->node->name ());
 
       slot = tree_decl_map.insert (semantic_functions[i]->func_decl,
                                    &existed_p);

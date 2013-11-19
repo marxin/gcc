@@ -1577,9 +1577,10 @@ do_per_function (void (*callback) (void *data), void *data)
     {
       struct cgraph_node *node;
       FOR_EACH_DEFINED_FUNCTION (node)
-	if (node->analyzed && gimple_has_body_p (node->decl)
-	    && (!node->clone_of || node->decl != node->clone_of->decl))
-	  {
+        if (node->analyzed && cgraph_function_with_gimple_body_p (node)
+          && !node->clone_of)
+      {
+      cgraph_get_body (node);
 	    push_cfun (DECL_STRUCT_FUNCTION (node->decl));
 	    callback (data);
 	    if (!flag_wpa)
