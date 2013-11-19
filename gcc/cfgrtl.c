@@ -361,7 +361,7 @@ rtl_create_basic_block (void *headp, void *endp, basic_block after)
       vec_safe_grow_cleared (basic_block_info, new_size);
     }
 
-  n_basic_blocks++;
+  n_basic_blocks_for_fn (cfun)++;
 
   bb = create_basic_block_structure (head, end, NULL, after);
   bb->aux = NULL;
@@ -500,7 +500,7 @@ make_pass_free_cfg (gcc::context *ctxt)
 rtx
 entry_of_function (void)
 {
-  return (n_basic_blocks > NUM_FIXED_BLOCKS ?
+  return (n_basic_blocks_for_fn (cfun) > NUM_FIXED_BLOCKS ?
 	  BB_HEAD (ENTRY_BLOCK_PTR->next_bb) : get_insns ());
 }
 
@@ -2921,10 +2921,10 @@ rtl_verify_bb_layout (void)
 	curr_bb = NULL;
     }
 
-  if (num_bb_notes != n_basic_blocks - NUM_FIXED_BLOCKS)
+  if (num_bb_notes != n_basic_blocks_for_fn (cfun) - NUM_FIXED_BLOCKS)
     internal_error
       ("number of bb notes in insn chain (%d) != n_basic_blocks (%d)",
-       num_bb_notes, n_basic_blocks);
+       num_bb_notes, n_basic_blocks_for_fn (cfun));
 
    return err;
 }
@@ -4204,6 +4204,15 @@ cfg_layout_initialize (unsigned int flags)
   rtx x;
   basic_block bb;
 
+  /* Once bb reordering is complete, cfg layout mode should not be re-entered.
+     Entering cfg layout mode will perform optimizations on the cfg that
+     could affect the bb layout negatively or even require fixups. An
+     example of the latter is if edge forwarding performed when optimizing
+     the cfg layout required moving a block from the hot to the cold section
+     under -freorder-blocks-and-partition. This would create an illegal
+     partitioning unless some manual fixup was performed.  */
+  gcc_assert (!crtl->bb_reorder_complete);
+
   initialize_original_copy_tables ();
 
   cfg_layout_rtl_register_cfg_hooks ();
@@ -4755,7 +4764,7 @@ rtl_flow_call_edges_add (sbitmap blocks)
   int last_bb = last_basic_block;
   bool check_last_block = false;
 
-  if (n_basic_blocks == NUM_FIXED_BLOCKS)
+  if (n_basic_blocks_for_fn (cfun) == NUM_FIXED_BLOCKS)
     return 0;
 
   if (! blocks)

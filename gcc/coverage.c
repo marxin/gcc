@@ -584,7 +584,7 @@ unsigned
 coverage_compute_cfg_checksum (struct function *fn)
 {
   basic_block bb;
-  unsigned chksum = n_basic_blocks_for_function (fn);
+  unsigned chksum = n_basic_blocks_for_fn (fn);
 
   FOR_EACH_BB_FN (bb, fn)
     {
