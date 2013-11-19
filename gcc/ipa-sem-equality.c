@@ -30,7 +30,7 @@ along with GCC; see the file COPYING3.  If not see
    number of arguments, types of that arguments, number of basic blocks and
    statements nested in each block. The checksum is saved to hashtable,
    where all functions having the same checksum live in a linked list.
-   Each table collision is a candidate for semantic equality. 
+   Each table collision is a candidate for semantic equality.
 
    Second, deep comparison phase, is based on further function collation.
    We traverse all basic blocks and each statement living in the block,
@@ -38,7 +38,7 @@ along with GCC; see the file COPYING3.  If not see
    declarations. Corresponding statement types are mandatory, each statement
    operand must point to an appropriate one in a function we do
    comparison with.
-   
+
    Edge bidictionary is helpfull for phi node collation, where all phi node
    arguments must point to an appropriate basic block.
 
@@ -201,7 +201,7 @@ struct decl_var_hash: typed_noop_remove <decl_pair_t>
   typedef decl_pair_t value_type;
   typedef decl_pair_t compare_type;
   static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);  
+  static inline int equal (const value_type *, const compare_type *);
 };
 
 /* Hash compute function returns hash for a given declaration pair.  */
@@ -279,7 +279,7 @@ init_ssa_names_vec (vec<int> &vector, unsigned n)
 
 static void
 func_dict_init (func_dict_t *d, unsigned ssa_names_size1,
-                unsigned ssa_names_size2) 
+                unsigned ssa_names_size2)
 {
   init_ssa_names_vec (d->source, ssa_names_size1);
   init_ssa_names_vec (d->target, ssa_names_size2);
@@ -339,7 +339,7 @@ independent_hash (sem_func_t *f)
 {
   unsigned int i;
   hashval_t hash = 0;
-  
+
   hash = iterative_hash_object (f->arg_count, hash);
   hash = iterative_hash_object (f->bb_count, hash);
   hash = iterative_hash_object (f->edge_count, hash);
@@ -428,7 +428,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
 
   if (!func || !cgraph_function_with_gimple_body_p (node))
     return false;
-  
+
   f->ssa_names_size = SSANAMES (func)->length ();
   f->node = node;
 
@@ -468,12 +468,12 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
           code = (hashval_t) gimple_code (stmt);
 
           /* We ignore all debug statements.  */
-          if (code != GIMPLE_DEBUG) 
+          if (code != GIMPLE_DEBUG)
           {
             nondbg_stmt_count++;
             gcode_hash = iterative_hash_object (code, gcode_hash);
 
-            /* More precise hash could be enhanced by function call.  */            
+            /* More precise hash could be enhanced by function call.  */
             if (code == GIMPLE_CALL)
             {
               funcdecl = gimple_call_fndecl (stmt);
@@ -641,7 +641,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
      We also need to care about type based devirtualization.  */
   if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
     SE_EXIT_FALSE_WITH_MSG ("");
- 
+
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
 
@@ -653,7 +653,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       t1 = base1;
       t2 = base2;
     }
-  
+
   if (TREE_CODE (t1) != TREE_CODE (t2))
     SE_EXIT_FALSE_WITH_MSG ("");
 
@@ -723,7 +723,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
     {
       x1 = TREE_OPERAND (t1, 0);
       x2 = TREE_OPERAND (t2, 0);
-      
+
       ret = compare_handled_component (x1, x2, d, func1, func2);
       SE_EXIT_DEBUG (ret);
     }
@@ -760,7 +760,7 @@ compare_handled_component (tree t1, tree t2, func_dict_t *d,
       ret = check_declaration (t1, t2, d, func1, func2);
       SE_EXIT_DEBUG (ret);
     }
-    default:    
+    default:
       // TODO: remove after development
       debug_tree (t1);
       gcc_unreachable ();
@@ -812,7 +812,7 @@ check_operand (tree t1, tree t2, func_dict_t *d, tree func1, tree func2)
       ret = check_declaration (t1, t2, d, func1, func2);
       SE_EXIT_DEBUG (ret);
     case SSA_NAME:
-      ret = check_ssa_names (d, t1, t2, func1, func2); 
+      ret = check_ssa_names (d, t1, t2, func1, func2);
       SE_EXIT_DEBUG (ret);
     case INTEGER_CST:
       ret = (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
@@ -860,7 +860,7 @@ check_gimple_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
   t1 = gimple_call_fndecl (s1);
   t2 = gimple_call_fndecl (s2);
 
-  /* Function pointer variables are not supported yet.  */ 
+  /* Function pointer variables are not supported yet.  */
   if (t1 == NULL || t2 == NULL)
     {
       if (!check_operand (t1, t2, d, func1, func2))
@@ -873,7 +873,7 @@ check_gimple_call (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func2)
 
   /* Checking of argument.  */
   for (i = 0; i < gimple_call_num_args (s1); ++i)
-    { 
+    {
       t1 = gimple_call_arg (s1, i);
       t2 = gimple_call_arg (s2, i);
 
@@ -908,7 +908,7 @@ check_gimple_assign (gimple s1, gimple s2, func_dict_t *d, tree func1, tree func
   code1 = gimple_assign_rhs_code (s1);
   code2 = gimple_assign_rhs_code (s2);
 
-  if (code1 != code2) 
+  if (code1 != code2)
     return false;
 
   for (i = 0; i < gimple_num_ops (s1); i++)
@@ -1064,7 +1064,7 @@ check_gimple_resx (gimple g1, gimple g2)
 
 /* Returns for a given GSI statement first nondebug statement.  */
 
-static void 
+static void
 gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
 {
   gimple s;
@@ -1073,7 +1073,7 @@ gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
 
   while (gimple_code (s) == GIMPLE_DEBUG)
   {
-    gsi_next (&gsi);    
+    gsi_next (&gsi);
     gcc_assert (!gsi_end_p (gsi));
 
     s = gsi_stmt (gsi);
@@ -1349,7 +1349,7 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
           lp1 = lp1->next_lp;
           lp2 = lp2->next_lp;
         }
-      
+
       if (lp1 || lp2)
         return false;
 
@@ -1358,7 +1358,7 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
         case ERT_TRY:
           c1 = r1->u.eh_try.first_catch;
           c2 = r2->u.eh_try.first_catch;
-                    
+
           while (c1 && c2)
             {
               /* Catch label checking */
@@ -1384,7 +1384,7 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
         case ERT_ALLOWED_EXCEPTIONS:
           if (r1->u.allowed.filter != r2->u.allowed.filter)
             return false;
-          
+
           if (!compare_type_lists (r1->u.allowed.type_list,
                                    r2->u.allowed.type_list))
             return false;
@@ -1414,7 +1414,7 @@ compare_eh_regions (eh_region r1, eh_region r2, func_dict_t *d,
       /* If there are peers, process them.  */
       else if (r1->next_peer)
         {
-      	  r1 = r1->next_peer;
+          r1 = r1->next_peer;
           r2 = r2->next_peer;
         }
       /* Otherwise, step back up the tree to the next peer.  */
@@ -1557,7 +1557,7 @@ compare_functions (sem_func_t *f1, sem_func_t *f2)
 
           ei_next (&ei2);
         }
-      } 
+      }
 
   /* Basic block PHI nodes comparison.  */
   for (i = 0; i < f1->bb_count; ++i)
@@ -1628,7 +1628,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
                  "Not unifying; original and alias are in different sections.\n\n");
       return;
     }
- 
+
   /* See if original is in a section that can be discarded if the main
      symbol is not used.  */
   if (DECL_EXTERNAL (original->decl))
@@ -1713,7 +1713,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
       DECL_RESULT (alias->decl) = result;
       allocate_struct_function (alias_func->node->decl, false);
       set_cfun (NULL);
-	
+
       /* Turn alias into thunk and expand it into GIMPLE representation.  */
       alias->definition = true;
       alias->thunk.thunk_p = true;
@@ -1733,7 +1733,7 @@ merge_functions (sem_func_t *original_func, sem_func_t *alias_func)
 
       /* Create the alias.  */
       cgraph_create_function_alias (alias_func->func_decl, original_func->func_decl);
-      symtab_resolve_alias (alias, original);  
+      symtab_resolve_alias (alias, original);
       if (dump_file)
         fprintf (dump_file, "Alias has been created.\n\n");
     }
@@ -1777,7 +1777,7 @@ struct cong_use_var_hash: typed_noop_remove <cong_use_t>
   typedef cong_use_t value_type;
   typedef cong_use_t compare_type;
   static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);  
+  static inline int equal (const value_type *, const compare_type *);
 };
 
 /* Congruence use hash functions is simply based on index.  */
@@ -1828,7 +1828,7 @@ struct cong_class_var_hash: typed_noop_remove <cong_class_t>
   typedef cong_class_t value_type;
   typedef cong_class_t compare_type;
   static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);  
+  static inline int equal (const value_type *, const compare_type *);
 };
 
 /* Hash for congruence class set is derived just from a pointer.  */
@@ -2073,7 +2073,7 @@ add_to_worklist (hash_table<cong_class_var_hash> &worklist, cong_class_t *c)
 {
   cong_class_t **result;
 
-  result = worklist.find_slot (c, INSERT);  
+  result = worklist.find_slot (c, INSERT);
 
   if (*result)
     return;
@@ -2099,7 +2099,7 @@ struct cong_info_var_hash: typed_noop_remove <cong_info_t>
   typedef cong_info_t value_type;
   typedef cong_info_t compare_type;
   static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);  
+  static inline int equal (const value_type *, const compare_type *);
   static inline void remove (value_type *);
 };
 
@@ -2131,7 +2131,7 @@ find_info_for_index (hash_table<cong_info_var_hash> &htable,
                      unsigned int index, bitmap_obstack &bmstack)
 {
   cong_info_t **slot;
-  cong_info_t info;  
+  cong_info_t info;
   info.index = index;
 
   slot = htable.find_slot (&info, INSERT);
@@ -2143,7 +2143,7 @@ find_info_for_index (hash_table<cong_info_var_hash> &htable,
       cong_info_t *new_info = XNEW (cong_info_t);
       new_info->index = index;
 
-      for (unsigned int i = 0; i < 2; i++)        
+      for (unsigned int i = 0; i < 2; i++)
         {
           new_info->split[i].count = 0;
           new_info->split[i].bm = BITMAP_ALLOC (&bmstack);
@@ -2244,7 +2244,7 @@ do_cong_step_for_index (cong_class *c, unsigned int index,
         congruence_classes[ci]->members = new_members[small];
 
         /* New group is created and added to list of congruent classes.  */
-        cong_class_t *newclass = XCNEW (cong_class_t);          
+        cong_class_t *newclass = XCNEW (cong_class_t);
         newclass->index = congruence_classes.length ();
         newclass->members = new_members[large];
 
@@ -2304,10 +2304,10 @@ process_congruence_reduction (void)
   while (worklist.elements ())
     {
       cong_class_t *c = &(*worklist.begin ());
-      worklist.remove_elt (c);      
+      worklist.remove_elt (c);
 
       process_congruence_step (worklist, c, bmstack);
-    }  
+    }
 
   worklist.dispose ();
 
@@ -2354,8 +2354,8 @@ merge_groups (unsigned int groupcount_before)
       for (unsigned int j = 1; j < c->members->length (); j++)
         {
           f2 = (*c->members)[j]->func;
-          
-          merge_functions (f1, f2);          
+
+          merge_functions (f1, f2);
         }
     }
 }
@@ -2375,7 +2375,7 @@ congruence_clean_up (void)
       congruence_items[i]->usage.dispose ();
       XDELETE (congruence_items[i]);
     }
-  
+
   congruence_items.release ();
 }
 
@@ -2408,7 +2408,7 @@ semantic_equality (void)
 {
   sem_func_t *f;
   unsigned int groupcount;
-  
+
   /* Semantic equality pass will be rewritten to a normal IPA pass, so that
    * all following steps are grouped to future pass phases: LGEN, WPA and
    * LTRANS.  */
@@ -2463,7 +2463,7 @@ semantic_equality (void)
 
   semantic_functions.release ();
 
-  return 0; 
+  return 0;
 }
 
 /* IPA pass gate function.  */
