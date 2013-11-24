@@ -23,19 +23,28 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "stor-layout.h"
 #include "basic-block.h"
 #include "gimple-pretty-print.h"
 #include "tree-inline.h"
+#include "hash-table.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-fold.h"
+#include "tree-eh.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimplify.h"
 #include "gimple-ssa.h"
 #include "tree-phinodes.h"
 #include "ssa-iterators.h"
+#include "stringpool.h"
 #include "tree-ssanames.h"
+#include "expr.h"
 #include "tree-dfa.h"
 #include "tree-ssa.h"
 #include "dumpfile.h"
-#include "hash-table.h"
 #include "alloc-pool.h"
 #include "flags.h"
 #include "cfgloop.h"
@@ -783,7 +792,7 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 	  /* The base address gets its own vn_reference_op_s structure.  */
 	  temp.op0 = TREE_OPERAND (ref, 1);
 	  if (tree_fits_shwi_p (TREE_OPERAND (ref, 1)))
-	    temp.off = TREE_INT_CST_LOW (TREE_OPERAND (ref, 1));
+	    temp.off = tree_to_shwi (TREE_OPERAND (ref, 1));
 	  break;
 	case BIT_FIELD_REF:
 	  /* Record bits and position.  */
@@ -947,7 +956,7 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
       if (!tree_fits_uhwi_p (size_tree))
 	size = -1;
       else
-	size = TREE_INT_CST_LOW (size_tree);
+	size = tree_to_uhwi (size_tree);
     }
 
   /* Initially, maxsize is the same as the accessed element size.
@@ -1018,7 +1027,7 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
 	      max_size = -1;
 	    else
 	      {
-		offset += (TREE_INT_CST_LOW (DECL_FIELD_OFFSET (field))
+		offset += (tree_to_uhwi (DECL_FIELD_OFFSET (field))
 			   * BITS_PER_UNIT);
 		offset += TREE_INT_CST_LOW (DECL_FIELD_BIT_OFFSET (field));
 	      }
@@ -1034,9 +1043,9 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
 	    max_size = -1;
 	  else
 	    {
-	      HOST_WIDE_INT hindex = TREE_INT_CST_LOW (op->op0);
-	      hindex -= TREE_INT_CST_LOW (op->op1);
-	      hindex *= TREE_INT_CST_LOW (op->op2);
+	      HOST_WIDE_INT hindex = tree_to_shwi (op->op0);
+	      hindex -= tree_to_shwi (op->op1);
+	      hindex *= tree_to_shwi (op->op2);
 	      hindex *= BITS_PER_UNIT;
 	      offset += hindex;
 	    }
@@ -1165,7 +1174,7 @@ vn_reference_fold_indirect (vec<vn_reference_op_s> *ops,
       mem_op->op0 = double_int_to_tree (TREE_TYPE (mem_op->op0), off);
       op->op0 = build_fold_addr_expr (addr_base);
       if (tree_fits_shwi_p (mem_op->op0))
-	mem_op->off = TREE_INT_CST_LOW (mem_op->op0);
+	mem_op->off = tree_to_shwi (mem_op->op0);
       else
 	mem_op->off = -1;
     }
@@ -1230,7 +1239,7 @@ vn_reference_maybe_forwprop_address (vec<vn_reference_op_s> *ops,
 
   mem_op->op0 = double_int_to_tree (TREE_TYPE (mem_op->op0), off);
   if (tree_fits_shwi_p (mem_op->op0))
-    mem_op->off = TREE_INT_CST_LOW (mem_op->op0);
+    mem_op->off = tree_to_shwi (mem_op->op0);
   else
     mem_op->off = -1;
   if (TREE_CODE (op->op0) == SSA_NAME)
@@ -1601,9 +1610,9 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_)
       tree base2;
       HOST_WIDE_INT offset2, size2, maxsize2;
       base2 = get_ref_base_and_extent (ref2, &offset2, &size2, &maxsize2);
-      size2 = TREE_INT_CST_LOW (gimple_call_arg (def_stmt, 2)) * 8;
+      size2 = tree_to_uhwi (gimple_call_arg (def_stmt, 2)) * 8;
       if ((unsigned HOST_WIDE_INT)size2 / 8
-	  == TREE_INT_CST_LOW (gimple_call_arg (def_stmt, 2))
+	  == tree_to_uhwi (gimple_call_arg (def_stmt, 2))
 	  && maxsize2 != -1
 	  && operand_equal_p (base, base2, 0)
 	  && offset2 <= offset
@@ -1748,8 +1757,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_)
       tree base2;
       HOST_WIDE_INT offset2, size2, maxsize2;
       int i, j;
-      vec<vn_reference_op_s>
-	  rhs = vNULL;
+      auto_vec<vn_reference_op_s> rhs;
       vn_reference_op_t vro;
       ao_ref r;
 
@@ -1812,7 +1820,6 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_)
 	vr->operands.truncate (i + 1 + rhs.length ());
       FOR_EACH_VEC_ELT (rhs, j, vro)
 	vr->operands[i + 1 + j] = *vro;
-      rhs.release ();
       vr->operands = valueize_refs (vr->operands);
       vr->hashcode = vn_reference_compute_hash (vr);
 
@@ -1873,7 +1880,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_)
 	      && tree_fits_uhwi_p (TREE_OPERAND (tem, 1)))
 	    {
 	      lhs = TREE_OPERAND (tem, 0);
-	      lhs_offset += TREE_INT_CST_LOW (TREE_OPERAND (tem, 1));
+	      lhs_offset += tree_to_uhwi (TREE_OPERAND (tem, 1));
 	    }
 	  else if (DECL_P (tem))
 	    lhs = build_fold_addr_expr (tem);
@@ -1899,7 +1906,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_)
 	      && tree_fits_uhwi_p (TREE_OPERAND (tem, 1)))
 	    {
 	      rhs = TREE_OPERAND (tem, 0);
-	      rhs_offset += TREE_INT_CST_LOW (TREE_OPERAND (tem, 1));
+	      rhs_offset += tree_to_uhwi (TREE_OPERAND (tem, 1));
 	    }
 	  else if (DECL_P (tem))
 	    rhs = build_fold_addr_expr (tem);
@@ -1910,7 +1917,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_)
 	  && TREE_CODE (rhs) != ADDR_EXPR)
 	return (void *)-1;
 
-      copy_size = TREE_INT_CST_LOW (gimple_call_arg (def_stmt, 2));
+      copy_size = tree_to_uhwi (gimple_call_arg (def_stmt, 2));
 
       /* The bases of the destination and the references have to agree.  */
       if ((TREE_CODE (base) != MEM_REF
@@ -1926,7 +1933,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_)
       /* And the access has to be contained within the memcpy destination.  */
       at = offset / BITS_PER_UNIT;
       if (TREE_CODE (base) == MEM_REF)
-	at += TREE_INT_CST_LOW (TREE_OPERAND (base, 1));
+	at += tree_to_uhwi (TREE_OPERAND (base, 1));
       if (lhs_offset > at
 	  || lhs_offset + copy_size < at + maxsize / BITS_PER_UNIT)
 	return (void *)-1;
@@ -3234,7 +3241,7 @@ simplify_binary_expression (gimple stmt)
       && is_gimple_min_invariant (op0))
     return build_invariant_address (TREE_TYPE (op0),
 				    TREE_OPERAND (op0, 0),
-				    TREE_INT_CST_LOW (op1));
+				    tree_to_uhwi (op1));
 
   /* Avoid folding if nothing changed.  */
   if (op0 == gimple_assign_rhs1 (stmt)
@@ -3784,7 +3791,7 @@ process_scc (vec<tree> scc)
 static bool
 extract_and_process_scc_for_name (tree name)
 {
-  vec<tree> scc = vNULL;
+  auto_vec<tree> scc;
   tree x;
 
   /* Found an SCC, pop the components off the SCC stack and
@@ -3806,7 +3813,6 @@ extract_and_process_scc_for_name (tree name)
 		 "SCC size %u exceeding %u\n", scc.length (),
 		 (unsigned)PARAM_VALUE (PARAM_SCCVN_MAX_SCC_SIZE));
 
-      scc.release ();
       return false;
     }
 
@@ -3817,8 +3823,6 @@ extract_and_process_scc_for_name (tree name)
     print_scc (dump_file, scc);
 
   process_scc (scc);
-
-  scc.release ();
 
   return true;
 }

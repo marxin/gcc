@@ -23,22 +23,27 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "hashtab.h"
-#include "pointer-set.h"
 #include "tree.h"
+#include "stor-layout.h"
 #include "tm_p.h"
 #include "basic-block.h"
-#include "ggc.h"
 #include "langhooks.h"
 #include "flags.h"
 #include "function.h"
 #include "tree-pretty-print.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimple-iterator.h"
 #include "gimple-walk.h"
 #include "gimple-ssa.h"
 #include "tree-phinodes.h"
 #include "ssa-iterators.h"
+#include "stringpool.h"
 #include "tree-ssanames.h"
+#include "expr.h"
 #include "tree-dfa.h"
 #include "tree-inline.h"
 #include "tree-pass.h"
@@ -410,7 +415,7 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
       if (! tree_fits_uhwi_p (size_tree))
 	bitsize = -1;
       else
-	bitsize = TREE_INT_CST_LOW (size_tree);
+	bitsize = tree_to_uhwi (size_tree);
     }
 
   /* Initially, maxsize is the same as the accessed element size.
@@ -458,8 +463,8 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
 			if (tree_fits_shwi_p (fsize)
 			    && tree_fits_shwi_p (ssize)
 			    && doffset.fits_shwi ())
-			  maxsize += ((TREE_INT_CST_LOW (ssize)
-				       - TREE_INT_CST_LOW (fsize))
+			  maxsize += ((tree_to_shwi (ssize)
+				       - tree_to_shwi (fsize))
 				      * BITS_PER_UNIT
 					- doffset.to_shwi ());
 			else
@@ -477,8 +482,7 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
 		    && csize
 		    && tree_fits_uhwi_p (csize)
 		    && bit_offset.fits_shwi ())
-		  maxsize = TREE_INT_CST_LOW (csize)
-			    - bit_offset.to_shwi ();
+		  maxsize = tree_to_uhwi (csize) - bit_offset.to_shwi ();
 		else
 		  maxsize = -1;
 	      }
@@ -521,8 +525,7 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
 		    && asize
 		    && tree_fits_uhwi_p (asize)
 		    && bit_offset.fits_shwi ())
-		  maxsize = TREE_INT_CST_LOW (asize)
-			    - bit_offset.to_shwi ();
+		  maxsize = tree_to_uhwi (asize) - bit_offset.to_shwi ();
 		else
 		  maxsize = -1;
 
@@ -571,7 +574,7 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
 	      && (!bit_offset.fits_shwi ()
 		  || !tree_fits_uhwi_p (TYPE_SIZE (TREE_TYPE (exp)))
 		  || (bit_offset.to_shwi () + maxsize
-		      == (HOST_WIDE_INT) TREE_INT_CST_LOW
+		      == (HOST_WIDE_INT) tree_to_uhwi
 		            (TYPE_SIZE (TREE_TYPE (exp))))))
 	    maxsize = -1;
 
@@ -608,7 +611,7 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
       && (!bit_offset.fits_shwi ()
 	  || !tree_fits_uhwi_p (TYPE_SIZE (TREE_TYPE (exp)))
 	  || (bit_offset.to_shwi () + maxsize
-	      == (HOST_WIDE_INT) TREE_INT_CST_LOW
+	      == (HOST_WIDE_INT) tree_to_uhwi
 	           (TYPE_SIZE (TREE_TYPE (exp))))))
     maxsize = -1;
 
@@ -632,7 +635,7 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
          base decl.  */
       if (maxsize == -1
 	  && tree_fits_uhwi_p (DECL_SIZE (exp)))
-	maxsize = TREE_INT_CST_LOW (DECL_SIZE (exp)) - hbit_offset;
+	maxsize = tree_to_uhwi (DECL_SIZE (exp)) - hbit_offset;
     }
   else if (CONSTANT_CLASS_P (exp))
     {
@@ -640,7 +643,7 @@ get_ref_base_and_extent (tree exp, HOST_WIDE_INT *poffset,
          base type constant.  */
       if (maxsize == -1
 	  && tree_fits_uhwi_p (TYPE_SIZE (TREE_TYPE (exp))))
-	maxsize = TREE_INT_CST_LOW (TYPE_SIZE (TREE_TYPE (exp))) - hbit_offset;
+	maxsize = tree_to_uhwi (TYPE_SIZE (TREE_TYPE (exp))) - hbit_offset;
     }
 
   /* ???  Due to negative offsets in ARRAY_REF we can end up with

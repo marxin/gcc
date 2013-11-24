@@ -34,6 +34,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "recog.h"
 #include "output.h"
 #include "tree.h"
+#include "varasm.h"
+#include "stringpool.h"
+#include "stor-layout.h"
+#include "calls.h"
 #include "function.h"
 #include "expr.h"
 #include "optabs.h"
@@ -50,6 +54,15 @@ along with GCC; see the file COPYING3.  If not see
 #include "common/common-target.h"
 #include "langhooks.h"
 #include "sched-int.h"
+#include "pointer-set.h"
+#include "vec.h"
+#include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-fold.h"
+#include "tree-eh.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimplify.h"
 #include "bitmap.h"
@@ -3968,7 +3981,7 @@ mips_rtx_costs (rtx x, int code, int outer_code, int opno ATTRIBUTE_UNUSED,
     case DIV:
       /* Check for a reciprocal.  */
       if (float_mode_p
-	  && ISA_HAS_FP4
+	  && ISA_HAS_FP_RECIP_RSQRT (mode)
 	  && flag_unsafe_math_optimizations
 	  && XEXP (x, 0) == CONST1_RTX (mode))
 	{
@@ -14838,7 +14851,7 @@ r10k_simplify_address (rtx x, rtx insn)
 	      /* Replace the incoming value of $sp with
 		 virtual_incoming_args_rtx.  */
 	      if (x == stack_pointer_rtx
-		  && DF_REF_BB (def) == ENTRY_BLOCK_PTR)
+		  && DF_REF_BB (def) == ENTRY_BLOCK_PTR_FOR_FN (cfun))
 		newx = virtual_incoming_args_rtx;
 	    }
 	  else if (dominated_by_p (CDI_DOMINATORS, DF_REF_BB (use),
@@ -16072,10 +16085,13 @@ mips_reorg_process_insns (void)
   if (crtl->profile)
     cfun->machine->all_noreorder_p = false;
 
-  /* Code compiled with -mfix-vr4120 or -mfix-24k can't be all noreorder
-     because we rely on the assembler to work around some errata.
-     The r5900 too has several bugs.  */
-  if (TARGET_FIX_VR4120 || TARGET_FIX_24K || TARGET_MIPS5900)
+  /* Code compiled with -mfix-vr4120, -mfix-rm7000 or -mfix-24k can't be
+     all noreorder because we rely on the assembler to work around some
+     errata.  The R5900 too has several bugs.  */
+  if (TARGET_FIX_VR4120
+      || TARGET_FIX_RM7000
+      || TARGET_FIX_24K
+      || TARGET_MIPS5900)
     cfun->machine->all_noreorder_p = false;
 
   /* The same is true for -mfix-vr4130 if we might generate MFLO or

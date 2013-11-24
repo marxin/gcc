@@ -26,6 +26,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "stringpool.h"
+#include "stor-layout.h"
+#include "attribs.h"
+#include "pointer-set.h"
+#include "hash-table.h"
 #include "cp-tree.h"
 #include "flags.h"
 #include "toplev.h"
@@ -34,9 +39,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "dumpfile.h"
 #include "splay-tree.h"
-#include "pointer-set.h"
-#include "hash-table.h"
-#include "gimple.h"
 #include "gimplify.h"
 
 /* The number of nested classes being processed.  If we are not in the

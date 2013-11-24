@@ -52,24 +52,31 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
 #include "tree.h"
-#include "tree-pass.h"
-#include "tree-dump.h"
-#include "tree-cfg.h"
-#include "langhooks.h"
+#include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
-#include "cgraph.h"
-#include "cfgloop.h"
-#include "tree-ssa-sccvn.h"
-#include "tree-ssanames.h"
-#include "coverage.h"
-#include "hash-table.h"
-#include "except.h"
-#include "gimple-ssa.h"
-#include "gimple-pretty-print.h"
-#include "tree-dfa.h"
+#include "expr.h"
 #include "gimple-iterator.h"
+#include "gimple-ssa.h"
+#include "tree-cfg.h"
+#include "tree-phinodes.h"
+#include "stringpool.h"
+#include "tree-ssanames.h"
+#include "tree-dfa.h"
+#include "tree-pass.h"
+#include "gimple-pretty-print.h"
+#include "ipa-inline.h"
+#include "cfgloop.h"
+#include "except.h"
+#include "hash-table.h"
+#include "coverage.h"
+#include "pointer-set.h"
+#include "attribs.h"
+#include "print-tree.h"
 
 #define SE_DUMP_MESSAGE(message) \
   do \
@@ -446,7 +453,7 @@ visit_function (struct cgraph_node *node, sem_func_t *f)
   /* basic block iteration.  */
   f->bb_count = n_basic_blocks_for_fn (func) - 2;
 
-  f->edge_count = n_edges_for_function (func);
+  f->edge_count = n_edges_for_fn (func);
   f->bb_sizes = XNEWVEC (unsigned int, f->bb_count);
 
   f->bb_sorted = XNEWVEC (sem_bb_t *, f->bb_count);

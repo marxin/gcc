@@ -77,7 +77,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
+#include "expr.h"
 #include "gimple-pretty-print.h"
+#include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimple-iterator.h"
 #include "tree-ssa-loop-niter.h"
@@ -4744,10 +4750,9 @@ analyze_all_data_dependences (struct loop *loop)
 void
 tree_check_data_deps (void)
 {
-  loop_iterator li;
   struct loop *loop_nest;
 
-  FOR_EACH_LOOP (li, loop_nest, 0)
+  FOR_EACH_LOOP (loop_nest, 0)
     analyze_all_data_dependences (loop_nest);
 }
 

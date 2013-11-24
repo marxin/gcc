@@ -27,20 +27,24 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "basic-block.h"
 #include "timevar.h"	/* for TV_ALIAS_STMT_WALK */
-#include "ggc.h"
 #include "langhooks.h"
 #include "flags.h"
 #include "function.h"
 #include "tree-pretty-print.h"
 #include "dumpfile.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "tree-eh.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimple-ssa.h"
+#include "stringpool.h"
 #include "tree-ssanames.h"
+#include "expr.h"
 #include "tree-dfa.h"
 #include "tree-inline.h"
 #include "params.h"
-#include "vec.h"
-#include "pointer-set.h"
 #include "alloc-pool.h"
 #include "tree-ssa-alias.h"
 #include "ipa-reference.h"
@@ -576,7 +580,7 @@ ao_ref_alias_set (ao_ref *ref)
 void
 ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
 {
-  HOST_WIDE_INT t, extra_offset = 0;
+  HOST_WIDE_INT t, size_hwi, extra_offset = 0;
   ref->ref = NULL_TREE;
   if (TREE_CODE (ptr) == SSA_NAME)
     {
@@ -615,9 +619,8 @@ ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
   ref->offset += extra_offset;
   if (size
       && tree_fits_shwi_p (size)
-      && TREE_INT_CST_LOW (size) * BITS_PER_UNIT / BITS_PER_UNIT
-	 == TREE_INT_CST_LOW (size))
-    ref->max_size = ref->size = TREE_INT_CST_LOW (size) * BITS_PER_UNIT;
+      && (size_hwi = tree_to_shwi (size)) <= HOST_WIDE_INT_MAX / BITS_PER_UNIT)
+    ref->max_size = ref->size = size_hwi * BITS_PER_UNIT;
   else
     ref->max_size = ref->size = -1;
   ref->ref_alias_set = 0;

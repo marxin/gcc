@@ -28,12 +28,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 #include "target.h"
 #include "bitmap.h"
+#include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimple-iterator.h"
 #include "gimple-walk.h"
 #include "gimple-ssa.h"
 #include "tree-phinodes.h"
 #include "ssa-iterators.h"
+#include "stringpool.h"
 #include "tree-ssanames.h"
 #include "sbitmap.h"
 #include "tree-pass.h"
@@ -96,7 +102,7 @@ reachable_at_most_once (basic_block va_arg_bb, basic_block va_start_bb)
 	  break;
 	}
 
-      gcc_assert (src != ENTRY_BLOCK_PTR);
+      gcc_assert (src != ENTRY_BLOCK_PTR_FOR_FN (cfun));
 
       if (! bitmap_bit_p (visited, src->index))
 	{

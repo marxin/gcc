@@ -21,13 +21,22 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
+#include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-fold.h"
+#include "tree-eh.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
+#include "expr.h"
+#include "stor-layout.h"
+#include "print-tree.h"
 #include "gimplify.h"
 #include "gimple-iterator.h"
 #include "gimplify-me.h"
 #include "gimple-walk.h"
 #include "langhooks.h"
-#include "ggc.h"
 #include "target.h"
 #include "ipa-prop.h"
 #include "bitmap.h"
@@ -386,6 +395,7 @@ ipa_set_jf_known_type (struct ipa_jump_func *jfunc, HOST_WIDE_INT offset,
   jfunc->value.known_type.offset = offset,
   jfunc->value.known_type.base_type = base_type;
   jfunc->value.known_type.component_type = component_type;
+  gcc_assert (component_type);
 }
 
 /* Set JFUNC to be a copy of another jmp (to be used by jump function
@@ -1739,8 +1749,6 @@ ipa_note_param_call (struct cgraph_node *node, int param_index, gimple stmt)
 
   cs = cgraph_edge (node, stmt);
   cs->indirect_info->param_index = param_index;
-  cs->indirect_info->offset = 0;
-  cs->indirect_info->polymorphic = 0;
   cs->indirect_info->agg_contents = 0;
   cs->indirect_info->member_ptr = 0;
   return cs;
@@ -1837,6 +1845,8 @@ ipa_analyze_indirect_call_uses (struct cgraph_node *node,
 				   NULL, &by_ref))
     {
       struct cgraph_edge *cs = ipa_note_param_call (node, index, call);
+      if (cs->indirect_info->offset != offset)
+	cs->indirect_info->outer_type = NULL;
       cs->indirect_info->offset = offset;
       cs->indirect_info->agg_contents = 1;
       cs->indirect_info->by_ref = by_ref;
@@ -1934,6 +1944,8 @@ ipa_analyze_indirect_call_uses (struct cgraph_node *node,
       && parm_preserved_before_stmt_p (&parms_ainfo[index], call, rec))
     {
       struct cgraph_edge *cs = ipa_note_param_call (node, index, call);
+      if (cs->indirect_info->offset != offset)
+	cs->indirect_info->outer_type = NULL;
       cs->indirect_info->offset = offset;
       cs->indirect_info->agg_contents = 1;
       cs->indirect_info->member_ptr = 1;
@@ -2770,6 +2782,8 @@ update_indirect_edges_after_inlining (struct cgraph_edge *cs,
 	  else
 	    {
 	      ici->param_index = ipa_get_jf_ancestor_formal_id (jfunc);
+	      if (ipa_get_jf_ancestor_offset (jfunc))
+	        ici->outer_type = NULL;
 	      ici->offset += ipa_get_jf_ancestor_offset (jfunc);
 	    }
 	}
@@ -3347,8 +3361,8 @@ ipa_get_vector_of_formal_parms (tree fndecl)
 /* Return a heap allocated vector containing types of formal parameters of
    function type FNTYPE.  */
 
-static inline vec<tree> 
-get_vector_of_formal_parm_types (tree fntype)
+vec<tree>
+ipa_get_vector_of_formal_parm_types (tree fntype)
 {
   vec<tree> types;
   int count = 0;
@@ -3370,32 +3384,22 @@ get_vector_of_formal_parm_types (tree fntype)
    base_index field.  */
 
 void
-ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments,
-			      const char *synth_parm_prefix)
+ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments)
 {
-  vec<tree> oparms, otypes;
-  tree orig_type, new_type = NULL;
-  tree old_arg_types, t, new_arg_types = NULL;
-  tree parm, *link = &DECL_ARGUMENTS (fndecl);
-  int i, len = adjustments.length ();
-  tree new_reversed = NULL;
-  bool care_for_types, last_parm_void;
-
-  if (!synth_parm_prefix)
-    synth_parm_prefix = "SYNTH";
-
-  oparms = ipa_get_vector_of_formal_parms (fndecl);
-  orig_type = TREE_TYPE (fndecl);
-  old_arg_types = TYPE_ARG_TYPES (orig_type);
+  vec<tree> oparms = ipa_get_vector_of_formal_parms (fndecl);
+  tree orig_type = TREE_TYPE (fndecl);
+  tree old_arg_types = TYPE_ARG_TYPES (orig_type);
 
   /* The following test is an ugly hack, some functions simply don't have any
      arguments in their type.  This is probably a bug but well... */
-  care_for_types = (old_arg_types != NULL_TREE);
+  bool care_for_types = (old_arg_types != NULL_TREE);
+  bool last_parm_void;
+  vec<tree> otypes;
   if (care_for_types)
     {
       last_parm_void = (TREE_VALUE (tree_last (old_arg_types))
 			== void_type_node);
-      otypes = get_vector_of_formal_parm_types (orig_type);
+      otypes = ipa_get_vector_of_formal_parm_types (orig_type);
       if (last_parm_void)
 	gcc_assert (oparms.length () + 1 == otypes.length ());
       else
@@ -3407,16 +3411,23 @@ ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments,
       otypes.create (0);
     }
 
-  for (i = 0; i < len; i++)
+  int len = adjustments.length ();
+  tree *link = &DECL_ARGUMENTS (fndecl);
+  tree new_arg_types = NULL;
+  for (int i = 0; i < len; i++)
     {
       struct ipa_parm_adjustment *adj;
       gcc_assert (link);
 
       adj = &adjustments[i];
-      parm = oparms[adj->base_index];
+      tree parm;
+      if (adj->op == IPA_PARM_OP_NEW)
+	parm = NULL;
+      else
+	parm = oparms[adj->base_index];
       adj->base = parm;
 
-      if (adj->copy_param)
+      if (adj->op == IPA_PARM_OP_COPY)
 	{
 	  if (care_for_types)
 	    new_arg_types = tree_cons (NULL_TREE, otypes[adj->base_index],
@@ -3424,7 +3435,7 @@ ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments,
 	  *link = parm;
 	  link = &DECL_CHAIN (parm);
 	}
-      else if (!adj->remove_param)
+      else if (adj->op != IPA_PARM_OP_REMOVE)
 	{
 	  tree new_parm;
 	  tree ptype;
@@ -3439,8 +3450,8 @@ ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments,
 
 	  new_parm = build_decl (UNKNOWN_LOCATION, PARM_DECL, NULL_TREE,
 				 ptype);
-	  DECL_NAME (new_parm) = create_tmp_var_name (synth_parm_prefix);
-
+	  const char *prefix = adj->arg_prefix ? adj->arg_prefix : "SYNTH";
+	  DECL_NAME (new_parm) = create_tmp_var_name (prefix);
 	  DECL_ARTIFICIAL (new_parm) = 1;
 	  DECL_ARG_TYPE (new_parm) = ptype;
 	  DECL_CONTEXT (new_parm) = fndecl;
@@ -3448,17 +3459,20 @@ ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments,
 	  DECL_IGNORED_P (new_parm) = 1;
 	  layout_decl (new_parm, 0);
 
-	  adj->base = parm;
-	  adj->reduction = new_parm;
+	  if (adj->op == IPA_PARM_OP_NEW)
+	    adj->base = NULL;
+	  else
+	    adj->base = parm;
+	  adj->new_decl = new_parm;
 
 	  *link = new_parm;
-
 	  link = &DECL_CHAIN (new_parm);
 	}
     }
 
   *link = NULL_TREE;
 
+  tree new_reversed = NULL;
   if (care_for_types)
     {
       new_reversed = nreverse (new_arg_types);
@@ -3476,8 +3490,9 @@ ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments,
      Exception is METHOD_TYPEs must have THIS argument.
      When we are asked to remove it, we need to build new FUNCTION_TYPE
      instead.  */
+  tree new_type = NULL;
   if (TREE_CODE (orig_type) != METHOD_TYPE
-       || (adjustments[0].copy_param
+       || (adjustments[0].op == IPA_PARM_OP_COPY
 	  && adjustments[0].base_index == 0))
     {
       new_type = build_distinct_type_copy (orig_type);
@@ -3501,7 +3516,7 @@ ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec adjustments,
 
   /* This is a new type, not a copy of an old type.  Need to reassociate
      variants.  We can handle everything except the main variant lazily.  */
-  t = TYPE_MAIN_VARIANT (orig_type);
+  tree t = TYPE_MAIN_VARIANT (orig_type);
   if (orig_type != t)
     {
       TYPE_MAIN_VARIANT (new_type) = t;
@@ -3550,13 +3565,13 @@ ipa_modify_call_arguments (struct cgraph_edge *cs, gimple stmt,
 
       adj = &adjustments[i];
 
-      if (adj->copy_param)
+      if (adj->op == IPA_PARM_OP_COPY)
 	{
 	  tree arg = gimple_call_arg (stmt, adj->base_index);
 
 	  vargs.quick_push (arg);
 	}
-      else if (!adj->remove_param)
+      else if (adj->op != IPA_PARM_OP_REMOVE)
 	{
 	  tree expr, base, off;
 	  location_t loc;
@@ -3675,7 +3690,7 @@ ipa_modify_call_arguments (struct cgraph_edge *cs, gimple stmt,
 					   NULL, true, GSI_SAME_STMT);
 	  vargs.quick_push (expr);
 	}
-      if (!adj->copy_param && MAY_HAVE_DEBUG_STMTS)
+      if (adj->op != IPA_PARM_OP_COPY && MAY_HAVE_DEBUG_STMTS)
 	{
 	  unsigned int ix;
 	  tree ddecl = NULL_TREE, origin = DECL_ORIGIN (adj->base), arg;
@@ -3750,6 +3765,124 @@ ipa_modify_call_arguments (struct cgraph_edge *cs, gimple stmt,
   free_dominance_info (CDI_DOMINATORS);
 }
 
+/* If the expression *EXPR should be replaced by a reduction of a parameter, do
+   so.  ADJUSTMENTS is a pointer to a vector of adjustments.  CONVERT
+   specifies whether the function should care about type incompatibility the
+   current and new expressions.  If it is false, the function will leave
+   incompatibility issues to the caller.  Return true iff the expression
+   was modified. */
+
+bool
+ipa_modify_expr (tree *expr, bool convert,
+		 ipa_parm_adjustment_vec adjustments)
+{
+  struct ipa_parm_adjustment *cand
+    = ipa_get_adjustment_candidate (&expr, &convert, adjustments, false);
+  if (!cand)
+    return false;
+
+  tree src;
+  if (cand->by_ref)
+    src = build_simple_mem_ref (cand->new_decl);
+  else
+    src = cand->new_decl;
+
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "About to replace expr ");
+      print_generic_expr (dump_file, *expr, 0);
+      fprintf (dump_file, " with ");
+      print_generic_expr (dump_file, src, 0);
+      fprintf (dump_file, "\n");
+    }
+
+  if (convert && !useless_type_conversion_p (TREE_TYPE (*expr), cand->type))
+    {
+      tree vce = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (*expr), src);
+      *expr = vce;
+    }
+  else
+    *expr = src;
+  return true;
+}
+
+/* If T is an SSA_NAME, return NULL if it is not a default def or
+   return its base variable if it is.  If IGNORE_DEFAULT_DEF is true,
+   the base variable is always returned, regardless if it is a default
+   def.  Return T if it is not an SSA_NAME.  */
+
+static tree
+get_ssa_base_param (tree t, bool ignore_default_def)
+{
+  if (TREE_CODE (t) == SSA_NAME)
+    {
+      if (ignore_default_def || SSA_NAME_IS_DEFAULT_DEF (t))
+	return SSA_NAME_VAR (t);
+      else
+	return NULL_TREE;
+    }
+  return t;
+}
+
+/* Given an expression, return an adjustment entry specifying the
+   transformation to be done on EXPR.  If no suitable adjustment entry
+   was found, returns NULL.
+
+   If IGNORE_DEFAULT_DEF is set, consider SSA_NAMEs which are not a
+   default def, otherwise bail on them.
+
+   If CONVERT is non-NULL, this function will set *CONVERT if the
+   expression provided is a component reference.  ADJUSTMENTS is the
+   adjustments vector.  */
+
+ipa_parm_adjustment *
+ipa_get_adjustment_candidate (tree **expr, bool *convert,
+			      ipa_parm_adjustment_vec adjustments,
+			      bool ignore_default_def)
+{
+  if (TREE_CODE (**expr) == BIT_FIELD_REF
+      || TREE_CODE (**expr) == IMAGPART_EXPR
+      || TREE_CODE (**expr) == REALPART_EXPR)
+    {
+      *expr = &TREE_OPERAND (**expr, 0);
+      if (convert)
+	*convert = true;
+    }
+
+  HOST_WIDE_INT offset, size, max_size;
+  tree base = get_ref_base_and_extent (**expr, &offset, &size, &max_size);
+  if (!base || size == -1 || max_size == -1)
+    return NULL;
+
+  if (TREE_CODE (base) == MEM_REF)
+    {
+      offset += mem_ref_offset (base).low * BITS_PER_UNIT;
+      base = TREE_OPERAND (base, 0);
+    }
+
+  base = get_ssa_base_param (base, ignore_default_def);
+  if (!base || TREE_CODE (base) != PARM_DECL)
+    return NULL;
+
+  struct ipa_parm_adjustment *cand = NULL;
+  unsigned int len = adjustments.length ();
+  for (unsigned i = 0; i < len; i++)
+    {
+      struct ipa_parm_adjustment *adj = &adjustments[i];
+
+      if (adj->base == base
+	  && (adj->offset == offset || adj->op == IPA_PARM_OP_REMOVE))
+	{
+	  cand = adj;
+	  break;
+	}
+    }
+
+  if (!cand || cand->op == IPA_PARM_OP_COPY || cand->op == IPA_PARM_OP_REMOVE)
+    return NULL;
+  return cand;
+}
+
 /* Return true iff BASE_INDEX is in ADJUSTMENTS more than once.  */
 
 static bool
@@ -3795,10 +3928,14 @@ ipa_combine_adjustments (ipa_parm_adjustment_vec inner,
       struct ipa_parm_adjustment *n;
       n = &inner[i];
 
-      if (n->remove_param)
+      if (n->op == IPA_PARM_OP_REMOVE)
 	removals++;
       else
-	tmp.quick_push (*n);
+	{
+	  /* FIXME: Handling of new arguments are not implemented yet.  */
+	  gcc_assert (n->op != IPA_PARM_OP_NEW);
+	  tmp.quick_push (*n);
+	}
     }
 
   adjustments.create (outlen + removals);
@@ -3809,15 +3946,20 @@ ipa_combine_adjustments (ipa_parm_adjustment_vec inner,
       struct ipa_parm_adjustment *in = &tmp[out->base_index];
 
       memset (&r, 0, sizeof (r));
-      gcc_assert (!in->remove_param);
-      if (out->remove_param)
+      gcc_assert (in->op != IPA_PARM_OP_REMOVE);
+      if (out->op == IPA_PARM_OP_REMOVE)
 	{
 	  if (!index_in_adjustments_multiple_times_p (in->base_index, tmp))
 	    {
-	      r.remove_param = true;
+	      r.op = IPA_PARM_OP_REMOVE;
 	      adjustments.quick_push (r);
 	    }
 	  continue;
+	}
+      else
+	{
+	  /* FIXME: Handling of new arguments are not implemented yet.  */
+	  gcc_assert (out->op != IPA_PARM_OP_NEW);
 	}
 
       r.base_index = in->base_index;
@@ -3825,11 +3967,11 @@ ipa_combine_adjustments (ipa_parm_adjustment_vec inner,
 
       /* FIXME:  Create nonlocal value too.  */
 
-      if (in->copy_param && out->copy_param)
-	r.copy_param = true;
-      else if (in->copy_param)
+      if (in->op == IPA_PARM_OP_COPY && out->op == IPA_PARM_OP_COPY)
+	r.op = IPA_PARM_OP_COPY;
+      else if (in->op == IPA_PARM_OP_COPY)
 	r.offset = out->offset;
-      else if (out->copy_param)
+      else if (out->op == IPA_PARM_OP_COPY)
 	r.offset = in->offset;
       else
 	r.offset = in->offset + out->offset;
@@ -3840,7 +3982,7 @@ ipa_combine_adjustments (ipa_parm_adjustment_vec inner,
     {
       struct ipa_parm_adjustment *n = &inner[i];
 
-      if (n->remove_param)
+      if (n->op == IPA_PARM_OP_REMOVE)
 	adjustments.quick_push (*n);
     }
 
@@ -3877,10 +4019,10 @@ ipa_dump_param_adjustments (FILE *file, ipa_parm_adjustment_vec adjustments,
 	  fprintf (file, ", base: ");
 	  print_generic_expr (file, adj->base, 0);
 	}
-      if (adj->reduction)
+      if (adj->new_decl)
 	{
-	  fprintf (file, ", reduction: ");
-	  print_generic_expr (file, adj->reduction, 0);
+	  fprintf (file, ", new_decl: ");
+	  print_generic_expr (file, adj->new_decl, 0);
 	}
       if (adj->new_ssa_base)
 	{
@@ -3888,9 +4030,9 @@ ipa_dump_param_adjustments (FILE *file, ipa_parm_adjustment_vec adjustments,
 	  print_generic_expr (file, adj->new_ssa_base, 0);
 	}
 
-      if (adj->copy_param)
+      if (adj->op == IPA_PARM_OP_COPY)
 	fprintf (file, ", copy_param");
-      else if (adj->remove_param)
+      else if (adj->op == IPA_PARM_OP_REMOVE)
 	fprintf (file, ", remove_param");
       else
 	fprintf (file, ", offset %li", (long) adj->offset);
@@ -4084,12 +4226,15 @@ ipa_write_indirect_edge_info (struct output_block *ob,
   bp_pack_value (&bp, ii->agg_contents, 1);
   bp_pack_value (&bp, ii->member_ptr, 1);
   bp_pack_value (&bp, ii->by_ref, 1);
+  bp_pack_value (&bp, ii->maybe_in_construction, 1);
+  bp_pack_value (&bp, ii->maybe_derived_type, 1);
   streamer_write_bitpack (&bp);
 
   if (ii->polymorphic)
     {
       streamer_write_hwi (ob, ii->otr_token);
       stream_write_tree (ob, ii->otr_type, true);
+      stream_write_tree (ob, ii->outer_type, true);
     }
 }
 
@@ -4111,10 +4256,13 @@ ipa_read_indirect_edge_info (struct lto_input_block *ib,
   ii->agg_contents = bp_unpack_value (&bp, 1);
   ii->member_ptr = bp_unpack_value (&bp, 1);
   ii->by_ref = bp_unpack_value (&bp, 1);
+  ii->maybe_in_construction = bp_unpack_value (&bp, 1);
+  ii->maybe_derived_type = bp_unpack_value (&bp, 1);
   if (ii->polymorphic)
     {
       ii->otr_token = (HOST_WIDE_INT) streamer_read_hwi (ib);
       ii->otr_type = stream_read_tree (ib, data_in);
+      ii->outer_type = stream_read_tree (ib, data_in);
     }
 }
 

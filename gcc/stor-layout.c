@@ -23,13 +23,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "stor-layout.h"
+#include "stringpool.h"
+#include "varasm.h"
+#include "print-tree.h"
 #include "rtl.h"
 #include "tm_p.h"
 #include "flags.h"
 #include "function.h"
 #include "expr.h"
 #include "diagnostic-core.h"
-#include "ggc.h"
 #include "target.h"
 #include "langhooks.h"
 #include "regs.h"
@@ -37,7 +40,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "tree-inline.h"
 #include "tree-dump.h"
-#include "gimple.h"
 #include "gimplify.h"
 
 /* Data type for the expressions representing sizes of data types.
@@ -1200,7 +1202,7 @@ place_field (record_layout_info rli, tree field)
       unsigned int type_align = TYPE_ALIGN (type);
       tree dsize = DECL_SIZE (field);
       HOST_WIDE_INT field_size = tree_to_uhwi (dsize);
-      HOST_WIDE_INT offset = tree_to_shwi (rli->offset);
+      HOST_WIDE_INT offset = tree_to_uhwi (rli->offset);
       HOST_WIDE_INT bit_offset = tree_to_shwi (rli->bitpos);
 
 #ifdef ADJUST_FIELD_ALIGN
@@ -1244,7 +1246,7 @@ place_field (record_layout_info rli, tree field)
       unsigned int type_align = TYPE_ALIGN (type);
       tree dsize = DECL_SIZE (field);
       HOST_WIDE_INT field_size = tree_to_uhwi (dsize);
-      HOST_WIDE_INT offset = tree_to_shwi (rli->offset);
+      HOST_WIDE_INT offset = tree_to_uhwi (rli->offset);
       HOST_WIDE_INT bit_offset = tree_to_shwi (rli->bitpos);
 
 #ifdef ADJUST_FIELD_ALIGN
@@ -1300,7 +1302,7 @@ place_field (record_layout_info rli, tree field)
 	      && !integer_zerop (DECL_SIZE (field))
 	      && !integer_zerop (DECL_SIZE (rli->prev_field))
 	      && tree_fits_shwi_p (DECL_SIZE (rli->prev_field))
-	      && tree_fits_shwi_p (TYPE_SIZE (type))
+	      && tree_fits_uhwi_p (TYPE_SIZE (type))
 	      && simple_cst_equal (TYPE_SIZE (type), TYPE_SIZE (prev_type)))
 	    {
 	      /* We're in the middle of a run of equal type size fields; make
@@ -1621,7 +1623,7 @@ compute_record_mode (tree type)
      does not apply to unions.  */
   if (TREE_CODE (type) == RECORD_TYPE && mode != VOIDmode
       && tree_fits_uhwi_p (TYPE_SIZE (type))
-      && GET_MODE_BITSIZE (mode) == TREE_INT_CST_LOW (TYPE_SIZE (type)))
+      && GET_MODE_BITSIZE (mode) == tree_to_uhwi (TYPE_SIZE (type)))
     SET_TYPE_MODE (type, mode);
   else
     SET_TYPE_MODE (type, mode_for_size_tree (TYPE_SIZE (type), MODE_INT, 1));

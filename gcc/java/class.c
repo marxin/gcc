@@ -27,6 +27,9 @@ The Free Software Foundation is independent of Sun Microsystems, Inc.  */
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
+#include "stringpool.h"
+#include "stor-layout.h"
+#include "varasm.h"
 #include "flags.h"
 #include "java-tree.h"
 #include "jcf.h"
@@ -2412,7 +2415,7 @@ maybe_layout_super_class (tree super_class, tree this_class ATTRIBUTE_UNUSED)
 }
 
 /* safe_layout_class just makes sure that we can load a class without
-   disrupting the current_class, input_file, input_line, etc, information
+   disrupting the current_class, input_location, etc, information
    about the class processed currently.  */
 
 void

@@ -23,9 +23,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
+#include "expr.h"
 #include "intl.h"
 #include "tm.h"
 #include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimplify.h"
 #include "gimple-iterator.h"
@@ -33,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-ssa.h"
 #include "cgraph.h"
 #include "tree-cfg.h"
+#include "stringpool.h"
 #include "tree-ssanames.h"
 #include "tree-pass.h"
 #include "tree-iterator.h"
@@ -650,7 +656,7 @@ instrument_func_entry (void)
   tree ret_addr, builtin_decl;
   gimple g;
 
-  succ_bb = single_succ (ENTRY_BLOCK_PTR);
+  succ_bb = single_succ (ENTRY_BLOCK_PTR_FOR_FN (cfun));
   gsi = gsi_after_labels (succ_bb);
 
   builtin_decl = builtin_decl_implicit (BUILT_IN_RETURN_ADDRESS);
@@ -680,7 +686,7 @@ instrument_func_exit (void)
   edge_iterator ei;
 
   /* Find all function exits.  */
-  exit_bb = EXIT_BLOCK_PTR;
+  exit_bb = EXIT_BLOCK_PTR_FOR_FN (cfun);
   FOR_EACH_EDGE (e, ei, exit_bb->preds)
     {
       gsi = gsi_last_bb (e->src);

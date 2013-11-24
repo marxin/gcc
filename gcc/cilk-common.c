@@ -24,12 +24,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
+#include "stringpool.h"
+#include "stor-layout.h"
 #include "langhooks.h"
 #include "expr.h"
 #include "optabs.h"
 #include "recog.h"
 #include "tree-iterator.h"
-#include "gimple.h"
 #include "gimplify.h"
 #include "cilk.h"
 
@@ -327,7 +328,7 @@ expand_builtin_cilk_detach (tree exp)
 
   tree parent = cilk_dot (fptr, CILK_TI_FRAME_PARENT, 0);
   tree worker = cilk_dot (fptr, CILK_TI_FRAME_WORKER, 0);
-  tree tail = cilk_dot (worker, CILK_TI_WORKER_TAIL, 1);
+  tree tail = cilk_arrow (worker, CILK_TI_WORKER_TAIL, 1);
 
   rtx wreg = expand_expr (worker, NULL_RTX, Pmode, EXPAND_NORMAL);
   if (GET_CODE (wreg) != REG)

@@ -24,18 +24,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm.h"
 #include "rtl.h"
 #include "tree.h"
+#include "varasm.h"
+#include "expr.h"
 #include "tm_p.h"
 #include "function.h"
 #include "alias.h"
 #include "emit-rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
-#include "basic-block.h"
 #include "flags.h"
 #include "diagnostic-core.h"
 #include "cselib.h"
 #include "splay-tree.h"
-#include "ggc.h"
 #include "langhooks.h"
 #include "timevar.h"
 #include "dumpfile.h"
@@ -43,6 +43,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "df.h"
 #include "tree-ssa-alias.h"
 #include "pointer-set.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimple-ssa.h"
 
@@ -339,8 +342,8 @@ ao_ref_from_mem (ao_ref *ref, const_rtx mem)
       && (ref->offset < 0
 	  || (DECL_P (ref->base)
 	      && (!tree_fits_uhwi_p (DECL_SIZE (ref->base))
-		  || (TREE_INT_CST_LOW (DECL_SIZE ((ref->base)))
-		      < (unsigned HOST_WIDE_INT)(ref->offset + ref->size))))))
+		  || (tree_to_uhwi (DECL_SIZE (ref->base))
+		      < (unsigned HOST_WIDE_INT) (ref->offset + ref->size))))))
     return false;
 
   return true;

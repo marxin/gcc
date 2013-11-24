@@ -28,6 +28,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "stor-layout.h"
+#include "trans-mem.h"
+#include "varasm.h"
+#include "stmt.h"
 #include "langhooks.h"
 #include "c-tree.h"
 #include "c-lang.h"
@@ -36,7 +40,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "tree-iterator.h"
 #include "bitmap.h"
-#include "gimple.h"
+#include "pointer-set.h"
+#include "basic-block.h"
+#include "gimple-expr.h"
 #include "gimplify.h"
 #include "tree-inline.h"
 #include "omp-low.h"
@@ -6181,7 +6187,7 @@ store_init_value (location_t init_loc, tree decl, tree init, tree origtype)
 
   /* Store the expression if valid; else report error.  */
 
-  if (!in_system_header
+  if (!in_system_header_at (input_location)
       && AGGREGATE_TYPE_P (TREE_TYPE (decl)) && !TREE_STATIC (decl))
     warning (OPT_Wtraditional, "traditional C rejects automatic "
 	     "aggregate initialization");
@@ -8682,7 +8688,7 @@ process_init_element (struct c_expr value, bool implicit,
 	     again on the assumption that this must be conditional on
 	     __STDC__ anyway (and we've already complained about the
 	     member-designator already).  */
-	  if (!in_system_header && !constructor_designated
+	  if (!in_system_header_at (input_location) && !constructor_designated
 	      && !(value.value && (integer_zerop (value.value)
 				   || real_zerop (value.value))))
 	    warning (OPT_Wtraditional, "traditional C rejects initialization "
@@ -9283,7 +9289,7 @@ c_start_case (location_t switch_loc,
 	{
 	  tree type = TYPE_MAIN_VARIANT (orig_type);
 
-	  if (!in_system_header
+	  if (!in_system_header_at (input_location)
 	      && (type == long_integer_type_node
 		  || type == long_unsigned_type_node))
 	    warning_at (switch_cond_loc,

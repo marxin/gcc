@@ -22,9 +22,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "stor-layout.h"
 #include "tm_p.h"
 #include "basic-block.h"
 #include "tree-pretty-print.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimplify.h"
 #include "gimple-iterator.h"
@@ -1281,7 +1286,7 @@ may_use_storent_in_loop_p (struct loop *loop)
 
       FOR_EACH_VEC_ELT (exits, i, exit)
 	if ((exit->flags & EDGE_ABNORMAL)
-	    && exit->dest == EXIT_BLOCK_PTR)
+	    && exit->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
 	  ret = false;
 
       exits.release ();
@@ -1929,7 +1934,6 @@ fail:
 unsigned int
 tree_ssa_prefetch_arrays (void)
 {
-  loop_iterator li;
   struct loop *loop;
   bool unrolled = false;
   int todo_flags = 0;
@@ -1977,7 +1981,7 @@ tree_ssa_prefetch_arrays (void)
      here.  */
   gcc_assert ((PREFETCH_BLOCK & (PREFETCH_BLOCK - 1)) == 0);
 
-  FOR_EACH_LOOP (li, loop, LI_FROM_INNERMOST)
+  FOR_EACH_LOOP (loop, LI_FROM_INNERMOST)
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "Processing loop %d:\n", loop->num);

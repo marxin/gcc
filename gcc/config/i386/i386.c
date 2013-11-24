@@ -23,6 +23,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm.h"
 #include "rtl.h"
 #include "tree.h"
+#include "stringpool.h"
+#include "attribs.h"
+#include "calls.h"
+#include "stor-layout.h"
+#include "varasm.h"
 #include "tm_p.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -47,6 +52,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "reload.h"
 #include "cgraph.h"
+#include "pointer-set.h"
+#include "hash-table.h"
+#include "vec.h"
+#include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-fold.h"
+#include "tree-eh.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimplify.h"
 #include "dwarf2.h"
@@ -3131,9 +3146,9 @@ ix86_option_override_internal (bool main_args_p,
 	PTA_64BIT | PTA_MMX | PTA_SSE | PTA_SSE2 | PTA_SSE3
 	| PTA_SSSE3 | PTA_CX16 | PTA_MOVBE | PTA_FXSR},
       {"slm", PROCESSOR_SLM, CPU_SLM,
-	PTA_64BIT | PTA_MMX | PTA_SSE | PTA_SSE2 | PTA_SSE3
-	| PTA_SSSE3 | PTA_SSE4_1 | PTA_SSE4_2 | PTA_CX16 | PTA_MOVBE
-	| PTA_FXSR},
+	PTA_64BIT | PTA_MMX | PTA_SSE | PTA_SSE2 | PTA_SSE3 | PTA_SSSE3
+	| PTA_SSE4_1 | PTA_SSE4_2 | PTA_CX16 | PTA_POPCNT | PTA_AES
+	| PTA_PCLMUL | PTA_RDRND | PTA_MOVBE | PTA_FXSR},
       {"geode", PROCESSOR_GEODE, CPU_GEODE,
 	PTA_MMX | PTA_3DNOW | PTA_3DNOW_A | PTA_PREFETCH_SSE | PTA_PRFCHW},
       {"k6", PROCESSOR_K6, CPU_K6, PTA_MMX},
@@ -3907,7 +3922,7 @@ ix86_option_override_internal (bool main_args_p,
      functions. */
   else if (fast_math_flags_set_p (&global_options)
 	   && TARGET_SSE2_P (opts->x_ix86_isa_flags))
-    ix86_fpmath = FPMATH_SSE;
+    opts->x_ix86_fpmath = FPMATH_SSE;
   else
     opts->x_ix86_fpmath = TARGET_FPMATH_DEFAULT_P (opts->x_ix86_isa_flags);
 
@@ -5588,7 +5603,7 @@ ix86_eax_live_at_start_p (void)
      to correct at this point.  This gives false positives for broken
      functions that might use uninitialized data that happens to be
      allocated in eax, but who cares?  */
-  return REGNO_REG_SET_P (df_get_live_out (ENTRY_BLOCK_PTR), 0);
+  return REGNO_REG_SET_P (df_get_live_out (ENTRY_BLOCK_PTR_FOR_FN (cfun)), 0);
 }
 
 static bool
@@ -9296,7 +9311,7 @@ ix86_compute_frame_layout (struct ix86_frame *frame)
      Recompute the value as needed.  Do not recompute when amount of registers
      didn't change as reload does multiple calls to the function and does not
      expect the decision to change within single iteration.  */
-  else if (!optimize_bb_for_size_p (ENTRY_BLOCK_PTR)
+  else if (!optimize_bb_for_size_p (ENTRY_BLOCK_PTR_FOR_FN (cfun))
            && cfun->machine->use_fast_prologue_epilogue_nregs != frame->nregs)
     {
       int count = frame->nregs;
@@ -11385,7 +11400,7 @@ ix86_expand_epilogue (int style)
       /* Leave results in shorter dependency chains on CPUs that are
 	 able to grok it fast.  */
       else if (TARGET_USE_LEAVE
-	       || optimize_bb_for_size_p (EXIT_BLOCK_PTR)
+	       || optimize_bb_for_size_p (EXIT_BLOCK_PTR_FOR_FN (cfun))
 	       || !cfun->machine->use_fast_prologue_epilogue)
 	ix86_emit_leave ();
       else
@@ -29174,8 +29189,8 @@ static const struct builtin_description bdesc_multi_arg[] =
   { OPTION_MASK_ISA_XOP, CODE_FOR_xop_shlv8hi3,         "__builtin_ia32_vpshlw",      IX86_BUILTIN_VPSHLW,      UNKNOWN,      (int)MULTI_ARG_2_HI },
   { OPTION_MASK_ISA_XOP, CODE_FOR_xop_shlv16qi3,        "__builtin_ia32_vpshlb",      IX86_BUILTIN_VPSHLB,      UNKNOWN,      (int)MULTI_ARG_2_QI },
 
-  { OPTION_MASK_ISA_XOP, CODE_FOR_xop_vmfrczv4sf2,       "__builtin_ia32_vfrczss",     IX86_BUILTIN_VFRCZSS,     UNKNOWN,      (int)MULTI_ARG_2_SF },
-  { OPTION_MASK_ISA_XOP, CODE_FOR_xop_vmfrczv2df2,       "__builtin_ia32_vfrczsd",     IX86_BUILTIN_VFRCZSD,     UNKNOWN,      (int)MULTI_ARG_2_DF },
+  { OPTION_MASK_ISA_XOP, CODE_FOR_xop_vmfrczv4sf2,       "__builtin_ia32_vfrczss",     IX86_BUILTIN_VFRCZSS,     UNKNOWN,      (int)MULTI_ARG_1_SF },
+  { OPTION_MASK_ISA_XOP, CODE_FOR_xop_vmfrczv2df2,       "__builtin_ia32_vfrczsd",     IX86_BUILTIN_VFRCZSD,     UNKNOWN,      (int)MULTI_ARG_1_DF },
   { OPTION_MASK_ISA_XOP, CODE_FOR_xop_frczv4sf2,         "__builtin_ia32_vfrczps",     IX86_BUILTIN_VFRCZPS,     UNKNOWN,      (int)MULTI_ARG_1_SF },
   { OPTION_MASK_ISA_XOP, CODE_FOR_xop_frczv2df2,         "__builtin_ia32_vfrczpd",     IX86_BUILTIN_VFRCZPD,     UNKNOWN,      (int)MULTI_ARG_1_DF },
   { OPTION_MASK_ISA_XOP, CODE_FOR_xop_frczv8sf2,         "__builtin_ia32_vfrczps256",  IX86_BUILTIN_VFRCZPS256,  UNKNOWN,      (int)MULTI_ARG_1_SF2 },
@@ -29833,7 +29848,7 @@ add_condition_to_bb (tree function_decl, tree version_decl,
   make_edge (bb1, bb3, EDGE_FALSE_VALUE); 
 
   remove_edge (e23);
-  make_edge (bb2, EXIT_BLOCK_PTR, 0);
+  make_edge (bb2, EXIT_BLOCK_PTR_FOR_FN (cfun), 0);
 
   pop_cfun ();
 
@@ -30703,7 +30718,6 @@ ix86_generate_version_dispatcher_body (void *node_p)
 {
   tree resolver_decl;
   basic_block empty_bb;
-  vec<tree> fn_ver_vec = vNULL;
   tree default_ver_decl;
   struct cgraph_node *versn;
   struct cgraph_node *node;
@@ -30733,7 +30747,7 @@ ix86_generate_version_dispatcher_body (void *node_p)
 
   push_cfun (DECL_STRUCT_FUNCTION (resolver_decl));
 
-  fn_ver_vec.create (2);
+  stack_vec<tree, 2> fn_ver_vec;
 
   for (versn_info = node_version_info->next; versn_info;
        versn_info = versn_info->next)
@@ -30751,7 +30765,6 @@ ix86_generate_version_dispatcher_body (void *node_p)
     }
 
   dispatch_function_versions (resolver_decl, &fn_ver_vec, &empty_bb);
-  fn_ver_vec.release ();
   rebuild_cgraph_edges (); 
   pop_cfun ();
   return resolver_decl;
@@ -32572,7 +32585,7 @@ ix86_expand_special_args_builtin (const struct builtin_description *d,
       gcc_assert (target == 0);
       if (memory)
 	{
-	  op = force_reg (Pmode, convert_to_mode (Pmode, op, 1));
+	  op = ix86_zero_extend_to_Pmode (op);
 	  target = gen_rtx_MEM (tmode, op);
 	}
       else
@@ -32617,7 +32630,7 @@ ix86_expand_special_args_builtin (const struct builtin_description *d,
 	  if (i == memory)
 	    {
 	      /* This must be the memory operand.  */
-	      op = force_reg (Pmode, convert_to_mode (Pmode, op, 1));
+	      op = ix86_zero_extend_to_Pmode (op);
 	      op = gen_rtx_MEM (mode, op);
 	      gcc_assert (GET_MODE (op) == mode
 			  || GET_MODE (op) == VOIDmode);
@@ -32865,7 +32878,7 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
       mode1 = insn_data[icode].operand[1].mode;
       mode2 = insn_data[icode].operand[2].mode;
 
-      op0 = force_reg (Pmode, convert_to_mode (Pmode, op0, 1));
+      op0 = ix86_zero_extend_to_Pmode (op0);
       op0 = gen_rtx_MEM (mode1, op0);
 
       if (!insn_data[icode].operand[0].predicate (op0, mode0))
@@ -32897,7 +32910,7 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 	op0 = expand_normal (arg0);
 	icode = CODE_FOR_sse2_clflush;
 	if (!insn_data[icode].operand[0].predicate (op0, Pmode))
-	  op0 = force_reg (Pmode, convert_to_mode (Pmode, op0, 1));
+	  op0 = ix86_zero_extend_to_Pmode (op0);
 
 	emit_insn (gen_sse2_clflush (op0));
 	return 0;
@@ -32910,7 +32923,7 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
       op1 = expand_normal (arg1);
       op2 = expand_normal (arg2);
       if (!REG_P (op0))
-	op0 = force_reg (Pmode, convert_to_mode (Pmode, op0, 1));
+	op0 = ix86_zero_extend_to_Pmode (op0);
       if (!REG_P (op1))
 	op1 = copy_to_mode_reg (SImode, op1);
       if (!REG_P (op2))
@@ -33167,7 +33180,7 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
       op0 = expand_normal (arg0);
       icode = CODE_FOR_lwp_llwpcb;
       if (!insn_data[icode].operand[0].predicate (op0, Pmode))
-	op0 = force_reg (Pmode, convert_to_mode (Pmode, op0, 1));
+	op0 = ix86_zero_extend_to_Pmode (op0);
       emit_insn (gen_lwp_llwpcb (op0));
       return 0;
 
@@ -33463,7 +33476,7 @@ addcarryx:
       /* Force memory operand only with base register here.  But we
 	 don't want to do it on memory operand for other builtin
 	 functions.  */
-      op1 = force_reg (Pmode, convert_to_mode (Pmode, op1, 1));
+      op1 = ix86_zero_extend_to_Pmode (op1);
 
       if (!insn_data[icode].operand[1].predicate (op0, mode0))
 	op0 = copy_to_mode_reg (mode0, op0);
@@ -36568,7 +36581,7 @@ ix86_pad_returns (void)
   edge e;
   edge_iterator ei;
 
-  FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR->preds)
+  FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
     {
       basic_block bb = e->src;
       rtx ret = BB_END (bb);
@@ -36668,14 +36681,14 @@ ix86_count_insn (basic_block bb)
       edge prev_e;
       edge_iterator prev_ei;
 
-      if (e->src == ENTRY_BLOCK_PTR)
+      if (e->src == ENTRY_BLOCK_PTR_FOR_FN (cfun))
 	{
 	  min_prev_count = 0;
 	  break;
 	}
       FOR_EACH_EDGE (prev_e, prev_ei, e->src->preds)
 	{
-	  if (prev_e->src == ENTRY_BLOCK_PTR)
+	  if (prev_e->src == ENTRY_BLOCK_PTR_FOR_FN (cfun))
 	    {
 	      int count = ix86_count_insn_bb (e->src);
 	      if (count < min_prev_count)
@@ -36699,7 +36712,7 @@ ix86_pad_short_function (void)
   edge e;
   edge_iterator ei;
 
-  FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR->preds)
+  FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
     {
       rtx ret = BB_END (e->src);
       if (JUMP_P (ret) && ANY_RETURN_P (PATTERN (ret)))
@@ -36739,7 +36752,7 @@ ix86_seh_fixup_eh_fallthru (void)
   edge e;
   edge_iterator ei;
 
-  FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR->preds)
+  FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
     {
       rtx insn, next;
 

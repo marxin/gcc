@@ -25,22 +25,26 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "stor-layout.h"
+#include "stringpool.h"
 #include "expr.h"
 #include "flags.h"
 #include "params.h"
 #include "input.h"
 #include "hashtab.h"
 #include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "gimple-iterator.h"
 #include "gimple-ssa.h"
 #include "tree-ssanames.h"
 #include "tree-pass.h"
 #include "function.h"
-#include "ggc.h"
 #include "diagnostic-core.h"
 #include "except.h"
-#include "vec.h"
 #include "lto-symtab.h"
 #include "lto-streamer.h"
 #include "data-streamer.h"
@@ -1592,7 +1596,7 @@ output_cfg (struct output_block *ob, struct function *fn)
 
   streamer_write_hwi (ob, -1);
 
-  bb = ENTRY_BLOCK_PTR;
+  bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
   while (bb->next_bb)
     {
       streamer_write_hwi (ob, bb->next_bb->index);

@@ -24,7 +24,17 @@ along with GCC; see the file COPYING3.  If not see
 #include "machmode.h"
 #include "rtl.h"
 #include "tree.h"
+#include "stringpool.h"
+#include "stor-layout.h"
+#include "calls.h"
+#include "varasm.h"
+#include "tree-object-size.h"
 #include "realmpfr.h"
+#include "basic-block.h"
+#include "tree-ssa-alias.h"
+#include "internal-fn.h"
+#include "gimple-expr.h"
+#include "is-a.h"
 #include "gimple.h"
 #include "flags.h"
 #include "regs.h"
@@ -42,7 +52,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm_p.h"
 #include "target.h"
 #include "langhooks.h"
-#include "basic-block.h"
 #include "tree-ssanames.h"
 #include "tree-dfa.h"
 #include "value-prof.h"
@@ -583,7 +592,7 @@ c_strlen (tree src, int only_value)
       && (only_value || !TREE_SIDE_EFFECTS (TREE_OPERAND (src, 0))))
     return c_strlen (TREE_OPERAND (src, 1), only_value);
 
-  loc = EXPR_LOC_OR_HERE (src);
+  loc = EXPR_LOC_OR_LOC (src, input_location);
 
   src = string_constant (src, &offset_node);
   if (src == 0)
@@ -8578,7 +8587,7 @@ fold_builtin_powi (location_t loc, tree fndecl ATTRIBUTE_UNUSED,
 
   if (tree_fits_shwi_p (arg1))
     {
-      HOST_WIDE_INT c = TREE_INT_CST_LOW (arg1);
+      HOST_WIDE_INT c = tree_to_shwi (arg1);
 
       /* Evaluate powi at compile-time.  */
       if (TREE_CODE (arg0) == REAL_CST

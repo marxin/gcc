@@ -115,6 +115,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm.h"
 #include "rtl.h"
 #include "tree.h"
+#include "stringpool.h"
+#include "stor-layout.h"
 #include "flags.h"
 #include "function.h"
 #include "expr.h"
@@ -122,7 +124,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-config.h"
 #include "except.h"
 #include "hard-reg-set.h"
-#include "basic-block.h"
 #include "output.h"
 #include "dwarf2asm.h"
 #include "dwarf2out.h"
@@ -130,7 +131,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "toplev.h"
 #include "hash-table.h"
 #include "intl.h"
-#include "ggc.h"
 #include "tm_p.h"
 #include "target.h"
 #include "common/common-target.h"
@@ -139,7 +139,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic.h"
 #include "tree-pretty-print.h"
 #include "tree-pass.h"
-#include "gimple.h"
+#include "pointer-set.h"
 #include "cfgloop.h"
 
 /* Provide defaults for stuff that may not be defined when using
@@ -1239,7 +1239,7 @@ sjlj_emit_function_enter (rtx dispatch_label)
       }
 
   if (fn_begin_outside_block)
-    insert_insn_on_edge (seq, single_succ_edge (ENTRY_BLOCK_PTR));
+    insert_insn_on_edge (seq, single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun)));
   else
     emit_insn_after (seq, fn_begin);
 }
@@ -1507,7 +1507,7 @@ finish_eh_generation (void)
 
   if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ
       /* Kludge for Alpha (see alpha_gp_save_rtx).  */
-      || single_succ_edge (ENTRY_BLOCK_PTR)->insns.r)
+      || single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun))->insns.r)
     commit_edge_insertions ();
 
   /* Redirect all EH edges from the post_landing_pad to the landing pad.  */

@@ -38,9 +38,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-core.h"
 #include "rtl.h"
 #include "tree.h"
+#include "varasm.h"
+#include "basic-block.h"
+#include "tree-eh.h"
 #include "tm_p.h"
 #include "flags.h"
 #include "function.h"
+#include "stringpool.h"
 #include "expr.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -48,14 +52,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-config.h"
 #include "recog.h"
 #include "bitmap.h"
-#include "basic-block.h"
-#include "ggc.h"
 #include "debug.h"
 #include "langhooks.h"
 #include "df.h"
 #include "params.h"
 #include "target.h"
-#include "tree-eh.h"
 
 struct target_rtl default_target_rtl;
 #if SWITCHABLE_TARGET
