@@ -3,6 +3,70 @@
 	* gcc/coverage.c (coverage_compute_cfg_checksum): Parameters introduced.
 	* gcc/profile.c (branch_prob): Argument added.
 
+2013-11-25  Jeff Law  <law@redhat.com>
+
+	* tree-ssa-threadupdate.c (thread_through_all_blocks): Selectively
+	invalidate loop information.
+
+2013-11-25  Oleg Endo  <olegendo@gcc.gnu.org>
+
+	* config/sh/sh.md (doloop_end_split): Add missing SI mode.
+
+2013-11-25  Oleg Endo  <olegendo@gcc.gnu.org>
+
+	PR target/53976
+	PR target/59243
+	* config/sh/sh_optimize_sett_clrt.cc (struct ccreg_value): Update
+	comments.
+	(sh_optimize_sett_clrt::find_last_ccreg_values): Check stack of
+	previously visited basic blocks before recursing instead of only one
+	basic block.
+
+2013-11-25  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (cortexa53_tuning): New struct.
+	* config/aarch64/aarch64-cores.def (cortex-a53):
+	Use cortexa53 tuning struct.
+
+2013-11-25  Andrew Macleod  <amacleod@redhat.com>
+
+	PR bootstrap/59260
+	* fold-const.c: Include hash-table.h.
+
+2013-11-25  Marek Polacek  <polacek@redhat.com>
+
+	PR sanitizer/59258
+	* ubsan.c (ubsan_create_data): Increase the size of the fields array.
+
+2013-11-25  Richard Biener  <rguenther@suse.de>
+
+	* tree-dfa.c: Remove unused convert.h include.
+
+2013-11-25  Terry Guo  <terry.guo@arm.com>
+
+	* doc/invoke.texi (-mslow-flash-data): Document new option.
+	* config/arm/arm.opt (mslow-flash-data): New option.
+	* config/arm/arm-protos.h (arm_max_const_double_inline_cost): Declare
+	it.
+	* config/arm/arm.h (TARGET_USE_MOVT): Always true when literal pools
+	are disabled.
+	(arm_disable_literal_pool): Declare it.
+	* config/arm/arm.c (arm_disable_literal_pool): New variable.
+	(arm_option_override): Handle new option.
+	(thumb2_legitimate_address_p): Don't allow symbol references when
+	literal pools are disabled.
+	(arm_max_const_double_inline_cost): New function.
+	* config/arm/arm.md (types.md): Include it before ...
+	(use_literal_pool): New attribute.
+	(enabled): Use new attribute.
+	(split pattern): Replace symbol+offset with MOVW/MOVT.
+
+2013-11-24  Steven Bosscher  <steven@gcc.gnu.org>
+
+	PR bootstrap/59279
+	Revert previous commit.
+>>>>>>> parent/master
+
 2013-11-24  Steven Bosscher  <steven@gcc.gnu.org>
 
 	* jump.c (reset_insn_reg_label_operand_notes): New function,

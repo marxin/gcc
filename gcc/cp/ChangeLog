@@ -1,3 +1,37 @@
+2013-11-25  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/54485
+	* decl.c (duplicate_decls): Enforce 8.3.6/6 about default arguments
+	for member functions of class templates.
+
+2013-11-25  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/58607
+	* semantics.c (check_constexpr_ctor_body): Check for BIND_EXPR_VARS.
+
+2013-11-25  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/58810
+	* decl.c (grokdeclarator): Don't handle qualified free functions here,
+	leave the diagnostic to grokfndecl.
+
+2013-11-25  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/59080
+	* pt.c (unify): Don't call unify_array_domain with a NULL_TREE
+	third argument.
+
+	PR c++/59096
+	* pt.c (apply_late_template_attributes): Check that TREE_VALUE
+	isn't NULL_TREE in the attribute_takes_identifier_p case.
+
+2013-11-25  Adam Butcher  <adam@jessamine.co.uk>
+
+	PR c++/59112
+	PR c++/59113
+	* parser.c (cp_parser_parameter_declaration_clause): Disallow implicit
+	function templates in local functions unless defining a lambda.
+
 2013-11-23  Easwaran Raman  <eraman@google.com>
 
 	PR c++/59031
