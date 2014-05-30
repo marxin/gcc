@@ -293,6 +293,7 @@ ctor_for_folding (tree decl)
   if (decl != real_decl)
     {
       gcc_assert (!DECL_INITIAL (decl)
+		  || (node->alias && varpool_alias_target (node) == real_node)
 		  || DECL_INITIAL (decl) == error_mark_node);
       if (lookup_attribute ("weakref", DECL_ATTRIBUTES (decl)))
 	{
