@@ -89,6 +89,10 @@ func_checker::func_checker (): initialized (false)
 {
 }
 
+/* Itializes internal structures according to given number of
+   source and target SSA names. The number of source names is SSA_SOURCE,
+   respectively SSA_TARGET.  */
+
 void
 func_checker::initialize (unsigned ssa_source, unsigned ssa_target)
 {
@@ -109,6 +113,8 @@ func_checker::initialize (unsigned ssa_source, unsigned ssa_target)
   decl_map = new pointer_map <tree> ();
 }
 
+/* Memory release routine.  */
+
 void
 func_checker::release (void)
 {
@@ -121,8 +127,10 @@ func_checker::release (void)
   target_ssa_names.release();
 }
 
+/* Verifies that trees T1 and T2 do correspond.  */
+
 bool
-func_checker::verify_ssa (tree t1, tree t2)
+func_checker::compare_ssa_name (tree t1, tree t2)
 {
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
@@ -140,8 +148,10 @@ func_checker::verify_ssa (tree t1, tree t2)
   return true;
 }
 
+/* Verification function for edges E1 and E2.  */
+
 bool
-func_checker::verify_edges (edge e1, edge e2)
+func_checker::compare_edge (edge e1, edge e2)
 {
   if (e1->flags != e2->flags)
     return false;
@@ -160,8 +170,11 @@ func_checker::verify_edges (edge e1, edge e2)
   return true;
 }
 
+/* Verification function for declaration trees T1 and T2 that
+   come from functions FUNC1 and FUNC2.  */
+
 bool
-func_checker::verify_decl (tree t1, tree t2, tree func1, tree func2)
+func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
 {
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
     SE_EXIT_DEBUG (t1 == t2);
@@ -183,15 +196,22 @@ func_checker::verify_decl (tree t1, tree t2, tree func1, tree func2)
   return true;
 }
 
+/* Congruence class constructor for a new class with _ID.  */
+
 congruence_class::congruence_class (unsigned int _id): id(_id)
 {
   members.create (2);
 }
 
+/* Constructor for key value pair, where _ITEM is key and _INDEX is a target.  */
+
 sem_usage_pair::sem_usage_pair (sem_item *_item, unsigned int _index):
   item (_item), index (_index)
 {
 }
+
+/* Semantic item constructor for a node of _TYPE, where STACK is used
+   for bitmap memory allocation.  */
 
 sem_item::sem_item (enum sem_item_type _type,
 		    bitmap_obstack *stack): type(_type), hash(0)
@@ -199,6 +219,9 @@ sem_item::sem_item (enum sem_item_type _type,
   setup (stack);
 }
 
+/* Semantic item constructor for a node of _TYPE, where STACK is used
+   for bitmap memory allocation. The item is based on symtab node _NODE
+   with computed _HASH.  */
 
 sem_item::sem_item (enum sem_item_type _type, struct symtab_node *_node,
 		    hashval_t _hash, bitmap_obstack *stack): type(_type),
@@ -207,6 +230,9 @@ sem_item::sem_item (enum sem_item_type _type, struct symtab_node *_node,
   decl = node->decl;
   setup (stack);
 }
+
+/* Initialize internal data structures. Bitmap STACK is used for
+   bitmap memory allocation process.  */
 
 void
 sem_item::setup (bitmap_obstack *stack)
@@ -229,7 +255,9 @@ sem_item::~sem_item ()
     delete usages[i];
 }
 
-void
+/* Dump function for debugging purpose.  */
+
+DEBUG_FUNCTION void
 sem_item::dump (void)
 {
   if (dump_file)
@@ -247,12 +275,16 @@ sem_item::dump (void)
     }
 }
 
+/* Semantic function constructor that uses STACK as bitmap memory stack.  */
+
 sem_function::sem_function (bitmap_obstack *stack): sem_item (FUNC, stack),
   compared_func (NULL)
 {
   arg_types.create (0);
 }
 
+/*  Constructor based on callgraph node _NODE with computed hash _HASH.
+    Bitmap STACK is used for memory allocation.  */
 sem_function::sem_function (cgraph_node *node, hashval_t hash,
 			    bitmap_obstack *stack):
   sem_item (FUNC, node, hash, stack), bb_sorted (NULL), compared_func (NULL)
@@ -272,18 +304,23 @@ sem_function::~sem_function ()
   free (bb_sorted);
 }
 
+/* Gets symbol name of the item.  */
+
 const char *
 sem_function::name (void)
 {
   return node->name ();
 }
 
+/* Gets assembler name of the item.  */
 
 const char *
 sem_function::asm_name (void)
 {
   return node->asm_name ();
 }
+
+/* Calculates hash value based on a BASIC_BLOCK.  */
 
 hashval_t
 sem_function::get_bb_hash (const sem_bb_t *basic_block)
@@ -294,6 +331,7 @@ sem_function::get_bb_hash (const sem_bb_t *basic_block)
   return hash;
 }
 
+/* References independent hash function.  */
 
 hashval_t
 sem_function::get_hash (void)
@@ -317,6 +355,8 @@ sem_function::get_hash (void)
 
   return hash;
 }
+
+/* Fast equality function based on knowledge known in WPA.  */
 
 bool
 sem_function::equals_wpa (sem_item *item)
@@ -344,6 +384,8 @@ sem_function::equals_wpa (sem_item *item)
   return true;
 }
 
+/* Returns true if the item equals to ITEM given as arguemnt.  */
+
 bool
 sem_function::equals (sem_item *item)
 {
@@ -355,6 +397,8 @@ sem_function::equals (sem_item *item)
 
   return eq;
 }
+
+/* Processes function equality comparison.  */
 
 bool
 sem_function::equals_private (sem_item *item)
@@ -413,10 +457,10 @@ sem_function::equals_private (sem_item *item)
 
   for (arg1 = DECL_ARGUMENTS (decl), arg2 = DECL_ARGUMENTS (compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
-    checker.verify_decl (arg1, arg2, decl, compared_func->decl);
+    checker.compare_decl (arg1, arg2, decl, compared_func->decl);
 
   /* Exception handling regions comparison.  */
-  if (!compare_eh_regions (region_tree, compared_func->region_tree, decl,
+  if (!compare_eh_region (region_tree, compared_func->region_tree, decl,
 			   compared_func->decl))
     SE_EXIT_FALSE();
 
@@ -452,7 +496,7 @@ sem_function::equals_private (sem_item *item)
 	  if (e1->flags != e2->flags)
 	    SE_EXIT_FALSE_WITH_MSG("flags comparison returns false");
 
-	  if (!checker.verify_edges (e1, e2))
+	  if (!checker.compare_edge (e1, e2))
 	    SE_EXIT_FALSE_WITH_MSG("edge comparison returns false");
 
 	  ei_next (&ei2);
@@ -461,12 +505,14 @@ sem_function::equals_private (sem_item *item)
 
   /* Basic block PHI nodes comparison.  */
   for (unsigned i = 0; i < bb_count; i++)
-    if (!compare_phi_nodes (bb_sorted[i]->bb, compared_func->bb_sorted[i]->bb,
+    if (!compare_phi_node (bb_sorted[i]->bb, compared_func->bb_sorted[i]->bb,
 			    decl, compared_func->decl))
       SE_EXIT_FALSE_WITH_MSG ("PHI node comparison returns false");
 
   return result;
 }
+
+/* Initializes references to another sem_item for tree T.  */
 
 void
 sem_function::init_refs_for_tree (tree t)
@@ -490,6 +536,8 @@ sem_function::init_refs_for_tree (tree t)
     }
 }
 
+/* Initializes references to another sem_item for gimple STMT of type assign.  */
+
 void
 sem_function::init_refs_for_assign (gimple stmt)
 {
@@ -501,8 +549,10 @@ sem_function::init_refs_for_assign (gimple stmt)
   init_refs_for_tree (rhs);
 }
 
+/* Initializes references to other semantic functions/variables.  */
+
 void
-sem_function::init_refs ()
+sem_function::init_refs (void)
 {
   for (unsigned i = 0; i < bb_count; i++)
     {
@@ -536,6 +586,8 @@ sem_function::init_refs ()
     }
 }
 
+/* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
+   be applied.  */
 bool
 sem_function::merge (sem_item *alias_item)
 {
@@ -576,26 +628,8 @@ sem_function::merge (sem_item *alias_item)
   if (original->resolution == LDPR_PREEMPTED_REG
       || original->resolution == LDPR_PREEMPTED_IR)
     original_discardable = true;
-  if (DECL_ONE_ONLY (original->decl)
-      && original->resolution != LDPR_PREVAILING_DEF
-      && original->resolution != LDPR_PREVAILING_DEF_IRONLY
-      && original->resolution != LDPR_PREVAILING_DEF_IRONLY_EXP)
+  if (symtab_can_be_discarded (original))
     original_discardable = true;
-
-// TODO:Honza (should be this checked uncommented?)
-#if 0
-  /* If original can be discarded and replaced by an different (semantically
-   equivalent) implementation, we risk creation of cycles from
-   wrappers of equivalent functions.  Do not attempt to unify for now.  */
-  if (original_discardable
-      && (DECL_COMDAT_GROUP (original->decl)
-	  != DECL_COMDAT_GROUP (alias->decl)))
-    {
-      if (dump_file)
-	fprintf (dump_file, "Not unifying; risk of creation of cycle.\n\n");
-      return;
-    }
-#endif
 
   /* See if original and/or alias address can be compared for equality.  */
   original_address_matters
@@ -628,6 +662,12 @@ sem_function::merge (sem_item *alias_item)
       create_alias = true;
       create_thunk = false;
       redirect_callers = false;
+    }
+
+  if (create_alias && DECL_COMDAT_GROUP (alias->decl))
+    {
+      create_alias = false;
+      create_thunk = true;
     }
 
   /* We want thunk to always jump to the local function body
@@ -667,14 +707,6 @@ sem_function::merge (sem_item *alias_item)
      function into real alias.  */
   else if (create_alias)
     {
-      // TODO:Honza (how can we verify that the alias will be valid across COMDAT groups?)
-      if (DECL_COMDAT_GROUP (alias->decl))
-	{
-	  if (dump_file)
-	    fprintf (dump_file, "Callgraph alias cannot be created because of COMDAT\n");
-	  return 0;
-	}
-
       /* Remove the function's body.  */
       cgraph_release_function_body (alias);
       cgraph_reset_node (alias);
@@ -718,6 +750,8 @@ sem_function::merge (sem_item *alias_item)
   return true;
 }
 
+/* Dump symbol to FILE.  */
+
 void
 sem_function::dump_to_file (FILE *file)
 {
@@ -726,11 +760,15 @@ sem_function::dump_to_file (FILE *file)
   dump_function_to_file (decl, file, TDF_DETAILS);
 }
 
+/* Returns cgraph_node.  */
+
 struct cgraph_node *
 sem_function::get_node (void)
 {
   return cgraph (node);
 }
+
+/* Initialize semantic item by info reachable during LTO WPA phase.  */
 
 void
 sem_function::init_wpa (void)
@@ -738,11 +776,13 @@ sem_function::init_wpa (void)
   parse_tree_args ();
 }
 
+/* Semantic item initialization function.  */
+
 void
 sem_function::init (void)
 {
   if (in_lto_p)
-    gcc_assert (cgraph_get_body (get_node ()));
+    cgraph_get_body (get_node ());
 
   tree fndecl = node->decl;
   struct function *func = DECL_STRUCT_FUNCTION (fndecl);
@@ -815,6 +855,9 @@ sem_function::init (void)
   parse_tree_args ();
 }
 
+/* For a given call graph NODE, the function constructs new
+   semantic function item.  */
+
 sem_function *
 sem_function::parse (struct cgraph_node *node, bitmap_obstack *stack)
 {
@@ -833,6 +876,8 @@ sem_function::parse (struct cgraph_node *node, bitmap_obstack *stack)
 
   return f;
 }
+
+/* Parses function arguments and result type.  */
 
 void
 sem_function::parse_tree_args (void)
@@ -860,6 +905,9 @@ sem_function::parse_tree_args (void)
 
   arg_count = arg_types.length ();
 }
+
+/* Basic block equivalence comparison function that returns true if
+   basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
 
 bool
 sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
@@ -889,42 +937,42 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
       switch (gimple_code (s1))
 	{
 	case GIMPLE_CALL:
-	  if (!check_gimple_call (s1, s2, func1, func2))
+	  if (!compare_gimple_call (s1, s2, func1, func2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_CALL");
 	  break;
 	case GIMPLE_ASSIGN:
-	  if (!check_gimple_assign (s1, s2, func1, func2))
+	  if (!compare_gimple_assign (s1, s2, func1, func2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_ASSIGN");
 	  break;
 	case GIMPLE_COND:
-	  if (!check_gimple_cond (s1, s2, func1, func2))
+	  if (!compare_gimple_cond (s1, s2, func1, func2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_COND");
 	  break;
 	case GIMPLE_SWITCH:
-	  if (!check_gimple_switch (s1, s2, func1, func2))
+	  if (!compare_gimple_switch (s1, s2, func1, func2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_SWITCH");
 	  break;
 	case GIMPLE_DEBUG:
 	case GIMPLE_EH_DISPATCH:
 	  break;
 	case GIMPLE_RESX:
-	  if (!check_gimple_resx (s1, s2))
+	  if (!compare_gimple_resx (s1, s2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_RESX");
 	  break;
 	case GIMPLE_LABEL:
-	  if (!check_gimple_label (s1, s2, func1, func2))
+	  if (!compare_gimple_label (s1, s2, func1, func2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_LABEL");
 	  break;
 	case GIMPLE_RETURN:
-	  if (!check_gimple_return (s1, s2, func1, func2))
+	  if (!compare_gimple_return (s1, s2, func1, func2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_RETURN");
 	  break;
 	case GIMPLE_GOTO:
-	  if (!check_gimple_goto (s1, s2, func1, func2))
+	  if (!compare_gimple_goto (s1, s2, func1, func2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_GOTO");
 	  break;
 	case GIMPLE_ASM:
-	  if (!check_gimple_asm (s1, s2))
+	  if (!compare_gimple_asm (s1, s2))
 	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_ASM");
 	  break;
 	case GIMPLE_PREDICT:
@@ -944,8 +992,12 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
   return true;
 }
 
+/* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
+   true value is returned if phi nodes are sematically
+   equivalent in these blocks .  */
+
 bool
-sem_function::compare_phi_nodes (basic_block bb1, basic_block bb2,
+sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
 				 tree func1, tree func2)
 {
   gimple_stmt_iterator si1, si2;
@@ -984,13 +1036,13 @@ sem_function::compare_phi_nodes (basic_block bb1, basic_block bb2,
 	  t1 = gimple_phi_arg (phi1, i)->def;
 	  t2 = gimple_phi_arg (phi2, i)->def;
 
-	  if (!check_operand (t1, t2, func1, func2))
+	  if (!compare_operand (t1, t2, func1, func2))
 	    SE_EXIT_FALSE ();
 
 	  e1 = gimple_phi_arg_edge (phi1, i);
 	  e2 = gimple_phi_arg_edge (phi2, i);
 
-	  if (!checker.verify_edges (e1, e2))
+	  if (!checker.compare_edge (e1, e2))
 	    SE_EXIT_FALSE ();
 	}
 
@@ -1000,8 +1052,12 @@ sem_function::compare_phi_nodes (basic_block bb1, basic_block bb2,
   return true;
 }
 
+/* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
+   true value is returned if exception handling regions are equivalent
+   in these blocks.  */
+
 bool
-sem_function::compare_eh_regions (eh_region r1, eh_region r2, tree func1,
+sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
 				  tree func2)
 {
   eh_landing_pad lp1, lp2;
@@ -1037,7 +1093,7 @@ sem_function::compare_eh_regions (eh_region r1, eh_region r2, tree func1,
 	      gcc_assert (TREE_CODE (t1) == LABEL_DECL);
 	      gcc_assert (TREE_CODE (t2) == LABEL_DECL);
 
-	      if (!check_tree_ssa_label (t1, t2, func1, func2))
+	      if (!compare_tree_ssa_label (t1, t2, func1, func2))
 		return false;
 	    }
 	  else if (lp1->post_landing_pad || lp2->post_landing_pad)
@@ -1061,7 +1117,7 @@ sem_function::compare_eh_regions (eh_region r1, eh_region r2, tree func1,
 	      /* Catch label checking */
 	      if (c1->label && c2->label)
 		{
-		  if (!check_tree_ssa_label (c1->label, c2->label,
+		  if (!compare_tree_ssa_label (c1->label, c2->label,
 					     func1, func2))
 		    return false;
 		}
@@ -1069,7 +1125,7 @@ sem_function::compare_eh_regions (eh_region r1, eh_region r2, tree func1,
 		return false;
 
 	      /* Type list checking */
-	      if (!compare_type_lists (c1->type_list, c2->type_list))
+	      if (!compare_type_list (c1->type_list, c2->type_list))
 		return false;
 
 	      c1 = c1->next_catch;
@@ -1082,7 +1138,7 @@ sem_function::compare_eh_regions (eh_region r1, eh_region r2, tree func1,
 	  if (r1->u.allowed.filter != r2->u.allowed.filter)
 	    return false;
 
-	  if (!compare_type_lists (r1->u.allowed.type_list,
+	  if (!compare_type_list (r1->u.allowed.type_list,
 				   r2->u.allowed.type_list))
 	    return false;
 
@@ -1136,6 +1192,8 @@ sem_function::compare_eh_regions (eh_region r1, eh_region r2, tree func1,
   return false;
 }
 
+/* Iterates GSI statement iterator to the next non-debug statement.  */
+
 void
 sem_function::gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
 {
@@ -1151,6 +1209,8 @@ sem_function::gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
       s = gsi_stmt (gsi);
     }
 }
+
+/* Iterates GSI statement iterator to the next non-virtual statement.  */
 
 void
 sem_function::gsi_next_nonvirtual_phi (gimple_stmt_iterator &it)
@@ -1174,8 +1234,10 @@ sem_function::gsi_next_nonvirtual_phi (gimple_stmt_iterator &it)
     }
 }
 
+/* Verifies that trees T1 and T2 do correspond.  */
+
 bool
-sem_function::check_function_decl (tree t1, tree t2)
+sem_function::compare_function_decl (tree t1, tree t2)
 {
   if (t1 == t2)
     return true;
@@ -1196,8 +1258,10 @@ sem_function::check_function_decl (tree t1, tree t2)
   return ret;
 }
 
+/* Verifies that trees T1 and T2 do correspond.  */
+
 bool
-sem_function::check_variable_decl (tree t1, tree t2, tree func1, tree func2)
+sem_function::compare_variable_decl (tree t1, tree t2, tree func1, tree func2)
 {
   if (t1 == t2)
     return true;
@@ -1208,13 +1272,15 @@ sem_function::check_variable_decl (tree t1, tree t2, tree func1, tree func2)
   if (ret)
     return true;
 
-  ret = checker.verify_decl (t1, t2, func1, func2);
+  ret = checker.compare_decl (t1, t2, func1, func2);
 
   SE_EXIT_DEBUG (ret);
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   call statements are semantically equivalent.  */
 bool
-sem_function::check_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
+sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
 {
   unsigned i;
   tree t1, t2;
@@ -1228,10 +1294,10 @@ sem_function::check_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
   /* Function pointer variables are not supported yet.  */
   if (t1 == NULL || t2 == NULL)
     {
-      if (!check_operand (t1, t2, func1, func2))
+      if (!compare_operand (t1, t2, func1, func2))
 	SE_EXIT_FALSE();
     }
-  else if (!check_function_decl (t1, t2))
+  else if (!compare_function_decl (t1, t2))
     return false;
 
   /* Checking of argument.  */
@@ -1240,7 +1306,7 @@ sem_function::check_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
       t1 = gimple_call_arg (s1, i);
       t2 = gimple_call_arg (s2, i);
 
-      if (!check_operand (t1, t2, func1, func2))
+      if (!compare_operand (t1, t2, func1, func2))
 	return false;
     }
 
@@ -1248,11 +1314,14 @@ sem_function::check_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
-  return check_operand (t1, t2, func1, func2);
+  return compare_operand (t1, t2, func1, func2);
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   assignment statements are semantically equivalent.  */
+
 bool
-sem_function::check_gimple_assign (gimple s1, gimple s2, tree func1, tree func2)
+sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1, tree func2)
 {
   tree arg1, arg2;
   enum tree_code code1, code2;
@@ -1275,15 +1344,18 @@ sem_function::check_gimple_assign (gimple s1, gimple s2, tree func1, tree func2)
       arg1 = gimple_op (s1, i);
       arg2 = gimple_op (s2, i);
 
-      if (!check_operand (arg1, arg2, func1, func2))
+      if (!compare_operand (arg1, arg2, func1, func2))
 	return false;
     }
 
   return true;
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   condition statements are semantically equivalent.  */
+
 bool
-sem_function::check_gimple_cond (gimple s1, gimple s2, tree func1, tree func2)
+sem_function::compare_gimple_cond (gimple s1, gimple s2, tree func1, tree func2)
 {
   tree t1, t2;
   enum tree_code code1, code2;
@@ -1297,32 +1369,40 @@ sem_function::check_gimple_cond (gimple s1, gimple s2, tree func1, tree func2)
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
 
-  if (!check_operand (t1, t2, func1, func2))
+  if (!compare_operand (t1, t2, func1, func2))
     return false;
 
   t1 = gimple_cond_rhs (s1);
   t2 = gimple_cond_rhs (s2);
 
-  return check_operand (t1, t2, func1, func2);
+  return compare_operand (t1, t2, func1, func2);
 }
 
+/* Verifies that tree labels T1 and T2 correspond in FUNC1 and FUNC2.  */
+
 bool
-sem_function::check_tree_ssa_label (tree t1, tree t2, tree func1, tree func2)
+sem_function::compare_tree_ssa_label (tree t1, tree t2, tree func1, tree func2)
 {
-  return check_operand (t1, t2, func1, func2);
+  return compare_operand (t1, t2, func1, func2);
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   label statements are semantically equivalent.  */
+
 bool
-sem_function::check_gimple_label (gimple g1, gimple g2, tree func1, tree func2)
+sem_function::compare_gimple_label (gimple g1, gimple g2, tree func1, tree func2)
 {
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
 
-  return check_tree_ssa_label (t1, t2, func1, func2);
+  return compare_tree_ssa_label (t1, t2, func1, func2);
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   switch statements are semantically equivalent.  */
+
 bool
-sem_function::check_gimple_switch (gimple g1, gimple g2, tree func1, tree func2)
+sem_function::compare_gimple_switch (gimple g1, gimple g2, tree func1, tree func2)
 {
   unsigned lsize1, lsize2, i;
   tree t1, t2, low1, low2, high1, high2;
@@ -1339,7 +1419,7 @@ sem_function::check_gimple_switch (gimple g1, gimple g2, tree func1, tree func2)
   if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
     return false;
 
-  if (!check_operand (t1, t2, func1, func2))
+  if (!compare_operand (t1, t2, func1, func2))
     return false;
 
   for (i = 0; i < lsize1; i++)
@@ -1363,8 +1443,11 @@ sem_function::check_gimple_switch (gimple g1, gimple g2, tree func1, tree func2)
   return true;
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   return statements are semantically equivalent.  */
+
 bool
-sem_function::check_gimple_return (gimple g1, gimple g2, tree func1, tree func2)
+sem_function::compare_gimple_return (gimple g1, gimple g2, tree func1, tree func2)
 {
   tree t1, t2;
 
@@ -1375,11 +1458,14 @@ sem_function::check_gimple_return (gimple g1, gimple g2, tree func1, tree func2)
   if (t1 == NULL && t2 == NULL)
     return true;
   else
-    return check_operand (t1, t2, func1, func2);
+    return compare_operand (t1, t2, func1, func2);
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   goto statements are semantically equivalent.  */
+
 bool
-sem_function::check_gimple_goto (gimple g1, gimple g2, tree func1, tree func2)
+sem_function::compare_gimple_goto (gimple g1, gimple g2, tree func1, tree func2)
 {
   tree dest1, dest2;
 
@@ -1389,17 +1475,24 @@ sem_function::check_gimple_goto (gimple g1, gimple g2, tree func1, tree func2)
   if (TREE_CODE (dest1) != TREE_CODE (dest2) || TREE_CODE (dest1) != SSA_NAME)
     return false;
 
-  return check_operand (dest1, dest2, func1, func2);
+  return compare_operand (dest1, dest2, func1, func2);
 }
 
+/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+   resx statements are semantically equivalent.  */
+
 bool
-sem_function::check_gimple_resx (gimple g1, gimple g2)
+sem_function::compare_gimple_resx (gimple g1, gimple g2)
 {
   return gimple_resx_region (g1) == gimple_resx_region (g2);
 }
 
+/* Verifies for given GIMPLEs S1 and S2 that ASM statements are equivalent.
+   For the beginning, the pass only supports equality for
+   '__asm__ __volatile__ ("", "", "", "memory")'.  */
+
 bool
-sem_function::check_gimple_asm (gimple g1, gimple g2)
+sem_function::compare_gimple_asm (gimple g1, gimple g2)
 {
   if (gimple_asm_volatile_p (g1) != gimple_asm_volatile_p (g2))
     return false;
@@ -1428,13 +1521,16 @@ sem_function::check_gimple_asm (gimple g1, gimple g2)
   return true;
 }
 
+/* If T1 and T2 are SSA names, dictionary comparison is processed. Otherwise,
+   declaration comparasion is executed.  */
+
 bool
-sem_function::check_ssa_names (tree t1, tree t2, tree func1, tree func2)
+sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
 {
   tree b1, b2;
   bool ret;
 
-  if (!checker.verify_ssa (t1, t2))
+  if (!checker.compare_ssa_name (t1, t2))
     SE_EXIT_FALSE ();
 
   if (SSA_NAME_IS_DEFAULT_DEF (t1))
@@ -1451,19 +1547,10 @@ sem_function::check_ssa_names (tree t1, tree t2, tree func1, tree func2)
       switch (TREE_CODE (b1))
 	{
 	case VAR_DECL:
-	  SE_EXIT_DEBUG (check_variable_decl (t1, t2, func1, func2));
+	  SE_EXIT_DEBUG (compare_variable_decl (t1, t2, func1, func2));
 	case PARM_DECL:
 	case RESULT_DECL:
-	  ret = checker.verify_decl(b1, b2, func1, func2);
-
-#if 0
-	  if (!ret && dump_file)
-	    {
-	      print_node (dump_file, "", b1, 3);
-	      print_node (dump_file, "", b2, 3);
-	    }
-#endif
-
+	  ret = checker.compare_decl (b1, b2, func1, func2);
 	  SE_EXIT_DEBUG (ret);
 	default:
 	  // TODO:Martin remove after development
@@ -1475,8 +1562,12 @@ sem_function::check_ssa_names (tree t1, tree t2, tree func1, tree func2)
     return true;
 }
 
+/* Function responsible for comparison of handled components T1 and T2.
+   If these components, from functions FUNC1 and FUNC2, are equal, true
+   is returned.  */
+
 bool
-sem_function::compare_handled_component (tree t1, tree t2,
+sem_function::compare_operand (tree t1, tree t2,
     tree func1, tree func2)
 {
   tree base1, base2, x1, x2, y1, y2, z1, z2;
@@ -1485,6 +1576,8 @@ sem_function::compare_handled_component (tree t1, tree t2,
 
   if (!t1 && !t2)
     return true;
+  else if (!t1 || !t2)
+    return false;
 
   /* TODO: We need to compare alias classes for loads & stores.
     We also need to care about type based devirtualization.  */
@@ -1508,6 +1601,21 @@ sem_function::compare_handled_component (tree t1, tree t2,
 
   switch (TREE_CODE (t1))
     {
+    case CONSTRUCTOR:
+      {
+	unsigned length1 = vec_safe_length (CONSTRUCTOR_ELTS (t1));
+	unsigned length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
+
+	if (length1 != length2)
+	 SE_EXIT_FALSE_WITH_MSG ("");
+
+	for (unsigned i = 0; i < length1; i++)
+	 if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
+			     CONSTRUCTOR_ELT (t2, i)->value, func1, func2))
+	   SE_EXIT_FALSE_WITH_MSG ("");
+
+	return true;
+      }
     case ARRAY_REF:
     case ARRAY_RANGE_REF:
       {
@@ -1516,17 +1624,17 @@ sem_function::compare_handled_component (tree t1, tree t2,
 	y1 = TREE_OPERAND (t1, 1);
 	y2 = TREE_OPERAND (t2, 1);
 
-	if (!compare_handled_component (array_ref_low_bound (t1),
+	if (!compare_operand (array_ref_low_bound (t1),
 					array_ref_low_bound (t2),
 					func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
-	if (!compare_handled_component (array_ref_element_size (t1),
+	if (!compare_operand (array_ref_element_size (t1),
 					array_ref_element_size (t2),
 					func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
-	if (!compare_handled_component (x1, x2, func1, func2))
+	if (!compare_operand (x1, x2, func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
-	return compare_handled_component (y1, y2, func1, func2);
+	return compare_operand (y1, y2, func1, func2);
       }
 
     case MEM_REF:
@@ -1552,7 +1660,7 @@ sem_function::compare_handled_component (tree t1, tree t2,
 	      SE_EXIT_FALSE_WITH_MSG ("strict aliasing types do not match");
 	  }
 
-	if (!compare_handled_component (x1, x2, func1, func2))
+	if (!compare_operand (x1, x2, func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
 	/* Type of the offset on MEM_REF does not matter.  */
 	return wi::to_offset  (y1) == wi::to_offset  (y2);
@@ -1564,8 +1672,8 @@ sem_function::compare_handled_component (tree t1, tree t2,
 	y1 = TREE_OPERAND (t1, 1);
 	y2 = TREE_OPERAND (t2, 1);
 
-	ret = compare_handled_component (x1, x2, func1, func2)
-	      && compare_handled_component (y1, y2, func1, func2);
+	ret = compare_operand (x1, x2, func1, func2)
+	      && compare_operand (y1, y2, func1, func2);
 
 	SE_EXIT_DEBUG (ret);
       }
@@ -1579,9 +1687,9 @@ sem_function::compare_handled_component (tree t1, tree t2,
 	z1 = TREE_OPERAND (t1, 2);
 	z2 = TREE_OPERAND (t2, 2);
 
-	ret = compare_handled_component (x1, x2, func1, func2)
-	      && compare_handled_component (y1, y2, func1, func2)
-	      && compare_handled_component (z1, z2, func1, func2);
+	ret = compare_operand (x1, x2, func1, func2)
+	      && compare_operand (y1, y2, func1, func2)
+	      && compare_operand (z1, z2, func1, func2);
 
 	SE_EXIT_DEBUG (ret);
       }
@@ -1590,12 +1698,12 @@ sem_function::compare_handled_component (tree t1, tree t2,
 	x1 = TREE_OPERAND (t1, 0);
 	x2 = TREE_OPERAND (t2, 0);
 
-	ret = compare_handled_component (x1, x2, func1, func2);
+	ret = compare_operand (x1, x2, func1, func2);
 	SE_EXIT_DEBUG (ret);
       }
     case SSA_NAME:
       {
-	ret = check_ssa_names (t1, t2, func1, func2);
+	ret = compare_ssa_name (t1, t2, func1, func2);
 	SE_EXIT_DEBUG (ret);
       }
     case INTEGER_CST:
@@ -1605,18 +1713,21 @@ sem_function::compare_handled_component (tree t1, tree t2,
 
 	SE_EXIT_DEBUG (ret);
       }
+    case COMPLEX_CST:
+    case VECTOR_CST:
     case STRING_CST:
+    case REAL_CST:
       {
 	ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
 	SE_EXIT_DEBUG (ret);
       }
     case FUNCTION_DECL:
       {
-	ret = check_function_decl (t1, t2);
+	ret = compare_function_decl (t1, t2);
 	SE_EXIT_DEBUG (ret);
       }
     case VAR_DECL:
-      SE_EXIT_DEBUG (check_variable_decl (t1, t2, func1, func2));
+      SE_EXIT_DEBUG (compare_variable_decl (t1, t2, func1, func2));
     case FIELD_DECL:
       {
 	tree fctx1 = DECL_FCONTEXT (t1);
@@ -1625,8 +1736,8 @@ sem_function::compare_handled_component (tree t1, tree t2,
 	tree offset1 = DECL_FIELD_OFFSET (t1);
 	tree offset2 = DECL_FIELD_OFFSET (t1);
 
-	ret = compare_handled_component (fctx1, fctx2, func1, func2)
-	      && compare_handled_component (offset1, offset2, func1, func2);
+	ret = compare_operand (fctx1, fctx2, func1, func2)
+	      && compare_operand (offset1, offset2, func1, func2);
 
 	SE_EXIT_DEBUG (ret);
       }
@@ -1636,7 +1747,7 @@ sem_function::compare_handled_component (tree t1, tree t2,
     case CONST_DECL:
     case BIT_FIELD_REF:
       {
-	ret = checker.verify_decl (t1, t2, func1, func2);
+	ret = checker.compare_decl (t1, t2, func1, func2);
 	SE_EXIT_DEBUG (ret);
       }
     default:
@@ -1647,77 +1758,7 @@ sem_function::compare_handled_component (tree t1, tree t2,
     }
 }
 
-bool
-sem_function::check_operand (tree t1, tree t2, tree func1, tree func2)
-{
-  enum tree_code tc1, tc2;
-  unsigned length1, length2, i;
-  bool ret;
-
-  if (t1 == NULL && t2 == NULL)
-    return true;
-
-  if (t1 == NULL || t2 == NULL)
-    SE_EXIT_FALSE_WITH_MSG ("");
-
-  tc1 = TREE_CODE (t1);
-  tc2 = TREE_CODE (t2);
-
-  if (tc1 != tc2)
-    SE_EXIT_FALSE_WITH_MSG ("");
-
-  switch (tc1)
-    {
-    case CONSTRUCTOR:
-      length1 = vec_safe_length (CONSTRUCTOR_ELTS (t1));
-      length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
-
-      if (length1 != length2)
-	SE_EXIT_FALSE_WITH_MSG ("");
-
-      for (i = 0; i < length1; i++)
-	if (!check_operand (CONSTRUCTOR_ELT (t1, i)->value,
-			    CONSTRUCTOR_ELT (t2, i)->value, func1, func2))
-	  SE_EXIT_FALSE_WITH_MSG ("");
-
-      return true;
-    case VAR_DECL:
-      SE_EXIT_DEBUG (check_variable_decl (t1, t2, func1, func2));
-    case PARM_DECL:
-    case LABEL_DECL:
-    case RESULT_DECL:
-      ret = checker.verify_decl (t1, t2, func1, func2);
-      SE_EXIT_DEBUG (ret);
-    case SSA_NAME:
-      ret = check_ssa_names (t1, t2, func1, func2);
-      SE_EXIT_DEBUG (ret);
-    case INTEGER_CST:
-      ret = (types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
-	     && wi::to_offset  (t1) == wi::to_offset  (t2));
-      SE_EXIT_DEBUG (ret);
-    default:
-      break;
-    }
-
-  if(icf_handled_component_p (t1))
-    {
-      ret = compare_handled_component (t1, t2, func1, func2);
-      SE_EXIT_DEBUG (ret);
-    }
-  else /* COMPLEX_CST, VECTOR_CST compared correctly here.  */
-    {
-      if (dump_file)
-	{
-	  print_node (dump_file, "\n", t1, 3);
-	  print_node (dump_file, "\n", t2, 3);
-	}
-
-      ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
-      SE_EXIT_DEBUG (ret);
-    }
-
-  SE_EXIT_DEBUG (ret);
-}
+/* Returns true if tree T can be compared as a handled component.  */
 
 bool
 sem_function::icf_handled_component_p (tree t)
@@ -1728,6 +1769,9 @@ sem_function::icf_handled_component_p (tree t)
 	  || tc == ADDR_EXPR || tc == MEM_REF || tc == REALPART_EXPR
 	  || tc == IMAGPART_EXPR || tc == OBJ_TYPE_REF);
 }
+
+/* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
+   corresponds to TARGET.  */
 
 bool
 sem_function::bb_dict_test (int* bb_dict, int source, int target)
@@ -1741,9 +1785,11 @@ sem_function::bb_dict_test (int* bb_dict, int source, int target)
     return bb_dict[source] == target;
 }
 
+/* Iterates all tree types in T1 and T2 and returns true if all types
+   are compatible.  */
 
 bool
-sem_function::compare_type_lists (tree t1, tree t2)
+sem_function::compare_type_list (tree t1, tree t2)
 {
   tree tv1, tv2;
   enum tree_code tc1, tc2;
@@ -1773,10 +1819,14 @@ sem_function::compare_type_lists (tree t1, tree t2)
   return !(t1 || t2);
 }
 
+/* Semantic variable constructor that uses STACK as bitmap memory stack.  */
+
 sem_variable::sem_variable (bitmap_obstack *stack): sem_item (VAR, stack)
 {
 }
 
+/*  Constructor based on varpool node _NODE with computed hash _HASH.
+    Bitmap STACK is used for memory allocation.  */
 
 sem_variable::sem_variable (varpool_node *node, hashval_t _hash,
 			    bitmap_obstack *stack): sem_item(VAR,
@@ -1786,11 +1836,15 @@ sem_variable::sem_variable (varpool_node *node, hashval_t _hash,
   gcc_checking_assert (get_node ());
 }
 
+/* Gets symbol name of the item.  */
+
 const char *
 sem_variable::name (void)
 {
   return node->name ();
 }
+
+/* Gets assembler name of the item.  */
 
 const char *
 sem_variable::asm_name (void)
@@ -1798,10 +1852,14 @@ sem_variable::asm_name (void)
   return node->asm_name ();
 }
 
+/* Fast equality variable based on knowledge known in WPA.  */
+
 bool sem_variable::equals_wpa (sem_item *item)
 {
   return item->type == VAR;
 }
+
+/* Returns true if the item equals to ITEM given as arguemnt.  */
 
 bool
 sem_variable::equals (sem_item *item)
@@ -1811,6 +1869,8 @@ sem_variable::equals (sem_item *item)
 
   return sem_variable::equals (ctor, static_cast<sem_variable *>(item)->ctor);
 }
+
+/* Compares trees T1 and T2 for semantic equality.  */
 
 bool
 sem_variable::equals (tree t1, tree t2)
@@ -1891,16 +1951,22 @@ sem_variable::equals (tree t1, tree t2)
     }
 }
 
+/* Returns varpool_node.  */
+
 struct varpool_node *
 sem_variable::get_node (void)
 {
   return varpool (node);
 }
 
+/* Initialize semantic variable by info reachable during LTO WPA phase.  */
+
 void
 sem_variable::init_wpa (void)
 {
 }
+
+/* Semantic variable initialization function.  */
 
 void
 sem_variable::init (void)
@@ -1910,6 +1976,8 @@ sem_variable::init (void)
   // TODO:Honza (is it correct start point of variable comparison?)
   ctor = ctor_for_folding (decl);
 }
+
+/* Parser function that visits a varpool NODE.  */
 
 sem_variable *
 sem_variable::parse (struct varpool_node *node, bitmap_obstack *stack)
@@ -1934,8 +2002,10 @@ sem_variable::parse (struct varpool_node *node, bitmap_obstack *stack)
   return v;
 }
 
+/* Initializes references to other semantic functions/variables.  */
+
 void
-sem_variable::init_refs ()
+sem_variable::init_refs (void)
 {
   parse_tree_refs (ctor);
 }
@@ -1960,6 +2030,8 @@ sem_variable::get_hash (void)
   return hash;
 }
 
+/* References independent hash function.  */
+
 bool
 sem_variable::merge (sem_item *alias_item)
 {
@@ -1978,10 +2050,7 @@ sem_variable::merge (sem_item *alias_item)
   if (original->resolution == LDPR_PREEMPTED_REG
       || original->resolution == LDPR_PREEMPTED_IR)
     original_discardable = true;
-  if (DECL_ONE_ONLY (original->decl)
-      && original->resolution != LDPR_PREVAILING_DEF
-      && original->resolution != LDPR_PREVAILING_DEF_IRONLY
-      && original->resolution != LDPR_PREVAILING_DEF_IRONLY_EXP)
+  if (symtab_can_be_discarded (original))
     original_discardable = true;
 
   gcc_assert (!TREE_ASM_WRITTEN (alias->decl));
@@ -2025,6 +2094,8 @@ sem_variable::merge (sem_item *alias_item)
     }
 }
 
+/* Dump symbol to FILE.  */
+
 void
 sem_variable::dump_to_file (FILE *file)
 {
@@ -2033,6 +2104,9 @@ sem_variable::dump_to_file (FILE *file)
   print_node (file, "", decl, 0);
   fprintf (file, "\n\n");
 }
+
+/* Iterates though a constructor and identifies tree references
+   we are interested in semantic function equality.  */
 
 void
 sem_variable::parse_tree_refs (tree t)
@@ -2124,6 +2198,8 @@ sem_item_optimizer::~sem_item_optimizer ()
   pointer_set_destroy (removed_items_set);
 }
 
+/* Write IPA ICF summary for symbols.  */
+
 void
 sem_item_optimizer::write_summary (void)
 {
@@ -2168,6 +2244,9 @@ sem_item_optimizer::write_summary (void)
   produce_asm (ob, NULL);
   destroy_output_block (ob);
 }
+
+/* Reads a section from LTO stream file FILE_DATA. Input block for DATA
+   contains LEN bytes.  */
 
 void
 sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
@@ -2228,6 +2307,8 @@ sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
   lto_data_in_delete (data_in);
 }
 
+/* Read IPA IPA ICF summary for symbols.  */
+
 void
 sem_item_optimizer::read_summary (void)
 {
@@ -2246,6 +2327,8 @@ sem_item_optimizer::read_summary (void)
     }
 }
 
+/* Register callgraph and varpool hooks.  */
+
 void
 sem_item_optimizer::register_hooks (void)
 {
@@ -2255,6 +2338,8 @@ sem_item_optimizer::register_hooks (void)
   varpool_node_hooks = varpool_add_node_removal_hook (
 			 &sem_item_optimizer::varpool_removal_hook, this);
 }
+
+/* Unregister callgraph and varpool hooks.  */
 
 void
 sem_item_optimizer::unregister_hooks (void)
@@ -2266,6 +2351,8 @@ sem_item_optimizer::unregister_hooks (void)
     varpool_remove_node_removal_hook (varpool_node_hooks);
 }
 
+/* Adds a CLS to hashtable associated by hash value.  */
+
 void
 sem_item_optimizer::add_class (congruence_class *cls)
 {
@@ -2275,6 +2362,8 @@ sem_item_optimizer::add_class (congruence_class *cls)
 				      cls->members[0]->get_hash ());
   group->classes.safe_push (cls);
 }
+
+/* Gets a congruence class group based on given HASH value.  */
 
 congruence_class_group_t *
 sem_item_optimizer::get_group_by_hash (hashval_t hash)
@@ -2295,12 +2384,16 @@ sem_item_optimizer::get_group_by_hash (hashval_t hash)
   return *slot;
 }
 
+/* Callgraph removal hook called for a NODE with a custom DATA.  */
+
 void
 sem_item_optimizer::cgraph_removal_hook (struct cgraph_node *node, void *data)
 {
   sem_item_optimizer *optimizer = (sem_item_optimizer *) data;
   optimizer->remove_symtab_node (node);
 }
+
+/* Varpool removal hook called for a NODE with a custom DATA.  */
 
 void
 sem_item_optimizer::varpool_removal_hook (struct varpool_node *node, void *data)
@@ -2309,6 +2402,7 @@ sem_item_optimizer::varpool_removal_hook (struct varpool_node *node, void *data)
   optimizer->remove_symtab_node (node);
 }
 
+/* Remove symtab NODE triggered by symtab removal hooks.  */
 
 void
 sem_item_optimizer::remove_symtab_node (struct symtab_node *node)
@@ -2317,6 +2411,9 @@ sem_item_optimizer::remove_symtab_node (struct symtab_node *node)
 
   pointer_set_insert (removed_items_set, node);
 }
+
+/* Removes all callgraph and varpool nodes that are marked by symtab
+   as deleted.  */
 
 void
 sem_item_optimizer::filter_removed_items (void)
@@ -2343,6 +2440,8 @@ sem_item_optimizer::filter_removed_items (void)
   for (unsigned int i = 0; i < filtered.length(); i++)
     items.safe_push (filtered[i]);
 }
+
+/* Optimizer entry point.  */
 
 void
 sem_item_optimizer::execute (void)
@@ -2380,6 +2479,9 @@ sem_item_optimizer::execute (void)
   if (dump_file && (dump_flags & TDF_DETAILS))
     dump_symtab (dump_file);
 }
+
+/* Function responsible for visiting all potential functions and
+   read-only variables that can be merged.  */
 
 void
 sem_item_optimizer::parse_funcs_and_vars (void)
@@ -2421,6 +2523,8 @@ sem_item_optimizer::parse_funcs_and_vars (void)
   }
 }
 
+/* Makes pairing between a congruence class CLS and semantic ITEM.  */
+
 void
 sem_item_optimizer::add_item_to_class (congruence_class *cls, sem_item *item)
 {
@@ -2428,6 +2532,8 @@ sem_item_optimizer::add_item_to_class (congruence_class *cls, sem_item *item)
   cls->members.safe_push (item);
   item->cls = cls;
 }
+
+/* Congruence classes are built by hash value.  */
 
 void
 sem_item_optimizer::build_hash_based_classes (void)
@@ -2447,6 +2553,9 @@ sem_item_optimizer::build_hash_based_classes (void)
       add_item_to_class (group->classes[0], item);
     }
 }
+
+/* Semantic items in classes having more than one element and initialized.
+   In case of WPA, we load function body.  */
 
 void
 sem_item_optimizer::parse_nonsingleton_classes (void)
@@ -2513,6 +2622,9 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
     fprintf (dump_file, "Init called for %u items (%.2f%%).\n", init_called_count,
 	     100.0f * init_called_count / items.length ());
 }
+
+/* Equality function for semantic items is used to subdivide existing
+   classes. If IN_WPA, fast equality function is invoked.  */
 
 void
 sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
@@ -2586,6 +2698,8 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
   verify_classes ();
 }
 
+/* Verify congruence classes if checking is enabled.  */
+
 void
 sem_item_optimizer::verify_classes (void)
 {
@@ -2618,6 +2732,10 @@ sem_item_optimizer::verify_classes (void)
 #endif
 }
 
+/* Disposes split map traverse function. CLS_PTR is pointer to congruence
+   class, BSLOT is bitmap slot we want to release. DATA is mandatory,
+   but unused argument.  */
+
 bool
 sem_item_optimizer::release_split_map (__attribute__((__unused__)) const void
 				       *cls_ptr,
@@ -2630,6 +2748,10 @@ sem_item_optimizer::release_split_map (__attribute__((__unused__)) const void
 
   return true;
 }
+
+/* Process split operation for a class given as pointer CLS_PTR,
+   where bitmap B splits congruence class members. DATA is used
+   as argument of split pair.  */
 
 bool
 sem_item_optimizer::traverse_congruence_split (const void *cls_ptr,
@@ -2719,6 +2841,9 @@ sem_item_optimizer::traverse_congruence_split (const void *cls_ptr,
   return true;
 }
 
+/* Tests if a class CLS used as INDEXth splits any congruence classes.
+   Bitmap stack BMSTACK is used for bitmap allocation.  */
+
 void
 sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
     unsigned int index)
@@ -2772,6 +2897,10 @@ sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
   split_map->traverse (&sem_item_optimizer::release_split_map, NULL);
 }
 
+/* Every usage of a congruence class CLS is a candidate that can split the
+   collection of classes. Bitmap stack BMSTACK is used for bitmap
+   allocation.  */
+
 void
 sem_item_optimizer::do_congruence_step (congruence_class *cls)
 {
@@ -2798,6 +2927,8 @@ sem_item_optimizer::do_congruence_step (congruence_class *cls)
   BITMAP_FREE (usage);
 }
 
+/* Adds a newly created congruence class CLS to worklist.  */
+
 void
 sem_item_optimizer::worklist_push (congruence_class *cls)
 {
@@ -2808,6 +2939,8 @@ sem_item_optimizer::worklist_push (congruence_class *cls)
 
   *slot = cls;
 }
+
+/* Pops a class from worklist. */
 
 congruence_class *
 sem_item_optimizer::worklist_pop (void)
@@ -2820,17 +2953,23 @@ sem_item_optimizer::worklist_pop (void)
   return cls;
 }
 
+/* Returns true if a congruence class CLS is presented in worklist.  */
+
 bool
 sem_item_optimizer::worklist_contains (const congruence_class *cls)
 {
   return worklist.find (cls);
 }
 
+/* Removes given congruence class CLS from worklist.  */
+
 void
 sem_item_optimizer::worklist_remove (const congruence_class *cls)
 {
   worklist.remove_elt (cls);
 }
+
+/* Iterative congruence reduction function.  */
 
 void
 sem_item_optimizer::process_cong_reduction (void)
@@ -2854,6 +2993,8 @@ sem_item_optimizer::process_cong_reduction (void)
       do_congruence_step (cls);
     }
 }
+
+/* Debug function prints all informations about congruence classes.  */
 
 void
 sem_item_optimizer::dump_cong_classes (void)
@@ -2908,6 +3049,10 @@ sem_item_optimizer::dump_cong_classes (void)
 
   free (histogram);
 }
+
+/* After reduction is done, we can declare all items in a group
+   to be equal. PREV_CLASS_COUNT is start number of classes
+   before reduction.  */
 
 void
 sem_item_optimizer::merge_classes (unsigned int prev_class_count)
@@ -2965,6 +3110,8 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
       }
 }
 
+/* Dump function prints all class members to a FILE with an INDENT.  */
+
 void
 congruence_class::dump (FILE *file, unsigned int indent) const
 {
@@ -2978,6 +3125,8 @@ congruence_class::dump (FILE *file, unsigned int indent) const
 
   fprintf (file, "\n");
 }
+
+/* Returns true if there's a member that is used from another group.  */
 
 bool
 congruence_class::is_class_used (void)
@@ -2994,17 +3143,23 @@ congruence_class::is_class_used (void)
 
 static sem_item_optimizer optimizer;
 
+/* Generate pass summary for IPA ICF pass.  */
+
 static void
 ipa_icf_generate_summary (void)
 {
   optimizer.parse_funcs_and_vars ();
 }
 
+/* Write pass summary for IPA ICF pass.  */
+
 static void
 ipa_icf_write_summary (void)
 {
   optimizer.write_summary ();
 }
+
+/* Read pass summary for IPA ICF pass.  */
 
 static void
 ipa_icf_read_summary (void)

@@ -91,22 +91,23 @@ class func_checker
 public:
   func_checker ();
 
-  /* Itializes internal structures according to given number of
-     source and target SSA names.  */
+  /* Initializes internal structures according to given number of
+     source and target SSA names. The number of source names is SSA_SOURCE,
+     respectively SSA_TARGET.  */
   void initialize (unsigned ssa_source, unsigned sss_target);
 
   /* Memory release routine.  */
   void release (void);
 
   /* Verifies that trees T1 and T2 do correspond.  */
-  bool verify_ssa (tree t1, tree t2);
+  bool compare_ssa_name (tree t1, tree t2);
 
   /* Verification function for edges E1 and E2.  */
-  bool verify_edges (edge e1, edge e2);
+  bool compare_edge (edge e1, edge e2);
 
   /* Verification function for declaration trees T1 and T2 that
      come from functions FUNC1 and FUNC2.  */
-  bool verify_decl (tree t1, tree t2, tree func1, tree func2);
+  bool compare_decl (tree t1, tree t2, tree func1, tree func2);
 
 private:
   /* Vector mapping source SSA names to target ones.  */
@@ -131,6 +132,7 @@ private:
 class congruence_class
 {
 public:
+  /* Congruence class constructor for a new class with _ID.  */
   congruence_class (unsigned int _id);
 
   /* Dump function prints all class members to a FILE with an INDENT.  */
@@ -157,6 +159,7 @@ enum sem_item_type
 class sem_usage_pair
 {
 public:
+  /* Constructor for key value pair, where _ITEM is key and _INDEX is a target.  */
   sem_usage_pair (sem_item *_item, unsigned int _index);
 
   /* Target semantic item where an item is used.  */
@@ -184,18 +187,25 @@ typedef struct sem_bb
 class sem_item
 {
 public:
+  /* Semantic item constructor for a node of _TYPE, where STACK is used
+     for bitmap memory allocation.  */
   sem_item (enum sem_item_type _type, bitmap_obstack *stack);
 
+  /* Semantic item constructor for a node of _TYPE, where STACK is used
+     for bitmap memory allocation. The item is based on symtab node _NODE
+     with computed _HASH.  */
   sem_item (enum sem_item_type _type, struct symtab_node *_node, hashval_t _hash,
 	    bitmap_obstack *stack);
 
   virtual ~sem_item ();
 
   /* Dump function for debugging purpose.  */
-  void dump (void);
+  DEBUG_FUNCTION void dump (void);
 
+  /* Initialize semantic item by info reachable during LTO WPA phase.  */
   virtual void init_wpa (void) = 0;
 
+  /* Semantic item initialization function.  */
   virtual void init (void) = 0;
 
   /* Gets symbol name of the item.  */
@@ -261,14 +271,19 @@ protected:
   hashval_t hash;
 
 private:
+  /* Initialize internal data structures. Bitmap STACK is used for
+     bitmap memory allocation process.  */
   void setup (bitmap_obstack *stack);
 }; // class sem_item
 
 class sem_function: public sem_item
 {
 public:
+  /* Semantic function constructor that uses STACK as bitmap memory stack.  */
   sem_function (bitmap_obstack *stack);
 
+  /*  Constructor based on callgraph node _NODE with computed hash _HASH.
+      Bitmap STACK is used for memory allocation.  */
   sem_function (cgraph_node *_node, hashval_t _hash, bitmap_obstack *stack);
 
   ~sem_function ();
@@ -338,13 +353,13 @@ private:
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
      true value is returned if phi nodes are sematically
      equivalent in these blocks .  */
-  bool compare_phi_nodes (basic_block bb1, basic_block bb2, tree func1,
+  bool compare_phi_node (basic_block bb1, basic_block bb2, tree func1,
 			  tree func2);
 
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
      true value is returned if exception handling regions are equivalent
      in these blocks.  */
-  bool compare_eh_regions (eh_region r1, eh_region r2, tree func1, tree func2);
+  bool compare_eh_region (eh_region r1, eh_region r2, tree func1, tree func2);
 
   /* Iterates GSI statement iterator to the next non-debug statement.  */
   void gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi);
@@ -353,64 +368,59 @@ private:
   void gsi_next_nonvirtual_phi (gimple_stmt_iterator &it);
 
   /* Verifies that trees T1 and T2 do correspond.  */
-  bool check_function_decl (tree t1, tree t2);
+  bool compare_function_decl (tree t1, tree t2);
 
   /* Verifies that trees T1 and T2 do correspond.  */
-  bool check_variable_decl (tree t1, tree t2, tree func1, tree func2);
+  bool compare_variable_decl (tree t1, tree t2, tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      call statements are semantically equivalent.  */
-  bool check_gimple_call (gimple s1, gimple s2,
+  bool compare_gimple_call (gimple s1, gimple s2,
 			  tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      assignment statements are semantically equivalent.  */
-  bool check_gimple_assign (gimple s1, gimple s2, tree func1, tree func2);
+  bool compare_gimple_assign (gimple s1, gimple s2, tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      condition statements are semantically equivalent.  */
-  bool check_gimple_cond (gimple s1, gimple s2, tree func1, tree func2);
+  bool compare_gimple_cond (gimple s1, gimple s2, tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      label statements are semantically equivalent.  */
-  bool check_gimple_label (gimple s1, gimple s2, tree func1, tree func2);
+  bool compare_gimple_label (gimple s1, gimple s2, tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      switch statements are semantically equivalent.  */
-  bool check_gimple_switch (gimple s1, gimple s2, tree func1, tree func2);
+  bool compare_gimple_switch (gimple s1, gimple s2, tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      return statements are semantically equivalent.  */
-  bool check_gimple_return (gimple s1, gimple s2, tree func1, tree func2);
+  bool compare_gimple_return (gimple s1, gimple s2, tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      goto statements are semantically equivalent.  */
-  bool check_gimple_goto (gimple s1, gimple s2, tree func1, tree func2);
+  bool compare_gimple_goto (gimple s1, gimple s2, tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      resx statements are semantically equivalent.  */
-  bool check_gimple_resx (gimple s1, gimple s2);
+  bool compare_gimple_resx (gimple s1, gimple s2);
 
   /* Verifies for given GIMPLEs S1 and S2 that ASM statements are equivalent.
      For the beginning, the pass only supports equality for
      '__asm__ __volatile__ ("", "", "", "memory")'.  */
-  bool check_gimple_asm (gimple s1, gimple s2);
+  bool compare_gimple_asm (gimple s1, gimple s2);
 
   /* Verifies that tree labels T1 and T2 correspond in FUNC1 and FUNC2.  */
-  bool check_tree_ssa_label (tree t1, tree t2, tree func1, tree func2);
+  bool compare_tree_ssa_label (tree t1, tree t2, tree func1, tree func2);
 
   /* Function compares two operands T1 and T2 and returns true if these
      two trees from FUNC1 (respectively FUNC2) are semantically equivalent.  */
-  bool check_operand (tree t1, tree t2, tree func1, tree func2);
+  bool compare_operand (tree t1, tree t2, tree func1, tree func2);
 
   /* If T1 and T2 are SSA names, dictionary comparison is processed. Otherwise,
      declaration comparasion is executed.  */
-  bool check_ssa_names (tree t1, tree t2, tree func1, tree func2);
-
-  /* Function responsible for comparison of handled components T1 and T2.
-     If these components, from functions FUNC1 and FUNC2, are equal, true
-     is returned.  */
-  bool compare_handled_component (tree t1, tree t2, tree func1, tree func2);
+  bool compare_ssa_name (tree t1, tree t2, tree func1, tree func2);
 
   /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
      corresponds to TARGET.  */
@@ -418,7 +428,7 @@ private:
 
   /* Iterates all tree types in T1 and T2 and returns true if all types
      are compatible.  */
-  bool compare_type_lists (tree t1, tree t2);
+  bool compare_type_list (tree t1, tree t2);
 
   /* Processes function equality comparison.  */
   bool equals_private (sem_item *item);
@@ -442,8 +452,12 @@ private:
 class sem_variable: public sem_item
 {
 public:
+  /* Semantic variable constructor that uses STACK as bitmap memory stack.  */
   sem_variable (bitmap_obstack *stack);
 
+  /*  Constructor based on callgraph node _NODE with computed hash _HASH.
+      Bitmap STACK is used for memory allocation.  */
+  
   sem_variable (varpool_node *_node, hashval_t _hash, bitmap_obstack *stack);
 
   virtual void init_wpa (void);
@@ -529,29 +543,29 @@ public:
   /* Verify congruence classes if checking is enabled.  */
   void verify_classes (void);
 
-  /* Write IPA sem equality summary for symbols.  */
+  /* Write IPA ICF summary for symbols.  */
   void write_summary (void);
 
-  /* Read IPA sem equality summary for symbols.  */
+  /* Read IPA IPA ICF summary for symbols.  */
   void read_summary (void);
 
-  /* Callgraph removal hook.  */
-  static void cgraph_removal_hook (struct cgraph_node *node, void *);
+  /* Callgraph removal hook called for a NODE with a custom DATA.  */
+  static void cgraph_removal_hook (struct cgraph_node *node, void *data);
 
-  /* Varpool removal hook.  */
-  static void varpool_removal_hook (struct varpool_node *node, void *);
+  /* Varpool removal hook called for a NODE with a custom DATA.  */
+  static void varpool_removal_hook (struct varpool_node *node, void *data);
 
   /* Worklist of congruence classes that can potentially
      refine classes of congruence.  */
   hash_table <congruence_class_var_hash> worklist;
 
-  /* Remove symtab node triggered by symtab removal hooks.  */
+  /* Remove symtab NODE triggered by symtab removal hooks.  */
   void remove_symtab_node (struct symtab_node *node);
 
-  /* Register hooks.  */
+  /* Register callgraph and varpool hooks.  */
   void register_hooks (void);
 
-  /* Unregister hooks.  */
+  /* Unregister callgraph and varpool hooks.  */
   void unregister_hooks (void);
 
   /* Adds a CLS to hashtable associated by hash value.  */
@@ -610,7 +624,7 @@ private:
 
   /* Disposes split map traverse function. CLS_PTR is pointer to congruence
      class, BSLOT is bitmap slot we want to release. DATA is mandatory,
-     but unused atrgument.  */
+     but unused argument.  */
   static bool release_split_map (const void *cls_ptr, bitmap *bslot, void *data);
 
   /* Process split operation for a class given as pointer CLS_PTR,
@@ -619,7 +633,8 @@ private:
   static bool traverse_congruence_split (const void *cls_ptr, bitmap *b,
 					 void *data);
 
-  /* Reads a section from LTO stream.  */
+  /* Reads a section from LTO stream file FILE_DATA. Input block for DATA
+     contains LEN bytes.  */
   void read_section (struct lto_file_decl_data *file_data, const char *data,
 		     size_t len);
 
