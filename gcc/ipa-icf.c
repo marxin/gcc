@@ -392,8 +392,10 @@ sem_function::equals (sem_item *item)
   bool eq = equals_private (item);
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, "Equals called for:%s:%s (%u:%u) (%s:%s) with result: %s\n\n",
-	     name(), item->name (), node->order, item->node->order, asm_name (), item->asm_name (), eq ? "true" : "false");
+    fprintf (dump_file,
+	     "Equals called for:%s:%s (%u:%u) (%s:%s) with result: %s\n\n",
+	     name(), item->name (), node->order, item->node->order, asm_name (),
+	     item->asm_name (), eq ? "true" : "false");
 
   return eq;
 }
@@ -426,14 +428,6 @@ sem_function::equals_private (sem_item *item)
   if (!equals_wpa (item))
     return false;
 
-  /* TODO:Honza (It shows that there function that are semantic candidates,
-   * problem is that newly created edge fails on verifier. The reason is
-   * LHS is no return call */
-
-  /* Checking noreturn information.  */
-  if (TREE_THIS_VOLATILE (decl) || TREE_THIS_VOLATILE (compared_func->decl))
-    SE_EXIT_FALSE_WITH_MSG ("noreturn attribute detected");
-
   /* Checking function arguments.  */
   tree decl1 = DECL_ATTRIBUTES (decl);
   tree decl2 = DECL_ATTRIBUTES (compared_func->decl);
@@ -445,6 +439,20 @@ sem_function::equals_private (sem_item *item)
 
       if (get_attribute_name (decl1) != get_attribute_name (decl2))
 	SE_EXIT_FALSE();
+
+      tree attr_value1 = TREE_VALUE (decl1);
+      tree attr_value2 = TREE_VALUE (decl2);
+
+      if (attr_value1 && attr_value2)
+	{
+	  bool ret = compare_operand (TREE_VALUE (attr_value1),
+				      TREE_VALUE (attr_value2), decl,
+				      compared_func->decl);
+	  if (!ret)
+	    SE_EXIT_FALSE_WITH_MSG ("attribute values are different")
+	  }
+      else if (!attr_value1 || !attr_value2)
+	SE_EXIT_FALSE ();
 
       decl1 = TREE_CHAIN (decl1);
       decl2 = TREE_CHAIN (decl2);
@@ -461,7 +469,7 @@ sem_function::equals_private (sem_item *item)
 
   /* Exception handling regions comparison.  */
   if (!compare_eh_region (region_tree, compared_func->region_tree, decl,
-			   compared_func->decl))
+			  compared_func->decl))
     SE_EXIT_FALSE();
 
   /* Checking all basic blocks.  */
@@ -506,7 +514,7 @@ sem_function::equals_private (sem_item *item)
   /* Basic block PHI nodes comparison.  */
   for (unsigned i = 0; i < bb_count; i++)
     if (!compare_phi_node (bb_sorted[i]->bb, compared_func->bb_sorted[i]->bb,
-			    decl, compared_func->decl))
+			   decl, compared_func->decl))
       SE_EXIT_FALSE_WITH_MSG ("PHI node comparison returns false");
 
   return result;
@@ -998,7 +1006,7 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
 
 bool
 sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
-				 tree func1, tree func2)
+				tree func1, tree func2)
 {
   gimple_stmt_iterator si1, si2;
   gimple phi1, phi2;
@@ -1058,7 +1066,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
 
 bool
 sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
-				  tree func2)
+				 tree func2)
 {
   eh_landing_pad lp1, lp2;
   eh_catch c1, c2;
@@ -1118,7 +1126,7 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
 	      if (c1->label && c2->label)
 		{
 		  if (!compare_tree_ssa_label (c1->label, c2->label,
-					     func1, func2))
+					       func1, func2))
 		    return false;
 		}
 	      else if (c1->label || c2->label)
@@ -1139,7 +1147,7 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
 	    return false;
 
 	  if (!compare_type_list (r1->u.allowed.type_list,
-				   r2->u.allowed.type_list))
+				  r2->u.allowed.type_list))
 	    return false;
 
 	  break;
@@ -1321,7 +1329,8 @@ sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
    assignment statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1, tree func2)
+sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1,
+				     tree func2)
 {
   tree arg1, arg2;
   enum tree_code code1, code2;
@@ -1390,7 +1399,8 @@ sem_function::compare_tree_ssa_label (tree t1, tree t2, tree func1, tree func2)
    label statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_label (gimple g1, gimple g2, tree func1, tree func2)
+sem_function::compare_gimple_label (gimple g1, gimple g2, tree func1,
+				    tree func2)
 {
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
@@ -1402,7 +1412,8 @@ sem_function::compare_gimple_label (gimple g1, gimple g2, tree func1, tree func2
    switch statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_switch (gimple g1, gimple g2, tree func1, tree func2)
+sem_function::compare_gimple_switch (gimple g1, gimple g2, tree func1,
+				     tree func2)
 {
   unsigned lsize1, lsize2, i;
   tree t1, t2, low1, low2, high1, high2;
@@ -1447,7 +1458,8 @@ sem_function::compare_gimple_switch (gimple g1, gimple g2, tree func1, tree func
    return statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_return (gimple g1, gimple g2, tree func1, tree func2)
+sem_function::compare_gimple_return (gimple g1, gimple g2, tree func1,
+				     tree func2)
 {
   tree t1, t2;
 
@@ -1568,7 +1580,7 @@ sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
 
 bool
 sem_function::compare_operand (tree t1, tree t2,
-    tree func1, tree func2)
+			       tree func1, tree func2)
 {
   tree base1, base2, x1, x2, y1, y2, z1, z2;
   HOST_WIDE_INT offset1, offset2;
@@ -1607,12 +1619,12 @@ sem_function::compare_operand (tree t1, tree t2,
 	unsigned length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
 
 	if (length1 != length2)
-	 SE_EXIT_FALSE_WITH_MSG ("");
+	  SE_EXIT_FALSE_WITH_MSG ("");
 
 	for (unsigned i = 0; i < length1; i++)
-	 if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
-			     CONSTRUCTOR_ELT (t2, i)->value, func1, func2))
-	   SE_EXIT_FALSE_WITH_MSG ("");
+	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
+				CONSTRUCTOR_ELT (t2, i)->value, func1, func2))
+	    SE_EXIT_FALSE_WITH_MSG ("");
 
 	return true;
       }
@@ -1625,12 +1637,12 @@ sem_function::compare_operand (tree t1, tree t2,
 	y2 = TREE_OPERAND (t2, 1);
 
 	if (!compare_operand (array_ref_low_bound (t1),
-					array_ref_low_bound (t2),
-					func1, func2))
+			      array_ref_low_bound (t2),
+			      func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
 	if (!compare_operand (array_ref_element_size (t1),
-					array_ref_element_size (t2),
-					func1, func2))
+			      array_ref_element_size (t2),
+			      func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
 	if (!compare_operand (x1, x2, func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
@@ -2286,7 +2298,8 @@ sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
       gcc_assert (node->definition);
 
       if (dump_file)
-	fprintf (dump_file, "Symbol added:%s (tree: %p)\n", node->asm_name (), (void *) node->decl);
+	fprintf (dump_file, "Symbol added:%s (tree: %p)\n", node->asm_name (),
+		 (void *) node->decl);
 
       if (is_a_helper<cgraph_node *>::test (node))
 	{

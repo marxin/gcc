@@ -354,7 +354,7 @@ private:
      true value is returned if phi nodes are sematically
      equivalent in these blocks .  */
   bool compare_phi_node (basic_block bb1, basic_block bb2, tree func1,
-			  tree func2);
+			 tree func2);
 
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
      true value is returned if exception handling regions are equivalent
@@ -376,7 +376,7 @@ private:
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      call statements are semantically equivalent.  */
   bool compare_gimple_call (gimple s1, gimple s2,
-			  tree func1, tree func2);
+			    tree func1, tree func2);
 
   /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
      assignment statements are semantically equivalent.  */
@@ -457,7 +457,7 @@ public:
 
   /*  Constructor based on callgraph node _NODE with computed hash _HASH.
       Bitmap STACK is used for memory allocation.  */
-  
+
   sem_variable (varpool_node *_node, hashval_t _hash, bitmap_obstack *stack);
 
   virtual void init_wpa (void);
