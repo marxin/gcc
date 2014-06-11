@@ -634,7 +634,7 @@ decl_section_name (const_tree node)
   struct symtab_node *snode = symtab_get_node (node);
   if (!snode)
     return NULL;
-  return snode->get_section ();
+  return snode->get_section_name ();
 }
 
 /* Set section section name of NODE to VALUE (that is expected to
@@ -6326,8 +6326,10 @@ build_qualified_type (tree type, int type_quals)
       else if (TYPE_CANONICAL (type) != type)
 	/* Build the underlying canonical type, since it is different
 	   from TYPE. */
-	TYPE_CANONICAL (t) = build_qualified_type (TYPE_CANONICAL (type),
-						   type_quals);
+	{
+	  tree c = build_qualified_type (TYPE_CANONICAL (type), type_quals);
+	  TYPE_CANONICAL (t) = TYPE_CANONICAL (c);
+	}
       else
 	/* T is its own canonical type. */
 	TYPE_CANONICAL (t) = t;

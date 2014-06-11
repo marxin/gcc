@@ -5732,6 +5732,8 @@ You may only specify this attribute on the definition of an @code{enum},
 also define the enumerated type, structure or union.
 
 @item transparent_union
+@cindex @code{transparent_union} attribute
+
 This attribute, attached to a @code{union} type definition, indicates
 that any function parameter having that union type causes calls to that
 function to be treated in a special way.
@@ -10513,9 +10515,6 @@ when the @option{-mfpu=neon} switch is used:
 
 @node ARM ACLE Intrinsics
 @subsection ARM ACLE Intrinsics
-
-These built-in intrinsics for the ARMv8-A CRC32 extension are available when
-the @option{-march=armv8-a+crc} switch is used:
 
 @include arm-acle-intrinsics.texi
 

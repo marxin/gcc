@@ -1,3 +1,196 @@
+2014-06-11  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-visibility.c (function_and_variable_visibility): Disable
+	virtual table rewriting temporarily on targets not supporting
+	ONE_ONLY.
+
+2014-06-11  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/61437
+	Revert
+	2014-06-04  Richard Biener  <rguenther@suse.de>
+
+	* tree.h (may_be_aliased): Trust TREE_ADDRESSABLE from
+	TREE_PUBLIC and DECL_EXTERNAL decls.
+
+2014-06-10  Jan Hubicka  <hubicka@ucw.cz>
+
+	* varasm.c (set_implicit_section): New function.
+	(resolve_unique_section): Use it to set implicit section
+	for aliases, too.
+	(get_named_text_section): Use symtab_get_node (decl)->implicit_section
+	(default_function_section): Likewise.
+	(decl_binds_to_current_def_p): Constify argument.
+	* varasm.h (decl_binds_to_current_def_p): Update prototype.
+	* asan.c (asan_protect_global): Use
+	symtab_get_node (decl)->implicit_section.
+	* symtab.c (dump_symtab_base): Dump implicit sections.
+	(verify_symtab_base): Verify sanity of sectoins and comdats.
+	(symtab_resolve_alias): Alias share the section of its target.
+	(set_section_1): New function.
+	(symtab_node::set_section): Move here, recurse to aliases.
+	(verify_symtab): Check for duplicated symtab lists.
+	* tree-core.h (implicit_section_name_p): Remove.
+	* tree-vect-data-refs.c: Include varasm.h.
+	(vect_can_force_dr_alignment_p): Fix conditional on when
+	decl bints to current definition; use
+	symtab_get_node (decl)->implicit_section.
+	* cgraph.c (cgraph_make_node_local_1): Fix section set.
+	* cgraph.h (struct symtab_node): Add implicit_section.
+	(set_section): Rename to ...
+	(set_section_for_node): ... this one.
+	(set_section): Declare.
+	* tree.h (DECL_HAS_IMPLICIT_SECTION_NAME_P): Remove.
+	* lto-cgraph.c (lto_output_node, lto_output_varpool_node,
+	input_overwrite_node, input_varpool_node): Stream implicit_section.
+	* ipa.c (symtab_remove_unreachable_nodes): Do not check symtab before
+	removal; it will fail in LTO.
+
+2014-06-10  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-simd.md (move_lo_quad_<mode>):
+	Change second alternative type to f_mcr.
+	* config/aarch64/aarch64.md (*movsi_aarch64): Change 11th
+	and 12th alternatives' types to f_mcr and f_mrc.
+	(*movdi_aarch64): Same for 12th and 13th alternatives.
+	(*movsf_aarch64): Change 9th alternatives' type to mov_reg.
+	(aarch64_movtilow_tilow): Change type to fmov.
+
+2014-06-10  Jiong Wang  <jiong.wang@arm.com>
+
+	* config/aarch64/aarch64.c (aarch64_save_or_restore_fprs)
+	(aarch64_save_or_restore_callee_save_registers): Fix layout.
+
+2014-06-10  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-simd.md (aarch64_sqdmulh_lane<mode>):
+	New expander.
+	(aarch64_sqrdmulh_lane<mode>): Likewise.
+	(aarch64_sq<r>dmulh_lane<mode>): Rename to...
+	(aarch64_sq<r>dmulh_lane<mode>_internal): ...this.
+	(aarch64_sqdmulh_laneq<mode>): New expander.
+	(aarch64_sqrdmulh_laneq<mode>): Likewise.
+	(aarch64_sq<r>dmulh_laneq<mode>): Rename to...
+	(aarch64_sq<r>dmulh_laneq<mode>_internal): ...this.
+	(aarch64_sqdmulh_lane<mode>): New expander.
+	(aarch64_sqrdmulh_lane<mode>): Likewise.
+	(aarch64_sq<r>dmulh_lane<mode>): Rename to...
+	(aarch64_sq<r>dmulh_lane<mode>_internal): ...this.
+	(aarch64_sqdmlal_lane<mode>): Add lane flip for big-endian.
+	(aarch64_sqdmlal_laneq<mode>): Likewise.
+	(aarch64_sqdmlsl_lane<mode>): Likewise.
+	(aarch64_sqdmlsl_laneq<mode>): Likewise.
+	(aarch64_sqdmlal2_lane<mode>): Likewise.
+	(aarch64_sqdmlal2_laneq<mode>): Likewise.
+	(aarch64_sqdmlsl2_lane<mode>): Likewise.
+	(aarch64_sqdmlsl2_laneq<mode>): Likewise.
+	(aarch64_sqdmull_lane<mode>): Likewise.
+	(aarch64_sqdmull_laneq<mode>): Likewise.
+	(aarch64_sqdmull2_lane<mode>): Likewise.
+	(aarch64_sqdmull2_laneq<mode>): Likewise.
+
+2014-06-10  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/61438
+	* tree-ssa-pre.c (eliminate_dom_walker): Add do_pre member.
+	(eliminate_dom_walker::before_dom_children): Only try to inhibit
+	insertion of IVs if running PRE.
+	(eliminate): Adjust.
+	(pass_pre::execute): Likewise.
+	(pass_fre::execute): Likewise.
+
+2014-06-10  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/61456
+	* tree-ssa-alias.c (nonoverlapping_component_refs_of_decl_p):
+	Do not use the main variant for the type comparison.
+	(ncr_compar): Likewise.
+	(nonoverlapping_component_refs_p): Likewise.
+
+2014-06-10  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* config/aarch64/aarch64.c (aarch64_save_or_restore_fprs): Fix
+	REG_CFA_RESTORE mode.
+
+2014-06-10  Evgeny Stupachenko  <evstupac@gmail.com>
+
+	* config/i386/i386.c (expand_vec_perm_pblendv): New.
+	* config/i386/i386.c (ix86_expand_vec_perm_const_1): Use
+	expand_vec_perm_pblendv.
+
+2014-06-10  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* doc/arm-acle-intrinsics.texi: Specify when CRC32 intrinsics are
+	available.
+	Simplify description of __crc32d and __crc32cd intrinsics.
+	* doc/extend.texi (ARM ACLE Intrinsics): Remove comment about CRC32
+	availability.
+
+2014-06-10  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR lto/61334
+	* configure.ac: Use gcc_AC_CHECK_DECLS to check for strnlen
+	prototype.
+	* config.in: Regenerate.
+	* configure: Likewise.
+
+2014-06-10  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-reference.c (is_proper_for_analysis): Exclude addressable and public
+	vars.
+	(intersect_static_var_sets): Remove.
+	(propagate): Do not prune local statics.
+
+2014-06-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/60928
+	* omp-low.c (lower_rec_input_clauses) <case OMP_CLAUSE_LASTPRIVATE>:
+	Set lastprivate_firstprivate even if omp_private_outer_ref
+	langhook returns true.
+	<case OMP_CLAUSE_REDUCTION>: When calling omp_clause_default_ctor
+	langhook, call unshare_expr on new_var and call
+	build_outer_var_ref to get the last argument.
+
+2014-06-10  Marek Polacek  <polacek@redhat.com>
+
+	PR c/60988
+	* doc/extend.texi: Add cindex for transparent_union.
+
+2014-06-09  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	* tree-ssa-math-opts.c (find_bswap_or_nop_load): Check return value of
+	init_symbolic_number ().
+
+2014-05-18  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR middle-end/61141
+	* emit-rtl.c (reset_all_used_flags): In a sequence, check that
+	XVECEXP (pat, 0, i) is an INSN before calling reset_insn_used_flags.
+	(verify_rtl_sharing): Likewise.  
+
+2014-06-09  Marc Glisse  <marc.glisse@inria.fr>
+
+	PR c++/54442
+	* tree.c (build_qualified_type): Use a canonical type for
+	TYPE_CANONICAL.
+
+2014-06-09  Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+
+	* config/arm/arm-modes.def: Remove XFmode.
+
+2014-06-09  Alan Lawrence  <alan.lawrence@arm.com>
+
+	PR target/61062
+	* config/arm/arm_neon.h (vtrn_s8, vtrn_s16, vtrn_u8, vtrn_u16, vtrn_p8,
+	vtrn_p16, vtrn_s32, vtrn_f32, vtrn_u32, vtrnq_s8, vtrnq_s16, vtrnq_s32,
+	vtrnq_f32, vtrnq_u8, vtrnq_u16, vtrnq_u32, vtrnq_p8, vtrnq_p16, vzip_s8,
+	vzip_s16, vzip_u8, vzip_u16, vzip_p8, vzip_p16, vzip_s32, vzip_f32,
+	vzip_u32, vzipq_s8, vzipq_s16, vzipq_s32, vzipq_f32, vzipq_u8,
+	vzipq_u16, vzipq_u32, vzipq_p8, vzipq_p16, vuzp_s8, vuzp_s16, vuzp_s32,
+	vuzp_f32, vuzp_u8, vuzp_u16, vuzp_u32, vuzp_p8, vuzp_p16, vuzpq_s8,
+	vuzpq_s16, vuzpq_s32, vuzpq_f32, vuzpq_u8, vuzpq_u16, vuzpq_u32,
+	vuzpq_p8, vuzpq_p16): Correct mask for bigendian.
+
 2014-06-09  Jan Hubicka  <hubicka@ucw.cz>
 
 	* tree-core.h (tree_decl_with_vis): Remove section_name.
