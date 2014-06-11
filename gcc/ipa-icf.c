@@ -2275,8 +2275,8 @@ sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
       gcc_assert (node->definition);
 
       if (dump_file)
-	fprintf (dump_file, "Symbol added:%s (tree: %p)\n", node->asm_name (),
-		 (void *) node->decl);
+	fprintf (dump_file, "Symbol added:%s (tree: %p, uid:%u)\n", node->asm_name (),
+		 (void *) node->decl, node->order);
 
       if (is_a_helper<cgraph_node *>::test (node))
 	{
@@ -2415,9 +2415,25 @@ sem_item_optimizer::filter_removed_items (void)
     {
       sem_item *item = items[i];
 
-      bool is_lto_alias = in_lto_p && item->type == FUNC && static_cast <sem_function *>(item)->get_node ()->alias;
+      bool no_body_function = false;
 
-      if(!pointer_set_contains (removed_items_set, items[i]->node) && is_lto_alias)
+      if (item->type == FUNC)
+	{
+	  struct cgraph_node *cnode = static_cast <sem_function *>(item)->get_node ();
+
+	  no_body_function = in_lto_p && (cnode->alias || cnode->body_removed);
+
+	  if (!pointer_set_contains (removed_items_set, item->node) && !no_body_function
+	      && !cnode->lto_file_data)
+	    {
+	      fprintf (dump_file, "unreachable:%u, %p, tree:%p\n", cnode->order, cnode,
+		       cnode->decl);
+	      gcc_unreachable ();
+	    }
+	}
+
+      if(!pointer_set_contains (removed_items_set, items[i]->node)
+	  && !no_body_function)
 	filtered.safe_push (items[i]);
     }
   items.release ();
