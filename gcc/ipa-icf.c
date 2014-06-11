@@ -616,12 +616,9 @@ sem_function::merge (sem_item *alias_item)
 
   /* Do not attempt to mix functions from different user sections;
      we do not know what user intends with those.  */
-  if (((DECL_SECTION_NAME (original->decl)
-	&& !DECL_HAS_IMPLICIT_SECTION_NAME_P (original->decl))
-       || (DECL_SECTION_NAME (alias->decl)
-	   && !DECL_HAS_IMPLICIT_SECTION_NAME_P (alias->decl)))
-      && DECL_SECTION_NAME (original->decl)
-      != DECL_SECTION_NAME (alias->decl))
+  if (((DECL_SECTION_NAME (original->decl) && !original->implicit_section)
+       || (DECL_SECTION_NAME (alias->decl) && !alias->implicit_section))
+      && DECL_SECTION_NAME (original->decl) != DECL_SECTION_NAME (alias->decl))
     {
       if (dump_file)
 	fprintf (dump_file,
@@ -728,25 +725,6 @@ sem_function::merge (sem_item *alias_item)
     }
   else if (create_thunk)
     {
-
-      // TODO:Honza (how can we verify that the thunk will be valid across COMDAT groups?)
-      if (DECL_COMDAT_GROUP (alias->decl))
-	{
-	  if (dump_file)
-	    fprintf (dump_file, "Callgraph thunk cannot be created because of COMDAT\n");
-	  return 0;
-	}
-
-      // TODO:Honza (this should be fine, always_inline makes no sense to touch)
-      if (lookup_attribute("always_inline", DECL_ATTRIBUTES (alias->decl)) != NULL)
-	{
-	  if (dump_file)
-	    fprintf (dump_file,
-		     "Callgraph thunk cannot be created because of always_inline attribute\n");
-
-	  return 0;
-	}
-
       cgraph_make_wrapper (alias, local_original);
 
       if (dump_file)
@@ -985,7 +963,7 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
 	  break;
 	case GIMPLE_PREDICT:
 	case GIMPLE_NOP:
-	  return true; /* TODO:Honza (is it correct?) */
+	  return true;
 	default:
 	  // TODO:Martin remove after development
 	  debug_gimple_stmt (s1);
@@ -1985,7 +1963,6 @@ sem_variable::init (void)
 {
   decl = get_node ()->decl;
 
-  // TODO:Honza (is it correct start point of variable comparison?)
   ctor = ctor_for_folding (decl);
 }
 
@@ -2438,15 +2415,10 @@ sem_item_optimizer::filter_removed_items (void)
     {
       sem_item *item = items[i];
 
-      /* TODO:Honza (there are function 'localalias' that ICE during cgraph_get_body,
-       * how can I smarter detect these functions (not by lto_file_data)? */
+      bool is_lto_alias = in_lto_p && item->type == FUNC && static_cast <sem_function *>(item)->get_node ()->alias;
 
-      bool c = !in_lto_p || (item->type == VAR
-			     || static_cast <sem_function *>(item)->get_node()->lto_file_data);
-
-      if(!pointer_set_contains (removed_items_set, items[i]->node) && c)
+      if(!pointer_set_contains (removed_items_set, items[i]->node) && is_lto_alias)
 	filtered.safe_push (items[i]);
-
     }
   items.release ();
 
