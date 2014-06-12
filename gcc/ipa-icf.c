@@ -705,7 +705,10 @@ sem_function::merge (sem_item *alias_item)
 	  redirected = true;
 	}
 
-      // TODO: Honza(should we remove the function?)
+      /* The alias function is removed just if symbol address
+         does not matters.  */
+      if (!alias_address_matters)
+        cgraph_remove_node (alias);
 
       if (dump_file && redirected)
 	fprintf (dump_file, "Callgraph local calls have been redirected.\n\n");
@@ -727,6 +730,14 @@ sem_function::merge (sem_item *alias_item)
     }
   else if (create_thunk)
     {
+      if (DECL_COMDAT_GROUP (alias->decl))
+        {
+          if (dump_file)
+	    fprintf (dump_file, "Callgraph thunk cannot be created because of COMDAT\n");
+
+	  return 0;
+      }
+
       cgraph_make_wrapper (alias, local_original);
 
       if (dump_file)
@@ -783,15 +794,9 @@ sem_function::init (void)
 
   decl = fndecl;
   region_tree = func->eh->region_tree;
-  tree fnargs = DECL_ARGUMENTS (fndecl);
 
   /* iterating all function arguments.  */
-  unsigned param_num = 0;
-
-  for (tree parm = fnargs; parm; parm = DECL_CHAIN (parm))
-    param_num++;
-
-  arg_count = param_num;
+  arg_count = count_formal_params (fndecl);
 
   /* basic block iteration.  */
   bb_count = n_basic_blocks_for_fn (func) - 2;
