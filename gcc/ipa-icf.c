@@ -451,7 +451,9 @@ sem_function::equals_private (sem_item *item)
 	  if (!ret)
 	    SE_EXIT_FALSE_WITH_MSG ("attribute values are different")
 	  }
-      else if (!attr_value1 || !attr_value2)
+      else if (!attr_value1 && !attr_value2)
+	{}
+      else
 	SE_EXIT_FALSE ();
 
       decl1 = TREE_CHAIN (decl1);
@@ -2422,14 +2424,6 @@ sem_item_optimizer::filter_removed_items (void)
 	  struct cgraph_node *cnode = static_cast <sem_function *>(item)->get_node ();
 
 	  no_body_function = in_lto_p && (cnode->alias || cnode->body_removed);
-
-	  if (!pointer_set_contains (removed_items_set, item->node) && !no_body_function
-	      && !cnode->lto_file_data)
-	    {
-	      fprintf (dump_file, "unreachable:%u, %p, tree:%p\n", cnode->order, cnode,
-		       cnode->decl);
-	      gcc_unreachable ();
-	    }
 	}
 
       if(!pointer_set_contains (removed_items_set, items[i]->node)
