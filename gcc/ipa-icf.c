@@ -81,6 +81,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "print-tree.h"
 #include "lto-streamer.h"
 #include "data-streamer.h"
+#include "ipa-utils.h"
 #include "ipa-icf.h"
 
 namespace {
@@ -718,6 +719,7 @@ sem_function::merge (sem_item *alias_item)
   else if (create_alias)
     {
       /* Remove the function's body.  */
+      ipa_merge_profiles (original, alias);
       cgraph_release_function_body (alias);
       cgraph_reset_node (alias);
 
@@ -738,6 +740,7 @@ sem_function::merge (sem_item *alias_item)
 	  return 0;
       }
 
+      ipa_merge_profiles (local_original, alias);
       cgraph_make_wrapper (alias, local_original);
 
       if (dump_file)
@@ -972,10 +975,7 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
 	case GIMPLE_NOP:
 	  return true;
 	default:
-	  // TODO:Martin remove after development
-	  debug_gimple_stmt (s1);
-	  gcc_unreachable ();
-	  return false;
+	  SE_EXIT_FALSE_WITH_MSG ("Unknown GIMPLE code reached")
 	}
 
       gsi_next (&gsi1);
@@ -1550,9 +1550,7 @@ sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
 	  ret = checker.compare_decl (b1, b2, func1, func2);
 	  SE_EXIT_DEBUG (ret);
 	default:
-	  // TODO:Martin remove after development
-	  gcc_unreachable ();
-	  return false;
+	  SE_EXIT_FALSE_WITH_MSG ("Unknown TREE code reached")
 	}
     }
   else
@@ -1576,10 +1574,23 @@ sem_function::compare_operand (tree t1, tree t2,
   else if (!t1 || !t2)
     return false;
 
-  /* TODO: We need to compare alias classes for loads & stores.
-    We also need to care about type based devirtualization.  */
   if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
     SE_EXIT_FALSE_WITH_MSG ("types are not compatible");
+
+  if (TREE_CODE (t1) == RECORD_TYPE && TREE_CODE (t2) == RECORD_TYPE)
+  {
+    tree ctx1 = DECL_CONTEXT (t1);
+    tree ctx2 = DECL_CONTEXT (t2);
+
+    if (TYPE_BINFO (ctx1) && TYPE_BINFO (ctx2) && polymorphic_type_binfo_p (TYPE_BINFO (ctx1)) && polymorphic_type_binfo_p (TYPE_BINFO (ctx2)))
+    if (!types_same_for_odr (t1, t2))
+      {
+	// TODO: remove after development
+        gcc_unreachable ();
+
+	SE_EXIT_FALSE_WITH_MSG ("polymorphic types detected");
+      }
+  }
 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
@@ -1748,10 +1759,7 @@ sem_function::compare_operand (tree t1, tree t2,
 	SE_EXIT_DEBUG (ret);
       }
     default:
-      // TODO:Martin remove after development
-      debug_tree (t1);
-      gcc_unreachable ();
-      return false;
+      SE_EXIT_FALSE_WITH_MSG ("Unknown TREE code reached")
     }
 }
 
@@ -1938,13 +1946,7 @@ sem_variable::equals (tree t1, tree t2)
     case ERROR_MARK:
       SE_EXIT_FALSE_WITH_MSG ("ERROR_MARK");
     default:
-      {
-	// TODO: remove after development
-	debug_tree (t1);
-	debug_tree (t2);
-	gcc_unreachable ();
-	return false;
-      }
+      SE_EXIT_FALSE_WITH_MSG ("Unknown TREE code reached")
     }
 }
 

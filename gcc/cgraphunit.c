@@ -2353,8 +2353,8 @@ cgraph_make_wrapper (struct cgraph_node *source, struct cgraph_node *target)
     /* Preserve DECL_RESULT so we get right by reference flag.  */
     tree decl_result = DECL_RESULT (source->decl);
 
-    /* Remove the function's body.  */
-    cgraph_release_function_body (source);
+    /* Profile merge operation removes the function's body.  */
+    cgraph_remove_node (source);
     cgraph_reset_node (source);
 
     DECL_RESULT (source->decl) = decl_result;
