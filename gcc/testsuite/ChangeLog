@@ -1,3 +1,64 @@
+2014-06-10  Alan Lawrence  <alan.lawrence@arm.com>
+
+	PR target/59843
+	* gcc.dg/vect/vect-singleton_1.c: New file.
+
+2014-06-12  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/61443
+	* gcc.target/avr/torture/pr61443.c: New test.
+
+2014-06-11  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/19200
+	* g++.dg/parse/friend11.C: New.
+
+2014-06-11  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/60265
+	* g++.dg/cpp0x/using-enum-1.C: New.
+	* g++.dg/cpp0x/using-enum-2.C: Likewise.
+
+2014-06-11  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/19200
+	* g++.dg/parse/friend9.C: New.
+	* g++.dg/parse/friend10.C: Likewise.
+	* g++.dg/parse/friend7.C: Adjust.
+
+2014-06-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/61452
+	* gcc.dg/torture/pr61452.c: New testcase.
+
+2014-06-11  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/34049
+	* g++.dg/parse/pr34049.C: New.
+
+2014-06-11  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	* gcc.c-torture/execute/pr61306-1.c: New test.
+	* gcc.c-torture/execute/pr61306-2.c: Likewise.
+	* gcc.c-torture/execute/pr61306-3.c: Likewise.
+
+2014-06-11  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/acle/acle.exp: New.
+	* gcc.target/aarch64/acle/crc32b.c: New test.
+	* gcc.target/aarch64/acle/crc32cb.c: Likewise.
+	* gcc.target/aarch64/acle/crc32cd.c: Likewise.
+	* gcc.target/aarch64/acle/crc32ch.c: Likewise.
+	* gcc.target/aarch64/acle/crc32cw.c: Likewise.
+	* gcc.target/aarch64/acle/crc32d.c: Likewise.
+	* gcc.target/aarch64/acle/crc32h.c: Likewise.
+	* gcc.target/aarch64/acle/crc32w.c: Likewise.
+
+2014-06-11  Evgeny Stupachenko  <evstupac@gmail.com>
+
+	PR tree-optimization/52252
+	* gcc.dg/vect/pr52252-st.c: Test on stores group of size 3.
+
 2014-06-11  Richard Biener  <rguenther@suse.de>
 
 	PR middle-end/61437
