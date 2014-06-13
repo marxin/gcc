@@ -233,6 +233,10 @@ public:
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file) = 0;
 
+  /* Compare two types if are same aliases in case of strict aliasing
+     is enabled.  */
+  static bool compare_for_aliasing (tree t1, tree t2);
+
   /* Item type.  */
   enum sem_item_type type;
 

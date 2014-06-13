@@ -276,6 +276,22 @@ sem_item::dump (void)
     }
 }
 
+/* Compare two types if are same aliases in case of strict aliasing
+   is enabled.  */
+bool
+sem_item::compare_for_aliasing (tree t1, tree t2)
+{
+  if (flag_strict_aliasing)
+    {
+      alias_set_type s1 = get_deref_alias_set (TREE_TYPE (t1));
+      alias_set_type s2 = get_deref_alias_set (TREE_TYPE (t2));
+
+      return s1 == s2;
+    }
+
+  return true;
+}
+
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
 sem_function::sem_function (bitmap_obstack *stack): sem_item (FUNC, stack),
@@ -709,7 +725,7 @@ sem_function::merge (sem_item *alias_item)
       /* The alias function is removed just if symbol address
          does not matters.  */
       if (!alias_address_matters)
-        cgraph_remove_node (alias);
+	cgraph_remove_node (alias);
 
       if (dump_file && redirected)
 	fprintf (dump_file, "Callgraph local calls have been redirected.\n\n");
@@ -733,12 +749,12 @@ sem_function::merge (sem_item *alias_item)
   else if (create_thunk)
     {
       if (DECL_COMDAT_GROUP (alias->decl))
-        {
-          if (dump_file)
+	{
+	  if (dump_file)
 	    fprintf (dump_file, "Callgraph thunk cannot be created because of COMDAT\n");
 
 	  return 0;
-      }
+	}
 
       ipa_merge_profiles (local_original, alias);
       cgraph_make_wrapper (alias, local_original);
@@ -1578,19 +1594,21 @@ sem_function::compare_operand (tree t1, tree t2,
     SE_EXIT_FALSE_WITH_MSG ("types are not compatible");
 
   if (TREE_CODE (t1) == RECORD_TYPE && TREE_CODE (t2) == RECORD_TYPE)
-  {
-    tree ctx1 = DECL_CONTEXT (t1);
-    tree ctx2 = DECL_CONTEXT (t2);
+    {
+      tree ctx1 = DECL_CONTEXT (t1);
+      tree ctx2 = DECL_CONTEXT (t2);
 
-    if (TYPE_BINFO (ctx1) && TYPE_BINFO (ctx2) && polymorphic_type_binfo_p (TYPE_BINFO (ctx1)) && polymorphic_type_binfo_p (TYPE_BINFO (ctx2)))
-    if (!types_same_for_odr (t1, t2))
-      {
-	// TODO: remove after development
-        gcc_unreachable ();
+      if (TYPE_BINFO (ctx1) && TYPE_BINFO (ctx2)
+	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx1))
+	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx2)))
+	if (!types_same_for_odr (t1, t2))
+	  {
+	    // TODO: remove after development
+	    gcc_unreachable ();
 
-	SE_EXIT_FALSE_WITH_MSG ("polymorphic types detected");
-      }
-  }
+	    SE_EXIT_FALSE_WITH_MSG ("polymorphic types detected");
+	  }
+    }
 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
@@ -1651,6 +1669,7 @@ sem_function::compare_operand (tree t1, tree t2,
 	x2 = TREE_OPERAND (t2, 0);
 	y1 = TREE_OPERAND (t1, 1);
 	y2 = TREE_OPERAND (t2, 1);
+
 	/* See if operand is an memory access (the test originate from
 	 gimple_load_p).
 
@@ -1659,17 +1678,12 @@ sem_function::compare_operand (tree t1, tree t2,
 	we seek for equivalency classes, so simply require inclussion in
 	both directions.  */
 
-	if (flag_strict_aliasing)
-	  {
-	    alias_set_type s1 = get_deref_alias_set (TREE_TYPE (y1));
-	    alias_set_type s2 = get_deref_alias_set (TREE_TYPE (y2));
-
-	    if (s1 != s2)
-	      SE_EXIT_FALSE_WITH_MSG ("strict aliasing types do not match");
-	  }
+	if (!sem_item::compare_for_aliasing (y1, y2))
+	  SE_EXIT_FALSE_WITH_MSG ("strict aliasing types do not match");
 
 	if (!compare_operand (x1, x2, func1, func2))
 	  SE_EXIT_FALSE_WITH_MSG ("");
+
 	/* Type of the offset on MEM_REF does not matter.  */
 	return wi::to_offset  (y1) == wi::to_offset  (y2);
       }
@@ -1904,15 +1918,18 @@ sem_variable::equals (tree t1, tree t2)
 	return true;
       }
     case MEM_REF:
-    case POINTER_PLUS_EXPR:
       {
 	tree x1 = TREE_OPERAND (t1, 0);
 	tree x2 = TREE_OPERAND (t2, 0);
 	tree y1 = TREE_OPERAND (t1, 1);
 	tree y2 = TREE_OPERAND (t2, 1);
 
-	// TODO: strict aliasing
-	return (sem_variable::equals (x1, x2) && !sem_variable::equals (y1, y2));
+	if (!sem_item::compare_for_aliasing (y1, y2))
+	  SE_EXIT_FALSE_WITH_MSG ("strict aliasing types do not match");
+
+	/* Type of the offset on MEM_REF does not matter.  */
+	return sem_variable::equals (x1, x2)
+	       && wi::to_offset  (y1) == wi::to_offset  (y2);
       }
     case NOP_EXPR:
     case ADDR_EXPR:
@@ -1935,6 +1952,7 @@ sem_variable::equals (tree t1, tree t2)
       return operand_equal_p (t1, t2, OEP_ONLY_CONST);
     case COMPONENT_REF:
     case ARRAY_REF:
+    case POINTER_PLUS_EXPR:
       {
 	tree x1 = TREE_OPERAND (t1, 0);
 	tree x2 = TREE_OPERAND (t2, 0);
