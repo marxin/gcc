@@ -1,3 +1,58 @@
+2014-06-13  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	PR tree-optimization/61375
+	* tree-ssa-math-opts.c (init_symbolic_number): Cancel optimization if
+	symbolic number cannot be represented in an uint64_t.
+	(find_bswap_or_nop_1): Likewise.
+
+2014-06-12  Jan Hubicka  <hubicka@ucw.cz>
+
+	* symtab.c (symtab_node::reset_section): New method.
+	* cgraph.c (cgraph_node_cannot_be_local_p_1): Accept non-local
+	for localization.
+	* cgraph.h (reset_section): Declare.
+	* ipa-inline-analysis.c (do_estimate_growth): Check for comdat groups;
+	do not consider comdat locals.
+	* cgraphclones.c (set_new_clone_decl_and_node_flags): Get section
+	for new symbol.
+	* ipa-visiblity.c (cgraph_externally_visible_p): Cleanup.
+	(update_visibility_by_resolution_info): Consider UNDEF; fix checking;
+	reset sections of symbols dragged out of the comdats.
+	(function_and_variable_visibility): Reset sections of localized symbols.
+
+2014-06-12  Jan Hubicka  <hubicka@ucw.cz>
+
+	* tree-vect-data-refs.c (vect_can_force_dr_alignment_p): Reorg
+	to use symtab and decl_binds_to_current_def_p
+	* tree-vectorizer.c (increase_alignment): Increase alignment
+	of alias target, too.
+
+2014-06-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/61486
+	* gimplify.c (struct gimplify_omp_ctx): Add distribute field.
+	(gimplify_adjust_omp_clauses): Don't or in GOVD_LASTPRIVATE
+	if outer combined construct is distribute.
+	(gimplify_omp_for): For OMP_DISTRIBUTE set
+	gimplify_omp_ctxp->distribute.
+	* omp-low.c (scan_sharing_clauses) <case OMP_CLAUSE_SHARED>: For
+	GIMPLE_OMP_TEAMS, if decl isn't global in outer context, record
+	mapping into decl map.
+
+2014-06-12  Jason Merrill  <jason@redhat.com>
+
+	* common.opt (fabi-version): Change default to 0.
+
+2014-06-12  Jason Merrill  <jason@redhat.com>
+
+	* toplev.c (process_options): Reject -fabi-version=1.
+
+2014-06-12  Jeff Law  <law@redhat.com>
+
+        PR tree-optimization/61009
+	* tree-ssa-threadedge.c (thread_through_normal_block): Correct return
+	value when we stop processing a block due to problematic PHIs.
+
 2014-06-12  Alan Lawrence  <alan.lawrence@arm.com>
 
 	* config/aarch64/arm_neon.h (vmlaq_n_f64, vmlsq_n_f64, vrsrtsq_f64,

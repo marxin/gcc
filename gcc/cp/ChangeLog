@@ -1,3 +1,32 @@
+2014-06-12  Jason Merrill  <jason@redhat.com>
+
+	* call.c (convert_arg_to_ellipsis): Use abi_version_crosses.
+	* cvt.c (type_promotes_to): Likewise.
+	* mangle.c (write_type, write_expression): Likewise.
+	(write_name, write_template_arg): Likewise.
+	(mangle_decl): Make alias based on flag_abi_compat_version.
+	Emit -Wabi warning here.
+	(finish_mangling_internal): Not here.  Drop warn parm.
+	(finish_mangling_get_identifier, finish_mangling): Adjust.
+	(mangle_type_string, mangle_special_for_type): Adjust.
+	(mangle_ctor_vtbl_for_type, mangle_thunk): Adjust.
+	(mangle_guard_variable, mangle_tls_init_fn): Adjust.
+	(mangle_tls_wrapper_fn, mangle_ref_init_variable): Adjust.
+
+	* call.c (build_operator_new_call): Remove -fabi-version=1 support.
+	* class.c (walk_subobject_offsets, include_empty_classes): Likewise.
+	(layout_nonempty_base_or_field, end_of_class): Likewise.
+	(layout_empty_base, build_base_field, layout_class_type): Likewise.
+	(is_empty_class, add_vcall_offset_vtbl_entries_1): Likewise.
+	(layout_virtual_bases): Likewise.
+	* decl.c (compute_array_index_type): Likewise.
+	* mangle.c (write_mangled_name, write_prefix): Likewise.
+	(write_template_prefix, write_integer_cst, write_expression): Likewise.
+	(write_template_arg, write_array_type): Likewise.
+	* method.c (lazily_declare_fn): Likewise.
+	* rtti.c (get_pseudo_ti_index): Likewise.
+	* typeck.c (comp_array_types): Likewise.
+
 2014-06-11  Jan Hubicka  <hubicka@ucw.cz>
 
 	* vtable-class-hierarchy.c: Update handling for section names
