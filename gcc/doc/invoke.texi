@@ -377,7 +377,7 @@ Objective-C and Objective-C++ Dialects}.
 -fif-conversion2 -findirect-inlining @gol
 -finline-functions -finline-functions-called-once -finline-limit=@var{n} @gol
 -finline-small-functions -fipa-cp -fipa-cp-clone @gol
--fipa-pta -fipa-profile -fipa-pure-const -fipa-reference @gol
+-fipa-pta -fipa-profile -fipa-pure-const -fipa-reference -fipa-icf @gol
 -fira-algorithm=@var{algorithm} @gol
 -fira-region=@var{region} -fira-hoist-pressure @gol
 -fira-loop-pressure -fno-ira-share-save-slots @gol
@@ -6947,6 +6947,7 @@ also turns on the following optimization flags:
 -finline-small-functions @gol
 -findirect-inlining @gol
 -fipa-sra @gol
+-fipa-icf @gol
 -fisolate-erroneous-paths-dereference @gol
 -foptimize-sibling-calls @gol
 -fpartial-inlining @gol
@@ -7861,6 +7862,14 @@ Because this optimization can create multiple copies of functions,
 it may significantly increase code size
 (see @option{--param ipcp-unit-growth=@var{value}}).
 This flag is enabled by default at @option{-O3}.
+
+@item -fipa-icf
+@opindex fipa-icf
+Perform Identical Code Folding for functions and read-only variables.
+Behavior is similar to Gold Linker ICF optimization. Symbols proved
+as semantically equivalent are redirected to corresponding symbol. The pass
+sensitively decides for usage of alias, thunk or local redirection.
+This flag is enabled by default at @option{-O2}.
 
 @item -fisolate-erroneous-paths-dereference
 Detect paths which trigger erroneous or undefined behaviour due to
