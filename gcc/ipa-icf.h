@@ -135,6 +135,9 @@ public:
   /* Congruence class constructor for a new class with _ID.  */
   congruence_class (unsigned int _id);
 
+  /* Destructor.  */
+  ~congruence_class ();
+
   /* Dump function prints all class members to a FILE with an INDENT.  */
   void dump (FILE *file, unsigned int indent = 0) const;
 

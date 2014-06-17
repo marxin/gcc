@@ -110,7 +110,6 @@ func_checker::initialize (unsigned ssa_source, unsigned ssa_target)
     target_ssa_names.safe_push (-1);
 
   edge_map = new pointer_map <edge> ();
-
   decl_map = new pointer_map <tree> ();
 }
 
@@ -126,6 +125,8 @@ func_checker::release (void)
   delete decl_map;
   source_ssa_names.release();
   target_ssa_names.release();
+
+  initialized = false;
 }
 
 /* Verifies that trees T1 and T2 do correspond.  */
@@ -204,6 +205,11 @@ congruence_class::congruence_class (unsigned int _id): id(_id)
   members.create (2);
 }
 
+congruence_class::~congruence_class ()
+{
+  members.release ();
+}
+
 /* Constructor for key value pair, where _ITEM is key and _INDEX is a target.  */
 
 sem_usage_pair::sem_usage_pair (sem_item *_item, unsigned int _index):
@@ -254,6 +260,8 @@ sem_item::~sem_item ()
 
   for (unsigned i = 0; i < usages.length (); i++)
     delete usages[i];
+
+  usages.release ();
 }
 
 /* Dump function for debugging purpose.  */
@@ -319,6 +327,8 @@ sem_function::~sem_function ()
 
   free (bb_sizes);
   free (bb_sorted);
+
+  arg_types.release ();
 }
 
 /* Gets symbol name of the item.  */
@@ -397,7 +407,7 @@ sem_function::equals_wpa (sem_item *item)
 	SE_EXIT_FALSE_WITH_MSG ("NULL arg type");
 
       if (!types_compatible_p (arg_types[i], compared_func->arg_types[i]))
-        SE_EXIT_FALSE_WITH_MSG("argument type is different");
+	SE_EXIT_FALSE_WITH_MSG("argument type is different");
     }
 
   /* Result type checking.  */
@@ -413,6 +423,8 @@ bool
 sem_function::equals (sem_item *item)
 {
   bool eq = equals_private (item);
+
+  checker.release ();
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file,
@@ -2472,7 +2484,11 @@ sem_item_optimizer::filter_removed_items (void)
 
       if(!pointer_set_contains (removed_items_set, items[i]->node)
 	  && !no_body_function)
-	filtered.safe_push (items[i]);
+	{
+	  if (item->type == VAR || (!DECL_CXX_CONSTRUCTOR_P (item->decl)
+				    && DECL_CXX_DESTRUCTOR_P (item->decl)))
+	    filtered.safe_push (items[i]);
+	}
     }
   items.release ();
 
@@ -2636,6 +2652,7 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 
 		item->init ();
 		item->init_refs ();
+
 		init_called_count++;
 
 		for (unsigned j = 0; j < item->tree_refs.length (); j++)
@@ -2833,16 +2850,18 @@ sem_item_optimizer::traverse_congruence_split (const void *cls_ptr,
       if (in_work_list)
 	optimizer->worklist_remove (cls);
 
-      for (hash_table <congruence_class_group_hash>::iterator it =
-	     optimizer->classes.begin (); it != optimizer->classes.end (); ++it)
-	{
-	  for (unsigned int i = 0; i < (*it).classes.length (); i++)
-	    if ((*it).classes[i] == cls)
-	      {
-		(*it).classes.ordered_remove (i);
-		break;
-	      }
-	}
+      congruence_class_group g;
+      g.hash = cls->members[0]->get_hash ();
+
+      congruence_class_group *slot = optimizer->classes.find(&g);
+
+      for (unsigned int i = 0; i < slot->classes.length (); i++)
+	if (slot->classes[i] == cls)
+	  {
+	    slot->classes.ordered_remove (i);
+	    break;
+	  }
+
       /* New class will be inserted and integrated to work list.  */
       for (unsigned int i = 0; i < 2; i++)
 	optimizer->add_class (newclasses[i]);
