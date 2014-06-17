@@ -19,6 +19,6 @@ int main()
   return myarray.a - myarray_alias.a;
 }
 
-/* { dg-final { scan-ipa-dump "Varpool alias cannot be created (alias cycle)." "icf"  } } */
+/* { dg-final { scan-ipa-dump "Varpool alias cannot be created \\(alias cycle\\)." "icf"  } } */
 /* { dg-final { scan-ipa-dump "Equal symbols: 1" "icf"  } } */
 /* { dg-final { cleanup-ipa-dump "icf" } } */

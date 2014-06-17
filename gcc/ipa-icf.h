@@ -492,6 +492,9 @@ private:
   /* Compares trees T1 and T2 for semantic equality.  */
   static bool equals (tree t1, tree t2);
 
+  /* Compare that symbol sections are either NULL or have same name.  */
+  bool compare_sections (sem_variable *alias);
+
 }; // class sem_variable
 
 class sem_item_optimizer;

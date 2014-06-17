@@ -391,8 +391,14 @@ sem_function::equals_wpa (sem_item *item)
 
   /* Checking types of arguments.  */
   for (unsigned i = 0; i < arg_count; i++)
-    if (!types_compatible_p (arg_types[i], compared_func->arg_types[i]))
-      SE_EXIT_FALSE_WITH_MSG("argument type is different");
+    {
+      /* This guard is here for function pointer with attributes (pr59927.c).  */
+      if (!arg_types[i] || !compared_func->arg_types[i])
+	SE_EXIT_FALSE_WITH_MSG ("NULL arg type");
+
+      if (!types_compatible_p (arg_types[i], compared_func->arg_types[i]))
+        SE_EXIT_FALSE_WITH_MSG("argument type is different");
+    }
 
   /* Result type checking.  */
   if (!types_compatible_p (result_type, compared_func->result_type))
@@ -1602,12 +1608,7 @@ sem_function::compare_operand (tree t1, tree t2,
 	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx1))
 	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx2)))
 	if (!types_same_for_odr (t1, t2))
-	  {
-	    // TODO: remove after development
-	    gcc_unreachable ();
-
-	    SE_EXIT_FALSE_WITH_MSG ("polymorphic types detected");
-	  }
+	  SE_EXIT_FALSE_WITH_MSG ("polymorphic types detected");
     }
 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
@@ -2026,6 +2027,8 @@ sem_variable::init_refs (void)
   parse_tree_refs (ctor);
 }
 
+/* References independent hash function.  */
+
 hashval_t
 sem_variable::get_hash (void)
 {
@@ -2046,7 +2049,8 @@ sem_variable::get_hash (void)
   return hash;
 }
 
-/* References independent hash function.  */
+/* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
+   be applied.  */
 
 bool
 sem_variable::merge (sem_item *alias_item)
@@ -2071,7 +2075,8 @@ sem_variable::merge (sem_item *alias_item)
 
   gcc_assert (!TREE_ASM_WRITTEN (alias->decl));
 
-  if (original_discardable || DECL_EXTERNAL (alias_var->decl))
+  if (original_discardable || DECL_EXTERNAL (alias_var->decl) ||
+      !compare_sections (alias_var))
     {
       if (dump_file)
 	fprintf (dump_file, "Varpool alias cannot be created\n\n");
@@ -2108,6 +2113,20 @@ sem_variable::merge (sem_item *alias_item)
 
       return true;
     }
+}
+
+bool
+sem_variable::compare_sections (sem_variable *alias)
+{
+  const char *source = node->get_section ();
+  const char *target = alias->node->get_section();
+
+  if (source == NULL && target == NULL)
+    return true;
+  else if(!source || !target)
+    return false;
+  else
+    return strcmp (source, target) == 0;
 }
 
 /* Dump symbol to FILE.  */
