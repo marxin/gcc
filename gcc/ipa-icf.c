@@ -261,7 +261,11 @@ sem_item::~sem_item ()
   for (unsigned i = 0; i < usages.length (); i++)
     delete usages[i];
 
+  refs.release ();
+  tree_refs.release ();
   usages.release ();
+
+  BITMAP_FREE (usage_index_bitmap);
 }
 
 /* Dump function for debugging purpose.  */
@@ -2231,12 +2235,17 @@ sem_item_optimizer::~sem_item_optimizer ()
 
   for (hash_table<congruence_class_group_hash>::iterator it = classes.begin ();
        it != classes.end (); ++it)
-    for (unsigned int i = 0; i < (*it).classes.length (); i++)
-      delete (*it).classes[i];
+    {
+      for (unsigned int i = 0; i < (*it).classes.length (); i++)
+	delete (*it).classes[i];
+
+      (*it).classes.release ();
+    }
 
   classes.dispose ();
-
   worklist.dispose ();
+
+  items.release ();
 
   if (split_map != NULL)
     delete split_map;
@@ -2486,14 +2495,17 @@ sem_item_optimizer::filter_removed_items (void)
 	  && !no_body_function)
 	{
 	  if (item->type == VAR || (!DECL_CXX_CONSTRUCTOR_P (item->decl)
-				    && DECL_CXX_DESTRUCTOR_P (item->decl)))
+				    && !DECL_CXX_DESTRUCTOR_P (item->decl)))
 	    filtered.safe_push (items[i]);
 	}
     }
+
   items.release ();
 
   for (unsigned int i = 0; i < filtered.length(); i++)
     items.safe_push (filtered[i]);
+
+  filtered.release ();
 }
 
 /* Optimizer entry point.  */
@@ -2747,6 +2759,8 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 
 	      for (unsigned int j = 0; j < new_vector.length (); j++)
 		add_item_to_class (c, new_vector[j]);
+
+	      new_vector.release ();
 	    }
 	}
     }
@@ -3199,14 +3213,17 @@ congruence_class::is_class_used (void)
 /* Initialization and computation of symtab node hash, there data
    are propagated later on.  */
 
-static sem_item_optimizer optimizer;
+static sem_item_optimizer *optimizer = NULL;
 
 /* Generate pass summary for IPA ICF pass.  */
 
 static void
 ipa_icf_generate_summary (void)
 {
-  optimizer.parse_funcs_and_vars ();
+  if (!optimizer)
+    optimizer = new sem_item_optimizer ();
+
+  optimizer->parse_funcs_and_vars ();
 }
 
 /* Write pass summary for IPA ICF pass.  */
@@ -3214,7 +3231,9 @@ ipa_icf_generate_summary (void)
 static void
 ipa_icf_write_summary (void)
 {
-  optimizer.write_summary ();
+  gcc_assert (optimizer);
+
+  optimizer->write_summary ();
 }
 
 /* Read pass summary for IPA ICF pass.  */
@@ -3222,8 +3241,11 @@ ipa_icf_write_summary (void)
 static void
 ipa_icf_read_summary (void)
 {
-  optimizer.read_summary ();
-  optimizer.register_hooks ();
+  if (!optimizer)
+    optimizer = new sem_item_optimizer ();
+
+  optimizer->read_summary ();
+  optimizer->register_hooks ();
 }
 
 /* Semantic equality exection function.  */
@@ -3231,8 +3253,12 @@ ipa_icf_read_summary (void)
 static unsigned int
 ipa_icf_driver (void)
 {
-  optimizer.execute ();
-  optimizer.unregister_hooks ();
+  gcc_assert (optimizer);
+
+  optimizer->execute ();
+  optimizer->unregister_hooks ();
+
+  delete optimizer;
 
   return 0;
 }
