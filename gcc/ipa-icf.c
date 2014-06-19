@@ -2556,38 +2556,40 @@ sem_item_optimizer::parse_funcs_and_vars (void)
   struct cgraph_node *cnode;
   sem_item **slot;
 
-  FOR_EACH_DEFINED_FUNCTION (cnode)
-  {
-    sem_function *f = sem_function::parse (cnode, &bmstack);
-    if (f)
-      {
-	items.safe_push (f);
-	slot = symtab_node_map.insert (cnode);
-	*slot = f;
+  if (flag_ipa_icf_functions)
+    FOR_EACH_DEFINED_FUNCTION (cnode)
+    {
+      sem_function *f = sem_function::parse (cnode, &bmstack);
+      if (f)
+	{
+	  items.safe_push (f);
+	  slot = symtab_node_map.insert (cnode);
+	  *slot = f;
 
-	if (dump_file)
-	  fprintf (dump_file, "Parsed function:%s\n", f->asm_name ());
+	  if (dump_file)
+	    fprintf (dump_file, "Parsed function:%s\n", f->asm_name ());
 
-	if (dump_file && (dump_flags & TDF_DETAILS))
-	  f->dump_to_file (dump_file);
-      }
-    else if (dump_file)
-      fprintf (dump_file, "Not parsed function:%s\n", cnode->asm_name ());
-  }
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    f->dump_to_file (dump_file);
+	}
+      else if (dump_file)
+	fprintf (dump_file, "Not parsed function:%s\n", cnode->asm_name ());
+    }
 
   varpool_node *vnode;
 
-  FOR_EACH_DEFINED_VARIABLE (vnode)
-  {
-    sem_variable *v = sem_variable::parse (vnode, &bmstack);
+  if (flag_ipa_icf_variables)
+    FOR_EACH_DEFINED_VARIABLE (vnode)
+    {
+      sem_variable *v = sem_variable::parse (vnode, &bmstack);
 
-    if (v)
-      {
-	items.safe_push (v);
-	slot = symtab_node_map.insert (vnode);
-	*slot = v;
-      }
-  }
+      if (v)
+	{
+	  items.safe_push (v);
+	  slot = symtab_node_map.insert (vnode);
+	  *slot = v;
+	}
+    }
 }
 
 /* Makes pairing between a congruence class CLS and semantic ITEM.  */

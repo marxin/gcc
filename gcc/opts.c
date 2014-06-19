@@ -1908,6 +1908,13 @@ common_handle_option (struct gcc_options *opts,
 	opts->x_flag_wrapv = 0;
       break;
 
+    case OPT_fipa_icf:
+      if (!opts_set->x_flag_ipa_icf_functions)
+	opts->x_flag_ipa_icf_functions = true;
+      if (!opts_set->x_flag_ipa_icf_variables)
+	opts->x_flag_ipa_icf_variables = true;
+      break;
+
     default:
       /* If the flag was handled in a standard way, assume the lack of
 	 processing here is intentional.  */
