@@ -34,7 +34,7 @@ along with GCC; see the file COPYING3.  If not see
    Optimization pass arranges as follows:
    1) All functions and read-only variables are visited and internal
       data structure, either sem_function or sem_variables is created.
-   2) For every symbol from the previoues step, VAR_DECL and FUNCTION_DECL are
+   2) For every symbol from the previous step, VAR_DECL and FUNCTION_DECL are
       saved and matched to corresponding sem_items.
    3) These declaration are ignored for equality check and are solved
       by Value Numbering algorithm published by Alpert, Zadeck in 1992.
@@ -44,7 +44,7 @@ along with GCC; see the file COPYING3.  If not see
       We must prove that all SSA names, declarations and other items
       correspond.
    6) Value Numbering is executed for these classes. At the end of the process
-      all symbol members in remaining classes can be mrged.
+      all symbol members in remaining classes can be merged.
    7) Merge operation creates alias in case of read-only variables. For
       callgraph node, we must decide if we can redirect local calls,
       create an alias or a thunk.
@@ -86,47 +86,33 @@ along with GCC; see the file COPYING3.  If not see
 
 namespace {
 
-func_checker::func_checker (): initialized (false)
-{
-}
-
 /* Itializes internal structures according to given number of
    source and target SSA names. The number of source names is SSA_SOURCE,
    respectively SSA_TARGET.  */
 
-void
-func_checker::initialize (unsigned ssa_source, unsigned ssa_target)
+func_checker::func_checker (unsigned ssa_source, unsigned ssa_target)
 {
-  release ();
-  initialized = true;
-
-  source_ssa_names.create (ssa_source);
-  target_ssa_names.create (ssa_target);
+  m_source_ssa_names.create (ssa_source);
+  m_target_ssa_names.create (ssa_target);
 
   for (unsigned int i = 0; i < ssa_source; i++)
-    source_ssa_names.safe_push (-1);
+    m_source_ssa_names.safe_push (-1);
 
   for (unsigned int i = 0; i < ssa_target; i++)
-    target_ssa_names.safe_push (-1);
+    m_target_ssa_names.safe_push (-1);
 
-  edge_map = new pointer_map <edge> ();
-  decl_map = new pointer_map <tree> ();
+  m_edge_map = new pointer_map <edge> ();
+  m_decl_map = new pointer_map <tree> ();
 }
 
 /* Memory release routine.  */
 
-void
-func_checker::release (void)
+func_checker::~func_checker ()
 {
-  if (!initialized)
-    return;
-
-  delete edge_map;
-  delete decl_map;
-  source_ssa_names.release();
-  target_ssa_names.release();
-
-  initialized = false;
+  delete m_edge_map;
+  delete m_decl_map;
+  m_source_ssa_names.release();
+  m_target_ssa_names.release();
 }
 
 /* Verifies that trees T1 and T2 do correspond.  */
@@ -137,14 +123,14 @@ func_checker::compare_ssa_name (tree t1, tree t2)
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
 
-  if (source_ssa_names[i1] == -1)
-    source_ssa_names[i1] = i2;
-  else if (source_ssa_names[i1] != (int) i2)
+  if (m_source_ssa_names[i1] == -1)
+    m_source_ssa_names[i1] = i2;
+  else if (m_source_ssa_names[i1] != (int) i2)
     return false;
 
-  if(target_ssa_names[i2] == -1)
-    target_ssa_names[i2] = i1;
-  else if (target_ssa_names[i2] != (int) i1)
+  if(m_target_ssa_names[i2] == -1)
+    m_target_ssa_names[i2] = i1;
+  else if (m_target_ssa_names[i2] != (int) i1)
     return false;
 
   return true;
@@ -158,16 +144,15 @@ func_checker::compare_edge (edge e1, edge e2)
   if (e1->flags != e2->flags)
     return false;
 
-  edge *slot = edge_map->contains (e1);
-  if (slot)
+  bool existed_p;
+
+  edge *slot = m_edge_map->insert (e1, &existed_p);
+  if (existed_p)
     {
       SE_EXIT_DEBUG (*slot == e2);
     }
   else
-    {
-      slot = edge_map->insert (e1);
       *slot = e2;
-    }
 
   return true;
 }
@@ -184,16 +169,15 @@ func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
   if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
     SE_EXIT_FALSE ();
 
-  tree *slot = decl_map->contains (t1);
-  if (slot)
+  bool existed_p;
+
+  tree *slot = m_decl_map->insert (t1, &existed_p);
+  if (existed_p)
     {
       SE_EXIT_DEBUG (*slot == t2);
     }
   else
-    {
-      slot = decl_map->insert (t1);
       *slot = t2;
-    }
 
   return true;
 }
@@ -288,8 +272,8 @@ sem_item::dump (void)
     }
 }
 
-/* Compare two types if are same aliases in case of strict aliasing
-   is enabled.  */
+/* If strict aliasing is enabled, function compares if given types are
+   in the same alias set.  */
 bool
 sem_item::compare_for_aliasing (tree t1, tree t2)
 {
@@ -307,7 +291,7 @@ sem_item::compare_for_aliasing (tree t1, tree t2)
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
 sem_function::sem_function (bitmap_obstack *stack): sem_item (FUNC, stack),
-  compared_func (NULL)
+  m_checker (NULL), m_compared_func (NULL)
 {
   arg_types.create (0);
 }
@@ -316,7 +300,8 @@ sem_function::sem_function (bitmap_obstack *stack): sem_item (FUNC, stack),
     Bitmap STACK is used for memory allocation.  */
 sem_function::sem_function (cgraph_node *node, hashval_t hash,
 			    bitmap_obstack *stack):
-  sem_item (FUNC, node, hash, stack), bb_sorted (NULL), compared_func (NULL)
+  sem_item (FUNC, node, hash, stack), bb_sorted (NULL),
+  m_checker (NULL), m_compared_func (NULL)
 {
   arg_types.create (0);
 }
@@ -392,43 +377,44 @@ sem_function::get_hash (void)
 bool
 sem_function::equals_wpa (sem_item *item)
 {
-  if (item->type != FUNC)
+  if(item->type != FUNC)
     return false;
 
-  compared_func = static_cast<sem_function *> (item);
+  m_compared_func = static_cast<sem_function *> (item);
 
-  if (arg_count != compared_func->arg_count)
+  if (arg_types.length () != m_compared_func->arg_types.length ())
     SE_EXIT_FALSE_WITH_MSG ("different number of arguments");
 
-  gcc_assert (arg_count == arg_types.length ());
-  gcc_assert (compared_func->arg_count == compared_func->arg_types.length ());
-
   /* Checking types of arguments.  */
-  for (unsigned i = 0; i < arg_count; i++)
+  for (unsigned i = 0; i < arg_types.length (); i++)
     {
       /* This guard is here for function pointer with attributes (pr59927.c).  */
-      if (!arg_types[i] || !compared_func->arg_types[i])
+      if (!arg_types[i] || !m_compared_func->arg_types[i])
 	SE_EXIT_FALSE_WITH_MSG ("NULL arg type");
 
-      if (!types_compatible_p (arg_types[i], compared_func->arg_types[i]))
+      if (!types_compatible_p (arg_types[i], m_compared_func->arg_types[i]))
 	SE_EXIT_FALSE_WITH_MSG("argument type is different");
     }
 
   /* Result type checking.  */
-  if (!types_compatible_p (result_type, compared_func->result_type))
+  if (!types_compatible_p (result_type, m_compared_func->result_type))
     SE_EXIT_FALSE_WITH_MSG("result types are different");
 
   return true;
 }
 
-/* Returns true if the item equals to ITEM given as arguemnt.  */
+/* Returns true if the item equals to ITEM given as argument.  */
 
 bool
 sem_function::equals (sem_item *item)
 {
   bool eq = equals_private (item);
 
-  checker.release ();
+  if (m_checker != NULL)
+    {
+      delete m_checker;
+      m_checker = NULL;
+    }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file,
@@ -454,14 +440,13 @@ sem_function::equals_private (sem_item *item)
   bool result = true;
   tree arg1, arg2;
 
-  compared_func = static_cast<sem_function *> (item);
+  m_compared_func = static_cast<sem_function *> (item);
 
   gcc_assert (decl != item->decl);
 
-  if (arg_count != compared_func->arg_count
-      || bb_count != compared_func->bb_count
-      || edge_count != compared_func->edge_count
-      || cfg_checksum != compared_func->cfg_checksum)
+  if (bb_count != m_compared_func->bb_count
+      || edge_count != m_compared_func->edge_count
+      || cfg_checksum != m_compared_func->cfg_checksum)
     SE_EXIT_FALSE();
 
   if (!equals_wpa (item))
@@ -469,7 +454,7 @@ sem_function::equals_private (sem_item *item)
 
   /* Checking function arguments.  */
   tree decl1 = DECL_ATTRIBUTES (decl);
-  tree decl2 = DECL_ATTRIBUTES (compared_func->decl);
+  tree decl2 = DECL_ATTRIBUTES (m_compared_func->decl);
 
   while (decl1)
     {
@@ -486,7 +471,7 @@ sem_function::equals_private (sem_item *item)
 	{
 	  bool ret = compare_operand (TREE_VALUE (attr_value1),
 				      TREE_VALUE (attr_value2), decl,
-				      compared_func->decl);
+				      m_compared_func->decl);
 	  if (!ret)
 	    SE_EXIT_FALSE_WITH_MSG ("attribute values are different")
 	  }
@@ -502,21 +487,21 @@ sem_function::equals_private (sem_item *item)
   if (decl1 != decl2)
     SE_EXIT_FALSE();
 
-  checker.initialize (ssa_names_size, compared_func->ssa_names_size);
+  m_checker = new func_checker (ssa_names_size, m_compared_func->ssa_names_size);
 
-  for (arg1 = DECL_ARGUMENTS (decl), arg2 = DECL_ARGUMENTS (compared_func->decl);
+  for (arg1 = DECL_ARGUMENTS (decl), arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
-    checker.compare_decl (arg1, arg2, decl, compared_func->decl);
+    m_checker->compare_decl (arg1, arg2, decl, m_compared_func->decl);
 
   /* Exception handling regions comparison.  */
-  if (!compare_eh_region (region_tree, compared_func->region_tree, decl,
-			  compared_func->decl))
+  if (!compare_eh_region (region_tree, m_compared_func->region_tree, decl,
+			  m_compared_func->decl))
     SE_EXIT_FALSE();
 
   /* Checking all basic blocks.  */
   for (unsigned i = 0; i < bb_count; ++i)
-    if(!compare_bb (bb_sorted[i], compared_func->bb_sorted[i], decl,
-		    compared_func->decl))
+    if(!compare_bb (bb_sorted[i], m_compared_func->bb_sorted[i], decl,
+		    m_compared_func->decl))
       SE_EXIT_FALSE();
 
   SE_DUMP_MESSAGE ("All BBs are equal\n");
@@ -528,7 +513,7 @@ sem_function::equals_private (sem_item *item)
       memset (bb_dict, -1, (bb_count + 2) * sizeof (int));
 
       bb1 = bb_sorted[i]->bb;
-      bb2 = compared_func->bb_sorted[i]->bb;
+      bb2 = m_compared_func->bb_sorted[i]->bb;
 
       ei2 = ei_start (bb2->preds);
 
@@ -536,16 +521,16 @@ sem_function::equals_private (sem_item *item)
 	{
 	  ei_cond (ei2, &e2);
 
+	  if (e1->flags != e2->flags)
+	    SE_EXIT_FALSE_WITH_MSG("flags comparison returns false");
+
 	  if (!bb_dict_test (bb_dict, e1->src->index, e2->src->index))
 	    SE_EXIT_FALSE_WITH_MSG("edge comparison returns false");
 
 	  if (!bb_dict_test (bb_dict, e1->dest->index, e2->dest->index))
 	    SE_EXIT_FALSE_WITH_MSG("BB comparison returns false");
 
-	  if (e1->flags != e2->flags)
-	    SE_EXIT_FALSE_WITH_MSG("flags comparison returns false");
-
-	  if (!checker.compare_edge (e1, e2))
+	  if (!m_checker->compare_edge (e1, e2))
 	    SE_EXIT_FALSE_WITH_MSG("edge comparison returns false");
 
 	  ei_next (&ei2);
@@ -554,8 +539,8 @@ sem_function::equals_private (sem_item *item)
 
   /* Basic block PHI nodes comparison.  */
   for (unsigned i = 0; i < bb_count; i++)
-    if (!compare_phi_node (bb_sorted[i]->bb, compared_func->bb_sorted[i]->bb,
-			   decl, compared_func->decl))
+    if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb,
+			   decl, m_compared_func->decl))
       SE_EXIT_FALSE_WITH_MSG ("PHI node comparison returns false");
 
   return result;
@@ -619,7 +604,7 @@ sem_function::init_refs (void)
 	      {
 		tree funcdecl = gimple_call_fndecl (stmt);
 
-		/* Function pointer variables are not support yet.  */
+		/* Function pointer variables are not supported yet.  */
 		if (funcdecl)
 		  tree_refs.safe_push (funcdecl);
 
@@ -744,8 +729,8 @@ sem_function::merge (sem_item *alias_item)
 	  redirected = true;
 	}
 
-      /* The alias function is removed just if symbol address
-         does not matters.  */
+      /* The alias function is removed if symbol address
+         does not matter.  */
       if (!alias_address_matters)
 	cgraph_remove_node (alias);
 
@@ -936,8 +921,6 @@ sem_function::parse_tree_args (void)
 
       result_type = TREE_TYPE (TREE_TYPE (decl));
     }
-
-  arg_count = arg_types.length ();
 }
 
 /* Basic block equivalence comparison function that returns true if
@@ -959,8 +942,11 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
 
   for (i = 0; i < bb1->nondbg_stmt_count; i++)
     {
-      gsi_next_nondebug_stmt (gsi1);
-      gsi_next_nondebug_stmt (gsi2);
+      if (is_gimple_debug (gsi_stmt (gsi1)))	
+        gsi_next_nondebug (&gsi1);
+
+      if (is_gimple_debug (gsi_stmt (gsi2)))
+        gsi_next_nondebug (&gsi2);
 
       s1 = gsi_stmt (gsi1);
       s2 = gsi_stmt (gsi2);
@@ -1024,8 +1010,7 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
 }
 
 /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
-   true value is returned if phi nodes are sematically
-   equivalent in these blocks .  */
+   return true if phi nodes are sematically equivalent in these blocks .  */
 
 bool
 sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
@@ -1044,8 +1029,8 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
   for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1);
        gsi_next (&si1))
     {
-      gsi_next_nonvirtual_phi (si1);
-      gsi_next_nonvirtual_phi (si2);
+      gsi_next_nonvirtual_phi (&si1);
+      gsi_next_nonvirtual_phi (&si2);
 
       if (gsi_end_p (si1) && gsi_end_p (si2))
 	break;
@@ -1073,7 +1058,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
 	  e1 = gimple_phi_arg_edge (phi1, i);
 	  e2 = gimple_phi_arg_edge (phi2, i);
 
-	  if (!checker.compare_edge (e1, e2))
+	  if (!m_checker->compare_edge (e1, e2))
 	    SE_EXIT_FALSE ();
 	}
 
@@ -1223,48 +1208,6 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
   return false;
 }
 
-/* Iterates GSI statement iterator to the next non-debug statement.  */
-
-void
-sem_function::gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi)
-{
-  gimple s;
-
-  s = gsi_stmt (gsi);
-
-  while (gimple_code (s) == GIMPLE_DEBUG)
-    {
-      gsi_next (&gsi);
-      gcc_assert (!gsi_end_p (gsi));
-
-      s = gsi_stmt (gsi);
-    }
-}
-
-/* Iterates GSI statement iterator to the next non-virtual statement.  */
-
-void
-sem_function::gsi_next_nonvirtual_phi (gimple_stmt_iterator &it)
-{
-  gimple phi;
-
-  if (gsi_end_p (it))
-    return;
-
-  phi = gsi_stmt (it);
-  gcc_assert (phi != NULL);
-
-  while (virtual_operand_p (gimple_phi_result (phi)))
-    {
-      gsi_next (&it);
-
-      if (gsi_end_p (it))
-	return;
-
-      phi = gsi_stmt (it);
-    }
-}
-
 /* Verifies that trees T1 and T2 do correspond.  */
 
 bool
@@ -1274,7 +1217,7 @@ sem_function::compare_function_decl (tree t1, tree t2)
     return true;
 
   bool ret = pointer_set_contains (tree_refs_set, t1)
-	     && pointer_set_contains (compared_func->tree_refs_set, t2);
+	     && pointer_set_contains (m_compared_func->tree_refs_set, t2);
 
   if (ret)
     return true;
@@ -1298,12 +1241,12 @@ sem_function::compare_variable_decl (tree t1, tree t2, tree func1, tree func2)
     return true;
 
   bool ret = pointer_set_contains (tree_refs_set, t1)
-	     && pointer_set_contains (compared_func->tree_refs_set, t2);
+	     && pointer_set_contains (m_compared_func->tree_refs_set, t2);
 
   if (ret)
     return true;
 
-  ret = checker.compare_decl (t1, t2, func1, func2);
+  ret = m_checker->compare_decl (t1, t2, func1, func2);
 
   SE_EXIT_DEBUG (ret);
 }
@@ -1565,7 +1508,7 @@ sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
   tree b1, b2;
   bool ret;
 
-  if (!checker.compare_ssa_name (t1, t2))
+  if (!m_checker->compare_ssa_name (t1, t2))
     SE_EXIT_FALSE ();
 
   if (SSA_NAME_IS_DEFAULT_DEF (t1))
@@ -1585,7 +1528,7 @@ sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
 	  SE_EXIT_DEBUG (compare_variable_decl (t1, t2, func1, func2));
 	case PARM_DECL:
 	case RESULT_DECL:
-	  ret = checker.compare_decl (b1, b2, func1, func2);
+	  ret = m_checker->compare_decl (b1, b2, func1, func2);
 	  SE_EXIT_DEBUG (ret);
 	default:
 	  SE_EXIT_FALSE_WITH_MSG ("Unknown TREE code reached")
@@ -1630,11 +1573,11 @@ sem_function::compare_operand (tree t1, tree t2,
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
 
+  if (offset1 != offset2)
+    SE_EXIT_FALSE_WITH_MSG ("base offsets are different");
+
   if (base1 && base2)
     {
-      if (offset1 != offset2)
-	SE_EXIT_FALSE_WITH_MSG ("base offsets are different");
-
       t1 = base1;
       t2 = base2;
     }
@@ -1786,7 +1729,7 @@ sem_function::compare_operand (tree t1, tree t2,
     case CONST_DECL:
     case BIT_FIELD_REF:
       {
-	ret = checker.compare_decl (t1, t2, func1, func2);
+	ret = m_checker->compare_decl (t1, t2, func1, func2);
 	SE_EXIT_DEBUG (ret);
       }
     default:
@@ -1801,7 +1744,7 @@ sem_function::icf_handled_component_p (tree t)
 {
   enum tree_code tc = TREE_CODE (t);
 
-  return ((handled_component_p (t) && handled_component_p (t))
+  return ((handled_component_p (t))
 	  || tc == ADDR_EXPR || tc == MEM_REF || tc == REALPART_EXPR
 	  || tc == IMAGPART_EXPR || tc == OBJ_TYPE_REF);
 }
@@ -1895,7 +1838,7 @@ bool sem_variable::equals_wpa (sem_item *item)
   return item->type == VAR;
 }
 
-/* Returns true if the item equals to ITEM given as arguemnt.  */
+/* Returns true if the item equals to ITEM given as argument.  */
 
 bool
 sem_variable::equals (sem_item *item)
@@ -2218,23 +2161,23 @@ congruence_class_group_hash::equal (const congruence_class_group *item1,
 
 unsigned int sem_item_optimizer::class_id = 0;
 
-sem_item_optimizer::sem_item_optimizer (): classes_count (0), split_map (NULL),
-  cgraph_node_hooks (NULL), varpool_node_hooks (NULL)
+sem_item_optimizer::sem_item_optimizer (): m_classes_count (0), m_split_map (NULL),
+  m_cgraph_node_hooks (NULL), m_varpool_node_hooks (NULL)
 {
-  items.create (0);
-  removed_items_set = pointer_set_create ();
-  classes.create (0);
   worklist.create (0);
-  bitmap_obstack_initialize (&bmstack);
+  m_items.create (0);
+  m_removed_items_set = pointer_set_create ();
+  m_classes.create (0);
+  bitmap_obstack_initialize (&m_bmstack);
 }
 
 sem_item_optimizer::~sem_item_optimizer ()
 {
-  for (unsigned int i = 0; i < items.length (); i++)
-    delete items[i];
+  for (unsigned int i = 0; i < m_items.length (); i++)
+    delete m_items[i];
 
-  for (hash_table<congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
     {
       for (unsigned int i = 0; i < (*it).classes.length (); i++)
 	delete (*it).classes[i];
@@ -2242,16 +2185,16 @@ sem_item_optimizer::~sem_item_optimizer ()
       (*it).classes.release ();
     }
 
-  classes.dispose ();
+  m_classes.dispose ();
   worklist.dispose ();
 
-  items.release ();
+  m_items.release ();
 
-  if (split_map != NULL)
-    delete split_map;
+  if (m_split_map != NULL)
+    delete m_split_map;
 
-  bitmap_obstack_release (&bmstack);
-  pointer_set_destroy (removed_items_set);
+  bitmap_obstack_release (&m_bmstack);
+  pointer_set_destroy (m_removed_items_set);
 }
 
 /* Write IPA ICF summary for symbols.  */
@@ -2272,7 +2215,7 @@ sem_item_optimizer::write_summary (void)
     {
       struct symtab_node *node = lsei_node (lsei);
 
-      if (symtab_node_map.contains (node))
+      if (m_symtab_node_map.contains (node))
 	count++;
     }
 
@@ -2285,7 +2228,7 @@ sem_item_optimizer::write_summary (void)
     {
       struct symtab_node *node = lsei_node (lsei);
 
-      sem_item **item = symtab_node_map.contains (node);
+      sem_item **item = m_symtab_node_map.contains (node);
 
       if (item && *item)
 	{
@@ -2349,13 +2292,13 @@ sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
 	{
 	  cgraph_node *cnode = cgraph (node);
 
-	  items.safe_push (new sem_function (cnode, hash, &bmstack));
+	  m_items.safe_push (new sem_function (cnode, hash, &m_bmstack));
 	}
       else
 	{
 	  varpool_node *vnode = varpool (node);
 
-	  items.safe_push (new sem_variable (vnode, hash, &bmstack));
+	  m_items.safe_push (new sem_variable (vnode, hash, &m_bmstack));
 	}
     }
 
@@ -2389,10 +2332,10 @@ sem_item_optimizer::read_summary (void)
 void
 sem_item_optimizer::register_hooks (void)
 {
-  cgraph_node_hooks = cgraph_add_node_removal_hook (
+  m_cgraph_node_hooks = cgraph_add_node_removal_hook (
 			&sem_item_optimizer::cgraph_removal_hook, this);
 
-  varpool_node_hooks = varpool_add_node_removal_hook (
+  m_varpool_node_hooks = varpool_add_node_removal_hook (
 			 &sem_item_optimizer::varpool_removal_hook, this);
 }
 
@@ -2401,11 +2344,11 @@ sem_item_optimizer::register_hooks (void)
 void
 sem_item_optimizer::unregister_hooks (void)
 {
-  if (cgraph_node_hooks)
-    cgraph_remove_node_removal_hook (cgraph_node_hooks);
+  if (m_cgraph_node_hooks)
+    cgraph_remove_node_removal_hook (m_cgraph_node_hooks);
 
-  if (varpool_node_hooks)
-    varpool_remove_node_removal_hook (varpool_node_hooks);
+  if (m_varpool_node_hooks)
+    varpool_remove_node_removal_hook (m_varpool_node_hooks);
 }
 
 /* Adds a CLS to hashtable associated by hash value.  */
@@ -2428,7 +2371,7 @@ sem_item_optimizer::get_group_by_hash (hashval_t hash)
   congruence_class_group_t *item = XNEW (congruence_class_group_t);
   item->hash = hash;
 
-  congruence_class_group **slot = classes.find_slot (item, INSERT);
+  congruence_class_group **slot = m_classes.find_slot (item, INSERT);
 
   if (*slot)
     free (item);
@@ -2464,9 +2407,9 @@ sem_item_optimizer::varpool_removal_hook (struct varpool_node *node, void *data)
 void
 sem_item_optimizer::remove_symtab_node (struct symtab_node *node)
 {
-  gcc_assert (!classes.elements());
+  gcc_assert (!m_classes.elements());
 
-  pointer_set_insert (removed_items_set, node);
+  pointer_set_insert (m_removed_items_set, node);
 }
 
 /* Removes all callgraph and varpool nodes that are marked by symtab
@@ -2476,11 +2419,11 @@ void
 sem_item_optimizer::filter_removed_items (void)
 {
   vec <sem_item *> filtered;
-  filtered.create (items.length());
+  filtered.create (m_items.length());
 
-  for (unsigned int i = 0; i < items.length(); i++)
+  for (unsigned int i = 0; i < m_items.length(); i++)
     {
-      sem_item *item = items[i];
+      sem_item *item = m_items[i];
 
       if (!flag_ipa_icf_functions && item->type == FUNC)
 	continue;
@@ -2497,19 +2440,19 @@ sem_item_optimizer::filter_removed_items (void)
 	  no_body_function = in_lto_p && (cnode->alias || cnode->body_removed);
 	}
 
-      if(!pointer_set_contains (removed_items_set, items[i]->node)
+      if(!pointer_set_contains (m_removed_items_set, m_items[i]->node)
 	  && !no_body_function)
 	{
 	  if (item->type == VAR || (!DECL_CXX_CONSTRUCTOR_P (item->decl)
 				    && !DECL_CXX_DESTRUCTOR_P (item->decl)))
-	    filtered.safe_push (items[i]);
+	    filtered.safe_push (m_items[i]);
 	}
     }
 
-  items.release ();
+  m_items.release ();
 
   for (unsigned int i = 0; i < filtered.length(); i++)
-    items.safe_push (filtered[i]);
+    m_items.safe_push (filtered[i]);
 
   filtered.release ();
 }
@@ -2526,8 +2469,8 @@ sem_item_optimizer::execute (void)
     fprintf (dump_file, "Dump after hash based groups\n");
   dump_cong_classes ();
 
-  for (unsigned int i = 0; i < items.length(); i++)
-    items[i]->init_wpa ();
+  for (unsigned int i = 0; i < m_items.length(); i++)
+    m_items[i]->init_wpa ();
 
   subdivide_classes_by_equality (true);
 
@@ -2543,7 +2486,7 @@ sem_item_optimizer::execute (void)
 
   dump_cong_classes ();
 
-  unsigned int prev_class_count = classes_count;
+  unsigned int prev_class_count = m_classes_count;
 
   process_cong_reduction ();
   dump_cong_classes ();
@@ -2565,11 +2508,11 @@ sem_item_optimizer::parse_funcs_and_vars (void)
   if (flag_ipa_icf_functions)
     FOR_EACH_DEFINED_FUNCTION (cnode)
     {
-      sem_function *f = sem_function::parse (cnode, &bmstack);
+      sem_function *f = sem_function::parse (cnode, &m_bmstack);
       if (f)
 	{
-	  items.safe_push (f);
-	  slot = symtab_node_map.insert (cnode);
+	  m_items.safe_push (f);
+	  slot = m_symtab_node_map.insert (cnode);
 	  *slot = f;
 
 	  if (dump_file)
@@ -2587,12 +2530,12 @@ sem_item_optimizer::parse_funcs_and_vars (void)
   if (flag_ipa_icf_variables)
     FOR_EACH_DEFINED_VARIABLE (vnode)
     {
-      sem_variable *v = sem_variable::parse (vnode, &bmstack);
+      sem_variable *v = sem_variable::parse (vnode, &m_bmstack);
 
       if (v)
 	{
-	  items.safe_push (v);
-	  slot = symtab_node_map.insert (vnode);
+	  m_items.safe_push (v);
+	  slot = m_symtab_node_map.insert (vnode);
 	  *slot = v;
 	}
     }
@@ -2613,15 +2556,15 @@ sem_item_optimizer::add_item_to_class (congruence_class *cls, sem_item *item)
 void
 sem_item_optimizer::build_hash_based_classes (void)
 {
-  for (unsigned i = 0; i < items.length (); i++)
+  for (unsigned i = 0; i < m_items.length (); i++)
     {
-      sem_item *item = items[i];
+      sem_item *item = m_items[i];
 
       congruence_class_group_t *group = get_group_by_hash (item->get_hash ());
 
       if (!group->classes.length ())
 	{
-	  classes_count++;
+	  m_classes_count++;
 	  group->classes.safe_push (new congruence_class (class_id++));
 	}
 
@@ -2635,8 +2578,8 @@ sem_item_optimizer::build_hash_based_classes (void)
 void
 sem_item_optimizer::parse_nonsingleton_classes (void)
 {
-  for (hash_table <congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
     {
       for (unsigned i = 0; i < (*it).classes.length (); i++)
 	{
@@ -2648,7 +2591,7 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 		sem_item *item = c->members[j];
 		sem_item **slot;
 
-		slot = decl_map.insert (item->decl);
+		slot = m_decl_map.insert (item->decl);
 		*slot = item;
 
 	      }
@@ -2657,8 +2600,8 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 
   unsigned int init_called_count = 0;
 
-  for (hash_table <congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
     {
       /* We fill in all declarations for sem_items.  */
       for (unsigned i = 0; i < (*it).classes.length (); i++)
@@ -2677,7 +2620,7 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 
 		for (unsigned j = 0; j < item->tree_refs.length (); j++)
 		  {
-		    sem_item **result = decl_map.contains (item->tree_refs[j]);
+		    sem_item **result = m_decl_map.contains (item->tree_refs[j]);
 
 		    if(result)
 		      {
@@ -2696,7 +2639,7 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 
   if (dump_file)
     fprintf (dump_file, "Init called for %u items (%.2f%%).\n", init_called_count,
-	     100.0f * init_called_count / items.length ());
+	     100.0f * init_called_count / m_items.length ());
 }
 
 /* Equality function for semantic items is used to subdivide existing
@@ -2705,8 +2648,8 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 void
 sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 {
-  for (hash_table <congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
     {
       unsigned int class_count = (*it).classes.length ();
 
@@ -2753,7 +2696,7 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 		      if (!integrated)
 			{
 			  congruence_class *c = new congruence_class (class_id++);
-			  classes_count++;
+			  m_classes_count++;
 			  add_item_to_class (c, item);
 
 			  (*it).classes.safe_push (c);
@@ -2782,8 +2725,8 @@ void
 sem_item_optimizer::verify_classes (void)
 {
 #if ENABLE_CHECKING
-  for (hash_table <congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
     {
       for (unsigned int i = 0; i < (*it).classes.length (); i++)
 	{
@@ -2875,7 +2818,7 @@ sem_item_optimizer::traverse_congruence_split (const void *cls_ptr,
       congruence_class_group g;
       g.hash = cls->members[0]->get_hash ();
 
-      congruence_class_group *slot = optimizer->classes.find(&g);
+      congruence_class_group *slot = optimizer->m_classes.find(&g);
 
       for (unsigned int i = 0; i < slot->classes.length (); i++)
 	if (slot->classes[i] == cls)
@@ -2889,7 +2832,7 @@ sem_item_optimizer::traverse_congruence_split (const void *cls_ptr,
 	optimizer->add_class (newclasses[i]);
 
       /* Two classes replace one, so that increment just by one.  */
-      optimizer->classes_count++;
+      optimizer->m_classes_count++;
 
       /* If OLD class was presented in the worklist, we remove the class
          are replace it will both newly created classes.  */
@@ -2929,8 +2872,8 @@ sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
     unsigned int index)
 {
   /* Split map reset */
-  if (split_map != NULL)
-    delete split_map;
+  if (m_split_map != NULL)
+    delete m_split_map;
 
   pointer_map <bitmap> *split_map = new pointer_map <bitmap> ();
 
@@ -2951,7 +2894,7 @@ sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
 	  if(!slot)
 	    {
 	      slot = split_map->insert (usage->item->cls);
-	      *slot = BITMAP_ALLOC (&bmstack);
+	      *slot = BITMAP_ALLOC (&m_bmstack);
 	    }
 
 	  bitmap b = *slot;
@@ -2987,7 +2930,7 @@ sem_item_optimizer::do_congruence_step (congruence_class *cls)
   bitmap_iterator bi;
   unsigned int i;
 
-  bitmap usage = BITMAP_ALLOC (&bmstack);
+  bitmap usage = BITMAP_ALLOC (&m_bmstack);
 
   for (unsigned int i = 0; i < cls->members.length (); i++)
     bitmap_ior_into (usage, cls->members[i]->usage_index_bitmap);
@@ -3054,8 +2997,8 @@ sem_item_optimizer::worklist_remove (const congruence_class *cls)
 void
 sem_item_optimizer::process_cong_reduction (void)
 {
-  for (hash_table<congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
     for (unsigned i = 0; i < (*it).classes.length (); i++)
       if ((*it).classes[i]->is_class_used ())
 	worklist_push ((*it).classes[i]);
@@ -3084,14 +3027,14 @@ sem_item_optimizer::dump_cong_classes (void)
 
   fprintf (dump_file,
 	   "Congruence classes: %u (unique hash values: %lu), with total: %u items\n",
-	   classes_count, classes.elements(), items.length ());
+	   m_classes_count, m_classes.elements(), m_items.length ());
 
   /* Histogram calculation.  */
   unsigned int max_index = 0;
-  unsigned int* histogram = XCNEWVEC (unsigned int, items.length ());
+  unsigned int* histogram = XCNEWVEC (unsigned int, m_items.length ());
 
-  for (hash_table<congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
 
     for (unsigned i = 0; i < (*it).classes.length (); i++)
       {
@@ -3113,8 +3056,8 @@ sem_item_optimizer::dump_cong_classes (void)
 
 
   if (dump_flags & TDF_DETAILS)
-    for (hash_table<congruence_class_group_hash>::iterator it = classes.begin ();
-	 it != classes.end (); ++it)
+    for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+	 it != m_classes.end (); ++it)
       {
 	fprintf (dump_file, "  group: with %u classes:\n", (*it).classes.length ());
 
@@ -3137,8 +3080,8 @@ sem_item_optimizer::dump_cong_classes (void)
 void
 sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 {
-  unsigned int item_count = items.length ();
-  unsigned int class_count = classes_count;
+  unsigned int item_count = m_items.length ();
+  unsigned int class_count = m_classes_count;
   unsigned int equal_items = item_count - class_count;
 
   if (dump_file)
@@ -3154,8 +3097,8 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 	       100.0f * equal_items / item_count);
     }
 
-  for (hash_table<congruence_class_group_hash>::iterator it = classes.begin ();
-       it != classes.end (); ++it)
+  for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
     for (unsigned int i = 0; i < (*it).classes.length (); i++)
       {
 	congruence_class *c = (*it).classes[i];

@@ -89,15 +89,13 @@ class sem_item;
 class func_checker
 {
 public:
-  func_checker ();
-
   /* Initializes internal structures according to given number of
      source and target SSA names. The number of source names is SSA_SOURCE,
      respectively SSA_TARGET.  */
-  void initialize (unsigned ssa_source, unsigned sss_target);
+  func_checker (unsigned ssa_source, unsigned sss_target);
 
   /* Memory release routine.  */
-  void release (void);
+  ~func_checker();
 
   /* Verifies that trees T1 and T2 do correspond.  */
   bool compare_ssa_name (tree t1, tree t2);
@@ -111,19 +109,16 @@ public:
 
 private:
   /* Vector mapping source SSA names to target ones.  */
-  vec <int> source_ssa_names;
+  vec <int> m_source_ssa_names;
 
   /* Vector mapping target SSA names to source ones.  */
-  vec <int> target_ssa_names;
+  vec <int> m_target_ssa_names;
 
   /* Source to target edge map.  */
-  pointer_map <edge> *edge_map;
+  pointer_map <edge> *m_edge_map;
 
   /* Source to target declaration map.  */
-  pointer_map <tree> *decl_map;
-
-  /* Flag that indicates if the checker is initialize.  */
-  bool initialized;
+  pointer_map <tree> *m_decl_map;
 };
 
 /* Congruence class encompasses a collection of either functions or
@@ -368,12 +363,6 @@ private:
      in these blocks.  */
   bool compare_eh_region (eh_region r1, eh_region r2, tree func1, tree func2);
 
-  /* Iterates GSI statement iterator to the next non-debug statement.  */
-  void gsi_next_nondebug_stmt (gimple_stmt_iterator &gsi);
-
-  /* Iterates GSI statement iterator to the next non-virtual statement.  */
-  void gsi_next_nonvirtual_phi (gimple_stmt_iterator &it);
-
   /* Verifies that trees T1 and T2 do correspond.  */
   bool compare_function_decl (tree t1, tree t2);
 
@@ -450,10 +439,10 @@ private:
   static bool icf_handled_component_p (tree t);
 
   /* Function checker stores binding between functions.   */
-  func_checker checker;
+  func_checker *m_checker;
 
   /* COMPARED_FUNC is a function that we compare to.  */
-  sem_function *compared_func;
+  sem_function *m_compared_func;
 }; // class sem_function
 
 class sem_variable: public sem_item
@@ -653,26 +642,26 @@ private:
   void filter_removed_items (void);
 
   /* Vector of semantic items.  */
-  vec <sem_item *> items;
+  vec <sem_item *> m_items;
 
   /* A set containing all items removed by hooks.  */
-  pointer_set_t *removed_items_set;
+  pointer_set_t *m_removed_items_set;
 
   /* Hashtable of congruence classes */
-  hash_table <congruence_class_group_hash> classes;
+  hash_table <congruence_class_group_hash> m_classes;
 
   /* Count of congruence classes.  */
-  unsigned int classes_count;
+  unsigned int m_classes_count;
 
   /* Map data structure maps trees to semantic items.  */
-  pointer_map <sem_item *> decl_map;
+  pointer_map <sem_item *> m_decl_map;
 
   /* Map data structure maps symtab nodes to semantic items.  */
-  pointer_map <sem_item *> symtab_node_map;
+  pointer_map <sem_item *> m_symtab_node_map;
 
   /* For all congruence classes, we indicate partial mapping
      during reduction.  */
-  pointer_map <bitmap> *split_map;
+  pointer_map <bitmap> *m_split_map;
 
   /* Set to true if a splitter class is removed.  */
   bool splitter_class_removed;
@@ -681,13 +670,13 @@ private:
   static unsigned int class_id;
 
   /* Callgraph node removal hook holder.  */
-  struct cgraph_node_hook_list *cgraph_node_hooks;
+  struct cgraph_node_hook_list *m_cgraph_node_hooks;
 
   /* Varpool node removal hook holder.  */
-  struct varpool_node_hook_list *varpool_node_hooks;
+  struct varpool_node_hook_list *m_varpool_node_hooks;
 
   /* Bitmap stack.  */
-  bitmap_obstack bmstack;
+  bitmap_obstack m_bmstack;
 }; // class sem_item_optimizer
 
 }
