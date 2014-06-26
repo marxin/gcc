@@ -115,7 +115,7 @@ func_checker::~func_checker ()
   m_target_ssa_names.release();
 }
 
-/* Verifies that trees T1 and T2 do correspond.  */
+/* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
 
 bool
 func_checker::compare_ssa_name (tree t1, tree t2)
@@ -152,7 +152,7 @@ func_checker::compare_edge (edge e1, edge e2)
       SE_EXIT_DEBUG (*slot == e2);
     }
   else
-      *slot = e2;
+    *slot = e2;
 
   return true;
 }
@@ -177,21 +177,9 @@ func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
       SE_EXIT_DEBUG (*slot == t2);
     }
   else
-      *slot = t2;
+    *slot = t2;
 
   return true;
-}
-
-/* Congruence class constructor for a new class with _ID.  */
-
-congruence_class::congruence_class (unsigned int _id): id(_id)
-{
-  members.create (2);
-}
-
-congruence_class::~congruence_class ()
-{
-  members.release ();
 }
 
 /* Constructor for key value pair, where _ITEM is key and _INDEX is a target.  */
@@ -320,22 +308,6 @@ sem_function::~sem_function ()
   arg_types.release ();
 }
 
-/* Gets symbol name of the item.  */
-
-const char *
-sem_function::name (void)
-{
-  return node->name ();
-}
-
-/* Gets assembler name of the item.  */
-
-const char *
-sem_function::asm_name (void)
-{
-  return node->asm_name ();
-}
-
 /* Calculates hash value based on a BASIC_BLOCK.  */
 
 hashval_t
@@ -377,8 +349,7 @@ sem_function::get_hash (void)
 bool
 sem_function::equals_wpa (sem_item *item)
 {
-  if(item->type != FUNC)
-    return false;
+  gcc_assert (item->type == FUNC);
 
   m_compared_func = static_cast<sem_function *> (item);
 
@@ -408,6 +379,7 @@ sem_function::equals_wpa (sem_item *item)
 bool
 sem_function::equals (sem_item *item)
 {
+  gcc_assert (item->type == FUNC);
   bool eq = equals_private (item);
 
   if (m_checker != NULL)
@@ -489,7 +461,8 @@ sem_function::equals_private (sem_item *item)
 
   m_checker = new func_checker (ssa_names_size, m_compared_func->ssa_names_size);
 
-  for (arg1 = DECL_ARGUMENTS (decl), arg2 = DECL_ARGUMENTS (m_compared_func->decl);
+  for (arg1 = DECL_ARGUMENTS (decl),
+       arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
     m_checker->compare_decl (arg1, arg2, decl, m_compared_func->decl);
 
@@ -775,32 +748,6 @@ sem_function::merge (sem_item *alias_item)
   return true;
 }
 
-/* Dump symbol to FILE.  */
-
-void
-sem_function::dump_to_file (FILE *file)
-{
-  gcc_assert (file);
-
-  dump_function_to_file (decl, file, TDF_DETAILS);
-}
-
-/* Returns cgraph_node.  */
-
-struct cgraph_node *
-sem_function::get_node (void)
-{
-  return cgraph (node);
-}
-
-/* Initialize semantic item by info reachable during LTO WPA phase.  */
-
-void
-sem_function::init_wpa (void)
-{
-  parse_tree_args ();
-}
-
 /* Semantic item initialization function.  */
 
 void
@@ -942,11 +889,11 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
 
   for (i = 0; i < bb1->nondbg_stmt_count; i++)
     {
-      if (is_gimple_debug (gsi_stmt (gsi1)))	
-        gsi_next_nondebug (&gsi1);
+      if (is_gimple_debug (gsi_stmt (gsi1)))
+	gsi_next_nondebug (&gsi1);
 
       if (is_gimple_debug (gsi_stmt (gsi2)))
-        gsi_next_nondebug (&gsi2);
+	gsi_next_nondebug (&gsi2);
 
       s1 = gsi_stmt (gsi1);
       s2 = gsi_stmt (gsi2);
@@ -1208,7 +1155,8 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
   return false;
 }
 
-/* Verifies that trees T1 and T2 do correspond.  */
+/* Verifies that trees T1 and T2, representing function declarations
+   are equivalent from perspective of ICF.  */
 
 bool
 sem_function::compare_function_decl (tree t1, tree t2)
@@ -1253,6 +1201,7 @@ sem_function::compare_variable_decl (tree t1, tree t2, tree func1, tree func2)
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
    call statements are semantically equivalent.  */
+
 bool
 sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
 {
@@ -1815,36 +1764,12 @@ sem_variable::sem_variable (varpool_node *node, hashval_t _hash,
   gcc_checking_assert (get_node ());
 }
 
-/* Gets symbol name of the item.  */
-
-const char *
-sem_variable::name (void)
-{
-  return node->name ();
-}
-
-/* Gets assembler name of the item.  */
-
-const char *
-sem_variable::asm_name (void)
-{
-  return node->asm_name ();
-}
-
-/* Fast equality variable based on knowledge known in WPA.  */
-
-bool sem_variable::equals_wpa (sem_item *item)
-{
-  return item->type == VAR;
-}
-
 /* Returns true if the item equals to ITEM given as argument.  */
 
 bool
 sem_variable::equals (sem_item *item)
 {
-  if (item->type != VAR)
-    return false;
+  gcc_assert (item->type == VAR);
 
   return sem_variable::equals (ctor, static_cast<sem_variable *>(item)->ctor);
 }
@@ -1928,31 +1853,6 @@ sem_variable::equals (tree t1, tree t2)
     }
 }
 
-/* Returns varpool_node.  */
-
-struct varpool_node *
-sem_variable::get_node (void)
-{
-  return varpool (node);
-}
-
-/* Initialize semantic variable by info reachable during LTO WPA phase.  */
-
-void
-sem_variable::init_wpa (void)
-{
-}
-
-/* Semantic variable initialization function.  */
-
-void
-sem_variable::init (void)
-{
-  decl = get_node ()->decl;
-
-  ctor = ctor_for_folding (decl);
-}
-
 /* Parser function that visits a varpool NODE.  */
 
 sem_variable *
@@ -1976,14 +1876,6 @@ sem_variable::parse (struct varpool_node *node, bitmap_obstack *stack)
   v->init ();
 
   return v;
-}
-
-/* Initializes references to other semantic functions/variables.  */
-
-void
-sem_variable::init_refs (void)
-{
-  parse_tree_refs (ctor);
 }
 
 /* References independent hash function.  */
@@ -2133,35 +2025,10 @@ sem_variable::parse_tree_refs (tree t)
     }
 }
 
-inline hashval_t
-congruence_class_var_hash::hash (const congruence_class *item)
-{
-  return htab_hash_pointer (item);
-}
-
-inline int
-congruence_class_var_hash::equal (const congruence_class *item1,
-				  const congruence_class *item2)
-{
-  return item1 == item2;
-}
-
-inline hashval_t
-congruence_class_group_hash::hash (const congruence_class_group *item)
-{
-  return item->hash;
-}
-
-inline int
-congruence_class_group_hash::equal (const congruence_class_group *item1,
-				    const congruence_class_group *item2)
-{
-  return item1->hash == item2->hash;
-}
-
 unsigned int sem_item_optimizer::class_id = 0;
 
-sem_item_optimizer::sem_item_optimizer (): m_classes_count (0), m_split_map (NULL),
+sem_item_optimizer::sem_item_optimizer (): m_classes_count (0),
+  m_split_map (NULL),
   m_cgraph_node_hooks (NULL), m_varpool_node_hooks (NULL)
 {
   worklist.create (0);
@@ -2333,10 +2200,10 @@ void
 sem_item_optimizer::register_hooks (void)
 {
   m_cgraph_node_hooks = cgraph_add_node_removal_hook (
-			&sem_item_optimizer::cgraph_removal_hook, this);
+			  &sem_item_optimizer::cgraph_removal_hook, this);
 
   m_varpool_node_hooks = varpool_add_node_removal_hook (
-			 &sem_item_optimizer::varpool_removal_hook, this);
+			   &sem_item_optimizer::varpool_removal_hook, this);
 }
 
 /* Unregister callgraph and varpool hooks.  */
@@ -2359,17 +2226,19 @@ sem_item_optimizer::add_class (congruence_class *cls)
   gcc_assert (cls->members.length ());
 
   congruence_class_group_t *group = get_group_by_hash (
-				      cls->members[0]->get_hash ());
+				      cls->members[0]->get_hash (),
+				      cls->members[0]->type);
   group->classes.safe_push (cls);
 }
 
-/* Gets a congruence class group based on given HASH value.  */
+/* Gets a congruence class group based on given HASH value and TYPE.  */
 
 congruence_class_group_t *
-sem_item_optimizer::get_group_by_hash (hashval_t hash)
+sem_item_optimizer::get_group_by_hash (hashval_t hash, sem_item_type type)
 {
   congruence_class_group_t *item = XNEW (congruence_class_group_t);
   item->hash = hash;
+  item->type = type;
 
   congruence_class_group **slot = m_classes.find_slot (item, INSERT);
 
@@ -2560,7 +2429,8 @@ sem_item_optimizer::build_hash_based_classes (void)
     {
       sem_item *item = m_items[i];
 
-      congruence_class_group_t *group = get_group_by_hash (item->get_hash ());
+      congruence_class_group_t *group = get_group_by_hash (item->get_hash (),
+					item->type);
 
       if (!group->classes.length ())
 	{
@@ -2817,6 +2687,7 @@ sem_item_optimizer::traverse_congruence_split (const void *cls_ptr,
 
       congruence_class_group g;
       g.hash = cls->members[0]->get_hash ();
+      g.type = cls->members[0]->type;
 
       congruence_class_group *slot = optimizer->m_classes.find(&g);
 
@@ -2974,22 +2845,6 @@ sem_item_optimizer::worklist_pop (void)
   worklist.remove_elt (cls);
 
   return cls;
-}
-
-/* Returns true if a congruence class CLS is presented in worklist.  */
-
-bool
-sem_item_optimizer::worklist_contains (const congruence_class *cls)
-{
-  return worklist.find (cls);
-}
-
-/* Removes given congruence class CLS from worklist.  */
-
-void
-sem_item_optimizer::worklist_remove (const congruence_class *cls)
-{
-  worklist.remove_elt (cls);
 }
 
 /* Iterative congruence reduction function.  */

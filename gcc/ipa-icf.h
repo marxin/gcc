@@ -97,7 +97,7 @@ public:
   /* Memory release routine.  */
   ~func_checker();
 
-  /* Verifies that trees T1 and T2 do correspond.  */
+  /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
   bool compare_ssa_name (tree t1, tree t2);
 
   /* Verification function for edges E1 and E2.  */
@@ -128,10 +128,16 @@ class congruence_class
 {
 public:
   /* Congruence class constructor for a new class with _ID.  */
-  congruence_class (unsigned int _id);
+  congruence_class (unsigned int _id): id(_id)
+  {
+    members.create (2);
+  }
 
   /* Destructor.  */
-  ~congruence_class ();
+  ~congruence_class ()
+  {
+    members.release ();
+  }
 
   /* Dump function prints all class members to a FILE with an INDENT.  */
   void dump (FILE *file, unsigned int indent = 0) const;
@@ -207,10 +213,16 @@ public:
   virtual void init (void) = 0;
 
   /* Gets symbol name of the item.  */
-  virtual const char *name (void) = 0;
+  const char *name (void)
+  {
+    return node->name ();
+  }
 
   /* Gets assembler name of the item.  */
-  virtual const char *asm_name (void) = 0;
+  const char *asm_name (void)
+  {
+    return node->asm_name ();
+  }
 
   /* Initializes references to other semantic functions/variables.  */
   virtual void init_refs () = 0;
@@ -290,22 +302,33 @@ public:
 
   ~sem_function ();
 
-  virtual void init_wpa (void);
+  inline virtual void init_wpa (void)
+  {
+    parse_tree_args ();
+  }
+
   virtual void init (void);
-  virtual const char *name (void);
-  virtual const char *asm_name (void);
-  virtual hashval_t get_hash (void);
   virtual bool equals_wpa (sem_item *item);
+  virtual hashval_t get_hash (void);
   virtual bool equals (sem_item *item);
   virtual void init_refs ();
   virtual bool merge (sem_item *alias_item);
-  virtual void dump_to_file (FILE *file);
+
+  /* Dump symbol to FILE.  */
+  virtual void dump_to_file (FILE *file)
+  {
+    gcc_assert (file);
+    dump_function_to_file (decl, file, TDF_DETAILS);
+  }
 
   /* Parses function arguments and result type.  */
   void parse_tree_args (void);
 
   /* Returns cgraph_node.  */
-  struct cgraph_node *get_node (void);
+  inline struct cgraph_node *get_node (void)
+  {
+    return cgraph (node);
+  }
 
   /* For a given call graph NODE, the function constructs new
      semantic function item.  */
@@ -363,7 +386,8 @@ private:
      in these blocks.  */
   bool compare_eh_region (eh_region r1, eh_region r2, tree func1, tree func2);
 
-  /* Verifies that trees T1 and T2 do correspond.  */
+  /* Verifies that trees T1 and T2, representing function declarations
+     are equivalent from perspective of ICF.  */
   bool compare_function_decl (tree t1, tree t2);
 
   /* Verifies that trees T1 and T2 do correspond.  */
@@ -456,19 +480,38 @@ public:
 
   sem_variable (varpool_node *_node, hashval_t _hash, bitmap_obstack *stack);
 
-  virtual void init_wpa (void);
-  virtual void init (void);
-  virtual const char *name (void);
-  virtual const char *asm_name (void);
-  virtual void init_refs ();
+  inline virtual void init_wpa (void) {}
+
+  /* Semantic variable initialization function.  */
+  inline virtual void init (void)
+  {
+    decl = get_node ()->decl;
+    ctor = ctor_for_folding (decl);
+  }
+
+  /* Initializes references to other semantic functions/variables.  */
+  inline virtual void init_refs ()
+  {
+    parse_tree_refs (ctor);
+  }
+
   virtual hashval_t get_hash (void);
   virtual bool merge (sem_item *alias_item);
   virtual void dump_to_file (FILE *file);
-  virtual bool equals_wpa (sem_item *item);
   virtual bool equals (sem_item *item);
 
+  /* Fast equality variable based on knowledge known in WPA.  */
+  inline virtual bool equals_wpa (sem_item *item)
+  {
+    gcc_assert (item->type == VAR);
+    return true;
+  }
+
   /* Returns varpool_node.  */
-  struct varpool_node *get_node (void);
+  inline struct varpool_node *get_node (void)
+  {
+    return varpool (node);
+  }
 
   /* Parser function that visits a varpool NODE.  */
   static sem_variable *parse (struct varpool_node *node, bitmap_obstack *stack);
@@ -496,13 +539,22 @@ struct congruence_class_var_hash: typed_noop_remove <congruence_class>
 {
   typedef congruence_class value_type;
   typedef congruence_class compare_type;
-  static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);
+
+  static inline hashval_t hash (const value_type *item)
+  {
+    return htab_hash_pointer (item);
+  }
+
+  static inline int equal (const value_type *item1, const compare_type *item2)
+  {
+    return item1 == item2;
+  }
 };
 
 typedef struct congruence_class_group
 {
   hashval_t hash;
+  sem_item_type type;
   vec <congruence_class *> classes;
 } congruence_class_group_t;
 
@@ -511,8 +563,16 @@ struct congruence_class_group_hash: typed_noop_remove <congruence_class_group_t>
 {
   typedef congruence_class_group value_type;
   typedef congruence_class_group compare_type;
-  static inline hashval_t hash (const value_type *);
-  static inline int equal (const value_type *, const compare_type *);
+
+  static inline hashval_t hash (const value_type *item)
+  {
+    return item->hash;
+  }
+
+  static inline int equal (const value_type *item1, const compare_type *item2)
+  {
+    return item1->hash == item2->hash && item1->type == item2->type;
+  }
 };
 
 struct traverse_split_pair
@@ -570,8 +630,9 @@ public:
   /* Adds a CLS to hashtable associated by hash value.  */
   void add_class (congruence_class *cls);
 
-  /* Gets a congruence class group based on given HASH value.  */
-  congruence_class_group_t *get_group_by_hash (hashval_t hash);
+  /* Gets a congruence class group based on given HASH value and TYPE.  */
+  congruence_class_group_t *get_group_by_hash (hashval_t hash,
+      sem_item_type type);
 
 private:
 
@@ -604,10 +665,16 @@ private:
   congruence_class *worklist_pop ();
 
   /* Returns true if a congruence class CLS is presented in worklist.  */
-  bool worklist_contains (const congruence_class *cls);
+  inline bool worklist_contains (const congruence_class *cls)
+  {
+    return worklist.find (cls);
+  }
 
   /* Removes given congruence class CLS from worklist.  */
-  void worklist_remove (const congruence_class *cls);
+  inline void worklist_remove (const congruence_class *cls)
+  {
+    worklist.remove_elt (cls);
+  }
 
   /* Every usage of a congruence class CLS is a candidate that can split the
      collection of classes. Bitmap stack BMSTACK is used for bitmap
