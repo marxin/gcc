@@ -282,30 +282,30 @@ sem_function::sem_function (bitmap_obstack *stack): sem_item (FUNC, stack),
   m_checker (NULL), m_compared_func (NULL)
 {
   arg_types.create (0);
+  bb_sizes.create (0);
+  bb_sorted.create (0);
 }
 
 /*  Constructor based on callgraph node _NODE with computed hash _HASH.
     Bitmap STACK is used for memory allocation.  */
 sem_function::sem_function (cgraph_node *node, hashval_t hash,
 			    bitmap_obstack *stack):
-  sem_item (FUNC, node, hash, stack), bb_sorted (NULL),
+  sem_item (FUNC, node, hash, stack),
   m_checker (NULL), m_compared_func (NULL)
 {
   arg_types.create (0);
+  bb_sizes.create (0);
+  bb_sorted.create (0);
 }
 
 sem_function::~sem_function ()
 {
-  if (!bb_sorted)
-    return;
-
-  for (unsigned i = 0; i < bb_count; i++)
+  for (unsigned i = 0; i < bb_sorted.length (); i++)
     free (bb_sorted[i]);
 
-  free (bb_sizes);
-  free (bb_sorted);
-
   arg_types.release ();
+  bb_sizes.release ();
+  bb_sorted.release ();
 }
 
 /* Calculates hash value based on a BASIC_BLOCK.  */
@@ -329,15 +329,13 @@ sem_function::get_hash (void)
       hash = 177454; /* Random number for function type.  */
 
       hash = iterative_hash_object (arg_count, hash);
-      hash = iterative_hash_object (bb_count, hash);
-      hash = iterative_hash_object (edge_count, hash);
       hash = iterative_hash_object (cfg_checksum, hash);
       hash = iterative_hash_object (gcode_hash, hash);
 
-      for (unsigned i = 0; i < bb_count; i++)
+      for (unsigned i = 0; i < bb_sorted.length (); i++)
 	hash = iterative_hash_object (hash, get_bb_hash (bb_sorted[i]));
 
-      for (unsigned i = 0; i < bb_count; i++)
+      for (unsigned i = 0; i < bb_sizes.length (); i++)
 	hash = iterative_hash_object (bb_sizes[i], hash);
     }
 
@@ -416,7 +414,7 @@ sem_function::equals_private (sem_item *item)
 
   gcc_assert (decl != item->decl);
 
-  if (bb_count != m_compared_func->bb_count
+  if (bb_sorted.length () != m_compared_func->bb_sorted.length ()
       || edge_count != m_compared_func->edge_count
       || cfg_checksum != m_compared_func->cfg_checksum)
     SE_EXIT_FALSE();
@@ -472,7 +470,7 @@ sem_function::equals_private (sem_item *item)
     SE_EXIT_FALSE();
 
   /* Checking all basic blocks.  */
-  for (unsigned i = 0; i < bb_count; ++i)
+  for (unsigned i = 0; i < bb_sorted.length (); ++i)
     if(!compare_bb (bb_sorted[i], m_compared_func->bb_sorted[i], decl,
 		    m_compared_func->decl))
       SE_EXIT_FALSE();
@@ -480,10 +478,10 @@ sem_function::equals_private (sem_item *item)
   SE_DUMP_MESSAGE ("All BBs are equal\n");
 
   /* Basic block edges check.  */
-  for (unsigned i = 0; i < bb_count; ++i)
+  for (unsigned i = 0; i < bb_sorted.length (); ++i)
     {
-      bb_dict = XNEWVEC (int, bb_count + 2);
-      memset (bb_dict, -1, (bb_count + 2) * sizeof (int));
+      bb_dict = XNEWVEC (int, bb_sorted.length () + 2);
+      memset (bb_dict, -1, (bb_sorted.length () + 2) * sizeof (int));
 
       bb1 = bb_sorted[i]->bb;
       bb2 = m_compared_func->bb_sorted[i]->bb;
@@ -511,7 +509,7 @@ sem_function::equals_private (sem_item *item)
     }
 
   /* Basic block PHI nodes comparison.  */
-  for (unsigned i = 0; i < bb_count; i++)
+  for (unsigned i = 0; i < bb_sorted.length (); i++)
     if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb,
 			   decl, m_compared_func->decl))
       SE_EXIT_FALSE_WITH_MSG ("PHI node comparison returns false");
@@ -561,7 +559,7 @@ sem_function::init_refs_for_assign (gimple stmt)
 void
 sem_function::init_refs (void)
 {
-  for (unsigned i = 0; i < bb_count; i++)
+  for (unsigned i = 0; i < bb_sorted.length (); i++)
     {
       basic_block bb = bb_sorted[i]->bb;
 
@@ -771,16 +769,9 @@ sem_function::init (void)
   /* iterating all function arguments.  */
   arg_count = count_formal_params (fndecl);
 
-  /* basic block iteration.  */
-  bb_count = n_basic_blocks_for_fn (func) - 2;
-
   edge_count = n_edges_for_fn (func);
-  bb_sizes = XNEWVEC (unsigned int, bb_count);
-
-  bb_sorted = XNEWVEC (sem_bb_t *, bb_count);
   cfg_checksum = coverage_compute_cfg_checksum (func);
 
-  unsigned bb_count = 0;
   gcode_hash = 0;
 
   basic_block bb;
@@ -807,7 +798,7 @@ sem_function::init (void)
 	  }
       }
 
-    bb_sizes[bb_count] = nondbg_stmt_count;
+    bb_sizes.safe_push (nondbg_stmt_count);
 
     /* Inserting basic block to hash table.  */
     sem_bb_t *sem_bb = XNEW (sem_bb_t);
@@ -815,7 +806,7 @@ sem_function::init (void)
     sem_bb->nondbg_stmt_count = nondbg_stmt_count;
     sem_bb->edge_count = EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs);
 
-    bb_sorted[bb_count++] = sem_bb;
+    bb_sorted.safe_push (sem_bb);
   }
 
   parse_tree_args ();

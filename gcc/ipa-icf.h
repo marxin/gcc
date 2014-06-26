@@ -346,14 +346,11 @@ public:
   /* Number of function arguments.  */
   unsigned int arg_count;
 
-  /* Basic block count.  */
-  unsigned int bb_count;
-
   /* Total amount of edges in the function.  */
   unsigned int edge_count;
 
-  /* Array of sizes of all basic blocks.  */
-  unsigned int *bb_sizes;
+  /* Vector of sizes of all basic blocks.  */
+  vec <unsigned int> bb_sizes;
 
   /* Control flow graph checksum.  */
   hashval_t cfg_checksum;
@@ -365,7 +362,7 @@ public:
   unsigned ssa_names_size;
 
   /* Array of structures for all basic blocks.  */
-  sem_bb_t **bb_sorted;
+  vec <sem_bb_t *> bb_sorted;
 
 private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
