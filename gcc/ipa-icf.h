@@ -743,4 +743,4 @@ private:
   bitmap_obstack m_bmstack;
 }; // class sem_item_optimizer
 
-}
+} // ipa_icf namespace
