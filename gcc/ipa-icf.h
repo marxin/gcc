@@ -79,7 +79,7 @@ along with GCC; see the file COPYING3.  If not see
   } \
   while (false);
 
-namespace {
+namespace ipa_icf {
 
 /* Forward declaration for sem_func class.  */
 class sem_item;
