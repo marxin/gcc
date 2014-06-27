@@ -665,6 +665,13 @@ enum annot_expr_kind {
   annot_expr_kind_last
 };
 
+/* Internal functions.  */
+enum internal_fn {
+#define DEF_INTERNAL_FN(CODE, FLAGS) IFN_##CODE,
+#include "internal-fn.def"
+#undef DEF_INTERNAL_FN
+  IFN_LAST
+};
 
 /*---------------------------------------------------------------------------
                                 Type definitions
@@ -787,6 +794,9 @@ struct GTY(()) tree_base {
 
     /* SSA version number.  This field is only used with SSA_NAME.  */
     unsigned int version;
+
+    /* Internal function code.  */
+    enum internal_fn ifn;
   } GTY((skip(""))) u;
 };
 
@@ -1484,14 +1494,10 @@ struct GTY(()) tree_var_decl {
 
 struct GTY(()) tree_decl_non_common {
   struct tree_decl_with_vis common;
-  /* C++ uses this in namespaces.  */
-  tree saved_tree;
   /* C++ uses this in templates.  */
   tree arguments;
   /* Almost all FE's use this.  */
   tree result;
-  /* C++ uses this in namespaces and function_decls.  */
-  tree vindex;
 };
 
 /* FUNCTION_DECL inherits from DECL_NON_COMMON because of the use of the
@@ -1510,6 +1516,11 @@ struct GTY(()) tree_function_decl {
   /* Function specific options that are used by this function.  */
   tree function_specific_target;	/* target options */
   tree function_specific_optimization;	/* optimization options */
+
+  /* Generic function body.  */
+  tree saved_tree;
+  /* Index within a virtual table.  */
+  tree vindex;
 
   /* In a FUNCTION_DECL for which DECL_BUILT_IN holds, this is
      DECL_FUNCTION_CODE.  Otherwise unused.
@@ -1759,13 +1770,6 @@ struct GTY(()) tree_decl_map {
 struct GTY(()) tree_int_map {
   struct tree_map_base base;
   unsigned int to;
-};
-
-/* Map from a tree to initialization/finalization priorities.  */
-struct GTY(()) tree_priority_map {
-  struct tree_map_base base;
-  priority_type init;
-  priority_type fini;
 };
 
 /* Map from a decl tree to a tree vector.  */
