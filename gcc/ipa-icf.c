@@ -840,6 +840,10 @@ void
 sem_function::parse_tree_args (void)
 {
   tree result;
+
+  if (arg_types.exists ())
+    arg_types.release ();
+
   arg_types.create (4);
   tree fnargs = DECL_ARGUMENTS (decl);
 
