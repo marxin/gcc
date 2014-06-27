@@ -1471,7 +1471,6 @@
 	* params.def: Define new parameter.
 	* params.h: Likewise.
 	* sanitizer.def: Describe new builtins.
->>>>>>> parent/master
 
 2014-06-16  Richard Biener  <rguenther@suse.de>
 
