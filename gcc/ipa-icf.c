@@ -101,8 +101,8 @@ func_checker::func_checker (unsigned ssa_source, unsigned ssa_target)
   for (unsigned int i = 0; i < ssa_target; i++)
     m_target_ssa_names.safe_push (-1);
 
-  m_edge_map = new pointer_map <edge> ();
-  m_decl_map = new pointer_map <tree> ();
+  m_edge_map = new hash_map <edge, edge> ();
+  m_decl_map = new hash_map <tree, tree> ();
 }
 
 /* Memory release routine.  */
@@ -146,13 +146,13 @@ func_checker::compare_edge (edge e1, edge e2)
 
   bool existed_p;
 
-  edge *slot = m_edge_map->insert (e1, &existed_p);
+  edge &slot = m_edge_map->get_or_insert (e1, &existed_p);
   if (existed_p)
     {
-      SE_EXIT_DEBUG (*slot == e2);
+      SE_EXIT_DEBUG (slot == e2);
     }
   else
-    *slot = e2;
+    slot = e2;
 
   return true;
 }
@@ -171,13 +171,13 @@ func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
 
   bool existed_p;
 
-  tree *slot = m_decl_map->insert (t1, &existed_p);
+  tree &slot = m_decl_map->get_or_insert (t1, &existed_p);
   if (existed_p)
     {
-      SE_EXIT_DEBUG (*slot == t2);
+      SE_EXIT_DEBUG (slot == t2);
     }
   else
-    *slot = t2;
+    slot = t2;
 
   return true;
 }
@@ -1616,7 +1616,7 @@ sem_variable::merge (sem_item *alias_item)
       alias->analyzed = false;
 
       DECL_INITIAL (alias->decl) = DECL_INITIAL (alias_var->decl);
-      ipa_remove_all_references (&alias->ref_list);
+      alias->remove_all_references ();
 
       varpool_create_variable_alias (alias_var->decl, decl);
       symtab_resolve_alias (alias, original);
@@ -1689,14 +1689,11 @@ sem_variable::parse_tree_refs (tree t)
 
 unsigned int sem_item_optimizer::class_id = 0;
 
-sem_item_optimizer::sem_item_optimizer (): m_classes_count (0),
-  m_split_map (NULL),
-  m_cgraph_node_hooks (NULL), m_varpool_node_hooks (NULL)
+sem_item_optimizer::sem_item_optimizer (): worklist (0), m_classes (0),
+m_classes_count (0), m_cgraph_node_hooks (NULL), m_varpool_node_hooks (NULL)
 {
-  worklist.create (0);
   m_items.create (0);
   m_removed_items_set = pointer_set_create ();
-  m_classes.create (0);
   bitmap_obstack_initialize (&m_bmstack);
 }
 
@@ -1708,19 +1705,13 @@ sem_item_optimizer::~sem_item_optimizer ()
   for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
     {
-      for (unsigned int i = 0; i < (*it).classes.length (); i++)
-	delete (*it).classes[i];
+      for (unsigned int i = 0; i < (*it)->classes.length (); i++)
+	delete (*it)->classes[i];
 
-      (*it).classes.release ();
+      (*it)->classes.release ();
     }
 
-  m_classes.dispose ();
-  worklist.dispose ();
-
   m_items.release ();
-
-  if (m_split_map != NULL)
-    delete m_split_map;
 
   bitmap_obstack_release (&m_bmstack);
   pointer_set_destroy (m_removed_items_set);
@@ -1744,7 +1735,7 @@ sem_item_optimizer::write_summary (void)
     {
       struct symtab_node *node = lsei_node (lsei);
 
-      if (m_symtab_node_map.contains (node))
+      if (m_symtab_node_map.get (node))
 	count++;
     }
 
@@ -1757,7 +1748,7 @@ sem_item_optimizer::write_summary (void)
     {
       struct symtab_node *node = lsei_node (lsei);
 
-      sem_item **item = m_symtab_node_map.contains (node);
+      sem_item **item = m_symtab_node_map.get (node);
 
       if (item && *item)
 	{
@@ -2034,7 +2025,6 @@ void
 sem_item_optimizer::parse_funcs_and_vars (void)
 {
   struct cgraph_node *cnode;
-  sem_item **slot;
 
   if (flag_ipa_icf_functions)
     FOR_EACH_DEFINED_FUNCTION (cnode)
@@ -2043,8 +2033,7 @@ sem_item_optimizer::parse_funcs_and_vars (void)
       if (f)
 	{
 	  m_items.safe_push (f);
-	  slot = m_symtab_node_map.insert (cnode);
-	  *slot = f;
+	  m_symtab_node_map.put (cnode, f);
 
 	  if (dump_file)
 	    fprintf (dump_file, "Parsed function:%s\n", f->asm_name ());
@@ -2066,8 +2055,7 @@ sem_item_optimizer::parse_funcs_and_vars (void)
       if (v)
 	{
 	  m_items.safe_push (v);
-	  slot = m_symtab_node_map.insert (vnode);
-	  *slot = v;
+	  m_symtab_node_map.put (vnode, v);
 	}
     }
 }
@@ -2113,19 +2101,15 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
   for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
     {
-      for (unsigned i = 0; i < (*it).classes.length (); i++)
+      for (unsigned i = 0; i < (*it)->classes.length (); i++)
 	{
-	  congruence_class *c = (*it).classes [i];
+	  congruence_class *c = (*it)->classes [i];
 
 	  if (c->members.length() > 1)
 	    for (unsigned j = 0; j < c->members.length (); j++)
 	      {
 		sem_item *item = c->members[j];
-		sem_item **slot;
-
-		slot = m_decl_map.insert (item->decl);
-		*slot = item;
-
+		m_decl_map.put (item->decl, item);
 	      }
 	}
     }
@@ -2136,9 +2120,9 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
        it != m_classes.end (); ++it)
     {
       /* We fill in all declarations for sem_items.  */
-      for (unsigned i = 0; i < (*it).classes.length (); i++)
+      for (unsigned i = 0; i < (*it)->classes.length (); i++)
 	{
-	  congruence_class *c = (*it).classes [i];
+	  congruence_class *c = (*it)->classes [i];
 
 	  if (c->members.length() > 1)
 	    for (unsigned j = 0; j < c->members.length (); j++)
@@ -2152,7 +2136,7 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 
 		for (unsigned j = 0; j < item->tree_refs.length (); j++)
 		  {
-		    sem_item **result = m_decl_map.contains (item->tree_refs[j]);
+		    sem_item **result = m_decl_map.get (item->tree_refs[j]);
 
 		    if(result)
 		      {
@@ -2183,11 +2167,11 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
   for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
     {
-      unsigned int class_count = (*it).classes.length ();
+      unsigned int class_count = (*it)->classes.length ();
 
       for (unsigned i = 0; i < class_count; i++)
 	{
-	  congruence_class *c = (*it).classes [i];
+	  congruence_class *c = (*it)->classes [i];
 
 	  if (c->members.length() > 1)
 	    {
@@ -2197,7 +2181,7 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 	      sem_item *first = c->members[0];
 	      new_vector.safe_push (first);
 
-	      unsigned class_split_first = (*it).classes.length ();
+	      unsigned class_split_first = (*it)->classes.length ();
 
 	      for (unsigned j = 1; j < c->members.length (); j++)
 		{
@@ -2211,15 +2195,15 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 		    {
 		      bool integrated = false;
 
-		      for (unsigned k = class_split_first; k < (*it).classes.length (); k++)
+		      for (unsigned k = class_split_first; k < (*it)->classes.length (); k++)
 			{
-			  sem_item *x = (*it).classes[k]->members[0];
+			  sem_item *x = (*it)->classes[k]->members[0];
 			  bool equals = in_wpa ? x->equals_wpa (item) : x->equals (item);
 
 			  if (equals)
 			    {
 			      integrated = true;
-			      add_item_to_class ((*it).classes[k], item);
+			      add_item_to_class ((*it)->classes[k], item);
 
 			      break;
 			    }
@@ -2231,7 +2215,7 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 			  m_classes_count++;
 			  add_item_to_class (c, item);
 
-			  (*it).classes.safe_push (c);
+			  (*it)->classes.safe_push (c);
 			}
 		    }
 		}
@@ -2260,9 +2244,9 @@ sem_item_optimizer::verify_classes (void)
   for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
     {
-      for (unsigned int i = 0; i < (*it).classes.length (); i++)
+      for (unsigned int i = 0; i < (*it)->classes.length (); i++)
 	{
-	  congruence_class *cls = (*it).classes[i];
+	  congruence_class *cls = (*it)->classes[i];
 
 	  gcc_checking_assert (cls);
 	  gcc_checking_assert (cls->members.length () > 0);
@@ -2290,14 +2274,14 @@ sem_item_optimizer::verify_classes (void)
    but unused argument.  */
 
 bool
-sem_item_optimizer::release_split_map (__attribute__((__unused__)) const void
-				       *cls_ptr,
-				       __attribute__((__unused__)) bitmap *bslot,
-				       __attribute__((__unused__)) void *data)
+sem_item_optimizer::release_split_map (__attribute__((__unused__)) congruence_class *
+				       const &cls,
+				       __attribute__((__unused__)) bitmap const &b,
+				       __attribute__((__unused__)) traverse_split_pair *pair)
 {
-  bitmap b = *bslot;
+  bitmap bmp = b; 
 
-  BITMAP_FREE (b);
+  BITMAP_FREE (bmp);
 
   return true;
 }
@@ -2307,13 +2291,9 @@ sem_item_optimizer::release_split_map (__attribute__((__unused__)) const void
    as argument of split pair.  */
 
 bool
-sem_item_optimizer::traverse_congruence_split (const void *cls_ptr,
-    bitmap *bslot, void *data)
+sem_item_optimizer::traverse_congruence_split (congruence_class * const &cls,
+    bitmap const &b, traverse_split_pair *pair)
 {
-  const congruence_class *cls = (const congruence_class *) cls_ptr;
-  bitmap b = *bslot;
-
-  traverse_split_pair *pair = (traverse_split_pair *) data;
   sem_item_optimizer *optimizer = pair->optimizer;
   const congruence_class *splitter_cls = pair->cls;
 
@@ -2404,11 +2384,8 @@ void
 sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
     unsigned int index)
 {
-  /* Split map reset */
-  if (m_split_map != NULL)
-    delete m_split_map;
-
-  pointer_map <bitmap> *split_map = new pointer_map <bitmap> ();
+  hash_map <congruence_class *, bitmap> *split_map =
+  	new hash_map <congruence_class *, bitmap> ();
 
   for (unsigned int i = 0; i < cls->members.length (); i++)
     {
@@ -2422,15 +2399,16 @@ sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
 	  if (usage->index != index)
 	    continue;
 
-	  bitmap *slot = split_map->contains (usage->item->cls);
+	  bitmap *slot = split_map->get (usage->item->cls);
+	  bitmap b;
 
 	  if(!slot)
-	    {
-	      slot = split_map->insert (usage->item->cls);
-	      *slot = BITMAP_ALLOC (&m_bmstack);
-	    }
-
-	  bitmap b = *slot;
+	  {
+	      b = BITMAP_ALLOC (&m_bmstack);
+	      split_map->put (usage->item->cls, b);
+	  }
+	  else
+	    b = *slot;
 
 #if ENABLE_CHECKING
 	  gcc_checking_assert (usage->item->cls);
@@ -2447,10 +2425,10 @@ sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
   pair.cls = cls;
 
   splitter_class_removed = false;
-  split_map->traverse (&sem_item_optimizer::traverse_congruence_split, &pair);
+  split_map->traverse <traverse_split_pair *, sem_item_optimizer::traverse_congruence_split> (&pair);
 
   /* Bitmap clean-up.  */
-  split_map->traverse (&sem_item_optimizer::release_split_map, NULL);
+  split_map->traverse <traverse_split_pair *, sem_item_optimizer::release_split_map> (NULL);
 }
 
 /* Every usage of a congruence class CLS is a candidate that can split the
@@ -2503,7 +2481,7 @@ sem_item_optimizer::worklist_pop (void)
 {
   gcc_assert (worklist.elements ());
 
-  congruence_class *cls = &(*worklist.begin ());
+  congruence_class *cls = *worklist.begin ();
   worklist.remove_elt (cls);
 
   return cls;
@@ -2516,9 +2494,9 @@ sem_item_optimizer::process_cong_reduction (void)
 {
   for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
-    for (unsigned i = 0; i < (*it).classes.length (); i++)
-      if ((*it).classes[i]->is_class_used ())
-	worklist_push ((*it).classes[i]);
+    for (unsigned i = 0; i < (*it)->classes.length (); i++)
+      if ((*it)->classes[i]->is_class_used ())
+	worklist_push ((*it)->classes[i]);
 
   if (dump_file)
     fprintf (dump_file, "Worklist has been filled with: %lu\n",
@@ -2553,9 +2531,9 @@ sem_item_optimizer::dump_cong_classes (void)
   for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
 
-    for (unsigned i = 0; i < (*it).classes.length (); i++)
+    for (unsigned i = 0; i < (*it)->classes.length (); i++)
       {
-	unsigned int c = (*it).classes[i]->members.length ();
+	unsigned int c = (*it)->classes[i]->members.length ();
 	histogram[c]++;
 
 	if (c > max_index)
@@ -2576,13 +2554,13 @@ sem_item_optimizer::dump_cong_classes (void)
     for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
 	 it != m_classes.end (); ++it)
       {
-	fprintf (dump_file, "  group: with %u classes:\n", (*it).classes.length ());
+	fprintf (dump_file, "  group: with %u classes:\n", (*it)->classes.length ());
 
-	for (unsigned i = 0; i < (*it).classes.length (); i++)
+	for (unsigned i = 0; i < (*it)->classes.length (); i++)
 	  {
-	    (*it).classes[i]->dump (dump_file, 4);
+	    (*it)->classes[i]->dump (dump_file, 4);
 
-	    if(i < (*it).classes.length () - 1)
+	    if(i < (*it)->classes.length () - 1)
 	      fprintf (dump_file, " ");
 	  }
       }
@@ -2616,9 +2594,9 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 
   for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
-    for (unsigned int i = 0; i < (*it).classes.length (); i++)
+    for (unsigned int i = 0; i < (*it)->classes.length (); i++)
       {
-	congruence_class *c = (*it).classes[i];
+	congruence_class *c = (*it)->classes[i];
 
 	if (c->members.length () == 1)
 	  continue;

@@ -115,10 +115,10 @@ private:
   vec <int> m_target_ssa_names;
 
   /* Source to target edge map.  */
-  pointer_map <edge> *m_edge_map;
+  hash_map <edge, edge> *m_edge_map;
 
   /* Source to target declaration map.  */
-  pointer_map <tree> *m_decl_map;
+  hash_map <tree, tree> *m_decl_map;
 };
 
 /* Congruence class encompasses a collection of either functions or
@@ -685,16 +685,17 @@ private:
   /* Makes pairing between a congruence class CLS and semantic ITEM.  */
   static void add_item_to_class (congruence_class *cls, sem_item *item);
 
-  /* Disposes split map traverse function. CLS_PTR is pointer to congruence
+  /* Disposes split map traverse function. CLS is congruence
      class, BSLOT is bitmap slot we want to release. DATA is mandatory,
      but unused argument.  */
-  static bool release_split_map (const void *cls_ptr, bitmap *bslot, void *data);
+  static bool release_split_map (congruence_class * const &cls, bitmap const &b,
+					 traverse_split_pair *pair);
 
-  /* Process split operation for a class given as pointer CLS_PTR,
+  /* Process split operation for a cognruence class CLS,
      where bitmap B splits congruence class members. DATA is used
      as argument of split pair.  */
-  static bool traverse_congruence_split (const void *cls_ptr, bitmap *b,
-					 void *data);
+  static bool traverse_congruence_split (congruence_class * const &cls, bitmap const &b,
+					 traverse_split_pair *pair);
 
   /* Reads a section from LTO stream file FILE_DATA. Input block for DATA
      contains LEN bytes.  */
@@ -718,14 +719,10 @@ private:
   unsigned int m_classes_count;
 
   /* Map data structure maps trees to semantic items.  */
-  pointer_map <sem_item *> m_decl_map;
+  hash_map <tree, sem_item *> m_decl_map;
 
   /* Map data structure maps symtab nodes to semantic items.  */
-  pointer_map <sem_item *> m_symtab_node_map;
-
-  /* For all congruence classes, we indicate partial mapping
-     during reduction.  */
-  pointer_map <bitmap> *m_split_map;
+  hash_map <symtab_node *, sem_item *> m_symtab_node_map;
 
   /* Set to true if a splitter class is removed.  */
   bool splitter_class_removed;
