@@ -443,6 +443,10 @@ Wignored-qualifiers
 C C++ Var(warn_ignored_qualifiers) Warning EnabledBy(Wextra)
 Warn whenever type qualifiers are ignored.
 
+Wincompatible-pointer-types
+C ObjC Var(warn_incompatible_pointer_types) Init(1) Warning
+Warn when there is a conversion between pointers that have incompatible types
+
 Winit-self
 C ObjC C++ ObjC++ Var(warn_init_self) Warning LangEnabledBy(C++ ObjC++,Wall)
 Warn about variables which are initialized to themselves
@@ -469,6 +473,10 @@ C ObjC C++ ObjC++ Undocumented Ignore
 Winherited-variadic-ctor
 C++ ObjC++ Var(warn_inh_var_ctor) Init(1) Warning
 Warn about C++11 inheriting constructors when the base has a variadic constructor
+
+Wint-conversion
+C ObjC Var(warn_int_conversion) Init(1) Warning
+Warn about incompatible integer to pointer and pointer to integer conversions
 
 Wint-to-pointer-cast
 C ObjC C++ ObjC++ Var(warn_int_to_pointer_cast) Init(1) Warning

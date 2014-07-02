@@ -1,3 +1,350 @@
+2014-07-02  Christian Bruel  <christian.bruel@st.com>
+
+	PR target/29349
+	PR target/53513
+	* mode-switching.c (struct bb_info): Add mode_out, mode_in caches.
+	(make_preds_opaque): Delete.
+	(clear_mode_bit, mode_bit_p, set_mode_bit): New macros.
+	(commit_mode_sets): New function.
+	(optimize_mode_switching): Handle current_mode to mode_switching_emit.
+	Process all modes at once.
+	* basic-block.h (pre_edge_lcm_avs): Declare.
+	* lcm.c (pre_edge_lcm_avs): Renamed from pre_edge_lcm.
+	Call clear_aux_for_edges. Fix comments.
+	(pre_edge_lcm): New wrapper function to call pre_edge_lcm_avs.
+	(pre_edge_rev_lcm): Idem.
+	* config/epiphany/epiphany.c (emit_set_fp_mode): Add prev_mode parameter.
+	* config/epiphany/epiphany-protos.h (emit_set_fp_mode): Idem.
+	* config/epiphany/resolve-sw-modes.c (pass_resolve_sw_modes::execute): Idem.
+	* config/i386/i386.c (x96_emit_mode_set): Idem.
+	* config/sh/sh.c (sh_emit_mode_set): Likewise. Handle PR toggle.
+	* config/sh/sh.md (toggle_pr): 	Defined if TARGET_FPU_SINGLE.
+	(fpscr_toggle) Disallow from delay slot.
+	* target.def (emit_mode_set): Add prev_mode parameter.
+	* doc/tm.texi: Regenerate.
+
+2014-07-02  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (aarch64_expand_vec_perm): Delete unused
+	variable i.
+
+2014-07-01  Jan Hubicka   <hubicka@ucw.cz>
+
+	* ipa-utils.h (method_class_type, vtable_pointer_value_to_binfo,
+	vtable_pointer_value_to_vtable): Constify.
+	(contains_polymorphic_type_p): Declare.
+	* ipa-devirt.c (method_class_type, vtable_pointer_value_to_binfo,
+	vtable_pointer_value_to_vtable): Constify.
+	(contains_polymorphic_type_p): New predicate.
+	* ipa-prop.c (ipa_set_jf_known_type): Allow types containing
+	polymorphic types.
+	(ipa_set_ancestor_jf): Likewise.
+	(detect_type_change): Return false in easy cases.
+	(compute_complex_assign_jump_func): Require type to contain
+	polymorphic type.
+	(compute_known_type_jump_func): Likewise.
+
+2014-07-01  Jan Hubicka   <hubicka@ucw.cz>
+
+	* tree.c (decls_same_for_odr, decls_same_for_odr,
+	types_same_for_odr): Remove.
+	(type_in_anonymous_namespace_p): Constify argument.
+	* tree.h (types_same_for_odr, type_in_anonymous_namespace_p):
+	Constify.
+	* ipa-devirt.c (odr_type_d): Add ODR_VIOLATED field.
+	(main_odr_variant): New function.
+	(hash_type_name): Make static; update assert; do not ICE on
+	non-records.
+	(types_same_for_odr): Bring here from tree.c; simplify
+	and remove old structural comparing code that doesn't work
+	for templates.
+	(odr_hasher::equal): Update assert.
+	(add_type_duplicate): Return true when bases should be computed;
+	replace incomplete loader by complete; do not output duplicated
+	warnings; do not ICE on non-records; set odr_violated flag.
+	(get_odr_type): Be ready to replace incomplete type by complete
+	one; work on ODR variants instead of main variants; reorder item
+	in array so bases have still smaller indexes.
+	(dump_type_inheritance_graph): Be ready for holdes in odr_types
+	array.
+	(possible_polymorphic_call_targets): Do not ICE when BINFO is NULL.
+
+2014-07-01  Cary Coutant  <ccoutant@google.com>
+
+	* dwarf2out.c (remove_addr_table_entry): Remove unnecessary hash table
+        lookup.
+	(resolve_addr_in_expr): When replacing the rtx in a location list
+        entry, get a new address table entry.
+	(dwarf2out_finish): Call index_location_lists even if there are no
+        addr_index_table entries yet.
+
+2014-07-01  Trevor Saunders  <tsaunders@mozilla.com>
+
+	* config/i386/winnt.c (i386_pe_section_type_flags): Revert previous
+	change for not being obvious.
+
+2014-07-01  Trevor Saunders  <tsaunders@mozilla.com>
+
+	* config/i386/winnt.c (i386_pe_section_type_flags): Remove name of
+	unused argument.
+
+2014-07-01  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/arm_neon.h (vcage_f64): New intrinsic.
+	(vcagt_f64): Likewise.
+	(vcale_f64): Likewise.
+	(vcaled_f64): Likewise.
+	(vcales_f32): Likewise.
+	(vcalt_f64): Likewise.
+	(vcaltd_f64): Likewise.
+	(vcalts_f32): Likewise.
+
+2014-07-01  Marek Polacek  <polacek@redhat.com>
+
+	* doc/invoke.texi: Document -Wint-conversion.
+
+2014-07-01  Marek Polacek  <polacek@redhat.com>
+
+	PR c/58286
+	* doc/invoke.texi: Document -Wincompatible-pointer-types.
+
+2014-07-01  Martin Liska  <mliska@suse.cz>
+
+	IPA REF alias refactoring
+	* cgraph.h (iterate_direct_aliases): New function.
+	(FOR_EACH_ALIAS): New macro iterates all direct aliases for a node.
+	* cgraph.c (cgraph_for_node_thunks_and_aliases): Usage of
+	FOR_EACH_ALIAS added.
+	(cgraph_for_node_and_aliases): Likewise.
+	* cgraphunit.c (assemble_thunks_and_aliases): Likewise.
+	* ipa-inline.c (reset_edge_caches): Likewise.
+	(update_caller_keys): Likewise.
+	* trans-mem.c (ipa_tm_execute): Likewise.
+	*varpool.c (varpool_analyze_node): Likewise.
+	(varpool_for_node_and_aliases): Likewise.
+	* ipa-ref.h (first_alias): New function.
+	(last_alias): Likewise.
+	(has_aliases_p): Likewise.
+	* ipa-ref.c (ipa_ref::remove_reference): Removal function
+	is sensitive to IPA_REF_ALIASes.
+	* symtab.c (symtab_node::add_reference): Node of IPA_REF_ALIAS type
+	are put at the beginning of the list.
+	(symtab_node::iterate_direct_aliases): New function.
+
+2014-06-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	Revert:
+	* tree-streamer-out.c (pack_ts_type_common_value_fields): Stream if type
+	is complete.
+	(write_ts_type_common_tree_pointers): Do not stream fields not set for incomplete
+	types; do not stream duplicated fields for variants; sanity check that variant
+	and type match.
+	(write_ts_type_non_common_tree_pointers): Likewise.
+	* tree-streamer-in.c (unpack_ts_type_common_value_fields): Mark in TYPE_SIZE whether
+	type is complete.
+	(lto_input_ts_type_common_tree_pointers): Do same changes as in
+	write_ts_type_common_tree_pointers
+	(lto_input_ts_type_non_common_tree_pointers): Likewise.
+
+2014-06-30  Joseph Myers  <joseph@codesourcery.com>
+
+	* var-tracking.c (add_stores): Return instead of asserting if old
+	and new values for conditional store are the same.
+
+2014-06-30  Richard Henderson  <rth@redhat.com>
+
+	PR rtl-opt/61608
+	PR target/39284
+	* bb-reorder.c (pass_duplicate_computed_gotos::execute): Cleanup
+	the cfg if there were any changes.
+	* passes.def: Revert move of peephole2 after reorder_blocks;
+	move duplicate_computed_gotos before peephole2.
+
+2014-06-30  Uros Bizjak  <ubizjak@gmail.com>
+
+	* except.c (emit_note_eh_region_end): New helper function.
+	(convert_to_eh_region_ranges): Use emit_note_eh_region_end to
+	emit EH_REGION_END note.
+	* jump.c (cleanup_barriers): Do not split a call and its
+	corresponding CALL_ARG_LOCATION note.
+
+2014-06-30  Jeff Law  <law@redhat.com>
+
+	PR tree-optimization/61607
+	* tree-ssa-threadedge.c (simplify_control_stmt_condition): Look
+	deeper into the SSA_NAME_VALUE chain.
+
+2014-06-30  Marek Polacek  <polacek@redhat.com>
+
+	* convert.c (convert_to_integer): Don't instrument conversions if the
+	function has no_sanitize_undefined attribute.
+	* ubsan.c: Don't run the ubsan pass if the function has
+	no_sanitize_undefined attribute.
+
+2014-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* doc/invoke.texi (-fsanitize=bounds): Move to the table with
+	-fsanitize=undefined suboptions.
+
+2014-06-30  Alan Lawrence  <alan.lawrence@arm.com>
+
+	* config/aarch64/aarch64-simd.md (vec_perm): Enable for bigendian.
+	* config/aarch64/aarch64.c (aarch64_expand_vec_perm): Remove assert
+	against bigendian and adjust indices.
+
+2014-06-30  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/install.texi (Specific, aarch64*-*-*): Fix markup.  Reword a bit.
+
+2014-06-30  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	PR target/61633
+	* config/aarch64/aarch64.md (*aarch64_ashr_sisd_or_int_<mode>3):
+	Add alternative; make early clobber.  Adjust both split patterns
+	to use operand 0 as the working register.
+
+2014-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* ira-build.c (sort_conflict_id_map): Don't call qsort if num is 0,
+	as ira_object_id_map might be NULL, or 1.
+
+2014-06-30  Zhenqiang Chen  <zhenqiang.chen@linaro.org>
+
+	* loop-invariant.c (get_inv_cost): Handle register class.
+	(gain_for_invariant): Check the register pressure of the inv
+	and its overlapped register class, other than all.
+
+2014-06-30  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/invoke.texi (Optimize Options): Fix descriptions of
+	ipa-cp-loop-hint-bonus and ipa-cp-array-index-hint-bonus.
+
+2014-06-29  David Wohlferd <dw@LimeGreenSocks.com>
+
+	* doc/extend.texi (Function Attributes): Update 'naked' attribute
+	documentation.
+
+2014-06-29  Tobias Grosser <tobias@grosser.es>
+
+	PR bootstrap/61650
+	* graphite-isl-ast-to-gimple.c: Add missing guards.
+
+2014-06-29  Roman Gareev  <gareevroman@gmail.com>
+
+	* Makefile.in: Add the compilation of graphite-isl-ast-to-gimple.o.
+	* common.opt: Add new switch fgraphite-code-generator=[isl|cloog].
+	* flag-types.h: Add new enum fgraphite_generator.
+	* graphite-isl-ast-to-gimple.c: New.
+	* graphite-isl-ast-to-gimple.h: New.
+	* graphite.c (graphite_transform_loops): Add choice of Graphite
+	code generator, which depends on flag_graphite_code_gen.
+
+2014-06-29  Roman Gareev  <gareevroman@gmail.com>
+
+	* graphite-dependences.c (subtract_commutative_associative_deps):
+	Add NULL checking of the following variables: must_raw_no_source,
+	may_raw_no_source, must_war_no_source, may_war_no_source,
+	must_waw_no_source, may_waw_no_source, must_raw, may_raw,
+	must_war, may_war, must_waw, may_waw.
+
+2014-06-29  Roman Gareev  <gareevroman@gmail.com>
+
+	* graphite-clast-to-gimple.c: gloog is renamed to
+	graphite_regenerate_ast_cloog.  gloog_error is renamed to
+	graphite_regenerate_error.
+	* graphite-clast-to-gimple.h: The definition of the struct
+	bb_pbb_def is moved to graphite-htab.h.
+	Add inclusion of the hash-table.h.
+	* graphite-htab.h: The declaration of the function gloog is moved
+	to graphite-clast-to-gimple.h and renamed to
+	graphite_regenerate_ast_cloog.
+	* graphite.c (graphite_transform_loops): gloog is renamed
+	to graphite_regenerate_ast_cloog.
+
+2014-06-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* tree-streamer-out.c (pack_ts_type_common_value_fields): Stream if
+	type is complete.
+	(write_ts_type_common_tree_pointers): Do not stream fields not set
+	for incomplete types; do not stream duplicated fields for variants;
+	sanity check that variant and type match.
+	(write_ts_type_non_common_tree_pointers): Likewise.
+	* tree-streamer-in.c (unpack_ts_type_common_value_fields): Mark in
+	TYPE_SIZE whether type is complete.
+	(lto_input_ts_type_common_tree_pointers): Do same changes as in
+	write_ts_type_common_tree_pointers
+	(lto_input_ts_type_non_common_tree_pointers): Likewise.
+
+2014-06-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* cgraph.c (dump_cgraph_node): Dump init&fini priorities.
+
+2014-06-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* tree-inline.c (remap_type_1): Do not duplicate fields
+	that are shared in between type and its main variant.
+
+2014-06-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-prop.c (ipa_set_jf_known_type): Record always the main variant
+	of the type.
+	(ipa_set_ancestor_jf) Likewise.
+	(check_stmt_for_type_change): Check that we work on main variant.
+	(detect_type_change): Look into main variant.
+	(compute_known_type_jump_func): Check that main variant has BINFO.
+
+2014-06-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-devirt.c (set_type_binfo): New function.
+	(add_type_duplicate): Use it.
+	(get_odr_type): Sanity check that binfos points to main variants.
+	(get_class_context): Be sure the context's outer_type is main variant.
+	(contains_type_p): Walk main variant.
+	(get_polymorphic_call_info_for_decl): Set outer_type to be
+	main variant.
+	(get_polymorphic_call_info): Likewise.
+	(possible_polymorphic_call_targets): Sanity check that we operate
+	on main variant.
+
+2014-06-28  Jan Hubicka  <hubicka@ucw.cz>
+
+	* stor-layout.c (finish_builtin_struct): Copy fields into the variants.
+
+2014-06-28  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_aggregate_candidate): Revert
+	accidental change due to wide-int branch merge.
+
+2014-06-27  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* configure.ac (gcc_cv_as_compress_debug): Check for assembler
+	compressed debug support.
+	(gcc_cv_ld_compress_debug): Check for linker compressed debug support.
+	* configure: Regenerate.
+	* config.in: Regenerate.
+	* common.opt (compressed_debug_sections): New enum.
+	(gz, gz=): New options.
+	* gcc.c (LINK_COMPRESS_DEBUG_SPEC, ASM_COMPRESS_DEBUG_SPEC): Define.
+	(LINK_COMMAND_SPEC): Invoke LINK_COMPRESS_DEBUG_SPEC.
+	(asm_options): Invoke ASM_COMPRESS_DEBUG_SPEC.
+	* config/darwin.h (LINK_COMMAND_SPEC_A): Invoke
+	LINK_COMPRESS_DEBUG_SPEC.
+	* config/i386/djgpp.h (LINK_COMMAND_SPEC): Likewise.
+	* opts.c (common_handle_option): Handle OPT_gz, OPT_gz_.
+	* doc/invoke.texi (Option Summary, Debugging Options): Add -gz[=type].
+	(Debugging Options): Document -gz[=type].
+
+2014-06-27  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/61160
+	* cgraphclones.c (duplicate_thunk_for_node): Removed parameter
+	args_to_skip, use those from node instead.  Copy args_to_skip and
+	combined_args_to_skip from node to the new thunk.
+	(redirect_edge_duplicating_thunks): Removed parameter args_to_skip.
+	(cgraph_create_virtual_clone): Moved computation of
+	combined_args_to_skip...
+	(cgraph_clone_node): ...here, simplify it to bitmap_ior..
+
 2014-06-27  trevor Saunders  <tsaunders@mozilla.com>
 
 	* config/i386/winnt.c (i386_pe_section_type_flags): Remove
@@ -48,17 +395,6 @@
 	PR target/61542
 	* config/rs6000/vsx.md (vsx_extract_v4sf): Fix bug with element
 	extraction other than index 3.
-
-2014-06-26  Teresa Johnson  <tejohnson@google.com>
-
-	* c-family/c-common.h (get_dump_info): Declare.
-	* c-family/c-gimplify.c (c_genericize): Use saved dump files.
-	* c-family/c-opts.c (c_common_parse_file): Begin and end dumps
-	once around parsing invocation.
-	(get_dump_info): New function.
-	* cp/class.c (dump_class_hierarchy): Use saved dump files.
-	(dump_vtable): Ditto.
-	(dump_vtt): Ditto.
 
 2014-06-26  Teresa Johnson  <tejohnson@google.com>
 
