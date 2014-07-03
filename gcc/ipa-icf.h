@@ -100,7 +100,6 @@ return_different_stmts (gimple s1, gimple s2, const char *code,
 
 namespace ipa_icf {
 
-/* Forward declaration for sem_func class.  */
 class sem_item;
 
 /* A class aggregating all connections and semantic equivalents
@@ -111,7 +110,7 @@ public:
   /* Initialize internal structures according to given number of
      source and target SSA names. The number of source names is SSA_SOURCE,
      respectively SSA_TARGET.  */
-  func_checker (unsigned ssa_source, unsigned sss_target);
+  func_checker (unsigned ssa_source, unsigned ssa_target);
 
   /* Memory release routine.  */
   ~func_checker();
@@ -192,9 +191,13 @@ public:
   unsigned int index;
 };
 
-/* Basic block struct for sematic equality pass.  */
-typedef struct sem_bb
+/* Basic block struct for semantic equality pass.  */
+class sem_bb
 {
+public:
+  sem_bb (basic_block bb_, unsigned nondbg_stmt_count_, unsigned edge_count_):
+    bb (bb_), nondbg_stmt_count (nondbg_stmt_count_), edge_count (edge_count_) {}
+
   /* Basic block the structure belongs to.  */
   basic_block bb;
 
@@ -203,7 +206,7 @@ typedef struct sem_bb
 
   /* Number of edges connected to the block.  */
   unsigned edge_count;
-} sem_bb_t;
+};
 
 /* Semantic item is a base class that encapsulates all shared functionality
    for both semantic function and variable items.  */
@@ -212,12 +215,12 @@ class sem_item
 public:
   /* Semantic item constructor for a node of _TYPE, where STACK is used
      for bitmap memory allocation.  */
-  sem_item (enum sem_item_type _type, bitmap_obstack *stack);
+  sem_item (sem_item_type _type, bitmap_obstack *stack);
 
   /* Semantic item constructor for a node of _TYPE, where STACK is used
      for bitmap memory allocation. The item is based on symtab node _NODE
      with computed _HASH.  */
-  sem_item (enum sem_item_type _type, struct symtab_node *_node, hashval_t _hash,
+  sem_item (sem_item_type _type, struct symtab_node *_node, hashval_t _hash,
 	    bitmap_obstack *stack);
 
   virtual ~sem_item ();
@@ -267,7 +270,7 @@ public:
   static bool compare_for_aliasing (tree t1, tree t2);
 
   /* Item type.  */
-  enum sem_item_type type;
+  sem_item_type type;
 
   /* Global unique function index.  */
   unsigned int index;
@@ -381,18 +384,18 @@ public:
   unsigned ssa_names_size;
 
   /* Array of structures for all basic blocks.  */
-  vec <sem_bb_t *> bb_sorted;
+  vec <sem_bb *> bb_sorted;
 
 private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
-  hashval_t get_bb_hash (const sem_bb_t *basic_block);
+  hashval_t get_bb_hash (const sem_bb *basic_block);
 
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
-  bool compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2);
+  bool compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2);
 
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
-     true value is returned if phi nodes are sematically
+     true value is returned if phi nodes are semantically
      equivalent in these blocks .  */
   bool compare_phi_node (basic_block bb1, basic_block bb2, tree func1,
 			 tree func2);
@@ -567,15 +570,15 @@ struct congruence_class_var_hash: typed_noop_remove <congruence_class>
   }
 };
 
-typedef struct congruence_class_group
+struct congruence_class_group
 {
   hashval_t hash;
   sem_item_type type;
   vec <congruence_class *> classes;
-} congruence_class_group_t;
+};
 
 /* Congruence class set structure.  */
-struct congruence_class_group_hash: typed_noop_remove <congruence_class_group_t>
+struct congruence_class_group_hash: typed_noop_remove <congruence_class_group>
 {
   typedef congruence_class_group value_type;
   typedef congruence_class_group compare_type;
@@ -647,7 +650,7 @@ public:
   void add_class (congruence_class *cls);
 
   /* Gets a congruence class group based on given HASH value and TYPE.  */
-  congruence_class_group_t *get_group_by_hash (hashval_t hash,
+  congruence_class_group *get_group_by_hash (hashval_t hash,
       sem_item_type type);
 
 private:
@@ -680,7 +683,7 @@ private:
   /* Pops a class from worklist. */
   congruence_class *worklist_pop ();
 
-  /* Returns true if a congruence class CLS is presented in worklist.  */
+  /* Returns true if a congruence class CLS is present in worklist.  */
   inline bool worklist_contains (const congruence_class *cls)
   {
     return worklist.find (cls);

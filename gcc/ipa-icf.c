@@ -86,7 +86,7 @@ along with GCC; see the file COPYING3.  If not see
 
 namespace ipa_icf {
 
-/* Itializes internal structures according to given number of
+/* Initialize internal structures according to given number of
    source and target SSA names. The number of source names is SSA_SOURCE,
    respectively SSA_TARGET.  */
 
@@ -183,7 +183,7 @@ sem_usage_pair::sem_usage_pair (sem_item *_item, unsigned int _index):
 /* Semantic item constructor for a node of _TYPE, where STACK is used
    for bitmap memory allocation.  */
 
-sem_item::sem_item (enum sem_item_type _type,
+sem_item::sem_item (sem_item_type _type,
 		    bitmap_obstack *stack): type(_type), hash(0)
 {
   setup (stack);
@@ -193,7 +193,7 @@ sem_item::sem_item (enum sem_item_type _type,
    for bitmap memory allocation. The item is based on symtab node _NODE
    with computed _HASH.  */
 
-sem_item::sem_item (enum sem_item_type _type, struct symtab_node *_node,
+sem_item::sem_item (sem_item_type _type, struct symtab_node *_node,
 		    hashval_t _hash, bitmap_obstack *stack): type(_type),
   node (_node), hash (_hash)
 {
@@ -302,7 +302,7 @@ sem_function::~sem_function ()
 /* Calculates hash value based on a BASIC_BLOCK.  */
 
 hashval_t
-sem_function::get_bb_hash (const sem_bb_t *basic_block)
+sem_function::get_bb_hash (const sem_bb *basic_block)
 {
   hashval_t hash = basic_block->nondbg_stmt_count;
   hash = iterative_hash_object (basic_block->edge_count, hash);
@@ -792,12 +792,10 @@ sem_function::init (void)
     bb_sizes.safe_push (nondbg_stmt_count);
 
     /* Inserting basic block to hash table.  */
-    sem_bb_t *sem_bb = XNEW (sem_bb_t);
-    sem_bb->bb = bb;
-    sem_bb->nondbg_stmt_count = nondbg_stmt_count;
-    sem_bb->edge_count = EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs);
+    sem_bb *semantic_bb = new sem_bb (bb, nondbg_stmt_count,
+				      EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs));
 
-    bb_sorted.safe_push (sem_bb);
+    bb_sorted.safe_push (semantic_bb);
   }
 
   parse_tree_args ();
@@ -857,7 +855,7 @@ sem_function::parse_tree_args (void)
 }
 
 /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
-   return true if phi nodes are sematically equivalent in these blocks .  */
+   return true if phi nodes are semantically equivalent in these blocks .  */
 
 bool
 sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
@@ -1105,7 +1103,7 @@ sem_function::compare_variable_decl (tree t1, tree t2, tree func1, tree func2)
 bool
 sem_function::icf_handled_component_p (tree t)
 {
-  enum tree_code tc = TREE_CODE (t);
+  tree_code tc = TREE_CODE (t);
 
   return ((handled_component_p (t))
 	  || tc == ADDR_EXPR || tc == MEM_REF || tc == REALPART_EXPR
@@ -1372,7 +1370,7 @@ bool
 sem_function::compare_type_list (tree t1, tree t2)
 {
   tree tv1, tv2;
-  enum tree_code tc1, tc2;
+  tree_code tc1, tc2;
 
   if (!t1 && !t2)
     return true;
@@ -1869,7 +1867,7 @@ sem_item_optimizer::add_class (congruence_class *cls)
 {
   gcc_assert (cls->members.length ());
 
-  congruence_class_group_t *group = get_group_by_hash (
+  congruence_class_group *group = get_group_by_hash (
 				      cls->members[0]->get_hash (),
 				      cls->members[0]->type);
   group->classes.safe_push (cls);
@@ -1877,10 +1875,10 @@ sem_item_optimizer::add_class (congruence_class *cls)
 
 /* Gets a congruence class group based on given HASH value and TYPE.  */
 
-congruence_class_group_t *
+congruence_class_group *
 sem_item_optimizer::get_group_by_hash (hashval_t hash, sem_item_type type)
 {
-  congruence_class_group_t *item = XNEW (congruence_class_group_t);
+  congruence_class_group *item = XNEW (congruence_class_group);
   item->hash = hash;
   item->type = type;
 
@@ -2066,7 +2064,7 @@ sem_item_optimizer::build_hash_based_classes (void)
     {
       sem_item *item = m_items[i];
 
-      congruence_class_group_t *group = get_group_by_hash (item->get_hash (),
+      congruence_class_group *group = get_group_by_hash (item->get_hash (),
 					item->type);
 
       if (!group->classes.length ())
@@ -2258,9 +2256,8 @@ sem_item_optimizer::verify_classes (void)
    but unused argument.  */
 
 bool
-sem_item_optimizer::release_split_map (__attribute__((__unused__)) congruence_class *
-				       const &cls, bitmap const &b,
-				       traverse_split_pair *)
+sem_item_optimizer::release_split_map (congruence_class * const &,
+				       bitmap const &b, traverse_split_pair *)
 {
   bitmap bmp = b; 
 

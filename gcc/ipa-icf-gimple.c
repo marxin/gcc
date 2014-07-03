@@ -49,7 +49,7 @@ namespace ipa_icf {
    basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
 
 bool
-sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
+sem_function::compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2)
 {
   unsigned i;
   gimple_stmt_iterator gsi1, gsi2;
@@ -181,7 +181,7 @@ sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1,
 				     tree func2)
 {
   tree arg1, arg2;
-  enum tree_code code1, code2;
+  tree_code code1, code2;
   unsigned i;
 
   code1 = gimple_expr_code (s1);
@@ -215,7 +215,7 @@ bool
 sem_function::compare_gimple_cond (gimple s1, gimple s2, tree func1, tree func2)
 {
   tree t1, t2;
-  enum tree_code code1, code2;
+  tree_code code1, code2;
 
   code1 = gimple_expr_code (s1);
   code2 = gimple_expr_code (s2);
