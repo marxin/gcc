@@ -144,7 +144,7 @@ func_checker::compare_edge (edge e1, edge e2)
   edge &slot = m_edge_map.get_or_insert (e1, &existed_p);
   if (existed_p)
     {
-      RETURN_CONDITION (slot == e2);
+      SE_EXIT_DEBUG (slot == e2);
     }
   else
     slot = e2;
@@ -159,17 +159,17 @@ bool
 func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
 {
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
-    RETURN_CONDITION (t1 == t2);
+    SE_EXIT_DEBUG (t1 == t2);
 
   if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
-    RETURN_FALSE ();
+    SE_EXIT_FALSE ();
 
   bool existed_p;
 
   tree &slot = m_decl_map.get_or_insert (t1, &existed_p);
   if (existed_p)
     {
-      RETURN_CONDITION (slot == t2);
+      SE_EXIT_DEBUG (slot == t2);
     }
   else
     slot = t2;
@@ -347,22 +347,22 @@ sem_function::equals_wpa (sem_item *item)
   m_compared_func = static_cast<sem_function *> (item);
 
   if (arg_types.length () != m_compared_func->arg_types.length ())
-    RETURN_FALSE_WITH_MSG ("different number of arguments");
+    SE_EXIT_FALSE_WITH_MSG ("different number of arguments");
 
   /* Checking types of arguments.  */
   for (unsigned i = 0; i < arg_types.length (); i++)
     {
       /* This guard is here for function pointer with attributes (pr59927.c).  */
       if (!arg_types[i] || !m_compared_func->arg_types[i])
-	RETURN_FALSE_WITH_MSG ("NULL arg type");
+	SE_EXIT_FALSE_WITH_MSG ("NULL arg type");
 
       if (!types_compatible_p (arg_types[i], m_compared_func->arg_types[i]))
-	RETURN_FALSE_WITH_MSG("argument type is different");
+	SE_EXIT_FALSE_WITH_MSG("argument type is different");
     }
 
   /* Result type checking.  */
   if (!types_compatible_p (result_type, m_compared_func->result_type))
-    RETURN_FALSE_WITH_MSG("result types are different");
+    SE_EXIT_FALSE_WITH_MSG("result types are different");
 
   return true;
 }
@@ -412,7 +412,7 @@ sem_function::equals_private (sem_item *item)
   if (bb_sorted.length () != m_compared_func->bb_sorted.length ()
       || edge_count != m_compared_func->edge_count
       || cfg_checksum != m_compared_func->cfg_checksum)
-    RETURN_FALSE();
+    SE_EXIT_FALSE();
 
   if (!equals_wpa (item))
     return false;
@@ -424,10 +424,10 @@ sem_function::equals_private (sem_item *item)
   while (decl1)
     {
       if (decl2 == NULL)
-	RETURN_FALSE();
+	SE_EXIT_FALSE();
 
       if (get_attribute_name (decl1) != get_attribute_name (decl2))
-	RETURN_FALSE();
+	SE_EXIT_FALSE();
 
       tree attr_value1 = TREE_VALUE (decl1);
       tree attr_value2 = TREE_VALUE (decl2);
@@ -438,19 +438,19 @@ sem_function::equals_private (sem_item *item)
 				      TREE_VALUE (attr_value2), decl,
 				      m_compared_func->decl);
 	  if (!ret)
-	    RETURN_FALSE_WITH_MSG ("attribute values are different");
+	    SE_EXIT_FALSE_WITH_MSG ("attribute values are different")
 	  }
       else if (!attr_value1 && !attr_value2)
 	{}
       else
-	RETURN_FALSE ();
+	SE_EXIT_FALSE ();
 
       decl1 = TREE_CHAIN (decl1);
       decl2 = TREE_CHAIN (decl2);
     }
 
   if (decl1 != decl2)
-    RETURN_FALSE();
+    SE_EXIT_FALSE();
 
   m_checker = new func_checker (ssa_names_size, m_compared_func->ssa_names_size);
 
@@ -462,15 +462,15 @@ sem_function::equals_private (sem_item *item)
   /* Exception handling regions comparison.  */
   if (!compare_eh_region (region_tree, m_compared_func->region_tree, decl,
 			  m_compared_func->decl))
-    RETURN_FALSE();
+    SE_EXIT_FALSE();
 
   /* Checking all basic blocks.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
     if(!compare_bb (bb_sorted[i], m_compared_func->bb_sorted[i], decl,
 		    m_compared_func->decl))
-      RETURN_FALSE();
+      SE_EXIT_FALSE();
 
-  DUMP_MESSAGE ("All BBs are equal\n");
+  SE_DUMP_MESSAGE ("All BBs are equal\n");
 
   /* Basic block edges check.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
@@ -488,16 +488,16 @@ sem_function::equals_private (sem_item *item)
 	  ei_cond (ei2, &e2);
 
 	  if (e1->flags != e2->flags)
-	    RETURN_FALSE_WITH_MSG("flags comparison returns false");
+	    SE_EXIT_FALSE_WITH_MSG("flags comparison returns false");
 
 	  if (!bb_dict_test (bb_dict, e1->src->index, e2->src->index))
-	    RETURN_FALSE_WITH_MSG("edge comparison returns false");
+	    SE_EXIT_FALSE_WITH_MSG("edge comparison returns false");
 
 	  if (!bb_dict_test (bb_dict, e1->dest->index, e2->dest->index))
-	    RETURN_FALSE_WITH_MSG("BB comparison returns false");
+	    SE_EXIT_FALSE_WITH_MSG("BB comparison returns false");
 
 	  if (!m_checker->compare_edge (e1, e2))
-	    RETURN_FALSE_WITH_MSG("edge comparison returns false");
+	    SE_EXIT_FALSE_WITH_MSG("edge comparison returns false");
 
 	  ei_next (&ei2);
 	}
@@ -507,7 +507,7 @@ sem_function::equals_private (sem_item *item)
   for (unsigned i = 0; i < bb_sorted.length (); i++)
     if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb,
 			   decl, m_compared_func->decl))
-      RETURN_FALSE_WITH_MSG ("PHI node comparison returns false");
+      SE_EXIT_FALSE_WITH_MSG ("PHI node comparison returns false");
 
   return result;
 }
@@ -887,7 +887,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
 	break;
 
       if (gsi_end_p (si1) || gsi_end_p (si2))
-	RETURN_FALSE ();
+	SE_EXIT_FALSE ();
 
       phi1 = gsi_stmt (si1);
       phi2 = gsi_stmt (si2);
@@ -896,7 +896,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
       size2 = gimple_phi_num_args (phi2);
 
       if (size1 != size2)
-	RETURN_FALSE ();
+	SE_EXIT_FALSE ();
 
       for (i = 0; i < size1; ++i)
 	{
@@ -904,13 +904,13 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
 	  t2 = gimple_phi_arg (phi2, i)->def;
 
 	  if (!compare_operand (t1, t2, func1, func2))
-	    RETURN_FALSE ();
+	    SE_EXIT_FALSE ();
 
 	  e1 = gimple_phi_arg_edge (phi1, i);
 	  e2 = gimple_phi_arg_edge (phi2, i);
 
 	  if (!m_checker->compare_edge (e1, e2))
-	    RETURN_FALSE ();
+	    SE_EXIT_FALSE ();
 	}
 
       gsi_next (&si2);
@@ -1100,7 +1100,7 @@ sem_function::compare_variable_decl (tree t1, tree t2, tree func1, tree func2)
 
   ret = m_checker->compare_decl (t1, t2, func1, func2);
 
-  return RETURN_CONDITION (ret);
+  SE_EXIT_DEBUG (ret);
 }
 
 
@@ -1141,7 +1141,7 @@ sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
   bool ret;
 
   if (!m_checker->compare_ssa_name (t1, t2))
-    RETURN_FALSE ();
+    SE_EXIT_FALSE ();
 
   if (SSA_NAME_IS_DEFAULT_DEF (t1))
     {
@@ -1152,18 +1152,18 @@ sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
 	return true;
 
       if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
-	RETURN_FALSE ();
+	SE_EXIT_FALSE ();
 
       switch (TREE_CODE (b1))
 	{
 	case VAR_DECL:
-	  RETURN_CONDITION (compare_variable_decl (t1, t2, func1, func2));
+	  SE_EXIT_DEBUG (compare_variable_decl (t1, t2, func1, func2));
 	case PARM_DECL:
 	case RESULT_DECL:
 	  ret = m_checker->compare_decl (b1, b2, func1, func2);
-	  return RETURN_CONDITION (ret);
+	  SE_EXIT_DEBUG (ret);
 	default:
-	  return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
+	  SE_EXIT_FALSE_WITH_MSG ("Unknown TREE code reached")
 	}
     }
   else
@@ -1188,7 +1188,7 @@ sem_function::compare_operand (tree t1, tree t2,
     return false;
 
   if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
-    RETURN_FALSE_WITH_MSG ("types are not compatible");
+    SE_EXIT_FALSE_WITH_MSG ("types are not compatible");
 
   if (TREE_CODE (t1) == RECORD_TYPE && TREE_CODE (t2) == RECORD_TYPE)
     {
@@ -1199,14 +1199,14 @@ sem_function::compare_operand (tree t1, tree t2,
 	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx1))
 	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx2)))
 	if (!types_same_for_odr (t1, t2))
-	  RETURN_FALSE_WITH_MSG ("polymorphic types detected");
+	  SE_EXIT_FALSE_WITH_MSG ("polymorphic types detected");
     }
 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
 
   if (offset1 != offset2)
-    RETURN_FALSE_WITH_MSG ("base offsets are different");
+    SE_EXIT_FALSE_WITH_MSG ("base offsets are different");
 
   if (base1 && base2)
     {
@@ -1215,7 +1215,7 @@ sem_function::compare_operand (tree t1, tree t2,
     }
 
   if (TREE_CODE (t1) != TREE_CODE (t2))
-    RETURN_FALSE_WITH_MSG ("");
+    SE_EXIT_FALSE_WITH_MSG ("");
 
   switch (TREE_CODE (t1))
     {
@@ -1225,12 +1225,12 @@ sem_function::compare_operand (tree t1, tree t2,
 	unsigned length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
 
 	if (length1 != length2)
-	  RETURN_FALSE_WITH_MSG ("");
+	  SE_EXIT_FALSE_WITH_MSG ("");
 
 	for (unsigned i = 0; i < length1; i++)
 	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
 				CONSTRUCTOR_ELT (t2, i)->value, func1, func2))
-	    RETURN_FALSE_WITH_MSG ("");
+	    SE_EXIT_FALSE_WITH_MSG ("");
 
 	return true;
       }
@@ -1245,13 +1245,13 @@ sem_function::compare_operand (tree t1, tree t2,
 	if (!compare_operand (array_ref_low_bound (t1),
 			      array_ref_low_bound (t2),
 			      func1, func2))
-	  RETURN_FALSE_WITH_MSG ("");
+	  SE_EXIT_FALSE_WITH_MSG ("");
 	if (!compare_operand (array_ref_element_size (t1),
 			      array_ref_element_size (t2),
 			      func1, func2))
-	  RETURN_FALSE_WITH_MSG ("");
+	  SE_EXIT_FALSE_WITH_MSG ("");
 	if (!compare_operand (x1, x2, func1, func2))
-	  RETURN_FALSE_WITH_MSG ("");
+	  SE_EXIT_FALSE_WITH_MSG ("");
 	return compare_operand (y1, y2, func1, func2);
       }
 
@@ -1271,10 +1271,10 @@ sem_function::compare_operand (tree t1, tree t2,
 	both directions.  */
 
 	if (!sem_item::compare_for_aliasing (y1, y2))
-	  RETURN_FALSE_WITH_MSG ("strict aliasing types do not match");
+	  SE_EXIT_FALSE_WITH_MSG ("strict aliasing types do not match");
 
 	if (!compare_operand (x1, x2, func1, func2))
-	  RETURN_FALSE_WITH_MSG ("");
+	  SE_EXIT_FALSE_WITH_MSG ("");
 
 	/* Type of the offset on MEM_REF does not matter.  */
 	return wi::to_offset  (y1) == wi::to_offset  (y2);
@@ -1289,7 +1289,7 @@ sem_function::compare_operand (tree t1, tree t2,
 	ret = compare_operand (x1, x2, func1, func2)
 	      && compare_operand (y1, y2, func1, func2);
 
-	RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     /* Virtual table call.  */
     case OBJ_TYPE_REF:
@@ -1305,7 +1305,7 @@ sem_function::compare_operand (tree t1, tree t2,
 	      && compare_operand (y1, y2, func1, func2)
 	      && compare_operand (z1, z2, func1, func2);
 
-	RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     case ADDR_EXPR:
       {
@@ -1313,19 +1313,19 @@ sem_function::compare_operand (tree t1, tree t2,
 	x2 = TREE_OPERAND (t2, 0);
 
 	ret = compare_operand (x1, x2, func1, func2);
-	RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     case SSA_NAME:
       {
 	ret = compare_ssa_name (t1, t2, func1, func2);
-	RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     case INTEGER_CST:
       {
 	ret = types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
 	      && wi::to_offset  (t1) == wi::to_offset  (t2);
 
-	RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     case COMPLEX_CST:
     case VECTOR_CST:
@@ -1333,15 +1333,15 @@ sem_function::compare_operand (tree t1, tree t2,
     case REAL_CST:
       {
 	ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
-	RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     case FUNCTION_DECL:
       {
 	ret = compare_function_decl (t1, t2);
-	RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     case VAR_DECL:
-      RETURN_CONDITION (compare_variable_decl (t1, t2, func1, func2));
+      SE_EXIT_DEBUG (compare_variable_decl (t1, t2, func1, func2));
     case FIELD_DECL:
       {
 	tree fctx1 = DECL_FCONTEXT (t1);
@@ -1353,7 +1353,7 @@ sem_function::compare_operand (tree t1, tree t2,
 	ret = compare_operand (fctx1, fctx2, func1, func2)
 	      && compare_operand (offset1, offset2, func1, func2);
 
-	return RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     case PARM_DECL:
     case LABEL_DECL:
@@ -1362,10 +1362,10 @@ sem_function::compare_operand (tree t1, tree t2,
     case BIT_FIELD_REF:
       {
 	ret = m_checker->compare_decl (t1, t2, func1, func2);
-	return RETURN_CONDITION (ret);
+	SE_EXIT_DEBUG (ret);
       }
     default:
-      return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached")
+      SE_EXIT_FALSE_WITH_MSG ("Unknown TREE code reached")
     }
 }
 
@@ -1467,7 +1467,7 @@ sem_variable::equals (tree t1, tree t2)
 	tree y2 = TREE_OPERAND (t2, 1);
 
 	if (!sem_item::compare_for_aliasing (y1, y2))
-	  RETURN_FALSE_WITH_MSG ("strict aliasing types do not match");
+	  SE_EXIT_FALSE_WITH_MSG ("strict aliasing types do not match");
 
 	/* Type of the offset on MEM_REF does not matter.  */
 	return sem_variable::equals (x1, x2)
@@ -1504,9 +1504,9 @@ sem_variable::equals (tree t1, tree t2)
 	return sem_variable::equals (x1, x2) && sem_variable::equals (y1, y2);
       }
     case ERROR_MARK:
-      RETURN_FALSE_WITH_MSG ("ERROR_MARK");
+      SE_EXIT_FALSE_WITH_MSG ("ERROR_MARK");
     default:
-      RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
+      SE_EXIT_FALSE_WITH_MSG ("Unknown TREE code reached")
     }
 }
 
@@ -2619,10 +2619,10 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 void
 congruence_class::dump (FILE *file, unsigned int indent) const
 {
-  fprintf_spaces (file, "class with id: %u, hash: %u, items: %u\n", indent, " ",
+  FPRINTF_SPACES (file, indent, "class with id: %u, hash: %u, items: %u\n",
 		  id, members[0]->get_hash (), members.length ());
 
-  fprintf_spaces (file, "", indent + 2);
+  FPUTS_SPACES (file, indent + 2, "");
   for (unsigned i = 0; i < members.length (); i++)
     fprintf (file, "%s(%p/%u)", members[i]->asm_name (), (void *) members[i]->decl,
 	     members[i]->node->order);

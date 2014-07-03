@@ -19,73 +19,65 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+/* Prints string STRING to a FILE with a given number of SPACE_COUNT.  */
+#define FPUTS_SPACES(file, space_count, string) \
+  do \
+  { \
+    fprintf (file, "%*s" string, space_count, " "); \
+  } \
+  while (false);
+
 /* fprintf function wrapper that transforms given FORMAT to follow given
    number for SPACE_COUNT and call fprintf for a FILE.  */
-static inline void fprintf_spaces(FILE *file, const char *format, unsigned space_count, ...)
-{
-  va_list vl;
-  va_start (vl, space_count);
-
-  char *fmt = (char *) xmalloc (strlen (format) + space_count + 1);
-  memset (fmt, ' ', space_count);
-  strcpy (fmt + space_count, format);
-
-  vfprintf (file, fmt, vl);
-
-  va_end (vl);
-  free (fmt);
-}
-
-static inline void
-dump_message (const char *message, const char *func, unsigned int line)
-{
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, "  debug message: %s (%s:%u)\n", message, func, line);
-}
+#define FPRINTF_SPACES(file, space_count, format, ...) \
+  fprintf (file, "%*s" format, space_count, " ", ##__VA_ARGS__);
 
 /* Prints a MESSAGE to dump_file if exists.  */
-#define DUMP_MESSAGE(message) dump_message (message, __func__, __LINE__)
-
-static inline bool
-return_with_msg (bool result, const char *message, const char *func, unsigned int line)
-{
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, "  false returned: '%s' (%s:%u)\n", message, __func__, __LINE__);
-  return result;
-}
-
-#define RETURN_CONDITION(result) \
-  return_with_msg (result, "", __func__, __LINE__)
+#define SE_DUMP_MESSAGE(message) \
+  do \
+  { \
+    if (dump_file && (dump_flags & TDF_DETAILS)) \
+      fprintf (dump_file, "  debug message: %s (%s:%u)\n", message, __func__, __LINE__); \
+  } \
+  while (false);
 
 /* Logs a MESSAGE to dump_file if exists and returns false.  */
-static inline bool
-return_false_with_msg (const char *message, const char *func, unsigned int line)
-{
-  return return_with_msg (false, message, func, line);
-}
+#define SE_EXIT_FALSE_WITH_MSG(message) \
+  do \
+  { \
+    if (dump_file && (dump_flags & TDF_DETAILS)) \
+      fprintf (dump_file, "  false returned: '%s' (%s:%u)\n", message, __func__, __LINE__); \
+    return false; \
+  } \
+  while (false);
 
-#define RETURN_FALSE_WITH_MSG(message) \
-  return_false_with_msg (message, __func__, __LINE__)
+/* Return false and log that false value is returned.  */
+#define SE_EXIT_FALSE() \
+  SE_EXIT_FALSE_WITH_MSG("")
 
-#define RETURN_FALSE() \
-  return_false_with_msg ("", __func__, __LINE__)
+/* Logs return value if RESULT is false.  */
+#define SE_EXIT_DEBUG(result) \
+  do \
+  { \
+    if (!(result) && dump_file && (dump_flags & TDF_DETAILS)) \
+      fprintf (dump_file, "  false returned (%s:%u)\n", __func__, __LINE__); \
+    return result; \
+  } \
+  while (false);
 
-static inline bool
-return_different_statements (gimple s1, gimple s2, const char *code,
-			     const char *func, unsigned int line)
-{
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    {
-      fprintf (dump_file, "  different statement for code: %s:\n", code);
-      print_gimple_stmt (dump_file, s1, 3, TDF_DETAILS);
-      print_gimple_stmt (dump_file, s2, 3, TDF_DETAILS);
-    }
-
-  return false;
-}
-
-#define RETURN_DIFFERENT_STATEMENTS(s1, s2, code) \
-  return_different_statements (s1, s2, code, __func__, __LINE__)
+/* Verbose logging function logging statements S1 and S2 of a CODE.  */
+#define SE_DIFF_STATEMENT(s1, s2, code) \
+  do \
+  { \
+    if (dump_file && (dump_flags & TDF_DETAILS)) \
+      { \
+        fprintf (dump_file, "  different statement for code: %s:\n", code); \
+        print_gimple_stmt (dump_file, s1, 3, TDF_DETAILS); \
+        print_gimple_stmt (dump_file, s2, 3, TDF_DETAILS); \
+      } \
+    return false; \
+  } \
+  while (false);
 
 namespace ipa_icf {
 
