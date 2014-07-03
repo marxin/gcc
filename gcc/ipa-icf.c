@@ -1679,7 +1679,7 @@ sem_variable::parse_tree_refs (tree t)
 unsigned int sem_item_optimizer::class_id = 0;
 
 sem_item_optimizer::sem_item_optimizer (): worklist (0), m_classes (0),
-m_classes_count (0), m_cgraph_node_hooks (NULL), m_varpool_node_hooks (NULL)
+  m_classes_count (0), m_cgraph_node_hooks (NULL), m_varpool_node_hooks (NULL)
 {
   m_items.create (0);
   m_removed_items_set = pointer_set_create ();
@@ -1868,8 +1868,8 @@ sem_item_optimizer::add_class (congruence_class *cls)
   gcc_assert (cls->members.length ());
 
   congruence_class_group *group = get_group_by_hash (
-				      cls->members[0]->get_hash (),
-				      cls->members[0]->type);
+				    cls->members[0]->get_hash (),
+				    cls->members[0]->type);
   group->classes.safe_push (cls);
 }
 
@@ -2065,7 +2065,7 @@ sem_item_optimizer::build_hash_based_classes (void)
       sem_item *item = m_items[i];
 
       congruence_class_group *group = get_group_by_hash (item->get_hash (),
-					item->type);
+				      item->type);
 
       if (!group->classes.length ())
 	{
@@ -2259,7 +2259,7 @@ bool
 sem_item_optimizer::release_split_map (congruence_class * const &,
 				       bitmap const &b, traverse_split_pair *)
 {
-  bitmap bmp = b; 
+  bitmap bmp = b;
 
   BITMAP_FREE (bmp);
 
@@ -2382,10 +2382,10 @@ sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
 	  bitmap b;
 
 	  if(!slot)
-	  {
+	    {
 	      b = BITMAP_ALLOC (&m_bmstack);
 	      split_map.put (usage->item->cls, b);
-	  }
+	    }
 	  else
 	    b = *slot;
 
@@ -2404,10 +2404,12 @@ sem_item_optimizer::do_congruence_step_for_index (congruence_class *cls,
   pair.cls = cls;
 
   splitter_class_removed = false;
-  split_map.traverse <traverse_split_pair *, sem_item_optimizer::traverse_congruence_split> (&pair);
+  split_map.traverse
+  <traverse_split_pair *, sem_item_optimizer::traverse_congruence_split> (&pair);
 
   /* Bitmap clean-up.  */
-  split_map.traverse <traverse_split_pair *, sem_item_optimizer::release_split_map> (NULL);
+  split_map.traverse
+  <traverse_split_pair *, sem_item_optimizer::release_split_map> (NULL);
 }
 
 /* Every usage of a congruence class CLS is a candidate that can split the

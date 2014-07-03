@@ -711,12 +711,13 @@ private:
      class, BSLOT is bitmap slot we want to release. DATA is mandatory,
      but unused argument.  */
   static bool release_split_map (congruence_class * const &cls, bitmap const &b,
-					 traverse_split_pair *pair);
+				 traverse_split_pair *pair);
 
   /* Process split operation for a cognruence class CLS,
      where bitmap B splits congruence class members. DATA is used
      as argument of split pair.  */
-  static bool traverse_congruence_split (congruence_class * const &cls, bitmap const &b,
+  static bool traverse_congruence_split (congruence_class * const &cls,
+					 bitmap const &b,
 					 traverse_split_pair *pair);
 
   /* Reads a section from LTO stream file FILE_DATA. Input block for DATA
