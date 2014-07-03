@@ -57,7 +57,7 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
 
   if (bb1->nondbg_stmt_count != bb2->nondbg_stmt_count
       || bb1->edge_count != bb2->edge_count)
-    SE_EXIT_FALSE ();
+    RETURN_FALSE ();
 
   gsi1 = gsi_start_bb (bb1->bb);
   gsi2 = gsi_start_bb (bb2->bb);
@@ -74,54 +74,54 @@ sem_function::compare_bb (sem_bb_t *bb1, sem_bb_t *bb2, tree func1, tree func2)
       s2 = gsi_stmt (gsi2);
 
       if (gimple_code (s1) != gimple_code (s2))
-	SE_EXIT_FALSE_WITH_MSG ("gimple codes are different");
+	RETURN_FALSE_WITH_MESSAGE ("gimple codes are different");
 
       switch (gimple_code (s1))
 	{
 	case GIMPLE_CALL:
 	  if (!compare_gimple_call (s1, s2, func1, func2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_CALL");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_CALL");
 	  break;
 	case GIMPLE_ASSIGN:
 	  if (!compare_gimple_assign (s1, s2, func1, func2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_ASSIGN");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_ASSIGN");
 	  break;
 	case GIMPLE_COND:
 	  if (!compare_gimple_cond (s1, s2, func1, func2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_COND");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_COND");
 	  break;
 	case GIMPLE_SWITCH:
 	  if (!compare_gimple_switch (s1, s2, func1, func2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_SWITCH");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_SWITCH");
 	  break;
 	case GIMPLE_DEBUG:
 	case GIMPLE_EH_DISPATCH:
 	  break;
 	case GIMPLE_RESX:
 	  if (!compare_gimple_resx (s1, s2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_RESX");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_RESX");
 	  break;
 	case GIMPLE_LABEL:
 	  if (!compare_gimple_label (s1, s2, func1, func2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_LABEL");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_LABEL");
 	  break;
 	case GIMPLE_RETURN:
 	  if (!compare_gimple_return (s1, s2, func1, func2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_RETURN");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_RETURN");
 	  break;
 	case GIMPLE_GOTO:
 	  if (!compare_gimple_goto (s1, s2, func1, func2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_GOTO");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_GOTO");
 	  break;
 	case GIMPLE_ASM:
 	  if (!compare_gimple_asm (s1, s2))
-	    SE_DIFF_STATEMENT (s1, s2, "GIMPLE_ASM");
+	    RETURN_DIFFERENT_STATEMENTS (s1, s2, "GIMPLE_ASM");
 	  break;
 	case GIMPLE_PREDICT:
 	case GIMPLE_NOP:
 	  return true;
 	default:
-	  SE_EXIT_FALSE_WITH_MSG ("Unknown GIMPLE code reached")
+	  RETURN_FALSE_WITH_MESSAGE ("Unknown GIMPLE code reached")
 	}
 
       gsi_next (&gsi1);
@@ -151,7 +151,7 @@ sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
   if (t1 == NULL || t2 == NULL)
     {
       if (!compare_operand (t1, t2, func1, func2))
-	SE_EXIT_FALSE();
+	RETURN_FALSE ();
     }
   else if (!compare_function_decl (t1, t2))
     return false;
