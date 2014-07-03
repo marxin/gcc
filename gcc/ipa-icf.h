@@ -21,63 +21,82 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Prints string STRING to a FILE with a given number of SPACE_COUNT.  */
 #define FPUTS_SPACES(file, space_count, string) \
-  do \
-  { \
-    fprintf (file, "%*s" string, space_count, " "); \
-  } \
-  while (false);
-
+  fprintf (file, "%*s" string, space_count, " "); \
+ 
 /* fprintf function wrapper that transforms given FORMAT to follow given
    number for SPACE_COUNT and call fprintf for a FILE.  */
 #define FPRINTF_SPACES(file, space_count, format, ...) \
   fprintf (file, "%*s" format, space_count, " ", ##__VA_ARGS__);
 
+/* Prints a MESSAGE to dump_file if exists. FUNC is name of function and
+   LINE is location in the source file.  */
+
+static inline void
+dump_message (const char *message, const char *func, unsigned int line)
+{
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, "  debug message: %s (%s:%u)\n", message, func, line);
+}
+
 /* Prints a MESSAGE to dump_file if exists.  */
-#define SE_DUMP_MESSAGE(message) \
-  do \
-  { \
-    if (dump_file && (dump_flags & TDF_DETAILS)) \
-      fprintf (dump_file, "  debug message: %s (%s:%u)\n", message, __func__, __LINE__); \
-  } \
-  while (false);
+#define DUMP_MESSAGE(message) dump_message (message, __func__, __LINE__)
+
+/* Logs a MESSAGE to dump_file if exists and returns false. FUNC is name
+   of function and LINE is location in the source file.  */
+
+static inline bool
+return_false_with_message (const char *message, const char *func,
+			   unsigned int line)
+{
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, "  false returned: '%s' (%s:%u)\n", message, func, line);
+  return false;
+}
 
 /* Logs a MESSAGE to dump_file if exists and returns false.  */
-#define SE_EXIT_FALSE_WITH_MSG(message) \
-  do \
-  { \
-    if (dump_file && (dump_flags & TDF_DETAILS)) \
-      fprintf (dump_file, "  false returned: '%s' (%s:%u)\n", message, __func__, __LINE__); \
-    return false; \
-  } \
-  while (false);
+#define RETURN_FALSE_WITH_MSG(message) \
+  return_false_with_message (message, __func__, __LINE__)
 
 /* Return false and log that false value is returned.  */
-#define SE_EXIT_FALSE() \
-  SE_EXIT_FALSE_WITH_MSG("")
+#define RETURN_FALSE() RETURN_FALSE_WITH_MSG ("")
+
+/* Logs return value if RESULT is false. FUNC is name of function and LINE
+   is location in the source file.  */
+
+static inline bool
+return_with_result (bool result, const char *func, unsigned int line)
+{
+  if (!result && dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, "  false returned (%s:%u)\n", func, line);
+
+  return result;
+}
 
 /* Logs return value if RESULT is false.  */
-#define SE_EXIT_DEBUG(result) \
-  do \
-  { \
-    if (!(result) && dump_file && (dump_flags & TDF_DETAILS)) \
-      fprintf (dump_file, "  false returned (%s:%u)\n", __func__, __LINE__); \
-    return result; \
-  } \
-  while (false);
+#define RETURN_WITH_DEBUG(result) return_with_result (result, __func__, __LINE__)
+
+/* Verbose logging function logging statements S1 and S2 of a CODE.
+   FUNC is name of function and LINE is location in the source file.  */
+
+static inline bool
+return_different_stmts (gimple s1, gimple s2, const char *code,
+			const char *func, unsigned int line)
+{
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "  different statement for code: %s (%s:%u):\n",
+	       code, func, line);
+
+      print_gimple_stmt (dump_file, s1, 3, TDF_DETAILS);
+      print_gimple_stmt (dump_file, s2, 3, TDF_DETAILS);
+    }
+
+  return false;
+}
 
 /* Verbose logging function logging statements S1 and S2 of a CODE.  */
-#define SE_DIFF_STATEMENT(s1, s2, code) \
-  do \
-  { \
-    if (dump_file && (dump_flags & TDF_DETAILS)) \
-      { \
-        fprintf (dump_file, "  different statement for code: %s:\n", code); \
-        print_gimple_stmt (dump_file, s1, 3, TDF_DETAILS); \
-        print_gimple_stmt (dump_file, s2, 3, TDF_DETAILS); \
-      } \
-    return false; \
-  } \
-  while (false);
+#define RETURN_DIFFERENT_STMTS(s1, s2, code) \
+  return_different_stmts (s1, s2, code, __func__, __LINE__)
 
 namespace ipa_icf {
 
