@@ -1725,7 +1725,7 @@ sem_item_optimizer::write_summary (void)
 
   struct output_block *ob = create_output_block (LTO_section_ipa_icf);
   lto_symtab_encoder_t encoder = ob->decl_state->symtab_node_encoder;
-  ob->cgraph_node = NULL;
+  ob->symbol = NULL;
 
   /* Calculate number of symbols to be serialized.  */
   for (lto_symtab_encoder_iterator lsei = lsei_start_in_partition (encoder);
@@ -2705,7 +2705,6 @@ const pass_data pass_data_ipa_icf =
   IPA_PASS,		    /* type */
   "icf",		    /* name */
   OPTGROUP_IPA,             /* optinfo_flags */
-  true,                     /* has_execute */
   TV_IPA_ICF,		    /* tv_id */
   0,                        /* properties_required */
   0,                        /* properties_provided */

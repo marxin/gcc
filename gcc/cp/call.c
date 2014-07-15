@@ -806,6 +806,12 @@ build_list_conv (tree type, tree ctor, int flags, tsubst_flags_t complain)
   /* But no narrowing conversions.  */
   flags |= LOOKUP_NO_NARROWING;
 
+  /* Can't make an array of these types.  */
+  if (TREE_CODE (elttype) == REFERENCE_TYPE
+      || TREE_CODE (elttype) == FUNCTION_TYPE
+      || VOID_TYPE_P (elttype))
+    return NULL;
+
   FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (ctor), i, val)
     {
       conversion *sub
@@ -3586,7 +3592,8 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
 
   /* It's OK to bind a temporary for converting constructor arguments, but
      not in converting the return value of a conversion operator.  */
-  convflags = ((flags & LOOKUP_NO_TEMP_BIND) | LOOKUP_NO_CONVERSION);
+  convflags = ((flags & LOOKUP_NO_TEMP_BIND) | LOOKUP_NO_CONVERSION
+	       | (flags & LOOKUP_NO_NARROWING));
   flags &= ~LOOKUP_NO_TEMP_BIND;
 
   if (ctors)
@@ -4762,6 +4769,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
     {
       conversion *conv2;
       conversion *conv3;
+      bool converted = false;
 
       /* Get the high-water mark for the CONVERSION_OBSTACK.  */
       p = conversion_obstack_alloc (0);
@@ -4808,6 +4816,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
 	     converted to X, the conversion will fail.  */
 	  if (error_operand_p (arg2))
 	    result = error_mark_node;
+	  converted = true;
 	}
       else if (conv3 && !conv3->bad_p)
 	{
@@ -4816,6 +4825,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
 	  arg3_type = TREE_TYPE (arg3);
 	  if (error_operand_p (arg3))
 	    result = error_mark_node;
+	  converted = true;
 	}
 
       /* Free all the conversions we allocated.  */
@@ -4839,8 +4849,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
 	 conditional expression failing altogether, even though,
 	 according to this step, the one operand could be converted to
 	 the type of the other.  */
-      if (((conv2 && !conv2->bad_p)
-	   || (conv3 && !conv3->bad_p))
+      if (converted
 	  && CLASS_TYPE_P (arg2_type)
 	  && cp_type_quals (arg2_type) != cp_type_quals (arg3_type))
 	arg2_type = arg3_type =
@@ -6067,9 +6076,11 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
 	{
 	  if (t->kind == ck_user && t->cand->reason)
 	    {
-	      permerror (loc, "invalid user-defined conversion "
-			 "from %qT to %qT", TREE_TYPE (expr), totype);
-	      print_z_candidate (loc, "candidate is:", t->cand);
+	      complained = permerror (loc, "invalid user-defined conversion "
+				      "from %qT to %qT", TREE_TYPE (expr),
+				      totype);
+	      if (complained)
+		print_z_candidate (loc, "candidate is:", t->cand);
 	      expr = convert_like_real (t, expr, fn, argnum, 1,
 					/*issue_conversion_warnings=*/false,
 					/*c_cast_p=*/false,
@@ -6080,7 +6091,7 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
 					     complain);
 	      else
 		expr = cp_convert (totype, expr, complain);
-	      if (fn)
+	      if (complained && fn)
 		inform (DECL_SOURCE_LOCATION (fn),
 			"  initializing argument %P of %qD", argnum, fn);
 	      return expr;
