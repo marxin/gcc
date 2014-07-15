@@ -159,7 +159,7 @@ func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
     return RETURN_WITH_DEBUG (t1 == t2);
 
-  if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
+  if (!sem_item::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
     return RETURN_FALSE ();
 
   bool existed_p;
@@ -251,21 +251,38 @@ sem_item::dump (void)
     }
 }
 
-/* If strict aliasing is enabled, function compares if given types are
-   in the same alias set.  */
-bool
-sem_item::compare_for_aliasing (tree t1, tree t2)
+/* Return true if types are compatible from perspective of ICF.  */
+bool sem_item::types_are_compatible_p (tree t1, tree t2, bool first_argument)
 {
-  if (flag_strict_aliasing)
-    {
-      alias_set_type s1 = get_deref_alias_set (TREE_TYPE (t1));
-      alias_set_type s2 = get_deref_alias_set (TREE_TYPE (t2));
+  if (TREE_CODE (t1) != TREE_CODE (t2))
+    return RETURN_FALSE_WITH_MSG ("different tree types");
 
-      return s1 == s2;
+  if (!types_compatible_p (t1, t2))
+    return RETURN_FALSE_WITH_MSG ("types are not compatible");
+
+  if (get_alias_set (t1) != get_alias_set (t2))
+    return RETURN_FALSE_WITH_MSG ("alias sets are different");
+
+  /* We call contains_polymorphic_type_p with this pointer type.  */
+  if (first_argument && TREE_CODE (t1) == POINTER_TYPE)
+    {
+      t1 = TREE_TYPE (t1);
+      t2 = TREE_TYPE (t2);
+    }
+
+  if (contains_polymorphic_type_p (t1) || contains_polymorphic_type_p (t2))
+    {
+      if (!contains_polymorphic_type_p (t1) || !contains_polymorphic_type_p (t2))
+	return RETURN_FALSE_WITH_MSG ("one type is not polymorphic");
+
+      if (TYPE_MAIN_VARIANT (t1) != TYPE_MAIN_VARIANT (t2))
+	return RETURN_FALSE_WITH_MSG ("type variants are different for "
+				      "polymorphic type");
     }
 
   return true;
 }
+
 
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
@@ -352,12 +369,13 @@ sem_function::equals_wpa (sem_item *item)
       if (!arg_types[i] || !m_compared_func->arg_types[i])
 	return RETURN_FALSE_WITH_MSG ("NULL arg type");
 
-      if (!types_compatible_p (arg_types[i], m_compared_func->arg_types[i]))
+      if (!types_are_compatible_p (arg_types[i], m_compared_func->arg_types[i],
+				   i == 0))
 	return RETURN_FALSE_WITH_MSG ("argument type is different");
     }
 
   /* Result type checking.  */
-  if (!types_compatible_p (result_type, m_compared_func->result_type))
+  if (!types_are_compatible_p (result_type, m_compared_func->result_type))
     return RETURN_FALSE_WITH_MSG ("result types are different");
 
   return true;
@@ -453,7 +471,8 @@ sem_function::equals_private (sem_item *item)
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
-    m_checker->compare_decl (arg1, arg2, decl, m_compared_func->decl);
+    if (!m_checker->compare_decl (arg1, arg2, decl, m_compared_func->decl))
+      return RETURN_FALSE ();
 
   /* Exception handling regions comparison.  */
   if (!compare_eh_region (region_tree, m_compared_func->region_tree, decl,
@@ -837,11 +856,11 @@ sem_function::parse_tree_args (void)
   tree fnargs = DECL_ARGUMENTS (decl);
 
   for (tree parm = fnargs; parm; parm = DECL_CHAIN (parm))
-    arg_types.safe_push (TYPE_CANONICAL (DECL_ARG_TYPE (parm)));
+    arg_types.safe_push (DECL_ARG_TYPE (parm));
 
   /* Function result type.  */
   result = DECL_RESULT (decl);
-  result_type = result ? TYPE_CANONICAL (TREE_TYPE (result)) : NULL;
+  result_type = result ? TREE_TYPE (result) : NULL;
 
   /* During WPA, we can get arguments by following method.  */
   if (!fnargs)
@@ -1181,20 +1200,11 @@ sem_function::compare_operand (tree t1, tree t2,
   else if (!t1 || !t2)
     return false;
 
-  if (!types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
-    return RETURN_FALSE_WITH_MSG ("types are not compatible");
+  tree tt1 = TREE_TYPE (t1);
+  tree tt2 = TREE_TYPE (t2);
 
-  if (TREE_CODE (t1) == RECORD_TYPE && TREE_CODE (t2) == RECORD_TYPE)
-    {
-      tree ctx1 = DECL_CONTEXT (t1);
-      tree ctx2 = DECL_CONTEXT (t2);
-
-      if (TYPE_BINFO (ctx1) && TYPE_BINFO (ctx2)
-	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx1))
-	  && polymorphic_type_binfo_p (TYPE_BINFO (ctx2)))
-	if (!types_same_for_odr (t1, t2))
-	  return RETURN_FALSE_WITH_MSG ("polymorphic types detected");
-    }
+  if (!types_are_compatible_p (tt1, tt2))
+    return false;
 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
@@ -1264,8 +1274,8 @@ sem_function::compare_operand (tree t1, tree t2,
 	we seek for equivalency classes, so simply require inclussion in
 	both directions.  */
 
-	if (!sem_item::compare_for_aliasing (y1, y2))
-	  return RETURN_FALSE_WITH_MSG ("strict aliasing types do not match");
+	if (!sem_item::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2)))
+	  return RETURN_FALSE ();
 
 	if (!compare_operand (x1, x2, func1, func2))
 	  return RETURN_FALSE_WITH_MSG ("");
@@ -1316,7 +1326,7 @@ sem_function::compare_operand (tree t1, tree t2,
       }
     case INTEGER_CST:
       {
-	ret = types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+	ret = types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
 	      && wi::to_offset  (t1) == wi::to_offset  (t2);
 
 	return RETURN_WITH_DEBUG (ret);
@@ -1387,7 +1397,7 @@ sem_function::compare_type_list (tree t1, tree t2)
 	{}
       else if (tc1 == NOP_EXPR || tc2 == NOP_EXPR)
 	return false;
-      else if (!types_compatible_p (tv1, tv2))
+      else if (!types_are_compatible_p (tv1, tv2))
 	return false;
 
       t1 = TREE_CHAIN (t1);
@@ -1460,8 +1470,8 @@ sem_variable::equals (tree t1, tree t2)
 	tree y1 = TREE_OPERAND (t1, 1);
 	tree y2 = TREE_OPERAND (t2, 1);
 
-	if (!sem_item::compare_for_aliasing (y1, y2))
-	  return RETURN_FALSE_WITH_MSG ("strict aliasing types do not match");
+	if (!sem_item::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2)))
+	  return RETURN_FALSE ();
 
 	/* Type of the offset on MEM_REF does not matter.  */
 	return sem_variable::equals (x1, x2)
@@ -1480,7 +1490,7 @@ sem_variable::equals (tree t1, tree t2)
     case LABEL_DECL:
       return t1 == t2;
     case INTEGER_CST:
-      return types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+      return types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
 	     && wi::to_offset (t1) == wi::to_offset (t2);
     case STRING_CST:
     case REAL_CST:

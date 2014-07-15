@@ -265,9 +265,15 @@ public:
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file) = 0;
 
-  /* Compare two types if are same aliases in case of strict aliasing
-     is enabled.  */
-  static bool compare_for_aliasing (tree t1, tree t2);
+  /* Return base tree that can be used for types_compatible_p and
+     contains_polymorphic_type_p comparison.  */
+
+  static bool get_base_types (tree *t1, tree *t2);
+
+  /* Return true if types are compatible from perspective of ICF.
+     FIRST_ARGUMENT indicates if the comparison is called for first parameter of a function.  */
+  static bool types_are_compatible_p (tree t1, tree t2,
+				      bool first_argument = false);
 
   /* Item type.  */
   sem_item_type type;
