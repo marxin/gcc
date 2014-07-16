@@ -1614,7 +1614,7 @@ sem_variable::merge (sem_item *alias_item)
 
       alias->analyzed = false;
 
-      DECL_INITIAL (alias->decl) = DECL_INITIAL (alias_var->decl);
+      DECL_INITIAL (alias->decl) = NULL;
       alias->remove_all_references ();
 
       varpool_create_variable_alias (alias_var->decl, decl);
