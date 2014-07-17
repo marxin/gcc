@@ -183,7 +183,7 @@ struct GTY(()) odr_type_d
    inheritance (because vtables are shared).  Look up the BINFO of type
    and check presence of its vtable.  */
 
-static bool
+static inline bool
 polymorphic_type_binfo_p (tree binfo)
 {
   /* See if BINFO's type has an virtual table associtated with it.  */
