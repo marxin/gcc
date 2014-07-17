@@ -1,3 +1,45 @@
+2014-07-17  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/simd/vfma_f64.c: New test.
+	* gcc.target/aarch64/simd/vmla_f64.c: Likewise.
+	* gcc.target/aarch64/simd/vfms_f64.c: Likewise.
+	* gcc.target/aarch64/simd/vmls_f64.c: Likewise.
+
+2014-07-17  Max Ostapenko  <m.ostapenko@partner.samsung.com>
+
+	* c-c++-common/ubsan/bounds-2.c: Change output pattern.
+	* c-c++-common/ubsan/bounds-5.c: Likewise.
+	* c-c++-common/ubsan/bounds-6.c: Likewise.
+	* c-c++-common/ubsan/bounds-7.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-1.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-10.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-2.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-3.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-4.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-5.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-6.c: Likewise.
+	* c-c++-common/ubsan/float-cast-overflow-8.c: Likewise.
+	* gcc.dg/ubsan/float-cast-overflow-bf.c: Likewise.
+	* g++.dg/ubsan/float-cast-overflow-bf.C: Likewise.
+
+2014-07-17  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/simd/vcaled_f64.c: Mark expected value volatile.
+	* gcc.target/aarch64/simd/vcales_f32.c: Likewise.
+	* gcc.target/aarch64/simd/vcaltd_f64.c: Likewise.
+	* gcc.target/aarch64/simd/vcalts_f32.c: Likewise.
+
+2014-07-17  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.dg/atomic/c11-atomic-exec-5.c (dg-additional-options): Use
+	-mfp-trap-mode=sui instead of -miee-with-inexact for alpha*-*-*.
+	* gfortran.dg/ieee/ieee_1.F90 (dg-additional-options): Ditto.
+
+2014-07-17  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/61804
+	* g++.dg/parse/pr61804.C: New.
+
 2014-07-16  Arnaud Charlet  <charlet@adacore.com>
 
 	* gnat.db/specs/alignment2.ads, gnat.db/specs/size_clause1.ads,
@@ -310,7 +352,7 @@
 	* c-c++-common/sizeof-array-argument.c: New test.
 	* gcc.dg/vla-5.c: Add dg-warnings.
 
-2014-07-05  Jan Hubicka   <hubicka@ucw.cz>
+2014-07-05  Jan Hubicka  <hubicka@ucw.cz>
 
 	* g++.dg/ipa/devirt-26.C: Update testcase.
 	* g++.dg/ipa/imm-devirt-1.C: Update testcase.
