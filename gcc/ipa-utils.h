@@ -72,7 +72,6 @@ struct odr_type_d;
 typedef odr_type_d *odr_type;
 void build_type_inheritance_graph (void);
 void update_type_inheritance_graph (void);
-bool polymorphic_type_binfo_p (tree binfo);
 
 vec <cgraph_node *>
 possible_polymorphic_call_targets (tree, HOST_WIDE_INT,
