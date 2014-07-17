@@ -7943,9 +7943,14 @@ This flag is enabled by default at @option{-O3}.
 @item -fipa-icf
 @opindex fipa-icf
 Perform Identical Code Folding for functions and read-only variables.
-Behavior is similar to Gold Linker ICF optimization. Symbols proved
-as semantically equivalent are redirected to corresponding symbol. The pass
-sensitively decides for usage of alias, thunk or local redirection.
+The optimization reduces code size and may disturb unwind stacks by replacing
+a function by equivalent one with a different name. The optimization works
+more effectively with link time optimization enabled.
+
+Nevertheless the behavior is similar to Gold Linker ICF optimization, GCC ICF
+works on different levels and thus the optimizations are not same - there are
+equivalences that are found only by GCC and equivalences found only by Gold.
+
 This flag is enabled by default at @option{-O2}.
 
 @item -fisolate-erroneous-paths-dereference
