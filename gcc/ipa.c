@@ -114,7 +114,7 @@ process_references (symtab_node *snode,
       if (node->definition && !node->in_other_partition
 	  && ((!DECL_EXTERNAL (node->decl) || node->alias)
 	      || (((before_inlining_p
-		    && (cgraph_state < CGRAPH_STATE_IPA_SSA
+		    && (symtab->cgraph_state < CGRAPH_STATE_IPA_SSA
 		        || !lookup_attribute ("always_inline",
 					      DECL_ATTRIBUTES (node->decl)))))
 		  /* We use variable constructors during late complation for
@@ -169,7 +169,7 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
 	     devirtualization.  */
 	   if (n->definition
 	       && (before_inlining_p
-		   && (cgraph_state < CGRAPH_STATE_IPA_SSA
+		   && (symtab->cgraph_state < CGRAPH_STATE_IPA_SSA
 		       || !lookup_attribute ("always_inline",
 					     DECL_ATTRIBUTES (n->decl)))))
 	     pointer_set_insert (reachable, n);
@@ -449,9 +449,9 @@ symtab_remove_unreachable_nodes (bool before_inlining_p, FILE *file)
     }
 
   /* Remove unreachable functions.   */
-  for (node = cgraph_first_function (); node; node = next)
+  for (node = symtab->first_function (); node; node = next)
     {
-      next = cgraph_next_function (node);
+      next = symtab->next_function (node);
 
       /* If node is not needed at all, remove it.  */
       if (!node->aux)
@@ -516,9 +516,9 @@ symtab_remove_unreachable_nodes (bool before_inlining_p, FILE *file)
   /* Remove unreachable variables.  */
   if (file)
     fprintf (file, "\nReclaiming variables:");
-  for (vnode = varpool_first_variable (); vnode; vnode = vnext)
+  for (vnode = symtab->first_variable (); vnode; vnode = vnext)
     {
-      vnext = varpool_next_variable (vnode);
+      vnext = symtab->next_variable (vnode);
       if (!vnode->aux
 	  /* For can_refer_decl_in_current_unit_p we want to track for
 	     all external variables if they are defined in other partition

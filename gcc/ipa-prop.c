@@ -3475,8 +3475,8 @@ void
 ipa_set_node_agg_value_chain (struct cgraph_node *node,
 			      struct ipa_agg_replacement_value *aggvals)
 {
-  if (vec_safe_length (ipa_node_agg_replacements) <= (unsigned) cgraph_max_uid)
-    vec_safe_grow_cleared (ipa_node_agg_replacements, cgraph_max_uid + 1);
+  if (vec_safe_length (ipa_node_agg_replacements) <= (unsigned) symtab->cgraph_max_uid)
+    vec_safe_grow_cleared (ipa_node_agg_replacements, symtab->cgraph_max_uid + 1);
 
   (*ipa_node_agg_replacements)[node->uid] = aggvals;
 }
@@ -3664,18 +3664,18 @@ ipa_register_cgraph_hooks (void)
 {
   if (!edge_removal_hook_holder)
     edge_removal_hook_holder =
-      cgraph_add_edge_removal_hook (&ipa_edge_removal_hook, NULL);
+      symtab->add_edge_removal_hook (&ipa_edge_removal_hook, NULL);
   if (!node_removal_hook_holder)
     node_removal_hook_holder =
-      cgraph_add_node_removal_hook (&ipa_node_removal_hook, NULL);
+      symtab->add_cgraph_removal_hook (&ipa_node_removal_hook, NULL);
   if (!edge_duplication_hook_holder)
     edge_duplication_hook_holder =
-      cgraph_add_edge_duplication_hook (&ipa_edge_duplication_hook, NULL);
+      symtab->add_edge_duplication_hook (&ipa_edge_duplication_hook, NULL);
   if (!node_duplication_hook_holder)
     node_duplication_hook_holder =
-      cgraph_add_node_duplication_hook (&ipa_node_duplication_hook, NULL);
+      symtab->add_cgraph_duplication_hook (&ipa_node_duplication_hook, NULL);
   function_insertion_hook_holder =
-      cgraph_add_function_insertion_hook (&ipa_add_new_function, NULL);
+      symtab->add_cgraph_insertion_hook (&ipa_add_new_function, NULL);
 }
 
 /* Unregister our cgraph hooks if they are not already there.  */
@@ -3683,15 +3683,15 @@ ipa_register_cgraph_hooks (void)
 static void
 ipa_unregister_cgraph_hooks (void)
 {
-  cgraph_remove_edge_removal_hook (edge_removal_hook_holder);
+  symtab->remove_edge_removal_hook (edge_removal_hook_holder);
   edge_removal_hook_holder = NULL;
-  cgraph_remove_node_removal_hook (node_removal_hook_holder);
+  symtab->remove_cgraph_removal_hook (node_removal_hook_holder);
   node_removal_hook_holder = NULL;
-  cgraph_remove_edge_duplication_hook (edge_duplication_hook_holder);
+  symtab->remove_edge_duplication_hook (edge_duplication_hook_holder);
   edge_duplication_hook_holder = NULL;
-  cgraph_remove_node_duplication_hook (node_duplication_hook_holder);
+  symtab->remove_cgraph_duplication_hook (node_duplication_hook_holder);
   node_duplication_hook_holder = NULL;
-  cgraph_remove_function_insertion_hook (function_insertion_hook_holder);
+  symtab->remove_cgraph_insertion_hook (function_insertion_hook_holder);
   function_insertion_hook_holder = NULL;
 }
 

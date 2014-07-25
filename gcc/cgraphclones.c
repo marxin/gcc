@@ -164,7 +164,7 @@ cgraph_clone_edge (struct cgraph_edge *e, struct cgraph_node *n,
       if (e->count < 0)
 	e->count = 0;
     }
-  cgraph_call_edge_duplication_hooks (e, new_edge);
+  symtab->call_edge_duplication_hooks (e, new_edge);
   return new_edge;
 }
 
@@ -353,10 +353,11 @@ duplicate_thunk_for_node (cgraph_node *thunk, cgraph_node *node)
   struct cgraph_edge *e = new_thunk->create_edge (node, NULL, 0,
 						  CGRAPH_FREQ_BASE);
   e->call_stmt_cannot_inline_p = true;
-  cgraph_call_edge_duplication_hooks (thunk->callees, e);
+  symtab->call_edge_duplication_hooks (thunk->callees, e);
   if (!new_thunk->expand_thunk (false, false))
     new_thunk->analyzed = true;
-  thunk->call_duplication_hooks (new_thunk);
+
+  symtab->call_cgraph_duplication_hooks (thunk, new_thunk);
   return new_thunk;
 }
 
@@ -398,7 +399,7 @@ cgraph_node::create_clone (tree decl, gcov_type gcov_count, int freq,
 			   struct cgraph_node *new_inlined_to,
 			   bitmap args_to_skip)
 {
-  struct cgraph_node *new_node = cgraph_node::create_empty ();
+  struct cgraph_node *new_node = symtab->create_empty ();
   struct cgraph_edge *e;
   gcov_type count_scale;
   unsigned i;
@@ -480,7 +481,7 @@ cgraph_node::create_clone (tree decl, gcov_type gcov_count, int freq,
   new_node->clone_of = this;
 
   if (call_duplication_hook)
-    call_duplication_hooks (new_node);
+    symtab->call_cgraph_duplication_hooks (this, new_node);
   return new_node;
 }
 
@@ -583,7 +584,7 @@ cgraph_node::create_virtual_clone (vec<cgraph_edge *> redirect_callers,
     new_node->ipa_transforms_to_apply
       = ipa_transforms_to_apply.copy ();
 
-  call_duplication_hooks (new_node);
+  symtab->call_cgraph_duplication_hooks (this, new_node);
 
   return new_node;
 }
@@ -880,7 +881,7 @@ cgraph_node::create_version_clone (tree new_decl,
        cgraph_redirect_edge_callee (e, new_version);
      }
 
-   call_duplication_hooks (new_version);
+   symtab->call_cgraph_duplication_hooks (this, new_version);
 
    return new_version;
  }
@@ -969,7 +970,7 @@ cgraph_node::create_version_clone_with_body
   /* Update the call_expr on the edges to call the new version node. */
   update_call_expr (new_version_node);
 
-  new_version_node->call_function_insertion_hooks ();
+  symtab->call_cgraph_insertion_hooks (this);
   return new_version_node;
 }
 

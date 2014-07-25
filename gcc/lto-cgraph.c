@@ -1120,7 +1120,6 @@ input_node (struct lto_file_decl_data *file_data,
   int i, count;
   tree group;
   const char *section;
-
   order = streamer_read_hwi (ib) + order_base;
   clone_ref = streamer_read_hwi (ib);
 
@@ -1138,14 +1137,14 @@ input_node (struct lto_file_decl_data *file_data,
       /* Declaration of functions can be already merged with a declaration
 	 from other input file.  We keep cgraph unmerged until after streaming
 	 of ipa passes is done.  Alays forcingly create a fresh node.  */
-      node = cgraph_node::create_empty ();
+      node = symtab->create_empty ();
       node->decl = fn_decl;
       node->register_symbol ();
     }
 
   node->order = order;
-  if (order >= symtab_order)
-    symtab_order = order + 1;
+  if (order >= symtab->order)
+    symtab->order++;
 
   node->count = streamer_read_gcov_count (ib);
   node->count_materialization_scale = streamer_read_hwi (ib);
@@ -1247,8 +1246,8 @@ input_varpool_node (struct lto_file_decl_data *file_data,
   node->register_symbol ();
 
   node->order = order;
-  if (order >= symtab_order)
-    symtab_order = order + 1;
+  if (order >= symtab->order)
+    symtab->order++;
   node->lto_file_data = file_data;
 
   bp = streamer_read_bitpack (ib);
@@ -1403,7 +1402,7 @@ input_cgraph_1 (struct lto_file_decl_data *file_data,
   unsigned i;
 
   tag = streamer_read_enum (ib, LTO_symtab_tags, LTO_symtab_last_tag);
-  order_base = symtab_order;
+  order_base = symtab->order;
   while (tag)
     {
       if (tag == LTO_symtab_edge)

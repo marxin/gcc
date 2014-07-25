@@ -4913,7 +4913,7 @@ ipa_tm_create_version (struct cgraph_node *old_node)
 
   record_tm_clone_pair (old_decl, new_decl);
 
-  new_node->call_function_insertion_hooks ();
+  symtab->call_cgraph_insertion_hooks (new_node);
   if (old_node->force_output
       || old_node->ref_list.first_referring ())
     ipa_tm_mark_force_output_node (new_node);

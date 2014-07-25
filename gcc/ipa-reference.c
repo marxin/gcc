@@ -419,9 +419,9 @@ ipa_init (void)
   all_module_statics = BITMAP_ALLOC (&optimization_summary_obstack);
 
   node_removal_hook_holder =
-      cgraph_add_node_removal_hook (&remove_node_data, NULL);
+      symtab->add_cgraph_removal_hook (&remove_node_data, NULL);
   node_duplication_hook_holder =
-      cgraph_add_node_duplication_hook (&duplicate_node_data, NULL);
+      symtab->add_cgraph_duplication_hook (&duplicate_node_data, NULL);
 }
 
 
@@ -660,7 +660,7 @@ propagate (void)
 {
   struct cgraph_node *node;
   struct cgraph_node **order =
-    XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+    XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
   int order_pos;
   int i;
 
@@ -1011,9 +1011,9 @@ ipa_reference_read_optimization_summary (void)
   bitmap_obstack_initialize (&optimization_summary_obstack);
 
   node_removal_hook_holder =
-      cgraph_add_node_removal_hook (&remove_node_data, NULL);
+      symtab->add_cgraph_removal_hook (&remove_node_data, NULL);
   node_duplication_hook_holder =
-      cgraph_add_node_duplication_hook (&duplicate_node_data, NULL);
+      symtab->add_cgraph_duplication_hook (&duplicate_node_data, NULL);
   all_module_statics = BITMAP_ALLOC (&optimization_summary_obstack);
 
   while ((file_data = file_data_vec[j++]))

@@ -5656,12 +5656,12 @@ assemble_alias (tree decl, tree target)
 
   /* If the target has already been emitted, we don't have to queue the
      alias.  This saves a tad of memory.  */
-  if (cgraph_global_info_ready)
+  if (symtab->cgraph_global_info_ready)
     target_decl = find_decl (target);
   else
     target_decl= NULL;
   if ((target_decl && TREE_ASM_WRITTEN (target_decl))
-      || cgraph_state >= CGRAPH_STATE_EXPANSION)
+      || symtab->cgraph_state >= CGRAPH_STATE_EXPANSION)
     do_assemble_alias (decl, target);
   else
     {
@@ -7591,10 +7591,10 @@ default_asm_output_ident_directive (const char *ident_str)
      to asm_out_file.  Instead, add a fake top-level asm statement.
      This allows the front ends to use this hook without actually
      writing to asm_out_file, to handle #ident or Pragma Ident.  */
-  if (cgraph_state == CGRAPH_STATE_PARSING)
+  if (symtab->cgraph_state == CGRAPH_STATE_PARSING)
     {
       char *buf = ACONCAT ((ident_asm_op, "\"", ident_str, "\"\n", NULL));
-      add_asm_node (build_string (strlen (buf), buf));
+      symtab->register_asm_symbol (build_string (strlen (buf), buf));
     }
   else
     fprintf (asm_out_file, "%s\"%s\"\n", ident_asm_op, ident_str);

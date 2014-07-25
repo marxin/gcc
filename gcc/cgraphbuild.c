@@ -345,8 +345,7 @@ pass_build_cgraph_edges::execute (function *fun)
 							 bb);
 	      decl = gimple_call_fndecl (stmt);
 	      if (decl)
-		node->create_edge (cgraph_node::get_create (decl),
-				   stmt, bb->count, freq);
+		node->create_edge (cgraph_node::get_create (decl), stmt, bb->count, freq);
 	      else if (gimple_call_internal_p (stmt))
 		;
 	      else

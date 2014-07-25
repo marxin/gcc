@@ -717,7 +717,7 @@ function_and_variable_visibility (bool whole_program)
 	  fprintf (dump_file, " %s", vnode->name ());
       fprintf (dump_file, "\n\n");
     }
-  cgraph_function_flags_ready = true;
+  symtab->cgraph_function_flags_ready = true;
   return 0;
 }
 

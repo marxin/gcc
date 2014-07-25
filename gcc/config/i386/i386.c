@@ -32192,7 +32192,7 @@ make_resolver_func (const tree default_decl,
   *empty_bb = init_lowered_empty_function (decl, false);
 
   cgraph_node::add_new_function (decl, true);
-  cgraph_node::get_create (decl)->call_function_insertion_hooks ();
+  symtab->call_cgraph_insertion_hooks (cgraph_node::get_create (decl));
 
   pop_cfun ();
 

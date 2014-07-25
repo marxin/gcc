@@ -224,12 +224,6 @@ static void handle_alias_pairs (void);
 
 FILE *cgraph_dump_file;
 
-/* Linked list of cgraph asm nodes.  */
-struct asm_node *asm_nodes;
-
-/* Last node in cgraph_asm_nodes.  */
-static GTY(()) struct asm_node *asm_last_node;
-
 /* Used for vtable lookup in thunk adjusting.  */
 static GTY (()) tree vtable_entry_type;
 
@@ -312,14 +306,14 @@ cgraph_process_new_functions (void)
     {
       node = csi_node (csi);
       fndecl = node->decl;
-      switch (cgraph_state)
+      switch (symtab->cgraph_state)
 	{
 	case CGRAPH_STATE_CONSTRUCTION:
 	  /* At construction time we just need to finalize function and move
 	     it into reachable functions list.  */
 
 	  cgraph_finalize_function (fndecl, false);
-	  node->call_function_insertion_hooks ();
+	  symtab->call_cgraph_insertion_hooks (node);
 	  enqueue_node (node);
 	  break;
 
@@ -333,7 +327,7 @@ cgraph_process_new_functions (void)
 	  if (!node->analyzed)
 	    node->analyze ();
 	  push_cfun (DECL_STRUCT_FUNCTION (fndecl));
-	  if (cgraph_state == CGRAPH_STATE_IPA_SSA
+	  if (symtab->cgraph_state == CGRAPH_STATE_IPA_SSA
 	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl)))
 	    g->get_passes ()->execute_early_local_passes ();
 	  else if (inline_summary_vec != NULL)
@@ -341,14 +335,13 @@ cgraph_process_new_functions (void)
 	  free_dominance_info (CDI_POST_DOMINATORS);
 	  free_dominance_info (CDI_DOMINATORS);
 	  pop_cfun ();
-	  node->call_function_insertion_hooks ();
 	  break;
 
 	case CGRAPH_STATE_EXPANSION:
 	  /* Functions created during expansion shall be compiled
 	     directly.  */
 	  node->process = 0;
-	  node->call_function_insertion_hooks ();
+	  symtab->call_cgraph_insertion_hooks (node);
 	  expand_function (node);
 	  break;
 
@@ -468,7 +461,7 @@ cgraph_finalize_function (tree decl, bool no_collect)
   if (!no_collect)
     ggc_collect ();
 
-  if (cgraph_state == CGRAPH_STATE_CONSTRUCTION
+  if (symtab->cgraph_state == CGRAPH_STATE_CONSTRUCTION
       && (decide_is_symbol_needed (node)
 	  || referred_to_p (node)))
     enqueue_node (node);
@@ -491,7 +484,7 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 {
   gcc::pass_manager *passes = g->get_passes ();
   struct cgraph_node *node;
-  switch (cgraph_state)
+  switch (symtab->cgraph_state)
     {
       case CGRAPH_STATE_PARSING:
 	cgraph_finalize_function (fndecl, false);
@@ -515,7 +508,7 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 	node->local.local = false;
 	node->definition = true;
 	node->force_output = true;
-	if (!lowered && cgraph_state == CGRAPH_STATE_EXPANSION)
+	if (!lowered && symtab->cgraph_state == CGRAPH_STATE_EXPANSION)
 	  {
 	    push_cfun (DECL_STRUCT_FUNCTION (fndecl));
 	    gimple_register_cfg_hooks ();
@@ -563,25 +556,6 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
     DECL_FUNCTION_PERSONALITY (fndecl) = lang_hooks.eh_personality ();
 }
 
-/* Add a top-level asm statement to the list.  */
-
-struct asm_node *
-add_asm_node (tree asm_str)
-{
-  struct asm_node *node;
-
-  node = ggc_cleared_alloc<asm_node> ();
-  node->asm_str = asm_str;
-  node->order = symtab_order++;
-  node->next = NULL;
-  if (asm_nodes == NULL)
-    asm_nodes = node;
-  else
-    asm_last_node->next = node;
-  asm_last_node = node;
-  return node;
-}
-
 /* Output all asm statements we have stored up to be output.  */
 
 static void
@@ -592,9 +566,10 @@ output_asm_statements (void)
   if (seen_error ())
     return;
 
-  for (can = asm_nodes; can; can = can->next)
+  for (can = symtab->first_asm_symbol (); can; can = can->next)
     assemble_asm (can->asm_str);
-  asm_nodes = NULL;
+  
+  symtab->clear_asm_symbols ();
 }
 
 /* Analyze the function scheduled to be output.  */
@@ -740,8 +715,8 @@ process_function_and_variable_attributes (struct cgraph_node *first,
   struct cgraph_node *node;
   varpool_node *vnode;
 
-  for (node = cgraph_first_function (); node != first;
-       node = cgraph_next_function (node))
+  for (node = symtab->first_function (); node != first;
+       node = symtab->next_function (node))
     {
       tree decl = node->decl;
       if (DECL_PRESERVE_P (decl))
@@ -773,8 +748,8 @@ process_function_and_variable_attributes (struct cgraph_node *first,
      
       process_common_attributes (decl);
     }
-  for (vnode = varpool_first_variable (); vnode != first_var;
-       vnode = varpool_next_variable (vnode))
+  for (vnode = symtab->first_variable (); vnode != first_var;
+       vnode = symtab->next_variable (vnode))
     {
       tree decl = vnode->decl;
       if (DECL_EXTERNAL (decl)
@@ -826,16 +801,16 @@ varpool_node::finalize_decl (tree decl)
 	  && !DECL_ARTIFICIAL (node->decl)))
     node->force_output = true;
 
-  if (cgraph_state == CGRAPH_STATE_CONSTRUCTION
+  if (symtab->cgraph_state == CGRAPH_STATE_CONSTRUCTION
       && (decide_is_symbol_needed (node)
 	  || referred_to_p (node)))
     enqueue_node (node);
-  if (cgraph_state >= CGRAPH_STATE_IPA_SSA)
+  if (symtab->cgraph_state >= CGRAPH_STATE_IPA_SSA)
     node->analyze ();
   /* Some frontends produce various interface variables after compilation
      finished.  */
-  if (cgraph_state == CGRAPH_STATE_FINISHED
-      || (!flag_toplevel_reorder && cgraph_state == CGRAPH_STATE_EXPANSION))
+  if (symtab->cgraph_state == CGRAPH_STATE_FINISHED
+      || (!flag_toplevel_reorder && symtab->cgraph_state == CGRAPH_STATE_EXPANSION))
     node->assemble_decl ();
 }
 
@@ -946,7 +921,7 @@ analyze_functions (void)
   location_t saved_loc = input_location;
 
   bitmap_obstack_initialize (NULL);
-  cgraph_state = CGRAPH_STATE_CONSTRUCTION;
+  symtab->cgraph_state = CGRAPH_STATE_CONSTRUCTION;
   input_location = UNKNOWN_LOCATION;
 
   /* Ugly, but the fixup can not happen at a time same body alias is created;
@@ -967,7 +942,7 @@ analyze_functions (void)
 						first_analyzed_var);
 
       /* First identify the trivially needed symbols.  */
-      for (node = symtab_nodes;
+      for (node = symtab->first_symbol ();
 	   node != first_analyzed
 	   && node != first_analyzed_var; node = node->next)
 	{
@@ -989,8 +964,8 @@ analyze_functions (void)
 	    break;
 	}
       cgraph_process_new_functions ();
-      first_analyzed_var = varpool_first_variable ();
-      first_analyzed = cgraph_first_function ();
+      first_analyzed_var = symtab->first_variable ();
+      first_analyzed = symtab->first_function ();
 
       if (changed && cgraph_dump_file)
 	fprintf (cgraph_dump_file, "\n");
@@ -1085,7 +1060,7 @@ analyze_functions (void)
   if (cgraph_dump_file)
     fprintf (cgraph_dump_file, "\nRemoving unused symbols:");
 
-  for (node = symtab_nodes;
+  for (node = symtab->first_symbol ();
        node != first_handled
        && node != first_handled_var; node = next)
     {
@@ -1115,8 +1090,8 @@ analyze_functions (void)
     }
   for (;node; node = node->next)
     node->aux = NULL;
-  first_analyzed = cgraph_first_function ();
-  first_analyzed_var = varpool_first_variable ();
+  first_analyzed = symtab->first_function ();
+  first_analyzed_var = symtab->first_variable ();
   if (cgraph_dump_file)
     {
       fprintf (cgraph_dump_file, "\n\nReclaimed ");
@@ -1758,7 +1733,7 @@ expand_function (struct cgraph_node *node)
 
   timevar_push (TV_REST_OF_COMPILATION);
 
-  gcc_assert (cgraph_global_info_ready);
+  gcc_assert (symtab->cgraph_global_info_ready);
 
   /* Initialize the default bitmap obstack.  */
   bitmap_obstack_initialize (NULL);
@@ -1883,13 +1858,14 @@ static void
 expand_all_functions (void)
 {
   struct cgraph_node *node;
-  struct cgraph_node **order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  struct cgraph_node **order = XCNEWVEC (struct cgraph_node *,
+					 symtab->cgraph_count);
   unsigned int expanded_func_count = 0, profiled_func_count = 0;
   int order_pos, new_order_pos = 0;
   int i;
 
   order_pos = ipa_reverse_postorder (order);
-  gcc_assert (order_pos == cgraph_n_nodes);
+  gcc_assert (order_pos == symtab->cgraph_count);
 
   /* Garbage collector may remove inline clones we eliminate during
      optimization.  So we must be sure to not reference them.  */
@@ -1968,8 +1944,7 @@ output_in_order (void)
   struct cgraph_node *pf;
   varpool_node *pv;
   struct asm_node *pa;
-
-  max = symtab_order;
+  max = symtab->order;
   nodes = XCNEWVEC (struct cgraph_order_sort, max);
 
   FOR_EACH_DEFINED_FUNCTION (pf)
@@ -1992,7 +1967,7 @@ output_in_order (void)
 	nodes[i].u.v = pv;
       }
 
-  for (pa = asm_nodes; pa; pa = pa->next)
+  for (pa = symtab->first_asm_symbol (); pa; pa = pa->next)
     {
       i = pa->order;
       gcc_assert (nodes[i].kind == ORDER_UNDEFINED);
@@ -2031,7 +2006,8 @@ output_in_order (void)
 	}
     }
 
-  asm_nodes = NULL;
+  symtab->clear_asm_symbols ();
+  
   free (nodes);
 }
 
@@ -2062,8 +2038,8 @@ ipa_passes (void)
 
   /* If pass_all_early_optimizations was not scheduled, the state of
      the cgraph will not be properly updated.  Update it now.  */
-  if (cgraph_state < CGRAPH_STATE_IPA_SSA)
-    cgraph_state = CGRAPH_STATE_IPA_SSA;
+  if (symtab->cgraph_state < CGRAPH_STATE_IPA_SSA)
+    symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
 
   if (!in_lto_p)
     {
@@ -2172,7 +2148,7 @@ compile (void)
     }
   if (!quiet_flag)
     fprintf (stderr, "Performing interprocedural optimizations\n");
-  cgraph_state = CGRAPH_STATE_IPA;
+  symtab->cgraph_state = CGRAPH_STATE_IPA;
 
   /* If LTO is enabled, initialize the streamer hooks needed by GIMPLE.  */
   if (flag_lto)
@@ -2193,7 +2169,7 @@ compile (void)
   /* This pass remove bodies of extern inline functions we never inlined.
      Do this later so other IPA passes see what is really going on.  */
   symtab_remove_unreachable_nodes (false, dump_file);
-  cgraph_global_info_ready = true;
+  symtab->cgraph_global_info_ready = true;
   if (cgraph_dump_file)
     {
       fprintf (cgraph_dump_file, "Optimized ");
@@ -2250,7 +2226,7 @@ compile (void)
       }
 #endif
 
-  cgraph_state = CGRAPH_STATE_EXPANSION;
+  symtab->cgraph_state = CGRAPH_STATE_EXPANSION;
 
   if (!flag_toplevel_reorder)
     output_in_order ();
@@ -2263,7 +2239,7 @@ compile (void)
     }
 
   cgraph_process_new_functions ();
-  cgraph_state = CGRAPH_STATE_FINISHED;
+  symtab->cgraph_state = CGRAPH_STATE_FINISHED;
   output_weakrefs ();
 
   if (cgraph_dump_file)

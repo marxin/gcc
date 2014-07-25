@@ -1413,10 +1413,10 @@ recursive_inlining (struct cgraph_edge *edge,
   /* Remove master clone we used for inlining.  We rely that clones inlined
      into master clone gets queued just before master clone so we don't
      need recursion.  */
-  for (node = cgraph_first_function (); node != master_clone;
+  for (node = symtab->first_function (); node != master_clone;
        node = next)
     {
-      next = cgraph_next_function (node);
+      next = symtab->next_function (node);
       if (node->global.inlined_to == master_clone)
 	node->remove ();
     }
@@ -1561,14 +1561,13 @@ inline_small_functions (void)
   int min_size, max_size;
   auto_vec<cgraph_edge *> new_indirect_edges;
   int initial_size = 0;
-  struct cgraph_node **order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  struct cgraph_node **order = XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
   struct cgraph_edge_hook_list *edge_removal_hook_holder;
-
   if (flag_indirect_inlining)
     new_indirect_edges.create (8);
 
   edge_removal_hook_holder
-    = cgraph_add_edge_removal_hook (&heap_edge_removal_hook, edge_heap);
+    = symtab->add_edge_removal_hook (&heap_edge_removal_hook, edge_heap);
 
   /* Compute overall unit size and other global parameters used by badness
      metrics.  */
@@ -1859,7 +1858,7 @@ inline_small_functions (void)
 	     initial_size, overall_size,
 	     initial_size ? overall_size * 100 / (initial_size) - 100: 0);
   BITMAP_FREE (updated_nodes);
-  cgraph_remove_edge_removal_hook (edge_removal_hook_holder);
+  symtab->remove_edge_removal_hook (edge_removal_hook_holder);
 }
 
 /* Flatten NODE.  Performed both during early inlining and
@@ -2141,7 +2140,7 @@ ipa_inline (void)
   if (!optimize)
     return 0;
 
-  order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  order = XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
 
   if (in_lto_p && optimize)
     ipa_update_after_lto_read ();

@@ -173,7 +173,7 @@ ipa_reduced_postorder (struct cgraph_node **order,
   struct cgraph_node *node;
   struct searchc_env env;
   splay_tree_node result;
-  env.stack = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  env.stack = XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
   env.stack_size = 0;
   env.result = order;
   env.order_pos = 0;
@@ -292,7 +292,7 @@ ipa_reverse_postorder (struct cgraph_node **order)
   struct ipa_ref *ref = NULL;
 
   struct postorder_stack *stack =
-    XCNEWVEC (struct postorder_stack, cgraph_n_nodes);
+    XCNEWVEC (struct postorder_stack, symtab->cgraph_count);
 
   /* We have to deal with cycles nicely, so use a depth first traversal
      output algorithm.  Ignore the fact that some functions won't need

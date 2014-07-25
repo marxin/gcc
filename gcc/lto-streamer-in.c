@@ -1378,10 +1378,10 @@ lto_input_toplevel_asms (struct lto_file_decl_data *file_data, int order_base)
 
   while ((str = streamer_read_string_cst (data_in, &ib)))
     {
-      struct asm_node *node = add_asm_node (str);
+      struct asm_node *node = symtab->register_asm_symbol (str);
       node->order = streamer_read_hwi (&ib) + order_base;
-      if (node->order >= symtab_order)
-	symtab_order = node->order + 1;
+      if (node->order >= symtab->order)
+	symtab->order++;
     }
 
   lto_data_in_delete (data_in);

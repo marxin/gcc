@@ -333,8 +333,8 @@ execute_all_early_local_passes (void)
      none of the sub-passes are IPA passes and do not create new
      functions, this is ok.  We're setting this value for the benefit
      of IPA passes that follow.  */
-  if (cgraph_state < CGRAPH_STATE_IPA_SSA)
-    cgraph_state = CGRAPH_STATE_IPA_SSA;
+  if (symtab->cgraph_state < CGRAPH_STATE_IPA_SSA)
+    symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
   return 0;
 }
 
@@ -1504,7 +1504,7 @@ do_per_function_toporder (void (*callback) (function *, void *data), void *data)
   else
     {
       gcc_assert (!order);
-      order = ggc_vec_alloc<cgraph_node *> (cgraph_n_nodes);
+      order = ggc_vec_alloc<cgraph_node *> (symtab->cgraph_count);
       nnodes = ipa_reverse_postorder (order);
       for (i = nnodes - 1; i >= 0; i--)
         order[i]->process = 1;
@@ -2312,9 +2312,9 @@ ipa_write_summaries (void)
      cgraph_expand_all_functions.  This mostly facilitates debugging,
      since it causes the gimple file to be processed in the same order
      as the source code.  */
-  order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  order = XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
   order_pos = ipa_reverse_postorder (order);
-  gcc_assert (order_pos == cgraph_n_nodes);
+  gcc_assert (order_pos == symtab->cgraph_count);
 
   for (i = order_pos - 1; i >= 0; i--)
     {

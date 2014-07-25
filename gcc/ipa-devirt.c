@@ -215,7 +215,7 @@ static bool
 type_all_ctors_visible_p (tree t)
 {
   return !flag_ltrans
-	 && cgraph_state >= CGRAPH_STATE_CONSTRUCTION
+	 && symtab->cgraph_state >= CGRAPH_STATE_CONSTRUCTION
 	 /* We can not always use type_all_derivations_known_p.
 	    For function local types we must assume case where
 	    the function is COMDAT and shared in between units. 
@@ -1330,7 +1330,7 @@ referenced_from_vtable_p (struct cgraph_node *node)
     return true;
 
   /* We need references built.  */
-  if (cgraph_state <= CGRAPH_STATE_CONSTRUCTION)
+  if (symtab->cgraph_state <= CGRAPH_STATE_CONSTRUCTION)
     return true;
 
   for (i = 0; node->iterate_referring (i, ref); i++)
@@ -2462,8 +2462,8 @@ possible_polymorphic_call_targets (tree otr_type,
       if (!node_removal_hook_holder)
 	{
 	  node_removal_hook_holder =
-	    cgraph_add_node_removal_hook (&devirt_node_removal_hook, NULL);
-	  varpool_add_node_removal_hook (&devirt_variable_node_removal_hook,
+	    symtab->add_cgraph_removal_hook (&devirt_node_removal_hook, NULL);
+	  symtab->add_varpool_removal_hook (&devirt_variable_node_removal_hook,
 					 NULL);
 	}
     }

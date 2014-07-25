@@ -11055,7 +11055,7 @@ simd_clone_create (struct cgraph_node *old_node)
       DECL_STATIC_CONSTRUCTOR (new_decl) = 0;
       DECL_STATIC_DESTRUCTOR (new_decl) = 0;
       new_node = old_node->create_version_clone (new_decl, vNULL, NULL);
-      new_node->call_function_insertion_hooks ();
+      symtab->call_cgraph_insertion_hooks (new_node);
     }
   if (new_node == NULL)
     return new_node;

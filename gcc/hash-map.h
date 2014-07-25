@@ -185,6 +185,11 @@ public:
       return e->m_value;
     }
 
+  inline void erase (const Key &k)
+  {
+    m_table.remove_elt_with_hash (k, Traits::hash (k));
+  }
+
   /* Call the call back on each pair of key and value with the passed in
      arg.  */
 

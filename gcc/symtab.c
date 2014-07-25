@@ -79,14 +79,6 @@ struct GTY(()) symbol_priority_map {
 static GTY ((param_is (struct symbol_priority_map)))
   htab_t init_priority_hash;
 
-/* Linked list of symbol table nodes.  */
-symtab_node *symtab_nodes;
-
-/* The order index of the next symtab node to be created.  This is
-   used so that we can sort the cgraph nodes in order by when we saw
-   them, to support -fno-toplevel-reorder.  */
-int symtab_order;
-
 /* Hash asmnames ignoring the user specified marks.  */
 
 static hashval_t
@@ -391,18 +383,12 @@ eq_sections (const void *p1, const void *p2)
 void
 symtab_node::register_symbol (void)
 {
-  next = symtab_nodes;
-  previous = NULL;
-  if (symtab_nodes)
-    symtab_nodes->previous = this;
-  symtab_nodes = this;
+  symtab->register_symbol (this);
 
   if (!decl->decl_with_vis.symtab_node)
     decl->decl_with_vis.symtab_node = this;
 
   ref_list.clear ();
-
-  order = symtab_order++;
 
   /* Be sure to do this last; C++ FE might create new nodes via
      DECL_ASSEMBLER_NAME langhook!  */
@@ -444,14 +430,7 @@ symtab_node::unregister (void)
 
   remove_from_same_comdat_group ();
 
-  if (previous)
-    previous->next = next;
-  else
-    symtab_nodes = next;
-  if (next)
-    next->previous = previous;
-  next = NULL;
-  previous = NULL;
+  symtab->unregister (this);
 
   /* During LTO symtab merging we temporarily corrupt decl to symtab node
      hash.  */
@@ -1031,7 +1010,7 @@ symtab_node::verify_base (void)
       error_found = true;
     }
    
-  if (cgraph_state != CGRAPH_LTO_STREAMING)
+  if (symtab->cgraph_state != CGRAPH_LTO_STREAMING)
     {
       hashed_node = symtab_node::get (decl);
       if (!hashed_node)
@@ -1677,7 +1656,7 @@ symtab_node::resolve_alias (symtab_node *target)
      when renaming symbols.  */
   alias_target = NULL;
 
-  if (cpp_implicit_alias && cgraph_state >= CGRAPH_STATE_CONSTRUCTION)
+  if (cpp_implicit_alias && symtab->cgraph_state >= CGRAPH_STATE_CONSTRUCTION)
     fixup_same_cpp_alias_visibility (target);
 
   /* If alias has address taken, so does the target.  */
@@ -1926,7 +1905,7 @@ symtab_node::nonzero_address ()
      When parsing, beware the cases when WEAK attribute is added later.  */
   if (!DECL_WEAK (this->decl)
       && flag_delete_null_pointer_checks
-      && cgraph_state > CGRAPH_STATE_PARSING)
+      && symtab->cgraph_state > CGRAPH_STATE_PARSING)
     return true;
 
   /* If target is defined and not extern, we know it will be output and thus

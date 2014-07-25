@@ -93,6 +93,8 @@ along with GCC; see the file COPYING3.  If not see
 				   declarations for e.g. AIX 4.x.  */
 #endif
 
+#include <new>
+
 static void general_init (const char *);
 static void do_compile (void);
 static void process_options (void);
@@ -401,7 +403,7 @@ wrapup_global_declaration_2 (tree decl)
 	needed = false;
       else if (node && node->alias)
 	needed = false;
-      else if (!cgraph_global_info_ready
+      else if (!symtab->cgraph_global_info_ready
 	       && (TREE_USED (decl)
 		   || TREE_USED (DECL_ASSEMBLER_NAME (decl))))
 	/* needed */;
@@ -1177,7 +1179,8 @@ general_init (const char *argv0)
 
   /* Create the singleton holder for global state.
      Doing so also creates the pass manager and with it the passes.  */
-  g = new gcc::context ();
+  g = new gcc::context (); 
+  symtab = ggc_cleared_alloc <symbol_table> ();
 
   statistics_early_init ();
   finish_params ();

@@ -50,17 +50,12 @@ struct varpool_node_hook_list {
   struct varpool_node_hook_list *next;
 };
 
-/* List of hooks triggered when a node is removed.  */
-struct varpool_node_hook_list *first_varpool_node_removal_hook;
-/* List of hooks triggered when an variable is inserted.  */
-struct varpool_node_hook_list *first_varpool_variable_insertion_hook;
-
 /* Register HOOK to be called with DATA on each removed node.  */
-struct varpool_node_hook_list *
-varpool_add_node_removal_hook (varpool_node_hook hook, void *data)
+varpool_node_hook_list *
+symbol_table::add_varpool_removal_hook (varpool_node_hook hook, void *data)
 {
   struct varpool_node_hook_list *entry;
-  struct varpool_node_hook_list **ptr = &first_varpool_node_removal_hook;
+  struct varpool_node_hook_list **ptr = &m_first_varpool_removal_hook;
 
   entry = (struct varpool_node_hook_list *) xmalloc (sizeof (*entry));
   entry->hook = hook;
@@ -74,9 +69,9 @@ varpool_add_node_removal_hook (varpool_node_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on removing nodes.  */
 void
-varpool_remove_node_removal_hook (struct varpool_node_hook_list *entry)
+symbol_table::remove_varpool_removal_hook (struct varpool_node_hook_list *entry)
 {
-  struct varpool_node_hook_list **ptr = &first_varpool_node_removal_hook;
+  struct varpool_node_hook_list **ptr = &m_first_varpool_removal_hook;
 
   while (*ptr != entry)
     ptr = &(*ptr)->next;
@@ -85,10 +80,10 @@ varpool_remove_node_removal_hook (struct varpool_node_hook_list *entry)
 }
 
 /* Call all node removal hooks.  */
-static void
-varpool_call_node_removal_hooks (varpool_node *node)
+void
+symbol_table::call_varpool_removal_hooks (varpool_node *node)
 {
-  struct varpool_node_hook_list *entry = first_varpool_node_removal_hook;
+  struct varpool_node_hook_list *entry = m_first_varpool_removal_hook;
   while (entry)
   {
     entry->hook (node, entry->data);
@@ -98,10 +93,10 @@ varpool_call_node_removal_hooks (varpool_node *node)
 
 /* Register HOOK to be called with DATA on each inserted node.  */
 struct varpool_node_hook_list *
-varpool_add_variable_insertion_hook (varpool_node_hook hook, void *data)
+symbol_table::add_varpool_insertion_hook (varpool_node_hook hook, void *data)
 {
   struct varpool_node_hook_list *entry;
-  struct varpool_node_hook_list **ptr = &first_varpool_variable_insertion_hook;
+  struct varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
 
   entry = (struct varpool_node_hook_list *) xmalloc (sizeof (*entry));
   entry->hook = hook;
@@ -115,9 +110,9 @@ varpool_add_variable_insertion_hook (varpool_node_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on inserted nodes.  */
 void
-varpool_remove_variable_insertion_hook (struct varpool_node_hook_list *entry)
+symbol_table::remove_varpool_insertion_hook (struct varpool_node_hook_list *entry)
 {
-  struct varpool_node_hook_list **ptr = &first_varpool_variable_insertion_hook;
+  struct varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
 
   while (*ptr != entry)
     ptr = &(*ptr)->next;
@@ -127,9 +122,9 @@ varpool_remove_variable_insertion_hook (struct varpool_node_hook_list *entry)
 
 /* Call all node insertion hooks.  */
 void
-varpool_call_variable_insertion_hooks (varpool_node *node)
+symbol_table::call_varpool_insertion_hooks (varpool_node *node)
 {
-  struct varpool_node_hook_list *entry = first_varpool_variable_insertion_hook;
+  struct varpool_node_hook_list *entry = m_first_varpool_insertion_hook;
   while (entry)
   {
     entry->hook (node, entry->data);
@@ -167,11 +162,11 @@ varpool_node::get_create (tree decl)
 void
 varpool_node::remove (void)
 {
-  varpool_call_node_removal_hooks (this);
+  symtab->call_varpool_removal_hooks (this);
   unregister ();
 
   /* When streaming we can have multiple nodes associated with decl.  */
-  if (cgraph_state == CGRAPH_LTO_STREAMING)
+  if (symtab->cgraph_state == CGRAPH_LTO_STREAMING)
     ;
   /* Keep constructor when it may be used for folding. We remove
      references to external variables before final compilation.  */
@@ -195,7 +190,7 @@ varpool_node::remove_initializer (void)
 	 entries for given decl.  Do not attempt to remove
 	 the boides, or we will end up remiving
 	 wrong one.  */
-      && cgraph_state != CGRAPH_LTO_STREAMING)
+      && symtab->cgraph_state != CGRAPH_LTO_STREAMING)
     DECL_INITIAL (decl) = error_mark_node;
 }
 
@@ -205,7 +200,7 @@ varpool_node::dump (FILE *f)
 {
   dump_base (f);
   fprintf (f, "  Availability: %s\n",
-	   cgraph_function_flags_ready
+	   symtab->cgraph_function_flags_ready
 	   ? cgraph_availability_names[get_availability ()]
 	   : "not-ready");
   fprintf (f, "  Varpool flags:");
@@ -437,7 +432,7 @@ varpool_add_new_variable (tree decl)
   varpool_node *node;
   varpool_node::finalize_decl (decl);
   node = varpool_node::get_create (decl);
-  varpool_call_variable_insertion_hooks (node);
+  symtab->call_varpool_insertion_hooks (node);
   if (node->externally_visible_p ())
     node->externally_visible = true;
 }
@@ -478,7 +473,7 @@ varpool_node::analyze (void)
      We however don't want to re-analyze already analyzed nodes.  */
   if (!analyzed)
     {
-      gcc_assert (!in_lto_p || cgraph_function_flags_ready);
+      gcc_assert (!in_lto_p || symtab->cgraph_function_flags_ready);
       /* Compute the alignment early so function body expanders are
 	 already informed about increased alignment.  */
       align_variable (decl, 0);
@@ -628,9 +623,9 @@ varpool_remove_unreferenced_decls (void)
     }
   if (cgraph_dump_file)
     fprintf (cgraph_dump_file, "\nRemoving variables:");
-  for (node = varpool_first_defined_variable (); node; node = next)
+  for (node = symtab->first_defined_variable (); node; node = next)
     {
-      next = varpool_next_defined_variable (node);
+      next = symtab->next_defined_variable (node);
       if (!node->aux)
 	{
           if (cgraph_dump_file)

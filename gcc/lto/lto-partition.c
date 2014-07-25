@@ -420,7 +420,7 @@ lto_balanced_map (int n_lto_partitions)
 {
   int n_nodes = 0;
   int n_varpool_nodes = 0, varpool_pos = 0, best_varpool_pos = 0;
-  struct cgraph_node **order = XNEWVEC (struct cgraph_node *, cgraph_max_uid);
+  struct cgraph_node **order = XNEWVEC (struct cgraph_node *, symtab->cgraph_max_uid);
   varpool_node **varpool_order = NULL;
   int i;
   struct cgraph_node *node;

@@ -894,11 +894,11 @@ register_hooks (void)
   init_p = true;
 
   node_removal_hook_holder =
-      cgraph_add_node_removal_hook (&remove_node_data, NULL);
+      symtab->add_cgraph_removal_hook (&remove_node_data, NULL);
   node_duplication_hook_holder =
-      cgraph_add_node_duplication_hook (&duplicate_node_data, NULL);
+      symtab->add_cgraph_duplication_hook (&duplicate_node_data, NULL);
   function_insertion_hook_holder =
-      cgraph_add_function_insertion_hook (&add_new_function, NULL);
+      symtab->add_cgraph_insertion_hook (&add_new_function, NULL);
 }
 
 
@@ -1103,7 +1103,7 @@ propagate_pure_const (void)
   struct cgraph_node *node;
   struct cgraph_node *w;
   struct cgraph_node **order =
-    XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+    XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
   int order_pos;
   int i;
   struct ipa_dfs_info * w_info;
@@ -1381,7 +1381,7 @@ propagate_nothrow (void)
   struct cgraph_node *node;
   struct cgraph_node *w;
   struct cgraph_node **order =
-    XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+    XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
   int order_pos;
   int i;
   struct ipa_dfs_info * w_info;
@@ -1486,9 +1486,9 @@ propagate (void)
 {
   struct cgraph_node *node;
 
-  cgraph_remove_function_insertion_hook (function_insertion_hook_holder);
-  cgraph_remove_node_duplication_hook (node_duplication_hook_holder);
-  cgraph_remove_node_removal_hook (node_removal_hook_holder);
+  symtab->remove_cgraph_insertion_hook (function_insertion_hook_holder);
+  symtab->remove_cgraph_duplication_hook (node_duplication_hook_holder);
+  symtab->remove_cgraph_removal_hook (node_removal_hook_holder);
 
   /* Nothrow makes more function to not lead to return and improve
      later analysis.  */
