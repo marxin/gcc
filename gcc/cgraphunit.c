@@ -291,7 +291,7 @@ enqueue_node (symtab_node *node)
    functions inserted into callgraph already at construction time.  */
 
 void
-cgraph_process_new_functions (void)
+symbol_table::process_new_functions (void)
 {
   tree fndecl;
   struct cgraph_node *node;
@@ -306,14 +306,14 @@ cgraph_process_new_functions (void)
     {
       node = csi_node (csi);
       fndecl = node->decl;
-      switch (symtab->cgraph_state)
+      switch (cgraph_state)
 	{
 	case CGRAPH_STATE_CONSTRUCTION:
 	  /* At construction time we just need to finalize function and move
 	     it into reachable functions list.  */
 
 	  cgraph_finalize_function (fndecl, false);
-	  symtab->call_cgraph_insertion_hooks (node);
+	  call_cgraph_insertion_hooks (node);
 	  enqueue_node (node);
 	  break;
 
@@ -327,7 +327,7 @@ cgraph_process_new_functions (void)
 	  if (!node->analyzed)
 	    node->analyze ();
 	  push_cfun (DECL_STRUCT_FUNCTION (fndecl));
-	  if (symtab->cgraph_state == CGRAPH_STATE_IPA_SSA
+	  if (cgraph_state == CGRAPH_STATE_IPA_SSA
 	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl)))
 	    g->get_passes ()->execute_early_local_passes ();
 	  else if (inline_summary_vec != NULL)
@@ -341,7 +341,7 @@ cgraph_process_new_functions (void)
 	  /* Functions created during expansion shall be compiled
 	     directly.  */
 	  node->process = 0;
-	  symtab->call_cgraph_insertion_hooks (node);
+	  call_cgraph_insertion_hooks (node);
 	  expand_function (node);
 	  break;
 
@@ -674,7 +674,7 @@ cgraph_node::analyze (void)
    PCH we build the links via this function.  */
 
 void
-cgraph_process_same_body_aliases (void)
+symbol_table::process_same_body_aliases (void)
 {
   symtab_node *node;
   FOR_EACH_SYMBOL (node)
@@ -983,7 +983,7 @@ analyze_functions (void)
 	      || node == first_analyzed_var)
 	    break;
 	}
-      cgraph_process_new_functions ();
+      symtab->process_new_functions ();
       first_analyzed_var = symtab->first_variable ();
       first_analyzed = symtab->first_function ();
 
@@ -1064,7 +1064,7 @@ analyze_functions (void)
 	  for (i = 0; node->iterate_reference (i, ref); i++)
 	    if (ref->referred->definition)
 	      enqueue_node (ref->referred);
-          cgraph_process_new_functions ();
+          symtab->process_new_functions ();
 	}
     }
   if (optimize && flag_devirtualize)
@@ -1922,7 +1922,7 @@ expand_all_functions (void)
     fprintf (cgraph_dump_file, "Expanded functions with time profile:%u/%u\n",
              profiled_func_count, expanded_func_count);
 
-  cgraph_process_new_functions ();
+  symtab->process_new_functions ();
   free_gimplify_stack ();
 
   free (order);
@@ -2054,7 +2054,7 @@ ipa_passes (void)
      because TODO is run before the subpasses.  It is important to remove
      the unreachable functions to save works at IPA level and to get LTO
      symbol tables right.  */
-  symtab_remove_unreachable_nodes (true, cgraph_dump_file);
+  symtab->remove_unreachable_nodes (true, cgraph_dump_file);
 
   /* If pass_all_early_optimizations was not scheduled, the state of
      the cgraph will not be properly updated.  Update it now.  */
@@ -2069,7 +2069,7 @@ ipa_passes (void)
       /* Process new functions added.  */
       set_cfun (NULL);
       current_function_decl = NULL;
-      cgraph_process_new_functions ();
+      symtab->process_new_functions ();
 
       execute_ipa_summary_passes
 	((ipa_opt_pass_d *) passes->all_regular_ipa_passes);
@@ -2188,7 +2188,7 @@ compile (void)
 
   /* This pass remove bodies of extern inline functions we never inlined.
      Do this later so other IPA passes see what is really going on.  */
-  symtab_remove_unreachable_nodes (false, dump_file);
+  symtab->remove_unreachable_nodes (false, dump_file);
   symtab->cgraph_global_info_ready = true;
   if (cgraph_dump_file)
     {
@@ -2213,7 +2213,7 @@ compile (void)
   cgraph_materialize_all_clones ();
   bitmap_obstack_initialize (NULL);
   execute_ipa_pass_list (g->get_passes ()->all_late_ipa_passes);
-  symtab_remove_unreachable_nodes (true, dump_file);
+  symtab->remove_unreachable_nodes (true, dump_file);
 #ifdef ENABLE_CHECKING
   symtab_node::verify_symtab_nodes ();
 #endif
@@ -2258,7 +2258,7 @@ compile (void)
       varpool_node::output_variables ();
     }
 
-  cgraph_process_new_functions ();
+  symtab->process_new_functions ();
   symtab->cgraph_state = CGRAPH_STATE_FINISHED;
   output_weakrefs ();
 

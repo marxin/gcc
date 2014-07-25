@@ -3088,7 +3088,7 @@ read_cgraph_and_symbols (unsigned nfiles, const char **fnames)
   /* Removal of unreacable symbols is needed to make verify_symtab to pass;
      we are still having duplicated comdat groups containing local statics.
      We could also just remove them while merging.  */
-  symtab_remove_unreachable_nodes (false, dump_file);
+  symtab->remove_unreachable_nodes (false, dump_file);
   ggc_collect ();
   symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
 
@@ -3245,7 +3245,7 @@ do_whole_program_analysis (void)
   symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
 
   execute_ipa_pass_list (g->get_passes ()->all_regular_ipa_passes);
-  symtab_remove_unreachable_nodes (false, dump_file);
+  symtab->remove_unreachable_nodes (false, dump_file);
 
   if (cgraph_dump_file)
     {

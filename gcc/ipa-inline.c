@@ -2183,7 +2183,7 @@ ipa_inline (void)
 
   /* Do first after-inlining removal.  We want to remove all "stale" extern inline
      functions and virtual functions so we really know what is called once.  */
-  symtab_remove_unreachable_nodes (false, dump_file);
+  symtab->remove_unreachable_nodes (false, dump_file);
   free (order);
 
   /* Inline functions with a property that after inlining into all callers the
