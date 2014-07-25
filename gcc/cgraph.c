@@ -488,7 +488,7 @@ cgraph_node::get_create (tree decl)
     {
       first_clone->clone_of = node;
       node->clones = first_clone;
-      symtab_prevail_in_asm_name_hash (node);
+      symtab->symtab_prevail_in_asm_name_hash (node);
       node->decl->decl_with_vis.symtab_node = node;
       if (dump_file)
 	fprintf (dump_file, "Introduced new external node "
@@ -587,7 +587,7 @@ cgraph_node *
 cgraph_node::get_for_asmname (tree asmname)
 {
   /* We do not want to look at inline clones.  */
-  for (symtab_node *node = symtab_node_for_asm (asmname);
+  for (symtab_node *node = symtab_node::get_for_asmname (asmname);
        node;
        node = node->next_sharing_asm_name)
     {

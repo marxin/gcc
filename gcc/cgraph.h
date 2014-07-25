@@ -336,6 +336,10 @@ public:
     return decl->decl_with_vis.symtab_node;
   }
 
+  /* Return the cgraph node that has ASMNAME for its DECL_ASSEMBLER_NAME.
+     Return NULL if there's no such node.  */
+  static symtab_node *get_for_asmname (const_tree asmname);
+
   /* Dump symbol table to F.  */
   static void dump_table (FILE *);
 
@@ -1508,6 +1512,13 @@ enum cgraph_state
   CGRAPH_STATE_FINISHED
 };
 
+/* Map from a symbol to initialization/finalization priorities.  */
+struct GTY(()) symbol_priority_map {
+  symtab_node *symbol;
+  priority_type init;
+  priority_type fini;
+};
+
 class GTY((tag ("SYMTAB"))) symbol_table
 {
 public:
@@ -1638,6 +1649,34 @@ public:
   /* Call all node insertion hooks.  */
   void call_varpool_insertion_hooks (varpool_node *node);
 
+  /* Insert NODE to assembler name hash.  */
+  void insert_to_assembler_name_hash (symtab_node *node, bool with_clones);
+
+  /* Remove NODE from assembler name hash.  */
+  void unlink_from_assembler_name_hash (symtab_node *node, bool with_clones);
+
+  /* Arrange node to be first in its entry of assembler_name_hash.  */
+  void symtab_prevail_in_asm_name_hash (symtab_node *node);
+
+  /* Initalize asm name hash unless.  */
+  void symtab_initialize_asm_name_hash (void);
+
+  /* Set the DECL_ASSEMBLER_NAME and update symtab hashtables.  */
+  void change_decl_assembler_name (tree decl, tree name);
+
+  /* Hash asmnames ignoring the user specified marks.  */
+  static hashval_t decl_assembler_name_hash (const_tree asmname);
+
+  /* Compare ASMNAME with the DECL_ASSEMBLER_NAME of DECL.  */
+  static bool decl_assembler_name_equal (tree decl, const_tree asmname);
+
+  /* Returns a hash code for P.  */
+  static hashval_t hash_node_by_assembler_name (const void *p);
+
+  /* Returns nonzero if P1 and P2 are equal.  */
+  static int eq_assembler_name (const void *p1, const void *p2);
+
+
   int cgraph_count;
   int cgraph_max_uid;
   int cgraph_max_superuid;
@@ -1659,12 +1698,21 @@ public:
      them, to support -fno-toplevel-reorder.  */
   int order;
 
-/* Set when whole unit has been analyzed so we can access global info.  */
+  /* Set when whole unit has been analyzed so we can access global info.  */
   bool cgraph_global_info_ready;
-/* What state callgraph is in right now.  */
+  /* What state callgraph is in right now.  */
   enum cgraph_state cgraph_state;
-/* Set when the cgraph is fully build and the basic flags are computed.  */
+  /* Set when the cgraph is fully build and the basic flags are computed.  */
   bool cgraph_function_flags_ready;
+
+  /* Hash table used to hold sectoons.  */
+  htab_t GTY((param_is (section_hash_entry))) section_hash;
+
+  /* Hash table used to convert assembler names into nodes.  */
+  htab_t GTY((param_is (symtab_node))) assembler_name_hash;
+
+  /* Hash table used to hold init priorities.  */
+  htab_t GTY ((param_is (symbol_priority_map))) init_priority_hash;
 
 private:
   /* List of hooks triggered when an edge is removed.  */
@@ -1687,9 +1735,6 @@ extern GTY(()) symbol_table *symtab;
 
 extern cgraph_node_set cgraph_new_nodes;
 extern bool cpp_implicit_aliases_done;
-
-/* In symtab.c  */
-symtab_node *symtab_node_for_asm (const_tree asmname);
 
 /* In cgraph.c  */
 void release_function_body (tree);
@@ -1782,11 +1827,6 @@ bool cgraph_maybe_hot_edge_p (struct cgraph_edge *e);
 void varpool_reset_queue (void);
 tree ctor_for_folding (tree);
 void varpool_add_new_variable (tree);
-void symtab_initialize_asm_name_hash (void);
-void symtab_prevail_in_asm_name_hash (symtab_node *node);
-
-/* In cgraph.c */
-extern void change_decl_assembler_name (tree, tree);
 
 /* Return true when the symbol is real symbol, i.e. it is not inline clone
    or abstract function kept for debug info purposes only.  */

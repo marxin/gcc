@@ -11888,7 +11888,7 @@ expand_simd_clones (struct cgraph_node *node)
 	      clone->prev_clone->simdclone->next_clone = n;
 	      node->simd_clones->simdclone->prev_clone = n;
 	    }
-	  change_decl_assembler_name (n->decl, id);
+	  symtab->change_decl_assembler_name (n->decl, id);
 	  /* And finally adjust the return type, parameters and for
 	     definitions also function body.  */
 	  if (node->definition)

@@ -1144,7 +1144,7 @@ input_node (struct lto_file_decl_data *file_data,
 
   node->order = order;
   if (order >= symtab->order)
-    symtab->order++;
+    symtab->order = order + 1;
 
   node->count = streamer_read_gcov_count (ib);
   node->count_materialization_scale = streamer_read_hwi (ib);
@@ -1247,7 +1247,7 @@ input_varpool_node (struct lto_file_decl_data *file_data,
 
   node->order = order;
   if (order >= symtab->order)
-    symtab->order++;
+    symtab->order = order + 1;
   node->lto_file_data = file_data;
 
   bp = streamer_read_bitpack (ib);

@@ -1104,7 +1104,7 @@ analyze_functions (void)
      mangling and same body alias creation before we free DECL_ARGUMENTS
      used by it.  */
   if (!seen_error ())
-    symtab_initialize_asm_name_hash ();
+    symtab->symtab_initialize_asm_name_hash ();
 
   input_location = saved_loc;
 }
@@ -1121,7 +1121,7 @@ handle_alias_pairs (void)
   
   for (i = 0; alias_pairs && alias_pairs->iterate (i, &p);)
     {
-      symtab_node *target_node = symtab_node_for_asm (p->target);
+      symtab_node *target_node = symtab_node::get_for_asmname (p->target);
 
       /* Weakrefs with target not defined in current unit are easy to handle:
 	 they behave just as external variables except we need to note the

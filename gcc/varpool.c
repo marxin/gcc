@@ -251,7 +251,7 @@ varpool_node::debug_varpool (void)
 varpool_node *
 varpool_node::get_for_asmname (tree asmname)
 {
-  if (symtab_node *node = symtab_node_for_asm (asmname))
+  if (symtab_node *node = symtab_node::get_for_asmname (asmname))
     return dyn_cast <varpool_node *> (node);
   else
     return NULL;

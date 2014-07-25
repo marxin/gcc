@@ -22,7 +22,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "toplev.h"
 #include "tree.h"
-#include "gcc-symtab.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -769,7 +768,7 @@ privatize_symbol_name (symtab_node *node)
 		name);
       return false;
     }
-  change_decl_assembler_name (decl, clone_function_name (decl, "lto_priv"));
+  symtab->change_decl_assembler_name (decl, clone_function_name (decl, "lto_priv"));
   if (node->lto_file_data)
     lto_record_renamed_decl (node->lto_file_data, name,
 			     IDENTIFIER_POINTER
@@ -849,7 +848,7 @@ rename_statics (lto_symtab_encoder_t encoder, symtab_node *node)
   /* Now walk symbols sharing the same name and see if there are any conflicts.
      (all types of symbols counts here, since we can not have static of the
      same name as external or public symbol.)  */
-  for (s = symtab_node_for_asm (name);
+  for (s = symtab_node::get_for_asmname (name);
        s; s = s->next_sharing_asm_name)
     if ((s->real_symbol_p () || may_need_named_section_p (encoder, s))
 	&& s->decl != node->decl
@@ -867,7 +866,7 @@ rename_statics (lto_symtab_encoder_t encoder, symtab_node *node)
 
   /* Assign every symbol in the set that shares the same ASM name an unique
      mangled name.  */
-  for (s = symtab_node_for_asm (name); s;)
+  for (s = symtab_node::get_for_asmname (name); s;)
     if (!s->externally_visible
 	&& ((s->real_symbol_p ()
              && !DECL_EXTERNAL (node->decl)
@@ -878,7 +877,7 @@ rename_statics (lto_symtab_encoder_t encoder, symtab_node *node)
       {
         if (privatize_symbol_name (s))
 	  /* Re-start from beginning since we do not know how many symbols changed a name.  */
-	  s = symtab_node_for_asm (name);
+	  s = symtab_node::get_for_asmname (name);
         else s = s->next_sharing_asm_name;
       }
     else s = s->next_sharing_asm_name;

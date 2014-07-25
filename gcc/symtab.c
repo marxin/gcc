@@ -61,28 +61,10 @@ const char * const ld_plugin_symbol_resolution_names[]=
   "prevailing_def_ironly_exp"
 };
 
-
-/* Hash table used to hold sectoons.  */
-static GTY((param_is (section_hash_entry))) htab_t section_hash;
-
-/* Hash table used to convert assembler names into nodes.  */
-static GTY((param_is (symtab_node))) htab_t assembler_name_hash;
-
-/* Map from a symbol to initialization/finalization priorities.  */
-struct GTY(()) symbol_priority_map {
-  symtab_node *symbol;
-  priority_type init;
-  priority_type fini;
-};
-
-/* Hash table used to hold init priorities.  */
-static GTY ((param_is (struct symbol_priority_map)))
-  htab_t init_priority_hash;
-
 /* Hash asmnames ignoring the user specified marks.  */
 
-static hashval_t
-decl_assembler_name_hash (const_tree asmname)
+hashval_t
+symbol_table::decl_assembler_name_hash (const_tree asmname)
 {
   if (IDENTIFIER_POINTER (asmname)[0] == '*')
     {
@@ -103,8 +85,8 @@ decl_assembler_name_hash (const_tree asmname)
 
 /* Returns a hash code for P.  */
 
-static hashval_t
-hash_node_by_assembler_name (const void *p)
+hashval_t
+symbol_table::hash_node_by_assembler_name (const void *p)
 {
   const symtab_node *n = (const symtab_node *) p;
   return (hashval_t) decl_assembler_name_hash (DECL_ASSEMBLER_NAME (n->decl));
@@ -112,8 +94,8 @@ hash_node_by_assembler_name (const void *p)
 
 /* Compare ASMNAME with the DECL_ASSEMBLER_NAME of DECL.  */
 
-static bool
-decl_assembler_name_equal (tree decl, const_tree asmname)
+bool
+symbol_table::decl_assembler_name_equal (tree decl, const_tree asmname)
 {
   tree decl_asmname = DECL_ASSEMBLER_NAME (decl);
   const char *decl_str;
@@ -168,8 +150,8 @@ decl_assembler_name_equal (tree decl, const_tree asmname)
 
 /* Returns nonzero if P1 and P2 are equal.  */
 
-static int
-eq_assembler_name (const void *p1, const void *p2)
+int
+symbol_table::eq_assembler_name (const void *p1, const void *p2)
 {
   const symtab_node *n1 = (const symtab_node *) p1;
   const_tree name = (const_tree)p2;
@@ -178,8 +160,8 @@ eq_assembler_name (const void *p1, const void *p2)
 
 /* Insert NODE to assembler name hash.  */
 
-static void
-insert_to_assembler_name_hash (symtab_node *node, bool with_clones)
+void
+symbol_table::insert_to_assembler_name_hash (symtab_node *node, bool with_clones)
 {
   if (is_a <varpool_node *> (node) && DECL_HARD_REGISTER (node->decl))
     return;
@@ -214,8 +196,8 @@ insert_to_assembler_name_hash (symtab_node *node, bool with_clones)
 
 /* Remove NODE from assembler name hash.  */
 
-static void
-unlink_from_assembler_name_hash (symtab_node *node, bool with_clones)
+void
+symbol_table::unlink_from_assembler_name_hash (symtab_node *node, bool with_clones)
 {
   if (assembler_name_hash)
     {
@@ -258,7 +240,7 @@ unlink_from_assembler_name_hash (symtab_node *node, bool with_clones)
 /* Arrange node to be first in its entry of assembler_name_hash.  */
 
 void
-symtab_prevail_in_asm_name_hash (symtab_node *node)
+symbol_table::symtab_prevail_in_asm_name_hash (symtab_node *node)
 {
   unlink_from_assembler_name_hash (node, false);
   insert_to_assembler_name_hash (node, false);
@@ -267,7 +249,7 @@ symtab_prevail_in_asm_name_hash (symtab_node *node)
 /* Initalize asm name hash unless.  */
 
 void
-symtab_initialize_asm_name_hash (void)
+symbol_table::symtab_initialize_asm_name_hash (void)
 {
   symtab_node *node;
   if (!assembler_name_hash)
@@ -280,32 +262,10 @@ symtab_initialize_asm_name_hash (void)
     }
 }
 
-/* Return the cgraph node that has ASMNAME for its DECL_ASSEMBLER_NAME.
-   Return NULL if there's no such node.  */
-
-symtab_node *
-symtab_node_for_asm (const_tree asmname)
-{
-  symtab_node *node;
-  void **slot;
-
-  symtab_initialize_asm_name_hash ();
-  slot = htab_find_slot_with_hash (assembler_name_hash, asmname,
-				   decl_assembler_name_hash (asmname),
-				   NO_INSERT);
-
-  if (slot)
-    {
-      node = (symtab_node *) *slot;
-      return node;
-    }
-  return NULL;
-}
-
 /* Set the DECL_ASSEMBLER_NAME and update symtab hashtables.  */
 
 void
-change_decl_assembler_name (tree decl, tree name)
+symbol_table::change_decl_assembler_name (tree decl, tree name)
 {
   symtab_node *node = NULL;
 
@@ -392,7 +352,7 @@ symtab_node::register_symbol (void)
 
   /* Be sure to do this last; C++ FE might create new nodes via
      DECL_ASSEMBLER_NAME langhook!  */
-  insert_to_assembler_name_hash (this, false);
+  symtab->insert_to_assembler_name_hash (this, false);
 }
 
 /* Remove NODE from same comdat group.   */
@@ -443,16 +403,16 @@ symtab_node::unregister (void)
       decl->decl_with_vis.symtab_node = replacement_node;
     }
   if (!is_a <varpool_node *> (this) || !DECL_HARD_REGISTER (decl))
-    unlink_from_assembler_name_hash (this, false);
+    symtab->unlink_from_assembler_name_hash (this, false);
   if (in_init_priority_hash)
     {
       struct symbol_priority_map in;
       void **slot;
       in.symbol = this;
 
-      slot = htab_find_slot (init_priority_hash, &in, NO_INSERT);
+      slot = htab_find_slot (symtab->init_priority_hash, &in, NO_INSERT);
       if (slot)
-	htab_clear_slot (init_priority_hash, slot);
+	htab_clear_slot (symtab->init_priority_hash, slot);
     }
 }
 
@@ -972,6 +932,29 @@ symtab_node::dump_table (FILE *f)
     node->dump (f);
 }
 
+
+/* Return the cgraph node that has ASMNAME for its DECL_ASSEMBLER_NAME.
+   Return NULL if there's no such node.  */
+
+symtab_node *
+symtab_node::get_for_asmname (const_tree asmname)
+{
+  symtab_node *node;
+  void **slot;
+
+  symtab->symtab_initialize_asm_name_hash ();
+  slot = htab_find_slot_with_hash (symtab->assembler_name_hash, asmname,
+                                  symtab->decl_assembler_name_hash (asmname),
+                                  NO_INSERT);
+
+  if (slot)
+    {
+      node = (symtab_node *) *slot;
+      return node;
+    }
+  return NULL;
+}
+
 /* Dump symtab node NODE to stderr.  */
 
 DEBUG_FUNCTION void
@@ -1027,9 +1010,9 @@ symtab_node::verify_base (void)
 	  error_found = true;
 	}
     }
-  if (assembler_name_hash)
+  if (symtab->assembler_name_hash)
     {
-      hashed_node = symtab_node_for_asm (DECL_ASSEMBLER_NAME (decl));
+      hashed_node = symtab_node::get_for_asmname (DECL_ASSEMBLER_NAME (decl));
       if (hashed_node && hashed_node->previous_sharing_asm_name)
 	{
           error ("assembler name hash list corrupted");
@@ -1415,11 +1398,11 @@ symtab_node::set_section_for_node (const char *section)
       x_section->ref_count--;
       if (!x_section->ref_count)
 	{
-	  slot = htab_find_slot_with_hash (section_hash, x_section->name,
+	  slot = htab_find_slot_with_hash (symtab->section_hash, x_section->name,
 					   htab_hash_string (x_section->name),
 					   INSERT);
 	  ggc_free (x_section);
-	  htab_clear_slot (section_hash, slot);
+	  htab_clear_slot (symtab->section_hash, slot);
 	}
       x_section = NULL;
     }
@@ -1428,10 +1411,10 @@ symtab_node::set_section_for_node (const char *section)
       implicit_section = false;
       return;
     }
-  if (!section_hash)
-    section_hash = htab_create_ggc (10, hash_section_hash_entry,
+  if (!symtab->section_hash)
+    symtab->section_hash = htab_create_ggc (10, hash_section_hash_entry,
 				    eq_sections, NULL);
-  slot = htab_find_slot_with_hash (section_hash, section,
+  slot = htab_find_slot_with_hash (symtab->section_hash, section,
 				   htab_hash_string (section),
 				   INSERT);
   if (*slot)
@@ -1476,7 +1459,7 @@ symtab_node::get_init_priority ()
   if (!this->in_init_priority_hash)
     return DEFAULT_INIT_PRIORITY;
   in.symbol = this;
-  h = (struct symbol_priority_map *) htab_find (init_priority_hash, &in);
+  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash, &in);
   return h ? h->init : DEFAULT_INIT_PRIORITY;
 }
 
@@ -1501,7 +1484,7 @@ cgraph_node::get_fini_priority ()
   if (!this->in_init_priority_hash)
     return DEFAULT_INIT_PRIORITY;
   in.symbol = this;
-  h = (struct symbol_priority_map *) htab_find (init_priority_hash, &in);
+  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash, &in);
   return h ? h->fini : DEFAULT_INIT_PRIORITY;
 }
 
@@ -1535,11 +1518,12 @@ symtab_node::priority_info (void)
   void **loc;
 
   in.symbol = this;
-  if (!init_priority_hash)
-    init_priority_hash = htab_create_ggc (512, symbol_priority_map_hash,
-                                          symbol_priority_map_eq, 0);
+  if (!symtab->init_priority_hash)
+    symtab->init_priority_hash = htab_create_ggc (512,
+						  symbol_priority_map_hash,
+						  symbol_priority_map_eq, 0);
 
-  loc = htab_find_slot (init_priority_hash, &in, INSERT);
+  loc = htab_find_slot (symtab->init_priority_hash, &in, INSERT);
   h = (struct symbol_priority_map *) *loc;
   if (!h)
     {
@@ -1923,4 +1907,3 @@ symtab_node::nonzero_address ()
     return true;
   return false;
 }
-#include "gt-symtab.h"

@@ -493,7 +493,7 @@ lto_symtab_merge_decls_1 (symtab_node *first)
 	}
     }
 
-  symtab_prevail_in_asm_name_hash (prevailing);
+  symtab->symtab_prevail_in_asm_name_hash (prevailing);
 
   /* Diagnose mismatched objects.  */
   for (e = prevailing->next_sharing_asm_name;
@@ -551,7 +551,7 @@ lto_symtab_merge_decls (void)
   symtab_node *node;
 
   /* Populate assembler name hash.   */
-  symtab_initialize_asm_name_hash ();
+  symtab->symtab_initialize_asm_name_hash ();
 
   FOR_EACH_SYMBOL (node)
     if (!node->previous_sharing_asm_name
@@ -595,7 +595,7 @@ lto_symtab_merge_symbols (void)
 
   if (!flag_ltrans)
     {
-      symtab_initialize_asm_name_hash ();
+      symtab->symtab_initialize_asm_name_hash ();
 
       /* Do the actual merging.  
          At this point we invalidate hash translating decls into symtab nodes
@@ -617,7 +617,7 @@ lto_symtab_merge_symbols (void)
 
 	  if (!node->analyzed && node->alias_target)
 	    {
-	      symtab_node *tgt = symtab_node_for_asm (node->alias_target);
+	      symtab_node *tgt = symtab_node::get_for_asmname (node->alias_target);
 	      gcc_assert (node->weakref);
 	      if (tgt)
 		node->resolve_alias (tgt);
@@ -684,7 +684,7 @@ lto_symtab_prevailing_decl (tree decl)
   gcc_assert (DECL_ASSEMBLER_NAME_SET_P (decl));
 
   /* Walk through the list of candidates and return the one we merged to.  */
-  ret = symtab_node_for_asm (DECL_ASSEMBLER_NAME (decl));
+  ret = symtab_node::get_for_asmname (DECL_ASSEMBLER_NAME (decl));
   if (!ret)
     return decl;
 

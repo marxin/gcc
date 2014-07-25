@@ -33,7 +33,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "stor-layout.h"
 #include "stringpool.h"
-#include "gcc-symtab.h"
 #include "varasm.h"
 #include "flags.h"
 #include "function.h"
@@ -856,7 +855,7 @@ set_user_assembler_name (tree decl, const char *name)
   char *starred = (char *) alloca (strlen (name) + 2);
   starred[0] = '*';
   strcpy (starred + 1, name);
-  change_decl_assembler_name (decl, get_identifier (starred));
+  symtab->change_decl_assembler_name (decl, get_identifier (starred));
   SET_DECL_RTL (decl, NULL_RTX);
 }
 
@@ -5361,7 +5360,7 @@ weak_finish_1 (tree decl)
 static tree
 find_decl (tree target)
 {
-  symtab_node *node = symtab_node_for_asm (target);
+  symtab_node *node = symtab_node::get_for_asmname (target);
   if (node)
     return node->decl;
   return NULL_TREE;
