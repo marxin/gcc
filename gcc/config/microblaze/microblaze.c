@@ -3306,7 +3306,7 @@ microblaze_asm_output_ident (const char *string)
   int size;
   char *buf;
 
-  if (cgraph_state != CGRAPH_STATE_PARSING)
+  if (symtab->cgraph_state != CGRAPH_STATE_PARSING)
     return;
 
   size = strlen (string) + 1;
@@ -3316,7 +3316,7 @@ microblaze_asm_output_ident (const char *string)
     section_asm_op = READONLY_DATA_SECTION_ASM_OP;
 
   buf = ACONCAT ((section_asm_op, "\n\t.ascii \"", string, "\\0\"\n", NULL));
-  add_asm_node (build_string (strlen (buf), buf));
+  symtab->add_asm_symbol (build_string (strlen (buf), buf));
 }
 
 static void
