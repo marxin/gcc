@@ -1391,6 +1391,12 @@ public:
      if all direct calls are eliminated.  */
   inline bool can_remove_if_no_refs_p (void);
 
+  /* Add the variable DECL to the varpool.
+     Unlike varpool_finalize_decl function is intended to be used
+     by middle end and allows insertion of new variable at arbitrary point
+     of compilation.  */
+  static void add (tree decl);
+
   /* Return varpool node for given symbol and check it is a function. */
   static inline varpool_node *get (const_tree decl);
 
@@ -1676,7 +1682,6 @@ public:
   /* Returns nonzero if P1 and P2 are equal.  */
   static int eq_assembler_name (const void *p1, const void *p2);
 
-
   int cgraph_count;
   int cgraph_max_uid;
   int cgraph_max_superuid;
@@ -1826,7 +1831,6 @@ bool cgraph_maybe_hot_edge_p (struct cgraph_edge *e);
 /* In varpool.c  */
 void varpool_reset_queue (void);
 tree ctor_for_folding (tree);
-void varpool_add_new_variable (tree);
 
 /* Return true when the symbol is real symbol, i.e. it is not inline clone
    or abstract function kept for debug info purposes only.  */

@@ -427,7 +427,7 @@ ctor_for_folding (tree decl)
    by middle end and allows insertion of new variable at arbitrary point
    of compilation.  */
 void
-varpool_add_new_variable (tree decl)
+varpool_node::add (tree decl)
 {
   varpool_node *node;
   varpool_node::finalize_decl (decl);
