@@ -1454,6 +1454,8 @@ private:
 /* Every top level asm statement is put into a asm_node.  */
 
 struct GTY(()) asm_node {
+
+
   /* Next asm node.  */
   struct asm_node *next;
   /* String for this asm node.  */
@@ -1532,6 +1534,9 @@ public:
 
   /* Register a symbol NODE.  */
   inline void register_symbol (symtab_node *node);
+
+  /* Add a top-level asm statement to the list.  */
+  asm_node *add_asm_symbol (tree asm_str);
 
   /* Register a top-level asm statement ASM_STR.  */
   inline asm_node *register_asm_symbol (tree asm_str);
@@ -1829,7 +1834,6 @@ void ipa_discover_readonly_nonaddressable_vars (void);
 bool cgraph_maybe_hot_edge_p (struct cgraph_edge *e);
 
 /* In varpool.c  */
-void varpool_reset_queue (void);
 tree ctor_for_folding (tree);
 
 /* Return true when the symbol is real symbol, i.e. it is not inline clone
