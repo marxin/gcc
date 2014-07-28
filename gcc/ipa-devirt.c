@@ -2775,7 +2775,7 @@ ipa_devirt (void)
 
 	    npolymorphic++;
 
-	    if (!cgraph_maybe_hot_edge_p (e))
+	    if (!e->maybe_hot_p ())
 	      {
 		if (dump_file)
 		  fprintf (dump_file, "Call is cold\n\n");

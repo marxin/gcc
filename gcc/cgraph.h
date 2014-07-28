@@ -1316,6 +1316,9 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
   /* Return true when the edge represents a direct recursion.  */
   bool recursive_p (void);
 
+  /* Return true if the call can be hot.  */
+  bool maybe_hot_p (void);
+
   /* Expected number of executions: calculated in profile.c.  */
   gcov_type count;
   cgraph_node *caller;
@@ -1901,9 +1904,6 @@ void dump_varpool_node_set (FILE *, varpool_node_set);
 void debug_varpool_node_set (varpool_node_set);
 void free_varpool_node_set (varpool_node_set);
 void ipa_discover_readonly_nonaddressable_vars (void);
-
-/* In predict.c  */
-bool cgraph_maybe_hot_edge_p (struct cgraph_edge *e);
 
 /* In varpool.c  */
 tree ctor_for_folding (tree);

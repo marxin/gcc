@@ -498,7 +498,7 @@ gather_caller_stats (struct cgraph_node *node, void *data)
 	stats->count_sum += cs->count;
 	stats->freq_sum += cs->frequency;
 	stats->n_calls++;
-	if (cgraph_maybe_hot_edge_p (cs))
+	if (cs->maybe_hot_p ())
 	  stats->n_hot_calls ++;
       }
   return false;
@@ -2285,7 +2285,7 @@ propagate_effects (void)
       for (val = base; val; val = val->scc_next)
 	for (src = val->sources; src; src = src->next)
 	  if (src->val
-	      && cgraph_maybe_hot_edge_p (src->cs))
+	      && src->cs->maybe_hot_p ())
 	    {
 	      src->val->prop_time_benefit = safe_add (time,
 						src->val->prop_time_benefit);
@@ -2556,7 +2556,7 @@ get_info_about_necessary_edges (struct ipcp_value *val, int *freq_sum,
 	      count++;
 	      freq += cs->frequency;
 	      cnt += cs->count;
-	      hot |= cgraph_maybe_hot_edge_p (cs);
+	      hot |= cs->maybe_hot_p ();
 	    }
 	  cs = get_next_cgraph_edge_clone (cs);
 	}

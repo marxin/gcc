@@ -379,13 +379,13 @@ contains_hot_call_p (struct cgraph_node *node)
 {
   struct cgraph_edge *e;
   for (e = node->callees; e; e = e->next_callee)
-    if (cgraph_maybe_hot_edge_p (e))
+    if (e->maybe_hot_p ())
       return true;
     else if (!e->inline_failed
 	     && contains_hot_call_p (e->callee))
       return true;
   for (e = node->indirect_calls; e; e = e->next_callee)
-    if (cgraph_maybe_hot_edge_p (e))
+    if (e->maybe_hot_p ())
       return true;
   return false;
 }
@@ -603,7 +603,7 @@ ipa_profile (void)
 			fprintf (dump_file,
 				 "Not speculating: probability is too low.\n");
 		    }
-		  else if (!cgraph_maybe_hot_edge_p (e))
+		  else if (!e->maybe_hot_p ())
 		    {
 		      nuseless++;
 		      if (dump_file)

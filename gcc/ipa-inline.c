@@ -463,7 +463,7 @@ want_early_inline_function_p (struct cgraph_edge *e)
 
       if (growth <= 0)
 	;
-      else if (!cgraph_maybe_hot_edge_p (e)
+      else if (!e->maybe_hot_p ()
 	       && growth > 0)
 	{
 	  if (dump_file)
@@ -578,7 +578,7 @@ want_inline_small_function_p (struct cgraph_edge *e, bool report)
      promote non-inline function to inline and we increase
      MAX_INLINE_INSNS_SINGLE 16fold for inline functions.  */
   else if ((!DECL_DECLARED_INLINE_P (callee->decl)
-	   && (!e->count || !cgraph_maybe_hot_edge_p (e)))
+	   && (!e->count || !e->maybe_hot_p ()))
 	   && inline_summary (callee)->min_size - inline_edge_summary (e)->call_stmt_size
 	      > MAX (MAX_INLINE_INSNS_SINGLE, MAX_INLINE_INSNS_AUTO))
     {
@@ -651,7 +651,7 @@ want_inline_small_function_p (struct cgraph_edge *e, bool report)
  	    }
 	}
       /* If call is cold, do not inline when function body would grow. */
-      else if (!cgraph_maybe_hot_edge_p (e)
+      else if (!e->maybe_hot_p ()
 	       && (growth >= MAX_INLINE_INSNS_SINGLE
 		   || growth_likely_positive (callee, growth)))
 	{
@@ -689,7 +689,7 @@ want_inline_self_recursive_call_p (struct cgraph_edge *edge,
   if (DECL_DECLARED_INLINE_P (edge->caller->decl))
     max_depth = PARAM_VALUE (PARAM_MAX_INLINE_RECURSIVE_DEPTH);
 
-  if (!cgraph_maybe_hot_edge_p (edge))
+  if (!edge->maybe_hot_p ())
     {
       reason = "recursive call is cold";
       want_inline = false;
@@ -797,7 +797,7 @@ check_callers (struct cgraph_node *node, void *has_hot_call)
      {
        if (!can_inline_edge_p (e, true))
          return true;
-       if (!(*(bool *)has_hot_call) && cgraph_maybe_hot_edge_p (e))
+       if (!(*(bool *)has_hot_call) && e->maybe_hot_p ())
 	 *(bool *)has_hot_call = true;
      }
   return false;
@@ -1485,7 +1485,7 @@ speculation_useful_p (struct cgraph_edge *e, bool anticipate_inlining)
 
   gcc_assert (e->speculative && !e->indirect_unknown_callee);
 
-  if (!cgraph_maybe_hot_edge_p (e))
+  if (!e->maybe_hot_p ())
     return false;
 
   /* See if IP optimizations found something potentially useful about the
