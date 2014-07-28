@@ -1295,6 +1295,10 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
   cgraph_edge *turn_to_speculative (cgraph_node *n2, gcov_type direct_count,
 				    int direct_frequency);
 
+  /* If necessary, change the function declaration in the call statement
+     associated with the edge so that it corresponds to the edge callee.  */
+  gimple redirect_call_stmt_to_callee (void);
+
    /* Given speculative call edge, return all three components.  */
   void speculative_call_info (cgraph_edge *&direct, cgraph_edge *&indirect,
 			      ipa_ref *&reference);
@@ -1862,7 +1866,6 @@ const char* cgraph_inline_failed_string (cgraph_inline_failed_t);
 cgraph_inline_failed_type_t cgraph_inline_failed_type (cgraph_inline_failed_t);
 
 bool resolution_used_from_other_file_p (enum ld_plugin_symbol_resolution);
-gimple cgraph_redirect_edge_call_stmt_to_callee (struct cgraph_edge *);
 extern bool gimple_check_call_matching_types (gimple, tree, bool);
 
 /* In cgraphunit.c  */

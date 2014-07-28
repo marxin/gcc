@@ -1240,8 +1240,10 @@ cgraph_edge::make_direct (cgraph_node *callee)
    associated with E so that it corresponds to the edge callee.  */
 
 gimple
-cgraph_redirect_edge_call_stmt_to_callee (struct cgraph_edge *e)
+cgraph_edge::redirect_call_stmt_to_callee (void)
 {
+  cgraph_edge *e = this;
+
   tree decl = gimple_call_fndecl (e->call_stmt);
   tree lhs = gimple_call_lhs (e->call_stmt);
   gimple new_stmt;

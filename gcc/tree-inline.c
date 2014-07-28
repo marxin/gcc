@@ -2432,7 +2432,7 @@ redirect_all_calls (copy_body_data * id, basic_block bb)
 	{
 	  struct cgraph_edge *edge = id->dst_node->get_edge (gsi_stmt (si));
 	  if (edge)
-	    cgraph_redirect_edge_call_stmt_to_callee (edge);
+	    edge->redirect_call_stmt_to_callee ();
 	}
     }
 }

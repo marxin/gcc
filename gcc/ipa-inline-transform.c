@@ -451,7 +451,7 @@ inline_transform (struct cgraph_node *node)
   for (e = node->callees; e; e = next)
     {
       next = e->next_callee;
-      cgraph_redirect_edge_call_stmt_to_callee (e);
+      e->redirect_call_stmt_to_callee ();
     }
   node->remove_all_references ();
 
