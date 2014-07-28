@@ -2198,7 +2198,7 @@ compile (void)
   symtab_node::verify_symtab_nodes ();
 #endif
 
-  cgraph_materialize_all_clones ();
+  symtab->materialize_all_clones ();
   bitmap_obstack_initialize (NULL);
   execute_ipa_pass_list (g->get_passes ()->all_late_ipa_passes);
   symtab->remove_unreachable_nodes (true, dump_file);

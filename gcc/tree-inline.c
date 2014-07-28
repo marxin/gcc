@@ -5545,7 +5545,7 @@ tree_function_versioning (tree old_decl, tree new_decl,
   fold_cond_expr_cond ();
   delete_unreachable_blocks_update_callgraph (&id);
   if (id.dst_node->definition)
-    cgraph_rebuild_references ();
+    symtab->rebuild_references ();
   update_ssa (TODO_update_ssa);
 
   /* After partial cloning we need to rescale frequencies, so they are

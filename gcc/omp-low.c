@@ -4910,7 +4910,7 @@ expand_omp_taskreg (struct omp_region *region)
       push_cfun (child_cfun);
       if (optimize)
 	optimize_omp_library_calls (entry_stmt);
-      rebuild_cgraph_edges ();
+      symtab->rebuild_edges ();
 
       /* Some EH regions might become dead, see PR34608.  If
 	 pass_cleanup_cfg isn't the first pass to happen with the
@@ -8026,7 +8026,7 @@ expand_omp_target (struct omp_region *region)
       /* Fix the callgraph edges for child_cfun.  Those for cfun will be
 	 fixed in a following pass.  */
       push_cfun (child_cfun);
-      rebuild_cgraph_edges ();
+      symtab->rebuild_edges ();
 
       /* Some EH regions might become dead, see PR34608.  If
 	 pass_cleanup_cfg isn't the first pass to happen with the

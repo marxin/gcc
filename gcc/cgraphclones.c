@@ -1020,7 +1020,7 @@ cgraph_materialize_clone (struct cgraph_node *node)
    this order.  */
 
 void
-cgraph_materialize_all_clones (void)
+symbol_table::materialize_all_clones (void)
 {
   struct cgraph_node *node;
   bool stabilized = false;

@@ -1706,6 +1706,21 @@ public:
   /* Set the DECL_ASSEMBLER_NAME and update symtab hashtables.  */
   void change_decl_assembler_name (tree decl, tree name);
 
+  /* Rebuild cgraph edges for current function node.  This needs to be run after
+     passes that don't update the cgraph.  */
+  unsigned int rebuild_edges (void);
+
+  /* Rebuild cgraph references for current function node.  This needs to be run after
+     passes that don't update the cgraph.  */
+  void rebuild_references (void);
+
+  /* Once all functions from compilation unit are in memory, produce all clones
+     and update all calls.  We might also do this on demand if we don't want to
+     bring all functions to memory prior compilation, but current WHOPR
+     implementation does that and it is is bit easier to keep everything right in
+     this order.  */
+  void materialize_all_clones (void);
+
   /* Hash asmnames ignoring the user specified marks.  */
   static hashval_t decl_assembler_name_hash (const_tree asmname);
 
@@ -1824,16 +1839,13 @@ basic_block init_lowered_empty_function (tree, bool);
 struct cgraph_edge * cgraph_clone_edge (struct cgraph_edge *,
 					cgraph_node *, gimple,
 					unsigned, gcov_type, int, bool);
+struct cgraph_edge *cgraph_resolve_speculation (struct cgraph_edge *, tree);
 tree clone_function_name (tree decl, const char *);
 
-void cgraph_materialize_all_clones (void);
 void tree_function_versioning (tree, tree, vec<ipa_replace_map *, va_gc> *,
 			       bool, bitmap, bool, bitmap, basic_block);
-struct cgraph_edge *cgraph_resolve_speculation (struct cgraph_edge *, tree);
 
 /* In cgraphbuild.c  */
-unsigned int rebuild_cgraph_edges (void);
-void cgraph_rebuild_references (void);
 int compute_call_stmt_bb_frequency (tree, basic_block bb);
 void record_references_in_initializer (tree, bool);
 

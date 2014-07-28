@@ -32265,7 +32265,7 @@ ix86_generate_version_dispatcher_body (void *node_p)
     }
 
   dispatch_function_versions (resolver_decl, &fn_ver_vec, &empty_bb);
-  rebuild_cgraph_edges (); 
+  symtab->rebuild_edges (); 
   pop_cfun ();
   return resolver_decl;
 }

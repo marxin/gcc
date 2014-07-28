@@ -4925,7 +4925,7 @@ modify_function (struct cgraph_node *node, ipa_parm_adjustment_vec adjustments)
   struct cgraph_node *new_node;
   bool cfg_changed;
 
-  rebuild_cgraph_edges ();
+  symtab->rebuild_edges ();
   free_dominance_info (CDI_DOMINATORS);
   pop_cfun ();
 
