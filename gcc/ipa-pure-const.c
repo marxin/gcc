@@ -1205,7 +1205,7 @@ propagate_pure_const (void)
 			       y_l->looping);
 		    }
 		  if (y_l->pure_const_state > IPA_PURE
-		      && cgraph_edge_cannot_lead_to_return (e))
+		      && e->cannot_lead_to_return_p ())
 		    {
 		      if (dump_file && (dump_flags & TDF_DETAILS))
 			fprintf (dump_file,
@@ -1226,7 +1226,7 @@ propagate_pure_const (void)
 	      else
 		state_from_flags (&edge_state, &edge_looping,
 				  flags_from_decl_or_type (y->decl),
-				  cgraph_edge_cannot_lead_to_return (e));
+				  e->cannot_lead_to_return_p ());
 
 	      /* Merge the results with what we already know.  */
 	      better_state (&edge_state, &edge_looping,
@@ -1250,7 +1250,7 @@ propagate_pure_const (void)
 		fprintf (dump_file, "    Indirect call");
 	      state_from_flags (&edge_state, &edge_looping,
 			        ie->indirect_info->ecf_flags,
-			        cgraph_edge_cannot_lead_to_return (ie));
+			        ie->cannot_lead_to_return_p ());
 	      /* Merge the results with what we already know.  */
 	      better_state (&edge_state, &edge_looping,
 			    w_l->state_previously_known,

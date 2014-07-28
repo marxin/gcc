@@ -5131,7 +5131,7 @@ ipa_tm_transform_calls_redirect (struct cgraph_node *node,
       fndecl = new_node->decl;
     }
 
-  cgraph_redirect_edge_callee (e, new_node);
+  e->redirect_callee (new_node);
   gimple_call_set_fndecl (stmt, fndecl);
 }
 

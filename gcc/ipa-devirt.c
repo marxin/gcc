@@ -2827,7 +2827,7 @@ ipa_devirt (void)
 	      {
 		struct cgraph_edge *e2;
 		struct ipa_ref *ref;
-		cgraph_speculative_call_info (e, e2, e, ref);
+		e->speculative_call_info (e2, e, ref);
 		if (e2->callee->ultimate_alias_target ()
 		    == likely_target->ultimate_alias_target ())
 		  {
@@ -2898,8 +2898,8 @@ ipa_devirt (void)
 		  }
 		nconverted++;
 		update = true;
-		cgraph_turn_edge_to_speculative
-		  (e, likely_target, e->count * 8 / 10, e->frequency * 8 / 10);
+		e->turn_to_speculative
+		  (likely_target, e->count * 8 / 10, e->frequency * 8 / 10);
 	      }
 	  }
       if (update)

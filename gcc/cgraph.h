@@ -1266,18 +1266,65 @@ struct GTY(()) cgraph_indirect_call_info
 };
 
 struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgraph_edge {
+  /* Remove the edge in the cgraph.  */
+  void remove (void);
+
+  /* Remove the edge from the list of the callers of the callee.  */
+  void remove_caller (void);
+
+  /* Remove the edge from the list of the callees of the caller.  */
+  void remove_callee (void);
+
+  /* Change field call_stmt of edge to NEW_STMT.
+     If UPDATE_SPECULATIVE and E is any component of speculative
+     edge, then update all components.  */
+  void set_call_stmt (gimple new_stmt, bool update_speculative = true);
+
+  /* Return true when call of edge can not lead to return from caller
+     and thus it is safe to ignore its side effects for IPA analysis
+     when computing side effects of the caller.  */
+  bool cannot_lead_to_return_p (void);
+
+  /* Redirect callee of the edge to N.  The function does not update underlying
+     call expression.  */
+  void redirect_callee (cgraph_node *n);
+
+  /* Make an indirect edge with an unknown callee an ordinary edge leading to
+     CALLEE.  DELTA is an integer constant that is to be added to the this
+     pointer (first parameter) to compensate for skipping a thunk adjustment.  */
+  cgraph_edge *make_direct (cgraph_node *callee);
+
+  /* Turn edge into speculative call calling N2. Update
+     the profile so the direct call is taken COUNT times
+     with FREQUENCY.  */
+  cgraph_edge *turn_to_speculative (cgraph_node *n2, gcov_type direct_count,
+				    int direct_frequency);
+
+   /* Given speculative call edge, return all three components.  */
+  void speculative_call_info (cgraph_edge *&direct, cgraph_edge *&indirect,
+			      ipa_ref *&reference);
+
+  /* Create clone of edge in the node N represented by CALL_EXPR the callgraph.  */
+  cgraph_edge * clone (cgraph_node *n, gimple call_stmt, unsigned stmt_uid,
+		       gcov_type count_scale, int freq_scale, bool update_original);
+
+  /* Speculative call edge turned out to be direct call to CALLE_DECL.
+     Remove the speculative call sequence and return edge representing the call.
+     It is up to caller to redirect the call as appropriate. */
+  cgraph_edge *resolve_speculation (tree callee_decl = NULL);
+
   /* Expected number of executions: calculated in profile.c.  */
   gcov_type count;
   cgraph_node *caller;
   cgraph_node *callee;
-  struct cgraph_edge *prev_caller;
-  struct cgraph_edge *next_caller;
-  struct cgraph_edge *prev_callee;
-  struct cgraph_edge *next_callee;
+  cgraph_edge *prev_caller;
+  cgraph_edge *next_caller;
+  cgraph_edge *prev_callee;
+  cgraph_edge *next_callee;
   gimple call_stmt;
   /* Additional information about an indirect call.  Not cleared when an edge
      becomes direct.  */
-  struct cgraph_indirect_call_info *indirect_info;
+  cgraph_indirect_call_info *indirect_info;
   PTR GTY ((skip (""))) aux;
   /* When equal to CIF_OK, inline this call.  Otherwise, points to the
      explanation why function was not inlined.  */
@@ -1798,32 +1845,18 @@ extern cgraph_node_set cgraph_new_nodes;
 /* In cgraph.c  */
 void release_function_body (tree);
 struct cgraph_indirect_call_info *cgraph_allocate_init_indirect_info (void);
-void cgraph_remove_edge (struct cgraph_edge *);
 
-void cgraph_set_call_stmt (struct cgraph_edge *, gimple, bool update_speculative = true);
 void cgraph_update_edges_for_call_stmt (gimple, tree, gimple);
 struct cgraph_local_info *cgraph_local_info (tree);
 struct cgraph_global_info *cgraph_global_info (tree);
 struct cgraph_rtl_info *cgraph_rtl_info (tree);
 bool cgraph_function_possibly_inlined_p (tree);
-bool cgraph_edge_cannot_lead_to_return (struct cgraph_edge *);
-void cgraph_redirect_edge_callee (struct cgraph_edge *, cgraph_node *);
-struct cgraph_edge *cgraph_make_edge_direct (struct cgraph_edge *,
-					     cgraph_node *);
 
 const char* cgraph_inline_failed_string (cgraph_inline_failed_t);
 cgraph_inline_failed_type_t cgraph_inline_failed_type (cgraph_inline_failed_t);
 
 bool resolution_used_from_other_file_p (enum ld_plugin_symbol_resolution);
 gimple cgraph_redirect_edge_call_stmt_to_callee (struct cgraph_edge *);
-struct cgraph_edge *
-cgraph_turn_edge_to_speculative (struct cgraph_edge *,
-				 cgraph_node *,
-				 gcov_type, int);
-void cgraph_speculative_call_info (struct cgraph_edge *,
-				   struct cgraph_edge *&,
-				   struct cgraph_edge *&,
-				   struct ipa_ref *&);
 extern bool gimple_check_call_matching_types (gimple, tree, bool);
 
 /* In cgraphunit.c  */
@@ -1836,10 +1869,6 @@ basic_block init_lowered_empty_function (tree, bool);
 
 /* In cgraphclones.c  */
 
-struct cgraph_edge * cgraph_clone_edge (struct cgraph_edge *,
-					cgraph_node *, gimple,
-					unsigned, gcov_type, int, bool);
-struct cgraph_edge *cgraph_resolve_speculation (struct cgraph_edge *, tree);
 tree clone_function_name (tree decl, const char *);
 
 void tree_function_versioning (tree, tree, vec<ipa_replace_map *, va_gc> *,

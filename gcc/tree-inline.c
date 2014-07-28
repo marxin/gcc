@@ -1805,10 +1805,10 @@ copy_bb (copy_body_data *id, basic_block bb, int frequency_scale,
 		      int edge_freq = edge->frequency;
 		      int new_freq;
 		      struct cgraph_edge *old_edge = edge;
-		      edge = cgraph_clone_edge (edge, id->dst_node, stmt,
-					        gimple_uid (stmt),
-					        REG_BR_PROB_BASE, CGRAPH_FREQ_BASE,
-					        true);
+		      edge = edge->clone (id->dst_node, stmt,
+					  gimple_uid (stmt),
+					  REG_BR_PROB_BASE, CGRAPH_FREQ_BASE,
+					  true);
 		      /* We could also just rescale the frequency, but
 		         doing so would introduce roundoff errors and make
 			 verifier unhappy.  */
@@ -1823,11 +1823,11 @@ copy_bb (copy_body_data *id, basic_block bb, int frequency_scale,
 			  struct ipa_ref *ref;
 
 			  gcc_assert (!edge->indirect_unknown_callee);
-			  cgraph_speculative_call_info (old_edge, direct, indirect, ref);
-			  indirect = cgraph_clone_edge (indirect, id->dst_node, stmt,
-							gimple_uid (stmt),
-							REG_BR_PROB_BASE, CGRAPH_FREQ_BASE,
-							true);
+			  old_edge->speculative_call_info (direct, indirect, ref);
+			  indirect = indirect->clone (id->dst_node, stmt,
+						      gimple_uid (stmt),
+						      REG_BR_PROB_BASE, CGRAPH_FREQ_BASE,
+						      true);
 			  if (old_edge->frequency + indirect->frequency)
 			    {
 			      edge->frequency = MIN (RDIV ((gcov_type)new_freq * old_edge->frequency,
@@ -1870,7 +1870,7 @@ copy_bb (copy_body_data *id, basic_block bb, int frequency_scale,
 		case CB_CGE_MOVE:
 		  edge = id->dst_node->get_edge (orig_stmt);
 		  if (edge)
-		    cgraph_set_call_stmt (edge, stmt);
+		    edge->set_call_stmt (stmt);
 		  break;
 
 		default:
@@ -5226,7 +5226,7 @@ delete_unreachable_blocks_update_callgraph (copy_body_data *id)
 		  if (!e->inline_failed)
 		    e->callee->remove_symbol_and_inline_clones (id->dst_node);
 		  else
-		    cgraph_remove_edge (e);
+		    e->remove ();
 		}
 	      if (id->transform_call_graph_edges == CB_CGE_MOVE_CLONES
 		  && id->dst_node->clones)
@@ -5239,7 +5239,7 @@ delete_unreachable_blocks_update_callgraph (copy_body_data *id)
 			if (!e->inline_failed)
 			  e->callee->remove_symbol_and_inline_clones (id->dst_node);
 			else
-			  cgraph_remove_edge (e);
+			  e->remove ();
 		      }
 
 		    if (node->clones)

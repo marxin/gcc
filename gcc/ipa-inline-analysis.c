@@ -758,9 +758,8 @@ edge_set_predicate (struct cgraph_edge *e, struct predicate *predicate)
     {
       struct cgraph_node *callee = !e->inline_failed ? e->callee : NULL;
 
-      cgraph_redirect_edge_callee (e,
-				   cgraph_node::get_create
-				     (builtin_decl_implicit (BUILT_IN_UNREACHABLE)));
+      e->redirect_callee (cgraph_node::get_create
+			    (builtin_decl_implicit (BUILT_IN_UNREACHABLE)));
       e->inline_failed = CIF_UNREACHABLE;
       if (callee)
 	callee->remove_symbol_and_inline_clones ();

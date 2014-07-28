@@ -75,7 +75,7 @@ lto_cgraph_replace_node (struct cgraph_node *node,
   for (e = node->callers; e; e = next)
     {
       next = e->next_caller;
-      cgraph_redirect_edge_callee (e, prevailing_node);
+      e->redirect_callee (prevailing_node);
       /* If there is a mismatch between the supposed callee return type and
 	 the real one do not attempt to inline this function.
 	 ???  We really need a way to match function signatures for ABI

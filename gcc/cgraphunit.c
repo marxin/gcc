@@ -902,7 +902,7 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
 			       edge->caller->name (), target->name ());
 	    }
 
-	  cgraph_make_edge_direct (edge, target);
+	  edge->make_direct (target);
 	  cgraph_redirect_edge_call_stmt_to_callee (edge);
 	  if (symtab->dump_file)
 	    {

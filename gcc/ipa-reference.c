@@ -387,7 +387,7 @@ propagate_bits (ipa_reference_global_vars_info_t x_global, struct cgraph_node *x
 		 seems so to local analysis.  If we cannot return from
 		 the function, we can safely ignore the call.  */
 	      if ((flags & ECF_PURE)
-		  || cgraph_edge_cannot_lead_to_return (e))
+		  || e->cannot_lead_to_return_p ())
 		continue;
 
 	      union_static_var_sets (x_global->statics_written,
@@ -642,7 +642,7 @@ get_read_write_all_from_node (struct cgraph_node *node,
 	read_all = true;
 	if (dump_file && (dump_flags & TDF_DETAILS))
 	  fprintf (dump_file, "   indirect call -> read all\n");
-	if (!cgraph_edge_cannot_lead_to_return (ie)
+	if (!ie->cannot_lead_to_return_p ()
 	    && !(ie->indirect_info->ecf_flags & ECF_PURE))
 	  {
 	    if (dump_file && (dump_flags & TDF_DETAILS))

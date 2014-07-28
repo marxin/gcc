@@ -633,8 +633,8 @@ ipa_profile (void)
 			    n2 = alias;
 			}
 		      nconverted++;
-		      cgraph_turn_edge_to_speculative
-			(e, n2,
+		      e->turn_to_speculative
+			(n2,
 			 apply_scale (e->count,
 				      e->indirect_info->common_target_probability),
 			 apply_scale (e->frequency,

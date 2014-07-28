@@ -1342,13 +1342,13 @@ recursive_inlining (struct cgraph_edge *edge,
 	 the already modified body.  */
       if (master_clone)
 	{
-          cgraph_redirect_edge_callee (curr, master_clone);
+          curr->redirect_callee (master_clone);
           reset_edge_growth_cache (curr);
 	}
 
       if (estimate_size_after_inlining (node, curr) > limit)
 	{
-	  cgraph_redirect_edge_callee (curr, dest);
+	  curr->redirect_callee (dest);
 	  reset_edge_growth_cache (curr);
 	  break;
 	}
@@ -1362,7 +1362,7 @@ recursive_inlining (struct cgraph_edge *edge,
 
       if (!want_inline_self_recursive_call_p (curr, node, false, depth))
 	{
-	  cgraph_redirect_edge_callee (curr, dest);
+	  curr->redirect_callee (dest);
 	  reset_edge_growth_cache (curr);
 	  continue;
 	}
@@ -1387,7 +1387,7 @@ recursive_inlining (struct cgraph_edge *edge,
 	  for (e = master_clone->callees; e; e = e->next_callee)
 	    if (!e->inline_failed)
 	      clone_inlined_nodes (e, true, false, NULL, CGRAPH_FREQ_BASE);
-          cgraph_redirect_edge_callee (curr, master_clone);
+          curr->redirect_callee (master_clone);
           reset_edge_growth_cache (curr);
 	}
 
@@ -1496,13 +1496,13 @@ speculation_useful_p (struct cgraph_edge *e, bool anticipate_inlining)
       int ecf_flags = flags_from_decl_or_type (target->decl);
       if (ecf_flags & ECF_CONST)
         {
-          cgraph_speculative_call_info (e, direct, indirect, ref);
+          e->speculative_call_info (direct, indirect, ref);
 	  if (!(indirect->indirect_info->ecf_flags & ECF_CONST))
 	    return true;
         }
       else if (ecf_flags & ECF_PURE)
         {
-          cgraph_speculative_call_info (e, direct, indirect, ref);
+          e->speculative_call_info (direct, indirect, ref);
 	  if (!(indirect->indirect_info->ecf_flags & ECF_PURE))
 	    return true;
         }
@@ -1534,7 +1534,7 @@ resolve_noninline_speculation (fibheap_t edge_heap, struct cgraph_edge *edge)
       bitmap updated_nodes = BITMAP_ALLOC (NULL);
 
       spec_rem += edge->count;
-      cgraph_resolve_speculation (edge, NULL);
+      edge->resolve_speculation ();
       reset_edge_caches (where);
       inline_update_overall_summary (where);
       update_caller_keys (edge_heap, where,
@@ -1650,7 +1650,7 @@ inline_small_functions (void)
 	    }
 	  if (edge->speculative && !speculation_useful_p (edge, edge->aux != NULL))
 	    {
-	      cgraph_resolve_speculation (edge, NULL);
+	      edge->resolve_speculation ();
 	      update = true;
 	    }
 	}
@@ -2221,7 +2221,7 @@ ipa_inline (void)
 	      next = edge->next_callee;
 	      if (edge->speculative && !speculation_useful_p (edge, false))
 		{
-		  cgraph_resolve_speculation (edge, NULL);
+		  edge->resolve_speculation ();
 		  spec_rem += edge->count;
 		  update = true;
 		  remove_functions = true;

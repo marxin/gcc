@@ -3367,7 +3367,7 @@ perhaps_add_new_callers (struct cgraph_node *node, struct ipcp_value *val)
 			     xstrdup (val->spec_node->name ()),
 			     val->spec_node->order);
 
-		  cgraph_redirect_edge_callee (cs, val->spec_node);
+		  cs->redirect_callee (val->spec_node);
 		  redirected_sum += cs->count;
 		}
 	    }

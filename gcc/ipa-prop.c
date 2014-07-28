@@ -2862,7 +2862,7 @@ ipa_make_edge_direct_to_target (struct cgraph_edge *ie, tree target)
 		       "converting indirect call in %s to direct call to %s\n",
 		       ie->caller->name (), callee->name ());
     }
-  ie = cgraph_make_edge_direct (ie, callee);
+  ie = ie->make_direct (callee);
   es = inline_edge_summary (ie);
   es->call_stmt_size -= (eni_size_weights.indirect_call_cost
 			 - eni_size_weights.call_cost);
@@ -4221,7 +4221,7 @@ ipa_modify_call_arguments (struct cgraph_edge *cs, gimple stmt,
     }
   gsi_replace (&gsi, new_stmt, true);
   if (cs)
-    cgraph_set_call_stmt (cs, new_stmt);
+    cs->set_call_stmt (new_stmt);
   do
     {
       current_node->record_stmt_references (gsi_stmt (gsi));

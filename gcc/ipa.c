@@ -205,7 +205,7 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
                                target->name (),
                                target->order);
 	    }
-	  edge = cgraph_make_edge_direct (edge, target);
+	  edge = edge->make_direct (target);
 	  if (inline_summary_vec)
 	    inline_update_overall_summary (node);
 	  else if (edge->call_stmt)
