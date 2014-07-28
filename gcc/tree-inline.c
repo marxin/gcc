@@ -4216,7 +4216,7 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
 	       && reason != CIF_UNSPECIFIED
 	       && !lookup_attribute ("noinline", DECL_ATTRIBUTES (fn))
 	       /* Do not warn about not inlined recursive calls.  */
-	       && !cgraph_edge_recursive_p (cg_edge)
+	       && !cg_edge->recursive_p ()
 	       /* Avoid warnings during early inline pass. */
 	       && symtab->cgraph_global_info_ready)
 	{

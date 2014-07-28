@@ -3632,7 +3632,7 @@ simple_edge_hints (struct cgraph_edge *edge)
 			    ? edge->caller->global.inlined_to : edge->caller);
   if (inline_summary (to)->scc_no
       && inline_summary (to)->scc_no == inline_summary (edge->callee)->scc_no
-      && !cgraph_edge_recursive_p (edge))
+      && !edge->recursive_p ())
     hints |= INLINE_HINT_same_scc;
 
   if (to->lto_file_data && edge->callee->lto_file_data

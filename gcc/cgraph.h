@@ -1280,11 +1280,6 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
      edge, then update all components.  */
   void set_call_stmt (gimple new_stmt, bool update_speculative = true);
 
-  /* Return true when call of edge can not lead to return from caller
-     and thus it is safe to ignore its side effects for IPA analysis
-     when computing side effects of the caller.  */
-  bool cannot_lead_to_return_p (void);
-
   /* Redirect callee of the edge to N.  The function does not update underlying
      call expression.  */
   void redirect_callee (cgraph_node *n);
@@ -1312,6 +1307,14 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
      Remove the speculative call sequence and return edge representing the call.
      It is up to caller to redirect the call as appropriate. */
   cgraph_edge *resolve_speculation (tree callee_decl = NULL);
+
+  /* Return true when call of edge can not lead to return from caller
+     and thus it is safe to ignore its side effects for IPA analysis
+     when computing side effects of the caller.  */
+  bool cannot_lead_to_return_p (void);
+
+  /* Return true when the edge represents a direct recursion.  */
+  bool recursive_p (void);
 
   /* Expected number of executions: calculated in profile.c.  */
   gcov_type count;
@@ -2542,15 +2545,15 @@ varpool_node::ultimate_alias_target (availability *availability)
   return n;
 }
 
-/* Return true when the edge E represents a direct recursion.  */
-static inline bool
-cgraph_edge_recursive_p (struct cgraph_edge *e)
+/* Return true when the edge represents a direct recursion.  */
+inline bool
+cgraph_edge::recursive_p (void)
 {
-  cgraph_node *callee = e->callee->ultimate_alias_target ();
-  if (e->caller->global.inlined_to)
-    return e->caller->global.inlined_to->decl == callee->decl;
+  cgraph_node *c = callee->ultimate_alias_target ();
+  if (caller->global.inlined_to)
+    return caller->global.inlined_to->decl == c->decl;
   else
-    return e->caller->decl == callee->decl;
+    return caller->decl == c->decl;
 }
 
 /* Return true if the TM_CLONE bit is set for a given FNDECL.  */

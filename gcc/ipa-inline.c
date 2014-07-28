@@ -1052,7 +1052,7 @@ edge_badness (struct cgraph_edge *edge, bool dump)
   gcc_assert (badness >= INT_MIN);
   gcc_assert (badness <= INT_MAX - 1);
   /* Make recursive inlining happen always after other inlining is done.  */
-  if (cgraph_edge_recursive_p (edge))
+  if (edge->recursive_p ())
     return badness + 1;
   else
     return badness;
@@ -1755,7 +1755,7 @@ inline_small_functions (void)
 	 recursive calls where we do effects similar to loop unrolling.
 	 When inlining such edge seems profitable, leave decision on
 	 specific inliner.  */
-      if (cgraph_edge_recursive_p (edge))
+      if (edge->recursive_p ())
 	{
 	  where = edge->caller;
 	  if (where->global.inlined_to)
@@ -1907,7 +1907,7 @@ flatten_function (struct cgraph_node *node, bool early)
 	  : !can_early_inline_edge_p (e))
 	continue;
 
-      if (cgraph_edge_recursive_p (e))
+      if (e->recursive_p ())
 	{
 	  if (dump_file)
 	    fprintf (dump_file, "Not inlining: recursive call.\n");
@@ -2283,7 +2283,7 @@ inline_always_inline_functions (struct cgraph_node *node)
       if (!DECL_DISREGARD_INLINE_LIMITS (callee->decl))
 	continue;
 
-      if (cgraph_edge_recursive_p (e))
+      if (e->recursive_p ())
 	{
 	  if (dump_file)
 	    fprintf (dump_file, "  Not inlining recursive call to %s.\n",
@@ -2345,7 +2345,7 @@ early_inline_small_functions (struct cgraph_node *node)
       if (!can_early_inline_edge_p (e))
 	continue;
 
-      if (cgraph_edge_recursive_p (e))
+      if (e->recursive_p ())
 	{
 	  if (dump_file)
 	    fprintf (dump_file, "  Not inlining: recursive call.\n");
