@@ -27,6 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "basic-block.h"
 #include "function.h"
 #include "ipa-ref.h"
+#include "dumpfile.h"
 
 /* Symbol table consists of functions and variables.
    TODO: add labels and CONST_DECLs.  */
@@ -1532,6 +1533,14 @@ class GTY((tag ("SYMTAB"))) symbol_table
 public:
   inline void dump (void);
 
+  /* Initialize callgraph dump file.  */
+  inline void
+  initialize (void)
+  {
+    if (!dump_file)
+      dump_file = dump_begin (TDI_cgraph, NULL);
+  }
+
   /* Register a symbol NODE.  */
   inline void register_symbol (symtab_node *node);
 
@@ -1550,6 +1559,12 @@ public:
 
   /* Perform reachability analysis and reclaim all unreachable nodes.  */
   bool remove_unreachable_nodes (bool before_inlining_p, FILE *file);
+
+  /* Optimization of function bodies might've rendered some variables as
+     unnecessary so we want to avoid these from being compiled.  Re-do
+     reachability starting from variables that are either externally visible
+     or was referred from the asm output routines.  */
+  void remove_unreferenced_decls (void);
 
   /* Process CGRAPH_NEW_FUNCTIONS and perform actions necessary to add these
      functions into callgraph in a way so they look like ordinary reachable
@@ -1731,6 +1746,8 @@ public:
   /* Set when the cgraph is fully build and the basic flags are computed.  */
   bool cgraph_function_flags_ready;
 
+  bool cpp_implicit_aliases_done;
+
   /* Hash table used to hold sectoons.  */
   htab_t GTY((param_is (section_hash_entry))) section_hash;
 
@@ -1739,6 +1756,8 @@ public:
 
   /* Hash table used to hold init priorities.  */
   htab_t GTY ((param_is (symbol_priority_map))) init_priority_hash;
+
+  FILE* GTY ((skip)) dump_file;
 
 private:
   /* List of hooks triggered when an edge is removed.  */
@@ -1760,7 +1779,6 @@ private:
 extern GTY(()) symbol_table *symtab;
 
 extern cgraph_node_set cgraph_new_nodes;
-extern bool cpp_implicit_aliases_done;
 
 /* In cgraph.c  */
 void release_function_body (tree);
@@ -1794,11 +1812,9 @@ void cgraph_speculative_call_info (struct cgraph_edge *,
 extern bool gimple_check_call_matching_types (gimple, tree, bool);
 
 /* In cgraphunit.c  */
-extern FILE *cgraph_dump_file;
 void cgraph_finalize_function (tree, bool);
 void finalize_compilation_unit (void);
 void compile (void);
-void init_cgraph (void);
 /*  Initialize datastructures so DECL is a function in lowered gimple form.
     IN_SSA is true if the gimple is in SSA.  */
 basic_block init_lowered_empty_function (tree, bool);

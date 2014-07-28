@@ -970,14 +970,14 @@ add_type_duplicate (odr_type val, tree type)
 	  merge = false;
 	  odr_violation_reported = true;
 	  val->odr_violated = true;
-	  if (cgraph_dump_file)
+	  if (symtab->dump_file)
 	    {
-	      fprintf (cgraph_dump_file, "ODR violation\n");
+	      fprintf (symtab->dump_file, "ODR violation\n");
 	    
-	      print_node (cgraph_dump_file, "", val->type, 0);
-	      putc ('\n',cgraph_dump_file);
-	      print_node (cgraph_dump_file, "", type, 0);
-	      putc ('\n',cgraph_dump_file);
+	      print_node (symtab->dump_file, "", val->type, 0);
+	      putc ('\n',symtab->dump_file);
+	      print_node (symtab->dump_file, "", type, 0);
+	      putc ('\n',symtab->dump_file);
 	    }
 	}
       pointer_set_destroy (visited);
@@ -1011,14 +1011,14 @@ add_type_duplicate (odr_type val, tree type)
 			  "a type with the same name but different bases is "
 			  "defined in another translation unit");
 	      val->odr_violated = true;
-	      if (cgraph_dump_file)
+	      if (symtab->dump_file)
 		{
-		  fprintf (cgraph_dump_file, "ODR bse violation or merging bug?\n");
+		  fprintf (symtab->dump_file, "ODR bse violation or merging bug?\n");
 		
-		  print_node (cgraph_dump_file, "", val->type, 0);
-		  putc ('\n',cgraph_dump_file);
-		  print_node (cgraph_dump_file, "", type, 0);
-		  putc ('\n',cgraph_dump_file);
+		  print_node (symtab->dump_file, "", val->type, 0);
+		  putc ('\n',symtab->dump_file);
+		  print_node (symtab->dump_file, "", type, 0);
+		  putc ('\n',symtab->dump_file);
 		}
 	    }
 	}

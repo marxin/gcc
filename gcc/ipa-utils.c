@@ -670,9 +670,9 @@ ipa_merge_profiles (struct cgraph_node *dst,
 
   if (!dst->count)
     return;
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "Merging profiles of %s/%i to %s/%i\n",
+      fprintf (symtab->dump_file, "Merging profiles of %s/%i to %s/%i\n",
 	       xstrdup (src->name ()), src->order,
 	       xstrdup (dst->name ()), dst->order);
     }
@@ -719,16 +719,16 @@ ipa_merge_profiles (struct cgraph_node *dst,
   if (n_basic_blocks_for_fn (srccfun)
       != n_basic_blocks_for_fn (dstcfun))
     {
-      if (cgraph_dump_file)
-	fprintf (cgraph_dump_file,
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file,
 		 "Giving up; number of basic block mismatch.\n");
       match = false;
     }
   else if (last_basic_block_for_fn (srccfun)
 	   != last_basic_block_for_fn (dstcfun))
     {
-      if (cgraph_dump_file)
-	fprintf (cgraph_dump_file,
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file,
 		 "Giving up; last block mismatch.\n");
       match = false;
     }
@@ -743,8 +743,8 @@ ipa_merge_profiles (struct cgraph_node *dst,
 	  dstbb = BASIC_BLOCK_FOR_FN (dstcfun, srcbb->index);
 	  if (dstbb == NULL)
 	    {
-	      if (cgraph_dump_file)
-		fprintf (cgraph_dump_file,
+	      if (symtab->dump_file)
+		fprintf (symtab->dump_file,
 			 "No matching block for bb %i.\n",
 			 srcbb->index);
 	      match = false;
@@ -752,8 +752,8 @@ ipa_merge_profiles (struct cgraph_node *dst,
 	    }
 	  if (EDGE_COUNT (srcbb->succs) != EDGE_COUNT (dstbb->succs))
 	    {
-	      if (cgraph_dump_file)
-		fprintf (cgraph_dump_file,
+	      if (symtab->dump_file)
+		fprintf (symtab->dump_file,
 			 "Edge count mistmatch for bb %i.\n",
 			 srcbb->index);
 	      match = false;
@@ -765,8 +765,8 @@ ipa_merge_profiles (struct cgraph_node *dst,
 	      edge dste = EDGE_SUCC (dstbb, i);
 	      if (srce->dest->index != dste->dest->index)
 		{
-		  if (cgraph_dump_file)
-		    fprintf (cgraph_dump_file,
+		  if (symtab->dump_file)
+		    fprintf (symtab->dump_file,
 			     "Succ edge mistmatch for bb %i.\n",
 			     srce->dest->index);
 		  match = false;

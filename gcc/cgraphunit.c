@@ -222,8 +222,6 @@ static void mark_functions_to_output (void);
 static void expand_function (struct cgraph_node *);
 static void handle_alias_pairs (void);
 
-FILE *cgraph_dump_file;
-
 /* Used for vtable lookup in thunk adjusting.  */
 static GTY (()) tree vtable_entry_type;
 
@@ -853,9 +851,9 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
   if (!pointer_set_insert (reachable_call_targets,
 			   cache_token))
     {
-      if (cgraph_dump_file)
+      if (symtab->dump_file)
 	dump_possible_polymorphic_call_targets 
-	  (cgraph_dump_file, edge);
+	  (symtab->dump_file, edge);
 
       for (i = 0; i < targets.length (); i++)
 	{
@@ -888,11 +886,11 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
 	    target = cgraph_node::create
 			(builtin_decl_implicit (BUILT_IN_UNREACHABLE));
 
-	  if (cgraph_dump_file)
+	  if (symtab->dump_file)
 	    {
-	      fprintf (cgraph_dump_file,
+	      fprintf (symtab->dump_file,
 		       "Devirtualizing call: ");
-	      print_gimple_stmt (cgraph_dump_file,
+	      print_gimple_stmt (symtab->dump_file,
 				 edge->call_stmt, 0,
 				 TDF_SLIM);
 	    }
@@ -906,11 +904,11 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
 
 	  cgraph_make_edge_direct (edge, target);
 	  cgraph_redirect_edge_call_stmt_to_callee (edge);
-	  if (cgraph_dump_file)
+	  if (symtab->dump_file)
 	    {
-	      fprintf (cgraph_dump_file,
+	      fprintf (symtab->dump_file,
 		       "Devirtualized as: ");
-	      print_gimple_stmt (cgraph_dump_file,
+	      print_gimple_stmt (symtab->dump_file,
 				 edge->call_stmt, 0,
 				 TDF_SLIM);
 	    }
@@ -946,7 +944,7 @@ analyze_functions (void)
 
   /* Ugly, but the fixup can not happen at a time same body alias is created;
      C++ FE is confused about the COMDAT groups being right.  */
-  if (cpp_implicit_aliases_done)
+  if (symtab->cpp_implicit_aliases_done)
     FOR_EACH_SYMBOL (node)
       if (node->cpp_implicit_alias)
 	  node->fixup_same_cpp_alias_visibility (node->get_alias_target ());
@@ -971,13 +969,13 @@ analyze_functions (void)
 	  if (decide_is_symbol_needed (node))
 	    {
 	      enqueue_node (node);
-	      if (!changed && cgraph_dump_file)
-		fprintf (cgraph_dump_file, "Trivially needed symbols:");
+	      if (!changed && symtab->dump_file)
+		fprintf (symtab->dump_file, "Trivially needed symbols:");
 	      changed = true;
-	      if (cgraph_dump_file)
-		fprintf (cgraph_dump_file, " %s", node->asm_name ());
-	      if (!changed && cgraph_dump_file)
-		fprintf (cgraph_dump_file, "\n");
+	      if (symtab->dump_file)
+		fprintf (symtab->dump_file, " %s", node->asm_name ());
+	      if (!changed && symtab->dump_file)
+		fprintf (symtab->dump_file, "\n");
 	    }
 	  if (node == first_analyzed
 	      || node == first_analyzed_var)
@@ -987,8 +985,8 @@ analyze_functions (void)
       first_analyzed_var = symtab->first_variable ();
       first_analyzed = symtab->first_function ();
 
-      if (changed && cgraph_dump_file)
-	fprintf (cgraph_dump_file, "\n");
+      if (changed && symtab->dump_file)
+	fprintf (symtab->dump_file, "\n");
 
       /* Lower representation, build callgraph edges and references for all trivially
          needed symbols and all symbols referred by them.  */
@@ -1071,14 +1069,14 @@ analyze_functions (void)
     update_type_inheritance_graph ();
 
   /* Collect entry points to the unit.  */
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "\n\nInitial ");
-      symtab_node::dump_table (cgraph_dump_file);
+      fprintf (symtab->dump_file, "\n\nInitial ");
+      symtab_node::dump_table (symtab->dump_file);
     }
 
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "\nRemoving unused symbols:");
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file, "\nRemoving unused symbols:");
 
   for (node = symtab->first_symbol ();
        node != first_handled
@@ -1087,8 +1085,8 @@ analyze_functions (void)
       next = node->next;
       if (!node->aux && !referred_to_p (node))
 	{
-	  if (cgraph_dump_file)
-	    fprintf (cgraph_dump_file, " %s", node->name ());
+	  if (symtab->dump_file)
+	    fprintf (symtab->dump_file, " %s", node->name ());
 	  node->remove ();
 	  continue;
 	}
@@ -1112,10 +1110,10 @@ analyze_functions (void)
     node->aux = NULL;
   first_analyzed = symtab->first_function ();
   first_analyzed_var = symtab->first_variable ();
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "\n\nReclaimed ");
-      symtab_node::dump_table (cgraph_dump_file);
+      fprintf (symtab->dump_file, "\n\nReclaimed ");
+      symtab_node::dump_table (symtab->dump_file);
     }
   bitmap_obstack_release (NULL);
   pointer_set_destroy (reachable_call_targets);
@@ -1906,8 +1904,8 @@ expand_all_functions (void)
      if(node->tp_first_run)
        profiled_func_count++;
 
-    if (cgraph_dump_file)
-      fprintf (cgraph_dump_file, "Time profile order in expand_all_functions:%s:%d\n", node->asm_name (), node->tp_first_run);
+    if (symtab->dump_file)
+      fprintf (symtab->dump_file, "Time profile order in expand_all_functions:%s:%d\n", node->asm_name (), node->tp_first_run);
 
 	  node->process = 0;
 	  expand_function (node);
@@ -1918,8 +1916,8 @@ expand_all_functions (void)
       fprintf (dump_file, "Expanded functions with time profile (%s):%u/%u\n",
                main_input_filename, profiled_func_count, expanded_func_count);
 
-  if (cgraph_dump_file && flag_profile_reorder_functions)
-    fprintf (cgraph_dump_file, "Expanded functions with time profile:%u/%u\n",
+  if (symtab->dump_file && flag_profile_reorder_functions)
+    fprintf (symtab->dump_file, "Expanded functions with time profile:%u/%u\n",
              profiled_func_count, expanded_func_count);
 
   symtab->process_new_functions ();
@@ -2054,7 +2052,7 @@ ipa_passes (void)
      because TODO is run before the subpasses.  It is important to remove
      the unreachable functions to save works at IPA level and to get LTO
      symbol tables right.  */
-  symtab->remove_unreachable_nodes (true, cgraph_dump_file);
+  symtab->remove_unreachable_nodes (true, symtab->dump_file);
 
   /* If pass_all_early_optimizations was not scheduled, the state of
      the cgraph will not be properly updated.  Update it now.  */
@@ -2138,16 +2136,6 @@ output_weakrefs (void)
       }
 }
 
-/* Initialize callgraph dump file.  */
-
-void
-init_cgraph (void)
-{
-  if (!cgraph_dump_file)
-    cgraph_dump_file = dump_begin (TDI_cgraph, NULL);
-}
-
-
 /* Perform simple optimizations based on callgraph.  */
 
 void
@@ -2190,10 +2178,10 @@ compile (void)
      Do this later so other IPA passes see what is really going on.  */
   symtab->remove_unreachable_nodes (false, dump_file);
   symtab->cgraph_global_info_ready = true;
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "Optimized ");
-      symtab_node:: dump_table (cgraph_dump_file);
+      fprintf (symtab->dump_file, "Optimized ");
+      symtab_node:: dump_table (symtab->dump_file);
     }
   if (post_ipa_mem_report)
     {
@@ -2262,10 +2250,10 @@ compile (void)
   symtab->cgraph_state = CGRAPH_STATE_FINISHED;
   output_weakrefs ();
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "\nFinal ");
-      symtab_node::dump_table (cgraph_dump_file);
+      fprintf (symtab->dump_file, "\nFinal ");
+      symtab_node::dump_table (symtab->dump_file);
     }
 #ifdef ENABLE_CHECKING
   symtab_node::verify_symtab_nodes ();

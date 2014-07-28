@@ -1930,7 +1930,7 @@ do_compile (void)
 
           ggc_protect_identifiers = true;
 
-          init_cgraph ();
+	  symtab->initialize ();
           init_final (main_input_filename);
           coverage_init (aux_base_name);
           statistics_init ();

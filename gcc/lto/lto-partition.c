@@ -139,8 +139,8 @@ add_symbol_to_partition_1 (ltrans_partition part, symtab_node *node)
   if (symbol_partitioned_p (node))
     {
       node->in_other_partition = 1;
-      if (cgraph_dump_file)
-        fprintf (cgraph_dump_file, "Symbol node %s now used in multiple partitions\n",
+      if (symtab->dump_file)
+        fprintf (symtab->dump_file, "Symbol node %s now used in multiple partitions\n",
 		 node->name ());
     }
   node->aux = (void *)((size_t)node->aux + 1);
@@ -452,9 +452,9 @@ lto_balanced_map (int n_lto_partitions)
      things works smoother if we order in source order.  */
   qsort (order, n_nodes, sizeof (struct cgraph_node *), node_cmp);
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     for(i = 0; i < n_nodes; i++)
-      fprintf (cgraph_dump_file, "Balanced map symbol order:%s:%u\n", order[i]->name (), order[i]->tp_first_run);
+      fprintf (symtab->dump_file, "Balanced map symbol order:%s:%u\n", order[i]->name (), order[i]->tp_first_run);
 
   if (!flag_toplevel_reorder)
     {
@@ -477,8 +477,8 @@ lto_balanced_map (int n_lto_partitions)
     partition_size = PARAM_VALUE (MIN_PARTITION_SIZE);
   npartitions = 1;
   partition = new_partition ("");
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "Total unit size: %i, partition size: %i\n",
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file, "Total unit size: %i, partition size: %i\n",
 	     total_size, partition_size);
 
   for (i = 0; i < n_nodes; i++)
@@ -663,8 +663,8 @@ lto_balanced_map (int n_lto_partitions)
 	  best_total_size = total_size;
 	  best_varpool_pos = varpool_pos;
 	}
-      if (cgraph_dump_file)
-	fprintf (cgraph_dump_file, "Step %i: added %s/%i, size %i, cost %i/%i "
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file, "Step %i: added %s/%i, size %i, cost %i/%i "
 		 "best %i/%i, step %i\n", i,
 		 order[i]->name (), order[i]->order,
 		 partition->insns, cost, internal,
@@ -675,8 +675,8 @@ lto_balanced_map (int n_lto_partitions)
 	{
 	  if (best_i != i)
 	    {
-	      if (cgraph_dump_file)
-		fprintf (cgraph_dump_file, "Unwinding %i insertions to step %i\n",
+	      if (symtab->dump_file)
+		fprintf (symtab->dump_file, "Unwinding %i insertions to step %i\n",
 			 i - best_i, best_i);
 	      undo_partition (partition, best_n_nodes);
 	      varpool_pos = best_varpool_pos;
@@ -692,8 +692,8 @@ lto_balanced_map (int n_lto_partitions)
 	  total_size = best_total_size;
 	  cost = 0;
 
-	  if (cgraph_dump_file)
-	    fprintf (cgraph_dump_file, "New partition\n");
+	  if (symtab->dump_file)
+	    fprintf (symtab->dump_file, "New partition\n");
 	  best_n_nodes = 0;
 	  best_cost = INT_MAX;
 
@@ -750,8 +750,8 @@ privatize_symbol_name (symtab_node *node)
   if (node->lto_file_data
       && lto_get_decl_name_mapping (node->lto_file_data, name) != name)
     {
-      if (cgraph_dump_file)
-	fprintf (cgraph_dump_file,
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file,
 		"Not privatizing symbol name: %s. It privatized already.\n",
 		name);
       return false;
@@ -762,8 +762,8 @@ privatize_symbol_name (symtab_node *node)
      that are not really clones.  */
   if (node->unique_name)
     {
-      if (cgraph_dump_file)
-	fprintf (cgraph_dump_file,
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file,
 		"Not privatizing symbol name: %s. Has unique name.\n",
 		name);
       return false;
@@ -773,8 +773,8 @@ privatize_symbol_name (symtab_node *node)
     lto_record_renamed_decl (node->lto_file_data, name,
 			     IDENTIFIER_POINTER
 			     (DECL_ASSEMBLER_NAME (decl)));
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file,
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file,
 	    "Privatizing symbol name: %s -> %s\n",
 	    name, IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
   return true;
@@ -799,8 +799,8 @@ promote_symbol (symtab_node *node)
   TREE_PUBLIC (node->decl) = 1;
   DECL_VISIBILITY (node->decl) = VISIBILITY_HIDDEN;
   DECL_VISIBILITY_SPECIFIED (node->decl) = true;
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file,
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file,
 	    "Promoting as hidden: %s\n", node->name ());
 }
 
@@ -860,8 +860,8 @@ rename_statics (lto_symtab_encoder_t encoder, symtab_node *node)
   if (!s)
     return;
 
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file,
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file,
 	    "Renaming statics with asm name: %s\n", node->name ());
 
   /* Assign every symbol in the set that shares the same ASM name an unique

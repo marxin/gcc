@@ -46,9 +46,9 @@ lto_cgraph_replace_node (struct cgraph_node *node,
   struct cgraph_edge *e, *next;
   bool compatible_p;
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "Replacing cgraph node %s/%i by %s/%i"
+      fprintf (symtab->dump_file, "Replacing cgraph node %s/%i by %s/%i"
  	       " for symbol %s\n",
 	       node->name (), node->order,
 	       prevailing_node->name (),
@@ -439,13 +439,13 @@ lto_symtab_merge_decls_1 (symtab_node *first)
   symtab_node *prevailing;
   bool diagnosed_p = false;
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "Merging nodes for %s. Candidates:\n",
+      fprintf (symtab->dump_file, "Merging nodes for %s. Candidates:\n",
 	       first->asm_name ());
       for (e = first; e; e = e->next_sharing_asm_name)
 	if (TREE_PUBLIC (e->decl))
-	  e->dump (cgraph_dump_file);
+	  e->dump (symtab->dump_file);
     }
 
   /* Compute the symbol resolutions.  This is a no-op when using the
@@ -535,11 +535,11 @@ lto_symtab_merge_decls_1 (symtab_node *first)
      mismatches.  */
   lto_symtab_merge_decls_2 (prevailing, diagnosed_p);
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "After resolution:\n");
+      fprintf (symtab->dump_file, "After resolution:\n");
       for (e = prevailing; e; e = e->next_sharing_asm_name)
-	e->dump (cgraph_dump_file);
+	e->dump (symtab->dump_file);
     }
 }
 

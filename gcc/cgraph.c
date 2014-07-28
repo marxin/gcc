@@ -105,9 +105,6 @@ struct cgraph_2node_hook_list {
   struct cgraph_2node_hook_list *next;
 };
 
-/* Did procss_same_body_aliases run?  */
-bool cpp_implicit_aliases_done;
-
 /* Map a cgraph_node to cgraph_function_version_info using this htab.
    The cgraph_function_version_info has a THIS_NODE field that is the
    corresponding cgraph_node..  */
@@ -544,7 +541,7 @@ cgraph_node::create_same_body_alias (tree alias, tree decl)
 
   n = cgraph_node::create_alias (alias, decl);
   n->cpp_implicit_alias = true;
-  if (cpp_implicit_aliases_done)
+  if (symtab->cpp_implicit_aliases_done)
     n->resolve_alias (cgraph_node::get (decl));
   return n;
 }
@@ -1344,16 +1341,16 @@ cgraph_redirect_edge_call_stmt_to_callee (struct cgraph_edge *e)
     }
 #endif
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "updating call of %s/%i -> %s/%i: ",
+      fprintf (symtab->dump_file, "updating call of %s/%i -> %s/%i: ",
 	       xstrdup (e->caller->name ()), e->caller->order,
 	       xstrdup (e->callee->name ()), e->callee->order);
-      print_gimple_stmt (cgraph_dump_file, e->call_stmt, 0, dump_flags);
+      print_gimple_stmt (symtab->dump_file, e->call_stmt, 0, dump_flags);
       if (e->callee->clone.combined_args_to_skip)
 	{
-	  fprintf (cgraph_dump_file, " combined args to skip: ");
-	  dump_bitmap (cgraph_dump_file,
+	  fprintf (symtab->dump_file, " combined args to skip: ");
+	  dump_bitmap (symtab->dump_file,
 		       e->callee->clone.combined_args_to_skip);
 	}
     }
@@ -1419,10 +1416,10 @@ cgraph_redirect_edge_call_stmt_to_callee (struct cgraph_edge *e)
 
   e->caller->set_call_stmt_including_clones (e->call_stmt, new_stmt, false);
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "  updated to:");
-      print_gimple_stmt (cgraph_dump_file, e->call_stmt, 0, dump_flags);
+      fprintf (symtab->dump_file, "  updated to:");
+      print_gimple_stmt (symtab->dump_file, e->call_stmt, 0, dump_flags);
     }
   return new_stmt;
 }

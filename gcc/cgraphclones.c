@@ -988,10 +988,10 @@ cgraph_materialize_clone (struct cgraph_node *node)
   			    node->clone.tree_map, true,
 			    node->clone.args_to_skip, false,
 			    NULL, NULL);
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      dump_function_to_file (node->clone_of->decl, cgraph_dump_file, dump_flags);
-      dump_function_to_file (node->decl, cgraph_dump_file, dump_flags);
+      dump_function_to_file (node->clone_of->decl, symtab->dump_file, dump_flags);
+      dump_function_to_file (node->decl, symtab->dump_file, dump_flags);
     }
 
   /* Function is no longer clone.  */
@@ -1026,8 +1026,8 @@ cgraph_materialize_all_clones (void)
   bool stabilized = false;
   
 
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "Materializing clones\n");
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file, "Materializing clones\n");
 #ifdef ENABLE_CHECKING
   cgraph_node::verify_cgraph_nodes ();
 #endif
@@ -1047,39 +1047,39 @@ cgraph_materialize_all_clones (void)
 		node->clone_of->get_body ();
 	      if (gimple_has_body_p (node->clone_of->decl))
 	        {
-		  if (cgraph_dump_file)
+		  if (symtab->dump_file)
 		    {
-		      fprintf (cgraph_dump_file, "cloning %s to %s\n",
+		      fprintf (symtab->dump_file, "cloning %s to %s\n",
 			       xstrdup (node->clone_of->name ()),
 			       xstrdup (node->name ()));
 		      if (node->clone.tree_map)
 		        {
 			  unsigned int i;
-		          fprintf (cgraph_dump_file, "   replace map: ");
+		          fprintf (symtab->dump_file, "   replace map: ");
 			  for (i = 0;
 			       i < vec_safe_length (node->clone.tree_map);
 			       i++)
 			    {
 			      struct ipa_replace_map *replace_info;
 			      replace_info = (*node->clone.tree_map)[i];
-			      print_generic_expr (cgraph_dump_file, replace_info->old_tree, 0);
-			      fprintf (cgraph_dump_file, " -> ");
-			      print_generic_expr (cgraph_dump_file, replace_info->new_tree, 0);
-			      fprintf (cgraph_dump_file, "%s%s;",
+			      print_generic_expr (symtab->dump_file, replace_info->old_tree, 0);
+			      fprintf (symtab->dump_file, " -> ");
+			      print_generic_expr (symtab->dump_file, replace_info->new_tree, 0);
+			      fprintf (symtab->dump_file, "%s%s;",
 			      	       replace_info->replace_p ? "(replace)":"",
 				       replace_info->ref_p ? "(ref)":"");
 			    }
-			  fprintf (cgraph_dump_file, "\n");
+			  fprintf (symtab->dump_file, "\n");
 			}
 		      if (node->clone.args_to_skip)
 			{
-		          fprintf (cgraph_dump_file, "   args_to_skip: ");
-		          dump_bitmap (cgraph_dump_file, node->clone.args_to_skip);
+		          fprintf (symtab->dump_file, "   args_to_skip: ");
+		          dump_bitmap (symtab->dump_file, node->clone.args_to_skip);
 			}
 		      if (node->clone.args_to_skip)
 			{
-		          fprintf (cgraph_dump_file, "   combined_args_to_skip:");
-		          dump_bitmap (cgraph_dump_file, node->clone.combined_args_to_skip);
+		          fprintf (symtab->dump_file, "   combined_args_to_skip:");
+		          dump_bitmap (symtab->dump_file, node->clone.combined_args_to_skip);
 			}
 		    }
 		  cgraph_materialize_clone (node);
@@ -1096,12 +1096,12 @@ cgraph_materialize_all_clones (void)
       }
     else
       node->clear_stmts_in_references ();
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "Materialization Call site updates done.\n");
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file, "Materialization Call site updates done.\n");
 #ifdef ENABLE_CHECKING
   cgraph_node::verify_cgraph_nodes ();
 #endif
-  symtab->remove_unreachable_nodes (false, cgraph_dump_file);
+  symtab->remove_unreachable_nodes (false, symtab->dump_file);
 }
 
 #include "gt-cgraphclones.h"
