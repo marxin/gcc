@@ -2119,7 +2119,7 @@ execute_one_pass (opt_pass *pass)
 	      }
 	  }
       if (applied)
-        symtab->remove_unreachable_nodes (true, dump_file);
+	symtab->remove_unreachable_nodes (true, dump_file);
       /* Restore current_pass.  */
       current_pass = pass;
     }

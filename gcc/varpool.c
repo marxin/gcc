@@ -110,7 +110,7 @@ symbol_table::add_varpool_insertion_hook (varpool_node_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on inserted nodes.  */
 void
-symbol_table::remove_varpool_insertion_hook (struct varpool_node_hook_list *entry)
+symbol_table::remove_varpool_insertion_hook (varpool_node_hook_list *entry)
 {
   struct varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
 
@@ -587,7 +587,7 @@ symbol_table::remove_unreferenced_decls (void)
 	      || DECL_RTL_SET_P (node->decl)))
 	{
 	  enqueue_node (node, &first);
-          if (dump_file)
+	  if (dump_file)
 	    fprintf (dump_file, " %s", node->asm_name ());
 	}
     }
@@ -628,7 +628,7 @@ symbol_table::remove_unreferenced_decls (void)
       next = symtab->next_defined_variable (node);
       if (!node->aux)
 	{
-          if (dump_file)
+	  if (dump_file)
 	    fprintf (dump_file, " %s", node->asm_name ());
 	  if (pointer_set_contains (referenced, node))
 	    node->remove_initializer ();

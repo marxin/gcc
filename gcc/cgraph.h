@@ -913,8 +913,8 @@ public:
 
   /* Create edge from a given function to CALLEE in the cgraph.  */
   struct cgraph_edge *create_edge (cgraph_node *callee,
-                                   gimple call_stmt, gcov_type count,
-                                   int freq);
+				   gimple call_stmt, gcov_type count,
+				   int freq);
 
   /* Create an indirect edge with a yet-undetermined callee where the call
      statement destination is a formal parameter of the caller with index
@@ -1286,7 +1286,8 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
 
   /* Make an indirect edge with an unknown callee an ordinary edge leading to
      CALLEE.  DELTA is an integer constant that is to be added to the this
-     pointer (first parameter) to compensate for skipping a thunk adjustment.  */
+     pointer (first parameter) to compensate for skipping
+     a thunk adjustment.  */
   cgraph_edge *make_direct (cgraph_node *callee);
 
   /* Turn edge into speculative call calling N2. Update
@@ -1303,7 +1304,8 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
   void speculative_call_info (cgraph_edge *&direct, cgraph_edge *&indirect,
 			      ipa_ref *&reference);
 
-  /* Create clone of edge in the node N represented by CALL_EXPR the callgraph.  */
+  /* Create clone of edge in the node N represented
+     by CALL_EXPR the callgraph.  */
   cgraph_edge * clone (cgraph_node *n, gimple call_stmt, unsigned stmt_uid,
 		       gcov_type count_scale, int freq_scale, bool update_original);
 
@@ -1724,7 +1726,8 @@ public:
   cgraph_2edge_hook_list *add_edge_duplication_hook (cgraph_2edge_hook, void *);
   void remove_edge_duplication_hook (cgraph_2edge_hook_list *);
 
-  cgraph_2node_hook_list *add_cgraph_duplication_hook (cgraph_2node_hook, void *);
+  cgraph_2node_hook_list *add_cgraph_duplication_hook (cgraph_2node_hook,
+						       void *);
   void remove_cgraph_duplication_hook (cgraph_2node_hook_list *);
 
   /* Call all edge removal hooks.  */
@@ -1767,15 +1770,15 @@ public:
      passes that don't update the cgraph.  */
   unsigned int rebuild_edges (void);
 
-  /* Rebuild cgraph references for current function node.  This needs to be run after
-     passes that don't update the cgraph.  */
+  /* Rebuild cgraph references for current function node.  This needs to be run
+     after passes that don't update the cgraph.  */
   void rebuild_references (void);
 
   /* Once all functions from compilation unit are in memory, produce all clones
      and update all calls.  We might also do this on demand if we don't want to
      bring all functions to memory prior compilation, but current WHOPR
-     implementation does that and it is is bit easier to keep everything right in
-     this order.  */
+     implementation does that and it is is bit easier to keep everything right
+     in this order.  */
   void materialize_all_clones (void);
 
   /* Hash asmnames ignoring the user specified marks.  */
@@ -1795,7 +1798,7 @@ public:
   int cgraph_max_superuid;
 
   int edges_count;
-  int edges_max_uid;  
+  int edges_max_uid;
 
   symtab_node* GTY(()) nodes;
   asm_node* GTY(()) asmnodes;
@@ -2194,7 +2197,7 @@ symbol_table::next_static_initializer (varpool_node *node)
 /* Walk all static variables with initializer set.  */
 #define FOR_EACH_STATIC_INITIALIZER(node) \
    for ((node) = symtab->first_static_initializer (); (node); \
-        (node) = symtab->next_static_initializer (node))
+	(node) = symtab->next_static_initializer (node))
 
 /* Return first static variable with definition.  */
 inline varpool_node *
@@ -2226,7 +2229,7 @@ symbol_table::next_defined_variable (varpool_node *node)
 /* Walk all variables with definitions in current unit.  */
 #define FOR_EACH_DEFINED_VARIABLE(node) \
    for ((node) = symtab->first_defined_variable (); (node); \
-        (node) = symtab->next_defined_variable (node))
+	(node) = symtab->next_defined_variable (node))
 
 /* Return first function with body defined.  */
 inline cgraph_node *
@@ -2259,7 +2262,7 @@ symbol_table::next_defined_function (cgraph_node *node)
 /* Walk all functions with body defined.  */
 #define FOR_EACH_DEFINED_FUNCTION(node) \
    for ((node) = symtab->first_defined_function (); (node); \
-        (node) = symtab->next_defined_function ((node)))
+	(node) = symtab->next_defined_function ((node)))
 
 /* Return first function.  */
 inline cgraph_node *
@@ -2314,7 +2317,7 @@ symbol_table::next_function_with_gimple_body (cgraph_node *node)
 /* Walk all functions.  */
 #define FOR_EACH_FUNCTION(node) \
    for ((node) = symtab->first_function (); (node); \
-        (node) = symtab->next_function ((node)))
+	(node) = symtab->next_function ((node)))
 
 /* Return true when callgraph node is a function with Gimple body defined
    in current unit.  Functions can also be define externally or they
@@ -2331,7 +2334,7 @@ cgraph_node::has_gimple_body_p (void)
 /* Walk all functions with body defined.  */
 #define FOR_EACH_FUNCTION_WITH_GIMPLE_BODY(node) \
    for ((node) = symtab->first_function_with_gimple_body (); (node); \
-        (node) = symtab->next_function_with_gimple_body (node))
+	(node) = symtab->next_function_with_gimple_body (node))
 
 /* Create a new static variable of type TYPE.  */
 tree add_new_static_var (tree type);

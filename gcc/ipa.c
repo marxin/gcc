@@ -209,7 +209,7 @@ walk_polymorphic_call_targets (pointer_set_t *reachable_call_targets,
 	  if (inline_summary_vec)
 	    inline_update_overall_summary (node);
 	  else if (edge->call_stmt)
-	    edge->redirect_call_stmt_to_callee (); 
+	    edge->redirect_call_stmt_to_callee ();
 	}
     }
 }

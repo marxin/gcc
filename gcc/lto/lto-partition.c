@@ -140,7 +140,8 @@ add_symbol_to_partition_1 (ltrans_partition part, symtab_node *node)
     {
       node->in_other_partition = 1;
       if (symtab->dump_file)
-        fprintf (symtab->dump_file, "Symbol node %s now used in multiple partitions\n",
+	fprintf (symtab->dump_file,
+		 "Symbol node %s now used in multiple partitions\n",
 		 node->name ());
     }
   node->aux = (void *)((size_t)node->aux + 1);
@@ -419,7 +420,7 @@ lto_balanced_map (int n_lto_partitions)
 {
   int n_nodes = 0;
   int n_varpool_nodes = 0, varpool_pos = 0, best_varpool_pos = 0;
-  struct cgraph_node **order = XNEWVEC (struct cgraph_node *, symtab->cgraph_max_uid);
+  struct cgraph_node **order = XNEWVEC (cgraph_node *, symtab->cgraph_max_uid);
   varpool_node **varpool_order = NULL;
   int i;
   struct cgraph_node *node;
@@ -454,7 +455,8 @@ lto_balanced_map (int n_lto_partitions)
 
   if (symtab->dump_file)
     for(i = 0; i < n_nodes; i++)
-      fprintf (symtab->dump_file, "Balanced map symbol order:%s:%u\n", order[i]->name (), order[i]->tp_first_run);
+      fprintf (symtab->dump_file, "Balanced map symbol order:%s:%u\n",
+	       order[i]->name (), order[i]->tp_first_run);
 
   if (!flag_toplevel_reorder)
     {
@@ -768,7 +770,8 @@ privatize_symbol_name (symtab_node *node)
 		name);
       return false;
     }
-  symtab->change_decl_assembler_name (decl, clone_function_name (decl, "lto_priv"));
+  symtab->change_decl_assembler_name (decl,
+				      clone_function_name (decl, "lto_priv"));
   if (node->lto_file_data)
     lto_record_renamed_decl (node->lto_file_data, name,
 			     IDENTIFIER_POINTER

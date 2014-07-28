@@ -2216,7 +2216,8 @@ lto_create_files_from_ids (lto_file *file, struct lto_file_decl_data *file_data,
 {
   lto_file_finalize (file_data, file);
   if (symtab->dump_file)
-    fprintf (symtab->dump_file, "Creating file %s with sub id " HOST_WIDE_INT_PRINT_HEX "\n", 
+    fprintf (symtab->dump_file,
+	     "Creating file %s with sub id " HOST_WIDE_INT_PRINT_HEX "\n", 
 	     file_data->file_name, file_data->id);
   (*count)++;
   return 0;
@@ -2615,7 +2616,7 @@ lto_wpa_write_files (void)
 	      symtab_node *node = lsei_node (lsei);
 	      if (!lto_symtab_encoder_in_partition_p (part->encoder, node))
 		{
-	          fprintf (symtab->dump_file, "%s ", node->asm_name ());
+		  fprintf (symtab->dump_file, "%s ", node->asm_name ());
 		  cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
 		  if (cnode
 		      && lto_symtab_encoder_encode_body_p (part->encoder, cnode))

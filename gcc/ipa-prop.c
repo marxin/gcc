@@ -3475,8 +3475,10 @@ void
 ipa_set_node_agg_value_chain (struct cgraph_node *node,
 			      struct ipa_agg_replacement_value *aggvals)
 {
-  if (vec_safe_length (ipa_node_agg_replacements) <= (unsigned) symtab->cgraph_max_uid)
-    vec_safe_grow_cleared (ipa_node_agg_replacements, symtab->cgraph_max_uid + 1);
+  if (vec_safe_length (ipa_node_agg_replacements)
+      <= (unsigned) symtab->cgraph_max_uid)
+    vec_safe_grow_cleared (ipa_node_agg_replacements,
+			   symtab->cgraph_max_uid + 1);
 
   (*ipa_node_agg_replacements)[node->uid] = aggvals;
 }

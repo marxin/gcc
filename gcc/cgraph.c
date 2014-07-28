@@ -354,9 +354,9 @@ symbol_table::add_cgraph_insertion_hook (cgraph_node_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on inserted nodes.  */
 void
-symbol_table::remove_cgraph_insertion_hook (struct cgraph_node_hook_list *entry)
+symbol_table::remove_cgraph_insertion_hook (cgraph_node_hook_list *entry)
 {
-  struct cgraph_node_hook_list **ptr = &m_first_cgraph_insertion_hook;
+  cgraph_node_hook_list **ptr = &m_first_cgraph_insertion_hook;
 
   while (*ptr != entry)
     ptr = &(*ptr)->next;
@@ -368,10 +368,10 @@ symbol_table::remove_cgraph_insertion_hook (struct cgraph_node_hook_list *entry)
 struct cgraph_2edge_hook_list *
 symbol_table::add_edge_duplication_hook (cgraph_2edge_hook hook, void *data)
 {
-  struct cgraph_2edge_hook_list *entry;
-  struct cgraph_2edge_hook_list **ptr = &m_first_edge_duplicated_hook;
+  cgraph_2edge_hook_list *entry;
+  cgraph_2edge_hook_list **ptr = &m_first_edge_duplicated_hook;
 
-  entry = (struct cgraph_2edge_hook_list *) xmalloc (sizeof (*entry));
+  entry = (cgraph_2edge_hook_list *) xmalloc (sizeof (*entry));
   entry->hook = hook;
   entry->data = data;
   entry->next = NULL;
@@ -383,7 +383,7 @@ symbol_table::add_edge_duplication_hook (cgraph_2edge_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on duplicating edges.  */
 void
-symbol_table::remove_edge_duplication_hook (struct cgraph_2edge_hook_list *entry)
+symbol_table::remove_edge_duplication_hook (cgraph_2edge_hook_list *entry)
 {
   struct cgraph_2edge_hook_list **ptr = &m_first_edge_duplicated_hook;
 
@@ -397,7 +397,7 @@ symbol_table::remove_edge_duplication_hook (struct cgraph_2edge_hook_list *entry
 void
 symbol_table::call_edge_duplication_hooks (cgraph_edge *cs1, cgraph_edge *cs2)
 {
-  struct cgraph_2edge_hook_list *entry = m_first_edge_duplicated_hook;
+  cgraph_2edge_hook_list *entry = m_first_edge_duplicated_hook;
   while (entry)
   {
     entry->hook (cs1, cs2, entry->data);
@@ -406,13 +406,13 @@ symbol_table::call_edge_duplication_hooks (cgraph_edge *cs1, cgraph_edge *cs2)
 }
 
 /* Register HOOK to be called with DATA on each duplicated node.  */
-struct cgraph_2node_hook_list *
+cgraph_2node_hook_list *
 symbol_table::add_cgraph_duplication_hook (cgraph_2node_hook hook, void *data)
 {
-  struct cgraph_2node_hook_list *entry;
-  struct cgraph_2node_hook_list **ptr = &m_first_cgraph_duplicated_hook;
+  cgraph_2node_hook_list *entry;
+  cgraph_2node_hook_list **ptr = &m_first_cgraph_duplicated_hook;
 
-  entry = (struct cgraph_2node_hook_list *) xmalloc (sizeof (*entry));
+  entry = (cgraph_2node_hook_list *) xmalloc (sizeof (*entry));
   entry->hook = hook;
   entry->data = data;
   entry->next = NULL;
@@ -424,9 +424,9 @@ symbol_table::add_cgraph_duplication_hook (cgraph_2node_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on duplicating nodes.  */
 void
-symbol_table::remove_cgraph_duplication_hook (struct cgraph_2node_hook_list *entry)
+symbol_table::remove_cgraph_duplication_hook (cgraph_2node_hook_list *entry)
 {
-  struct cgraph_2node_hook_list **ptr = &m_first_cgraph_duplicated_hook;
+  cgraph_2node_hook_list **ptr = &m_first_cgraph_duplicated_hook;
 
   while (*ptr != entry)
     ptr = &(*ptr)->next;
@@ -436,9 +436,10 @@ symbol_table::remove_cgraph_duplication_hook (struct cgraph_2node_hook_list *ent
 
 /* Call all node duplication hooks.  */
 void
-symbol_table::call_cgraph_duplication_hooks (cgraph_node *node, cgraph_node *node2)
+symbol_table::call_cgraph_duplication_hooks (cgraph_node *node,
+					     cgraph_node *node2)
 {
-  struct cgraph_2node_hook_list *entry = m_first_cgraph_duplicated_hook;
+  cgraph_2node_hook_list *entry = m_first_cgraph_duplicated_hook;
   while (entry)
   {
     entry->hook (node, node2, entry->data);
@@ -451,7 +452,7 @@ symbol_table::call_cgraph_duplication_hooks (cgraph_node *node, cgraph_node *nod
 cgraph_node *
 cgraph_node::create (tree decl)
 {
-  struct cgraph_node *node = symtab->create_empty ();
+  cgraph_node *node = symtab->create_empty ();
   gcc_assert (TREE_CODE (decl) == FUNCTION_DECL);
 
   node->decl = decl;
@@ -477,7 +478,7 @@ cgraph_node::get_create (tree decl)
   if (first_clone && !first_clone->global.inlined_to)
     return first_clone;
 
-  struct cgraph_node *node = cgraph_node::create (decl);
+  cgraph_node *node = cgraph_node::create (decl);
   if (first_clone)
     {
       first_clone->clone_of = node;
@@ -1056,11 +1057,12 @@ cgraph_edge::turn_to_speculative (cgraph_node *n2, gcov_type direct_count,
    All three components are attached to single statement (the indirect
    call) and if one of them exists, all of them must exist.
 
-   Given speculative call edge, return all three components. 
+   Given speculative call edge, return all three components.
  */
 
 void
-cgraph_edge::speculative_call_info (cgraph_edge *&direct, cgraph_edge *&indirect,
+cgraph_edge::speculative_call_info (cgraph_edge *&direct,
+				    cgraph_edge *&indirect,
 				    ipa_ref *&reference)
 {
   ipa_ref *ref;
@@ -1787,9 +1789,10 @@ cgraph_local_info (tree decl)
 struct cgraph_global_info *
 cgraph_global_info (tree decl)
 {
-  struct cgraph_node *node;
+  cgraph_node *node;
 
-  gcc_assert (TREE_CODE (decl) == FUNCTION_DECL && symtab->cgraph_global_info_ready);
+  gcc_assert (TREE_CODE (decl) == FUNCTION_DECL
+    && symtab->cgraph_global_info_ready);
   node = cgraph_node::get (decl);
   if (!node)
     return NULL;

@@ -102,7 +102,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-streamer.h"
 #include "except.h"
 
-/* Create clone of edge in the node N represented by CALL_EXPR the callgraph.  */
+/* Create clone of edge in the node N represented by CALL_EXPR
+   the callgraph.  */
 
 cgraph_edge *
 cgraph_edge::clone (cgraph_node *n, gimple call_stmt, unsigned stmt_uid,
@@ -990,7 +991,8 @@ cgraph_materialize_clone (struct cgraph_node *node)
 			    NULL, NULL);
   if (symtab->dump_file)
     {
-      dump_function_to_file (node->clone_of->decl, symtab->dump_file, dump_flags);
+      dump_function_to_file (node->clone_of->decl, symtab->dump_file,
+			     dump_flags);
       dump_function_to_file (node->decl, symtab->dump_file, dump_flags);
     }
 
@@ -1055,7 +1057,7 @@ symbol_table::materialize_all_clones (void)
 		      if (node->clone.tree_map)
 		        {
 			  unsigned int i;
-		          fprintf (symtab->dump_file, "   replace map: ");
+			  fprintf (symtab->dump_file, "   replace map: ");
 			  for (i = 0;
 			       i < vec_safe_length (node->clone.tree_map);
 			       i++)
@@ -1073,13 +1075,14 @@ symbol_table::materialize_all_clones (void)
 			}
 		      if (node->clone.args_to_skip)
 			{
-		          fprintf (symtab->dump_file, "   args_to_skip: ");
-		          dump_bitmap (symtab->dump_file, node->clone.args_to_skip);
+			  fprintf (symtab->dump_file, "   args_to_skip: ");
+			  dump_bitmap (symtab->dump_file,
+				       node->clone.args_to_skip);
 			}
 		      if (node->clone.args_to_skip)
 			{
-		          fprintf (symtab->dump_file, "   combined_args_to_skip:");
-		          dump_bitmap (symtab->dump_file, node->clone.combined_args_to_skip);
+			  fprintf (symtab->dump_file, "   combined_args_to_skip:");
+			  dump_bitmap (symtab->dump_file, node->clone.combined_args_to_skip);
 			}
 		    }
 		  cgraph_materialize_clone (node);

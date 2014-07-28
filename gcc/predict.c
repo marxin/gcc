@@ -190,8 +190,7 @@ bool
 cgraph_edge::maybe_hot_p (void)
 {
   if (profile_info && flag_branch_probabilities
-      && !maybe_hot_count_p (NULL,
-                             count))
+      && !maybe_hot_count_p (NULL, count))
     return false;
   if (caller->frequency == NODE_FREQUENCY_UNLIKELY_EXECUTED
       || (callee

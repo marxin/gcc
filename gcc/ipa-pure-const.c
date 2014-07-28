@@ -1250,7 +1250,7 @@ propagate_pure_const (void)
 		fprintf (dump_file, "    Indirect call");
 	      state_from_flags (&edge_state, &edge_looping,
 			        ie->indirect_info->ecf_flags,
-			        ie->cannot_lead_to_return_p ());
+				ie->cannot_lead_to_return_p ());
 	      /* Merge the results with what we already know.  */
 	      better_state (&edge_state, &edge_looping,
 			    w_l->state_previously_known,

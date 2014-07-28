@@ -1342,8 +1342,8 @@ recursive_inlining (struct cgraph_edge *edge,
 	 the already modified body.  */
       if (master_clone)
 	{
-          curr->redirect_callee (master_clone);
-          reset_edge_growth_cache (curr);
+	  curr->redirect_callee (master_clone);
+	  reset_edge_growth_cache (curr);
 	}
 
       if (estimate_size_after_inlining (node, curr) > limit)
@@ -1387,7 +1387,7 @@ recursive_inlining (struct cgraph_edge *edge,
 	  for (e = master_clone->callees; e; e = e->next_callee)
 	    if (!e->inline_failed)
 	      clone_inlined_nodes (e, true, false, NULL, CGRAPH_FREQ_BASE);
-          curr->redirect_callee (master_clone);
+	  curr->redirect_callee (master_clone);
           reset_edge_growth_cache (curr);
 	}
 
@@ -1496,13 +1496,13 @@ speculation_useful_p (struct cgraph_edge *e, bool anticipate_inlining)
       int ecf_flags = flags_from_decl_or_type (target->decl);
       if (ecf_flags & ECF_CONST)
         {
-          e->speculative_call_info (direct, indirect, ref);
+	  e->speculative_call_info (direct, indirect, ref);
 	  if (!(indirect->indirect_info->ecf_flags & ECF_CONST))
 	    return true;
         }
       else if (ecf_flags & ECF_PURE)
         {
-          e->speculative_call_info (direct, indirect, ref);
+	  e->speculative_call_info (direct, indirect, ref);
 	  if (!(indirect->indirect_info->ecf_flags & ECF_PURE))
 	    return true;
         }
@@ -1561,7 +1561,7 @@ inline_small_functions (void)
   int min_size, max_size;
   auto_vec<cgraph_edge *> new_indirect_edges;
   int initial_size = 0;
-  struct cgraph_node **order = XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
+  struct cgraph_node **order = XCNEWVEC (cgraph_node *, symtab->cgraph_count);
   struct cgraph_edge_hook_list *edge_removal_hook_holder;
   if (flag_indirect_inlining)
     new_indirect_edges.create (8);

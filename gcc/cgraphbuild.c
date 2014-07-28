@@ -463,8 +463,8 @@ symbol_table::rebuild_edges (void)
   return 0;
 }
 
-/* Rebuild cgraph references for current function node.  This needs to be run after
-   passes that don't update the cgraph.  */
+/* Rebuild cgraph references for current function node.  This needs to be run
+   after passes that don't update the cgraph.  */
 
 void
 symbol_table::rebuild_references (void)

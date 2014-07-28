@@ -586,7 +586,7 @@ output_asm_statements (void)
 
   for (can = symtab->first_asm_symbol (); can; can = can->next)
     assemble_asm (can->asm_str);
-  
+
   symtab->clear_asm_symbols ();
 }
 
@@ -828,7 +828,8 @@ varpool_node::finalize_decl (tree decl)
   /* Some frontends produce various interface variables after compilation
      finished.  */
   if (symtab->cgraph_state == CGRAPH_STATE_FINISHED
-      || (!flag_toplevel_reorder && symtab->cgraph_state == CGRAPH_STATE_EXPANSION))
+      || (!flag_toplevel_reorder
+	&& symtab->cgraph_state == CGRAPH_STATE_EXPANSION))
     node->assemble_decl ();
 }
 
@@ -1062,7 +1063,7 @@ analyze_functions (void)
 	  for (i = 0; node->iterate_reference (i, ref); i++)
 	    if (ref->referred->definition)
 	      enqueue_node (ref->referred);
-          symtab->process_new_functions ();
+	  symtab->process_new_functions ();
 	}
     }
   if (optimize && flag_devirtualize)
@@ -1905,8 +1906,9 @@ expand_all_functions (void)
        profiled_func_count++;
 
     if (symtab->dump_file)
-      fprintf (symtab->dump_file, "Time profile order in expand_all_functions:%s:%d\n", node->asm_name (), node->tp_first_run);
-
+	  fprintf (symtab->dump_file,
+		   "Time profile order in expand_all_functions:%s:%d\n",
+		   node->asm_name (), node->tp_first_run);
 	  node->process = 0;
 	  expand_function (node);
 	}
@@ -2025,7 +2027,7 @@ output_in_order (void)
     }
 
   symtab->clear_asm_symbols ();
-  
+
   free (nodes);
 }
 
