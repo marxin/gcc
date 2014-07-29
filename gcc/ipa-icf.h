@@ -224,7 +224,7 @@ public:
   /* Semantic item constructor for a node of _TYPE, where STACK is used
      for bitmap memory allocation. The item is based on symtab node _NODE
      with computed _HASH.  */
-  sem_item (sem_item_type _type, struct symtab_node *_node, hashval_t _hash,
+  sem_item (sem_item_type _type, symtab_node *_node, hashval_t _hash,
 	    bitmap_obstack *stack);
 
   virtual ~sem_item ();
@@ -288,7 +288,7 @@ public:
   unsigned int index;
 
   /* Symtab node.  */
-  struct symtab_node *node;
+  symtab_node *node;
 
   /* Declaration tree node.  */
   tree decl;
@@ -359,7 +359,7 @@ public:
   void parse_tree_args (void);
 
   /* Returns cgraph_node.  */
-  inline struct cgraph_node *get_node (void)
+  inline cgraph_node *get_node (void)
   {
     return dyn_cast <cgraph_node *> (node);
   }
@@ -369,7 +369,7 @@ public:
 
   /* For a given call graph NODE, the function constructs new
      semantic function item.  */
-  static sem_function *parse (struct cgraph_node *node, bitmap_obstack *stack);
+  static sem_function *parse (cgraph_node *node, bitmap_obstack *stack);
 
   /* Exception handling region tree.  */
   eh_region region_tree;
@@ -543,13 +543,13 @@ public:
   }
 
   /* Returns varpool_node.  */
-  inline struct varpool_node *get_node (void)
+  inline varpool_node *get_node (void)
   {
     return dyn_cast <varpool_node *> (node);
   }
 
   /* Parser function that visits a varpool NODE.  */
-  static sem_variable *parse (struct varpool_node *node, bitmap_obstack *stack);
+  static sem_variable *parse (varpool_node *node, bitmap_obstack *stack);
 
   /* Variable constructor.  */
   tree ctor;
@@ -644,17 +644,17 @@ public:
   void read_summary (void);
 
   /* Callgraph removal hook called for a NODE with a custom DATA.  */
-  static void cgraph_removal_hook (struct cgraph_node *node, void *data);
+  static void cgraph_removal_hook (cgraph_node *node, void *data);
 
   /* Varpool removal hook called for a NODE with a custom DATA.  */
-  static void varpool_removal_hook (struct varpool_node *node, void *data);
+  static void varpool_removal_hook (varpool_node *node, void *data);
 
   /* Worklist of congruence classes that can potentially
      refine classes of congruence.  */
   hash_table <congruence_class_var_hash> worklist;
 
   /* Remove symtab NODE triggered by symtab removal hooks.  */
-  void remove_symtab_node (struct symtab_node *node);
+  void remove_symtab_node (symtab_node *node);
 
   /* Register callgraph and varpool hooks.  */
   void register_hooks (void);
@@ -738,7 +738,7 @@ private:
 
   /* Reads a section from LTO stream file FILE_DATA. Input block for DATA
      contains LEN bytes.  */
-  void read_section (struct lto_file_decl_data *file_data, const char *data,
+  void read_section (lto_file_decl_data *file_data, const char *data,
 		     size_t len);
 
   /* Removes all callgraph and varpool nodes that are marked by symtab
@@ -770,10 +770,10 @@ private:
   static unsigned int class_id;
 
   /* Callgraph node removal hook holder.  */
-  struct cgraph_node_hook_list *m_cgraph_node_hooks;
+  cgraph_node_hook_list *m_cgraph_node_hooks;
 
   /* Varpool node removal hook holder.  */
-  struct varpool_node_hook_list *m_varpool_node_hooks;
+  varpool_node_hook_list *m_varpool_node_hooks;
 
   /* Bitmap stack.  */
   bitmap_obstack m_bmstack;

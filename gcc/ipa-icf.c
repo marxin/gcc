@@ -196,7 +196,7 @@ sem_item::sem_item (sem_item_type _type,
    for bitmap memory allocation. The item is based on symtab node _NODE
    with computed _HASH.  */
 
-sem_item::sem_item (sem_item_type _type, struct symtab_node *_node,
+sem_item::sem_item (sem_item_type _type, symtab_node *_node,
 		    hashval_t _hash, bitmap_obstack *stack): type(_type),
   node (_node), hash (_hash)
 {
@@ -616,9 +616,9 @@ sem_function::merge (sem_item *alias_item)
 
   sem_function *alias_func = static_cast<sem_function *> (alias_item);
 
-  struct cgraph_node *original = get_node ();
-  struct cgraph_node *local_original = original;
-  struct cgraph_node *alias = alias_func->get_node ();
+  cgraph_node *original = get_node ();
+  cgraph_node *local_original = original;
+  cgraph_node *alias = alias_func->get_node ();
   bool original_address_matters;
   bool alias_address_matters;
 
@@ -705,7 +705,7 @@ sem_function::merge (sem_item *alias_item)
       bool redirected = false;
       while (alias->callers)
 	{
-	  struct cgraph_edge *e = alias->callers;
+	  cgraph_edge *e = alias->callers;
 	  cgraph_redirect_edge_callee (e, local_original);
 	  push_cfun (DECL_STRUCT_FUNCTION (e->caller->decl));
 
@@ -771,7 +771,7 @@ sem_function::init (void)
     get_node ()->get_body ();
 
   tree fndecl = node->decl;
-  struct function *func = DECL_STRUCT_FUNCTION (fndecl);
+  function *func = DECL_STRUCT_FUNCTION (fndecl);
 
   gcc_assert (func);
   gcc_assert (SSANAMES (func));
@@ -840,10 +840,10 @@ sem_function::compare_polymorphic_p (void)
    semantic function item.  */
 
 sem_function *
-sem_function::parse (struct cgraph_node *node, bitmap_obstack *stack)
+sem_function::parse (cgraph_node *node, bitmap_obstack *stack)
 {
   tree fndecl = node->decl;
-  struct function *func = DECL_STRUCT_FUNCTION (fndecl);
+  function *func = DECL_STRUCT_FUNCTION (fndecl);
 
   if (!func || !node->has_gimple_body_p ())
     return NULL;
@@ -1536,7 +1536,7 @@ sem_variable::equals (tree t1, tree t2)
 /* Parser function that visits a varpool NODE.  */
 
 sem_variable *
-sem_variable::parse (struct varpool_node *node, bitmap_obstack *stack)
+sem_variable::parse (varpool_node *node, bitmap_obstack *stack)
 {
   tree decl = node->decl;
 
@@ -1590,8 +1590,8 @@ sem_variable::merge (sem_item *alias_item)
 
   sem_variable *alias_var = static_cast<sem_variable *> (alias_item);
 
-  struct varpool_node *original = get_node ();
-  struct varpool_node *alias = alias_var->get_node ();
+  varpool_node *original = get_node ();
+  varpool_node *alias = alias_var->get_node ();
   bool original_discardable = false;
 
   /* See if original is in a section that can be discarded if the main
@@ -1742,7 +1742,7 @@ sem_item_optimizer::write_summary (void)
 {
   unsigned int count = 0;
 
-  struct output_block *ob = create_output_block (LTO_section_ipa_icf);
+  output_block *ob = create_output_block (LTO_section_ipa_icf);
   lto_symtab_encoder_t encoder = ob->decl_state->symtab_node_encoder;
   ob->symbol = NULL;
 
@@ -1751,7 +1751,7 @@ sem_item_optimizer::write_summary (void)
        !lsei_end_p (lsei);
        lsei_next_in_partition (&lsei))
     {
-      struct symtab_node *node = lsei_node (lsei);
+      symtab_node *node = lsei_node (lsei);
 
       if (m_symtab_node_map.get (node))
 	count++;
@@ -1764,7 +1764,7 @@ sem_item_optimizer::write_summary (void)
        !lsei_end_p (lsei);
        lsei_next_in_partition (&lsei))
     {
-      struct symtab_node *node = lsei_node (lsei);
+      symtab_node *node = lsei_node (lsei);
 
       sem_item **item = m_symtab_node_map.get (node);
 
@@ -1786,16 +1786,16 @@ sem_item_optimizer::write_summary (void)
    contains LEN bytes.  */
 
 void
-sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
+sem_item_optimizer::read_section (lto_file_decl_data *file_data,
 				  const char *data, size_t len)
 {
-  const struct lto_function_header *header =
-  (const struct lto_function_header *) data;
-  const int cfg_offset = sizeof (struct lto_function_header);
+  const lto_function_header *header =
+  (const lto_function_header *) data;
+  const int cfg_offset = sizeof (lto_function_header);
   const int main_offset = cfg_offset + header->cfg_size;
   const int string_offset = main_offset + header->main_size;
-  struct data_in *data_in;
-  struct lto_input_block ib_main;
+  data_in *data_in;
+  lto_input_block ib_main;
   unsigned int i;
   unsigned int count;
 
@@ -1811,7 +1811,7 @@ sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
   for (i = 0; i < count; i++)
     {
       unsigned int index;
-      struct symtab_node *node;
+      symtab_node *node;
       lto_symtab_encoder_t encoder;
 
       index = streamer_read_uhwi (&ib_main);
@@ -1850,8 +1850,8 @@ sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
 void
 sem_item_optimizer::read_summary (void)
 {
-  struct lto_file_decl_data **file_data_vec = lto_get_file_decl_data ();
-  struct lto_file_decl_data *file_data;
+  lto_file_decl_data **file_data_vec = lto_get_file_decl_data ();
+  lto_file_decl_data *file_data;
   unsigned int j = 0;
 
   while ((file_data = file_data_vec[j++]))
@@ -1927,7 +1927,7 @@ sem_item_optimizer::get_group_by_hash (hashval_t hash, sem_item_type type)
 /* Callgraph removal hook called for a NODE with a custom DATA.  */
 
 void
-sem_item_optimizer::cgraph_removal_hook (struct cgraph_node *node, void *data)
+sem_item_optimizer::cgraph_removal_hook (cgraph_node *node, void *data)
 {
   sem_item_optimizer *optimizer = (sem_item_optimizer *) data;
   optimizer->remove_symtab_node (node);
@@ -1936,7 +1936,7 @@ sem_item_optimizer::cgraph_removal_hook (struct cgraph_node *node, void *data)
 /* Varpool removal hook called for a NODE with a custom DATA.  */
 
 void
-sem_item_optimizer::varpool_removal_hook (struct varpool_node *node, void *data)
+sem_item_optimizer::varpool_removal_hook (varpool_node *node, void *data)
 {
   sem_item_optimizer *optimizer = (sem_item_optimizer *) data;
   optimizer->remove_symtab_node (node);
@@ -1945,7 +1945,7 @@ sem_item_optimizer::varpool_removal_hook (struct varpool_node *node, void *data)
 /* Remove symtab NODE triggered by symtab removal hooks.  */
 
 void
-sem_item_optimizer::remove_symtab_node (struct symtab_node *node)
+sem_item_optimizer::remove_symtab_node (symtab_node *node)
 {
   gcc_assert (!m_classes.elements());
 
@@ -1974,7 +1974,7 @@ sem_item_optimizer::filter_removed_items (void)
 
       if (item->type == FUNC)
 	{
-	  struct cgraph_node *cnode = static_cast <sem_function *>(item)->get_node ();
+	  cgraph_node *cnode = static_cast <sem_function *>(item)->get_node ();
 
 	  no_body_function = in_lto_p && (cnode->alias || cnode->body_removed);
 	}
@@ -2038,7 +2038,7 @@ sem_item_optimizer::execute (void)
 void
 sem_item_optimizer::parse_funcs_and_vars (void)
 {
-  struct cgraph_node *cnode;
+  cgraph_node *cnode;
 
   if (flag_ipa_icf_functions)
     FOR_EACH_DEFINED_FUNCTION (cnode)
