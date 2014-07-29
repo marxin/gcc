@@ -110,7 +110,8 @@ public:
   /* Initialize internal structures according to given number of
      source and target SSA names. The number of source names is SSA_SOURCE,
      respectively SSA_TARGET.  */
-  func_checker (unsigned ssa_source, unsigned ssa_target);
+  func_checker (unsigned ssa_source, unsigned ssa_target,
+		bool compare_polymorphic);
 
   /* Memory release routine.  */
   ~func_checker();
@@ -137,6 +138,9 @@ private:
 
   /* Source to target declaration map.  */
   hash_map <tree, tree> m_decl_map;
+
+  /* Flag if polymorphic comparison should be executed.  */
+  bool m_compare_polymorphic;
 };
 
 /* Congruence class encompasses a collection of either functions or
@@ -271,8 +275,10 @@ public:
   static bool get_base_types (tree *t1, tree *t2);
 
   /* Return true if types are compatible from perspective of ICF.
-     FIRST_ARGUMENT indicates if the comparison is called for first parameter of a function.  */
+     FIRST_ARGUMENT indicates if the comparison is called for
+     first parameter of a function.  */
   static bool types_are_compatible_p (tree t1, tree t2,
+				      bool compare_polymorphic = true,
 				      bool first_argument = false);
 
   /* Item type.  */
@@ -355,8 +361,11 @@ public:
   /* Returns cgraph_node.  */
   inline struct cgraph_node *get_node (void)
   {
-    return cgraph (node);
+    return dyn_cast <cgraph_node *> (node);
   }
+
+  /* Return true if polymorphic comparison must be processed.  */
+  bool compare_polymorphic_p (void);
 
   /* For a given call graph NODE, the function constructs new
      semantic function item.  */
@@ -472,8 +481,9 @@ private:
   bool bb_dict_test (int* bb_dict, int source, int target);
 
   /* Iterates all tree types in T1 and T2 and returns true if all types
-     are compatible.  */
-  bool compare_type_list (tree t1, tree t2);
+     are compatible. If COMPARE_POLYMORPHIC is set to true,
+     more strict comparison is executed.  */
+  bool compare_type_list (tree t1, tree t2, bool compare_polymorphic);
 
   /* Processes function equality comparison.  */
   bool equals_private (sem_item *item);
@@ -535,7 +545,7 @@ public:
   /* Returns varpool_node.  */
   inline struct varpool_node *get_node (void)
   {
-    return varpool (node);
+    return dyn_cast <varpool_node *> (node);
   }
 
   /* Parser function that visits a varpool NODE.  */

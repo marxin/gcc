@@ -90,7 +90,9 @@ namespace ipa_icf {
    source and target SSA names. The number of source names is SSA_SOURCE,
    respectively SSA_TARGET.  */
 
-func_checker::func_checker (unsigned ssa_source, unsigned ssa_target)
+func_checker::func_checker (unsigned ssa_source, unsigned ssa_target,
+			    bool compare_polymorphic)
+  : m_compare_polymorphic (compare_polymorphic)
 {
   m_source_ssa_names.create (ssa_source);
   m_target_ssa_names.create (ssa_target);
@@ -159,7 +161,8 @@ func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
     return RETURN_WITH_DEBUG (t1 == t2);
 
-  if (!sem_item::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2)))
+  if (!sem_item::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
+					 m_compare_polymorphic))
     return RETURN_FALSE ();
 
   bool existed_p;
@@ -252,7 +255,9 @@ sem_item::dump (void)
 }
 
 /* Return true if types are compatible from perspective of ICF.  */
-bool sem_item::types_are_compatible_p (tree t1, tree t2, bool first_argument)
+bool sem_item::types_are_compatible_p (tree t1, tree t2,
+				       bool compare_polymorphic,
+				       bool first_argument)
 {
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return RETURN_FALSE_WITH_MSG ("different tree types");
@@ -270,7 +275,8 @@ bool sem_item::types_are_compatible_p (tree t1, tree t2, bool first_argument)
       t2 = TREE_TYPE (t2);
     }
 
-  if (contains_polymorphic_type_p (t1) || contains_polymorphic_type_p (t2))
+  if (compare_polymorphic
+      && (contains_polymorphic_type_p (t1) || contains_polymorphic_type_p (t2)))
     {
       if (!contains_polymorphic_type_p (t1) || !contains_polymorphic_type_p (t2))
 	return RETURN_FALSE_WITH_MSG ("one type is not polymorphic");
@@ -282,7 +288,6 @@ bool sem_item::types_are_compatible_p (tree t1, tree t2, bool first_argument)
 
   return true;
 }
-
 
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
@@ -367,7 +372,7 @@ sem_function::equals_wpa (sem_item *item)
     {
       /* This guard is here for function pointer with attributes (pr59927.c).  */
       if (!arg_types[i] || !m_compared_func->arg_types[i])
-	return RETURN_FALSE_WITH_MSG ("NULL arg type");
+	return RETURN_FALSE_WITH_MSG ("NULL argument type");
 
       if (!types_are_compatible_p (arg_types[i], m_compared_func->arg_types[i],
 				   i == 0))
@@ -466,7 +471,8 @@ sem_function::equals_private (sem_item *item)
   if (decl1 != decl2)
     return RETURN_FALSE();
 
-  m_checker = new func_checker (ssa_names_size, m_compared_func->ssa_names_size);
+  m_checker = new func_checker (ssa_names_size, m_compared_func->ssa_names_size,
+				compare_polymorphic_p ());
 
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
@@ -640,18 +646,18 @@ sem_function::merge (sem_item *alias_item)
   if (original->resolution == LDPR_PREEMPTED_REG
       || original->resolution == LDPR_PREEMPTED_IR)
     original_discardable = true;
-  if (symtab_can_be_discarded (original))
+  if (original->can_be_discarded_p ())
     original_discardable = true;
 
   /* See if original and/or alias address can be compared for equality.  */
   original_address_matters
     = (!DECL_VIRTUAL_P (original->decl)
        && (original->externally_visible
-	   || address_taken_from_non_vtable_p (original)));
+	   || original->address_taken_from_non_vtable_p ()));
   alias_address_matters
     = (!DECL_VIRTUAL_P (alias->decl)
        && (alias->externally_visible
-	   || address_taken_from_non_vtable_p (alias)));
+	   || alias->address_taken_from_non_vtable_p ()));
 
   /* If alias and original can be compared for address equality, we need
      to create a thunk.  Also we can not create extra aliases into discardable
@@ -666,8 +672,8 @@ sem_function::merge (sem_item *alias_item)
          the extra thunk wrapper for direct calls.  */
       redirect_callers
 	= (!original_discardable
-	   && cgraph_function_body_availability (alias) > AVAIL_OVERWRITABLE
-	   && cgraph_function_body_availability (original) > AVAIL_OVERWRITABLE);
+	   && alias->get_availability () > AVAIL_INTERPOSABLE
+	   && original->get_availability () > AVAIL_INTERPOSABLE);
     }
   else
     {
@@ -690,7 +696,7 @@ sem_function::merge (sem_item *alias_item)
 	      && (DECL_COMDAT_GROUP (original->decl)
 		  == DECL_COMDAT_GROUP (alias->decl)))))
     local_original
-      = cgraph (symtab_nonoverwritable_alias (original));
+      = dyn_cast <cgraph_node *> (original->noninterposable_alias ());
 
   if (redirect_callers)
     {
@@ -713,7 +719,7 @@ sem_function::merge (sem_item *alias_item)
       /* The alias function is removed if symbol address
          does not matter.  */
       if (!alias_address_matters)
-	cgraph_remove_node (alias);
+	alias->remove ();
 
       if (dump_file && redirected)
 	fprintf (dump_file, "Callgraph local calls have been redirected.\n\n");
@@ -724,12 +730,12 @@ sem_function::merge (sem_item *alias_item)
     {
       /* Remove the function's body.  */
       ipa_merge_profiles (original, alias);
-      cgraph_release_function_body (alias);
-      cgraph_reset_node (alias);
+      alias->release_body ();
+      alias->reset ();
 
       /* Create the alias.  */
-      cgraph_create_function_alias (alias_func->decl, decl);
-      symtab_resolve_alias (alias, original);
+      cgraph_node::create_alias (alias_func->decl, decl);
+      alias->resolve_alias (original);
 
       if (dump_file)
 	fprintf (dump_file, "Callgraph alias has been created.\n\n");
@@ -745,7 +751,7 @@ sem_function::merge (sem_item *alias_item)
 	}
 
       ipa_merge_profiles (local_original, alias);
-      cgraph_make_wrapper (alias, local_original);
+      alias->create_wrapper (local_original);
 
       if (dump_file)
 	fprintf (dump_file, "Callgraph thunk has been created.\n\n");
@@ -762,7 +768,7 @@ void
 sem_function::init (void)
 {
   if (in_lto_p)
-    cgraph_get_body (get_node ());
+    get_node ()->get_body ();
 
   tree fndecl = node->decl;
   struct function *func = DECL_STRUCT_FUNCTION (fndecl);
@@ -820,6 +826,16 @@ sem_function::init (void)
   parse_tree_args ();
 }
 
+
+/* Return true if polymorphic comparison must be processed.  */
+
+bool
+sem_function::compare_polymorphic_p (void)
+{
+  return get_node ()->callees != NULL
+    || m_compared_func->get_node ()->callees != NULL;
+}
+
 /* For a given call graph NODE, the function constructs new
    semantic function item.  */
 
@@ -829,7 +845,7 @@ sem_function::parse (struct cgraph_node *node, bitmap_obstack *stack)
   tree fndecl = node->decl;
   struct function *func = DECL_STRUCT_FUNCTION (fndecl);
 
-  if (!func || !cgraph_function_with_gimple_body_p (node))
+  if (!func || !node->has_gimple_body_p ())
     return NULL;
 
   if (lookup_attribute_by_prefix ("omp ", DECL_ATTRIBUTES (node->decl)) != NULL)
@@ -1005,7 +1021,8 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
 		return false;
 
 	      /* Type list checking */
-	      if (!compare_type_list (c1->type_list, c2->type_list))
+	      if (!compare_type_list (c1->type_list, c2->type_list,
+				      compare_polymorphic_p ()))
 		return false;
 
 	      c1 = c1->next_catch;
@@ -1019,7 +1036,8 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
 	    return false;
 
 	  if (!compare_type_list (r1->u.allowed.type_list,
-				  r2->u.allowed.type_list))
+				  r2->u.allowed.type_list,
+				  compare_polymorphic_p ()))
 	    return false;
 
 	  break;
@@ -1088,8 +1106,8 @@ sem_function::compare_function_decl (tree t1, tree t2)
     return true;
 
   /* If function decl is WEAKREF, we compare targets.  */
-  struct cgraph_node *f1 = cgraph_get_node (t1);
-  struct cgraph_node *f2 = cgraph_get_node (t2);
+  cgraph_node *f1 = cgraph_node::get (t1);
+  cgraph_node *f2 = cgraph_node::get (t2);
 
   if(f1 && f2 && f1->weakref && f2->weakref)
     ret = f1->alias_target == f2->alias_target;
@@ -1374,10 +1392,11 @@ sem_function::compare_operand (tree t1, tree t2,
 }
 
 /* Iterates all tree types in T1 and T2 and returns true if all types
-   are compatible.  */
+   are compatible. If COMPARE_POLYMORPHIC is set to true,
+   more strict comparison is executed.  */
 
 bool
-sem_function::compare_type_list (tree t1, tree t2)
+sem_function::compare_type_list (tree t1, tree t2, bool compare_polymorphic)
 {
   tree tv1, tv2;
   tree_code tc1, tc2;
@@ -1397,7 +1416,7 @@ sem_function::compare_type_list (tree t1, tree t2)
 	{}
       else if (tc1 == NOP_EXPR || tc2 == NOP_EXPR)
 	return false;
-      else if (!types_are_compatible_p (tv1, tv2))
+      else if (!types_are_compatible_p (tv1, tv2, compare_polymorphic))
 	return false;
 
       t1 = TREE_CHAIN (t1);
@@ -1470,7 +1489,7 @@ sem_variable::equals (tree t1, tree t2)
 	tree y1 = TREE_OPERAND (t1, 1);
 	tree y2 = TREE_OPERAND (t2, 1);
 
-	if (!sem_item::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2)))
+	if (!sem_item::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2), true))
 	  return RETURN_FALSE ();
 
 	/* Type of the offset on MEM_REF does not matter.  */
@@ -1490,7 +1509,7 @@ sem_variable::equals (tree t1, tree t2)
     case LABEL_DECL:
       return t1 == t2;
     case INTEGER_CST:
-      return types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+      return types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2), true)
 	     && wi::to_offset (t1) == wi::to_offset (t2);
     case STRING_CST:
     case REAL_CST:
@@ -1582,7 +1601,7 @@ sem_variable::merge (sem_item *alias_item)
   if (original->resolution == LDPR_PREEMPTED_REG
       || original->resolution == LDPR_PREEMPTED_IR)
     original_discardable = true;
-  if (symtab_can_be_discarded (original))
+  if (original->can_be_discarded_p ())
     original_discardable = true;
 
   gcc_assert (!TREE_ASM_WRITTEN (alias->decl));
@@ -1602,7 +1621,7 @@ sem_variable::merge (sem_item *alias_item)
 
       while (n->alias)
 	{
-	  n = varpool_alias_target (n);
+	  n = n->get_alias_target ();
 	  if (n == alias)
 	    {
 	      if (dump_file)
@@ -1617,8 +1636,8 @@ sem_variable::merge (sem_item *alias_item)
       DECL_INITIAL (alias->decl) = NULL;
       alias->remove_all_references ();
 
-      varpool_create_variable_alias (alias_var->decl, decl);
-      symtab_resolve_alias (alias, original);
+      varpool_node::create_alias (alias_var->decl, decl);
+      alias->resolve_alias (original);
 
       if (dump_file)
 	fprintf (dump_file, "Varpool alias has been created.\n\n");
@@ -1809,13 +1828,13 @@ sem_item_optimizer::read_section (struct lto_file_decl_data *file_data,
 
       if (is_a<cgraph_node *> (node))
 	{
-	  cgraph_node *cnode = cgraph (node);
+	  cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
 
 	  m_items.safe_push (new sem_function (cnode, hash, &m_bmstack));
 	}
       else
 	{
-	  varpool_node *vnode = varpool (node);
+	  varpool_node *vnode = dyn_cast <varpool_node *> (node);
 
 	  m_items.safe_push (new sem_variable (vnode, hash, &m_bmstack));
 	}
@@ -2010,7 +2029,7 @@ sem_item_optimizer::execute (void)
   merge_classes (prev_class_count);
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    dump_symtab (dump_file);
+    symtab_node::dump_table (dump_file);
 }
 
 /* Function responsible for visiting all potential functions and
