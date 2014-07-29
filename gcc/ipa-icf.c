@@ -326,10 +326,12 @@ sem_function::~sem_function ()
 hashval_t
 sem_function::get_bb_hash (const sem_bb *basic_block)
 {
-  hashval_t hash = basic_block->nondbg_stmt_count;
-  hash = iterative_hash_object (basic_block->edge_count, hash);
+  inchash hstate;
 
-  return hash;
+  hstate.add_int (basic_block->nondbg_stmt_count);
+  hstate.add_int (basic_block->edge_count);
+
+  return hstate.end ();
 }
 
 /* References independent hash function.  */
@@ -339,17 +341,20 @@ sem_function::get_hash (void)
 {
   if(!hash)
     {
-      hash = 177454; /* Random number for function type.  */
+      inchash hstate;
+      hstate.add_int (177454); /* Random number for function type.  */
 
-      hash = iterative_hash_object (arg_count, hash);
-      hash = iterative_hash_object (cfg_checksum, hash);
-      hash = iterative_hash_object (gcode_hash, hash);
+      hstate.add_int (arg_count);
+      hstate.add_int (cfg_checksum);
+      hstate.add_int (gcode_hash);
 
       for (unsigned i = 0; i < bb_sorted.length (); i++)
-	hash = iterative_hash_object (hash, get_bb_hash (bb_sorted[i]));
+	hstate.merge_hash (get_bb_hash (bb_sorted[i]));
 
       for (unsigned i = 0; i < bb_sizes.length (); i++)
-	hash = iterative_hash_object (bb_sizes[i], hash);
+	hstate.add_int (bb_sizes[i]);
+
+      hash = hstate.end ();
     }
 
   return hash;
@@ -788,7 +793,7 @@ sem_function::init (void)
   edge_count = n_edges_for_fn (func);
   cfg_checksum = coverage_compute_cfg_checksum (func);
 
-  gcode_hash = 0;
+  inchash hstate;
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, func)
@@ -804,16 +809,17 @@ sem_function::init (void)
 	 gsi_next (&gsi))
       {
 	gimple stmt = gsi_stmt (gsi);
-	hashval_t code = (hashval_t) gimple_code (stmt);
+	enum gimple_code code = gimple_code (stmt);
 
 	/* We ignore all debug statements.  */
 	if (code != GIMPLE_DEBUG)
 	  {
 	    nondbg_stmt_count++;
-	    gcode_hash = iterative_hash_object (code, gcode_hash);
+	    hstate.add_int (code);
 	  }
       }
 
+    gcode_hash = hstate.end ();
     bb_sizes.safe_push (nondbg_stmt_count);
 
     /* Inserting basic block to hash table.  */
@@ -1566,16 +1572,18 @@ sem_variable::get_hash (void)
   if (hash)
     return hash;
 
-  hashval_t hash = 456346417;
+  inchash hstate;
 
-  tree_code tc = TREE_CODE (ctor);
-  hash = iterative_hash_object (tc, hash);
+  hstate.add_int (456346417);
+  hstate.add_int (TREE_CODE (ctor));
 
   if (TREE_CODE (ctor) == CONSTRUCTOR)
     {
       unsigned length = vec_safe_length (CONSTRUCTOR_ELTS (ctor));
-      hash = iterative_hash_object (length, hash);
+      hstate.add_int (length);
     }
+
+  hash = hstate.end ();
 
   return hash;
 }
