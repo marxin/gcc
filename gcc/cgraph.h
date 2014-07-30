@@ -870,6 +870,12 @@ public:
      thunks that are not lowered.  */
   bool expand_thunk (bool output_asm_thunks, bool force_gimple_thunk);
 
+  /* Assemble thunks and aliases associated to node.  */
+  void assemble_thunks_and_aliases (void);
+
+  /* Expand function specified by node.  */
+  void expand (void);
+
   /* As an GCC extension we allow redefinition of the function.  The
      semantics when both copies of bodies differ is not well defined.
      We replace the old body with new body so in unit at a time mode

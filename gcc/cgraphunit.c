@@ -219,7 +219,6 @@ cgraph_node_set cgraph_new_nodes;
 
 static void expand_all_functions (void);
 static void mark_functions_to_output (void);
-static void expand_function (struct cgraph_node *);
 static void handle_alias_pairs (void);
 
 /* Used for vtable lookup in thunk adjusting.  */
@@ -338,7 +337,7 @@ symbol_table::process_new_functions (void)
 	     directly.  */
 	  node->process = 0;
 	  call_cgraph_insertion_hooks (node);
-	  expand_function (node);
+	  node->expand ();
 	  break;
 
 	default:
@@ -537,7 +536,7 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 	  g->get_passes ()->execute_early_local_passes ();
 	bitmap_obstack_release (NULL);
 	pop_cfun ();
-	expand_function (node);
+	node->expand ();
 	break;
 
       default:
@@ -1693,56 +1692,55 @@ cgraph_node::expand_thunk (bool output_asm_thunks, bool force_gimple_thunk)
   return true;
 }
 
-/* Assemble thunks and aliases associated to NODE.  */
+/* Assemble thunks and aliases associated to node.  */
 
-static void
-assemble_thunks_and_aliases (struct cgraph_node *node)
+void
+cgraph_node::assemble_thunks_and_aliases (void)
 {
-  struct cgraph_edge *e;
-  struct ipa_ref *ref;
+  cgraph_edge *e;
+  ipa_ref *ref;
 
-  for (e = node->callers; e;)
+  for (e = callers; e;)
     if (e->caller->thunk.thunk_p)
       {
-	struct cgraph_node *thunk = e->caller;
+	cgraph_node *thunk = e->caller;
 
 	e = e->next_caller;
 	thunk->expand_thunk (true, false);
-	assemble_thunks_and_aliases (thunk);
+	thunk->assemble_thunks_and_aliases ();
       }
     else
       e = e->next_caller;
 
-  FOR_EACH_ALIAS (node, ref)
+  FOR_EACH_ALIAS (this, ref)
     {
-      struct cgraph_node *alias = dyn_cast <cgraph_node *> (ref->referring);
-      bool saved_written = TREE_ASM_WRITTEN (node->decl);
+      cgraph_node *alias = dyn_cast <cgraph_node *> (ref->referring);
+      bool saved_written = TREE_ASM_WRITTEN (decl);
 
       /* Force assemble_alias to really output the alias this time instead
 	 of buffering it in same alias pairs.  */
-      TREE_ASM_WRITTEN (node->decl) = 1;
+      TREE_ASM_WRITTEN (decl) = 1;
       do_assemble_alias (alias->decl,
-			 DECL_ASSEMBLER_NAME (node->decl));
-      assemble_thunks_and_aliases (alias);
-      TREE_ASM_WRITTEN (node->decl) = saved_written;
+			 DECL_ASSEMBLER_NAME (decl));
+      alias->assemble_thunks_and_aliases ();
+      TREE_ASM_WRITTEN (decl) = saved_written;
     }
 }
 
-/* Expand function specified by NODE.  */
+/* Expand function specified by node.  */
 
-static void
-expand_function (struct cgraph_node *node)
+void
+cgraph_node::expand (void)
 {
-  tree decl = node->decl;
   location_t saved_loc;
 
   /* We ought to not compile any inline clones.  */
-  gcc_assert (!node->global.inlined_to);
+  gcc_assert (!global.inlined_to);
 
   announce_function (decl);
-  node->process = 0;
-  gcc_assert (node->lowered);
-  node->get_body ();
+  process = 0;
+  gcc_assert (lowered);
+  get_body ();
 
   /* Generate RTL for the body of DECL.  */
 
@@ -1833,12 +1831,12 @@ expand_function (struct cgraph_node *node)
      make one pass assemblers, like one on AIX, happy.  See PR 50689.
      FIXME: Perhaps thunks should be move before function IFF they are not in comdat
      groups.  */
-  assemble_thunks_and_aliases (node);
-  node->release_body ();
+  assemble_thunks_and_aliases ();
+  release_body ();
   /* Eliminate all call edges.  This is important so the GIMPLE_CALL no longer
      points to the dead function body.  */
-  node->remove_callees ();
-  node->remove_all_references ();
+  remove_callees ();
+  remove_all_references ();
 }
 
 /* Node comparer that is responsible for the order that corresponds
@@ -1906,7 +1904,7 @@ expand_all_functions (void)
 		   "Time profile order in expand_all_functions:%s:%d\n",
 		   node->asm_name (), node->tp_first_run);
 	  node->process = 0;
-	  expand_function (node);
+	  node->expand ();
 	}
     }
 
@@ -2003,7 +2001,7 @@ output_in_order (void)
 	{
 	case ORDER_FUNCTION:
 	  nodes[i].u.f->process = 0;
-	  expand_function (nodes[i].u.f);
+	  nodes[i].u.f->expand ();
 	  break;
 
 	case ORDER_VAR:
