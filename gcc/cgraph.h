@@ -289,6 +289,14 @@ public:
      or abstract function kept for debug info purposes only.  */
   bool real_symbol_p (void);
 
+  /* Determine if symbol declaration is needed.  That is, visible to something
+     either outside this translation unit, something magic in the system
+     configury */
+  bool is_needed_p (void);
+
+  /* Return true when there are references to the node.  */
+  bool referred_to_p (void);
+
   /* Return true if NODE can be discarded by linker from the binary.  */
   inline bool
   can_be_discarded_p (void)
@@ -1466,9 +1474,6 @@ public:
      visible.  */
   static void finalize_decl (tree decl);
 
-  /* Output all variables enqueued to be assembled.  */
-  static bool output_variables (void);
-
   /* Attempt to mark ALIAS as an alias to DECL.  Return TRUE if successful.
      Extra name aliases are output whenever DECL is output.  */
   static varpool_node * create_extra_name_alias (tree alias, tree decl);
@@ -1636,8 +1641,17 @@ public:
      in order to do the fixups, but ipa-ref is not PCH safe.  Consequentely we
      first produce aliases without links, but once C++ FE is sure he won't sream
      PCH we build the links via this function.  */
-
   void process_same_body_aliases (void);
+
+  /* Output all variables enqueued to be assembled.  */
+  bool output_variables (void);
+
+  /* Output all asm statements we have stored up to be output.  */
+  void output_asm_statements (void);
+
+  /* Weakrefs may be associated to external decls and thus not output
+     at expansion time.  Emit all necessary aliases.  */
+  void output_weakrefs (void);
 
   /* Unregister a symbol NODE.  */
   inline void unregister (symtab_node *node);

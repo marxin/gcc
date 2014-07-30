@@ -660,7 +660,7 @@ varpool_node::finalize_named_section_flags (void)
 
 /* Output all variables enqueued to be assembled.  */
 bool
-varpool_node::output_variables (void)
+symbol_table::output_variables (void)
 {
   bool changed = false;
   varpool_node *node;

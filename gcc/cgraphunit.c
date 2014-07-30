@@ -225,31 +225,29 @@ static void handle_alias_pairs (void);
 /* Used for vtable lookup in thunk adjusting.  */
 static GTY (()) tree vtable_entry_type;
 
-/* Determine if symbol DECL is needed.  That is, visible to something
+/* Determine if symbol declaration is needed.  That is, visible to something
    either outside this translation unit, something magic in the system
    configury */
 bool
-decide_is_symbol_needed (symtab_node *node)
+symtab_node::is_needed_p (void)
 {
-  tree decl = node->decl;
-
   /* Double check that no one output the function into assembly file
      early.  */
   gcc_checking_assert (!DECL_ASSEMBLER_NAME_SET_P (decl)
 	               || !TREE_SYMBOL_REFERENCED (DECL_ASSEMBLER_NAME (decl)));
 
-  if (!node->definition)
+  if (!definition)
     return false;
 
   if (DECL_EXTERNAL (decl))
     return false;
 
   /* If the user told us it is used, then it must be so.  */
-  if (node->force_output)
+  if (force_output)
     return true;
 
   /* ABI forced symbols are needed when they are external.  */
-  if (node->forced_by_abi && TREE_PUBLIC (decl))
+  if (forced_by_abi && TREE_PUBLIC (decl))
     return true;
 
  /* Keep constructors, destructors and virtual functions.  */
@@ -386,18 +384,18 @@ cgraph_node::reset (void)
   remove_all_references ();
 }
 
-/* Return true when there are references to NODE.  */
+/* Return true when there are references to the node.  */
 
-static bool
-referred_to_p (symtab_node *node)
+bool
+symtab_node::referred_to_p (void)
 {
   struct ipa_ref *ref = NULL;
 
   /* See if there are any references at all.  */
-  if (node->iterate_referring (0, ref))
+  if (iterate_referring (0, ref))
     return true;
   /* For functions check also calls.  */
-  cgraph_node *cn = dyn_cast <cgraph_node *> (node);
+  cgraph_node *cn = dyn_cast <cgraph_node *> (this);
   if (cn && cn->callers)
     return true;
   return false;
@@ -460,8 +458,7 @@ cgraph_finalize_function (tree decl, bool no_collect)
     ggc_collect ();
 
   if (symtab->cgraph_state == CGRAPH_STATE_CONSTRUCTION
-      && (decide_is_symbol_needed (node)
-	  || referred_to_p (node)))
+      && (node->is_needed_p () || node->referred_to_p ()))
     enqueue_node (node);
 }
 
@@ -576,18 +573,18 @@ symbol_table::add_asm_symbol (tree asm_str)
 
 /* Output all asm statements we have stored up to be output.  */
 
-static void
-output_asm_statements (void)
+void
+symbol_table::output_asm_statements (void)
 {
   struct asm_node *can;
 
   if (seen_error ())
     return;
 
-  for (can = symtab->first_asm_symbol (); can; can = can->next)
+  for (can = first_asm_symbol (); can; can = can->next)
     assemble_asm (can->asm_str);
 
-  symtab->clear_asm_symbols ();
+  clear_asm_symbols ();
 }
 
 /* Analyze the function scheduled to be output.  */
@@ -820,8 +817,7 @@ varpool_node::finalize_decl (tree decl)
     node->force_output = true;
 
   if (symtab->cgraph_state == CGRAPH_STATE_CONSTRUCTION
-      && (decide_is_symbol_needed (node)
-	  || referred_to_p (node)))
+      && (node->is_needed_p () || node->referred_to_p ()))
     enqueue_node (node);
   if (symtab->cgraph_state >= CGRAPH_STATE_IPA_SSA)
     node->analyze ();
@@ -967,7 +963,7 @@ analyze_functions (void)
 	{
 	  /* Convert COMDAT group designators to IDENTIFIER_NODEs.  */
 	  node->get_comdat_group_id ();
-	  if (decide_is_symbol_needed (node))
+	  if (node->is_needed_p ())
 	    {
 	      enqueue_node (node);
 	      if (!changed && symtab->dump_file)
@@ -1084,7 +1080,7 @@ analyze_functions (void)
        && node != first_handled_var; node = next)
     {
       next = node->next;
-      if (!node->aux && !referred_to_p (node))
+      if (!node->aux && !node->referred_to_p ())
 	{
 	  if (symtab->dump_file)
 	    fprintf (symtab->dump_file, " %s", node->name ());
@@ -2107,8 +2103,8 @@ get_alias_symbol (tree decl)
 /* Weakrefs may be associated to external decls and thus not output
    at expansion time.  Emit all necessary aliases.  */
 
-static void
-output_weakrefs (void)
+void
+symbol_table::output_weakrefs (void)
 {
   symtab_node *node;
   FOR_EACH_SYMBOL (node)
@@ -2242,15 +2238,15 @@ compile (void)
     output_in_order ();
   else
     {
-      output_asm_statements ();
+      symtab->output_asm_statements ();
 
       expand_all_functions ();
-      varpool_node::output_variables ();
+      symtab->output_variables ();
     }
 
   symtab->process_new_functions ();
   symtab->cgraph_state = CGRAPH_STATE_FINISHED;
-  output_weakrefs ();
+  symtab->output_weakrefs ();
 
   if (symtab->dump_file)
     {
