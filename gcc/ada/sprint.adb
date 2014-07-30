@@ -513,6 +513,14 @@ package body Sprint is
    begin
       if Debug_Generated_Code and then Present (Dump_Node) then
          Set_Sloc (Dump_Node, Debug_Sloc + Source_Ptr (Column - 1));
+
+         --  We do not know the actual end location in the generated code and
+         --  it could be much closer than in the source code, so play safe.
+
+         if Nkind_In (Dump_Node, N_Case_Statement, N_If_Statement) then
+            Set_End_Location (Dump_Node, Debug_Sloc + Source_Ptr (Column - 1));
+         end if;
+
          Dump_Node := Empty;
       end if;
    end Set_Debug_Sloc;
@@ -2261,6 +2269,7 @@ package body Sprint is
 
                   begin
                      if Nkind (Odef) = N_Identifier
+                       and then Present (Etype (Odef))
                        and then Is_Array_Type (Etype (Odef))
                        and then not Is_Constrained (Etype (Odef))
                        and then Present (Etype (Def_Id))
@@ -4083,7 +4092,7 @@ package body Sprint is
 
                   --  Array types and string types
 
-                  when E_Array_Type | E_String_Type =>
+                  when E_Array_Type =>
                      Write_Header;
                      Write_Str ("array (");
 
