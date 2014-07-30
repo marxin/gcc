@@ -650,7 +650,7 @@ tree_profiling (void)
       cleanup_tree_cfg ();
       update_ssa (TODO_update_ssa);
 
-      rebuild_cgraph_edges ();
+      symtab->rebuild_edges ();
 
       pop_cfun ();
     }

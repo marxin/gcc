@@ -758,9 +758,8 @@ edge_set_predicate (struct cgraph_edge *e, struct predicate *predicate)
     {
       struct cgraph_node *callee = !e->inline_failed ? e->callee : NULL;
 
-      cgraph_redirect_edge_callee (e,
-				   cgraph_node::get_create
-				     (builtin_decl_implicit (BUILT_IN_UNREACHABLE)));
+      e->redirect_callee (cgraph_node::get_create
+			    (builtin_decl_implicit (BUILT_IN_UNREACHABLE)));
       e->inline_failed = CIF_UNREACHABLE;
       if (callee)
 	callee->remove_symbol_and_inline_clones ();
@@ -3019,7 +3018,7 @@ estimate_edge_size_and_time (struct cgraph_edge *e, int *size, int *min_size,
   if (!e->callee
       && estimate_edge_devirt_benefit (e, &call_size, &call_time,
 				       known_vals, known_binfos, known_aggs)
-      && hints && cgraph_maybe_hot_edge_p (e))
+      && hints && e->maybe_hot_p ())
     *hints |= INLINE_HINT_indirect_call;
   cur_size = call_size * INLINE_SIZE_SCALE;
   *size += cur_size;
@@ -3633,7 +3632,7 @@ simple_edge_hints (struct cgraph_edge *edge)
 			    ? edge->caller->global.inlined_to : edge->caller);
   if (inline_summary (to)->scc_no
       && inline_summary (to)->scc_no == inline_summary (edge->callee)->scc_no
-      && !cgraph_edge_recursive_p (edge))
+      && !edge->recursive_p ())
     hints |= INLINE_HINT_same_scc;
 
   if (to->lto_file_data && edge->callee->lto_file_data
@@ -3677,7 +3676,7 @@ do_estimate_edge_time (struct cgraph_edge *edge)
      edges and for those we disable size limits.  Don't do that when
      probability that caller will call the callee is low however, since it
      may hurt optimization of the caller's hot path.  */
-  if (edge->count && cgraph_maybe_hot_edge_p (edge)
+  if (edge->count && edge->maybe_hot_p ()
       && (edge->count * 2
           > (edge->caller->global.inlined_to
 	     ? edge->caller->global.inlined_to->count : edge->caller->count)))

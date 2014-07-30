@@ -1179,7 +1179,7 @@ general_init (const char *argv0)
 
   /* Create the singleton holder for global state.
      Doing so also creates the pass manager and with it the passes.  */
-  g = new gcc::context (); 
+  g = new gcc::context ();
   symtab = ggc_cleared_alloc <symbol_table> ();
 
   statistics_early_init ();
@@ -1930,7 +1930,7 @@ do_compile (void)
 
           ggc_protect_identifiers = true;
 
-          init_cgraph ();
+	  symtab->initialize ();
           init_final (main_input_filename);
           coverage_init (aux_base_name);
           statistics_init ();

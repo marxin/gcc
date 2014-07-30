@@ -8018,7 +8018,7 @@ ix86_libcall_value (enum machine_mode mode)
 /* Return true iff type is returned in memory.  */
 
 static bool
-ix86_return_in_memory (const_tree type, const_tree fntype)
+ix86_return_in_memory (const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
 {
 #ifdef SUBTARGET_RETURN_IN_MEMORY
   return SUBTARGET_RETURN_IN_MEMORY (type, fntype);
@@ -32265,7 +32265,7 @@ ix86_generate_version_dispatcher_body (void *node_p)
     }
 
   dispatch_function_versions (resolver_decl, &fn_ver_vec, &empty_bb);
-  rebuild_cgraph_edges (); 
+  symtab->rebuild_edges ();
   pop_cfun ();
   return resolver_decl;
 }

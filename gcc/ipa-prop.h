@@ -549,7 +549,8 @@ ipa_check_create_node_params (void)
 static inline void
 ipa_check_create_edge_args (void)
 {
-  if (vec_safe_length (ipa_edge_args_vector) <= (unsigned) symtab->edges_max_uid)
+  if (vec_safe_length (ipa_edge_args_vector)
+      <= (unsigned) symtab->edges_max_uid)
     vec_safe_grow_cleared (ipa_edge_args_vector, symtab->edges_max_uid + 1);
 }
 

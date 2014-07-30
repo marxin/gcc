@@ -2862,7 +2862,7 @@ ipa_make_edge_direct_to_target (struct cgraph_edge *ie, tree target)
 		       "converting indirect call in %s to direct call to %s\n",
 		       ie->caller->name (), callee->name ());
     }
-  ie = cgraph_make_edge_direct (ie, callee);
+  ie = ie->make_direct (callee);
   es = inline_edge_summary (ie);
   es->call_stmt_size -= (eni_size_weights.indirect_call_cost
 			 - eni_size_weights.call_cost);
@@ -3475,8 +3475,10 @@ void
 ipa_set_node_agg_value_chain (struct cgraph_node *node,
 			      struct ipa_agg_replacement_value *aggvals)
 {
-  if (vec_safe_length (ipa_node_agg_replacements) <= (unsigned) symtab->cgraph_max_uid)
-    vec_safe_grow_cleared (ipa_node_agg_replacements, symtab->cgraph_max_uid + 1);
+  if (vec_safe_length (ipa_node_agg_replacements)
+      <= (unsigned) symtab->cgraph_max_uid)
+    vec_safe_grow_cleared (ipa_node_agg_replacements,
+			   symtab->cgraph_max_uid + 1);
 
   (*ipa_node_agg_replacements)[node->uid] = aggvals;
 }
@@ -4221,7 +4223,7 @@ ipa_modify_call_arguments (struct cgraph_edge *cs, gimple stmt,
     }
   gsi_replace (&gsi, new_stmt, true);
   if (cs)
-    cgraph_set_call_stmt (cs, new_stmt);
+    cs->set_call_stmt (new_stmt);
   do
     {
       current_node->record_stmt_references (gsi_stmt (gsi));
@@ -4693,6 +4695,7 @@ ipa_write_indirect_edge_info (struct output_block *ob,
   bp_pack_value (&bp, ii->by_ref, 1);
   bp_pack_value (&bp, ii->maybe_in_construction, 1);
   bp_pack_value (&bp, ii->maybe_derived_type, 1);
+  bp_pack_value (&bp, ii->speculative_maybe_derived_type, 1);
   streamer_write_bitpack (&bp);
 
   if (ii->polymorphic)
@@ -4700,6 +4703,9 @@ ipa_write_indirect_edge_info (struct output_block *ob,
       streamer_write_hwi (ob, ii->otr_token);
       stream_write_tree (ob, ii->otr_type, true);
       stream_write_tree (ob, ii->outer_type, true);
+      stream_write_tree (ob, ii->speculative_outer_type, true);
+      if (ii->speculative_outer_type)
+        streamer_write_hwi (ob, ii->speculative_offset);
     }
 }
 
@@ -4723,11 +4729,15 @@ ipa_read_indirect_edge_info (struct lto_input_block *ib,
   ii->by_ref = bp_unpack_value (&bp, 1);
   ii->maybe_in_construction = bp_unpack_value (&bp, 1);
   ii->maybe_derived_type = bp_unpack_value (&bp, 1);
+  ii->speculative_maybe_derived_type = bp_unpack_value (&bp, 1);
   if (ii->polymorphic)
     {
       ii->otr_token = (HOST_WIDE_INT) streamer_read_hwi (ib);
       ii->otr_type = stream_read_tree (ib, data_in);
       ii->outer_type = stream_read_tree (ib, data_in);
+      ii->speculative_outer_type = stream_read_tree (ib, data_in);
+      if (ii->speculative_outer_type)
+        ii->speculative_offset = (HOST_WIDE_INT) streamer_read_hwi (ib);
     }
 }
 

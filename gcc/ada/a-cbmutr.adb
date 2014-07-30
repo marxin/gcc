@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---             Copyright (C) 2011-2013, Free Software Foundation, Inc.      --
+--             Copyright (C) 2011-2014, Free Software Foundation, Inc.      --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -92,10 +92,6 @@ package body Ada.Containers.Bounded_Multiway_Trees is
    procedure Allocate_Node
      (Container : in out Tree;
       New_Item  : Element_Type;
-      New_Node  : out Count_Type);
-
-   procedure Allocate_Node
-     (Container : in out Tree;
       New_Node  : out Count_Type);
 
    procedure Allocate_Node
@@ -314,15 +310,6 @@ package body Ada.Containers.Bounded_Multiway_Trees is
          Element_Type'Read (Stream, Container.Elements (Index));
       end Initialize_Element;
 
-   begin
-      Allocate_Node (Container, Initialize_Element'Access, New_Node);
-   end Allocate_Node;
-
-   procedure Allocate_Node
-     (Container : in out Tree;
-      New_Node  : out Count_Type)
-   is
-      procedure Initialize_Element (Index : Count_Type) is null;
    begin
       Allocate_Node (Container, Initialize_Element'Access, New_Node);
    end Allocate_Node;
@@ -1511,6 +1498,7 @@ package body Ada.Containers.Bounded_Multiway_Trees is
       Count     : Count_Type := 1)
    is
       Nodes : Tree_Node_Array renames Container.Nodes;
+      First : Count_Type;
       Last  : Count_Type;
 
    begin
@@ -1551,10 +1539,10 @@ package body Ada.Containers.Bounded_Multiway_Trees is
          Initialize_Root (Container);
       end if;
 
-      Allocate_Node (Container, New_Item, Position.Node);
-      Nodes (Position.Node).Parent := Parent.Node;
+      Allocate_Node (Container, New_Item, First);
+      Nodes (First).Parent := Parent.Node;
 
-      Last := Position.Node;
+      Last := First;
       for J in Count_Type'(2) .. Count loop
          Allocate_Node (Container, New_Item, Nodes (Last).Next);
          Nodes (Nodes (Last).Next).Parent := Parent.Node;
@@ -1565,14 +1553,14 @@ package body Ada.Containers.Bounded_Multiway_Trees is
 
       Insert_Subtree_List
         (Container => Container,
-         First     => Position.Node,
+         First     => First,
          Last      => Last,
          Parent    => Parent.Node,
          Before    => Before.Node);
 
       Container.Count := Container.Count + Count;
 
-      Position.Container := Parent.Container;
+      Position := Cursor'(Parent.Container, First);
    end Insert_Child;
 
    procedure Insert_Child
@@ -1583,6 +1571,7 @@ package body Ada.Containers.Bounded_Multiway_Trees is
       Count     : Count_Type := 1)
    is
       Nodes : Tree_Node_Array renames Container.Nodes;
+      First : Count_Type;
       Last  : Count_Type;
 
       New_Item : Element_Type;
@@ -1633,12 +1622,12 @@ package body Ada.Containers.Bounded_Multiway_Trees is
       --  initialization, so insert the specified number of possibly
       --  initialized elements at the given position.
 
-      Allocate_Node (Container, New_Item, Position.Node);
-      Nodes (Position.Node).Parent := Parent.Node;
+      Allocate_Node (Container, New_Item, First);
+      Nodes (First).Parent := Parent.Node;
 
-      Last := Position.Node;
+      Last := First;
       for J in Count_Type'(2) .. Count loop
-         Allocate_Node (Container, Nodes (Last).Next);
+         Allocate_Node (Container, New_Item, Nodes (Last).Next);
          Nodes (Nodes (Last).Next).Parent := Parent.Node;
          Nodes (Nodes (Last).Next).Prev := Last;
 
@@ -1647,14 +1636,14 @@ package body Ada.Containers.Bounded_Multiway_Trees is
 
       Insert_Subtree_List
         (Container => Container,
-         First     => Position.Node,
+         First     => First,
          Last      => Last,
          Parent    => Parent.Node,
          Before    => Before.Node);
 
       Container.Count := Container.Count + Count;
 
-      Position.Container := Parent.Container;
+      Position := Cursor'(Parent.Container, First);
    end Insert_Child;
 
    -------------------------

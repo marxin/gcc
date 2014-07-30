@@ -1730,7 +1730,7 @@ execute_function_todo (function *fn, void *data)
     rebuild_frequencies ();
 
   if (flags & TODO_rebuild_cgraph_edges)
-    rebuild_cgraph_edges ();
+    symtab->rebuild_edges ();
 
   /* If we've seen errors do not bother running any verifiers.  */
   if (!seen_error ())
@@ -1812,7 +1812,7 @@ execute_todo (unsigned int flags)
   if (flags & TODO_remove_functions)
     {
       gcc_assert (!cfun);
-      symtab_remove_unreachable_nodes (true, dump_file);
+      symtab->remove_unreachable_nodes (true, dump_file);
     }
 
   if ((flags & TODO_dump_symtab) && dump_file && !current_function_decl)
@@ -2111,7 +2111,7 @@ execute_one_pass (opt_pass *pass)
 		node->get_body ();
 		push_cfun (DECL_STRUCT_FUNCTION (node->decl));
 		execute_all_ipa_transforms ();
-		rebuild_cgraph_edges ();
+		symtab->rebuild_edges ();
 		free_dominance_info (CDI_DOMINATORS);
 		free_dominance_info (CDI_POST_DOMINATORS);
 		pop_cfun ();
@@ -2119,7 +2119,7 @@ execute_one_pass (opt_pass *pass)
 	      }
 	  }
       if (applied)
-        symtab_remove_unreachable_nodes (true, dump_file);
+	symtab->remove_unreachable_nodes (true, dump_file);
       /* Restore current_pass.  */
       current_pass = pass;
     }
@@ -2174,7 +2174,7 @@ execute_one_pass (opt_pass *pass)
     }
 
   if (!current_function_decl)
-    cgraph_process_new_functions ();
+    symtab->process_new_functions ();
 
   pass_fini_dump_file (pass);
 
@@ -2553,7 +2553,7 @@ execute_ipa_pass_list (opt_pass *pass)
 	    gcc_unreachable ();
 	}
       gcc_assert (!current_function_decl);
-      cgraph_process_new_functions ();
+      symtab->process_new_functions ();
       pass = pass->next;
     }
   while (pass);

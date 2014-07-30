@@ -161,7 +161,8 @@ symbol_table::eq_assembler_name (const void *p1, const void *p2)
 /* Insert NODE to assembler name hash.  */
 
 void
-symbol_table::insert_to_assembler_name_hash (symtab_node *node, bool with_clones)
+symbol_table::insert_to_assembler_name_hash (symtab_node *node,
+					     bool with_clones)
 {
   if (is_a <varpool_node *> (node) && DECL_HARD_REGISTER (node->decl))
     return;
@@ -197,7 +198,8 @@ symbol_table::insert_to_assembler_name_hash (symtab_node *node, bool with_clones
 /* Remove NODE from assembler name hash.  */
 
 void
-symbol_table::unlink_from_assembler_name_hash (symtab_node *node, bool with_clones)
+symbol_table::unlink_from_assembler_name_hash (symtab_node *node,
+					       bool with_clones)
 {
   if (assembler_name_hash)
     {
@@ -944,8 +946,8 @@ symtab_node::get_for_asmname (const_tree asmname)
 
   symtab->symtab_initialize_asm_name_hash ();
   slot = htab_find_slot_with_hash (symtab->assembler_name_hash, asmname,
-                                  symtab->decl_assembler_name_hash (asmname),
-                                  NO_INSERT);
+				   symtab->decl_assembler_name_hash (asmname),
+				   NO_INSERT);
 
   if (slot)
     {
@@ -1459,7 +1461,8 @@ symtab_node::get_init_priority ()
   if (!this->in_init_priority_hash)
     return DEFAULT_INIT_PRIORITY;
   in.symbol = this;
-  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash, &in);
+  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash,
+						&in);
   return h ? h->init : DEFAULT_INIT_PRIORITY;
 }
 
@@ -1484,7 +1487,8 @@ cgraph_node::get_fini_priority ()
   if (!this->in_init_priority_hash)
     return DEFAULT_INIT_PRIORITY;
   in.symbol = this;
-  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash, &in);
+  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash,
+						&in);
   return h ? h->fini : DEFAULT_INIT_PRIORITY;
 }
 

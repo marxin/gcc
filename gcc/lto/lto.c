@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "bitmap.h"
 #include "hash-map.h"
+#include "inchash.h"
 #include "ipa-prop.h"
 #include "common.h"
 #include "debug.h"
@@ -266,7 +267,7 @@ static hash_map<const_tree, hashval_t> *canonical_type_hash_cache;
 static unsigned long num_canonical_type_hash_entries;
 static unsigned long num_canonical_type_hash_queries;
 
-static hashval_t iterative_hash_canonical_type (tree type, hashval_t val);
+static void iterative_hash_canonical_type (tree type, inchash &hstate);
 static hashval_t gimple_canonical_type_hash (const void *p);
 static void gimple_register_canonical_type_1 (tree t, hashval_t hash);
 
@@ -278,14 +279,14 @@ static void gimple_register_canonical_type_1 (tree t, hashval_t hash);
 static hashval_t
 hash_canonical_type (tree type)
 {
-  hashval_t v;
+  inchash hstate;
 
   /* Combine a few common features of types so that types are grouped into
      smaller sets; when searching for existing matching types to merge,
      only existing types having the same features as the new type will be
      checked.  */
-  v = iterative_hash_hashval_t (TREE_CODE (type), 0);
-  v = iterative_hash_hashval_t (TYPE_MODE (type), v);
+  hstate.add_int (TREE_CODE (type));
+  hstate.add_int (TYPE_MODE (type));
 
   /* Incorporate common features of numerical types.  */
   if (INTEGRAL_TYPE_P (type)
@@ -294,48 +295,48 @@ hash_canonical_type (tree type)
       || TREE_CODE (type) == OFFSET_TYPE
       || POINTER_TYPE_P (type))
     {
-      v = iterative_hash_hashval_t (TYPE_PRECISION (type), v);
-      v = iterative_hash_hashval_t (TYPE_UNSIGNED (type), v);
+      hstate.add_int (TYPE_UNSIGNED (type));
+      hstate.add_int (TYPE_PRECISION (type));
     }
 
   if (VECTOR_TYPE_P (type))
     {
-      v = iterative_hash_hashval_t (TYPE_VECTOR_SUBPARTS (type), v);
-      v = iterative_hash_hashval_t (TYPE_UNSIGNED (type), v);
+      hstate.add_int (TYPE_VECTOR_SUBPARTS (type));
+      hstate.add_int (TYPE_UNSIGNED (type));
     }
 
   if (TREE_CODE (type) == COMPLEX_TYPE)
-    v = iterative_hash_hashval_t (TYPE_UNSIGNED (type), v);
+    hstate.add_int (TYPE_UNSIGNED (type));
 
   /* For pointer and reference types, fold in information about the type
      pointed to but do not recurse to the pointed-to type.  */
   if (POINTER_TYPE_P (type))
     {
-      v = iterative_hash_hashval_t (TYPE_ADDR_SPACE (TREE_TYPE (type)), v);
-      v = iterative_hash_hashval_t (TREE_CODE (TREE_TYPE (type)), v);
+      hstate.add_int (TYPE_ADDR_SPACE (TREE_TYPE (type)));
+      hstate.add_int (TREE_CODE (TREE_TYPE (type)));
     }
 
   /* For integer types hash only the string flag.  */
   if (TREE_CODE (type) == INTEGER_TYPE)
-    v = iterative_hash_hashval_t (TYPE_STRING_FLAG (type), v);
+    hstate.add_int (TYPE_STRING_FLAG (type));
 
   /* For array types hash the domain bounds and the string flag.  */
   if (TREE_CODE (type) == ARRAY_TYPE && TYPE_DOMAIN (type))
     {
-      v = iterative_hash_hashval_t (TYPE_STRING_FLAG (type), v);
+      hstate.add_int (TYPE_STRING_FLAG (type));
       /* OMP lowering can introduce error_mark_node in place of
 	 random local decls in types.  */
       if (TYPE_MIN_VALUE (TYPE_DOMAIN (type)) != error_mark_node)
-	v = iterative_hash_expr (TYPE_MIN_VALUE (TYPE_DOMAIN (type)), v);
+	iterative_hstate_expr (TYPE_MIN_VALUE (TYPE_DOMAIN (type)), hstate);
       if (TYPE_MAX_VALUE (TYPE_DOMAIN (type)) != error_mark_node)
-	v = iterative_hash_expr (TYPE_MAX_VALUE (TYPE_DOMAIN (type)), v);
+	iterative_hstate_expr (TYPE_MAX_VALUE (TYPE_DOMAIN (type)), hstate);
     }
 
   /* Recurse for aggregates with a single element type.  */
   if (TREE_CODE (type) == ARRAY_TYPE
       || TREE_CODE (type) == COMPLEX_TYPE
       || TREE_CODE (type) == VECTOR_TYPE)
-    v = iterative_hash_canonical_type (TREE_TYPE (type), v);
+    iterative_hash_canonical_type (TREE_TYPE (type), hstate);
 
   /* Incorporate function return and argument types.  */
   if (TREE_CODE (type) == FUNCTION_TYPE || TREE_CODE (type) == METHOD_TYPE)
@@ -345,17 +346,17 @@ hash_canonical_type (tree type)
 
       /* For method types also incorporate their parent class.  */
       if (TREE_CODE (type) == METHOD_TYPE)
-	v = iterative_hash_canonical_type (TYPE_METHOD_BASETYPE (type), v);
+	iterative_hash_canonical_type (TYPE_METHOD_BASETYPE (type), hstate);
 
-      v = iterative_hash_canonical_type (TREE_TYPE (type), v);
+      iterative_hash_canonical_type (TREE_TYPE (type), hstate);
 
       for (p = TYPE_ARG_TYPES (type), na = 0; p; p = TREE_CHAIN (p))
 	{
-	  v = iterative_hash_canonical_type (TREE_VALUE (p), v);
+	  iterative_hash_canonical_type (TREE_VALUE (p), hstate);
 	  na++;
 	}
 
-      v = iterative_hash_hashval_t (na, v);
+      hstate.add_int (na);
     }
 
   if (RECORD_OR_UNION_TYPE_P (type))
@@ -366,20 +367,20 @@ hash_canonical_type (tree type)
       for (f = TYPE_FIELDS (type), nf = 0; f; f = TREE_CHAIN (f))
 	if (TREE_CODE (f) == FIELD_DECL)
 	  {
-	    v = iterative_hash_canonical_type (TREE_TYPE (f), v);
+	    iterative_hash_canonical_type (TREE_TYPE (f), hstate);
 	    nf++;
 	  }
 
-      v = iterative_hash_hashval_t (nf, v);
+      hstate.add_int (nf);
     }
 
-  return v;
+  return hstate.end();
 }
 
 /* Returning a hash value for gimple type TYPE combined with VAL.  */
 
-static hashval_t
-iterative_hash_canonical_type (tree type, hashval_t val)
+static void
+iterative_hash_canonical_type (tree type, inchash &hstate)
 {
   hashval_t v;
   /* An already processed type.  */
@@ -397,7 +398,7 @@ iterative_hash_canonical_type (tree type, hashval_t val)
       v = hash_canonical_type (type);
       gimple_register_canonical_type_1 (type, v);
     }
-  return iterative_hash_hashval_t (v, val);
+  hstate.add_int (v);
 }
 
 /* Returns the hash for a canonical type P.  */
@@ -2214,8 +2215,9 @@ lto_create_files_from_ids (lto_file *file, struct lto_file_decl_data *file_data,
 			   int *count)
 {
   lto_file_finalize (file_data, file);
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "Creating file %s with sub id " HOST_WIDE_INT_PRINT_HEX "\n", 
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file,
+	     "Creating file %s with sub id " HOST_WIDE_INT_PRINT_HEX "\n", 
 	     file_data->file_name, file_data->id);
   (*count)++;
   return 0;
@@ -2594,41 +2596,41 @@ lto_wpa_write_files (void)
 
       if (!quiet_flag)
 	fprintf (stderr, " %s (%s %i insns)", temp_filename, part->name, part->insns);
-      if (cgraph_dump_file)
+      if (symtab->dump_file)
 	{
           lto_symtab_encoder_iterator lsei;
 	  
-	  fprintf (cgraph_dump_file, "Writing partition %s to file %s, %i insns\n",
+	  fprintf (symtab->dump_file, "Writing partition %s to file %s, %i insns\n",
 		   part->name, temp_filename, part->insns);
-	  fprintf (cgraph_dump_file, "  Symbols in partition: ");
+	  fprintf (symtab->dump_file, "  Symbols in partition: ");
 	  for (lsei = lsei_start_in_partition (part->encoder); !lsei_end_p (lsei);
 	       lsei_next_in_partition (&lsei))
 	    {
 	      symtab_node *node = lsei_node (lsei);
-	      fprintf (cgraph_dump_file, "%s ", node->asm_name ());
+	      fprintf (symtab->dump_file, "%s ", node->asm_name ());
 	    }
-	  fprintf (cgraph_dump_file, "\n  Symbols in boundary: ");
+	  fprintf (symtab->dump_file, "\n  Symbols in boundary: ");
 	  for (lsei = lsei_start (part->encoder); !lsei_end_p (lsei);
 	       lsei_next (&lsei))
 	    {
 	      symtab_node *node = lsei_node (lsei);
 	      if (!lto_symtab_encoder_in_partition_p (part->encoder, node))
 		{
-	          fprintf (cgraph_dump_file, "%s ", node->asm_name ());
+		  fprintf (symtab->dump_file, "%s ", node->asm_name ());
 		  cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
 		  if (cnode
 		      && lto_symtab_encoder_encode_body_p (part->encoder, cnode))
-		    fprintf (cgraph_dump_file, "(body included)");
+		    fprintf (symtab->dump_file, "(body included)");
 		  else
 		    {
 		      varpool_node *vnode = dyn_cast <varpool_node *> (node);
 		      if (vnode
 			  && lto_symtab_encoder_encode_initializer_p (part->encoder, vnode))
-			fprintf (cgraph_dump_file, "(initializer included)");
+			fprintf (symtab->dump_file, "(initializer included)");
 		    }
 		}
 	    }
-	  fprintf (cgraph_dump_file, "\n");
+	  fprintf (symtab->dump_file, "\n");
 	}
       gcc_checking_assert (lto_symtab_encoder_size (part->encoder) || !i);
 
@@ -2889,7 +2891,7 @@ read_cgraph_and_symbols (unsigned nfiles, const char **fnames)
   void **res;
   symtab_node *snode;
 
-  init_cgraph ();
+  symtab->initialize ();
 
   timevar_push (TV_IPA_LTO_DECL_IN);
 
@@ -3079,16 +3081,16 @@ read_cgraph_and_symbols (unsigned nfiles, const char **fnames)
 
   /* Finally merge the cgraph according to the decl merging decisions.  */
   timevar_push (TV_IPA_LTO_CGRAPH_MERGE);
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "Before merging:\n");
-      symtab_node::dump_table (cgraph_dump_file);
+      fprintf (symtab->dump_file, "Before merging:\n");
+      symtab_node::dump_table (symtab->dump_file);
     }
   lto_symtab_merge_symbols ();
   /* Removal of unreacable symbols is needed to make verify_symtab to pass;
      we are still having duplicated comdat groups containing local statics.
      We could also just remove them while merging.  */
-  symtab_remove_unreachable_nodes (false, dump_file);
+  symtab->remove_unreachable_nodes (false, dump_file);
   ggc_collect ();
   symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
 
@@ -3239,18 +3241,18 @@ do_whole_program_analysis (void)
 
   symtab->cgraph_function_flags_ready = true;
 
-  if (cgraph_dump_file)
-    symtab_node::dump_table (cgraph_dump_file);
+  if (symtab->dump_file)
+    symtab_node::dump_table (symtab->dump_file);
   bitmap_obstack_initialize (NULL);
   symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
 
   execute_ipa_pass_list (g->get_passes ()->all_regular_ipa_passes);
-  symtab_remove_unreachable_nodes (false, dump_file);
+  symtab->remove_unreachable_nodes (false, dump_file);
 
-  if (cgraph_dump_file)
+  if (symtab->dump_file)
     {
-      fprintf (cgraph_dump_file, "Optimized ");
-      symtab_node::dump_table (cgraph_dump_file);
+      fprintf (symtab->dump_file, "Optimized ");
+      symtab_node::dump_table (symtab->dump_file);
     }
 #ifdef ENABLE_CHECKING
   symtab_node::verify_symtab_nodes ();

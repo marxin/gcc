@@ -110,7 +110,7 @@ symbol_table::add_varpool_insertion_hook (varpool_node_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on inserted nodes.  */
 void
-symbol_table::remove_varpool_insertion_hook (struct varpool_node_hook_list *entry)
+symbol_table::remove_varpool_insertion_hook (varpool_node_hook_list *entry)
 {
   struct varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
 
@@ -564,8 +564,8 @@ enqueue_node (varpool_node *node, varpool_node **first)
    reachability starting from variables that are either externally visible
    or was referred from the asm output routines.  */
 
-static void
-varpool_remove_unreferenced_decls (void)
+void
+symbol_table::remove_unreferenced_decls (void)
 {
   varpool_node *next, *node;
   varpool_node *first = (varpool_node *)(void *)1;
@@ -576,8 +576,8 @@ varpool_remove_unreferenced_decls (void)
   if (seen_error ())
     return;
 
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "Trivially needed variables:");
+  if (dump_file)
+    fprintf (dump_file, "Trivially needed variables:");
   FOR_EACH_DEFINED_VARIABLE (node)
     {
       if (node->analyzed
@@ -587,8 +587,8 @@ varpool_remove_unreferenced_decls (void)
 	      || DECL_RTL_SET_P (node->decl)))
 	{
 	  enqueue_node (node, &first);
-          if (cgraph_dump_file)
-	    fprintf (cgraph_dump_file, " %s", node->asm_name ());
+	  if (dump_file)
+	    fprintf (dump_file, " %s", node->asm_name ());
 	}
     }
   while (first != (varpool_node *)(void *)1)
@@ -621,15 +621,15 @@ varpool_remove_unreferenced_decls (void)
 	    pointer_set_insert (referenced, node);
 	}
     }
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "\nRemoving variables:");
+  if (dump_file)
+    fprintf (dump_file, "\nRemoving variables:");
   for (node = symtab->first_defined_variable (); node; node = next)
     {
       next = symtab->next_defined_variable (node);
       if (!node->aux)
 	{
-          if (cgraph_dump_file)
-	    fprintf (cgraph_dump_file, " %s", node->asm_name ());
+	  if (dump_file)
+	    fprintf (dump_file, " %s", node->asm_name ());
 	  if (pointer_set_contains (referenced, node))
 	    node->remove_initializer ();
 	  else
@@ -637,8 +637,8 @@ varpool_remove_unreferenced_decls (void)
 	}
     }
   pointer_set_destroy (referenced);
-  if (cgraph_dump_file)
-    fprintf (cgraph_dump_file, "\n");
+  if (dump_file)
+    fprintf (dump_file, "\n");
 }
 
 /* For variables in named sections make sure get_variable_section
@@ -668,7 +668,7 @@ varpool_node::output_variables (void)
   if (seen_error ())
     return false;
 
-  varpool_remove_unreferenced_decls ();
+  symtab->remove_unreferenced_decls ();
 
   timevar_push (TV_VAROUT);
 
@@ -741,7 +741,7 @@ varpool_node::create_extra_name_alias (tree alias, tree decl)
      via DECL_ASSEMBLER_NAME mechanizm.
      This is unfortunate because they are not going through the
      standard channels.  Ensure they get output.  */
-  if (cpp_implicit_aliases_done)
+  if (symtab->cpp_implicit_aliases_done)
     alias_node->resolve_alias (varpool_node::get_create (decl));
   return alias_node;
 }
