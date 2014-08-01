@@ -1664,6 +1664,12 @@ public:
   /* Output all asm statements we have stored up to be output.  */
   void output_asm_statements (void);
 
+  /* Analyze the whole compilation unit once it is parsed completely.  */
+  void finalize_compilation_unit (void);
+
+  /* Perform simple optimizations based on callgraph.  */
+  void compile (void);
+
   /* Weakrefs may be associated to external decls and thus not output
      at expansion time.  Emit all necessary aliases.  */
   void output_weakrefs (void);
@@ -1900,8 +1906,6 @@ extern bool gimple_check_call_matching_types (gimple, tree, bool);
 
 /* In cgraphunit.c  */
 void cgraph_finalize_function (tree, bool);
-void finalize_compilation_unit (void);
-void compile (void);
 /*  Initialize datastructures so DECL is a function in lowered gimple form.
     IN_SSA is true if the gimple is in SSA.  */
 basic_block init_lowered_empty_function (tree, bool);

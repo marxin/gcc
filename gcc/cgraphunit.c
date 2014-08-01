@@ -2135,7 +2135,7 @@ symbol_table::output_weakrefs (void)
 /* Perform simple optimizations based on callgraph.  */
 
 void
-compile (void)
+symbol_table::compile (void)
 {
   if (seen_error ())
     return;
@@ -2277,7 +2277,7 @@ compile (void)
 /* Analyze the whole compilation unit once it is parsed completely.  */
 
 void
-finalize_compilation_unit (void)
+symbol_table::finalize_compilation_unit (void)
 {
   timevar_push (TV_CGRAPH);
 
