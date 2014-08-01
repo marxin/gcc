@@ -1163,9 +1163,9 @@ package body Exp_Aggr is
 
             if Needs_Finalization (Ctype) then
                Append_To (L,
-                 Make_Init_Call (
-                   Obj_Ref => New_Copy_Tree (Indexed_Comp),
-                   Typ     => Ctype));
+                 Make_Init_Call
+                   (Obj_Ref => New_Copy_Tree (Indexed_Comp),
+                    Typ     => Ctype));
             end if;
 
          else
@@ -1262,9 +1262,9 @@ package body Exp_Aggr is
                   and then Nkind (Expr) = N_Aggregate)
             then
                Append_To (L,
-                 Make_Adjust_Call (
-                   Obj_Ref => New_Copy_Tree (Indexed_Comp),
-                   Typ     => Comp_Type));
+                 Make_Adjust_Call
+                   (Obj_Ref => New_Copy_Tree (Indexed_Comp),
+                    Typ     => Comp_Type));
             end if;
          end if;
 
@@ -1406,11 +1406,12 @@ package body Exp_Aggr is
 
          --  Construct the final loop
 
-         Append_To (S, Make_Implicit_Loop_Statement
-                         (Node             => N,
-                          Identifier       => Empty,
-                          Iteration_Scheme => L_Iteration_Scheme,
-                          Statements       => L_Body));
+         Append_To (S,
+           Make_Implicit_Loop_Statement
+             (Node             => N,
+              Identifier       => Empty,
+              Iteration_Scheme => L_Iteration_Scheme,
+              Statements       => L_Body));
 
          --  A small optimization: if the aggregate is initialized with a box
          --  and the component type has no initialization procedure, remove the
@@ -1513,11 +1514,12 @@ package body Exp_Aggr is
 
          --  Construct the final loop
 
-         Append_To (S, Make_Implicit_Loop_Statement
-                         (Node             => N,
-                          Identifier       => Empty,
-                          Iteration_Scheme => W_Iteration_Scheme,
-                          Statements       => W_Body));
+         Append_To (S,
+           Make_Implicit_Loop_Statement
+             (Node             => N,
+              Identifier       => Empty,
+              Iteration_Scheme => W_Iteration_Scheme,
+              Statements       => W_Body));
 
          return S;
       end Gen_While;
@@ -1604,7 +1606,7 @@ package body Exp_Aggr is
       then
          Append_To (New_Code,
            Make_Assignment_Statement (Loc,
-             Name => New_Copy_Tree (Into),
+             Name       => New_Copy_Tree (Into),
              Expression =>
                Unchecked_Convert_To (Typ,
                  Make_Integer_Literal (Loc, Uint_0))));
@@ -2186,7 +2188,7 @@ package body Exp_Aggr is
 
             Append_To (L,
               Make_Procedure_Call_Statement (Loc,
-                Name =>
+                Name                   =>
                   New_Occurrence_Of
                     (Find_Prim_Op (Init_Typ, Name_Initialize), Loc),
                 Parameter_Associations => New_List (New_Copy_Tree (Ref))));
@@ -2220,6 +2222,7 @@ package body Exp_Aggr is
                 Prefix        => New_Copy_Tree (Lhs),
                 Selector_Name => Make_Identifier (Loc, Chars (Expr))));
          end if;
+
          return OK;
       end Rewrite_Discriminant;
 
@@ -2509,9 +2512,9 @@ package body Exp_Aggr is
                  and then not Is_Limited_Type (Etype (Ancestor))
                then
                   Append_To (Assign,
-                    Make_Adjust_Call (
-                      Obj_Ref => New_Copy_Tree (Ref),
-                      Typ     => Etype (Ancestor)));
+                    Make_Adjust_Call
+                      (Obj_Ref => New_Copy_Tree (Ref),
+                       Typ     => Etype (Ancestor)));
                end if;
 
                Append_To (L,
@@ -2627,9 +2630,8 @@ package body Exp_Aggr is
             if Nkind (N) = N_Aggregate then
                Append_To (L,
                  Make_Procedure_Call_Statement (Loc,
-                   Name =>
-                     New_Occurrence_Of
-                       (Base_Init_Proc (CPP_Parent), Loc),
+                   Name                   =>
+                     New_Occurrence_Of (Base_Init_Proc (CPP_Parent), Loc),
                    Parameter_Associations => New_List (
                      Unchecked_Convert_To (CPP_Parent,
                        New_Copy_Tree (Lhs)))));
@@ -2654,10 +2656,10 @@ package body Exp_Aggr is
          if Is_CPP_Constructor_Call (Expression (Comp)) then
             Append_List_To (L,
               Build_Initialization_Call (Loc,
-                Id_Ref            => Make_Selected_Component (Loc,
-                                       Prefix        => New_Copy_Tree (Target),
-                                       Selector_Name =>
-                                         New_Occurrence_Of (Selector, Loc)),
+                Id_Ref            =>
+                  Make_Selected_Component (Loc,
+                    Prefix        => New_Copy_Tree (Target),
+                    Selector_Name => New_Occurrence_Of (Selector, Loc)),
                 Typ               => Etype (Selector),
                 Enclos_Type       => Typ,
                 With_Default_Init => True,
@@ -2834,6 +2836,38 @@ package body Exp_Aggr is
             else
                if Has_Discriminants (Typ) then
                   Replace_Discriminants (Expr_Q);
+
+                  --  If the component is an array type that depends on
+                  --  discriminants, and the expression is a single Others
+                  --  clause, create an explicit subtype for it because the
+                  --  backend has troubles recovering the actual bounds.
+
+                  if Nkind (Expr_Q) = N_Aggregate
+                    and then Is_Array_Type (Comp_Type)
+                    and then Present (Component_Associations (Expr_Q))
+                  then
+                     declare
+                        Assoc : constant Node_Id :=
+                                  First (Component_Associations (Expr_Q));
+                        Decl  : Node_Id;
+
+                     begin
+                        if Nkind (First (Choices (Assoc))) = N_Others_Choice
+                        then
+                           Decl :=
+                             Build_Actual_Subtype_Of_Component
+                               (Comp_Type, Comp_Expr);
+
+                           --  If the component type does not in fact depend on
+                           --  discriminants, the subtype declaration is empty.
+
+                           if Present (Decl) then
+                              Append_To (L, Decl);
+                              Set_Etype (Comp_Expr, Defining_Entity (Decl));
+                           end if;
+                        end if;
+                     end;
+                  end if;
                end if;
 
                Instr :=
@@ -2878,13 +2912,13 @@ package body Exp_Aggr is
                  and then not Is_Limited_Type (Comp_Type)
                then
                   Append_To (L,
-                    Make_Adjust_Call (
-                      Obj_Ref => New_Copy_Tree (Comp_Expr),
-                      Typ     => Comp_Type));
+                    Make_Adjust_Call
+                      (Obj_Ref => New_Copy_Tree (Comp_Expr),
+                       Typ     => Comp_Type));
                end if;
             end if;
 
-         --  ???
+         --  comment would be good here ???
 
          elsif Ekind (Selector) = E_Discriminant
            and then Nkind (N) /= N_Extension_Aggregate
@@ -2922,9 +2956,9 @@ package body Exp_Aggr is
                   Make_Raise_Constraint_Error (Loc,
                     Condition =>
                       Make_Op_Ne (Loc,
-                        Left_Opnd => New_Copy_Tree (Node (D_Val)),
+                        Left_Opnd  => New_Copy_Tree (Node (D_Val)),
                         Right_Opnd => Expression (Comp)),
-                      Reason => CE_Discriminant_Check_Failed));
+                    Reason    => CE_Discriminant_Check_Failed));
 
                else
                   --  Find self-reference in previous discriminant assignment,
@@ -4006,20 +4040,29 @@ package body Exp_Aggr is
 
       --    1. N consists of a single OTHERS choice, possibly recursively
 
-      --    2. The component type is discrete
+      --    2. The array type is not packed
 
-      --    3. The component size is a multiple of Storage_Unit
+      --    3. The array type has no atomic components
 
-      --    4. The component size is exactly Storage_Unit or the expression is
-      --       an integer whose unsigned value is the binary concatenation of
-      --       K times its remainder modulo 2**Storage_Unit.
+      --    4. The array type has no null ranges (the purpose of this is to
+      --       avoid a bogus warning for an out-of-range value).
+
+      --    5. The component type is discrete
+
+      --    6. The component size is Storage_Unit or the value is of the form
+      --       M * (1 + A**1 + A**2 + .. A**(K-1)) where A = 2**(Storage_Unit)
+      --       and M in 1 .. A-1. This can also be viewed as K occurrences of
+      --       the 8-bit value M, concatenated together.
 
       --  The ultimate goal is to generate a call to a fast memset routine
       --  specifically optimized for the target.
 
       function Aggr_Assignment_OK_For_Backend (N : Node_Id) return Boolean is
          Ctyp      : Entity_Id;
+         Index     : Entity_Id;
          Expr      : Node_Id := N;
+         Low       : Node_Id;
+         High      : Node_Id;
          Remainder : Uint;
          Value     : Uint;
          Nunits    : Nat;
@@ -4035,6 +4078,25 @@ package body Exp_Aggr is
                return False;
             end if;
 
+            if Present (Packed_Array_Impl_Type (Ctyp)) then
+               return False;
+            end if;
+
+            if Has_Atomic_Components (Ctyp) then
+               return False;
+            end if;
+
+            Index := First_Index (Ctyp);
+            while Present (Index) loop
+               Get_Index_Bounds (Index, Low, High);
+
+               if Is_Null_Range (Low, High) then
+                  return False;
+               end if;
+
+               Next_Index (Index);
+            end loop;
+
             Expr := Expression (First (Component_Associations (Expr)));
 
             for J in 1 .. Number_Dimensions (Ctyp) - 1 loop
@@ -4048,11 +4110,13 @@ package body Exp_Aggr is
             end loop;
 
             Ctyp := Component_Type (Ctyp);
+
+            if Is_Atomic (Ctyp) then
+               return False;
+            end if;
          end loop;
 
-         if not Is_Discrete_Type (Ctyp)
-           or else RM_Size (Ctyp) mod System_Storage_Unit /= 0
-         then
+         if not Is_Discrete_Type (Ctyp) then
             return False;
          end if;
 
@@ -4060,7 +4124,10 @@ package body Exp_Aggr is
 
          Analyze_And_Resolve (Expr, Ctyp);
 
-         Nunits := UI_To_Int (RM_Size (Ctyp) / System_Storage_Unit);
+         --  The back end uses the Esize as the precision of the type
+
+         Nunits := UI_To_Int (Esize (Ctyp)) / System_Storage_Unit;
+
          if Nunits = 1 then
             return True;
          end if;
@@ -4075,7 +4142,7 @@ package body Exp_Aggr is
             Value := Value - Expr_Value (Type_Low_Bound (Ctyp));
          end if;
 
-         --  0 and -1 immediately satisfy check #4
+         --  Values 0 and -1 immediately satisfy the last check
 
          if Value = Uint_0 or else Value = Uint_Minus_1 then
             return True;
@@ -4133,7 +4200,7 @@ package body Exp_Aggr is
 
                Append_To (Indexes,
                  Make_Range (Loc,
-                   Low_Bound =>  Make_Integer_Literal (Loc, 1),
+                   Low_Bound  => Make_Integer_Literal (Loc, 1),
                    High_Bound => Make_Integer_Literal (Loc, Num)));
             end loop;
 
@@ -4143,11 +4210,10 @@ package body Exp_Aggr is
             --  positional. Retrieve each dimension bounds (computed earlier).
 
             for D in 1 .. Number_Dimensions (Typ) loop
-               Append (
+               Append_To (Indexes,
                  Make_Range (Loc,
-                    Low_Bound  => Aggr_Low  (D),
-                    High_Bound => Aggr_High (D)),
-                 Indexes);
+                   Low_Bound  => Aggr_Low  (D),
+                   High_Bound => Aggr_High (D)));
             end loop;
          end if;
 
@@ -5333,10 +5399,11 @@ package body Exp_Aggr is
          --  then we could go into an infinite recursion.
 
          if (In_Place_Assign_OK_For_Declaration or else Maybe_In_Place_OK)
-           and then not AAMP_On_Target
            and then VM_Target = No_VM
+           and then not AAMP_On_Target
            and then not Generate_SCIL
            and then not Possible_Bit_Aligned_Component (Target)
+           and then not Is_Possibly_Unaligned_Slice (Target)
            and then Aggr_Assignment_OK_For_Backend (N)
          then
             if Maybe_In_Place_OK then
@@ -5348,8 +5415,8 @@ package body Exp_Aggr is
                 Make_Assignment_Statement (Loc,
                   Name       => Target,
                   Expression => New_Copy (N)));
-         else
 
+         else
             Aggr_Code :=
               Build_Array_Aggr_Code (N,
                 Ctype       => Ctyp,
@@ -6030,11 +6097,11 @@ package body Exp_Aggr is
                   Discriminant := First_Stored_Discriminant (Base_Type (Typ));
                   while Present (Discriminant) loop
                      New_Comp :=
-                       New_Copy_Tree (
-                         Get_Discriminant_Value (
-                             Discriminant,
-                             Typ,
-                             Discriminant_Constraint (Typ)));
+                       New_Copy_Tree
+                         (Get_Discriminant_Value
+                            (Discriminant,
+                              Typ,
+                              Discriminant_Constraint (Typ)));
                      Append (New_Comp, Constraints);
                      Next_Stored_Discriminant (Discriminant);
                   end loop;
@@ -6106,8 +6173,7 @@ package body Exp_Aggr is
                        Make_Component_Association (Loc,
                          Choices    =>
                            New_List (New_Occurrence_Of (Comp, Loc)),
-                         Expression =>
-                           New_Comp));
+                         Expression => New_Comp));
 
                      Analyze_And_Resolve (New_Comp, Etype (Comp));
                   end if;
@@ -7068,8 +7134,7 @@ package body Exp_Aggr is
 
                for I in UI_To_Int (Intval (Lo)) .. UI_To_Int (Intval (Hi))
                loop
-                  Append_To
-                    (Expressions (Agg), New_Copy (Expression (Expr)));
+                  Append_To (Expressions (Agg), New_Copy (Expression (Expr)));
 
                   --  The copied expression must be analyzed and resolved.
                   --  Besides setting the type, this ensures that static

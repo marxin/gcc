@@ -349,9 +349,12 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
 	      || Is_Public (gnat_entity));
 
   /* Get the name of the entity and set up the line number and filename of
-     the original definition for use in any decl we make.  */
+     the original definition for use in any decl we make.  Make sure we do not
+     inherit another source location.  */
   gnu_entity_name = get_entity_name (gnat_entity);
-  Sloc_to_locus (Sloc (gnat_entity), &input_location);
+  if (Sloc (gnat_entity) != No_Location
+      && !renaming_from_generic_instantiation_p (gnat_entity))
+    Sloc_to_locus (Sloc (gnat_entity), &input_location);
 
   /* For cases when we are not defining (i.e., we are referencing from
      another compilation unit) public entities, show we are at global level
@@ -1429,15 +1432,13 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
 	  gnu_expr = convert (gnu_type, gnu_expr);
 
 	/* If this name is external or there was a name specified, use it,
-	   unless this is a VMS exception object since this would conflict
-	   with the symbol we need to export in addition.  Don't use the
-	   Interface_Name if there is an address clause (see CD30005).  */
-	if (!Is_VMS_Exception (gnat_entity)
-	    && ((Present (Interface_Name (gnat_entity))
-		 && No (Address_Clause (gnat_entity)))
-		|| (Is_Public (gnat_entity)
-		    && (!Is_Imported (gnat_entity)
-			|| Is_Exported (gnat_entity)))))
+	   Don't use the Interface_Name if there is an address clause
+	   (see CD30005).  */
+	if ((Present (Interface_Name (gnat_entity))
+	     && No (Address_Clause (gnat_entity)))
+	    || (Is_Public (gnat_entity)
+		&& (!Is_Imported (gnat_entity)
+	            || Is_Exported (gnat_entity))))
 	  gnu_ext_name = create_concat_name (gnat_entity, NULL);
 
 	/* If this is an aggregate constant initialized to a constant, force it
@@ -1920,18 +1921,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
       break;
 
     case E_Floating_Point_Type:
-      /* If this is a VAX floating-point type, use an integer of the proper
-	 size.  All the operations will be handled with ASM statements.  */
-      if (Vax_Float (gnat_entity))
-	{
-	  gnu_type = make_signed_type (esize);
-	  TYPE_VAX_FLOATING_POINT_P (gnu_type) = 1;
-	  SET_TYPE_DIGITS_VALUE (gnu_type,
-				 UI_To_gnu (Digits_Value (gnat_entity),
-					    sizetype));
-	  break;
-	}
-
       /* The type of the Low and High bounds can be our type if this is
 	 a type from Standard, so set them at the end of the function.  */
       gnu_type = make_node (REAL_TYPE);
@@ -1940,12 +1929,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
       break;
 
     case E_Floating_Point_Subtype:
-      if (Vax_Float (gnat_entity))
-	{
-	  gnu_type = gnat_to_gnu_type (Etype (gnat_entity));
-	  break;
-	}
-
       /* See the E_Signed_Integer_Subtype case for the rationale.  */
       if (!definition
 	  && Present (Ancestor_Subtype (gnat_entity))
@@ -1988,7 +1971,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
       maybe_present = true;
       break;
 
-      /* Array and String Types and Subtypes
+      /* Array Types and Subtypes
 
 	 Unconstrained array types are represented by E_Array_Type and
 	 constrained array types are represented by E_Array_Subtype.  There
@@ -2001,7 +1984,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
 		Number_Dimensions  Number of dimensions (an int).
 		First_Index	   Type of first index.  */
 
-    case E_String_Type:
     case E_Array_Type:
       {
 	const bool convention_fortran_p
@@ -2312,7 +2294,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
       }
       break;
 
-    case E_String_Subtype:
     case E_Array_Subtype:
 
       /* This is the actual data type for array variables.  Multidimensional
@@ -4145,7 +4126,9 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
 	enum inline_status_t inline_status
 	  = Has_Pragma_No_Inline (gnat_entity)
 	    ? is_suppressed
-	    : (Is_Inlined (gnat_entity) ? is_enabled : is_disabled);
+	    : Has_Pragma_Inline_Always (gnat_entity)
+	      ? is_required
+	      : (Is_Inlined (gnat_entity) ? is_enabled : is_disabled);
 	bool public_flag = Is_Public (gnat_entity) || imported_p;
 	bool extern_flag
 	  = (Is_Public (gnat_entity) && !definition) || imported_p;
@@ -4700,6 +4683,16 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
 	  }
 	else
 	  {
+	    /* ??? When only the spec of a package is provided, downgrade
+	       is_required to is_enabled to avoid issuing an error later.  */
+	    if (inline_status == is_required)
+	      {
+		Node_Id gnat_body = Parent (Declaration_Node (gnat_entity));
+		if (Nkind (gnat_body) != N_Subprogram_Body
+		    && No (Corresponding_Body (gnat_body)))
+		  inline_status = is_enabled;
+	      }
+
 	    if (has_stub)
 	      {
 		gnu_stub_name = gnu_ext_name;
@@ -5177,8 +5170,12 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
 	 The language rules ensure the parent type is already frozen here.  */
       if (Is_Derived_Type (gnat_entity) && !type_annotate_only)
 	{
-	  tree gnu_parent_type = gnat_to_gnu_type (Etype (gnat_entity));
-	  relate_alias_sets (gnu_type, gnu_parent_type,
+	  Entity_Id gnat_parent_type = Underlying_Type (Etype (gnat_entity));
+	  /* For packed array subtypes, the implementation type is used.  */
+	  if (kind == E_Array_Subtype
+	      && Present (Packed_Array_Impl_Type (gnat_parent_type)))
+	    gnat_parent_type = Packed_Array_Impl_Type (gnat_parent_type);
+	  relate_alias_sets (gnu_type, gnat_to_gnu_type (gnat_parent_type),
 			     Is_Composite_Type (gnat_entity)
 			     ? ALIAS_SET_COPY : ALIAS_SET_SUPERSET);
 	}
@@ -5281,7 +5278,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, int definition)
   /* If this is an enumeration or floating-point type, we were not able to set
      the bounds since they refer to the type.  These are always static.  */
   if ((kind == E_Enumeration_Type && Present (First_Literal (gnat_entity)))
-      || (kind == E_Floating_Point_Type && !Vax_Float (gnat_entity)))
+      || (kind == E_Floating_Point_Type))
     {
       tree gnu_scalar_type = gnu_type;
       tree gnu_low_bound, gnu_high_bound;

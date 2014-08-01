@@ -244,6 +244,18 @@ package Exp_Util is
    --  information for the tree and for error messages. The call node is not
    --  analyzed on return, the caller is responsible for analyzing it.
 
+   function Build_SS_Mark_Call
+     (Loc  : Source_Ptr;
+      Mark : Entity_Id) return Node_Id;
+   --  Build a call to routine System.Secondary_Stack.Mark. Mark denotes the
+   --  entity of the secondary stack mark.
+
+   function Build_SS_Release_Call
+     (Loc  : Source_Ptr;
+      Mark : Entity_Id) return Node_Id;
+   --  Build a call to routine System.Secondary_Stack.Release. Mark denotes the
+   --  entity of the secondary stack mark.
+
    function Build_Task_Image_Decls
      (Loc          : Source_Ptr;
       Id_Ref       : Node_Id;
@@ -513,11 +525,22 @@ package Exp_Util is
    --  N_Op_Eq), or to determine the result of some other test in other cases
    --  (e.g. no access check required if N_Op_Ne Null).
 
+   function Get_First_Parent_With_Ext_Axioms_For_Entity
+     (E : Entity_Id) return Entity_Id;
+   --  Returns the package entity with an external axiomatization containing E,
+   --  if any, or Empty if none.
+
    function Get_Stream_Size (E : Entity_Id) return Uint;
    --  Return the stream size value of the subtype E
 
    function Has_Access_Constraint (E : Entity_Id) return Boolean;
    --  Given object or type E, determine if a discriminant is of an access type
+
+   function Has_Annotate_Pragma_For_External_Axiomatization
+     (E : Entity_Id) return Boolean;
+   --  Returns whether E is a package entity, for which the initial list of
+   --  pragmas at the start of the package declaration contains
+   --    pragma Annotate (GNATprove, External_Axiomatization);
 
    function Has_Following_Address_Clause (D : Node_Id) return Boolean;
    --  D is the node for an object declaration. This function searches the

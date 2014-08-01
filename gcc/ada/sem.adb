@@ -1268,7 +1268,6 @@ package body Sem is
            Next     => Suppress_Stack_Entries);
       Suppress_Stack_Entries := Global_Suppress_Stack_Top;
       return;
-
    end Push_Global_Suppress_Stack_Entry;
 
    -------------------------------------
@@ -1483,13 +1482,7 @@ package body Sem is
             null;
 
          else
-            --  Initialize if first time
-
-            if No (Comp_Unit_List) then
-               Comp_Unit_List := New_Elmt_List;
-            end if;
-
-            Append_Elmt (Comp_Unit, Comp_Unit_List);
+            Append_New_Elmt (Comp_Unit, To => Comp_Unit_List);
 
             if Debug_Unit_Walk then
                Write_Str ("Appending ");

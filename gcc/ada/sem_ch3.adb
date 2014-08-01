@@ -586,6 +586,10 @@ package body Sem_Ch3 is
    --  copying the record declaration for the derived base. In the tagged case
    --  the value returned is irrelevant.
 
+   procedure Inherit_Predicate_Flags (Subt, Par : Entity_Id);
+   --  Propagate static and dynamic predicate flags from a parent to the
+   --  subtype in a subtype declaration with and without constraints.
+
    function Is_Valid_Constraint_Kind
      (T_Kind          : Type_Kind;
       Constraint_Kind : Node_Kind) return Boolean;
@@ -2140,7 +2144,6 @@ package body Sem_Ch3 is
          Spec_Id   : Entity_Id;
 
          Dummy : Entity_Id;
-         pragma Unreferenced (Dummy);
          --  A dummy variable used to capture the unused result of subprogram
          --  spec analysis.
 
@@ -2917,6 +2920,11 @@ package body Sem_Ch3 is
 
       if not Is_Overloaded (E) then
          T := Etype (E);
+         if Has_Dynamic_Predicate_Aspect (T) then
+            Error_Msg_N
+              ("subtype has dynamic predicate, "
+               & "not allowed in number declaration", N);
+         end if;
 
       else
          T := Any_Type;
@@ -3019,13 +3027,13 @@ package body Sem_Ch3 is
    begin
       if Ekind (Obj_Id) = E_Constant then
 
-         --  A constant cannot be volatile. This check is only relevant when
-         --  SPARK_Mode is on as it is not standard Ada legality rule. Do not
-         --  flag internally-generated constants that map generic formals to
-         --  actuals in instantiations (SPARK RM 7.1.3(6)).
+         --  A constant cannot be effectively volatile. This check is only
+         --  relevant with SPARK_Mode on as it is not a standard Ada legality
+         --  rule. Do not flag internally-generated constants that map generic
+         --  formals to actuals in instantiations (SPARK RM 7.1.3(6)).
 
          if SPARK_Mode = On
-           and then Is_SPARK_Volatile (Obj_Id)
+           and then Is_Effectively_Volatile (Obj_Id)
            and then No (Corresponding_Generic_Association (Parent (Obj_Id)))
          then
             Error_Msg_N ("constant cannot be volatile", Obj_Id);
@@ -3034,40 +3042,41 @@ package body Sem_Ch3 is
       else pragma Assert (Ekind (Obj_Id) = E_Variable);
 
          --  The following checks are only relevant when SPARK_Mode is on as
-         --  they are not standard Ada legality rules.
+         --  they are not standard Ada legality rules. Internally generated
+         --  temporaries are ignored.
 
-         if SPARK_Mode = On then
-            if Is_SPARK_Volatile (Obj_Id) then
+         if SPARK_Mode = On and then Comes_From_Source (Obj_Id) then
+            if Is_Effectively_Volatile (Obj_Id) then
 
-               --  The declaration of a volatile object must appear at the
-               --  library level (SPARK RM 7.1.3(7), C.6(6)).
+               --  The declaration of an effectively volatile object must
+               --  appear at the library level (SPARK RM 7.1.3(7), C.6(6)).
 
                if not Is_Library_Level_Entity (Obj_Id) then
                   Error_Msg_N
                     ("volatile variable & must be declared at library level",
                      Obj_Id);
 
-               --  An object of a discriminated type cannot be volatile
-               --  (SPARK RM C.6(4)).
+               --  An object of a discriminated type cannot be effectively
+               --  volatile (SPARK RM C.6(4)).
 
                elsif Has_Discriminants (Obj_Typ) then
                   Error_Msg_N
                     ("discriminated object & cannot be volatile", Obj_Id);
 
-               --  An object of a tagged type cannot be volatile
+               --  An object of a tagged type cannot be effectively volatile
                --  (SPARK RM C.6(5)).
 
                elsif Is_Tagged_Type (Obj_Typ) then
                   Error_Msg_N ("tagged object & cannot be volatile", Obj_Id);
                end if;
 
-            --  The object is not volatile
+            --  The object is not effectively volatile
 
             else
-               --  A non-volatile object cannot have volatile components
-               --  (SPARK RM 7.1.3(7)).
+               --  A non-effectively volatile object cannot have effectively
+               --  volatile components (SPARK RM 7.1.3(7)).
 
-               if not Is_SPARK_Volatile (Obj_Id)
+               if not Is_Effectively_Volatile (Obj_Id)
                  and then Has_Volatile_Component (Obj_Typ)
                then
                   Error_Msg_N
@@ -3418,9 +3427,9 @@ package body Sem_Ch3 is
       --  is considered, so that the Object_Definition node is still the same
       --  as in source code.
 
-      --  In SPARK, the nominal subtype shall be given by a subtype mark and
-      --  shall not be unconstrained. (The only exception to this is the
-      --  admission of declarations of constants of type String.)
+      --  In SPARK, the nominal subtype is always given by a subtype mark
+      --  and must not be unconstrained. (The only exception to this is the
+      --  acceptance of declarations of constants of type String.)
 
       if not
         Nkind_In (Object_Definition (N), N_Identifier, N_Expanded_Name)
@@ -3504,6 +3513,7 @@ package body Sem_Ch3 is
            and then Nkind (E) = N_Aggregate
          then
             Set_Etype (E, T);
+
          else
             Resolve (E, T);
          end if;
@@ -3514,7 +3524,7 @@ package body Sem_Ch3 is
          --  declaration without initializing expression and it has been
          --  analyzed (see Expand_Inlined_Call).
 
-         if Debug_Flag_Dot_K
+         if Back_End_Inlining
            and then Expander_Active
            and then Nkind (E) = N_Function_Call
            and then Nkind (Name (E)) in N_Has_Entity
@@ -3918,10 +3928,13 @@ package body Sem_Ch3 is
 
       Set_Etype (Id, Act_T);
 
-      --  Object is marked to be treated as volatile if type is volatile and
-      --  we clear the Current_Value setting that may have been set above.
+      --  Non-constant object is marked to be treated as volatile if type is
+      --  volatile and we clear the Current_Value setting that may have been
+      --  set above. Doing so for constants isn't required and might interfere
+      --  with possible uses of the object as a static expression in contexts
+      --  incompatible with volatility (e.g. as a case-statement alternative).
 
-      if Treat_As_Volatile (Etype (Id)) then
+      if Ekind (Id) /= E_Constant and then Treat_As_Volatile (Etype (Id)) then
          Set_Treat_As_Volatile (Id);
          Set_Current_Value (Id, Empty);
       end if;
@@ -4520,6 +4533,7 @@ package body Sem_Ch3 is
                Set_Is_Constrained       (Id, Is_Constrained     (T));
                Set_Is_Known_Valid       (Id, Is_Known_Valid     (T));
                Set_RM_Size              (Id, RM_Size            (T));
+               Inherit_Predicate_Flags  (Id, T);
 
             when Ordinary_Fixed_Point_Kind =>
                Set_Ekind                (Id, E_Ordinary_Fixed_Point_Subtype);
@@ -4542,6 +4556,7 @@ package body Sem_Ch3 is
                Set_Is_Constrained       (Id, Is_Constrained     (T));
                Set_Is_Known_Valid       (Id, Is_Known_Valid     (T));
                Set_RM_Size              (Id, RM_Size            (T));
+               Inherit_Predicate_Flags  (Id, T);
 
             when Modular_Integer_Kind =>
                Set_Ekind                (Id, E_Modular_Integer_Subtype);
@@ -4549,6 +4564,7 @@ package body Sem_Ch3 is
                Set_Is_Constrained       (Id, Is_Constrained     (T));
                Set_Is_Known_Valid       (Id, Is_Known_Valid     (T));
                Set_RM_Size              (Id, RM_Size            (T));
+               Inherit_Predicate_Flags  (Id, T);
 
             when Class_Wide_Kind =>
                Set_Ekind                (Id, E_Class_Wide_Subtype);
@@ -7066,10 +7082,10 @@ package body Sem_Ch3 is
 
    --  Furthermore if a KNOWN_DISCRIMINANT_PART is provided, then [3.7(13-18)]:
 
-   --  o The parent subtype shall be constrained;
+   --  o The parent subtype must be constrained;
 
    --  o If the parent type is not a tagged type, then each discriminant of
-   --    the derived type shall be used in the constraint defining a parent
+   --    the derived type must be used in the constraint defining a parent
    --    subtype. [Implementation note: This ensures that the new discriminant
    --    can share storage with an existing discriminant.]
 
@@ -7326,8 +7342,8 @@ package body Sem_Ch3 is
    --  [7.3(10-13)]:
 
    --  o If a private extension inherits known discriminants from the ancestor
-   --    subtype, then the full view shall also inherit its discriminants from
-   --    the ancestor subtype and the parent subtype of the full view shall be
+   --    subtype, then the full view must also inherit its discriminants from
+   --    the ancestor subtype and the parent subtype of the full view must be
    --    constrained if and only if the ancestor subtype is constrained.
 
    --  o If a partial view has unknown discriminants, then the full view may
@@ -7335,10 +7351,10 @@ package body Sem_Ch3 is
    --    discriminants.
 
    --  o If a partial view has neither known nor unknown discriminants, then
-   --    the full view shall define a definite subtype.
+   --    the full view must define a definite subtype.
 
    --  o If the ancestor subtype of a private extension has constrained
-   --    discriminants, then the parent subtype of the full view shall impose a
+   --    discriminants, then the parent subtype of the full view must impose a
    --    statically matching constraint on those discriminants.
 
    --  This means that only the following forms of private extensions are
@@ -8407,10 +8423,11 @@ package body Sem_Ch3 is
       --  STEP 5c: Process the record extension for non private tagged types
 
       elsif not Private_Extension then
-
-         --  Add the _parent field in the derived type
-
          Expand_Record_Extension (Derived_Type, Type_Def);
+
+         --  Note : previously in ASIS mode we set the Parent_Subtype of the
+         --  derived type to propagate some semantic information. This led
+         --  to other ASIS failures and has been removed.
 
          --  Ada 2005 (AI-251): Addition of the Tag corresponding to all the
          --  implemented interfaces if we are in expansion mode
@@ -12391,7 +12408,7 @@ package body Sem_Ch3 is
          Set_Etype (S, T);
          R := S;
 
-         Process_Range_Expr_In_Decl (R, T, Empty_List);
+         Process_Range_Expr_In_Decl (R, T);
 
          if not Error_Posted (S)
            and then
@@ -12412,6 +12429,10 @@ package body Sem_Ch3 is
          --  The parser has verified that this is a discrete indication
 
          Resolve_Discrete_Subtype_Indication (S, T);
+         Bad_Predicated_Subtype_Use
+           ("subtype& has predicate, not allowed in index constraint",
+            S, Entity (Subtype_Mark (S)));
+
          R := Range_Expression (Constraint (S));
 
          --  Capture values of bounds and generate temporaries for them if
@@ -13142,8 +13163,8 @@ package body Sem_Ch3 is
             Old_C := First_Component (Typ);
             while Present (Old_C) loop
                if Original_Record_Component (Old_C) = Old_C
-                and then Chars (Old_C) /= Name_uTag
-                and then Chars (Old_C) /= Name_uParent
+                 and then Chars (Old_C) /= Name_uTag
+                 and then Chars (Old_C) /= Name_uParent
                then
                   Append_Elmt (Old_C, Comp_List);
                end if;
@@ -15375,10 +15396,10 @@ package body Sem_Ch3 is
       Discriminant :=
          First_Stored_Discriminant (Explicitly_Discriminated_Type);
       while Present (Discriminant) loop
-         Append_Elmt (
-           Get_Discriminant_Value (
-             Discriminant, Explicitly_Discriminated_Type, Constraint),
-           Expansion);
+         Append_Elmt
+           (Get_Discriminant_Value
+              (Discriminant, Explicitly_Discriminated_Type, Constraint),
+            To => Expansion);
          Next_Stored_Discriminant (Discriminant);
       end loop;
 
@@ -15992,15 +16013,6 @@ package body Sem_Ch3 is
          --  Check specified "digits" constraint
 
          if Digs_Val > Digits_Value (E) then
-            return False;
-         end if;
-
-         --  Avoid types not matching pragma Float_Representation, if present
-
-         if (Opt.Float_Format = 'I' and then Float_Rep (E) /= IEEE_Binary)
-              or else
-            (Opt.Float_Format = 'V' and then Float_Rep (E) /= VAX_Native)
-         then
             return False;
          end if;
 
@@ -16793,6 +16805,19 @@ package body Sem_Ch3 is
       return Assoc_List;
    end Inherit_Components;
 
+   -----------------------------
+   -- Inherit_Predicate_Flags --
+   -----------------------------
+
+   procedure Inherit_Predicate_Flags (Subt, Par : Entity_Id) is
+   begin
+      Set_Has_Predicates (Subt, Has_Predicates (Par));
+      Set_Has_Static_Predicate_Aspect
+        (Subt, Has_Static_Predicate_Aspect (Par));
+      Set_Has_Dynamic_Predicate_Aspect
+        (Subt, Has_Dynamic_Predicate_Aspect (Par));
+   end Inherit_Predicate_Flags;
+
    -----------------------
    -- Is_Null_Extension --
    -----------------------
@@ -17140,11 +17165,11 @@ package body Sem_Ch3 is
    ----------------
 
    procedure Make_Index
-     (I            : Node_Id;
+     (N            : Node_Id;
       Related_Nod  : Node_Id;
       Related_Id   : Entity_Id := Empty;
-      Suffix_Index : Nat := 1;
-      In_Iter_Schm : Boolean := False)
+      Suffix_Index : Nat       := 1;
+      In_Iter_Schm : Boolean   := False)
    is
       R      : Node_Id;
       T      : Entity_Id;
@@ -17165,13 +17190,13 @@ package body Sem_Ch3 is
       --  Character literals also have a universal type in the absence of
       --  of additional context,  and are resolved to Standard_Character.
 
-      if Nkind (I) = N_Range then
+      if Nkind (N) = N_Range then
 
          --  The index is given by a range constraint. The bounds are known
          --  to be of a consistent type.
 
-         if not Is_Overloaded (I) then
-            T := Etype (I);
+         if not Is_Overloaded (N) then
+            T := Etype (N);
 
             --  For universal bounds, choose the specific predefined type
 
@@ -17179,7 +17204,7 @@ package body Sem_Ch3 is
                T := Standard_Integer;
 
             elsif T = Any_Character then
-               Ambiguous_Character (Low_Bound (I));
+               Ambiguous_Character (Low_Bound (N));
 
                T := Standard_Character;
             end if;
@@ -17188,7 +17213,7 @@ package body Sem_Ch3 is
          --  are available, but if a universal interpretation exists it is
          --  also the selected one.
 
-         elsif Universal_Interpretation (I) = Universal_Integer then
+         elsif Universal_Interpretation (N) = Universal_Integer then
             T := Standard_Integer;
 
          else
@@ -17199,7 +17224,7 @@ package body Sem_Ch3 is
                It  : Interp;
 
             begin
-               Get_First_Interp (I, Ind, It);
+               Get_First_Interp (N, Ind, It);
                while Present (It.Typ) loop
                   if Is_Discrete_Type (It.Typ) then
 
@@ -17207,7 +17232,7 @@ package body Sem_Ch3 is
                        and then not Covers (It.Typ, T)
                        and then not Covers (T, It.Typ)
                      then
-                        Error_Msg_N ("ambiguous bounds in discrete range", I);
+                        Error_Msg_N ("ambiguous bounds in discrete range", N);
                         exit;
                      else
                         T := It.Typ;
@@ -17219,8 +17244,8 @@ package body Sem_Ch3 is
                end loop;
 
                if T = Any_Type then
-                  Error_Msg_N ("discrete type required for range", I);
-                  Set_Etype (I, Any_Type);
+                  Error_Msg_N ("discrete type required for range", N);
+                  Set_Etype (N, Any_Type);
                   return;
 
                elsif T = Universal_Integer then
@@ -17230,70 +17255,76 @@ package body Sem_Ch3 is
          end if;
 
          if not Is_Discrete_Type (T) then
-            Error_Msg_N ("discrete type required for range", I);
-            Set_Etype (I, Any_Type);
+            Error_Msg_N ("discrete type required for range", N);
+            Set_Etype (N, Any_Type);
             return;
          end if;
 
-         if Nkind (Low_Bound (I)) = N_Attribute_Reference
-           and then Attribute_Name (Low_Bound (I)) = Name_First
-           and then Is_Entity_Name (Prefix (Low_Bound (I)))
-           and then Is_Type (Entity (Prefix (Low_Bound (I))))
-           and then Is_Discrete_Type (Entity (Prefix (Low_Bound (I))))
+         if Nkind (Low_Bound (N)) = N_Attribute_Reference
+           and then Attribute_Name (Low_Bound (N)) = Name_First
+           and then Is_Entity_Name (Prefix (Low_Bound (N)))
+           and then Is_Type (Entity (Prefix (Low_Bound (N))))
+           and then Is_Discrete_Type (Entity (Prefix (Low_Bound (N))))
          then
             --  The type of the index will be the type of the prefix, as long
             --  as the upper bound is 'Last of the same type.
 
-            Def_Id := Entity (Prefix (Low_Bound (I)));
+            Def_Id := Entity (Prefix (Low_Bound (N)));
 
-            if Nkind (High_Bound (I)) /= N_Attribute_Reference
-              or else Attribute_Name (High_Bound (I)) /= Name_Last
-              or else not Is_Entity_Name (Prefix (High_Bound (I)))
-              or else Entity (Prefix (High_Bound (I))) /= Def_Id
+            if Nkind (High_Bound (N)) /= N_Attribute_Reference
+              or else Attribute_Name (High_Bound (N)) /= Name_Last
+              or else not Is_Entity_Name (Prefix (High_Bound (N)))
+              or else Entity (Prefix (High_Bound (N))) /= Def_Id
             then
                Def_Id := Empty;
             end if;
          end if;
 
-         R := I;
+         R := N;
          Process_Range_Expr_In_Decl (R, T, In_Iter_Schm => In_Iter_Schm);
 
-      elsif Nkind (I) = N_Subtype_Indication then
+      elsif Nkind (N) = N_Subtype_Indication then
 
          --  The index is given by a subtype with a range constraint
 
-         T :=  Base_Type (Entity (Subtype_Mark (I)));
+         T :=  Base_Type (Entity (Subtype_Mark (N)));
 
          if not Is_Discrete_Type (T) then
-            Error_Msg_N ("discrete type required for range", I);
-            Set_Etype (I, Any_Type);
+            Error_Msg_N ("discrete type required for range", N);
+            Set_Etype (N, Any_Type);
             return;
          end if;
 
-         R := Range_Expression (Constraint (I));
+         R := Range_Expression (Constraint (N));
 
          Resolve (R, T);
          Process_Range_Expr_In_Decl
-           (R, Entity (Subtype_Mark (I)), In_Iter_Schm => In_Iter_Schm);
+           (R, Entity (Subtype_Mark (N)), In_Iter_Schm => In_Iter_Schm);
 
-      elsif Nkind (I) = N_Attribute_Reference then
+      elsif Nkind (N) = N_Attribute_Reference then
 
-         --  The parser guarantees that the attribute is a RANGE attribute
+         --  Catch beginner's error (use of attribute other than 'Range)
 
-         --  If the node denotes the range of a type mark, that is also the
-         --  resulting type, and we do no need to create an Itype for it.
-
-         if Is_Entity_Name (Prefix (I))
-           and then Comes_From_Source (I)
-           and then Is_Type (Entity (Prefix (I)))
-           and then Is_Discrete_Type (Entity (Prefix (I)))
-         then
-            Def_Id := Entity (Prefix (I));
+         if Attribute_Name (N) /= Name_Range then
+            Error_Msg_N ("expect attribute ''Range", N);
+            Set_Etype (N, Any_Type);
+            return;
          end if;
 
-         Analyze_And_Resolve (I);
-         T := Etype (I);
-         R := I;
+         --  If the node denotes the range of a type mark, that is also the
+         --  resulting type, and we do not need to create an Itype for it.
+
+         if Is_Entity_Name (Prefix (N))
+           and then Comes_From_Source (N)
+           and then Is_Type (Entity (Prefix (N)))
+           and then Is_Discrete_Type (Entity (Prefix (N)))
+         then
+            Def_Id := Entity (Prefix (N));
+         end if;
+
+         Analyze_And_Resolve (N);
+         T := Etype (N);
+         R := N;
 
       --  If none of the above, must be a subtype. We convert this to a
       --  range attribute reference because in the case of declared first
@@ -17307,9 +17338,9 @@ package body Sem_Ch3 is
       --  original index for instantiation purposes.
 
       else
-         if not Is_Entity_Name (I) or else not Is_Type (Entity (I)) then
-            Error_Msg_N ("invalid subtype mark in discrete range ", I);
-            Set_Etype (I, Any_Integer);
+         if not Is_Entity_Name (N) or else not Is_Type (Entity (N)) then
+            Error_Msg_N ("invalid subtype mark in discrete range ", N);
+            Set_Etype (N, Any_Integer);
             return;
 
          else
@@ -17317,31 +17348,31 @@ package body Sem_Ch3 is
             --  now that we can get the full view, previous analysis does
             --  not look specifically for a type mark.
 
-            Set_Entity (I, Get_Full_View (Entity (I)));
-            Set_Etype  (I, Entity (I));
-            Def_Id := Entity (I);
+            Set_Entity (N, Get_Full_View (Entity (N)));
+            Set_Etype  (N, Entity (N));
+            Def_Id := Entity (N);
 
             if not Is_Discrete_Type (Def_Id) then
-               Error_Msg_N ("discrete type required for index", I);
-               Set_Etype (I, Any_Type);
+               Error_Msg_N ("discrete type required for index", N);
+               Set_Etype (N, Any_Type);
                return;
             end if;
          end if;
 
          if Expander_Active then
-            Rewrite (I,
-              Make_Attribute_Reference (Sloc (I),
+            Rewrite (N,
+              Make_Attribute_Reference (Sloc (N),
                 Attribute_Name => Name_Range,
-                Prefix         => Relocate_Node (I)));
+                Prefix         => Relocate_Node (N)));
 
             --  The original was a subtype mark that does not freeze. This
             --  means that the rewritten version must not freeze either.
 
-            Set_Must_Not_Freeze (I);
-            Set_Must_Not_Freeze (Prefix (I));
-            Analyze_And_Resolve (I);
-            T := Etype (I);
-            R := I;
+            Set_Must_Not_Freeze (N);
+            Set_Must_Not_Freeze (Prefix (N));
+            Analyze_And_Resolve (N);
+            T := Etype (N);
+            R := N;
 
          --  If expander is inactive, type is legal, nothing else to construct
 
@@ -17351,12 +17382,12 @@ package body Sem_Ch3 is
       end if;
 
       if not Is_Discrete_Type (T) then
-         Error_Msg_N ("discrete type required for range", I);
-         Set_Etype (I, Any_Type);
+         Error_Msg_N ("discrete type required for range", N);
+         Set_Etype (N, Any_Type);
          return;
 
       elsif T = Any_Type then
-         Set_Etype (I, Any_Type);
+         Set_Etype (N, Any_Type);
          return;
       end if;
 
@@ -17398,12 +17429,16 @@ package body Sem_Ch3 is
          Set_Scalar_Range   (Def_Id, R);
          Conditional_Delay  (Def_Id, T);
 
+         if Nkind (N) = N_Subtype_Indication then
+            Inherit_Predicate_Flags (Def_Id, Entity (Subtype_Mark (N)));
+         end if;
+
          --  In the subtype indication case, if the immediate parent of the
          --  new subtype is non-static, then the subtype we create is non-
          --  static, even if its bounds are static.
 
-         if Nkind (I) = N_Subtype_Indication
-           and then not Is_OK_Static_Subtype (Entity (Subtype_Mark (I)))
+         if Nkind (N) = N_Subtype_Indication
+           and then not Is_OK_Static_Subtype (Entity (Subtype_Mark (N)))
          then
             Set_Is_Non_Static_Subtype (Def_Id);
          end if;
@@ -17411,7 +17446,7 @@ package body Sem_Ch3 is
 
       --  Final step is to label the index with this constructed type
 
-      Set_Etype (I, Def_Id);
+      Set_Etype (N, Def_Id);
    end Make_Index;
 
    ------------------------------
@@ -18110,12 +18145,12 @@ package body Sem_Ch3 is
             end if;
          end if;
 
-         --  A discriminant cannot be volatile. This check is only relevant
-         --  when SPARK_Mode is on as it is not standard Ada legality rule
-         --  (SPARK RM 7.1.3(6)).
+         --  A discriminant cannot be effectively volatile. This check is only
+         --  relevant when SPARK_Mode is on as it is not standard Ada legality
+         --  rule (SPARK RM 7.1.3(6)).
 
          if SPARK_Mode = On
-           and then Is_SPARK_Volatile (Defining_Identifier (Discr))
+           and then Is_Effectively_Volatile (Defining_Identifier (Discr))
          then
             Error_Msg_N ("discriminant cannot be volatile", Discr);
          end if;
@@ -19019,9 +19054,10 @@ package body Sem_Ch3 is
    procedure Process_Range_Expr_In_Decl
      (R            : Node_Id;
       T            : Entity_Id;
-      Check_List   : List_Id := Empty_List;
-      R_Check_Off  : Boolean := False;
-      In_Iter_Schm : Boolean := False)
+      Subtyp       : Entity_Id := Empty;
+      Check_List   : List_Id   := Empty_List;
+      R_Check_Off  : Boolean   := False;
+      In_Iter_Schm : Boolean   := False)
    is
       Lo, Hi      : Node_Id;
       R_Checks    : Check_Result;
@@ -19143,8 +19179,81 @@ package body Sem_Ch3 is
             --  not supposed to occur, e.g. on default parameters of a call.
 
             if Expander_Active or GNATprove_Mode then
-               Force_Evaluation (Lo);
-               Force_Evaluation (Hi);
+
+               --  If no subtype name, then just call Force_Evaluation to
+               --  create declarations as needed to deal with side effects.
+               --  Also ignore calls from within a record type, where we
+               --  have possible scoping issues.
+
+               if No (Subtyp) or else Is_Record_Type (Current_Scope) then
+                  Force_Evaluation (Lo);
+                  Force_Evaluation (Hi);
+
+               --  If a subtype is given, then we capture the bounds if they
+               --  are not known at compile time, using constant identifiers
+               --  xxx_FIRST and xxx_LAST where xxx is the name of the subtype.
+
+               --  Note: we do this transformation even if expansion is not
+               --  active, and in particular we do it in GNATprove_Mode since
+               --  the transformation is in general required to ensure that the
+               --  resulting tree has proper Ada semantics.
+
+               --  Historical note: We used to just do Force_Evaluation calls
+               --  in all cases, but it is better to capture the bounds with
+               --  proper non-serialized names, since these will be accessed
+               --  from other units, and hence may be public, and also we can
+               --  then expand 'First and 'Last references to be references to
+               --  these special names.
+
+               else
+                  if not Compile_Time_Known_Value (Lo)
+
+                    --  No need to capture bounds if they already are
+                    --  references to constants.
+
+                    and then not (Is_Entity_Name (Lo)
+                                   and then Is_Constant_Object (Entity (Lo)))
+                  then
+                     declare
+                        Loc : constant Source_Ptr := Sloc (Lo);
+                        Lov : constant Entity_Id  :=
+                          Make_Defining_Identifier (Loc,
+                            Chars =>
+                              New_External_Name (Chars (Subtyp), "_FIRST"));
+                     begin
+                        Insert_Action (R,
+                          Make_Object_Declaration (Loc,
+                            Defining_Identifier => Lov,
+                            Object_Definition   =>
+                              New_Occurrence_Of (Base_Type (T), Loc),
+                            Constant_Present    => True,
+                            Expression          => Relocate_Node (Lo)));
+                        Rewrite (Lo, New_Occurrence_Of (Lov, Loc));
+                     end;
+                  end if;
+
+                  if not Compile_Time_Known_Value (Hi)
+                    and then not (Is_Entity_Name (Hi)
+                                  and then Is_Constant_Object (Entity (Hi)))
+                  then
+                     declare
+                        Loc : constant Source_Ptr := Sloc (Hi);
+                        Hiv : constant Entity_Id  :=
+                          Make_Defining_Identifier (Loc,
+                            Chars =>
+                              New_External_Name (Chars (Subtyp), "_LAST"));
+                     begin
+                        Insert_Action (R,
+                          Make_Object_Declaration (Loc,
+                            Defining_Identifier => Hiv,
+                            Object_Definition   =>
+                              New_Occurrence_Of (Base_Type (T), Loc),
+                            Constant_Present    => True,
+                            Expression          => Relocate_Node (Hi)));
+                        Rewrite (Hi, New_Occurrence_Of (Hiv, Loc));
+                     end;
+                  end if;
+               end if;
             end if;
 
             --  We use a flag here instead of suppressing checks on the
@@ -19573,6 +19682,7 @@ package body Sem_Ch3 is
 
             when Enumeration_Kind =>
                Constrain_Enumeration (Def_Id, S);
+               Inherit_Predicate_Flags (Def_Id, Subtype_Mark_Id);
 
             when Ordinary_Fixed_Point_Kind =>
                Constrain_Ordinary_Fixed (Def_Id, S);
@@ -19582,6 +19692,7 @@ package body Sem_Ch3 is
 
             when Integer_Kind =>
                Constrain_Integer (Def_Id, S);
+               Inherit_Predicate_Flags (Def_Id, Subtype_Mark_Id);
 
             when E_Record_Type     |
                  E_Record_Subtype  |
@@ -20333,7 +20444,7 @@ package body Sem_Ch3 is
         or else Null_Present (Component_List (Def))
       then
          if not Is_Tagged_Type (T) then
-            Check_SPARK_Restriction ("non-tagged record cannot be null", Def);
+            Check_SPARK_Restriction ("untagged record cannot be null", Def);
          end if;
 
       else
@@ -20568,7 +20679,7 @@ package body Sem_Ch3 is
       --  catch possible premature use in the bounds themselves.
 
       Set_Ekind (Def_Id, E_Void);
-      Process_Range_Expr_In_Decl (R, Subt);
+      Process_Range_Expr_In_Decl (R, Subt, Subtyp => Def_Id);
       Set_Ekind (Def_Id, Kind);
    end Set_Scalar_Range_For_Subtype;
 

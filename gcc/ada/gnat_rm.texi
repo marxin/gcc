@@ -490,6 +490,7 @@ Partition-Wide Restrictions
 Program Unit Level Restrictions
 
 * No_Elaboration_Code::
+* No_Elaboration_Code_All::
 * No_Entry_Queue::
 * No_Implementation_Aspect_Specifications::
 * No_Implementation_Attributes::
@@ -650,7 +651,6 @@ The GNAT Library
 * GNAT.Wide_Wide_String_Split (g-zistsp.ads)::
 * Interfaces.C.Extensions (i-cexten.ads)::
 * Interfaces.C.Streams (i-cstrea.ads)::
-* Interfaces.CPP (i-cpp.ads)::
 * Interfaces.Packed_Decimal (i-pacdec.ads)::
 * Interfaces.VxWorks (i-vxwork.ads)::
 * Interfaces.VxWorks.IO (i-vxwoio.ads)::
@@ -1567,12 +1567,12 @@ useful when the pragma or aspect argument references subprograms
 in a with'ed package which is replaced by a dummy package
 for the final build.
 
-The implementation defined policy @code{Assertions} applies to all
+The implementation defined assertion kind @code{Assertions} applies to all
 assertion kinds. The form with no assertion kind given implies this
 choice, so it applies to all assertion kinds (RM defined, and
 implementation defined).
 
-The implementation defined policy @code{Statement_Assertions}
+The implementation defined assertion kind @code{Statement_Assertions}
 applies to @code{Assert}, @code{Assert_And_Cut},
 @code{Assume}, @code{Loop_Invariant}, and @code{Loop_Variant}.
 
@@ -2883,13 +2883,7 @@ MECHANISM ::=
 MECHANISM_ASSOCIATION ::=
   [formal_parameter_NAME =>] MECHANISM_NAME
 
-MECHANISM_NAME ::=
-  Value
-| Reference
-| Descriptor [([Class =>] CLASS_NAME)]
-| Short_Descriptor [([Class =>] CLASS_NAME)]
-
-CLASS_NAME ::= ubs | ubsb | uba | s | sb | a
+MECHANISM_NAME ::= Value | Reference
 @end smallexample
 
 @noindent
@@ -2916,13 +2910,6 @@ exactly match the subtypes in the corresponding function specification,
 using positional notation to match parameters with subtype marks.
 The form with an @code{'Access} attribute can be used to match an
 anonymous access parameter.
-
-@cindex OpenVMS
-@cindex Passing by descriptor
-Passing by descriptor is supported only on the OpenVMS ports of GNAT@.
-The default behavior for Export_Function is to accept either 64bit or
-32bit descriptors unless short_descriptor is specified, then only 32bit
-descriptors are accepted.
 
 @cindex Suppressing external name
 Special treatment is given if the EXTERNAL is an explicit null
@@ -2988,13 +2975,7 @@ MECHANISM ::=
 MECHANISM_ASSOCIATION ::=
   [formal_parameter_NAME =>] MECHANISM_NAME
 
-MECHANISM_NAME ::=
-  Value
-| Reference
-| Descriptor [([Class =>] CLASS_NAME)]
-| Short_Descriptor [([Class =>] CLASS_NAME)]
-
-CLASS_NAME ::= ubs | ubsb | uba | s | sb | a
+MECHANISM_NAME ::= Value | Reference
 @end smallexample
 
 @noindent
@@ -3006,13 +2987,6 @@ present, @code{Convention Ada} is assumed, which is usually
 not what is wanted, so it is usually appropriate to use this
 pragma in conjunction with a @code{Export} or @code{Convention}
 pragma that specifies the desired foreign convention.
-
-@cindex OpenVMS
-@cindex Passing by descriptor
-Passing by descriptor is supported only on the OpenVMS ports of GNAT@.
-The default behavior for Export_Procedure is to accept either 64bit or
-32bit descriptors unless short_descriptor is specified, then only 32bit
-descriptors are accepted.
 
 @cindex Suppressing external name
 Special treatment is given if the EXTERNAL is an explicit null
@@ -3074,13 +3048,7 @@ MECHANISM ::=
 MECHANISM_ASSOCIATION ::=
   [formal_parameter_NAME =>] MECHANISM_NAME
 
-MECHANISM_NAME ::=
-  Value
-| Reference
-| Descriptor [([Class =>] CLASS_NAME)]
-| Short_Descriptor [([Class =>] CLASS_NAME)]
-
-CLASS_NAME ::= ubs | ubsb | uba | s | sb | a
+MECHANISM_NAME ::= Value | Reference
 @end smallexample
 
 @noindent
@@ -3097,13 +3065,6 @@ not what is wanted since the whole point of this pragma is to interface
 with foreign language functions, so it is usually appropriate to use this
 pragma in conjunction with a @code{Export} or @code{Convention}
 pragma that specifies the desired foreign convention.
-
-@cindex OpenVMS
-@cindex Passing by descriptor
-Passing by descriptor is supported only on the OpenVMS ports of GNAT@.
-The default behavior for Export_Valued_Procedure is to accept either 64bit or
-32bit descriptors unless short_descriptor is specified, then only 32bit
-descriptors are accepted.
 
 @cindex Suppressing external name
 Special treatment is given if the EXTERNAL is an explicit null
@@ -3426,17 +3387,8 @@ pragma Ident (static_string_EXPRESSION);
 @end smallexample
 
 @noindent
-This pragma provides a string identification in the generated object file,
-if the system supports the concept of this kind of identification string.
-This pragma is allowed only in the outermost declarative part or
-declarative items of a compilation unit. If more than one @code{Ident}
-pragma is given, only the last one processed is effective.
-@cindex OpenVMS
-On OpenVMS systems, the effect of the pragma is identical to the effect of
-the DEC Ada 83 pragma of the same name. Note that in DEC Ada 83, the
-maximum allowed length is 31 characters, so if it is important to
-maintain compatibility with this compiler, you should obey this length
-limit.
+This pragma is identical in effect to pragma @code{Comment}. It is provided
+for compatibility with other Ada compilers providing this pragma.
 
 @node Pragma Implementation_Defined
 @unnumberedsec Pragma Implementation_Defined
@@ -3608,8 +3560,7 @@ pragma Import_Function (
   [, [Parameter_Types          =>] PARAMETER_TYPES]
   [, [Result_Type              =>] SUBTYPE_MARK]
   [, [Mechanism                =>] MECHANISM]
-  [, [Result_Mechanism         =>] MECHANISM_NAME]
-  [, [First_Optional_Parameter =>] IDENTIFIER]);
+  [, [Result_Mechanism         =>] MECHANISM_NAME]);
 
 EXTERNAL_SYMBOL ::=
   IDENTIFIER
@@ -3633,10 +3584,6 @@ MECHANISM_ASSOCIATION ::=
 MECHANISM_NAME ::=
   Value
 | Reference
-| Descriptor [([Class =>] CLASS_NAME)]
-| Short_Descriptor [([Class =>] CLASS_NAME)]
-
-CLASS_NAME ::= ubs | ubsb | uba | s | sb | a | nca
 @end smallexample
 
 @noindent
@@ -3664,21 +3611,6 @@ applies to all parameters.  Otherwise you may specify a mechanism on a
 parameter by parameter basis using either positional or named
 notation.  If the mechanism is not specified, the default mechanism
 is used.
-
-@cindex OpenVMS
-@cindex Passing by descriptor
-Passing by descriptor is supported only on the OpenVMS ports of GNAT@.
-The default behavior for Import_Function is to pass a 64bit descriptor
-unless short_descriptor is specified, then a 32bit descriptor is passed.
-
-@code{First_Optional_Parameter} applies only to OpenVMS ports of GNAT@.
-It specifies that the designated parameter and all following parameters
-are optional, meaning that they are not passed at the generated code
-level (this is distinct from the notion of optional parameters in Ada
-where the parameters are passed anyway with the designated optional
-parameters).  All optional parameters must be of mode @code{IN} and have
-default parameter values that are either known at compile time
-expressions, or uses of the @code{'Null_Parameter} attribute.
 
 @node Pragma Import_Object
 @unnumberedsec Pragma Import_Object
@@ -3717,8 +3649,7 @@ pragma Import_Procedure (
      [Internal                 =>] LOCAL_NAME
   [, [External                 =>] EXTERNAL_SYMBOL]
   [, [Parameter_Types          =>] PARAMETER_TYPES]
-  [, [Mechanism                =>] MECHANISM]
-  [, [First_Optional_Parameter =>] IDENTIFIER]);
+  [, [Mechanism                =>] MECHANISM]);
 
 EXTERNAL_SYMBOL ::=
   IDENTIFIER
@@ -3739,13 +3670,7 @@ MECHANISM ::=
 MECHANISM_ASSOCIATION ::=
   [formal_parameter_NAME =>] MECHANISM_NAME
 
-MECHANISM_NAME ::=
-  Value
-| Reference
-| Descriptor [([Class =>] CLASS_NAME)]
-| Short_Descriptor [([Class =>] CLASS_NAME)]
-
-CLASS_NAME ::= ubs | ubsb | uba | s | sb | a | nca
+MECHANISM_NAME ::= Value | Reference
 @end smallexample
 
 @noindent
@@ -3764,8 +3689,7 @@ pragma Import_Valued_Procedure (
      [Internal                 =>] LOCAL_NAME
   [, [External                 =>] EXTERNAL_SYMBOL]
   [, [Parameter_Types          =>] PARAMETER_TYPES]
-  [, [Mechanism                =>] MECHANISM]
-  [, [First_Optional_Parameter =>] IDENTIFIER]);
+  [, [Mechanism                =>] MECHANISM]);
 
 EXTERNAL_SYMBOL ::=
   IDENTIFIER
@@ -3786,13 +3710,7 @@ MECHANISM ::=
 MECHANISM_ASSOCIATION ::=
   [formal_parameter_NAME =>] MECHANISM_NAME
 
-MECHANISM_NAME ::=
-  Value
-| Reference
-| Descriptor [([Class =>] CLASS_NAME)]
-| Short_Descriptor [([Class =>] CLASS_NAME)]
-
-CLASS_NAME ::= ubs | ubsb | uba | s | sb | a | nca
+MECHANISM_NAME ::= Value | Reference
 @end smallexample
 
 @noindent
@@ -5331,7 +5249,7 @@ and whose type is potentially persistent. If no argument is given, then
 the pragma is a configuration pragma, and applies to all library level
 objects with no explicit initialization of potentially persistent types.
 
-A potentially persistent type is a scalar type, or a non-tagged,
+A potentially persistent type is a scalar type, or an untagged,
 non-discriminated record, all of whose components have no explicit
 initialization and are themselves of a potentially persistent type,
 or an array, all of whose constraints are static, and whose component
@@ -6436,11 +6354,8 @@ pragma Short_Descriptors
 @end smallexample
 
 @noindent
-In VMS versions of the compiler, this configuration pragma causes all
-occurrences of the mechanism types Descriptor[_xxx] to be treated as
-Short_Descriptor[_xxx]. This is helpful in porting legacy applications from a
-32-bit environment to a 64-bit environment. This pragma is ignored for non-VMS
-versions.
+This pragma is provided for compatibility with other Ada implementations. It
+is recognized but ignored by all current versions of GNAT.
 
 @node Pragma Simple_Storage_Pool_Type
 @unnumberedsec Pragma Simple_Storage_Pool_Type
@@ -7216,7 +7131,7 @@ The meaning of a test case is that there is at least one context where
 that context, then @code{Ensures} holds when the subprogram returns.
 Mode @code{Nominal} indicates that the input context should also satisfy the
 precondition of the subprogram, and the output context should also satisfy its
-postcondition. More @code{Robustness} indicates that the precondition and
+postcondition. Mode @code{Robustness} indicates that the precondition and
 postcondition of the subprogram should be ignored for this test case.
 
 @node Pragma Thread_Local_Storage
@@ -9260,27 +9175,7 @@ meaning the first parameter) of @var{subprogram}.  The code returned is:
 by copy (value)
 @item 2
 by reference
-@item 3
-by descriptor (default descriptor class)
-@item 4
-by descriptor (UBS: unaligned bit string)
-@item 5
-by descriptor (UBSB: aligned bit string with arbitrary bounds)
-@item 6
-by descriptor (UBA: unaligned bit array)
-@item 7
-by descriptor (S: string, also scalar access type parameter)
-@item 8
-by descriptor (SB: string with arbitrary bounds)
-@item 9
-by descriptor (A: contiguous array)
-@item 10
-by descriptor (NCA: non-contiguous array)
 @end table
-
-@noindent
-Values from 3 through 10 are only relevant to Digital OpenVMS implementations.
-@cindex OpenVMS
 
 @node Attribute Null_Parameter
 @unnumberedsec Attribute Null_Parameter
@@ -10164,6 +10059,16 @@ be determined at compile time that the prefix of the attribute has no
 scalar parts (e.g., if the prefix is of an access type, an interface type,
 an undiscriminated task type, or an undiscriminated protected type).
 
+For scalar types, @code{Valid_Scalars} is equivalent to @code{Valid}. The use
+of this attribute is not permitted for @code{Unchecked_Union} types for which
+in general it is not possible to determine the values of the discriminants.
+
+Note: @code{Valid_Scalars} can generate a lot of code, especially in the case
+of a large variant record. If the attribute is called in many places in the
+same program applied to objects of the same type, it can reduce program size
+to write a function with a single use of the attribute, and then call that
+function from multiple places.
+
 @node Attribute VADS_Size
 @unnumberedsec Attribute VADS_Size
 @cindex @code{Size}, VADS compatibility
@@ -10586,7 +10491,7 @@ statements (raise with no operand) are not permitted.
 [GNAT] This restriction ensures at compile time that no stream operations for
 types Exception_Id or Exception_Occurrence are used. This also makes it
 impossible to pass exceptions to or from a partition with this restriction
-in a distributed environment. If this exception is active, then the generated
+in a distributed environment. If this restriction is active, the generated
 code is simplified by omitting the otherwise-required global registration
 of exceptions when they are declared.
 
@@ -10955,6 +10860,7 @@ other compilation units in the partition.
 
 @menu
 * No_Elaboration_Code::
+* No_Elaboration_Code_All::
 * No_Entry_Queue::
 * No_Implementation_Aspect_Specifications::
 * No_Implementation_Attributes::
@@ -11014,6 +10920,22 @@ optimizer can figure this out.
 Note that this the implementation of this restriction requires full
 code generation. If it is used in conjunction with "semantics only"
 checking, then some cases of violations may be missed.
+
+@node No_Elaboration_Code_All
+@unnumberedsubsec No_Elaboration_Code_All
+@findex No_Elaboration_Code_All
+
+This restriction is identical in semantic effects to
+@code{No_Elaboration_Code}, and
+for most purposes is treated simply as a synonym of @code{No_Elaboration_Code}.
+
+The difference is that if @code{No_Elaboration_Code_All} is used then it
+must appear within a package or subprogram spec. As is the case for
+@code{No_Elaboration_Code}, it also applies to the corresponding body if
+there is one. In addition, any with'ed unit must itself contain a
+@code{No_Elaboration_Code_All} restriction,
+thus allowing transitive enforcement of the requirement for no elaboration
+code to be generated.
 
 @node No_Entry_Queue
 @unnumberedsubsec No_Entry_Queue
@@ -11102,16 +11024,16 @@ type @code{Character}).
 forbidden in SPARK 2005 are not present. Error messages related to
 SPARK restriction have the form:
 
+@smallexample
+violation of restriction "SPARK_05" at <source-location>
+ <error message>
+@end smallexample
+
 @findex SPARK
 The restriction @code{SPARK} is recognized as a
 synonym for @code{SPARK_05}. This is retained for historical
 compatibility purposes (and an unconditional warning will be generated
-for its use, advising replacement by @code{SPARK}.
-
-@smallexample
-violation of restriction "SPARK" at <file>
- <error message>
-@end smallexample
+for its use, advising replacement by @code{SPARK}).
 
 This is not a replacement for the semantic checks performed by the
 SPARK Examiner tool, as the compiler currently only deals with code,
@@ -11127,7 +11049,7 @@ This restriction can be useful in providing an initial filter for code
 developed using SPARK 2005, or in examining legacy code to see how far
 it is from meeting SPARK restrictions.
 
-The list below summarises the checks that are performed when this
+The list below summarizes the checks that are performed when this
 restriction is in force:
 @itemize @bullet
 @item No block statements
@@ -11187,7 +11109,7 @@ restriction is in force:
 @item Modular type modulus must be power of 2
 @item Base not allowed on subtype mark
 @item Unary operators not allowed on modular types (except not)
-@item Non-tagged record cannot be null
+@item Untagged record cannot be null
 @item No class-wide operations
 @item Initialization expressions must respect SPARK restrictions
 @item Non-static ranges not allowed except in iteration schemes
@@ -12138,9 +12060,7 @@ convention.  Any declarations useful for interfacing to any language on
 the given hardware architecture should be provided directly in
 @code{Interfaces}.
 @end cartouche
-Followed. An additional package not defined
-in the Ada Reference Manual is @code{Interfaces.CPP}, used
-for interfacing to C++.
+Followed.
 
 @sp 1
 @cartouche
@@ -19015,7 +18935,6 @@ of GNAT, and will generate a warning message.
 * GNAT.Wide_Wide_String_Split (g-zistsp.ads)::
 * Interfaces.C.Extensions (i-cexten.ads)::
 * Interfaces.C.Streams (i-cstrea.ads)::
-* Interfaces.CPP (i-cpp.ads)::
 * Interfaces.Packed_Decimal (i-pacdec.ads)::
 * Interfaces.VxWorks (i-vxwork.ads)::
 * Interfaces.VxWorks.IO (i-vxwoio.ads)::
@@ -20462,17 +20381,6 @@ to C libraries.
 @noindent
 This package is a binding for the most commonly used operations
 on C streams.
-
-@node Interfaces.CPP (i-cpp.ads)
-@section @code{Interfaces.CPP} (@file{i-cpp.ads})
-@cindex @code{Interfaces.CPP} (@file{i-cpp.ads})
-@cindex  C++ interfacing
-@cindex  Interfacing, to C++
-
-@noindent
-This package provides facilities for use in interfacing to C++.  It
-is primarily intended to be used in connection with automated tools
-for the generation of C++ interfaces.
 
 @node Interfaces.Packed_Decimal (i-pacdec.ads)
 @section @code{Interfaces.Packed_Decimal} (@file{i-pacdec.ads})

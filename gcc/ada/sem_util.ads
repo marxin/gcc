@@ -88,8 +88,8 @@ package Sem_Util is
    function Addressable (V : Uint) return Boolean;
    function Addressable (V : Int)  return Boolean;
    pragma Inline (Addressable);
-   --  Returns True if the value of V is the word size of an addressable
-   --  factor of the word size (typically 8, 16, 32 or 64).
+   --  Returns True if the value of V is the word size or an addressable factor
+   --  of the word size (typically 8, 16, 32 or 64).
 
    procedure Aggregate_Constraint_Checks
      (Exp       : Node_Id;
@@ -318,12 +318,6 @@ package Sem_Util is
    --  Check whether the expression is a pointer to a protected component,
    --  and the context is external to the protected operation, to warn against
    --  a possible unlocked access to data.
-
-   procedure Check_VMS (Construct : Node_Id);
-   --  Check that this the target is OpenVMS, and if so, return with no effect,
-   --  otherwise post an error noting this can only be used with OpenVMS ports.
-   --  The argument is the construct in question and is used to post the error
-   --  message.
 
    procedure Collect_Interfaces
      (T               : Entity_Id;
@@ -567,6 +561,12 @@ package Sem_Util is
    --  (Ekind is E_In_Parameter, E_Out_Parameter, or E_In_Out_Parameter) and
    --  Call is set to the node for the corresponding call. If the node N is not
    --  an actual parameter then Formal and Call are set to Empty.
+
+   function Find_Specific_Type (CW : Entity_Id) return Entity_Id;
+   --  Find specific type of a class-wide type, and handle the case of an
+   --  incomplete type coming either from a limited_with clause or from an
+   --  incomplete type declaration. If resulting type is private return its
+   --  full view.
 
    function Find_Body_Discriminal
      (Spec_Discriminant : Entity_Id) return Entity_Id;
@@ -1165,6 +1165,15 @@ package Sem_Util is
    --  This is the RM definition, a type is a descendent of another type if it
    --  is the same type or is derived from a descendent of the other type.
 
+   function Is_Effectively_Volatile (Id : Entity_Id) return Boolean;
+   --  The SPARK property "effectively volatile" applies to both types and
+   --  objects. To qualify as such, an entity must be either volatile or be
+   --  (of) an array type subject to aspect Volatile_Components.
+
+   function Is_Effectively_Volatile_Object (N : Node_Id) return Boolean;
+   --  Determine whether an arbitrary node denotes an effectively volatile
+   --  object.
+
    function Is_Expression_Function (Subp : Entity_Id) return Boolean;
    --  Predicate to determine whether a scope entity comes from a rewritten
    --  expression function call, and should be inlined unconditionally. Also
@@ -1203,16 +1212,6 @@ package Sem_Util is
    --  AI05-0139-2: Check whether Typ is one of the predefined interfaces in
    --  Ada.Iterator_Interfaces, or it is derived from one.
 
-   function Is_Junk_Name (N : Name_Id) return Boolean;
-   --  Returns True if the given name contains any of the following substrings
-   --    discard
-   --    dummy
-   --    ignore
-   --    junk
-   --    unused
-   --  Used to suppress warnings on names matching these patterns. The contents
-   --  of Name_Buffer and Name_Len are desteoyed by this call.
-
    type Is_LHS_Result is (Yes, No, Unknown);
    function Is_LHS (N : Node_Id) return Is_LHS_Result;
    --  Returns Yes if N is definitely used as Name in an assignment statement.
@@ -1246,7 +1245,7 @@ package Sem_Util is
    --  Used to test if AV is an acceptable formal for an OUT or IN OUT formal.
    --  Note that the Is_Variable function is not quite the right test because
    --  this is a case in which conversions whose expression is a variable (in
-   --  the Is_Variable sense) with a non-tagged type target are considered view
+   --  the Is_Variable sense) with an untagged type target are considered view
    --  conversions and hence variables.
 
    function Is_Partially_Initialized_Type
@@ -1270,7 +1269,7 @@ package Sem_Util is
 
    function Is_Potentially_Persistent_Type (T : Entity_Id) return Boolean;
    --  Determines if type T is a potentially persistent type. A potentially
-   --  persistent type is defined (recursively) as a scalar type, a non-tagged
+   --  persistent type is defined (recursively) as a scalar type, an untagged
    --  record whose components are all of a potentially persistent type, or an
    --  array with all static constraints whose component type is potentially
    --  persistent. A private type is potentially persistent if the full type
@@ -1313,18 +1312,6 @@ package Sem_Util is
 
    function Is_SPARK_Object_Reference (N : Node_Id) return Boolean;
    --  Determines if the tree referenced by N represents an object in SPARK
-
-   function Is_SPARK_Volatile (Id : Entity_Id) return Boolean;
-   --  This routine is similar to predicate Is_Volatile, but it takes SPARK
-   --  semantics into account. In SPARK volatile components to not render a
-   --  type volatile.
-
-   function Is_SPARK_Volatile_Object (N : Node_Id) return Boolean;
-   --  Determine whether an arbitrary node denotes a volatile object reference
-   --  according to the semantics of SPARK. To qualify as volatile, an object
-   --  must be subject to aspect/pragma Volatile or Atomic, or have a [sub]type
-   --  subject to the same attributes. Note that volatile components do not
-   --  render an object volatile.
 
    function Is_Statement (N : Node_Id) return Boolean;
    pragma Inline (Is_Statement);
@@ -1372,16 +1359,12 @@ package Sem_Util is
    function Is_Variable_Size_Record (E : Entity_Id) return Boolean;
    --  Returns true if E has variable size components
 
-   function Is_VMS_Operator (Op : Entity_Id) return Boolean;
-   --  Determine whether an operator is one of the intrinsics defined
-   --  in the DEC system extension.
-
    function Is_Variable
      (N                 : Node_Id;
       Use_Original_Node : Boolean := True) return Boolean;
    --  Determines if the tree referenced by N represents a variable, i.e. can
    --  appear on the left side of an assignment. There is one situation (formal
-   --  parameters) in which non-tagged type conversions are also considered
+   --  parameters) in which untagged type conversions are also considered
    --  variables, but Is_Variable returns False for such cases, since it has
    --  no knowledge of the context. Note that this is the point at which
    --  Assignment_OK is checked, and True is returned for any tree thus marked.
@@ -1582,11 +1565,6 @@ package Sem_Util is
    --  Note that the result produced is always an expression, not a parameter
    --  association node, even if named notation was used.
 
-   function No_Scalar_Parts (T : Entity_Id) return Boolean;
-   --  Tests if type T can be determined at compile time to have no scalar
-   --  parts in the sense of the Valid_Scalars attribute. Returns True if
-   --  this is the case, meaning that the result of Valid_Scalars is True.
-
    procedure Normalize_Actuals
      (N       : Node_Id;
       S       : Entity_Id;
@@ -1773,6 +1751,12 @@ package Sem_Util is
    --  Save the current SPARK_Mode in effect in Mode. Establish the SPARK_Mode
    --  (if any) of a package or a subprogram denoted by Context. This routine
    --  must be used in tandem with Restore_SPARK_Mode.
+
+   function Scalar_Part_Present (T : Entity_Id) return Boolean;
+   --  Tests if type T can be determined at compile time to have at least one
+   --  scalar part in the sense of the Valid_Scalars attribute. Returns True if
+   --  this is the case, and False if no scalar parts are present (meaning that
+   --  the result of Valid_Scalars applied to T is always vacuously True).
 
    function Scope_Within_Or_Same (Scope1, Scope2 : Entity_Id) return Boolean;
    --  Determines if the entity Scope1 is the same as Scope2, or if it is

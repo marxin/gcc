@@ -106,7 +106,7 @@ package body Sem_Ch6 is
    procedure Analyze_Null_Procedure
      (N             : Node_Id;
       Is_Completion : out Boolean);
-   --  A null procedure can be a declaration or (Ada 2012) a completion.
+   --  A null procedure can be a declaration or (Ada 2012) a completion
 
    procedure Analyze_Return_Statement (N : Node_Id);
    --  Common processing for simple and extended return statements
@@ -353,7 +353,12 @@ package body Sem_Ch6 is
          Analyze (New_Body);
          Set_Is_Inlined (Prev);
 
-      elsif Present (Prev) and then Comes_From_Source (Prev) then
+      --  If the expression function is a completion, the previous declaration
+      --  must come from source. We know already that appears in the current
+      --  scope. The entity itself may be internally created if within a body
+      --  to be inlined.
+
+      elsif Present (Prev) and then Comes_From_Source (Parent (Prev)) then
          Set_Has_Completion (Prev, False);
 
          --  An expression function that is a completion freezes the
@@ -468,34 +473,45 @@ package body Sem_Ch6 is
             Id    : constant Entity_Id := Defining_Entity (N);
 
          begin
-            if Nkind (Par) = N_Package_Specification
-              and then Decls = Visible_Declarations (Par)
-              and then Present (Private_Declarations (Par))
-              and then not Is_Empty_List (Private_Declarations (Par))
+            --  If this is a wrapper created for in an instance for a formal
+            --  subprogram, insert body after declaration, to be analyzed when
+            --  the enclosing instance is analyzed.
+
+            if GNATprove_Mode
+              and then Is_Generic_Actual_Subprogram (Defining_Entity (N))
             then
-               Decls := Private_Declarations (Par);
-            end if;
+               Insert_After (N, New_Body);
 
-            Insert_After (Last (Decls), New_Body);
-            Push_Scope (Id);
-            Install_Formals (Id);
-
-            --  Preanalyze the expression for name capture, except in an
-            --  instance, where this has been done during generic analysis,
-            --  and will be redone when analyzing the body.
-
-            declare
-               Expr : constant Node_Id := Expression (Ret);
-
-            begin
-               Set_Parent (Expr, Ret);
-
-               if not In_Instance then
-                  Preanalyze_Spec_Expression (Expr, Etype (Id));
+            else
+               if Nkind (Par) = N_Package_Specification
+                 and then Decls = Visible_Declarations (Par)
+                 and then Present (Private_Declarations (Par))
+                 and then not Is_Empty_List (Private_Declarations (Par))
+               then
+                  Decls := Private_Declarations (Par);
                end if;
-            end;
 
-            End_Scope;
+               Insert_After (Last (Decls), New_Body);
+               Push_Scope (Id);
+               Install_Formals (Id);
+
+               --  Preanalyze the expression for name capture, except in an
+               --  instance, where this has been done during generic analysis,
+               --  and will be redone when analyzing the body.
+
+               declare
+                  Expr : constant Node_Id := Expression (Ret);
+
+               begin
+                  Set_Parent (Expr, Ret);
+
+                  if not In_Instance then
+                     Preanalyze_Spec_Expression (Expr, Etype (Id));
+                  end if;
+               end;
+
+               End_Scope;
+            end if;
          end;
       end if;
 
@@ -976,6 +992,14 @@ package body Sem_Ch6 is
             then
                Error_Msg_N ("cannot return local access to subprogram", N);
             end if;
+
+         --  The expression cannot be of a formal incomplete type
+
+         elsif Ekind (Etype (Expr)) = E_Incomplete_Type
+           and then Is_Generic_Type (Etype (Expr))
+         then
+            Error_Msg_N
+              ("cannot return expression of a formal incomplete type", N);
          end if;
 
          --  If the result type is class-wide, then check that the return
@@ -1297,12 +1321,16 @@ package body Sem_Ch6 is
       --  Create new entities for body and formals
 
       Set_Defining_Unit_Name (Specification (Null_Body),
-        Make_Defining_Identifier (Loc, Chars (Defining_Entity (N))));
+        Make_Defining_Identifier
+          (Sloc (Defining_Entity (N)),
+           Chars (Defining_Entity (N))));
 
       Form := First (Parameter_Specifications (Specification (Null_Body)));
       while Present (Form) loop
          Set_Defining_Identifier (Form,
-           Make_Defining_Identifier (Loc, Chars (Defining_Identifier (Form))));
+           Make_Defining_Identifier
+             (Sloc (Defining_Identifier (Form)),
+              Chars (Defining_Identifier (Form))));
          Next (Form);
       end loop;
 
@@ -1378,19 +1406,14 @@ package body Sem_Ch6 is
          end if;
 
       else
-         --  The null procedure is a completion
+         --  The null procedure is a completion. We unconditionally rewrite
+         --  this as a null body (even if expansion is not active), because
+         --  there are various error checks that are applied on this body
+         --  when it is analyzed (e.g. correct aspect placement).
 
          Is_Completion := True;
-
-         if Expander_Active then
-            Rewrite (N, Null_Body);
-            Analyze (N);
-
-         else
-            Designator := Analyze_Subprogram_Specification (Spec);
-            Set_Has_Completion (Designator);
-            Set_Has_Completion (Prev);
-         end if;
+         Rewrite (N, Null_Body);
+         Analyze (N);
       end if;
    end Analyze_Null_Procedure;
 
@@ -1947,6 +1970,24 @@ package body Sem_Ch6 is
                      Error_Msg_NE
                        ("invalid use of incomplete type&",
                         Result_Definition (N), Typ);
+
+                  --  The return type of a subprogram body cannot be of a
+                  --  formal incomplete type.
+
+                  elsif Is_Generic_Type (Typ)
+                    and then Nkind (Parent (N)) = N_Subprogram_Body
+                  then
+                     Error_Msg_N
+                      ("return type cannot be a formal incomplete type",
+                        Result_Definition (N));
+
+                  elsif Is_Class_Wide_Type (Typ)
+                    and then Is_Generic_Type (Root_Type (Typ))
+                    and then Nkind (Parent (N)) = N_Subprogram_Body
+                  then
+                     Error_Msg_N
+                      ("return type cannot be a formal incomplete type",
+                        Result_Definition (N));
 
                   elsif Is_Tagged_Type (Typ) then
                      null;
@@ -3026,29 +3067,98 @@ package body Sem_Ch6 is
                --  We make two copies of the given spec, one for the new
                --  declaration, and one for the body.
 
-               --  This cannot be done for a compilation unit, which is not
-               --  in a context where we can insert a new spec.
-
                if No (Spec_Id)
                  and then GNATprove_Mode
-                 and then Debug_Flag_QQ
+
+                 --  Inlining does not apply during pre-analysis of code
+
                  and then Full_Analysis
+
+                 --  Inlining only applies to full bodies, not stubs
+
+                 and then Nkind (N) /= N_Subprogram_Body_Stub
+
+                 --  Inlining only applies to bodies in the source code, not to
+                 --  those generated by the compiler. In particular, expression
+                 --  functions, whose body is generated by the compiler, are
+                 --  treated specially by GNATprove.
+
                  and then Comes_From_Source (Body_Id)
+
+                 --  This cannot be done for a compilation unit, which is not
+                 --  in a context where we can insert a new spec.
+
                  and then Is_List_Member (N)
+
+                 --  Inlining only applies to subprograms without contracts,
+                 --  as a contract is a sign that GNATprove should perform a
+                 --  modular analysis of the subprogram instead of a contextual
+                 --  analysis at each call site. The same test is performed in
+                 --  Inline.Can_Be_Inlined_In_GNATprove_Mode. It is repeated
+                 --  here in another form (because the contract has not
+                 --  been attached to the body) to avoid frontend errors in
+                 --  case pragmas are used instead of aspects, because the
+                 --  corresponding pragmas in the body would not be transferred
+                 --  to the spec, leading to legality errors.
+
                  and then not Body_Has_Contract
                then
                   declare
                      Body_Spec : constant Node_Id :=
                                    Copy_Separate_Tree (Specification (N));
-                     New_Decl : constant Node_Id :=
-                                  Make_Subprogram_Declaration (Loc,
-                                    Copy_Separate_Tree (Specification (N)));
+                     New_Decl  : constant Node_Id :=
+                                   Make_Subprogram_Declaration (Loc,
+                                     Copy_Separate_Tree (Specification (N)));
+
+                     SPARK_Mode_Aspect : Node_Id;
+                     Aspects           : List_Id;
+                     Prag, Aspect      : Node_Id;
 
                   begin
                      Insert_Before (N, New_Decl);
                      Move_Aspects (From => N, To => New_Decl);
+
+                     --  Mark the newly moved aspects as not analyzed, so that
+                     --  their effect on New_Decl is properly analyzed.
+
+                     Aspect := First (Aspect_Specifications (New_Decl));
+                     while Present (Aspect) loop
+                        Set_Analyzed (Aspect, False);
+                        Next (Aspect);
+                     end loop;
+
                      Analyze (New_Decl);
+
+                     --  The analysis of the generated subprogram declaration
+                     --  may have introduced pragmas that need to be analyzed.
+
+                     Prag := Next (New_Decl);
+                     while Prag /= N loop
+                        Analyze (Prag);
+                        Next (Prag);
+                     end loop;
+
                      Spec_Id := Defining_Entity (New_Decl);
+
+                     --  As Body_Id originally comes from source, mark the new
+                     --  Spec_Id as such, which is required so that calls to
+                     --  this subprogram are registered in the local effects
+                     --  stored in ALI files for GNATprove.
+
+                     Set_Comes_From_Source (Spec_Id, True);
+
+                     --  If aspect SPARK_Mode was specified on the body, it
+                     --  needs to be repeated on the generated decl and the
+                     --  body. Since the original aspect was moved to the
+                     --  generated decl, copy it for the body.
+
+                     if Has_Aspect (Spec_Id, Aspect_SPARK_Mode) then
+                        SPARK_Mode_Aspect :=
+                          New_Copy (Find_Aspect (Spec_Id, Aspect_SPARK_Mode));
+                        Set_Analyzed (SPARK_Mode_Aspect, False);
+                        Aspects := New_List (SPARK_Mode_Aspect);
+                        Set_Aspect_Specifications (N, Aspects);
+                     end if;
 
                      Set_Specification (N, Body_Spec);
                      Body_Id := Analyze_Subprogram_Specification (Body_Spec);
@@ -3451,44 +3561,75 @@ package body Sem_Ch6 is
       --  mode where we want to expand some calls in place, even with expansion
       --  disabled, since the inlining eases formal verification.
 
-      --  Old semantics
-
-      if not Debug_Flag_Dot_K then
-         if Present (Spec_Id)
-           and then Expander_Active
-           and then
-             (Has_Pragma_Inline_Always (Spec_Id)
-              or else (Has_Pragma_Inline (Spec_Id) and Front_End_Inlining))
-         then
-            Build_Body_To_Inline (N, Spec_Id);
-
-         --  In GNATprove mode, inline only when there is a separate subprogram
-         --  declaration for now, as inlining of subprogram bodies acting as
-         --  declarations, or subprogram stubs, are not supported by frontend
-         --  inlining. This inlining should occur after analysis of the body,
-         --  so that it is known whether the value of SPARK_Mode applicable to
-         --  the body, which can be defined by a pragma inside the body.
-
-         elsif GNATprove_Mode
-           and then Full_Analysis
-           and then not Inside_A_Generic
-           and then Present (Spec_Id)
-           and then
-             Nkind (Parent (Parent (Spec_Id))) = N_Subprogram_Declaration
-           and then Can_Be_Inlined_In_GNATprove_Mode (Spec_Id, Body_Id)
-           and then not Body_Has_Contract
-         then
-            Build_Body_To_Inline (N, Spec_Id);
-         end if;
-
-      --  New semantics (enabled by debug flag gnatd.k for testing)
-
-      elsif Expander_Active
+      if not GNATprove_Mode
+        and then Expander_Active
         and then Serious_Errors_Detected = 0
         and then Present (Spec_Id)
         and then Has_Pragma_Inline (Spec_Id)
       then
-         Check_And_Build_Body_To_Inline (N, Spec_Id, Body_Id);
+         --  Legacy implementation (relying on frontend inlining)
+
+         if not Back_End_Inlining then
+            if Has_Pragma_Inline_Always (Spec_Id)
+              or else (Has_Pragma_Inline (Spec_Id) and Front_End_Inlining)
+            then
+               Build_Body_To_Inline (N, Spec_Id);
+            end if;
+
+         --  New implementation (relying on backend inlining). Enabled by
+         --  debug flag gnatd.z for testing
+
+         else
+            if Has_Pragma_Inline_Always (Spec_Id)
+              or else Optimization_Level > 0
+            then
+               --  Handle function returning an unconstrained type
+
+               if Comes_From_Source (Body_Id)
+                 and then Ekind (Spec_Id) = E_Function
+                 and then Returns_Unconstrained_Type (Spec_Id)
+               then
+                  Check_And_Split_Unconstrained_Function (N, Spec_Id, Body_Id);
+
+               else
+                  declare
+                     Body_Spec : constant Node_Id := Parent (Body_Id);
+                     Subp_Body : constant Node_Id := Parent (Body_Spec);
+                     Subp_Decl : constant List_Id := Declarations (Subp_Body);
+
+                  begin
+                     --  Do not pass inlining to the backend if the subprogram
+                     --  has declarations or statements which cannot be inlined
+                     --  by the backend. This check is done here to emit an
+                     --  error instead of the generic warning message reported
+                     --  by the GCC backend (ie. "function might not be
+                     --  inlinable").
+
+                     if Present (Subp_Decl)
+                       and then Has_Excluded_Declaration (Spec_Id, Subp_Decl)
+                     then
+                        null;
+
+                     elsif Has_Excluded_Statement
+                             (Spec_Id,
+                              Statements
+                                (Handled_Statement_Sequence (Subp_Body)))
+                     then
+                        null;
+
+                     --  If the backend inlining is available then at this
+                     --  stage we only have to mark the subprogram as inlined.
+                     --  The expander will take care of registering it in the
+                     --  table of subprograms inlined by the backend a part of
+                     --  processing calls to it (cf. Expand_Call)
+
+                     else
+                        Set_Is_Inlined (Spec_Id);
+                     end if;
+                  end;
+               end if;
+            end if;
+         end if;
 
       --  In GNATprove mode, inline only when there is a separate subprogram
       --  declaration for now, as inlining of subprogram bodies acting as
@@ -3505,7 +3646,7 @@ package body Sem_Ch6 is
         and then Can_Be_Inlined_In_GNATprove_Mode (Spec_Id, Body_Id)
         and then not Body_Has_Contract
       then
-         Check_And_Build_Body_To_Inline (N, Spec_Id, Body_Id);
+         Build_Body_To_Inline (N, Spec_Id);
       end if;
 
       --  Ada 2005 (AI-262): In library subprogram bodies, after the analysis
@@ -3639,6 +3780,7 @@ package body Sem_Ch6 is
         and then Nkind (Parent (Parent (Spec_Id))) = N_Subprogram_Declaration
       then
          Set_Body_To_Inline (Parent (Parent (Spec_Id)), Empty);
+         Set_Is_Inlined_Always (Spec_Id, False);
       end if;
 
       --  Check completion, and analyze the statements
@@ -4229,6 +4371,14 @@ package body Sem_Ch6 is
       else
          Set_Ekind (Designator, E_Procedure);
          Set_Etype (Designator, Standard_Void_Type);
+      end if;
+
+      --  Flag Is_Inlined_Always is True by default, and reversed to False for
+      --  those subprograms which could be inlined in GNATprove mode (because
+      --  Body_To_Inline is non-Empty) but cannot be inlined.
+
+      if GNATprove_Mode then
+         Set_Is_Inlined_Always (Designator);
       end if;
 
       --  Introduce new scope for analysis of the formals and the return type
@@ -6958,8 +7108,8 @@ package body Sem_Ch6 is
       Obj_Decl : Node_Id;
 
    begin
-      --  This check applies only if we have a subprogram declaration with a
-      --  non-tagged record type.
+      --  This check applies only if we have a subprogram declaration with an
+      --  untagged record type.
 
       if Nkind (Decl) /= N_Subprogram_Declaration
         or else not Is_Record_Type (Typ)
@@ -7124,21 +7274,38 @@ package body Sem_Ch6 is
          --  Check that the types of corresponding formals have the same
          --  generic actual if any. We have to account for subtypes of a
          --  generic formal, declared between a spec and a body, which may
-         --  appear distinct in an instance but matched in the generic.
+         --  appear distinct in an instance but matched in the generic, and
+         --  the subtype may be used either in the spec or the body of the
+         --  subprogram being checked.
 
          -------------------------
          -- Same_Generic_Actual --
          -------------------------
 
          function Same_Generic_Actual (T1, T2 : Entity_Id) return Boolean is
+
+            function Is_Declared_Subtype (S1, S2 : Entity_Id) return Boolean;
+            --  Predicate to check whether S1 is a subtype of S2 in the source
+            --  of the instance.
+
+            -------------------------
+            -- Is_Declared_Subtype --
+            -------------------------
+
+            function Is_Declared_Subtype (S1, S2 : Entity_Id) return Boolean is
+            begin
+               return Comes_From_Source (Parent (S1))
+                 and then Nkind (Parent (S1)) = N_Subtype_Declaration
+                 and then Is_Entity_Name (Subtype_Indication (Parent (S1)))
+                 and then Entity (Subtype_Indication (Parent (S1))) = S2;
+            end Is_Declared_Subtype;
+
+         --  Start of processing for Same_Generic_Actual
+
          begin
             return Is_Generic_Actual_Type (T1) = Is_Generic_Actual_Type (T2)
-              or else
-                (Present (Parent (T1))
-                  and then Comes_From_Source (Parent (T1))
-                  and then Nkind (Parent (T1)) = N_Subtype_Declaration
-                  and then Is_Entity_Name (Subtype_Indication (Parent (T1)))
-                  and then Entity (Subtype_Indication (Parent (T1))) = T2);
+              or else Is_Declared_Subtype (T1, T2)
+              or else Is_Declared_Subtype (T2, T1);
          end Same_Generic_Actual;
 
       --  Start of processing for Different_Generic_Profile
@@ -9744,7 +9911,8 @@ package body Sem_Ch6 is
 
                if Is_Tagged_Type (Formal_Type)
                  or else (Ada_Version >= Ada_2012
-                           and then not From_Limited_With (Formal_Type))
+                           and then not From_Limited_With (Formal_Type)
+                           and then not Is_Generic_Type (Formal_Type))
                then
                   if Ekind (Scope (Current_Scope)) = E_Package
                     and then not Is_Generic_Type (Formal_Type)
@@ -9756,7 +9924,7 @@ package body Sem_Ch6 is
                      then
                         Append_Elmt
                           (Current_Scope,
-                             Private_Dependents (Base_Type (Formal_Type)));
+                           To => Private_Dependents (Base_Type (Formal_Type)));
 
                         --  Freezing is delayed to ensure that Register_Prim
                         --  will get called for this operation, which is needed
@@ -9782,7 +9950,17 @@ package body Sem_Ch6 is
                   --  if there is no place at which the non-limited view can
                   --  become available.
 
-                  if Ada_Version >= Ada_2012 then
+                  --  Incomplete formal untagged types are not allowed in
+                  --  subprogram bodies (but are legal in their declarations).
+
+                  if Is_Generic_Type (Formal_Type)
+                    and then not Is_Tagged_Type (Formal_Type)
+                    and then Nkind (Parent (Related_Nod)) = N_Subprogram_Body
+                  then
+                     Error_Msg_N
+                       ("invalid use of formal incomplete type", Param_Spec);
+
+                  elsif Ada_Version >= Ada_2012 then
                      if Is_Tagged_Type (Formal_Type)
                        and then (not From_Limited_With (Formal_Type)
                                   or else not In_Package_Body)
@@ -9976,21 +10154,22 @@ package body Sem_Ch6 is
                     ("function cannot have parameter of mode `OUT` or "
                      & "`IN OUT`", Formal);
 
-               --  A function cannot have a volatile formal parameter
-               --  (SPARK RM 7.1.3(10)).
+               --  A function cannot have an effectively volatile formal
+               --  parameter (SPARK RM 7.1.3(10)).
 
-               elsif Is_SPARK_Volatile (Formal) then
+               elsif Is_Effectively_Volatile (Formal) then
                   Error_Msg_N
                     ("function cannot have a volatile formal parameter",
                      Formal);
                end if;
 
-            --  A procedure cannot have a formal parameter of mode IN because
-            --  it behaves as a constant (SPARK RM 7.1.3(6)).
+            --  A procedure cannot have an effectively volatile formal
+            --  parameter of mode IN because it behaves as a constant
+            --  (SPARK RM 7.1.3(6)).
 
             elsif Ekind (Scope (Formal)) = E_Procedure
               and then Ekind (Formal) = E_In_Parameter
-              and then Is_SPARK_Volatile (Formal)
+              and then Is_Effectively_Volatile (Formal)
             then
                Error_Msg_N
                  ("formal parameter of mode `IN` cannot be volatile", Formal);

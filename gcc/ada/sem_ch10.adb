@@ -3,7 +3,7 @@
 --                         GNAT COMPILER COMPONENTS                         --
 --                                                                          --
 --                             S E M _ C H 1 0                              --
---                                                                          --
+--     s                                                                     --
 --                                 B o d y                                  --
 --                                                                          --
 --          Copyright (C) 1992-2014, Free Software Foundation, Inc.         --
@@ -242,7 +242,7 @@ package body Sem_Ch10 is
    --  on the context. Note that in contrast with the handling of private
    --  types, the limited view and the non-limited view of a type are treated
    --  as separate entities, and no entity exchange needs to take place, which
-   --  makes the implementation must simpler than could be feared.
+   --  makes the implementation much simpler than could be feared.
 
    ------------------------------
    -- Analyze_Compilation_Unit --
@@ -512,6 +512,13 @@ package body Sem_Ch10 is
               and then not Implicit_With (Clause)
               and then not Limited_Present (Clause)
               and then not Elaborate_Present (Clause)
+
+              --  With_clauses introduced for renamings of parent clauses
+              --  are not marked implicit because they need to be properly
+              --  installed, but they do not come from source and do not
+              --  require warnings.
+
+              and then Comes_From_Source (Clause)
             then
                --  Package body-to-spec check
 
@@ -1333,18 +1340,47 @@ package body Sem_Ch10 is
            and then not Limited_Present (Item)
          then
             --  Skip analyzing with clause if no unit, nothing to do (this
-            --  happens for a with that references a non-existent unit). Skip
-            --  as well if this is a with_clause for the main unit, which
-            --  happens if a subunit has a useless with_clause on its parent.
+            --  happens for a with that references a non-existent unit).
 
             if Present (Library_Unit (Item)) then
+
+               --  Skip analyzing with clause if this is a with_clause for
+               --  the main unit, which happens if a subunit has a useless
+               --  with_clause on its parent.
+
                if Library_Unit (Item) /= Cunit (Current_Sem_Unit) then
                   Analyze (Item);
+
+                  --  This is the point at which we check for the case of an
+                  --  improper WITH from a unit with No_Elaboration_Code_All.
+
+                  if No_Elab_Code (Current_Sem_Unit) >=
+                       No_Elab_Code_All_Warn
+                  then
+                     if No_Elab_Code
+                          (Get_Source_Unit (Library_Unit (Item))) /=
+                             No_Elab_Code_All
+                     then
+                        Error_Msg_Warn :=
+                          No_Elab_Code (Current_Sem_Unit) =
+                            No_Elab_Code_All_Warn;
+                        Error_Msg_N
+                          ("<unit with No_Elaboration_Code_All has bad WITH",
+                           Item);
+                        Error_Msg_NE
+                          ("\<unit& does not have No_Elaboration_Code_All",
+                           Item, Entity (Name (Item)));
+                     end if;
+                  end if;
+
+               --  Here for the case of a useless with for the main unit
 
                else
                   Set_Entity (Name (Item), Cunit_Entity (Current_Sem_Unit));
                end if;
             end if;
+
+            --  Do version update (skipped for implicit with)
 
             if not Implicit_With (Item) then
                Version_Update (N, Library_Unit (Item));
@@ -3607,7 +3643,7 @@ package body Sem_Ch10 is
       procedure Check_Private_Limited_Withed_Unit (Item : Node_Id);
       --  Check that if a limited_with clause of a given compilation_unit
       --  mentions a descendant of a private child of some library unit, then
-      --  the given compilation_unit shall be the declaration of a private
+      --  the given compilation_unit must be the declaration of a private
       --  descendant of that library unit, or a public descendant of such. The
       --  code is analogous to that of Check_Private_Child_Unit but we cannot
       --  use entities on the limited with_clauses because their units have not
@@ -5694,13 +5730,11 @@ package body Sem_Ch10 is
             -------------------
 
             procedure Process_State (State : Node_Id) is
-               Loc  : constant Source_Ptr := Sloc (State);
-               Elmt : Node_Id;
-               Id   : Entity_Id;
-               Name : Name_Id;
-
+               Loc   : constant Source_Ptr := Sloc (State);
+               Decl  : Node_Id;
                Dummy : Entity_Id;
-               pragma Unreferenced (Dummy);
+               Elmt  : Node_Id;
+               Id    : Entity_Id;
 
             begin
                --  Multiple abstract states appear as an aggregate
@@ -5709,9 +5743,9 @@ package body Sem_Ch10 is
                   Elmt := First (Expressions (State));
                   while Present (Elmt) loop
                      Process_State (Elmt);
-
                      Next (Elmt);
                   end loop;
+
                   return;
 
                --  A null state has no abstract view
@@ -5723,12 +5757,12 @@ package body Sem_Ch10 is
                --  extension aggregate.
 
                elsif Nkind (State) = N_Extension_Aggregate then
-                  Name := Chars (Ancestor_Part (State));
+                  Decl := Ancestor_Part (State);
 
                --  Simple state declaration
 
                elsif Nkind (State) = N_Identifier then
-                  Name := Chars (State);
+                  Decl := State;
 
                --  Possibly an illegal state declaration
 
@@ -5736,14 +5770,26 @@ package body Sem_Ch10 is
                   return;
                end if;
 
-               --  Construct a dummy state for the purposes of establishing a
-               --  non-limited => limited view relation. Note that the dummy
-               --  state is not added to list Abstract_States to avoid multiple
-               --  definitions.
+               --  Abstract states are elaborated when the related pragma is
+               --  elaborated. Since the withed package is not analyzed yet,
+               --  the entities of the abstract states are not available. To
+               --  overcome this complication, create the entities now and
+               --  store them in their respective declarations. The entities
+               --  are later used by routine Create_Abstract_State to declare
+               --  and enter the states into visibility.
 
-               Id := Make_Defining_Identifier (Loc, New_External_Name (Name));
-               Set_Parent     (Id, State);
-               Decorate_State (Id, Scop);
+               if No (Entity (Decl)) then
+                  Id := Make_Defining_Identifier (Loc, Chars (Decl));
+
+                  Set_Entity     (Decl, Id);
+                  Set_Parent     (Id, State);
+                  Decorate_State (Id, Scop);
+
+               --  Otherwise the package was previously withed
+
+               else
+                  Id := Entity (Decl);
+               end if;
 
                Build_Shadow_Entity (Id, Scop, Dummy);
             end Process_State;

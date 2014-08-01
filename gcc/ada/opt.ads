@@ -224,7 +224,7 @@ package Opt is
    --  GNAT Normally, in accordance with (RM 13.9.1 (9-11)) the front end
    --  assumes that values could have invalid representations, unless it can
    --  clearly prove that the values are valid. If this switch is set (by
-   --  pragma Assume_No_Invalid_Values (Off)), then the compiler assumes values
+   --  pragma Assume_No_Invalid_Values (On)), then the compiler assumes values
    --  are valid and in range of their representations. This feature is now
    --  fully enabled in the compiler.
 
@@ -245,6 +245,13 @@ package Opt is
    --  Currently the default is False for all cases (set in gnat1drv). The
    --  default can be modified using -gnatd.L (sets the flag True). This is
    --  used to test the possibility of having the backend handle this.
+
+   Back_End_Inlining : Boolean := False;
+   --  GNAT
+   --  Set True to activate inlining by back-end expansion. This is the normal
+   --  default mode for gcc targets, so it is True on such targets unless the
+   --  switches -gnatN or -gnatd.z are used. See circuitry in gnat1drv for the
+   --  exact conditions for setting this switch.
 
    Bind_Alternate_Main_Name : Boolean := False;
    --  GNATBIND
@@ -414,12 +421,9 @@ package Opt is
 
    subtype Debug_Level_Value is Nat range 0 .. 3;
    Debugger_Level : Debug_Level_Value := 0;
-   --  GNATBIND
    --  The value given to the -g parameter. The default value for -g with
-   --  no value is 2. This is usually ignored by GNATBIND, except in the
-   --  VMS version where it is passed as an argument to __gnat_initialize
-   --  to trigger the activation of the remote debugging interface.
-   --  Is this still true ???
+   --  no value is 2. This is not currently used but is retained for possible
+   --  future use.
 
    Default_Exit_Status : Int := 0;
    --  GNATBIND
@@ -635,19 +639,6 @@ package Opt is
    --  Indicates the current setting of Fast_Math mode, as set by the use
    --  of a Fast_Math pragma (set True by Fast_Math (On)).
 
-   Float_Format : Character := ' ';
-   --  GNAT
-   --  A non-blank value indicates that a Float_Format pragma has been
-   --  processed, in which case this variable is set to 'I' for IEEE or to
-   --  'V' for VAX. The setting of 'V' is only possible on OpenVMS versions
-   --  of GNAT.
-
-   Float_Format_Long : Character := ' ';
-   --  GNAT
-   --  A non-blank value indicates that a Long_Float pragma has been processed
-   --  (this pragma is recognized only in OpenVMS versions of GNAT), in which
-   --  case this variable is set to D or G for D_Float or G_Float.
-
    Force_ALI_Tree_File : Boolean := False;
    --  GNAT
    --  Force generation of ALI file even if errors are encountered. Also forces
@@ -717,11 +708,6 @@ package Opt is
    GNAT_Mode : Boolean := False;
    --  GNAT
    --  True if compiling in GNAT system mode (-gnatg switch)
-
-   Heap_Size : Nat := 0;
-   --  GNATBIND
-   --  Heap size for memory allocations. Valid values are 32 and 64. Only
-   --  available on VMS.
 
    Identifier_Character_Set : Character;
    --  GNAT
@@ -840,7 +826,10 @@ package Opt is
 
    Front_End_Inlining : Boolean := False;
    --  GNAT
-   --  Set True to activate inlining by front-end expansion
+   --  Set True to activate inlining by front-end expansion (even on GCC
+   --  targets, where inlining is normally handled by the back end). Set by
+   --  the flag -gnatN (which is now considered obsolescent, since the GCC
+   --  back end can do a better job of inlining than the front end these days.
 
    Inline_Processing_Required : Boolean := False;
    --  GNAT
@@ -860,9 +849,9 @@ package Opt is
    --  sources until there is no more work.
 
    Keep_Temporary_Files : Boolean := False;
-   --  GNATCMD
-   --  When True the temporary files created by the GNAT driver are not
-   --  deleted. Set by switch -dn or qualifier /KEEP_TEMPORARY_FILES.
+   --  GNATCMD, GNATMAKE, GPRBUILD
+   --  When True the temporary files are not deleted. Set by switches -dn or
+   --  --keep-temp-files.
 
    Leap_Seconds_Support : Boolean := False;
    --  GNATBIND
@@ -1300,10 +1289,6 @@ package Opt is
    --  GNAT
    --  Set True if a pragma Short_Circuit_And_Or applies to the current unit.
 
-   Short_Descriptors : Boolean := False;
-   --  GNAT
-   --  Set True if a pragma Short_Descriptors applies to the current unit.
-
    type SPARK_Mode_Type is (None, Off, On);
    --  Possible legal modes that can be set by aspect/pragma SPARK_Mode, as
    --  well as the value None, which indicates no such pragma/aspect applies.
@@ -1471,12 +1456,6 @@ package Opt is
    Tree_Output : Boolean := False;
    --  GNAT
    --  Set to True (-gnatt) to generate output tree file
-
-   True_VMS_Target : Boolean := False;
-   --  Set True if we are on a VMS target. The setting of this flag reflects
-   --  the true state of the compile, unlike Targparm.OpenVMS_On_Target which
-   --  can also be true when debug flag m is set (-gnatdm). This is used in the
-   --  few cases where we do NOT want -gnatdm to trigger the VMS behavior.
 
    Try_Semantics : Boolean := False;
    --  GNAT
@@ -1934,6 +1913,11 @@ package Opt is
    --  This switch is not set when the pragma appears ahead of a given
    --  unit, so it does not affect the compilation of other units.
 
+   No_Exit_Message : Boolean := False;
+   --  GNATMAKE, GPRBUILD
+   --  Set with switch --no-exit-message. When True, if there are compilation
+   --  failures, the builder does not issue an exit error message.
+
    Optimize_Alignment_Config : Character;
    --  GNAT
    --  This is the value of the configuration switch that controls the
@@ -1958,14 +1942,6 @@ package Opt is
    --  further modified by the use of pragma Polling in the gnat.adc file. This
    --  flag is used to set the initial value for Polling_Required at the start
    --  of analyzing each unit.
-
-   Short_Descriptors_Config : Boolean;
-   --  GNAT
-   --  This is the value of the configuration switch that controls the use of
-   --  Short_Descriptors for setting descriptor default sizes. It can be set
-   --  True by the use of the pragma Short_Descriptors in the gnat.adc file.
-   --  This flag is used to set the initial value for Short_Descriptors at the
-   --  start of analyzing each unit.
 
    SPARK_Mode_Config : SPARK_Mode_Type := None;
    --  GNAT
@@ -2147,7 +2123,6 @@ private
       Optimize_Alignment_Local       : Boolean;
       Persistent_BSS_Mode            : Boolean;
       Polling_Required               : Boolean;
-      Short_Descriptors              : Boolean;
       SPARK_Mode                     : SPARK_Mode_Type;
       SPARK_Mode_Pragma              : Node_Id;
       Uneval_Old                     : Character;
