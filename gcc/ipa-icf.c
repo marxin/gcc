@@ -2582,7 +2582,7 @@ sem_item_optimizer::dump_cong_classes (void)
 
   /* Histogram calculation.  */
   unsigned int max_index = 0;
-  unsigned int* histogram = XCNEWVEC (unsigned int, m_items.length ());
+  unsigned int* histogram = XCNEWVEC (unsigned int, m_items.length () + 1);
 
   for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
