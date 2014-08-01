@@ -1777,28 +1777,24 @@ cgraph_node::mark_address_taken (void)
 
 /* Return local info for the compiled function.  */
 
-struct cgraph_local_info *
-cgraph_local_info (tree decl)
+cgraph_local_info *
+cgraph_node::local_info (tree decl)
 {
-  struct cgraph_node *node;
-
   gcc_assert (TREE_CODE (decl) == FUNCTION_DECL);
-  node = cgraph_node::get (decl);
+  cgraph_node *node = get (decl);
   if (!node)
     return NULL;
   return &node->local;
 }
 
-/* Return local info for the compiled function.  */
+/* Return global info for the compiled function.  */
 
-struct cgraph_global_info *
-cgraph_global_info (tree decl)
+cgraph_global_info *
+cgraph_node::global_info (tree decl)
 {
-  cgraph_node *node;
-
   gcc_assert (TREE_CODE (decl) == FUNCTION_DECL
     && symtab->cgraph_global_info_ready);
-  node = cgraph_node::get (decl);
+  cgraph_node *node = get (decl);
   if (!node)
     return NULL;
   return &node->global;
@@ -1806,13 +1802,11 @@ cgraph_global_info (tree decl)
 
 /* Return local info for the compiled function.  */
 
-struct cgraph_rtl_info *
-cgraph_rtl_info (tree decl)
+cgraph_rtl_info *
+cgraph_node::rtl_info (tree decl)
 {
-  struct cgraph_node *node;
-
   gcc_assert (TREE_CODE (decl) == FUNCTION_DECL);
-  node = cgraph_node::get (decl);
+  cgraph_node *node = get (decl);
   if (!node
       || (decl != current_function_decl
 	  && !TREE_ASM_WRITTEN (node->decl)))

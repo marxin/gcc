@@ -4715,7 +4715,7 @@ ipa_tm_diagnose_transaction (struct cgraph_node *node,
 	      if (is_tm_callable (fndecl))
 		continue;
 
-	      if (cgraph_local_info (fndecl)->tm_may_enter_irr)
+	      if (cgraph_node::local_info (fndecl)->tm_may_enter_irr)
 		error_at (gimple_location (stmt),
 			  "unsafe function call %qD within "
 			  "atomic transaction", fndecl);

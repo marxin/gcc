@@ -1096,6 +1096,15 @@ public:
      exist or if it corresponds to an inline clone, create a new one.  */
   static cgraph_node * get_create (tree);
 
+  /* Return local info for the compiled function.  */
+  static cgraph_local_info *local_info (tree decl);
+
+  /* Return global info for the compiled function.  */
+  static cgraph_global_info *global_info (tree);
+
+  /* Return local info for the compiled function.  */
+  static cgraph_rtl_info *rtl_info (tree);
+
   /* Return the cgraph node that has ASMNAME for its DECL_ASSEMBLER_NAME.
      Return NULL if there's no such node.  */
   static cgraph_node *get_for_asmname (tree asmname);
@@ -1881,9 +1890,6 @@ void release_function_body (tree);
 cgraph_indirect_call_info *cgraph_allocate_init_indirect_info (void);
 
 void cgraph_update_edges_for_call_stmt (gimple, tree, gimple);
-cgraph_local_info *cgraph_local_info (tree);
-cgraph_global_info *cgraph_global_info (tree);
-cgraph_rtl_info *cgraph_rtl_info (tree);
 bool cgraph_function_possibly_inlined_p (tree);
 
 const char* cgraph_inline_failed_string (cgraph_inline_failed_t);
