@@ -117,21 +117,21 @@ public:
   /* Return ipa reference from this symtab_node to
      REFERED_NODE or REFERED_VARPOOL_NODE. USE_TYPE specify type
      of the use and STMT the statement (if it exists).  */
-  struct ipa_ref *add_reference (symtab_node *referred_node,
-				 enum ipa_ref_use use_type);
+  ipa_ref *add_reference (symtab_node *referred_node,
+			  enum ipa_ref_use use_type);
 
   /* Return ipa reference from this symtab_node to
      REFERED_NODE or REFERED_VARPOOL_NODE. USE_TYPE specify type
      of the use and STMT the statement (if it exists).  */
-  struct ipa_ref *add_reference (symtab_node *referred_node,
-				 enum ipa_ref_use use_type, gimple stmt);
+  ipa_ref *add_reference (symtab_node *referred_node,
+			  enum ipa_ref_use use_type, gimple stmt);
 
   /* If VAL is a reference to a function or a variable, add a reference from
      this symtab_node to the corresponding symbol table node.  USE_TYPE specify
      type of the use and STMT the statement (if it exists).  Return the new
      reference or NULL if none was created.  */
-  struct ipa_ref *maybe_add_reference (tree val, enum ipa_ref_use use_type,
-				       gimple stmt);
+  ipa_ref *maybe_add_reference (tree val, enum ipa_ref_use use_type,
+				gimple stmt);
 
   /* Clone all references from symtab NODE to this symtab_node.  */
   void clone_references (symtab_node *node);
@@ -143,12 +143,12 @@ public:
   void clone_referring (symtab_node *node);
 
   /* Clone reference REF to this symtab_node and set its stmt to STMT.  */
-  struct ipa_ref *clone_reference (struct ipa_ref *ref, gimple stmt);
+  ipa_ref *clone_reference (ipa_ref *ref, gimple stmt);
 
   /* Find the structure describing a reference to REFERRED_NODE
      and associated with statement STMT.  */
-  struct ipa_ref *find_reference (symtab_node *referred_node, gimple stmt,
-				  unsigned int lto_stmt_uid);
+  ipa_ref *find_reference (symtab_node *referred_node, gimple stmt,
+			   unsigned int lto_stmt_uid);
 
   /* Remove all references that are associated with statement STMT.  */
   void remove_stmt_references (gimple stmt);
@@ -172,13 +172,13 @@ public:
   void dump_referring (FILE *);
 
   /* Iterates I-th reference in the list, REF is also set.  */
-  struct ipa_ref *iterate_reference (unsigned i, struct ipa_ref *&ref);
+  ipa_ref *iterate_reference (unsigned i, ipa_ref *&ref);
 
   /* Iterates I-th referring item in the list, REF is also set.  */
-  struct ipa_ref *iterate_referring (unsigned i, struct ipa_ref *&ref);
+  ipa_ref *iterate_referring (unsigned i, ipa_ref *&ref);
 
   /* Iterates I-th referring alias item in the list, REF is also set.  */
-  struct ipa_ref *iterate_direct_aliases (unsigned i, struct ipa_ref *&ref);
+  ipa_ref *iterate_direct_aliases (unsigned i, ipa_ref *&ref);
 
   /* Return true if symtab node and TARGET represents
      semantically equivalent symbols.  */
@@ -462,7 +462,7 @@ public:
   symtab_node *same_comdat_group;
 
   /* Vectors of referring and referenced entities.  */
-  struct ipa_ref_list ref_list;
+  ipa_ref_list ref_list;
 
   /* Alias target. May be either DECL pointer or ASSEMBLER_NAME pointer
      depending to what was known to frontend on the creation time.
@@ -691,7 +691,7 @@ struct GTY(()) cgraph_simd_clone {
   cgraph_node *origin;
 
   /* Annotated function arguments for the original function.  */
-  struct cgraph_simd_clone_arg GTY((length ("%h.nargs"))) args[1];
+  cgraph_simd_clone_arg GTY((length ("%h.nargs"))) args[1];
 };
 
 /* Function Multiversioning info.  */
@@ -701,11 +701,11 @@ struct GTY(()) cgraph_function_version_info {
   /* Chains all the semantically identical function versions.  The
      first function in this chain is the version_info node of the
      default function.  */
-  struct cgraph_function_version_info *prev;
+  cgraph_function_version_info *prev;
   /* If this version node corresponds to a dispatcher for function
      versions, this points to the version info node of the default
      function, the first node in the chain.  */
-  struct cgraph_function_version_info *next;
+  cgraph_function_version_info *next;
   /* If this node corresponds to a function version, this points
      to the dispatcher function decl, which is the function that must
      be called to execute the right function version at run-time.
@@ -781,7 +781,7 @@ public:
 			     bool update_original,
 			     vec<cgraph_edge *> redirect_callers,
 			     bool call_duplication_hook,
-			     struct cgraph_node *new_inlined_to,
+			     cgraph_node *new_inlined_to,
 			     bitmap args_to_skip);
 
   /* Create callgraph node clone with new declaration.  The actual body will
@@ -835,10 +835,10 @@ public:
 
   /* Insert a new cgraph_function_version_info node into cgraph_fnver_htab
      corresponding to cgraph_node.  */
-  struct cgraph_function_version_info *insert_new_function_version (void);
+  cgraph_function_version_info *insert_new_function_version (void);
 
   /* Get the cgraph_function_version_info node corresponding to node.  */
-  struct cgraph_function_version_info *function_version (void);
+  cgraph_function_version_info *function_version (void);
 
   /* Discover all functions and variables that are trivially needed, analyze
      them as well as all functions and variables referred by them  */
@@ -926,20 +926,20 @@ public:
   priority_type get_fini_priority (void);
 
   /* Create edge from a given function to CALLEE in the cgraph.  */
-  struct cgraph_edge *create_edge (cgraph_node *callee,
-				   gimple call_stmt, gcov_type count,
-				   int freq);
+  cgraph_edge *create_edge (cgraph_node *callee,
+			    gimple call_stmt, gcov_type count,
+			    int freq);
 
   /* Create an indirect edge with a yet-undetermined callee where the call
      statement destination is a formal parameter of the caller with index
      PARAM_INDEX. */
-  struct cgraph_edge *create_indirect_edge (gimple call_stmt, int ecf_flags,
-					    gcov_type count, int freq);
+  cgraph_edge *create_indirect_edge (gimple call_stmt, int ecf_flags,
+				     gcov_type count, int freq);
 
   /* Like cgraph_create_edge walk the clone tree and update all clones sharing
    same function body.  If clones already have edge for OLD_STMT; only
    update the edge same way as cgraph_set_call_stmt_including_clones does.  */
-  void create_edge_including_clones (struct cgraph_node *callee,
+  void create_edge_including_clones (cgraph_node *callee,
 				     gimple old_stmt, gimple stmt,
 				     gcov_type count,
 				     int freq,
@@ -1128,11 +1128,11 @@ public:
      with (not necessarily cgraph_node (DECL).  */
   static cgraph_node *create_alias (tree alias, tree target);
 
-  struct cgraph_edge *callees;
-  struct cgraph_edge *callers;
+  cgraph_edge *callees;
+  cgraph_edge *callers;
   /* List of edges representing indirect calls with a yet undetermined
      callee.  */
-  struct cgraph_edge *indirect_calls;
+  cgraph_edge *indirect_calls;
   /* For nested functions points to function the node is nested in.  */
   cgraph_node *origin;
   /* Points to first nested function, if any.  */
@@ -1146,13 +1146,13 @@ public:
   cgraph_node *clone_of;
   /* For functions with many calls sites it holds map from call expression
      to the edge to speed up cgraph_edge function.  */
-  htab_t GTY((param_is (struct cgraph_edge))) call_site_hash;
+  htab_t GTY((param_is (cgraph_edge))) call_site_hash;
   /* Declaration node used to be clone of. */
   tree former_clone_of;
 
   /* If this is a SIMD clone, this points to the SIMD specific
      information for it.  */
-  struct cgraph_simd_clone *simdclone;
+  cgraph_simd_clone *simdclone;
   /* If this function has SIMD clones, this points to the first clone.  */
   cgraph_node *simd_clones;
 
@@ -1161,11 +1161,11 @@ public:
      per-function in order to allow IPA passes to introduce new functions.  */
   vec<ipa_opt_pass> GTY((skip)) ipa_transforms_to_apply;
 
-  struct cgraph_local_info local;
-  struct cgraph_global_info global;
-  struct cgraph_rtl_info rtl;
-  struct cgraph_clone_info clone;
-  struct cgraph_thunk_info thunk;
+  cgraph_local_info local;
+  cgraph_global_info global;
+  cgraph_rtl_info rtl;
+  cgraph_clone_info clone;
+  cgraph_thunk_info thunk;
 
   /* Expected number of executions: calculated in profile.c.  */
   gcov_type count;
@@ -1224,7 +1224,7 @@ class varpool_node;
    can appear in multiple sets.  */
 struct varpool_node_set_def
 {
-  struct pointer_map_t * map;
+  pointer_map_t * map;
   vec<varpool_node *> nodes;
 };
 
@@ -1529,7 +1529,7 @@ struct GTY(()) asm_node {
 
 
   /* Next asm node.  */
-  struct asm_node *next;
+  asm_node *next;
   /* String for this asm node.  */
   tree asm_str;
   /* Ordering of all cgraph nodes.  */
@@ -1723,7 +1723,7 @@ public:
 			    bool indir_unknown_callee);
 
   /* Put the edge onto the free list.  */
-  void free_edge (struct cgraph_edge *e);
+  void free_edge (cgraph_edge *e);
 
   /* Return next reachable static variable with initializer after NODE.  */
   inline cgraph_node *next_function_with_gimple_body (cgraph_node *node);
@@ -1878,12 +1878,12 @@ extern cgraph_node_set cgraph_new_nodes;
 
 /* In cgraph.c  */
 void release_function_body (tree);
-struct cgraph_indirect_call_info *cgraph_allocate_init_indirect_info (void);
+cgraph_indirect_call_info *cgraph_allocate_init_indirect_info (void);
 
 void cgraph_update_edges_for_call_stmt (gimple, tree, gimple);
-struct cgraph_local_info *cgraph_local_info (tree);
-struct cgraph_global_info *cgraph_global_info (tree);
-struct cgraph_rtl_info *cgraph_rtl_info (tree);
+cgraph_local_info *cgraph_local_info (tree);
+cgraph_global_info *cgraph_global_info (tree);
+cgraph_rtl_info *cgraph_rtl_info (tree);
 bool cgraph_function_possibly_inlined_p (tree);
 
 const char* cgraph_inline_failed_string (cgraph_inline_failed_t);
@@ -1987,7 +1987,7 @@ symtab_node::in_same_comdat_group_p (symtab_node *target)
 inline symtab_node *
 symtab_node::get_alias_target (void)
 {
-  struct ipa_ref *ref = NULL;
+  ipa_ref *ref = NULL;
   iterate_reference (0, ref);
   gcc_checking_assert (ref->use == IPA_REF_ALIAS);
   return ref->referred;
@@ -2113,7 +2113,7 @@ symbol_table::release_cgraph_symbol (cgraph_node *node, int uid)
 inline cgraph_node *
 symbol_table::allocate_cgraph_symbol (void)
 {
-  struct cgraph_node *node;
+  cgraph_node *node;
 
   if (free_nodes)
     {
