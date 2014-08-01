@@ -2919,7 +2919,7 @@ Gcc_backend::write_global_definitions(
 
   wrapup_global_declarations(defs, i);
 
-  finalize_compilation_unit();
+  symtab->finalize_compilation_unit();
 
   check_global_declarations(defs, i);
   emit_debug_global_declarations(defs, i);

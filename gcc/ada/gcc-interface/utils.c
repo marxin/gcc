@@ -5834,7 +5834,7 @@ gnat_write_global_declarations (void)
       debug_hooks->global_decl (iter);
 
   /* Proceed to optimize and emit assembly. */
-  finalize_compilation_unit ();
+  symtab->finalize_compilation_unit ();
 
   /* After cgraph has had a chance to emit everything that's going to
      be emitted, output debug information for the rest of globals.  */
