@@ -364,6 +364,9 @@ public:
     return dyn_cast <cgraph_node *> (node);
   }
 
+  /* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
+  void improve_hash (inchash *hstate, gimple stmt);
+
   /* Return true if polymorphic comparison must be processed.  */
   bool compare_polymorphic_p (void);
 

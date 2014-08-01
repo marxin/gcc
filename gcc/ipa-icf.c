@@ -809,13 +809,11 @@ sem_function::init (void)
 	 gsi_next (&gsi))
       {
 	gimple stmt = gsi_stmt (gsi);
-	enum gimple_code code = gimple_code (stmt);
 
-	/* We ignore all debug statements.  */
-	if (code != GIMPLE_DEBUG)
+	if (gimple_code (stmt) != GIMPLE_DEBUG)
 	  {
+	    improve_hash (&hstate, stmt);
 	    nondbg_stmt_count++;
-	    hstate.add_int (code);
 	  }
       }
 
@@ -832,6 +830,46 @@ sem_function::init (void)
   parse_tree_args ();
 }
 
+/* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
+
+void
+sem_function::improve_hash (inchash *hstate, gimple stmt)
+{
+  enum gimple_code code = gimple_code (stmt);
+
+  hstate->add_int (code);
+
+  if (code == GIMPLE_CALL)
+    {
+      /* Checking of argument.  */
+      for (unsigned i = 0; i < gimple_call_num_args (stmt); ++i)
+	{
+	  tree argument = gimple_call_arg (stmt, i);
+
+	  switch (TREE_CODE (argument))
+	    {
+	    case INTEGER_CST:
+	      if (tree_fits_shwi_p (argument))
+		hstate->add_wide_int (tree_to_shwi (argument));
+	      else
+		hstate->add_wide_int (tree_to_uhwi (argument));
+	      break;
+	    case ADDR_EXPR:
+	      {
+		tree addr_operand = TREE_OPERAND (argument, 0);
+
+		if (TREE_CODE (addr_operand) == STRING_CST)
+		  hstate->add (TREE_STRING_POINTER (addr_operand),
+			       TREE_STRING_LENGTH (addr_operand));
+		break;
+	      }
+	    default:
+	      break;
+	    }
+	}
+    }
+}
+
 
 /* Return true if polymorphic comparison must be processed.  */
 
@@ -839,7 +877,7 @@ bool
 sem_function::compare_polymorphic_p (void)
 {
   return get_node ()->callees != NULL
-    || m_compared_func->get_node ()->callees != NULL;
+	 || m_compared_func->get_node ()->callees != NULL;
 }
 
 /* For a given call graph NODE, the function constructs new
@@ -1798,7 +1836,7 @@ sem_item_optimizer::read_section (lto_file_decl_data *file_data,
 				  const char *data, size_t len)
 {
   const lto_function_header *header =
-  (const lto_function_header *) data;
+    (const lto_function_header *) data;
   const int cfg_offset = sizeof (lto_function_header);
   const int main_offset = cfg_offset + header->cfg_size;
   const int string_offset = main_offset + header->main_size;
