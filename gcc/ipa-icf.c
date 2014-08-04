@@ -850,7 +850,7 @@ sem_function::improve_hash (inchash::hash *hstate, gimple stmt)
 	    case INTEGER_CST:
 	      if (tree_fits_shwi_p (argument))
 		hstate->add_wide_int (tree_to_shwi (argument));
-	      else
+	      else if (tree_fits_uhwi_p (argument))
 		hstate->add_wide_int (tree_to_uhwi (argument));
 	      break;
 	    case ADDR_EXPR:
