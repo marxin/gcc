@@ -1,3 +1,31 @@
+2014-08-01  Jason Merrill  <jason@redhat.com>
+
+	PR c++/60417
+	* init.c (build_vec_init): Set CONSTRUCTOR_IS_DIRECT_INIT on
+	init-list for trailing elements.
+	* typeck2.c (process_init_constructor_array): Likewise.
+
+2014-08-01  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	DR 217 again
+	* decl.c (duplicate_decls): Handle static member functions too.
+
+2014-08-01  Igor Zamyatin  <igor.zamyatin@intel.com>
+
+	* cp-array-notation.c (expand_an_in_modify_expr): Fix the misprint
+	in error output.
+
+2014-08-01  Igor Zamyatin  <igor.zamyatin@intel.com>
+
+	PR other/61963
+	* parser.c (cp_parser_array_notation): Added check for array_type.
+
+2014-08-01  Igor Zamyatin  <igor.zamyatin@intel.com>
+
+	PR middle-end/61455
+	* cp-array-notation.c (expand_array_notation_exprs): Handling of
+	DECL_EXPR improved. Changed handling for INIT_EXPR.
+
 2014-08-01  Paolo Carlini  <paolo.carlini@oracle.com>
 
 	* pt.c (lookup_template_class_1): Use DECL_TYPE_TEMPLATE_P.

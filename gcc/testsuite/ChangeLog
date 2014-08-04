@@ -1,3 +1,35 @@
+2014-08-02  Marek Polacek  <polacek@redhat.com>
+
+	PR c/59855
+	* gcc.dg/Wdesignated-init-2.c: New test.
+
+2014-08-01  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	DR 217 again
+	* g++.dg/tc1/dr217-2.C: New.
+
+2014-08-01  Igor Zamyatin  <igor.zamyatin@intel.com>
+
+	PR other/61963
+	* c-c++-common/cilk-plus/AN/pr61963.c: New test.
+
+2014-07-08  Igor Zamyatin  <igor.zamyatin@intel.com>
+
+	PR middle-end/61455
+	* c-c++-common/cilk-plus/AN/pr61455.c: New test.
+	* c-c++-common/cilk-plus/AN/pr61455-2.c: Likewise.
+
+2014-08-01  Jiong Wang  <jiong.wang@arm.com>
+
+	* gcc.target/aarch64/legitimize_stack_var_before_reload_1.c: New
+	testcase.
+
+2014-08-01  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/61762
+	* gcc.dg/pr61762.c: Align the string to make the testcase work
+	on strict-align targets.
+
 2014-08-01  Jakub Jelinek  <jakub@redhat.com>
 
 	* c-c++-common/ubsan/align-1.c: New test.

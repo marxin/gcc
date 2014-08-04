@@ -8783,55 +8783,6 @@ package body Sem_Prag is
             Id := Chars (Arg);
             Expr := Get_Pragma_Arg (Arg);
 
-            --  Special handling for No_Elaboration_Code
-
-            if Nkind (Expr) = N_Identifier
-              and then Chars (Expr) = Name_No_Elaboration_Code
-            then
-               if No_Elab_Code (Current_Sem_Unit) < No_Elab_Code then
-                  Set_No_Elab_Code (Current_Sem_Unit, No_Elab_Code);
-               end if;
-            end if;
-
-            --  Special handling for No_Elaboration_Code_All
-
-            if Nkind (Expr) = N_Identifier
-              and then Chars (Expr) = Name_No_Elaboration_Code_All
-            then
-               --  Must appear within a spec
-
-               if not Nkind_In (Unit (Cunit (Current_Sem_Unit)),
-                                N_Package_Declaration,
-                                N_Subprogram_Declaration)
-               then
-                  Error_Msg_Name_1 := Id;
-                  Error_Msg_N
-                    ("restriction% can appear only in package or "
-                     & "subprogram spec", Arg);
-               end if;
-
-               --  Set special value in unit table
-
-               declare
-                  New_Val : No_Elab_Code_T;
-
-               begin
-                  if Warn then
-                     New_Val := No_Elab_Code_All_Warn;
-                  else
-                     New_Val := No_Elab_Code_All;
-                  end if;
-
-                  if No_Elab_Code (Current_Sem_Unit) < New_Val then
-                     Set_No_Elab_Code (Current_Sem_Unit, New_Val);
-                  end if;
-               end;
-
-               --  Note that in the code below, Process_Restriction_Synonym
-               --  will treat No_Elaboration_Code_All like No_Elaboration_Code.
-
-            end if;
-
             --  Case of no restriction identifier present
 
             if Id = No_Name then
@@ -8911,10 +8862,10 @@ package body Sem_Prag is
                        ("\unless also specified in body or spec", N);
                      return;
 
-                  --  If we have a No_Elaboration_Code pragma that we
-                  --  accept, then it needs to be added to the configuration
-                  --  restrcition set so that we get proper application to
-                  --  other units in the main extended source as required.
+                  --  If we accept a No_Elaboration_Code restriction, then it
+                  --  needs to be added to the configuration restriction set so
+                  --  that we get proper application to other units in the main
+                  --  extended source as required.
 
                   else
                      Add_To_Config_Boolean_Restrictions (No_Elaboration_Code);
@@ -10926,20 +10877,17 @@ package body Sem_Prag is
               Pragma_Assume         |
               Pragma_Loop_Invariant =>
          Assert : declare
-            Expr : Node_Id;
-            Newa : List_Id;
-
-            Has_Loop_Entry : Boolean;
-            --  Set True by
-
-            function Contains_Loop_Entry return Boolean;
-            --  Tests if Expr contains a Loop_Entry attribute reference
+            function Contains_Loop_Entry (Expr : Node_Id) return Boolean;
+            --  Determine whether expression Expr contains a Loop_Entry
+            --  attribute reference.
 
             -------------------------
             -- Contains_Loop_Entry --
             -------------------------
 
-            function Contains_Loop_Entry return Boolean is
+            function Contains_Loop_Entry (Expr : Node_Id) return Boolean is
+               Has_Loop_Entry : Boolean := False;
+
                function Process (N : Node_Id) return Traverse_Result;
                --  Process function for traversal to look for Loop_Entry
 
@@ -10964,10 +10912,14 @@ package body Sem_Prag is
             --  Start of processing for Contains_Loop_Entry
 
             begin
-               Has_Loop_Entry := False;
                Traverse (Expr);
                return Has_Loop_Entry;
             end Contains_Loop_Entry;
+
+            --  Local variables
+
+            Expr : Node_Id;
+            Newa : List_Id;
 
          --  Start of processing for Assert
 
@@ -10989,17 +10941,19 @@ package body Sem_Prag is
             Check_Optional_Identifier (Arg1, Name_Check);
             Expr := Get_Pragma_Arg (Arg1);
 
-            --  Special processing for Loop_Invariant or for other cases if
-            --  a Loop_Entry attribute is present.
+            --  Special processing for Loop_Invariant, Loop_Variant or for
+            --  other cases where a Loop_Entry attribute is present. If the
+            --  assertion pragma contains attribute Loop_Entry, ensure that
+            --  the related pragma is within a loop.
 
             if Prag_Id = Pragma_Loop_Invariant
-              or else Contains_Loop_Entry
+              or else Prag_Id = Pragma_Loop_Variant
+              or else Contains_Loop_Entry (Expr)
             then
-               --  Check restricted placement, must be within a loop
-
                Check_Loop_Pragma_Placement;
 
-               --  Do preanalyze to deal with embedded Loop_Entry attribute
+               --  Perform preanalysis to deal with embedded Loop_Entry
+               --  attributes.
 
                Preanalyze_Assert_Expression (Expression (Arg1), Any_Boolean);
             end if;
@@ -16323,6 +16277,51 @@ package body Sem_Prag is
             GNAT_Pragma;
             Pragma_Misplaced;
 
+         -----------------------------
+         -- No_Elaboration_Code_All --
+         -----------------------------
+
+         --  pragma No_Elaboration_Code_All;
+
+         when Pragma_No_Elaboration_Code_All => NECA : declare
+         begin
+            GNAT_Pragma;
+            Check_Valid_Library_Unit_Pragma;
+
+            if Nkind (N) = N_Null_Statement then
+               return;
+            end if;
+
+            --  Must appear for a spec
+
+            if not Nkind_In (Unit (Cunit (Current_Sem_Unit)),
+                             N_Package_Declaration,
+                             N_Subprogram_Declaration)
+            then
+               Error_Pragma
+                 (Fix_Error
+                    ("pragma% can only occur for package "
+                     & "or subprogram spec"));
+            end if;
+
+            --  Set flag in unit table
+
+            Set_No_Elab_Code_All (Current_Sem_Unit);
+
+            --  Set restriction No_Elaboration_Code, including adding it to the
+            --  set of configuration restrictions so it will apply to all units
+            --  in the extended main source.
+
+            Set_Restriction (No_Elaboration_Code, N);
+            Add_To_Config_Boolean_Restrictions (No_Elaboration_Code);
+
+            --  If in main extended unit, activate transitive with test
+
+            if In_Extended_Main_Source_Unit (N) then
+               Opt.No_Elab_Code_All_Pragma := N;
+            end if;
+         end NECA;
+
          ---------------
          -- No_Inline --
          ---------------
@@ -17757,7 +17756,7 @@ package body Sem_Prag is
 
                Preanalyze_Spec_Expression (Arg, RTE (RE_Any_Priority));
 
-               if not Is_Static_Expression (Arg) then
+               if not Is_OK_Static_Expression (Arg) then
                   Check_Restriction (Static_Priorities, Arg);
                end if;
 
@@ -20714,6 +20713,8 @@ package body Sem_Prag is
          ----------------------
          -- Warning_As_Error --
          ----------------------
+
+         --  pragma Warning_As_Error (static_string_EXPRESSION);
 
          when Pragma_Warning_As_Error =>
             GNAT_Pragma;
@@ -24792,6 +24793,7 @@ package body Sem_Prag is
       Pragma_Memory_Size                    => -1,
       Pragma_No_Return                      =>  0,
       Pragma_No_Body                        =>  0,
+      Pragma_No_Elaboration_Code_All        => -1,
       Pragma_No_Inline                      =>  0,
       Pragma_No_Run_Time                    => -1,
       Pragma_No_Strict_Aliasing             => -1,
@@ -25084,6 +25086,9 @@ package body Sem_Prag is
          else
             return Has_Unconstrained_Component (Typ);
          end if;
+
+      elsif Is_Private_Type (Typ) and then Has_Discriminants (Typ) then
+         return True;
 
       else
          return False;

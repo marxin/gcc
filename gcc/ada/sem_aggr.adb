@@ -1732,7 +1732,7 @@ package body Sem_Aggr is
                              ("subtype& has dynamic predicate, not allowed "
                               & "in aggregate choice", Choice, E);
 
-                        elsif not Is_Static_Subtype (E) then
+                        elsif not Is_OK_Static_Subtype (E) then
                            Error_Msg_NE
                              ("non-static subtype& has predicate, not allowed "
                               & "in aggregate choice", Choice, E);
@@ -3984,21 +3984,6 @@ package body Sem_Aggr is
          --  Typ is not a derived tagged type
 
          else
-            --  A type derived from an untagged private type whose full view
-            --  has discriminants is constructed as a record type but there
-            --  are no legal aggregates for it.
-
-            if Is_Derived_Type (Typ)
-              and then Has_Private_Ancestor (Typ)
-              and then Nkind (N) /= N_Extension_Aggregate
-            then
-               Error_Msg_Node_2 := Base_Type (Etype (Typ));
-               Error_Msg_NE
-                 ("no aggregate available for type& derived from "
-                  & "private type&", N, Typ);
-               return;
-            end if;
-
             Record_Def := Type_Definition (Parent (Base_Type (Typ)));
 
             if Null_Present (Record_Def) then

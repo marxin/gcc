@@ -427,6 +427,7 @@ package body Restrict is
                if VV < 0 then
                   Info.Unknown (R) := True;
                   Info.Count (R) := 1;
+
                else
                   Info.Count (R) := VV;
                end if;
@@ -442,10 +443,11 @@ package body Restrict is
             if VV < 0 then
                Info.Unknown (R) := True;
 
-            --  If checked by maximization, do maximization
+            --  If checked by maximization, nothing to do because the
+            --  check is per-object.
 
             elsif R in Checked_Max_Parameter_Restrictions then
-               Info.Count (R) := Integer'Max (Info.Count (R), VV);
+               null;
 
             --  If checked by adding, do add, checking for overflow
 
@@ -553,6 +555,13 @@ package body Restrict is
       then
          Msg_Issued := True;
          Restriction_Msg (R, N);
+      end if;
+
+      --  For Max_Entries and the like, do not carry forward the violation
+      --  count because it does not affect later declarations.
+
+      if R in Checked_Max_Parameter_Restrictions then
+         Restrictions.Count (R) := 0;
       end if;
    end Check_Restriction;
 
@@ -858,8 +867,8 @@ package body Restrict is
    -- Process_Restriction_Synonyms --
    ----------------------------------
 
-   --  Note: body of this function must be coordinated with list of
-   --  renaming declarations in System.Rident.
+   --  Note: body of this function must be coordinated with list of renaming
+   --  declarations in System.Rident.
 
    function Process_Restriction_Synonyms (N : Node_Id) return Name_Id
    is
@@ -882,11 +891,6 @@ package body Restrict is
 
          when Name_No_Task_Attributes =>
             New_Name := Name_No_Task_Attributes_Package;
-
-         --  No_Elaboration_Code_All is special, no warning needed
-
-         when Name_No_Elaboration_Code_All =>
-            return Name_No_Elaboration_Code;
 
          --  SPARK is special in that we unconditionally warn
 

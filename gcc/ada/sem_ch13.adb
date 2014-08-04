@@ -1283,10 +1283,19 @@ package body Sem_Ch13 is
                --  the proper insertion point. As a result the order of pragmas
                --  is the same as the order of aspects.
 
+               --  As precondition pragmas generated from conjuncts in the
+               --  precondition aspect are presented in reverse order to
+               --  Insert_Pragma, insert them in the correct order here by not
+               --  skipping previously inserted precondition pragmas when the
+               --  current pragma is a precondition.
+
                Decl := First (Declarations (N));
                while Present (Decl) loop
                   if Nkind (Decl) = N_Pragma
                     and then From_Aspect_Specification (Decl)
+                    and then not (Get_Pragma_Id (Decl) = Pragma_Precondition
+                                    and then
+                                  Get_Pragma_Id (Prag) = Pragma_Precondition)
                   then
                      Next (Decl);
                   else
@@ -1850,67 +1859,92 @@ package body Sem_Ch13 is
                   --  pragma is one of Convention/Import/Export.
 
                   declare
-                     P_Name   : Name_Id;
-                     A_Name   : Name_Id;
-                     A        : Node_Id;
-                     Arg_List : List_Id;
-                     Found    : Boolean;
-                     L_Assoc  : Node_Id;
-                     E_Assoc  : Node_Id;
+                     Args : constant List_Id := New_List (
+                              Make_Pragma_Argument_Association (Sloc (Expr),
+                                Expression => Relocate_Node (Expr)),
+                              Make_Pragma_Argument_Association (Sloc (Ent),
+                                Expression => Ent));
+
+                     Imp_Exp_Seen : Boolean := False;
+                     --  Flag set when aspect Import or Export has been seen
+
+                     Imp_Seen : Boolean := False;
+                     --  Flag set when aspect Import has been seen
+
+                     Asp        : Node_Id;
+                     Asp_Nam    : Name_Id;
+                     Extern_Arg : Node_Id;
+                     Link_Arg   : Node_Id;
+                     Prag_Nam   : Name_Id;
 
                   begin
-                     P_Name   := Chars (Id);
-                     Found    := False;
-                     Arg_List := New_List;
-                     L_Assoc  := Empty;
-                     E_Assoc  := Empty;
+                     Extern_Arg := Empty;
+                     Link_Arg   := Empty;
+                     Prag_Nam   := Chars (Id);
 
-                     A := First (L);
-                     while Present (A) loop
-                        A_Name := Chars (Identifier (A));
+                     Asp := First (L);
+                     while Present (Asp) loop
+                        Asp_Nam := Chars (Identifier (Asp));
 
-                        if Nam_In (A_Name, Name_Import, Name_Export) then
-                           if Found then
-                              Error_Msg_N ("conflicting", A);
+                        --  Aspects Import and Export take precedence over
+                        --  aspect Convention. As a result the generated pragma
+                        --  must carry the proper interfacing aspect's name.
+
+                        if Nam_In (Asp_Nam, Name_Import, Name_Export) then
+                           if Imp_Exp_Seen then
+                              Error_Msg_N ("conflicting", Asp);
                            else
-                              Found := True;
+                              Imp_Exp_Seen := True;
+
+                              if Asp_Nam = Name_Import then
+                                 Imp_Seen := True;
+                              end if;
                            end if;
 
-                           P_Name := A_Name;
+                           Prag_Nam := Asp_Nam;
 
-                        elsif A_Name = Name_Link_Name then
-                           L_Assoc :=
-                             Make_Pragma_Argument_Association (Loc,
-                               Chars      => A_Name,
-                               Expression => Relocate_Node (Expression (A)));
+                        --  Aspect External_Name adds an extra argument to the
+                        --  generated pragma.
 
-                        elsif A_Name = Name_External_Name then
-                           E_Assoc :=
+                        elsif Asp_Nam = Name_External_Name then
+                           Extern_Arg :=
                              Make_Pragma_Argument_Association (Loc,
-                               Chars      => A_Name,
-                               Expression => Relocate_Node (Expression (A)));
+                               Chars      => Asp_Nam,
+                               Expression => Relocate_Node (Expression (Asp)));
+
+                        --  Aspect Link_Name adds an extra argument to the
+                        --  generated pragma.
+
+                        elsif Asp_Nam = Name_Link_Name then
+                           Link_Arg :=
+                             Make_Pragma_Argument_Association (Loc,
+                               Chars      => Asp_Nam,
+                               Expression => Relocate_Node (Expression (Asp)));
                         end if;
 
-                        Next (A);
+                        Next (Asp);
                      end loop;
 
-                     Arg_List := New_List (
-                       Make_Pragma_Argument_Association (Sloc (Expr),
-                         Expression => Relocate_Node (Expr)),
-                       Make_Pragma_Argument_Association (Sloc (Ent),
-                         Expression => Ent));
+                     --  Assemble the full argument list
 
-                     if Present (L_Assoc) then
-                        Append_To (Arg_List, L_Assoc);
+                     if Present (Link_Arg) then
+                        Append_To (Args, Link_Arg);
                      end if;
 
-                     if Present (E_Assoc) then
-                        Append_To (Arg_List, E_Assoc);
+                     if Present (Extern_Arg) then
+                        Append_To (Args, Extern_Arg);
                      end if;
 
                      Make_Aitem_Pragma
-                       (Pragma_Argument_Associations => Arg_List,
-                        Pragma_Name                  => P_Name);
+                       (Pragma_Argument_Associations => Args,
+                        Pragma_Name                  => Prag_Nam);
+
+                     --  Store the generated pragma Import in the related
+                     --  subprogram.
+
+                     if Imp_Seen and then Is_Subprogram (E) then
+                        Set_Import_Pragma (E, Aitem);
+                     end if;
                   end;
 
                --  CPU, Interrupt_Priority, Priority
@@ -3487,7 +3521,7 @@ package body Sem_Ch13 is
       ------------------------------
 
       procedure Check_Indexing_Functions is
-         Indexing_Found : Boolean;
+         Indexing_Found : Boolean := False;
 
          procedure Check_One_Function (Subp : Entity_Id);
          --  Check one possible interpretation. Sets Indexing_Found True if a

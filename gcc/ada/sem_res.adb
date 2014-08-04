@@ -1102,7 +1102,10 @@ package body Sem_Res is
                end if;
             end if;
 
-            Nam := New_Copy (N);
+            --  The node is the name of the parameterless call. Preserve its
+            --  descendants, which may be complex expressions.
+
+            Nam := Relocate_Node (N);
 
             --  If overloaded, overload set belongs to new copy
 
@@ -5368,15 +5371,6 @@ package body Sem_Res is
    ------------------
 
    procedure Resolve_Call (N : Node_Id; Typ : Entity_Id) is
-      Loc     : constant Source_Ptr := Sloc (N);
-      Subp    : constant Node_Id    := Name (N);
-      Nam     : Entity_Id;
-      I       : Interp_Index;
-      It      : Interp;
-      Norm_OK : Boolean;
-      Scop    : Entity_Id;
-      Rtype   : Entity_Id;
-
       function Same_Or_Aliased_Subprograms
         (S : Entity_Id;
          E : Entity_Id) return Boolean;
@@ -5395,6 +5389,20 @@ package body Sem_Res is
       begin
          return S = E or else (Present (Subp_Alias) and then Subp_Alias = E);
       end Same_Or_Aliased_Subprograms;
+
+      --  Local variables
+
+      Loc      : constant Source_Ptr := Sloc (N);
+      Subp     : constant Node_Id    := Name (N);
+      Body_Id  : Entity_Id;
+      I        : Interp_Index;
+      It       : Interp;
+      Nam      : Entity_Id;
+      Nam_Decl : Node_Id;
+      Nam_UA   : Entity_Id;
+      Norm_OK  : Boolean;
+      Rtype    : Entity_Id;
+      Scop     : Entity_Id;
 
    --  Start of processing for Resolve_Call
 
@@ -6205,30 +6213,26 @@ package body Sem_Res is
       Eval_Call (N);
       Check_Elab_Call (N);
 
-      --  In GNATprove mode, expansion is disabled, but we want to inline
-      --  some subprograms to facilitate formal verification. Indirect calls,
-      --  through a subprogram type, cannot be inlined. Inlining is only
-      --  performed for calls for which SPARK_Mode is On.
+      --  In GNATprove mode, expansion is disabled, but we want to inline some
+      --  subprograms to facilitate formal verification. Indirect calls through
+      --  a subprogram type or within a generic cannot be inlined. Inlining is
+      --  performed only for calls subject to SPARK_Mode on.
 
       if GNATprove_Mode
-        and then Is_Overloadable (Nam)
         and then SPARK_Mode = On
+        and then Is_Overloadable (Nam)
+        and then not Inside_A_Generic
       then
-         --  Retrieve the body to inline from the ultimate alias of Nam, if
-         --  there is one, otherwise calls that should be inlined end up not
-         --  being inlined.
+         Nam_UA   := Ultimate_Alias (Nam);
+         Nam_Decl := Unit_Declaration_Node (Nam_UA);
 
-         declare
-            Nam_UA  : constant Entity_Id := Ultimate_Alias (Nam);
-            Decl    : constant Node_Id   := Unit_Declaration_Node (Nam_UA);
-            Body_Id : constant Entity_Id := Corresponding_Body (Decl);
+         if Nkind (Nam_Decl) = N_Subprogram_Declaration then
+            Body_Id := Corresponding_Body (Nam_Decl);
 
-         begin
-            --  If the subprogram is not eligible for inlining in GNATprove
-            --  mode, do nothing.
+            --  Nothing to do if the subprogram is not eligible for inlining in
+            --  GNATprove mode.
 
-            if Nkind (Decl) /= N_Subprogram_Declaration
-              or else not Is_Inlined_Always (Nam_UA)
+            if not Is_Inlined_Always (Nam_UA)
               or else not Can_Be_Inlined_In_GNATprove_Mode (Nam_UA, Body_Id)
             then
                null;
@@ -6258,7 +6262,7 @@ package body Sem_Res is
                --  the subprogram is not suitable for inlining in GNATprove
                --  mode.
 
-               elsif No (Body_To_Inline (Decl)) then
+               elsif No (Body_To_Inline (Nam_Decl)) then
                   null;
 
                --  Calls cannot be inlined inside potentially unevaluated
@@ -6277,7 +6281,7 @@ package body Sem_Res is
                   Expand_Inlined_Call (N, Nam_UA, Nam);
                end if;
             end if;
-         end;
+         end if;
       end if;
 
       Warn_On_Overlapping_Actuals (Nam, N);
@@ -7172,7 +7176,11 @@ package body Sem_Res is
                   New_Occurrence_Of (PPC_Wrapper (Nam), Loc),
                 Parameter_Associations => New_Actuals);
             Rewrite (N, New_Call);
-            Analyze_And_Resolve (N);
+
+            --  Preanalyze and resolve new call. Current procedure is called
+            --  from Resolve_Call, after which expansion will take place.
+
+            Preanalyze_And_Resolve (N);
             return;
          end;
       end if;
