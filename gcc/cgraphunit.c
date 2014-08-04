@@ -289,7 +289,7 @@ void
 symbol_table::process_new_functions (void)
 {
   tree fndecl;
-  struct cgraph_node *node;
+  cgraph_node *node;
   cgraph_node_set_iterator csi;
 
   if (!cgraph_new_nodes)
@@ -388,7 +388,7 @@ cgraph_node::reset (void)
 bool
 symtab_node::referred_to_p (void)
 {
-  struct ipa_ref *ref = NULL;
+  ipa_ref *ref = NULL;
 
   /* See if there are any references at all.  */
   if (iterate_referring (0, ref))
@@ -408,7 +408,7 @@ symtab_node::referred_to_p (void)
 void
 cgraph_finalize_function (tree decl, bool no_collect)
 {
-  struct cgraph_node *node = cgraph_node::get_create (decl);
+  cgraph_node *node = cgraph_node::get_create (decl);
 
   if (node->definition)
     {
@@ -477,7 +477,7 @@ void
 cgraph_node::add_new_function (tree fndecl, bool lowered)
 {
   gcc::pass_manager *passes = g->get_passes ();
-  struct cgraph_node *node;
+  cgraph_node *node;
   switch (symtab->cgraph_state)
     {
       case CGRAPH_STATE_PARSING:
@@ -555,7 +555,7 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 asm_node *
 symbol_table::add_asm_symbol (tree asm_str)
 {
-  struct asm_node *node;
+  asm_node *node;
 
   node = ggc_cleared_alloc<asm_node> ();
   node->asm_str = asm_str;
@@ -575,7 +575,7 @@ symbol_table::add_asm_symbol (tree asm_str)
 void
 symbol_table::output_asm_statements (void)
 {
-  struct asm_node *can;
+  asm_node *can;
 
   if (seen_error ())
     return;
@@ -611,7 +611,7 @@ cgraph_node::analyze (void)
   else if (dispatcher_function)
     {
       /* Generate the dispatcher body of multi-versioned functions.  */
-      struct cgraph_function_version_info *dispatcher_version_info
+      cgraph_function_version_info *dispatcher_version_info
 	= function_version ();
       if (dispatcher_version_info != NULL
           && (dispatcher_version_info->dispatcher_resolver
@@ -723,10 +723,10 @@ process_common_attributes (tree decl)
    attributes at that point.  */
 
 static void
-process_function_and_variable_attributes (struct cgraph_node *first,
+process_function_and_variable_attributes (cgraph_node *first,
                                           varpool_node *first_var)
 {
-  struct cgraph_node *node;
+  cgraph_node *node;
   varpool_node *vnode;
 
   for (node = symtab->first_function (); node != first;
@@ -835,7 +835,7 @@ varpool_node::finalize_decl (tree decl)
 
 static void
 walk_polymorphic_call_targets (hash_set<void *> *reachable_call_targets,
-			       struct cgraph_edge *edge)
+			       cgraph_edge *edge)
 {
   unsigned int i;
   void *cache_token;
@@ -920,8 +920,8 @@ analyze_functions (void)
 {
   /* Keep track of already processed nodes when called multiple times for
      intermodule optimization.  */
-  static struct cgraph_node *first_analyzed;
-  struct cgraph_node *first_handled = first_analyzed;
+  static cgraph_node *first_analyzed;
+  cgraph_node *first_handled = first_analyzed;
   static varpool_node *first_analyzed_var;
   varpool_node *first_handled_var = first_analyzed_var;
   hash_set<void *> reachable_call_targets;
@@ -929,7 +929,7 @@ analyze_functions (void)
   symtab_node *node;
   symtab_node *next;
   int i;
-  struct ipa_ref *ref;
+  ipa_ref *ref;
   bool changed = true;
   location_t saved_loc = input_location;
 
@@ -993,7 +993,7 @@ analyze_functions (void)
 	  cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
 	  if (cnode && cnode->definition)
 	    {
-	      struct cgraph_edge *edge;
+	      cgraph_edge *edge;
 	      tree decl = cnode->decl;
 
 	      /* ??? It is possible to create extern inline function
@@ -1017,7 +1017,7 @@ analyze_functions (void)
 		   enqueue_node (edge->callee);
 	      if (optimize && flag_devirtualize)
 		{
-		  struct cgraph_edge *next;
+		  cgraph_edge *next;
 
 		  for (edge = cnode->indirect_calls; edge; edge = next)
 		    {
@@ -1034,7 +1034,7 @@ analyze_functions (void)
 	      will be later needed to output debug info.  */
 	      if (DECL_ABSTRACT_ORIGIN (decl))
 		{
-		  struct cgraph_node *origin_node
+		  cgraph_node *origin_node
 		    = cgraph_node::get_create (DECL_ABSTRACT_ORIGIN (decl));
 		  origin_node->used_as_abstract_origin = true;
 		}
@@ -1176,7 +1176,7 @@ handle_alias_pairs (void)
       if (TREE_CODE (p->decl) == FUNCTION_DECL
           && target_node && is_a <cgraph_node *> (target_node))
 	{
-	  struct cgraph_node *src_node = cgraph_node::get (p->decl);
+	  cgraph_node *src_node = cgraph_node::get (p->decl);
 	  if (src_node && src_node->definition)
 	    src_node->reset ();
 	  cgraph_node::create_alias (p->decl, target_node->decl);
@@ -1206,7 +1206,7 @@ handle_alias_pairs (void)
 static void
 mark_functions_to_output (void)
 {
-  struct cgraph_node *node;
+  cgraph_node *node;
 #ifdef ENABLE_CHECKING
   bool check_same_comdat_groups = false;
 
@@ -1235,7 +1235,7 @@ mark_functions_to_output (void)
 	  node->process = 1;
 	  if (node->same_comdat_group)
 	    {
-	      struct cgraph_node *next;
+	      cgraph_node *next;
 	      for (next = dyn_cast<cgraph_node *> (node->same_comdat_group);
 		   next != node;
 		   next = dyn_cast<cgraph_node *> (next->same_comdat_group))
@@ -1843,8 +1843,8 @@ cgraph_node::expand (void)
 static int
 node_cmp (const void *pa, const void *pb)
 {
-  const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
-  const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
+  const cgraph_node *a = *(const cgraph_node * const *) pa;
+  const cgraph_node *b = *(const cgraph_node * const *) pb;
 
   /* Functions with time profile must be before these without profile.  */
   if (!a->tp_first_run || !b->tp_first_run)
@@ -1868,8 +1868,8 @@ node_cmp (const void *pa, const void *pb)
 static void
 expand_all_functions (void)
 {
-  struct cgraph_node *node;
-  struct cgraph_node **order = XCNEWVEC (struct cgraph_node *,
+  cgraph_node *node;
+  cgraph_node **order = XCNEWVEC (cgraph_node *,
 					 symtab->cgraph_count);
   unsigned int expanded_func_count = 0, profiled_func_count = 0;
   int order_pos, new_order_pos = 0;
@@ -1885,7 +1885,7 @@ expand_all_functions (void)
       order[new_order_pos++] = order[i];
 
   if (flag_profile_reorder_functions)
-    qsort (order, new_order_pos, sizeof (struct cgraph_node *), node_cmp);
+    qsort (order, new_order_pos, sizeof (cgraph_node *), node_cmp);
 
   for (i = new_order_pos - 1; i >= 0; i--)
     {
@@ -1935,9 +1935,9 @@ struct cgraph_order_sort
   enum cgraph_order_sort_kind kind;
   union
   {
-    struct cgraph_node *f;
+    cgraph_node *f;
     varpool_node *v;
-    struct asm_node *a;
+    asm_node *a;
   } u;
 };
 
@@ -1951,13 +1951,13 @@ static void
 output_in_order (void)
 {
   int max;
-  struct cgraph_order_sort *nodes;
+  cgraph_order_sort *nodes;
   int i;
-  struct cgraph_node *pf;
+  cgraph_node *pf;
   varpool_node *pv;
-  struct asm_node *pa;
+  asm_node *pa;
   max = symtab->order;
-  nodes = XCNEWVEC (struct cgraph_order_sort, max);
+  nodes = XCNEWVEC (cgraph_order_sort, max);
 
   FOR_EACH_DEFINED_FUNCTION (pf)
     {
@@ -2255,7 +2255,7 @@ symbol_table::compile (void)
      function bodies have been released from memory.  */
   if (!seen_error ())
     {
-      struct cgraph_node *node;
+      cgraph_node *node;
       bool error_found = false;
 
       FOR_EACH_DEFINED_FUNCTION (node)
@@ -2322,7 +2322,7 @@ symbol_table::finalize_compilation_unit (void)
    kind of wrapper method.  */
 
 void
-cgraph_node::create_wrapper (struct cgraph_node *target)
+cgraph_node::create_wrapper (cgraph_node *target)
 {
     /* Preserve DECL_RESULT so we get right by reference flag.  */
     tree decl_result = DECL_RESULT (decl);
@@ -2341,7 +2341,7 @@ cgraph_node::create_wrapper (struct cgraph_node *target)
     thunk.thunk_p = true;
     thunk.this_adjusting = false;
 
-    struct cgraph_edge *e = create_edge (target, NULL, 0, CGRAPH_FREQ_BASE);
+    cgraph_edge *e = create_edge (target, NULL, 0, CGRAPH_FREQ_BASE);
 
     if (!expand_thunk (false, true))
       analyzed = true;
