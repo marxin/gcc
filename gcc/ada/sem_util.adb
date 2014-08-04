@@ -1252,123 +1252,177 @@ package body Sem_Util is
               Expression   => New_Occurrence_Of (Obj_Id, Loc))));
    end Build_Default_Init_Cond_Call;
 
-   --------------------------------------------
-   -- Build_Default_Init_Cond_Procedure_Body --
-   --------------------------------------------
+   ----------------------------------------------
+   -- Build_Default_Init_Cond_Procedure_Bodies --
+   ----------------------------------------------
 
-   procedure Build_Default_Init_Cond_Procedure_Body (Typ : Entity_Id) is
-      Param_Id : Entity_Id;
-      --  The entity of the formal parameter of the default initial condition
-      --  procedure.
+   procedure Build_Default_Init_Cond_Procedure_Bodies (Priv_Decls : List_Id) is
+      procedure Build_Default_Init_Cond_Procedure_Body (Typ : Entity_Id);
+      --  If type Typ is subject to pragma Default_Initial_Condition, build the
+      --  body of the procedure which verifies the assumption of the pragma at
+      --  run time. The generated body is added after the type declaration.
 
-      procedure Replace_Type_Reference (N : Node_Id);
-      --  Replace a single reference to type Typ with a reference to Param_Id
+      --------------------------------------------
+      -- Build_Default_Init_Cond_Procedure_Body --
+      --------------------------------------------
 
-      ----------------------------
-      -- Replace_Type_Reference --
-      ----------------------------
+      procedure Build_Default_Init_Cond_Procedure_Body (Typ : Entity_Id) is
+         Param_Id : Entity_Id;
+         --  The entity of the sole formal parameter of the default initial
+         --  condition procedure.
 
-      procedure Replace_Type_Reference (N : Node_Id) is
+         procedure Replace_Type_Reference (N : Node_Id);
+         --  Replace a single reference to type Typ with a reference to formal
+         --  parameter Param_Id.
+
+         ----------------------------
+         -- Replace_Type_Reference --
+         ----------------------------
+
+         procedure Replace_Type_Reference (N : Node_Id) is
+         begin
+            Rewrite (N, New_Occurrence_Of (Param_Id, Sloc (N)));
+         end Replace_Type_Reference;
+
+         procedure Replace_Type_References is
+           new Replace_Type_References_Generic (Replace_Type_Reference);
+
+         --  Local variables
+
+         Loc       : constant Source_Ptr := Sloc (Typ);
+         Prag      : constant Node_Id    :=
+                       Get_Pragma (Typ, Pragma_Default_Initial_Condition);
+         Proc_Id   : constant Entity_Id  := Default_Init_Cond_Procedure (Typ);
+         Spec_Decl : constant Node_Id    := Unit_Declaration_Node (Proc_Id);
+         Body_Decl : Node_Id;
+         Expr      : Node_Id;
+         Stmt      : Node_Id;
+
+      --  Start of processing for Build_Default_Init_Cond_Procedure_Body
+
       begin
-         Rewrite (N, New_Occurrence_Of (Param_Id, Sloc (N)));
-      end Replace_Type_Reference;
+         --  The procedure should be generated only for [sub]types subject to
+         --  pragma Default_Initial_Condition. Types that inherit the pragma do
+         --  not get this specialized procedure.
 
-      procedure Replace_Type_References is
-        new Replace_Type_References_Generic (Replace_Type_Reference);
+         pragma Assert (Has_Default_Init_Cond (Typ));
+         pragma Assert (Present (Prag));
+         pragma Assert (Present (Proc_Id));
+
+         --  Nothing to do if the body was already built
+
+         if Present (Corresponding_Body (Spec_Decl)) then
+            return;
+         end if;
+
+         Param_Id := First_Formal (Proc_Id);
+
+         --  The pragma has an argument. Note that the argument is analyzed
+         --  after all references to the current instance of the type are
+         --  replaced.
+
+         if Present (Pragma_Argument_Associations (Prag)) then
+            Expr :=
+              Get_Pragma_Arg (First (Pragma_Argument_Associations (Prag)));
+
+            if Nkind (Expr) = N_Null then
+               Stmt := Make_Null_Statement (Loc);
+
+            --  Preserve the original argument of the pragma by replicating it.
+            --  Replace all references to the current instance of the type with
+            --  references to the formal parameter.
+
+            else
+               Expr := New_Copy_Tree (Expr);
+               Replace_Type_References (Expr, Typ);
+
+               --  Generate:
+               --    pragma Check (Default_Initial_Condition, <Expr>);
+
+               Stmt :=
+                 Make_Pragma (Loc,
+                   Pragma_Identifier            =>
+                     Make_Identifier (Loc, Name_Check),
+
+                   Pragma_Argument_Associations => New_List (
+                     Make_Pragma_Argument_Association (Loc,
+                       Expression =>
+                         Make_Identifier (Loc,
+                           Chars => Name_Default_Initial_Condition)),
+                     Make_Pragma_Argument_Association (Loc,
+                       Expression => Expr)));
+            end if;
+
+         --  Otherwise the pragma appears without an argument
+
+         else
+            Stmt := Make_Null_Statement (Loc);
+         end if;
+
+         --  Generate:
+         --    procedure <Typ>Default_Init_Cond (I : <Typ>) is
+         --    begin
+         --       <Stmt>;
+         --    end <Typ>Default_Init_Cond;
+
+         Body_Decl :=
+           Make_Subprogram_Body (Loc,
+             Specification              =>
+               Copy_Separate_Tree (Specification (Spec_Decl)),
+             Declarations               => Empty_List,
+             Handled_Statement_Sequence =>
+               Make_Handled_Sequence_Of_Statements (Loc,
+                 Statements => New_List (Stmt)));
+
+         --  Link the spec and body of the default initial condition procedure
+         --  to prevent the generation of a duplicate body.
+
+         Set_Corresponding_Body (Spec_Decl, Defining_Entity (Body_Decl));
+         Set_Corresponding_Spec (Body_Decl, Proc_Id);
+
+         Insert_After_And_Analyze (Declaration_Node (Typ), Body_Decl);
+      end Build_Default_Init_Cond_Procedure_Body;
 
       --  Local variables
 
-      Loc       : constant Source_Ptr := Sloc (Typ);
-      Prag      : constant Node_Id    :=
-                    Get_Pragma (Typ, Pragma_Default_Initial_Condition);
-      Proc_Id   : constant Entity_Id  := Default_Init_Cond_Procedure (Typ);
-      Spec_Decl : constant Node_Id    := Unit_Declaration_Node (Proc_Id);
-      Body_Decl : Node_Id;
-      Expr      : Node_Id;
-      Stmt      : Node_Id;
+      Decl : Node_Id;
+      Typ  : Entity_Id;
 
-   --  Start of processing for Build_Default_Init_Cond_Procedure
+   --  Start of processing for Build_Default_Init_Cond_Procedure_Bodies
 
    begin
-      --  The procedure should be generated only for types subject to pragma
-      --  Default_Initial_Condition. Types that inherit the pragma do not get
-      --  this specialized procedure.
+      --  Inspect the private declarations looking for [sub]type declarations
 
-      pragma Assert (Has_Default_Init_Cond (Typ));
-      pragma Assert (Present (Prag));
-      pragma Assert (Present (Proc_Id));
+      Decl := First (Priv_Decls);
+      while Present (Decl) loop
+         if Nkind_In (Decl, N_Full_Type_Declaration,
+                            N_Subtype_Declaration)
+         then
+            Typ := Defining_Entity (Decl);
 
-      --  Nothing to do if the body was already built
+            --  Guard against partially decorate types due to previous errors
 
-      if Present (Corresponding_Body (Spec_Decl)) then
-         return;
-      end if;
+            if Is_Type (Typ) then
 
-      Param_Id := First_Formal (Proc_Id);
+               --  If the type is subject to pragma Default_Initial_Condition,
+               --  generate the body of the internal procedure which verifies
+               --  the assertion of the pragma at run time.
 
-      --  The pragma has an argument. Note that the argument is analyzed after
-      --  all references to the current instance of the type are replaced.
+               if Has_Default_Init_Cond (Typ) then
+                  Build_Default_Init_Cond_Procedure_Body (Typ);
 
-      if Present (Pragma_Argument_Associations (Prag)) then
-         Expr := Get_Pragma_Arg (First (Pragma_Argument_Associations (Prag)));
+               --  A derived type inherits the default initial condition
+               --  procedure from its parent type.
 
-         if Nkind (Expr) = N_Null then
-            Stmt := Make_Null_Statement (Loc);
-
-         --  Preserve the original argument of the pragma by replicating it.
-         --  Replace all references to the current instance of the type with
-         --  references to the formal parameter.
-
-         else
-            Expr := New_Copy_Tree (Expr);
-            Replace_Type_References (Expr, Typ);
-
-            --  Generate:
-            --    pragma Check (Default_Initial_Condition, <Expr>);
-
-            Stmt :=
-              Make_Pragma (Loc,
-                Pragma_Identifier            =>
-                  Make_Identifier (Loc, Name_Check),
-
-                Pragma_Argument_Associations => New_List (
-                  Make_Pragma_Argument_Association (Loc,
-                    Expression =>
-                      Make_Identifier (Loc, Name_Default_Initial_Condition)),
-                  Make_Pragma_Argument_Association (Loc,
-                    Expression => Expr)));
+               elsif Has_Inherited_Default_Init_Cond (Typ) then
+                  Inherit_Default_Init_Cond_Procedure (Typ);
+               end if;
+            end if;
          end if;
 
-      --  Otherwise the pragma appears without an argument
-
-      else
-         Stmt := Make_Null_Statement (Loc);
-      end if;
-
-      --  Generate:
-      --    procedure <Typ>Default_Init_Cond (I : <Typ>) is
-      --    begin
-      --       <Stmt>;
-      --    end <Typ>Default_Init_Cond;
-
-      Body_Decl :=
-        Make_Subprogram_Body (Loc,
-          Specification              =>
-            Copy_Separate_Tree (Specification (Spec_Decl)),
-          Declarations               => Empty_List,
-          Handled_Statement_Sequence =>
-            Make_Handled_Sequence_Of_Statements (Loc,
-              Statements => New_List (Stmt)));
-
-      --  Link the spec and body of the default initial condition procedure
-      --  to prevent the generation of a duplicate body in case there is an
-      --  attempt to freeze the related type again.
-
-      Set_Corresponding_Body (Spec_Decl, Defining_Entity (Body_Decl));
-      Set_Corresponding_Spec (Body_Decl, Proc_Id);
-
-      Append_Freeze_Action (Typ, Body_Decl);
-   end Build_Default_Init_Cond_Procedure_Body;
+         Next (Decl);
+      end loop;
+   end Build_Default_Init_Cond_Procedure_Bodies;
 
    ---------------------------------------------------
    -- Build_Default_Init_Cond_Procedure_Declaration --
@@ -16455,128 +16509,6 @@ package body Sem_Util is
 
       Set_Entity (N, Val);
    end Set_Entity_With_Checks;
-
-   ----------------------------------
-   -- Set_Ignore_Pragma_SPARK_Mode --
-   ----------------------------------
-
-   procedure Set_Ignore_Pragma_SPARK_Mode (N : Node_Id) is
-      procedure Set_SPARK_Mode (Expr : Node_Id);
-      --  Set flag Ignore_Pragma_SPARK_Mode based on the argument of aspect or
-      --  pragma SPARK_Mode denoted by Expr.
-
-      --------------------
-      -- Set_SPARK_Mode --
-      --------------------
-
-      procedure Set_SPARK_Mode (Expr : Node_Id) is
-      begin
-         --  When pragma SPARK_Mode with argument "off" applies to an instance,
-         --  all SPARK_Mode pragmas within the instance are ignored.
-
-         if Present (Expr)
-           and then Nkind (Expr) = N_Identifier
-           and then Chars (Expr) = Name_Off
-         then
-            Ignore_Pragma_SPARK_Mode := True;
-         end if;
-      end Set_SPARK_Mode;
-
-      --  Local variables
-
-      Aspects : constant List_Id := Aspect_Specifications (N);
-      Context : constant Node_Id := Parent (N);
-      Args    : List_Id;
-      Aspect  : Node_Id;
-      Decl    : Node_Id;
-
-   --  Start of processing for Set_Ignore_Pragma_SPARK_Mode
-
-   begin
-      --  When the enclosing context of the instance has SPARK_Mode "off", all
-      --  SPARK_Mode pragmas within the instance are ignored. Note that there
-      --  is no point in checking whether the instantiation itself carries
-      --  aspect/pragma SPARK_Mode because it is either illegal ("on") or has
-      --  no effect ("off").
-
-      if SPARK_Mode = Off then
-         Ignore_Pragma_SPARK_Mode := True;
-         return;
-      end if;
-
-      --  Inspect the aspects of the instantiation and locate SPARK_Mode. Note
-      --  that the aspect form of SPARK_Mode precedes a potentially duplicate
-      --  pragma.
-
-      if Present (Aspects) then
-         Aspect := First (Aspects);
-         while Present (Aspect) loop
-            if Get_Aspect_Id (Aspect) = Aspect_SPARK_Mode then
-               Set_SPARK_Mode (Expression (Aspect));
-               return;
-            end if;
-
-            Next (Aspect);
-         end loop;
-      end if;
-
-      --  Peek ahead of the instance and locate pragma SPARK_Mode. Even though
-      --  the pragma is analyzed after the instance, its mode must be known now
-      --  as it governs the legality of SPARK_Mode pragmas within the instance.
-
-      Decl := Empty;
-
-      --  The instance is a compilation unit, the pragma appears on the
-      --  Pragmas_After list.
-
-      if Present (Context)
-        and then Nkind (Context) = N_Compilation_Unit
-        and then Present (Aux_Decls_Node (Context))
-        and then Present (Pragmas_After (Aux_Decls_Node (Context)))
-      then
-         Decl := First (Pragmas_After (Aux_Decls_Node (Context)));
-
-      --  The instance is part of a declarative list, the pragma appears after
-      --  the instance.
-
-      elsif Is_List_Member (N) then
-         Decl := Next (N);
-      end if;
-
-      --  Inspect all declarations following the instance
-
-      while Present (Decl) loop
-         if Nkind (Decl) = N_Pragma then
-            if Get_Pragma_Id (Decl) = Pragma_SPARK_Mode then
-               Args := Pragma_Argument_Associations (Decl);
-
-               --  The pragma argument dictates the mode
-
-               if Present (Args) then
-                  Set_SPARK_Mode (Get_Pragma_Arg (First (Args)));
-               end if;
-
-               --  Only the first SPARK_Mode following the instance is
-               --  considered, any extra (illegal) pragmas are ignored.
-
-               exit;
-            end if;
-
-         --  Skip internally generated code
-
-         elsif not Comes_From_Source (Decl) then
-            null;
-
-         --  Otherwise a source construct exhaust the range where the pragma
-         --  may appear.
-
-         else
-            exit;
-         end if;
-
-         Next (Decl);
-      end loop;
-   end Set_Ignore_Pragma_SPARK_Mode;
 
    ------------------------
    -- Set_Name_Entity_Id --

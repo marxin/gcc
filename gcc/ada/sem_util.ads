@@ -218,11 +218,10 @@ package Sem_Util is
    --  Build a call to the default initial condition procedure of type Typ with
    --  Obj_Id as the actual parameter.
 
-   procedure Build_Default_Init_Cond_Procedure_Body (Typ : Entity_Id);
-   --  If private type Typ is subject to pragma Default_Initial_Condition,
-   --  build the body of the procedure which verifies the assumption of the
-   --  pragma at runtime. The generated body is added to the freeze actions
-   --  of the type.
+   procedure Build_Default_Init_Cond_Procedure_Bodies (Priv_Decls : List_Id);
+   --  Inspect the contents of private declarations Priv_Decls and build the
+   --  bodies the default initial condition procedures for all types subject
+   --  to pragma Default_Initial_Condition.
 
    procedure Build_Default_Init_Cond_Procedure_Declaration (Typ : Entity_Id);
    --  If private type Typ is subject to pragma Default_Initial_Condition,
@@ -1836,11 +1835,6 @@ package Sem_Util is
    --
    --    If restriction No_Implementation_Identifiers is set, then it checks
    --    that the entity is not implementation defined.
-
-   procedure Set_Ignore_Pragma_SPARK_Mode (N : Node_Id);
-   --  Determine whether [the enclosing context of] package or subprogram N is
-   --  subject to pragma SPARK_Mode with mode "off". If this is the case, set
-   --  global flag Ignore_Pragma_SPARK_Mode to True.
 
    procedure Set_Name_Entity_Id (Id : Name_Id; Val : Entity_Id);
    pragma Inline (Set_Name_Entity_Id);

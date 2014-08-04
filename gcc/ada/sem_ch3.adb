@@ -2393,6 +2393,15 @@ package body Sem_Ch3 is
             if L = Private_Declarations (Context) then
                Analyze_Package_Contract (Defining_Entity (Context));
 
+               --  Build the bodies of the default initial condition procedures
+               --  for all types subject to pragma Default_Initial_Condition.
+               --  From a purely Ada stand point, this is a freezing activity,
+               --  however freezing is not available under GNATprove_Mode. To
+               --  accomodate both scenarios, the bodies are build at the end
+               --  of private declaration analysis.
+
+               Build_Default_Init_Cond_Procedure_Bodies (L);
+
             --  Otherwise the contract is analyzed at the end of the visible
             --  declarations.
 
@@ -3758,6 +3767,14 @@ package body Sem_Ch3 is
             --  its expansion because there are cases in they are not required.
 
             elsif Is_Interface (T) then
+               null;
+
+            --  In GNATprove mode, Expand_Subtype_From_Expr does nothing. Thus,
+            --  we should prevent the generation of another Itype with the
+            --  same name as the one already generated, or we end up with
+            --  two identical types in GNATprove.
+
+            elsif GNATprove_Mode then
                null;
 
             else
@@ -15046,7 +15063,7 @@ package body Sem_Ch3 is
       end if;
 
       --  Only composite types other than array types are allowed to have
-      --  discriminants. In SPARK, no types are allowed to have discriminants.
+      --  discriminants.
 
       if Present (Discriminant_Specifications (N)) then
          if (Is_Elementary_Type (Parent_Type)
@@ -15057,6 +15074,9 @@ package body Sem_Ch3 is
               ("elementary or array type cannot have discriminants",
                Defining_Identifier (First (Discriminant_Specifications (N))));
             Set_Has_Discriminants (T, False);
+
+         --  The type is allowed to have discriminants
+
          else
             Check_SPARK_05_Restriction ("discriminant type is not allowed", N);
          end if;
@@ -18024,10 +18044,12 @@ package body Sem_Ch3 is
             end if;
          end if;
 
+         --  Handling of discriminants that are access types
+
          if Is_Access_Type (Discr_Type) then
 
-            --  Ada 2005 (AI-230): Access discriminant allowed in non-limited
-            --  record types
+            --  Ada 2005 (AI-230): Access discriminant allowed in non-
+            --  limited record types
 
             if Ada_Version < Ada_2005 then
                Check_Access_Discriminant_Requires_Limited
@@ -18039,9 +18061,12 @@ package body Sem_Ch3 is
                  ("(Ada 83) access discriminant not allowed", Discr);
             end if;
 
+         --  If not access type, must be a discrete type
+
          elsif not Is_Discrete_Type (Discr_Type) then
-            Error_Msg_N ("discriminants must have a discrete or access type",
-              Discriminant_Type (Discr));
+            Error_Msg_N
+              ("discriminants must have a discrete or access type",
+               Discriminant_Type (Discr));
          end if;
 
          Set_Etype (Defining_Identifier (Discr), Discr_Type);
@@ -18051,8 +18076,8 @@ package body Sem_Ch3 is
          --  expression of the discriminant; the default expression must be of
          --  the type of the discriminant. (RM 3.7.1) Since this expression is
          --  a default expression, we do the special preanalysis, since this
-         --  expression does not freeze (see "Handling of Default and Per-
-         --  Object Expressions" in spec of package Sem).
+         --  expression does not freeze (see section "Handling of Default and
+         --  Per-Object Expressions" in spec of package Sem).
 
          if Present (Expression (Discr)) then
             Preanalyze_Spec_Expression (Expression (Discr), Discr_Type);
