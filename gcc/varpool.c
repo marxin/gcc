@@ -55,10 +55,10 @@ struct varpool_node_hook_list {
 varpool_node_hook_list *
 symbol_table::add_varpool_removal_hook (varpool_node_hook hook, void *data)
 {
-  struct varpool_node_hook_list *entry;
-  struct varpool_node_hook_list **ptr = &m_first_varpool_removal_hook;
+  varpool_node_hook_list *entry;
+  varpool_node_hook_list **ptr = &m_first_varpool_removal_hook;
 
-  entry = (struct varpool_node_hook_list *) xmalloc (sizeof (*entry));
+  entry = (varpool_node_hook_list *) xmalloc (sizeof (*entry));
   entry->hook = hook;
   entry->data = data;
   entry->next = NULL;
@@ -70,9 +70,9 @@ symbol_table::add_varpool_removal_hook (varpool_node_hook hook, void *data)
 
 /* Remove ENTRY from the list of hooks called on removing nodes.  */
 void
-symbol_table::remove_varpool_removal_hook (struct varpool_node_hook_list *entry)
+symbol_table::remove_varpool_removal_hook (varpool_node_hook_list *entry)
 {
-  struct varpool_node_hook_list **ptr = &m_first_varpool_removal_hook;
+  varpool_node_hook_list **ptr = &m_first_varpool_removal_hook;
 
   while (*ptr != entry)
     ptr = &(*ptr)->next;
@@ -84,7 +84,7 @@ symbol_table::remove_varpool_removal_hook (struct varpool_node_hook_list *entry)
 void
 symbol_table::call_varpool_removal_hooks (varpool_node *node)
 {
-  struct varpool_node_hook_list *entry = m_first_varpool_removal_hook;
+  varpool_node_hook_list *entry = m_first_varpool_removal_hook;
   while (entry)
   {
     entry->hook (node, entry->data);
@@ -93,13 +93,13 @@ symbol_table::call_varpool_removal_hooks (varpool_node *node)
 }
 
 /* Register HOOK to be called with DATA on each inserted node.  */
-struct varpool_node_hook_list *
+varpool_node_hook_list *
 symbol_table::add_varpool_insertion_hook (varpool_node_hook hook, void *data)
 {
-  struct varpool_node_hook_list *entry;
-  struct varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
+  varpool_node_hook_list *entry;
+  varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
 
-  entry = (struct varpool_node_hook_list *) xmalloc (sizeof (*entry));
+  entry = (varpool_node_hook_list *) xmalloc (sizeof (*entry));
   entry->hook = hook;
   entry->data = data;
   entry->next = NULL;
@@ -113,7 +113,7 @@ symbol_table::add_varpool_insertion_hook (varpool_node_hook hook, void *data)
 void
 symbol_table::remove_varpool_insertion_hook (varpool_node_hook_list *entry)
 {
-  struct varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
+  varpool_node_hook_list **ptr = &m_first_varpool_insertion_hook;
 
   while (*ptr != entry)
     ptr = &(*ptr)->next;
@@ -125,7 +125,7 @@ symbol_table::remove_varpool_insertion_hook (varpool_node_hook_list *entry)
 void
 symbol_table::call_varpool_insertion_hooks (varpool_node *node)
 {
-  struct varpool_node_hook_list *entry = m_first_varpool_insertion_hook;
+  varpool_node_hook_list *entry = m_first_varpool_insertion_hook;
   while (entry)
   {
     entry->hook (node, entry->data);
@@ -264,7 +264,7 @@ varpool_node::get_for_asmname (tree asmname)
 tree
 varpool_node::get_constructor (void)
 {
-  struct lto_file_decl_data *file_data;
+  lto_file_decl_data *file_data;
   const char *data, *name;
   size_t len;
 
@@ -500,7 +500,7 @@ varpool_node::analyze (void)
 void
 varpool_node::assemble_aliases (void)
 {
-  struct ipa_ref *ref;
+  ipa_ref *ref;
 
   FOR_EACH_ALIAS (this, ref)
     {
@@ -580,7 +580,7 @@ symbol_table::remove_unreferenced_decls (void)
   varpool_node *next, *node;
   varpool_node *first = (varpool_node *)(void *)1;
   int i;
-  struct ipa_ref *ref = NULL;
+  ipa_ref *ref = NULL;
   hash_set<varpool_node *> referenced;
 
   if (seen_error ())
@@ -766,7 +766,7 @@ varpool_node::call_for_node_and_aliases (bool (*callback) (varpool_node *,
 					 void *data,
 					 bool include_overwritable)
 {
-  struct ipa_ref *ref;
+  ipa_ref *ref;
 
   if (callback (this, data))
     return true;
