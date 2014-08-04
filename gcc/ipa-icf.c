@@ -85,7 +85,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-icf.h"
 
 namespace ipa_icf {
-
 /* Initialize internal structures according to given number of
    source and target SSA names. The number of source names is SSA_SOURCE,
    respectively SSA_TARGET.  */
@@ -326,7 +325,7 @@ sem_function::~sem_function ()
 hashval_t
 sem_function::get_bb_hash (const sem_bb *basic_block)
 {
-  inchash hstate;
+  inchash::hash hstate;
 
   hstate.add_int (basic_block->nondbg_stmt_count);
   hstate.add_int (basic_block->edge_count);
@@ -341,7 +340,7 @@ sem_function::get_hash (void)
 {
   if(!hash)
     {
-      inchash hstate;
+      inchash::hash hstate;
       hstate.add_int (177454); /* Random number for function type.  */
 
       hstate.add_int (arg_count);
@@ -793,7 +792,7 @@ sem_function::init (void)
   edge_count = n_edges_for_fn (func);
   cfg_checksum = coverage_compute_cfg_checksum (func);
 
-  inchash hstate;
+  inchash::hash hstate;
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, func)
@@ -833,7 +832,7 @@ sem_function::init (void)
 /* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
 
 void
-sem_function::improve_hash (inchash *hstate, gimple stmt)
+sem_function::improve_hash (inchash::hash *hstate, gimple stmt)
 {
   enum gimple_code code = gimple_code (stmt);
 
@@ -1610,7 +1609,7 @@ sem_variable::get_hash (void)
   if (hash)
     return hash;
 
-  inchash hstate;
+  inchash::hash hstate;
 
   hstate.add_int (456346417);
   hstate.add_int (TREE_CODE (ctor));
