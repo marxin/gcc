@@ -1,3 +1,39 @@
+2014-08-04  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/61713
+	* gcc.dg/pr61756.c: New test.
+
+2014-08-04  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.dg/cproj-fails-with-broken-glibc.c: Use xfail for broken glibc
+	version instead of required-target.
+	* lib/target-supports.exp
+	(check_effective_target_not_glibc_2_11_or_earlier): Replace by ...
+	(check_effective_target_glibc_2_11_or_earlier): ... this.
+
+2014-08-04  Arnaud Charlet  <charlet@adacore.com>
+
+	* gnat.dg/discr6.adb, gnat.dg/discr6_pkg.ads: Removed, no longer
+	relevant.
+	* gnat.dg/debug1.ads: Adjust.
+	* gnat.dg/formal_type.ads: Fix error in test.
+
+2014-08-03  Marek Polacek  <polacek@redhat.com>
+
+	* gcc.dg/case-bogus-1.c: New test.
+
+2014-08-02  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/15339
+	* g++.dg/other/default9.C: New.
+	* g++.dg/other/default10.C: Likewise.
+	* g++.dg/other/default3.C: Remove xfail.
+
+2014-08-02  Jan Hubicka  <hubicka@ucw.cz>
+
+	* g++.dg/warn/Wsuggest-final.C: New testcase.
+	* g++.dg/ipa/devirt-34.C: Fix.
+
 2014-08-02  Marek Polacek  <polacek@redhat.com>
 
 	PR c/59855

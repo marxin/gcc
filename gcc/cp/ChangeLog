@@ -1,3 +1,20 @@
+2014-08-02  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/15339
+	* decl.c (check_redeclaration_no_default_args): New.
+	(duplicate_decls): Use it, handle default arguments
+	in redeclarations of function templates.
+
+2014-08-02  Trevor Saunders  <tsaunders@mozilla.com>
+
+	* optimize.c, semantics.c: Use hash_map instead of pointer_map.
+
+2014-08-02  Trevor Saunders  <tsaunders@mozilla.com>
+
+	* class.c, cp-gimplify.c, cp-tree.h, decl.c, decl2.c, error.c,
+	method.c, name-lookup.c, pt.c, semantics.c, tree.c: Use hash_set
+	instead of pointer_set.
+
 2014-08-01  Jason Merrill  <jason@redhat.com>
 
 	PR c++/60417

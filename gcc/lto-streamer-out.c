@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "input.h"
 #include "hashtab.h"
+#include "hash-set.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -2420,7 +2421,7 @@ lto_out_decl_state_written_size (struct lto_out_decl_state *state)
 
 static void
 write_symbol (struct streamer_tree_cache_d *cache,
-	      tree t, struct pointer_set_t *seen, bool alias)
+	      tree t, hash_set<const char *> *seen, bool alias)
 {
   const char *name;
   enum gcc_plugin_symbol_kind kind;
@@ -2448,9 +2449,8 @@ write_symbol (struct streamer_tree_cache_d *cache,
      same name manipulations that ASM_OUTPUT_LABELREF does. */
   name = IDENTIFIER_POINTER ((*targetm.asm_out.mangle_assembler_name) (name));
 
-  if (pointer_set_contains (seen, name))
+  if (seen->add (name))
     return;
-  pointer_set_insert (seen, name);
 
   streamer_tree_cache_lookup (cache, t, &slot_num);
   gcc_assert (slot_num != (unsigned)-1);
@@ -2575,14 +2575,13 @@ produce_symtab (struct output_block *ob)
 {
   struct streamer_tree_cache_d *cache = ob->writer_cache;
   char *section_name = lto_get_section_name (LTO_section_symtab, NULL, NULL);
-  struct pointer_set_t *seen;
   lto_symtab_encoder_t encoder = ob->decl_state->symtab_node_encoder;
   lto_symtab_encoder_iterator lsei;
 
   lto_begin_section (section_name, false);
   free (section_name);
 
-  seen = pointer_set_create ();
+  hash_set<const char *> seen;
 
   /* Write the symbol table.
      First write everything defined and then all declarations.
@@ -2594,7 +2593,7 @@ produce_symtab (struct output_block *ob)
 
       if (!output_symbol_p (node) || DECL_EXTERNAL (node->decl))
 	continue;
-      write_symbol (cache, node->decl, seen, false);
+      write_symbol (cache, node->decl, &seen, false);
     }
   for (lsei = lsei_start (encoder);
        !lsei_end_p (lsei); lsei_next (&lsei))
@@ -2603,10 +2602,8 @@ produce_symtab (struct output_block *ob)
 
       if (!output_symbol_p (node) || !DECL_EXTERNAL (node->decl))
 	continue;
-      write_symbol (cache, node->decl, seen, false);
+      write_symbol (cache, node->decl, &seen, false);
     }
-
-  pointer_set_destroy (seen);
 
   lto_end_section ();
 }

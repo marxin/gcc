@@ -1680,21 +1680,28 @@ package body Sem_Ch12 is
                         --  If actual is an entity (function or operator),
                         --  build wrapper for it.
 
-                        if Present (Match)
-                          and then Nkind (Match) = N_Operator_Symbol
-                        then
-                           --  If the name is a default, find its visible
-                           --  entity at the point of instantiation.
+                        if Present (Match) then
+                           if Nkind (Match) = N_Operator_Symbol then
 
-                           if Is_Entity_Name (Match)
-                             and then No (Entity (Match))
-                           then
-                              Find_Direct_Name (Match);
+                              --  If the name is a default, find its visible
+                              --  entity at the point of instantiation.
+
+                              if Is_Entity_Name (Match)
+                                and then No (Entity (Match))
+                              then
+                                 Find_Direct_Name (Match);
+                              end if;
+
+                              Append_To
+                                (Assoc,
+                                 Build_Wrapper
+                                   (Defining_Entity (Analyzed_Formal), Match));
+
+                           else
+                              Append_To (Assoc,
+                                         Instantiate_Formal_Subprogram
+                                           (Formal, Match, Analyzed_Formal));
                            end if;
-
-                           Append_To (Assoc,
-                             Build_Wrapper
-                               (Defining_Entity (Analyzed_Formal), Match));
 
                         --  Ditto if formal is an operator with a default.
 
@@ -3189,7 +3196,7 @@ package body Sem_Ch12 is
       Decl        : Node_Id;
 
    begin
-      Check_SPARK_Restriction ("generic is not allowed", N);
+      Check_SPARK_05_Restriction ("generic is not allowed", N);
 
       --  We introduce a renaming of the enclosing package, to have a usable
       --  entity as the prefix of an expanded name for a local entity of the
@@ -3322,7 +3329,7 @@ package body Sem_Ch12 is
       Typ         : Entity_Id;
 
    begin
-      Check_SPARK_Restriction ("generic is not allowed", N);
+      Check_SPARK_05_Restriction ("generic is not allowed", N);
 
       --  Create copy of generic unit, and save for instantiation. If the unit
       --  is a child unit, do not copy the specifications for the parent, which
@@ -3334,8 +3341,6 @@ package body Sem_Ch12 is
       New_N := Copy_Generic_Node (N, Empty, Instantiating => False);
       Set_Parent_Spec (New_N, Save_Parent);
       Rewrite (N, New_N);
-
-      Check_SPARK_Mode_In_Generic (N);
 
       --  The aspect specifications are not attached to the tree, and must
       --  be copied and attached to the generic copy explicitly.
@@ -3525,6 +3530,9 @@ package body Sem_Ch12 is
       Needs_Body       : Boolean;
       Inline_Now       : Boolean := False;
 
+      Save_IPSM : constant Boolean := Ignore_Pragma_SPARK_Mode;
+      --  Save flag Ignore_Pragma_SPARK_Mode for restore on exit
+
       Save_Style_Check : constant Boolean := Style_Check;
       --  Save style check mode for restore on exit
 
@@ -3618,7 +3626,7 @@ package body Sem_Ch12 is
    --  Start of processing for Analyze_Package_Instantiation
 
    begin
-      Check_SPARK_Restriction ("generic is not allowed", N);
+      Check_SPARK_05_Restriction ("generic is not allowed", N);
 
       --  Very first thing: check for Text_IO sp[ecial unit in case we are
       --  instantiating one of the children of [[Wide_]Wide_]Text_IO.
@@ -3764,6 +3772,12 @@ package body Sem_Ch12 is
          goto Leave;
 
       else
+         --  If the instance or its context is subject to SPARK_Mode "off",
+         --  set the global flag which signals Analyze_Pragma to ignore all
+         --  SPARK_Mode pragmas within the instance.
+
+         Set_Ignore_Pragma_SPARK_Mode (N);
+
          Gen_Decl := Unit_Declaration_Node (Gen_Unit);
 
          --  Initialize renamings map, for error checking, and the list that
@@ -3828,9 +3842,7 @@ package body Sem_Ch12 is
             Set_Visible_Declarations (Act_Spec, Renaming_List);
          end if;
 
-         Act_Decl :=
-           Make_Package_Declaration (Loc,
-             Specification => Act_Spec);
+         Act_Decl := Make_Package_Declaration (Loc, Specification => Act_Spec);
 
          --  Propagate the aspect specifications from the package declaration
          --  template to the instantiated version of the package declaration.
@@ -4270,6 +4282,7 @@ package body Sem_Ch12 is
          Set_Defining_Identifier (N, Act_Decl_Id);
       end if;
 
+      Ignore_Pragma_SPARK_Mode := Save_IPSM;
       Style_Check := Save_Style_Check;
 
       --  Check that if N is an instantiation of System.Dim_Float_IO or
@@ -4304,6 +4317,7 @@ package body Sem_Ch12 is
             Restore_Env;
          end if;
 
+         Ignore_Pragma_SPARK_Mode := Save_IPSM;
          Style_Check := Save_Style_Check;
    end Analyze_Package_Instantiation;
 
@@ -4858,6 +4872,9 @@ package body Sem_Ch12 is
 
       --  Local variables
 
+      Save_IPSM : constant Boolean := Ignore_Pragma_SPARK_Mode;
+      --  Save flag Ignore_Pragma_SPARK_Mode for restore on exit
+
       Vis_Prims_List : Elist_Id := No_Elist;
       --  List of primitives made temporarily visible in the instantiation
       --  to match the visibility of the formal type
@@ -4865,7 +4882,7 @@ package body Sem_Ch12 is
    --  Start of processing for Analyze_Subprogram_Instantiation
 
    begin
-      Check_SPARK_Restriction ("generic is not allowed", N);
+      Check_SPARK_05_Restriction ("generic is not allowed", N);
 
       --  Very first thing: check for special Text_IO unit in case we are
       --  instantiating one of the children of [[Wide_]Wide_]Text_IO. Of course
@@ -4922,6 +4939,12 @@ package body Sem_Ch12 is
          Error_Msg_NE ("instantiation of & within itself", N, Gen_Unit);
 
       else
+         --  If the instance or its context is subject to SPARK_Mode "off",
+         --  set the global flag which signals Analyze_Pragma to ignore all
+         --  SPARK_Mode pragmas within the instance.
+
+         Set_Ignore_Pragma_SPARK_Mode (N);
+
          Set_Entity (Gen_Id, Gen_Unit);
          Set_Is_Instantiated (Gen_Unit);
 
@@ -5132,6 +5155,8 @@ package body Sem_Ch12 is
          Env_Installed := False;
          Generic_Renamings.Set_Last (0);
          Generic_Renamings_HTable.Reset;
+
+         Ignore_Pragma_SPARK_Mode := Save_IPSM;
       end if;
 
    <<Leave>>
@@ -5148,6 +5173,8 @@ package body Sem_Ch12 is
          if Env_Installed then
             Restore_Env;
          end if;
+
+         Ignore_Pragma_SPARK_Mode := Save_IPSM;
    end Analyze_Subprogram_Instantiation;
 
    -------------------------
@@ -9454,14 +9481,10 @@ package body Sem_Ch12 is
       Actual          : Node_Id;
       Analyzed_Formal : Node_Id) return Node_Id
    is
-      Loc        : Source_Ptr;
-      Formal_Sub : constant Entity_Id :=
-                     Defining_Unit_Name (Specification (Formal));
       Analyzed_S : constant Entity_Id :=
                      Defining_Unit_Name (Specification (Analyzed_Formal));
-      Decl_Node  : Node_Id;
-      Nam        : Node_Id;
-      New_Spec   : Node_Id;
+      Formal_Sub : constant Entity_Id :=
+                     Defining_Unit_Name (Specification (Formal));
 
       function From_Parent_Scope (Subp : Entity_Id) return Boolean;
       --  If the generic is a child unit, the parent has been installed on the
@@ -9528,8 +9551,14 @@ package body Sem_Ch12 is
            ("expect subprogram or entry name in instantiation of&",
             Instantiation_Node, Formal_Sub);
          Abandon_Instantiation (Instantiation_Node);
-
       end Valid_Actual_Subprogram;
+
+      --  Local variables
+
+      Decl_Node  : Node_Id;
+      Loc        : Source_Ptr;
+      Nam        : Node_Id;
+      New_Spec   : Node_Id;
 
    --  Start of processing for Instantiate_Formal_Subprogram
 
@@ -9547,18 +9576,21 @@ package body Sem_Ch12 is
       Set_Defining_Unit_Name
         (New_Spec, Make_Defining_Identifier (Loc, Chars (Formal_Sub)));
 
-      --  Create new entities for the each of the formals in the
-      --  specification of the renaming declaration built for the actual.
+      --  Create new entities for the each of the formals in the specification
+      --  of the renaming declaration built for the actual.
 
       if Present (Parameter_Specifications (New_Spec)) then
          declare
-            F : Node_Id;
+            F    : Node_Id;
+            F_Id : Entity_Id;
+
          begin
             F := First (Parameter_Specifications (New_Spec));
             while Present (F) loop
+               F_Id := Defining_Identifier (F);
+
                Set_Defining_Identifier (F,
-                  Make_Defining_Identifier (Sloc (F),
-                    Chars => Chars (Defining_Identifier (F))));
+                  Make_Defining_Identifier (Sloc (F_Id), Chars (F_Id)));
                Next (F);
             end loop;
          end;
@@ -9607,9 +9639,10 @@ package body Sem_Ch12 is
          --  identifier or operator with the same name as the formal.
 
          if Nkind (Formal_Sub) = N_Defining_Operator_Symbol then
-            Nam := Make_Operator_Symbol (Loc,
-              Chars =>  Chars (Formal_Sub),
-              Strval => No_String);
+            Nam :=
+              Make_Operator_Symbol (Loc,
+                Chars  => Chars (Formal_Sub),
+                Strval => No_String);
          else
             Nam := Make_Identifier (Loc, Chars (Formal_Sub));
          end if;
@@ -9656,9 +9689,7 @@ package body Sem_Ch12 is
       --  instance. If overloaded, it will be resolved when analyzing the
       --  renaming declaration.
 
-      if Box_Present (Formal)
-        and then No (Actual)
-      then
+      if Box_Present (Formal) and then No (Actual) then
          Analyze (Nam);
 
          if Is_Child_Unit (Scope (Analyzed_S))

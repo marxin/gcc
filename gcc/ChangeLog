@@ -1,3 +1,90 @@
+2014-08-04  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+            James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* doc/md.texi (clrsb): Document.
+	(clz): Change reference to x into operand 1.
+	(ctz): Likewise.
+	(popcount): Likewise.
+
+2014-08-04  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/61713
+	* gcc/optabs.c (expand_atomic_test_and_set): Do not try to emit
+	move to subtarget in serial version if result is ignored.
+
+2014-08-04  Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
+            Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* sched-deps.c (try_group_insn): Generalise macro fusion hook usage
+	to any two insns.  Update comment.  Rename to sched_macro_fuse_insns.
+	(sched_analyze_insn): Update use of try_group_insn to
+	sched_macro_fuse_insns.
+	* config/i386/i386.c (ix86_macro_fusion_pair_p): Reject 2nd
+	arguments that are not conditional jumps.
+
+2014-08-04 Ganesh Gopalasubramanian  <Ganesh.Gopalasubramanian@amd.com>
+
+	* config/i386/driver-i386.c (host_detect_local_cpu): Handle AMD's extended
+	family information. Handle BTVER2 cpu with cpuid family value.
+
+2014-08-04  Tom de Vries  <tom@codesourcery.com>
+
+	* doc/sourcebuild.texi (glibc, glibc_2_12_or_later)
+	(glibc_2_11_or_earlier): Document effective-target keywords.
+
+2014-08-01  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-devirt.c (odr_type_warn_count): Add type.
+	(possible_polymorphic_call_targets): Set it.
+	(ipa_devirt): Use it.
+
+2014-08-01  Jan Hubicka  <hubicka@ucw.cz>
+
+	* doc/invoke.texi (Wsuggest-final-types, Wsuggest-final-methods): Document.
+	* ipa-devirt.c: Include hash-map.h
+	(struct polymorphic_call_target_d): Add type_warning and decl_warning.
+	(clear_speculation): Break out of ...
+	(get_class_context): ... here; speed up handling obviously useless
+	speculations.
+	(odr_type_warn_count, decl_warn_count): New structures.
+	(final_warning_record): New structure.
+	(final_warning_records): New static variable.
+	(possible_polymorphic_call_targets): Cleanup handling of speculative info;
+	do not build speculation when user do not care; record info about warnings
+	when asked for.
+	(add_decl_warning): New function.
+	(type_warning_cmp): New function.
+	(decl_warning_cmp): New function.
+	(ipa_devirt): Handle -Wsuggest-final-methods and -Wsuggest-final-types.
+	(gate): Enable pass when warnings are requested.
+	* common.opt (Wsuggest-final-types, Wsuggest-final-methods): New options.
+
+2014-08-02  Trevor Saunders  <tsaunders@mozilla.com>
+
+	* hash-map.h (default_hashmap_traits::mark_key_deleted):
+	Fix cast.
+	(hash_map::remove): New method.
+	(hash_map::traverse): New method.
+	* cgraph.h, except.c, except.h, gimple-ssa-strength-reduction.c,
+	ipa-utils.c, lto-cgraph.c, lto-streamer.h, omp-low.c, predict.c,
+	tree-cfg.c, tree-cfgcleanup.c, tree-eh.c, tree-eh.h, tree-inline.c,
+	tree-inline.h, tree-nested.c, tree-sra.c, tree-ssa-loop-im.c,
+	tree-ssa-loop-ivopts.c, tree-ssa-reassoc.c, tree-ssa-structalias.c,
+	tree-ssa.c, tree-ssa.h, var-tracking.c: Use hash_map instead of
+	pointer_map.
+
+2014-08-02  Trevor Saunders  <tsaunders@mozilla.com>
+
+	* hash-set.h: new File.
+	* cfgexpand.c, cfgloop.c, cgraph.c, cgraphbuild.c, cgraphunit.c,
+	cprop.c, cse.c, gimple-walk.c, gimple-walk.h, gimplify.c, godump.c,
+	ipa-devirt.c, ipa-pure-const.c, ipa-visibility.c, ipa.c, lto-cgraph.c,
+	lto-streamer-out.c, stmt.c, tree-cfg.c, tree-core.h, tree-eh.c,
+	tree-inline.c, tree-inline.h, tree-nested.c, tree-pretty-print.c,
+	tree-ssa-loop-niter.c, tree-ssa-phiopt.c, tree-ssa-threadedge.c,
+	tree-ssa-uninit.c, tree.c, tree.h, value-prof.c, varasm.c,
+	varpool.c: Use hash_set instead of pointer_set.
+
 2014-08-01  Alan Lawrence  <alan.lawrence@arm.com>
 
 	* config/aarch64/aarch64-simd-builtins.def (dup_lane, get_lane): Delete.

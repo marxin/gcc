@@ -151,11 +151,11 @@ package body Exp_Ch4 is
       Bodies : List_Id) return Node_Id;
    --  Local recursive function used to expand equality for nested composite
    --  types. Used by Expand_Record/Array_Equality, Bodies is a list on which
-   --  to attach bodies of local functions that are created in the process.
-   --  It is the responsibility of the caller to insert those bodies at the
-   --  right place. Nod provides the Sloc value for generated code. Lhs and Rhs
-   --  are the left and right sides for the comparison, and Typ is the type of
-   --  the objects to compare.
+   --  to attach bodies of local functions that are created in the process. It
+   --  is the responsibility of the caller to insert those bodies at the right
+   --  place. Nod provides the Sloc value for generated code. Lhs and Rhs are
+   --  the left and right sides for the comparison, and Typ is the type of the
+   --  objects to compare.
 
    procedure Expand_Concatenate (Cnode : Node_Id; Opnds : List_Id);
    --  Routine to expand concatenation of a sequence of two or more operands
@@ -6496,6 +6496,10 @@ package body Exp_Ch4 is
          Apply_Arithmetic_Overflow_Check (N);
          return;
       end if;
+
+      --  Overflow checks for floating-point if -gnateF mode active
+
+      Check_Float_Op_Overflow (N);
    end Expand_N_Op_Add;
 
    ---------------------
@@ -6704,6 +6708,10 @@ package body Exp_Ch4 is
       elsif Is_Integer_Type (Typ) then
          Apply_Divide_Checks (N);
       end if;
+
+      --  Overflow checks for floating-point if -gnateF mode active
+
+      Check_Float_Op_Overflow (N);
    end Expand_N_Op_Divide;
 
    --------------------
@@ -8462,6 +8470,10 @@ package body Exp_Ch4 is
       elsif Is_Signed_Integer_Type (Etype (N)) then
          Apply_Arithmetic_Overflow_Check (N);
       end if;
+
+      --  Overflow checks for floating-point if -gnateF mode active
+
+      Check_Float_Op_Overflow (N);
    end Expand_N_Op_Multiply;
 
    --------------------
@@ -9187,6 +9199,10 @@ package body Exp_Ch4 is
       if Is_Signed_Integer_Type (Typ) or else Is_Fixed_Point_Type (Typ) then
          Apply_Arithmetic_Overflow_Check (N);
       end if;
+
+      --  Overflow checks for floating-point if -gnateF mode active
+
+      Check_Float_Op_Overflow (N);
    end Expand_N_Op_Subtract;
 
    ---------------------
@@ -10416,13 +10432,29 @@ package body Exp_Ch4 is
          --  If the level of the operand type is statically deeper than the
          --  level of the target type, then force Program_Error. Note that this
          --  can only occur for cases where the attribute is within the body of
-         --  an instantiation (otherwise the conversion will already have been
-         --  rejected as illegal). Note: warnings are issued by the analyzer
-         --  for the instance cases.
+         --  an instantiation, otherwise the conversion will already have been
+         --  rejected as illegal.
+
+         --  Note: warnings are issued by the analyzer for the instance cases
 
          elsif In_Instance_Body
-           and then Type_Access_Level (Operand_Type) >
-                    Type_Access_Level (Target_Type)
+
+           --  The case where the target type is an anonymous access type of
+           --  a discriminant is excluded, because the level of such a type
+           --  depends on the context and currently the level returned for such
+           --  types is zero, resulting in warnings about about check failures
+           --  in certain legal cases involving class-wide interfaces as the
+           --  designated type (some cases, such as return statements, are
+           --  checked at run time, but not clear if these are handled right
+           --  in general, see 3.10.2(12/2-12.5/3) ???).
+
+           and then
+             not (Ekind (Target_Type) = E_Anonymous_Access_Type
+                   and then Present (Associated_Node_For_Itype (Target_Type))
+                   and then Nkind (Associated_Node_For_Itype (Target_Type)) =
+                                                  N_Discriminant_Specification)
+           and then
+             Type_Access_Level (Operand_Type) > Type_Access_Level (Target_Type)
          then
             Raise_Accessibility_Error;
 
@@ -10844,19 +10876,19 @@ package body Exp_Ch4 is
 
       --  The only remaining step is to generate a range check if we still have
       --  a type conversion at this stage and Do_Range_Check is set. For now we
-      --  do this only for conversions of discrete types and for floating-point
-      --  conversions where the base types of source and target are the same.
+      --  do this only for conversions of discrete types and for float-to-float
+      --  conversions.
 
       if Nkind (N) = N_Type_Conversion then
 
-         --  For now we only support floating-point cases where the base types
-         --  of the target type and source expression are the same, so there's
-         --  potentially only a range check. Conversions where the source and
-         --  target have different base types are still TBD. ???
+         --  For now we only support floating-point cases where both source
+         --  and target are floating-point types. Conversions where the source
+         --  and target involve integer or fixed-point types are still TBD,
+         --  though not clear whether those can even happen at this point, due
+         --  to transformations above. ???
 
          if Is_Floating_Point_Type (Etype (N))
-           and then
-             Base_Type (Etype (N)) = Base_Type (Etype (Expression (N)))
+           and then Is_Floating_Point_Type (Etype (Expression (N)))
          then
             if Do_Range_Check (Expression (N))
               and then Is_Floating_Point_Type (Target_Type)
@@ -10864,6 +10896,8 @@ package body Exp_Ch4 is
                Generate_Range_Check
                  (Expression (N), Target_Type, CE_Range_Check_Failed);
             end if;
+
+         --  Discrete-to-discrete conversions
 
          elsif Is_Discrete_Type (Etype (N)) then
             declare
