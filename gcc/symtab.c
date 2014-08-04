@@ -171,7 +171,7 @@ symbol_table::insert_to_assembler_name_hash (symtab_node *node,
   if (assembler_name_hash)
     {
       void **aslot;
-      struct cgraph_node *cnode;
+      cgraph_node *cnode;
       tree decl = node->decl;
 
       tree name = DECL_ASSEMBLER_NAME (node->decl);
@@ -203,7 +203,7 @@ symbol_table::unlink_from_assembler_name_hash (symtab_node *node,
 {
   if (assembler_name_hash)
     {
-      struct cgraph_node *cnode;
+      cgraph_node *cnode;
       tree decl = node->decl;
 
       if (node->next_sharing_asm_name)
@@ -408,7 +408,7 @@ symtab_node::unregister (void)
     symtab->unlink_from_assembler_name_hash (this, false);
   if (in_init_priority_hash)
     {
-      struct symbol_priority_map in;
+      symbol_priority_map in;
       void **slot;
       in.symbol = this;
 
@@ -501,7 +501,7 @@ symtab_node::name () const
    REFERED_NODE or REFERED_VARPOOL_NODE. USE_TYPE specify type
    of the use.  */
 
-struct ipa_ref *
+ipa_ref *
 symtab_node::add_reference (symtab_node *referred_node,
 			    enum ipa_ref_use use_type)
 {
@@ -513,12 +513,12 @@ symtab_node::add_reference (symtab_node *referred_node,
    REFERED_NODE or REFERED_VARPOOL_NODE. USE_TYPE specify type
    of the use and STMT the statement (if it exists).  */
 
-struct ipa_ref *
+ipa_ref *
 symtab_node::add_reference (symtab_node *referred_node,
 			    enum ipa_ref_use use_type, gimple stmt)
 {
-  struct ipa_ref *ref = NULL, *ref2 = NULL;
-  struct ipa_ref_list *list, *list2;
+  ipa_ref *ref = NULL, *ref2 = NULL;
+  ipa_ref_list *list, *list2;
   ipa_ref_t *old_references;
 
   gcc_checking_assert (!stmt || is_a <cgraph_node *> (this));
@@ -568,7 +568,7 @@ symtab_node::add_reference (symtab_node *referred_node,
    type of the use and STMT the statement (if it exists).  Return the new
    reference or NULL if none was created.  */
 
-struct ipa_ref *
+ipa_ref *
 symtab_node::maybe_add_reference (tree val, enum ipa_ref_use use_type,
 				  gimple stmt)
 {
@@ -589,9 +589,9 @@ symtab_node::maybe_add_reference (tree val, enum ipa_ref_use use_type,
 /* Clone all references from symtab NODE to this symtab_node.  */
 
 void
-symtab_node::clone_references (struct symtab_node *node)
+symtab_node::clone_references (symtab_node *node)
 {
-  struct ipa_ref *ref = NULL, *ref2 = NULL;
+  ipa_ref *ref = NULL, *ref2 = NULL;
   int i;
   for (i = 0; node->iterate_reference (i, ref); i++)
     {
@@ -607,9 +607,9 @@ symtab_node::clone_references (struct symtab_node *node)
 /* Clone all referring from symtab NODE to this symtab_node.  */
 
 void
-symtab_node::clone_referring (struct symtab_node *node)
+symtab_node::clone_referring (symtab_node *node)
 {
-  struct ipa_ref *ref = NULL, *ref2 = NULL;
+  ipa_ref *ref = NULL, *ref2 = NULL;
   int i;
   for (i = 0; node->iterate_referring(i, ref); i++)
     {
@@ -624,12 +624,12 @@ symtab_node::clone_referring (struct symtab_node *node)
 
 /* Clone reference REF to this symtab_node and set its stmt to STMT.  */
 
-struct ipa_ref *
-symtab_node::clone_reference (struct ipa_ref *ref, gimple stmt)
+ipa_ref *
+symtab_node::clone_reference (ipa_ref *ref, gimple stmt)
 {
   bool speculative = ref->speculative;
   unsigned int stmt_uid = ref->lto_stmt_uid;
-  struct ipa_ref *ref2;
+  ipa_ref *ref2;
 
   ref2 = add_reference (ref->referred, ref->use, stmt);
   ref2->speculative = speculative;
@@ -640,11 +640,11 @@ symtab_node::clone_reference (struct ipa_ref *ref, gimple stmt)
 /* Find the structure describing a reference to REFERRED_NODE
    and associated with statement STMT.  */
 
-struct ipa_ref *
+ipa_ref *
 symtab_node::find_reference (symtab_node *referred_node,
 			     gimple stmt, unsigned int lto_stmt_uid)
 {
-  struct ipa_ref *r = NULL;
+  ipa_ref *r = NULL;
   int i;
 
   for (i = 0; iterate_reference (i, r); i++)
@@ -662,7 +662,7 @@ symtab_node::find_reference (symtab_node *referred_node,
 void
 symtab_node::remove_stmt_references (gimple stmt)
 {
-  struct ipa_ref *r = NULL;
+  ipa_ref *r = NULL;
   int i = 0;
 
   while (iterate_reference (i, r))
@@ -680,7 +680,7 @@ symtab_node::remove_stmt_references (gimple stmt)
 void
 symtab_node::clear_stmts_in_references (void)
 {
-  struct ipa_ref *r = NULL;
+  ipa_ref *r = NULL;
   int i;
 
   for (i = 0; iterate_reference (i, r); i++)
@@ -716,7 +716,7 @@ symtab_node::remove_all_referring (void)
 void
 symtab_node::dump_references (FILE *file)
 {
-  struct ipa_ref *ref = NULL;
+  ipa_ref *ref = NULL;
   int i;
   for (i = 0; iterate_reference (i, ref); i++)
     {
@@ -735,7 +735,7 @@ symtab_node::dump_references (FILE *file)
 void
 symtab_node::dump_referring (FILE *file)
 {
-  struct ipa_ref *ref = NULL;
+  ipa_ref *ref = NULL;
   int i;
   for (i = 0; iterate_referring(i, ref); i++)
     {
@@ -753,7 +753,7 @@ symtab_node::dump_referring (FILE *file)
 bool
 symtab_node::has_aliases_p (void)
 {
-  struct ipa_ref *ref = NULL;
+  ipa_ref *ref = NULL;
   int i;
 
   for (i = 0; iterate_referring (i, ref); i++)
@@ -764,8 +764,8 @@ symtab_node::has_aliases_p (void)
 
 /* Iterates I-th reference in the list, REF is also set.  */
 
-struct ipa_ref *
-symtab_node::iterate_reference (unsigned i, struct ipa_ref *&ref)
+ipa_ref *
+symtab_node::iterate_reference (unsigned i, ipa_ref *&ref)
 {
   vec_safe_iterate (ref_list.references, i, &ref);
 
@@ -774,8 +774,8 @@ symtab_node::iterate_reference (unsigned i, struct ipa_ref *&ref)
 
 /* Iterates I-th referring item in the list, REF is also set.  */
 
-struct ipa_ref *
-symtab_node::iterate_referring (unsigned i, struct ipa_ref *&ref)
+ipa_ref *
+symtab_node::iterate_referring (unsigned i, ipa_ref *&ref)
 {
   ref_list.referring.iterate (i, &ref);
 
@@ -784,8 +784,8 @@ symtab_node::iterate_referring (unsigned i, struct ipa_ref *&ref)
 
 /* Iterates I-th referring alias item in the list, REF is also set.  */
 
-struct ipa_ref *
-symtab_node::iterate_direct_aliases (unsigned i, struct ipa_ref *&ref)
+ipa_ref *
+symtab_node::iterate_direct_aliases (unsigned i, ipa_ref *&ref)
 {
   ref_list.referring.iterate (i, &ref);
 
@@ -1102,7 +1102,7 @@ symtab_node::verify_base (void)
       while (n != this);
       if (comdat_local_p ())
 	{
-	  struct ipa_ref *ref = NULL;
+	  ipa_ref *ref = NULL;
 
 	  for (int i = 0; iterate_referring (i, ref); ++i)
 	    {
@@ -1455,13 +1455,13 @@ symtab_node::set_section (const char *section)
 priority_type
 symtab_node::get_init_priority ()
 {
-  struct symbol_priority_map *h;
-  struct symbol_priority_map in;
+  symbol_priority_map *h;
+  symbol_priority_map in;
 
   if (!this->in_init_priority_hash)
     return DEFAULT_INIT_PRIORITY;
   in.symbol = this;
-  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash,
+  h = (symbol_priority_map *) htab_find (symtab->init_priority_hash,
 						&in);
   return h ? h->init : DEFAULT_INIT_PRIORITY;
 }
@@ -1481,13 +1481,13 @@ enum availability symtab_node::get_availability (void)
 priority_type
 cgraph_node::get_fini_priority ()
 {
-  struct symbol_priority_map *h;
-  struct symbol_priority_map in;
+  symbol_priority_map *h;
+  symbol_priority_map in;
 
   if (!this->in_init_priority_hash)
     return DEFAULT_INIT_PRIORITY;
   in.symbol = this;
-  h = (struct symbol_priority_map *) htab_find (symtab->init_priority_hash,
+  h = (symbol_priority_map *) htab_find (symtab->init_priority_hash,
 						&in);
   return h ? h->fini : DEFAULT_INIT_PRIORITY;
 }
@@ -1497,8 +1497,8 @@ cgraph_node::get_fini_priority ()
 int
 symbol_priority_map_eq (const void *va, const void *vb)
 {
-  const struct symbol_priority_map *const a = (const struct symbol_priority_map *) va,
-    *const b = (const struct symbol_priority_map *) vb;
+  const symbol_priority_map *const a = (const symbol_priority_map *) va,
+    *const b = (const symbol_priority_map *) vb;
   return (a->symbol == b->symbol);
 }
 
@@ -1507,18 +1507,18 @@ symbol_priority_map_eq (const void *va, const void *vb)
 unsigned int
 symbol_priority_map_hash (const void *item)
 {
-  return htab_hash_pointer (((const struct symbol_priority_map *)item)->symbol);
+  return htab_hash_pointer (((const symbol_priority_map *)item)->symbol);
 }
 
 /* Return the initialization and finalization priority information for
    DECL.  If there is no previous priority information, a freshly
    allocated structure is returned.  */
 
-struct symbol_priority_map *
+symbol_priority_map *
 symtab_node::priority_info (void)
 {
-  struct symbol_priority_map in;
-  struct symbol_priority_map *h;
+  symbol_priority_map in;
+  symbol_priority_map *h;
   void **loc;
 
   in.symbol = this;
@@ -1528,7 +1528,7 @@ symtab_node::priority_info (void)
 						  symbol_priority_map_eq, 0);
 
   loc = htab_find_slot (symtab->init_priority_hash, &in, INSERT);
-  h = (struct symbol_priority_map *) *loc;
+  h = (symbol_priority_map *) *loc;
   if (!h)
     {
       h = ggc_cleared_alloc<symbol_priority_map> ();
@@ -1547,7 +1547,7 @@ symtab_node::priority_info (void)
 void
 symtab_node::set_init_priority (priority_type priority)
 {
-  struct symbol_priority_map *h;
+  symbol_priority_map *h;
 
   if (is_a <cgraph_node *> (this))
     gcc_assert (DECL_STATIC_CONSTRUCTOR (this->decl));
@@ -1566,7 +1566,7 @@ symtab_node::set_init_priority (priority_type priority)
 void
 cgraph_node::set_fini_priority (priority_type priority)
 {
-  struct symbol_priority_map *h;
+  symbol_priority_map *h;
 
   gcc_assert (DECL_STATIC_DESTRUCTOR (this->decl));
 
@@ -1663,7 +1663,7 @@ symtab_node::call_for_symbol_and_aliases (bool (*callback) (symtab_node *,
 					void *data, bool include_overwritable)
 {
   int i;
-  struct ipa_ref *ref;
+  ipa_ref *ref;
 
   if (callback (this, data))
     return true;
