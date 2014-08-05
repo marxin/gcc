@@ -379,7 +379,7 @@ sem_function::equals_wpa (sem_item *item)
 	return RETURN_FALSE_WITH_MSG ("NULL argument type");
 
       if (!types_are_compatible_p (arg_types[i], m_compared_func->arg_types[i],
-				   i == 0))
+				   true, i == 0))
 	return RETURN_FALSE_WITH_MSG ("argument type is different");
     }
 
