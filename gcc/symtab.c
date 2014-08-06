@@ -995,7 +995,7 @@ symtab_node::verify_base (void)
       error_found = true;
     }
    
-  if (symtab->cgraph_state != CGRAPH_LTO_STREAMING)
+  if (symtab->state != CGRAPH_LTO_STREAMING)
     {
       hashed_node = symtab_node::get (decl);
       if (!hashed_node)
@@ -1644,7 +1644,7 @@ symtab_node::resolve_alias (symtab_node *target)
      when renaming symbols.  */
   alias_target = NULL;
 
-  if (cpp_implicit_alias && symtab->cgraph_state >= CGRAPH_STATE_CONSTRUCTION)
+  if (cpp_implicit_alias && symtab->state >= CGRAPH_STATE_CONSTRUCTION)
     fixup_same_cpp_alias_visibility (target);
 
   /* If alias has address taken, so does the target.  */
@@ -1893,7 +1893,7 @@ symtab_node::nonzero_address ()
      When parsing, beware the cases when WEAK attribute is added later.  */
   if (!DECL_WEAK (this->decl)
       && flag_delete_null_pointer_checks
-      && symtab->cgraph_state > CGRAPH_STATE_PARSING)
+      && symtab->state > CGRAPH_STATE_PARSING)
     return true;
 
   /* If target is defined and not extern, we know it will be output and thus

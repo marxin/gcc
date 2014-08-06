@@ -167,7 +167,7 @@ varpool_node::remove (void)
   unregister ();
 
   /* When streaming we can have multiple nodes associated with decl.  */
-  if (symtab->cgraph_state == CGRAPH_LTO_STREAMING)
+  if (symtab->state == CGRAPH_LTO_STREAMING)
     ;
   /* Keep constructor when it may be used for folding. We remove
      references to external variables before final compilation.  */
@@ -191,7 +191,7 @@ varpool_node::remove_initializer (void)
 	 entries for given decl.  Do not attempt to remove
 	 the boides, or we will end up remiving
 	 wrong one.  */
-      && symtab->cgraph_state != CGRAPH_LTO_STREAMING)
+      && symtab->state != CGRAPH_LTO_STREAMING)
     DECL_INITIAL (decl) = error_mark_node;
 }
 
@@ -201,7 +201,7 @@ varpool_node::dump (FILE *f)
 {
   dump_base (f);
   fprintf (f, "  Availability: %s\n",
-	   symtab->cgraph_function_flags_ready
+	   symtab->function_flags_ready
 	   ? cgraph_availability_names[get_availability ()]
 	   : "not-ready");
   fprintf (f, "  Varpool flags:");
@@ -433,7 +433,7 @@ ctor_for_folding (tree decl)
 }
 
 /* Add the variable DECL to the varpool.
-   Unlike varpool_finalize_decl function is intended to be used
+   Unlike finalize_decl function is intended to be used
    by middle end and allows insertion of new variable at arbitrary point
    of compilation.  */
 void
@@ -483,7 +483,7 @@ varpool_node::analyze (void)
      We however don't want to re-analyze already analyzed nodes.  */
   if (!analyzed)
     {
-      gcc_assert (!in_lto_p || symtab->cgraph_function_flags_ready);
+      gcc_assert (!in_lto_p || symtab->function_flags_ready);
       /* Compute the alignment early so function body expanders are
 	 already informed about increased alignment.  */
       align_variable (decl, 0);

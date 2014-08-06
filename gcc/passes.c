@@ -333,8 +333,8 @@ execute_all_early_local_passes (void)
      none of the sub-passes are IPA passes and do not create new
      functions, this is ok.  We're setting this value for the benefit
      of IPA passes that follow.  */
-  if (symtab->cgraph_state < CGRAPH_STATE_IPA_SSA)
-    symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
+  if (symtab->state < CGRAPH_STATE_IPA_SSA)
+    symtab->state = CGRAPH_STATE_IPA_SSA;
   return 0;
 }
 

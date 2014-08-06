@@ -403,7 +403,7 @@ wrapup_global_declaration_2 (tree decl)
 	needed = false;
       else if (node && node->alias)
 	needed = false;
-      else if (!symtab->cgraph_global_info_ready
+      else if (!symtab->global_info_ready
 	       && (TREE_USED (decl)
 		   || TREE_USED (DECL_ASSEMBLER_NAME (decl))))
 	/* needed */;

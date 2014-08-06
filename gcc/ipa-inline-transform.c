@@ -421,7 +421,7 @@ save_inline_function_body (struct cgraph_node *node)
 static bool
 preserve_function_body_p (struct cgraph_node *node)
 {
-  gcc_assert (symtab->cgraph_global_info_ready);
+  gcc_assert (symtab->global_info_ready);
   gcc_assert (!node->alias && !node->thunk.thunk_p);
 
   /* Look if there is any clone around.  */

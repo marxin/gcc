@@ -8693,12 +8693,12 @@ finish_function (void)
 
 	  /* ??? Objc emits functions after finalizing the compilation unit.
 	     This should be cleaned up later and this conditional removed.  */
-	  if (symtab->cgraph_global_info_ready)
+	  if (symtab->global_info_ready)
 	    {
 	      cgraph_node::add_new_function (fndecl, false);
 	      return;
 	    }
-	  cgraph_finalize_function (fndecl, false);
+	  cgraph_node::finalize_function (fndecl, false);
 	}
       else
 	{

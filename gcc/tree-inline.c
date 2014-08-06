@@ -4193,7 +4193,7 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
 	  && !cg_edge->callee->local.redefined_extern_inline
 	  /* During early inline pass, report only when optimization is
 	     not turned on.  */
-	  && (symtab->cgraph_global_info_ready
+	  && (symtab->global_info_ready
 	      || !optimize
 	      || cgraph_inline_failed_type (reason) == CIF_FINAL_ERROR)
 	  /* PR 20090218-1_0.c. Body can be provided by another module. */
@@ -4212,7 +4212,7 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
 	       /* Do not warn about not inlined recursive calls.  */
 	       && !cg_edge->recursive_p ()
 	       /* Avoid warnings during early inline pass. */
-	       && symtab->cgraph_global_info_ready)
+	       && symtab->global_info_ready)
 	{
 	  warning (OPT_Winline, "inlining failed in call to %q+F: %s",
 		   fn, _(cgraph_inline_failed_string (reason)));

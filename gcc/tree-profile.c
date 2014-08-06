@@ -565,7 +565,7 @@ tree_profiling (void)
 
   /* This is a small-ipa pass that gets called only once, from
      cgraphunit.c:ipa_passes().  */
-  gcc_assert (symtab->cgraph_state == CGRAPH_STATE_IPA_SSA);
+  gcc_assert (symtab->state == CGRAPH_STATE_IPA_SSA);
 
   init_node_map (true);
 

@@ -25,7 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 
    The front-end is supposed to use following functionality:
 
-    - cgraph_finalize_function
+    - finalize_function
 
       This function is called once front-end has parsed whole body of function
       and it is certain that the function body nor the declaration will change.
@@ -228,7 +228,7 @@ static GTY (()) tree vtable_entry_type;
    either outside this translation unit, something magic in the system
    configury */
 bool
-symtab_node::is_needed_p (void)
+symtab_node::needed_p (void)
 {
   /* Double check that no one output the function into assembly file
      early.  */
@@ -300,13 +300,13 @@ symbol_table::process_new_functions (void)
     {
       cgraph_node *node = cgraph_new_nodes[i];
       fndecl = node->decl;
-      switch (cgraph_state)
+      switch (state)
 	{
 	case CGRAPH_STATE_CONSTRUCTION:
 	  /* At construction time we just need to finalize function and move
 	     it into reachable functions list.  */
 
-	  cgraph_finalize_function (fndecl, false);
+	  cgraph_node::finalize_function (fndecl, false);
 	  call_cgraph_insertion_hooks (node);
 	  enqueue_node (node);
 	  break;
@@ -321,7 +321,7 @@ symbol_table::process_new_functions (void)
 	  if (!node->analyzed)
 	    node->analyze ();
 	  push_cfun (DECL_STRUCT_FUNCTION (fndecl));
-	  if (cgraph_state == CGRAPH_STATE_IPA_SSA
+	  if (state == CGRAPH_STATE_IPA_SSA
 	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl)))
 	    g->get_passes ()->execute_early_local_passes ();
 	  else if (inline_summary_vec != NULL)
@@ -405,7 +405,7 @@ symtab_node::referred_to_p (void)
    a new GC context, or just not compile right now.  */
 
 void
-cgraph_finalize_function (tree decl, bool no_collect)
+cgraph_node::finalize_function (tree decl, bool no_collect)
 {
   cgraph_node *node = cgraph_node::get_create (decl);
 
@@ -455,13 +455,13 @@ cgraph_finalize_function (tree decl, bool no_collect)
   if (!no_collect)
     ggc_collect ();
 
-  if (symtab->cgraph_state == CGRAPH_STATE_CONSTRUCTION
-      && (node->is_needed_p () || node->referred_to_p ()))
+  if (symtab->state == CGRAPH_STATE_CONSTRUCTION
+      && (node->needed_p () || node->referred_to_p ()))
     enqueue_node (node);
 }
 
 /* Add the function FNDECL to the call graph.
-   Unlike cgraph_finalize_function, this function is intended to be used
+   Unlike finalize_function, this function is intended to be used
    by middle end and allows insertion of new function at arbitrary point
    of compilation.  The function can be either in high, low or SSA form
    GIMPLE.
@@ -477,10 +477,10 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 {
   gcc::pass_manager *passes = g->get_passes ();
   cgraph_node *node;
-  switch (symtab->cgraph_state)
+  switch (symtab->state)
     {
       case CGRAPH_STATE_PARSING:
-	cgraph_finalize_function (fndecl, false);
+	cgraph_node::finalize_function (fndecl, false);
 	break;
       case CGRAPH_STATE_CONSTRUCTION:
 	/* Just enqueue function to be processed at nearest occurrence.  */
@@ -499,7 +499,7 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 	node->local.local = false;
 	node->definition = true;
 	node->force_output = true;
-	if (!lowered && symtab->cgraph_state == CGRAPH_STATE_EXPANSION)
+	if (!lowered && symtab->state == CGRAPH_STATE_EXPANSION)
 	  {
 	    push_cfun (DECL_STRUCT_FUNCTION (fndecl));
 	    gimple_register_cfg_hooks ();
@@ -707,7 +707,7 @@ process_common_attributes (tree decl)
    declaration -- but the front end will subsequently merge that declaration
    with the original declaration and discard the second declaration.
 
-   Furthermore, we can't mark these nodes in cgraph_finalize_function because:
+   Furthermore, we can't mark these nodes in finalize_function because:
 
     void f() {}
     void f() __attribute__((externally_visible));
@@ -810,16 +810,16 @@ varpool_node::finalize_decl (tree decl)
 	  && !DECL_ARTIFICIAL (node->decl)))
     node->force_output = true;
 
-  if (symtab->cgraph_state == CGRAPH_STATE_CONSTRUCTION
-      && (node->is_needed_p () || node->referred_to_p ()))
+  if (symtab->state == CGRAPH_STATE_CONSTRUCTION
+      && (node->needed_p () || node->referred_to_p ()))
     enqueue_node (node);
-  if (symtab->cgraph_state >= CGRAPH_STATE_IPA_SSA)
+  if (symtab->state >= CGRAPH_STATE_IPA_SSA)
     node->analyze ();
   /* Some frontends produce various interface variables after compilation
      finished.  */
-  if (symtab->cgraph_state == CGRAPH_STATE_FINISHED
+  if (symtab->state == CGRAPH_STATE_FINISHED
       || (!flag_toplevel_reorder
-	&& symtab->cgraph_state == CGRAPH_STATE_EXPANSION))
+	&& symtab->state == CGRAPH_STATE_EXPANSION))
     node->assemble_decl ();
 }
 
@@ -929,7 +929,7 @@ analyze_functions (void)
   location_t saved_loc = input_location;
 
   bitmap_obstack_initialize (NULL);
-  symtab->cgraph_state = CGRAPH_STATE_CONSTRUCTION;
+  symtab->state = CGRAPH_STATE_CONSTRUCTION;
   input_location = UNKNOWN_LOCATION;
 
   /* Ugly, but the fixup can not happen at a time same body alias is created;
@@ -956,7 +956,7 @@ analyze_functions (void)
 	{
 	  /* Convert COMDAT group designators to IDENTIFIER_NODEs.  */
 	  node->get_comdat_group_id ();
-	  if (node->is_needed_p ())
+	  if (node->needed_p ())
 	    {
 	      enqueue_node (node);
 	      if (!changed && symtab->dump_file)
@@ -1739,7 +1739,7 @@ cgraph_node::expand (void)
 
   timevar_push (TV_REST_OF_COMPILATION);
 
-  gcc_assert (symtab->cgraph_global_info_ready);
+  gcc_assert (symtab->global_info_ready);
 
   /* Initialize the default bitmap obstack.  */
   bitmap_obstack_initialize (NULL);
@@ -2045,8 +2045,8 @@ ipa_passes (void)
 
   /* If pass_all_early_optimizations was not scheduled, the state of
      the cgraph will not be properly updated.  Update it now.  */
-  if (symtab->cgraph_state < CGRAPH_STATE_IPA_SSA)
-    symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
+  if (symtab->state < CGRAPH_STATE_IPA_SSA)
+    symtab->state = CGRAPH_STATE_IPA_SSA;
 
   if (!in_lto_p)
     {
@@ -2145,7 +2145,7 @@ symbol_table::compile (void)
     }
   if (!quiet_flag)
     fprintf (stderr, "Performing interprocedural optimizations\n");
-  symtab->cgraph_state = CGRAPH_STATE_IPA;
+  symtab->state = CGRAPH_STATE_IPA;
 
   /* If LTO is enabled, initialize the streamer hooks needed by GIMPLE.  */
   if (flag_lto)
@@ -2166,7 +2166,7 @@ symbol_table::compile (void)
   /* This pass remove bodies of extern inline functions we never inlined.
      Do this later so other IPA passes see what is really going on.  */
   symtab->remove_unreachable_nodes (false, dump_file);
-  symtab->cgraph_global_info_ready = true;
+  symtab->global_info_ready = true;
   if (symtab->dump_file)
     {
       fprintf (symtab->dump_file, "Optimized ");
@@ -2223,7 +2223,7 @@ symbol_table::compile (void)
       }
 #endif
 
-  symtab->cgraph_state = CGRAPH_STATE_EXPANSION;
+  symtab->state = CGRAPH_STATE_EXPANSION;
 
   if (!flag_toplevel_reorder)
     output_in_order ();
@@ -2236,7 +2236,7 @@ symbol_table::compile (void)
     }
 
   symtab->process_new_functions ();
-  symtab->cgraph_state = CGRAPH_STATE_FINISHED;
+  symtab->state = CGRAPH_STATE_FINISHED;
   symtab->output_weakrefs ();
 
   if (symtab->dump_file)

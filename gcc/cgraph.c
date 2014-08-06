@@ -535,7 +535,7 @@ cgraph_node::create_same_body_alias (tree alias, tree decl)
 #endif
   /* Langhooks can create same body aliases of symbols not defined.
      Those are useless. Drop them on the floor.  */
-  if (symtab->cgraph_global_info_ready)
+  if (symtab->global_info_ready)
     return NULL;
 
   n = cgraph_node::create_alias (alias, decl);
@@ -1644,7 +1644,7 @@ void
 cgraph_node::release_body (void)
 {
   ipa_transforms_to_apply.release ();
-  if (!used_as_abstract_origin && symtab->cgraph_state != CGRAPH_STATE_PARSING)
+  if (!used_as_abstract_origin && symtab->state != CGRAPH_STATE_PARSING)
     {
       DECL_RESULT (decl) = NULL;
       DECL_ARGUMENTS (decl) = NULL;
@@ -1729,12 +1729,12 @@ cgraph_node::remove (void)
      itself is kept in the cgraph even after it is compiled.  Check whether
      we are done with this body and reclaim it proactively if this is the case.
      */
-  if (symtab->cgraph_state != CGRAPH_LTO_STREAMING)
+  if (symtab->state != CGRAPH_LTO_STREAMING)
     {
       n = cgraph_node::get (decl);
       if (!n
 	  || (!n->clones && !n->clone_of && !n->global.inlined_to
-	      && (symtab->cgraph_global_info_ready
+	      && (symtab->global_info_ready
 		  && (TREE_ASM_WRITTEN (n->decl)
 		      || DECL_EXTERNAL (n->decl)
 		      || !n->analyzed
@@ -1749,7 +1749,7 @@ cgraph_node::remove (void)
       call_site_hash = NULL;
     }
 
-  symtab->release_cgraph_symbol (this, uid);
+  symtab->release_symbol (this, uid);
 }
 
 /* Likewise indicate that a node is having address taken.  */
@@ -1794,7 +1794,7 @@ cgraph_global_info *
 cgraph_node::global_info (tree decl)
 {
   gcc_assert (TREE_CODE (decl) == FUNCTION_DECL
-    && symtab->cgraph_global_info_ready);
+    && symtab->global_info_ready);
   cgraph_node *node = get (decl);
   if (!node)
     return NULL;
@@ -1876,7 +1876,7 @@ cgraph_node::dump (FILE *f)
     fprintf (f, "  Clone of %s/%i\n",
 	     clone_of->asm_name (),
 	     clone_of->order);
-  if (symtab->cgraph_function_flags_ready)
+  if (symtab->function_flags_ready)
     fprintf (f, "  Availability: %s\n",
 	     cgraph_availability_names [get_availability ()]);
 
@@ -2011,7 +2011,7 @@ cgraph_node::dump_cgraph (FILE *f)
 bool
 cgraph_function_possibly_inlined_p (tree decl)
 {
-  if (!symtab->cgraph_global_info_ready)
+  if (!symtab->global_info_ready)
     return !DECL_UNINLINABLE (decl);
   return DECL_POSSIBLY_INLINED (decl);
 }
@@ -2548,7 +2548,7 @@ verify_edge_corresponds_to_fndecl (cgraph_edge *e, tree decl)
 
   if (!decl || e->callee->global.inlined_to)
     return false;
-  if (symtab->cgraph_state == CGRAPH_LTO_STREAMING)
+  if (symtab->state == CGRAPH_LTO_STREAMING)
     return false;
   node = cgraph_node::get (decl);
 

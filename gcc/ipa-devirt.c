@@ -220,7 +220,7 @@ static bool
 type_all_ctors_visible_p (tree t)
 {
   return !flag_ltrans
-	 && symtab->cgraph_state >= CGRAPH_STATE_CONSTRUCTION
+	 && symtab->state >= CGRAPH_STATE_CONSTRUCTION
 	 /* We can not always use type_all_derivations_known_p.
 	    For function local types we must assume case where
 	    the function is COMDAT and shared in between units. 
@@ -1334,7 +1334,7 @@ referenced_from_vtable_p (struct cgraph_node *node)
     return true;
 
   /* We need references built.  */
-  if (symtab->cgraph_state <= CGRAPH_STATE_CONSTRUCTION)
+  if (symtab->state <= CGRAPH_STATE_CONSTRUCTION)
     return true;
 
   for (i = 0; node->iterate_referring (i, ref); i++)

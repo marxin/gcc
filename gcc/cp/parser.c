@@ -16625,7 +16625,7 @@ cp_parser_asm_definition (cp_parser* parser)
 	    }
 	}
       else
-	symtab->register_asm_symbol (string);
+	symtab->finalize_toplevel_asm (string);
     }
 }
 

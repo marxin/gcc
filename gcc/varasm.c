@@ -2331,8 +2331,8 @@ assemble_external (tree decl ATTRIBUTE_UNUSED)
      Ideally, only final.c would be calling this function, but it is
      not clear whether that would break things somehow.  See PR 17982
      for further discussion.  */
-  gcc_assert (cgraph_state == CGRAPH_STATE_EXPANSION
-	      || cgraph_state == CGRAPH_STATE_FINISHED);
+  gcc_assert (state == CGRAPH_STATE_EXPANSION
+	      || state == CGRAPH_STATE_FINISHED);
 #endif
 
   if (!DECL_P (decl) || !DECL_EXTERNAL (decl) || !TREE_PUBLIC (decl))
@@ -5655,12 +5655,12 @@ assemble_alias (tree decl, tree target)
 
   /* If the target has already been emitted, we don't have to queue the
      alias.  This saves a tad of memory.  */
-  if (symtab->cgraph_global_info_ready)
+  if (symtab->global_info_ready)
     target_decl = find_decl (target);
   else
     target_decl= NULL;
   if ((target_decl && TREE_ASM_WRITTEN (target_decl))
-      || symtab->cgraph_state >= CGRAPH_STATE_EXPANSION)
+      || symtab->state >= CGRAPH_STATE_EXPANSION)
     do_assemble_alias (decl, target);
   else
     {
@@ -7590,10 +7590,10 @@ default_asm_output_ident_directive (const char *ident_str)
      to asm_out_file.  Instead, add a fake top-level asm statement.
      This allows the front ends to use this hook without actually
      writing to asm_out_file, to handle #ident or Pragma Ident.  */
-  if (symtab->cgraph_state == CGRAPH_STATE_PARSING)
+  if (symtab->state == CGRAPH_STATE_PARSING)
     {
       char *buf = ACONCAT ((ident_asm_op, "\"", ident_str, "\"\n", NULL));
-      symtab->register_asm_symbol (build_string (strlen (buf), buf));
+      symtab->finalize_toplevel_asm (build_string (strlen (buf), buf));
     }
   else
     fprintf (asm_out_file, "%s\"%s\"\n", ident_asm_op, ident_str);

@@ -293,7 +293,7 @@ public:
   /* Determine if symbol declaration is needed.  That is, visible to something
      either outside this translation unit, something magic in the system
      configury */
-  bool is_needed_p (void);
+  bool needed_p (void);
 
   /* Return true when there are references to the node.  */
   bool referred_to_p (void);
@@ -375,7 +375,7 @@ public:
   /*** Flags representing the symbol type.  ***/
 
   /* True when symbol corresponds to a definition in current unit.
-     set via cgraph_finalize_function or varpool_finalize_decl  */
+     set via finalize_function or finalize_decl  */
   unsigned definition : 1;
   /* True when symbol is an alias.
      Set by ssemble_alias.  */
@@ -1071,7 +1071,7 @@ public:
   static void delete_function_version (tree decl);
 
   /* Add the function FNDECL to the call graph.
-     Unlike cgraph_finalize_function, this function is intended to be used
+     Unlike finalize_function, this function is intended to be used
      by middle end and allows insertion of new function at arbitrary point
      of compilation.  The function can be either in high, low or SSA form
      GIMPLE.
@@ -1089,6 +1089,12 @@ public:
     gcc_checking_assert (TREE_CODE (decl) == FUNCTION_DECL);
     return dyn_cast <cgraph_node *> (symtab_node::get (decl));
   }
+
+  /* DECL has been parsed.  Take it, queue it, compile it at the whim of the
+     logic in effect.  If NO_COLLECT is true, then our caller cannot stand to have
+     the garbage collector run at the moment.  We would need to either create
+     a new GC context, or just not compile right now.  */
+  static void finalize_function (tree, bool);
 
   /* Return cgraph node assigned to DECL.  Create new one when needed.  */
   static cgraph_node * create (tree decl);
@@ -1477,7 +1483,7 @@ public:
   inline bool can_remove_if_no_refs_p (void);
 
   /* Add the variable DECL to the varpool.
-     Unlike varpool_finalize_decl function is intended to be used
+     Unlike finalize_decl function is intended to be used
      by middle end and allows insertion of new variable at arbitrary point
      of compilation.  */
   static void add (tree decl);
@@ -1629,7 +1635,7 @@ public:
   asm_node *add_asm_symbol (tree asm_str);
 
   /* Register a top-level asm statement ASM_STR.  */
-  inline asm_node *register_asm_symbol (tree asm_str);
+  inline asm_node *finalize_toplevel_asm (tree asm_str);
 
   inline void
   clear_asm_symbols (void)
@@ -1681,7 +1687,7 @@ public:
   /* Allocate new callgraph node and insert it into basic data structures.  */
   cgraph_node *create_empty (void);
 
-  void release_cgraph_symbol (cgraph_node *node, int uid);
+  void release_symbol (cgraph_node *node, int uid);
 
   /* Allocate new callgraph node.  */
   inline cgraph_node * allocate_cgraph_symbol (void);
@@ -1852,11 +1858,11 @@ public:
   int order;
 
   /* Set when whole unit has been analyzed so we can access global info.  */
-  bool cgraph_global_info_ready;
+  bool global_info_ready;
   /* What state callgraph is in right now.  */
-  enum cgraph_state cgraph_state;
+  enum cgraph_state state;
   /* Set when the cgraph is fully build and the basic flags are computed.  */
-  bool cgraph_function_flags_ready;
+  bool function_flags_ready;
 
   bool cpp_implicit_aliases_done;
 
@@ -1906,7 +1912,6 @@ bool resolution_used_from_other_file_p (enum ld_plugin_symbol_resolution);
 extern bool gimple_check_call_matching_types (gimple, tree, bool);
 
 /* In cgraphunit.c  */
-void cgraph_finalize_function (tree, bool);
 /*  Initialize datastructures so DECL is a function in lowered gimple form.
     IN_SSA is true if the gimple is in SSA.  */
 basic_block init_lowered_empty_function (tree, bool);
@@ -2039,7 +2044,7 @@ symbol_table::register_symbol (symtab_node *node)
 /* Register a top-level asm statement ASM_STR.  */
 
 asm_node *
-symbol_table::register_asm_symbol (tree asm_str)
+symbol_table::finalize_toplevel_asm (tree asm_str)
 {
   asm_node *node;
 
@@ -2089,7 +2094,7 @@ symbol_table::create_empty (void)
 }
 
 inline void
-symbol_table::release_cgraph_symbol (cgraph_node *node, int uid)
+symbol_table::release_symbol (cgraph_node *node, int uid)
 {
   cgraph_count--;
 

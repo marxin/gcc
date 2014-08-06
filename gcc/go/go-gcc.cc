@@ -2908,7 +2908,7 @@ Gcc_backend::write_global_definitions(
         {
           go_preserve_from_gc(decl);
           gimplify_function_tree(decl);
-          cgraph_finalize_function(decl, true);
+          cgraph_node::finalize_function(decl, true);
 
           defs[i] = decl;
           ++i;
