@@ -1,3 +1,90 @@
+2014-08-04  Claire Dross  <dross@adacore.com>
+
+	* exp_util.adb (Get_First_Parent_With_Ext_Axioms_For_Entity):
+	For an instance, look at the scope before the generic parent.
+
+2014-08-04  Yannick Moy  <moy@adacore.com>
+
+	* lib-writ.ads: Update comments.
+	* sem_disp.ads, sem_disp.adb (Inherited_Subprograms): Add
+	parameters to filter inherited subprograms.
+
+2014-08-04  Robert Dewar  <dewar@adacore.com>
+
+	* gnat_rm.texi: Add section on use of address clause for memory
+	mapped I/O.
+
+2014-08-04  Ed Schonberg  <schonberg@adacore.com>
+
+	* sem_ch3.adb (Analyze_Subtype_Declaration): A subtype, in
+	particular the subtype created for a generic actual, inherits
+	invariant information from the base type.
+
+2014-08-04  Robert Dewar  <dewar@adacore.com>
+
+	* aspects.ads, aspects.adb: Add entries for aspect Obsolescent.
+	* gnat_rm.texi: Add documentation for aspect Obsolescent.
+	* sem_ch13.adb (Analyze_Aspect_Specifications): Implement aspect
+	Obsolescent.
+	(Check_Aspect_At_Freeze_Point): Add dummy entry for pragma Obsolescent.
+	* s-osprim-mingw.adb: Minor reformatting.
+	* sem_res.adb (Is_Atomic_Ref_With_Address): New function
+	(Resolve_Indexed_Component): Rework warnings for non-atomic access
+	(Resolve_Selected_Component): Add warnings for non-atomic access.
+
+2014-08-04  Doug Rupp  <rupp@adacore.com>
+
+	* g-calend.adb (timeval_to_duration, duration_to_timeval): Change sec
+	formal to long_long.
+	* g-calend.ads (timeval): Bump up size to accomodate sec type.
+	* s-taprop-linux.adb (timeval_to_duration): Change sec formal to
+	long_long
+	* s-osprim-posix.adb (timeval): Bump up size to accomodate
+	new sec type.
+	(timeval_to_duration): Change sec formal to Long_Long_Integer
+	* s-osinte-darwin.adb (timeval): Bump up
+	size to accomodate new sec type.
+	(timeval_to_duration): Change sec formal to long_long
+	* s-osinte-android.adb: Likewise.
+	* cal.c (__gnat_timeal_to_duration, __gnat_duration_to_timeval): Change
+	sec formal from long to long long.
+
+2014-08-04  Robert Dewar  <dewar@adacore.com>
+
+	* sem_res.adb (Resolve_Qualified_Expression): Make sure
+	Do_Range_Check flag gets set.
+
+2014-08-04  Robert Dewar  <dewar@adacore.com>
+
+	* einfo.ads, einfo.adb (Is_Standard_String_Type): New function.
+	* exp_ch3.adb (Build_Array_Init_Proc): Use
+	Is_Standard_String_Type.
+	(Expand_Freeze_Array_Type): ditto.
+	(Get_Simple_Init_Val): ditto.
+	(Needs_Simple_Initialization): ditto.
+	* sem_eval.adb (Eval_String_Literal): Use Is_Standard_String_Type.
+	* sem_warn.adb (Is_Suspicious_Type): Use Is_Standard_String_Type.
+
+2014-08-04  Pascal Obry  <obry@adacore.com>
+
+	* adaint.c (__gnat_try_lock): Use _tcscpy and _tcscat instead of
+	_stprintf which insert garbage into the wfull_path buffer.
+
+2014-08-04  Arnaud Charlet  <charlet@adacore.com>
+
+	* cal.c: Remove old VMS/nucleus code. Remove obsolete vxworks
+	code.
+	* fe.h: Minor reformatting.
+
+2014-08-04  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* cstreams.c: (_LARGEFILE_SOURCE): Guard definition.
+
+2014-08-04  Robert Dewar  <dewar@adacore.com>
+
+	* par-ch13.adb (Get_Aspect_Specifications): Improve error
+	recovery, fixing a -gnatQ bomb.
+
 2014-08-04  Yannick Moy  <moy@adacore.com>
 
 	* sem_ch3.adb (Analyze_Object_Declaration): In GNATprove mode,
