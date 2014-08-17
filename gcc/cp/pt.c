@@ -34,7 +34,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "stor-layout.h"
 #include "intl.h"
-#include "pointer-set.h"
 #include "flags.h"
 #include "cp-tree.h"
 #include "c-family/c-common.h"
@@ -1112,13 +1111,11 @@ retrieve_specialization (tree tmpl, tree args, hashval_t hash)
 static tree
 retrieve_local_specialization (tree tmpl)
 {
-  void **slot;
-
   if (local_specializations == NULL)
     return NULL_TREE;
 
-  slot = pointer_map_contains (local_specializations, tmpl);
-  return slot ? (tree) *slot : NULL_TREE;
+  tree *slot = local_specializations->get (tmpl);
+  return slot ? *slot : NULL_TREE;
 }
 
 /* Returns nonzero iff DECL is a specialization of TMPL.  */
@@ -1730,10 +1727,7 @@ reregister_specialization (tree spec, tree tinfo, tree new_spec)
 static void
 register_local_specialization (tree spec, tree tmpl)
 {
-  void **slot;
-
-  slot = pointer_map_insert (local_specializations, tmpl);
-  *slot = spec;
+  local_specializations->put (tmpl, spec);
 }
 
 /* TYPE is a class type.  Returns true if TYPE is an explicitly
@@ -2817,9 +2811,11 @@ check_explicit_specialization (tree declarator,
 	       It's just the name of an instantiation.  But, it's not
 	       a request for an instantiation, either.  */
 	    SET_DECL_IMPLICIT_INSTANTIATION (decl);
-	  else
+	  else if (TREE_CODE (decl) == FUNCTION_DECL)
 	    /* A specialization is not necessarily COMDAT.  */
 	    DECL_COMDAT (decl) = DECL_DECLARED_INLINE_P (decl);
+	  else if (TREE_CODE (decl) == VAR_DECL)
+	    DECL_COMDAT (decl) = false;
 
 	  /* Register this specialization so that we can find it
 	     again.  */
@@ -4726,6 +4722,9 @@ push_template_decl_real (tree decl, bool is_friend)
          template <typename T> friend void A<T>::f();
        is not primary.  */
     is_primary = false;
+  else if (TREE_CODE (decl) == TYPE_DECL
+	   && LAMBDA_TYPE_P (TREE_TYPE (decl)))
+    is_primary = false;
   else
     is_primary = template_parm_scope_p ();
 
@@ -4741,6 +4740,11 @@ push_template_decl_real (tree decl, bool is_friend)
 	}
       else if (TREE_CODE (decl) == FUNCTION_DECL)
 	{
+	  if (member_template_p)
+	    {
+	      if (DECL_OVERRIDE_P (decl) || DECL_FINAL_P (decl))
+		error ("member template %qD may not have virt-specifiers", decl);
+	    }
 	  if (DECL_DESTRUCTOR_P (decl))
 	    {
 	      /* [temp.mem]
@@ -6860,19 +6864,24 @@ coerce_template_parms (tree parms,
   int variadic_args_p = 0;
   int post_variadic_parms = 0;
 
+  /* Likewise for parameters with default arguments.  */
+  int default_p = 0;
+
   if (args == error_mark_node)
     return error_mark_node;
 
   nparms = TREE_VEC_LENGTH (parms);
 
-  /* Determine if there are any parameter packs.  */
+  /* Determine if there are any parameter packs or default arguments.  */
   for (parm_idx = 0; parm_idx < nparms; ++parm_idx)
     {
-      tree tparm = TREE_VALUE (TREE_VEC_ELT (parms, parm_idx));
+      tree parm = TREE_VEC_ELT (parms, parm_idx);
       if (variadic_p)
 	++post_variadic_parms;
-      if (template_parameter_pack_p (tparm))
+      if (template_parameter_pack_p (TREE_VALUE (parm)))
 	++variadic_p;
+      if (TREE_PURPOSE (parm))
+	++default_p;
     }
 
   inner_args = orig_inner_args = INNERMOST_TEMPLATE_ARGS (args);
@@ -6901,18 +6910,18 @@ coerce_template_parms (tree parms,
     {
       if (complain & tf_error)
 	{
-          if (variadic_p)
+          if (variadic_p || default_p)
             {
-              nparms -= variadic_p;
+              nparms -= variadic_p + default_p;
 	      error ("wrong number of template arguments "
-		     "(%d, should be %d or more)", nargs, nparms);
+		     "(%d, should be at least %d)", nargs, nparms);
             }
 	  else
 	     error ("wrong number of template arguments "
 		    "(%d, should be %d)", nargs, nparms);
 
 	  if (in_decl)
-	    error ("provided for %q+D", in_decl);
+	    inform (input_location, "provided for %q+D", in_decl);
 	}
 
       return error_mark_node;
@@ -7817,6 +7826,12 @@ lookup_template_class_1 (tree d1, tree arglist, tree in_decl, tree context,
 	    }
 	}
 
+      if (OVERLOAD_TYPE_P (t)
+	  && !DECL_ALIAS_TEMPLATE_P (gen_tmpl))
+	if (tree attributes
+	    = lookup_attribute ("abi_tag", TYPE_ATTRIBUTES (template_type)))
+	  TYPE_ATTRIBUTES (t) = attributes;
+
       /* Let's consider the explicit specialization of a member
          of a class template specialization that is implicitly instantiated,
 	 e.g.:
@@ -7958,13 +7973,22 @@ lookup_template_class (tree d1, tree arglist, tree in_decl, tree context,
   return ret;
 }
 
-/* Return a TEMPLATE_ID_EXPR for the given variable template and ARGLIST. */
+/* Return a TEMPLATE_ID_EXPR for the given variable template and ARGLIST. 
+   If the ARGLIST refers to any template parameters, the type of the
+   expression is the unknown_type_node since the template-id could
+   refer to an explicit or partial specialization. */
 
 tree
 lookup_template_variable (tree templ, tree arglist)
 {
-  return build2 (TEMPLATE_ID_EXPR, TREE_TYPE (templ), templ, arglist);
+  tree type;
+  if (uses_template_parms (arglist))
+    type = unknown_type_node;
+  else
+    type = TREE_TYPE (templ);
+  return build2 (TEMPLATE_ID_EXPR, type, templ, arglist);
 }
+
 
 struct pair_fn_data
 {
@@ -9216,6 +9240,11 @@ instantiate_class_template_1 (tree type)
 		  && DECL_OMP_DECLARE_REDUCTION_P (r))
 		cp_check_omp_declare_reduction (r);
 	    }
+	  else if (DECL_CLASS_TEMPLATE_P (t)
+		   && LAMBDA_TYPE_P (TREE_TYPE (t)))
+	    /* A closure type for a lambda in a default argument for a
+	       member template.  Ignore it; it will be instantiated with
+	       the default argument.  */;
 	  else
 	    {
 	      /* Build new TYPE_FIELDS.  */
@@ -9770,7 +9799,7 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
   bool unsubstituted_packs = false;
   int i, len = -1;
   tree result;
-  struct pointer_map_t *saved_local_specializations = NULL;
+  hash_map<tree, tree> *saved_local_specializations = NULL;
   bool need_local_specializations = false;
   int levels;
 
@@ -9924,7 +9953,7 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
 	 case of recursive unification) might have bindings that we don't
 	 want to use or alter.  */
       saved_local_specializations = local_specializations;
-      local_specializations = pointer_map_create ();
+      local_specializations = new hash_map<tree, tree>;
     }
 
   /* For each argument in each argument pack, substitute into the
@@ -9973,7 +10002,7 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
 
   if (need_local_specializations)
     {
-      pointer_map_destroy (local_specializations);
+      delete local_specializations;
       local_specializations = saved_local_specializations;
     }
   
@@ -17263,11 +17292,6 @@ check_cv_quals_for_unify (int strict, tree arg, tree parm)
   int arg_quals = cp_type_quals (arg);
   int parm_quals = cp_type_quals (parm);
 
-  /* DR 1584: cv-qualification of a deduced function type is
-     ignored; see 8.3.5 [dcl.fct].  */
-  if (TREE_CODE (arg) == FUNCTION_TYPE)
-    return 1;
-
   if (TREE_CODE (parm) == TEMPLATE_TYPE_PARM
       && !(strict & UNIFY_ALLOW_OUTER_MORE_CV_QUAL))
     {
@@ -20087,7 +20111,7 @@ instantiate_decl (tree d, int defer_ok,
     synthesize_method (d);
   else if (TREE_CODE (d) == FUNCTION_DECL)
     {
-      struct pointer_map_t *saved_local_specializations;
+      hash_map<tree, tree> *saved_local_specializations;
       tree subst_decl;
       tree tmpl_parm;
       tree spec_parm;
@@ -20098,7 +20122,7 @@ instantiate_decl (tree d, int defer_ok,
       saved_local_specializations = local_specializations;
 
       /* Set up the list of local specializations.  */
-      local_specializations = pointer_map_create ();
+      local_specializations = new hash_map<tree, tree>;
 
       /* Set up context.  */
       if (DECL_OMP_DECLARE_REDUCTION_P (code_pattern)
@@ -20162,7 +20186,7 @@ instantiate_decl (tree d, int defer_ok,
 	}
 
       /* We don't need the local specializations any more.  */
-      pointer_map_destroy (local_specializations);
+      delete local_specializations;
       local_specializations = saved_local_specializations;
 
       /* Finish the function.  */
