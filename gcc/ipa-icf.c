@@ -76,7 +76,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "except.h"
 #include "hash-table.h"
 #include "coverage.h"
-#include "pointer-set.h"
 #include "attribs.h"
 #include "print-tree.h"
 #include "lto-streamer.h"
@@ -214,15 +213,11 @@ sem_item::setup (bitmap_obstack *stack)
   refs.create (0);
   tree_refs.create (0);
   usages.create (0);
-  tree_refs_set = pointer_set_create ();
   usage_index_bitmap = BITMAP_ALLOC (stack);
 }
 
 sem_item::~sem_item ()
 {
-  if (tree_refs_set)
-    pointer_set_destroy (tree_refs_set);
-
   for (unsigned i = 0; i < usages.length (); i++)
     delete usages[i];
 
@@ -1142,8 +1137,8 @@ sem_function::compare_function_decl (tree t1, tree t2)
   if (t1 == t2)
     return true;
 
-  bool ret = pointer_set_contains (tree_refs_set, t1)
-	     && pointer_set_contains (m_compared_func->tree_refs_set, t2);
+  bool ret = tree_refs_set.contains (t1)
+	     && m_compared_func->tree_refs_set.contains (t2);
 
   if (ret)
     return true;
@@ -1166,8 +1161,8 @@ sem_function::compare_variable_decl (tree t1, tree t2, tree func1, tree func2)
   if (t1 == t2)
     return true;
 
-  bool ret = pointer_set_contains (tree_refs_set, t1)
-	     && pointer_set_contains (m_compared_func->tree_refs_set, t2);
+  bool ret = tree_refs_set.contains (t1)
+	     && m_compared_func->tree_refs_set.contains (t2);
 
   if (ret)
     return true;
@@ -1756,7 +1751,6 @@ sem_item_optimizer::sem_item_optimizer (): worklist (0), m_classes (0),
   m_classes_count (0), m_cgraph_node_hooks (NULL), m_varpool_node_hooks (NULL)
 {
   m_items.create (0);
-  m_removed_items_set = pointer_set_create ();
   bitmap_obstack_initialize (&m_bmstack);
 }
 
@@ -1777,7 +1771,6 @@ sem_item_optimizer::~sem_item_optimizer ()
   m_items.release ();
 
   bitmap_obstack_release (&m_bmstack);
-  pointer_set_destroy (m_removed_items_set);
 }
 
 /* Write IPA ICF summary for symbols.  */
@@ -1840,12 +1833,11 @@ sem_item_optimizer::read_section (lto_file_decl_data *file_data,
   const int main_offset = cfg_offset + header->cfg_size;
   const int string_offset = main_offset + header->main_size;
   data_in *data_in;
-  lto_input_block ib_main;
   unsigned int i;
   unsigned int count;
 
-  LTO_INIT_INPUT_BLOCK (ib_main, (const char *) data + main_offset, 0,
-			header->main_size);
+  lto_input_block ib_main ((const char *) data + main_offset, 0,
+			   header->main_size);
 
   data_in =
     lto_data_in_create (file_data, (const char *) data + string_offset,
@@ -1994,7 +1986,7 @@ sem_item_optimizer::remove_symtab_node (symtab_node *node)
 {
   gcc_assert (!m_classes.elements());
 
-  pointer_set_insert (m_removed_items_set, node);
+  m_removed_items_set.add (node);
 }
 
 /* Removes all callgraph and varpool nodes that are marked by symtab
@@ -2024,7 +2016,7 @@ sem_item_optimizer::filter_removed_items (void)
 	  no_body_function = in_lto_p && (cnode->alias || cnode->body_removed);
 	}
 
-      if(!pointer_set_contains (m_removed_items_set, m_items[i]->node)
+      if(!m_removed_items_set.contains (m_items[i]->node)
 	  && !no_body_function)
 	{
 	  if (item->type == VAR || (!DECL_CXX_CONSTRUCTOR_P (item->decl)
@@ -2205,7 +2197,7 @@ sem_item_optimizer::parse_nonsingleton_classes (void)
 			unsigned index = item->refs.length ();
 			target->usages.safe_push (new sem_usage_pair(item, index));
 			bitmap_set_bit (target->usage_index_bitmap, index);
-			pointer_set_insert (item->tree_refs_set, item->tree_refs[j]);
+			item->tree_refs_set.add (item->tree_refs[j]);
 		      }
 		  }
 	      }

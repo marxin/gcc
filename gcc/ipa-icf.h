@@ -312,7 +312,7 @@ public:
   vec <tree> tree_refs;
 
   /* A set with tree references (either FUNC_DECL or VAR_DECL).  */
-  pointer_set_t *tree_refs_set;
+  hash_set <tree> tree_refs_set;
 
 protected:
   /* Cached, once calculated hash for the item.  */
@@ -752,7 +752,7 @@ private:
   vec <sem_item *> m_items;
 
   /* A set containing all items removed by hooks.  */
-  pointer_set_t *m_removed_items_set;
+  hash_set <symtab_node *> m_removed_items_set;
 
   /* Hashtable of congruence classes */
   hash_table <congruence_class_group_hash> m_classes;
