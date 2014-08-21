@@ -3360,7 +3360,7 @@ microblaze_asm_output_ident (const char *string)
     section_asm_op = READONLY_DATA_SECTION_ASM_OP;
 
   buf = ACONCAT ((section_asm_op, "\n\t.ascii \"", string, "\\0\"\n", NULL));
-  symtab->add_asm_symbol (build_string (strlen (buf), buf));
+  symtab->finalize_toplevel_asm (build_string (strlen (buf), buf));
 }
 
 static void

@@ -952,7 +952,7 @@ cgraph_edge::remove_caller (void)
   if (caller->call_site_hash)
     htab_remove_elt_with_hash (caller->call_site_hash,
 			       call_stmt,
-	  		       htab_hash_pointer (call_stmt));
+			       htab_hash_pointer (call_stmt));
 }
 
 /* Put the edge onto the free list.  */
