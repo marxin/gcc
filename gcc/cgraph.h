@@ -1191,7 +1191,6 @@ public:
   int count_materialization_scale;
   /* Unique id of the node.  */
   int uid;
-  int superuid;
   /* ID assigned by the profiling.  */
   unsigned int profile_id;
   /* Time profiler: first run of function.  */
@@ -1619,8 +1618,6 @@ struct GTY(()) symbol_priority_map {
 class GTY((tag ("SYMTAB"))) symbol_table
 {
 public:
-  inline void dump (void);
-
   /* Initialize callgraph dump file.  */
   inline void
   initialize (void)
@@ -1631,9 +1628,6 @@ public:
 
   /* Register a symbol NODE.  */
   inline void register_symbol (symtab_node *node);
-
-  /* Add a top-level asm statement to the list.  */
-  asm_node *add_asm_symbol (tree asm_str);
 
   /* Register a top-level asm statement ASM_STR.  */
   inline asm_node *finalize_toplevel_asm (tree asm_str);
@@ -1839,7 +1833,6 @@ public:
 
   int cgraph_count;
   int cgraph_max_uid;
-  int cgraph_max_superuid;
 
   int edges_count;
   int edges_max_uid;
@@ -2015,18 +2008,6 @@ varpool_node::get (const_tree decl)
   return dyn_cast<varpool_node *> (symtab_node::get (decl));
 }
 
-inline void
-symbol_table::dump (void)
-{
-  fprintf (stderr, "Cgraph nodes: %u, cgraph max UID: %u (%2.2f%%)\n",
-	     cgraph_count, cgraph_max_uid,
-	     100.0f * cgraph_count / cgraph_max_uid);
-
-  fprintf (stderr, "Edges: %u, edge max UID: %u (%2.2f%%)\n",
-	   edges_count, edges_max_uid,
-	   100.0f * edges_count / edges_max_uid);
-}
-
 /* Register a symbol NODE.  */
 
 inline void
@@ -2124,7 +2105,6 @@ symbol_table::allocate_cgraph_symbol (void)
     {
       node = ggc_cleared_alloc<cgraph_node> ();
       node->uid = cgraph_max_uid++;
-      node->uid = cgraph_max_superuid++;
     }
 
   return node;

@@ -545,26 +545,6 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
     DECL_FUNCTION_PERSONALITY (fndecl) = lang_hooks.eh_personality ();
 }
 
-/* Add a top-level asm statement to the list.  */
-
-asm_node *
-symbol_table::add_asm_symbol (tree asm_str)
-{
-  asm_node *node;
-
-  node = ggc_cleared_alloc<asm_node> ();
-  node->asm_str = asm_str;
-  node->order = symtab->order++;
-  node->next = NULL;
-  if (asmnodes == NULL)
-    asmnodes = node;
-  else
-    asm_last_node->next = node;
-  asm_last_node = node;
-  return node;
-}
-
-
 /* Output all asm statements we have stored up to be output.  */
 
 void
