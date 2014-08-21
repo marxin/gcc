@@ -3156,7 +3156,7 @@ rest_of_subprog_body_compilation (tree subprog_decl)
   dump_function (TDI_original, subprog_decl);
 
   if (!decl_function_context (subprog_decl))
-    cgraph_finalize_function (subprog_decl, false);
+    cgraph_node::finalize_function (subprog_decl, false);
   else
     /* Register this function with cgraph just far enough to get it
        added to our parent's nested function list.  */
