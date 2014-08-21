@@ -866,7 +866,8 @@ cgraph_allocate_init_indirect_info (void)
 
 cgraph_edge *
 cgraph_node::create_indirect_edge (gimple call_stmt, int ecf_flags,
-				   gcov_type count, int freq)
+				   gcov_type count, int freq,
+				   bool compute_indirect_info)
 {
   cgraph_edge *edge = symtab->create_edge (this, NULL, call_stmt,
 							    count, freq, true);
@@ -878,7 +879,8 @@ cgraph_node::create_indirect_edge (gimple call_stmt, int ecf_flags,
   edge->indirect_info->ecf_flags = ecf_flags;
 
   /* Record polymorphic call info.  */
-  if (call_stmt
+  if (compute_indirect_info
+      && call_stmt
       && (target = gimple_call_fn (call_stmt))
       && virtual_method_call_p (target))
     {

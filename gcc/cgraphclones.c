@@ -137,7 +137,7 @@ cgraph_edge::clone (cgraph_node *n, gimple call_stmt, unsigned stmt_uid,
 	{
 	  new_edge = n->create_indirect_edge (call_stmt,
 					      indirect_info->ecf_flags,
-					      gcov_count, freq);
+					      count, freq, false);
 	  *new_edge->indirect_info = *indirect_info;
 	}
     }
