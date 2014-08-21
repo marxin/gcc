@@ -3350,7 +3350,7 @@ microblaze_asm_output_ident (const char *string)
   int size;
   char *buf;
 
-  if (symtab->cgraph_state != CGRAPH_STATE_PARSING)
+  if (symtab->state != CGRAPH_STATE_PARSING)
     return;
 
   size = strlen (string) + 1;

@@ -2577,7 +2577,7 @@ cris_legitimate_pic_operand (rtx x)
 void 
 cris_asm_output_ident (const char *string)
 {
-  if (cgraph_state != CGRAPH_STATE_PARSING)
+  if (symtab->state != CGRAPH_STATE_PARSING)
     return;
 
   default_asm_output_ident_directive (string);
