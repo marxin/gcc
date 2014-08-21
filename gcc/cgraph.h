@@ -1092,9 +1092,9 @@ public:
   }
 
   /* DECL has been parsed.  Take it, queue it, compile it at the whim of the
-     logic in effect.  If NO_COLLECT is true, then our caller cannot stand to have
-     the garbage collector run at the moment.  We would need to either create
-     a new GC context, or just not compile right now.  */
+     logic in effect.  If NO_COLLECT is true, then our caller cannot stand to
+     have the garbage collector run at the moment.  We would need to either
+     create a new GC context, or just not compile right now.  */
   static void finalize_function (tree, bool);
 
   /* Return cgraph node assigned to DECL.  Create new one when needed.  */

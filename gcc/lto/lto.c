@@ -2217,7 +2217,7 @@ lto_create_files_from_ids (lto_file *file, struct lto_file_decl_data *file_data,
   lto_file_finalize (file_data, file);
   if (symtab->dump_file)
     fprintf (symtab->dump_file,
-	     "Creating file %s with sub id " HOST_WIDE_INT_PRINT_HEX "\n", 
+	     "Creating file %s with sub id " HOST_WIDE_INT_PRINT_HEX "\n",
 	     file_data->file_name, file_data->id);
   (*count)++;
   return 0;

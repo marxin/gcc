@@ -5664,7 +5664,7 @@ ix86_function_regparm (const_tree type, const_tree decl)
       && !(profile_flag && !flag_fentry))
     {
       /* FIXME: remove this CONST_CAST when cgraph.[ch] is constified.  */
-      struct cgraph_local_info *i = cgraph_node::local_info (CONST_CAST_TREE (decl));
+      cgraph_local_info *i = cgraph_node::local_info (CONST_CAST_TREE (decl));
       if (i && i->local && i->can_change_signature)
 	{
 	  int local_regparm, globals = 0, regno;
@@ -5741,7 +5741,7 @@ ix86_function_sseregparm (const_tree type, const_tree decl, bool warn)
       && !(profile_flag && !flag_fentry))
     {
       /* FIXME: remove this CONST_CAST when cgraph.[ch] is constified.  */
-      struct cgraph_local_info *i = cgraph_node::local_info (CONST_CAST_TREE(decl));
+      cgraph_local_info *i = cgraph_node::local_info (CONST_CAST_TREE(decl));
       if (i && i->local && i->can_change_signature)
 	return TARGET_SSE2 ? 2 : 1;
     }
