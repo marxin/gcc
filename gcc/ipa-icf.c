@@ -1248,7 +1248,7 @@ sem_function::compare_operand (tree t1, tree t2,
 			       tree func1, tree func2)
 {
   tree base1, base2, x1, x2, y1, y2, z1, z2;
-  HOST_WIDE_INT offset1, offset2;
+  HOST_WIDE_INT offset1 = 0, offset2 = 0;
   bool ret;
 
   if (!t1 && !t2)
@@ -2685,7 +2685,7 @@ congruence_class::dump (FILE *file, unsigned int indent) const
 
   FPUTS_SPACES (file, indent + 2, "");
   for (unsigned i = 0; i < members.length (); i++)
-    fprintf (file, "%s(%p/%u)", members[i]->asm_name (), (void *) members[i]->decl,
+    fprintf (file, "%s(%p/%u) ", members[i]->asm_name (), (void *) members[i]->decl,
 	     members[i]->node->order);
 
   fprintf (file, "\n");
