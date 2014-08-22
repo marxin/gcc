@@ -164,6 +164,8 @@ public:
 
     if (*v)
       annotation->call_removal_hooks (node, *v);
+
+    annotation->m_map->remove (node);
   }
 
   static void symtab_duplication (cgraph_node *node, cgraph_node *node2,
