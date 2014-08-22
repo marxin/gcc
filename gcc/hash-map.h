@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef hash_map_h
 #define hash_map_h
 
+#include <new>
 #include "hash-table.h"
 
 /* implement default behavior for traits when types allow it.  */
@@ -103,7 +104,7 @@ private:
 
 template<typename Key, typename Value,
 	 typename Traits = default_hashmap_traits>
-class hash_map
+class GTY((user)) hash_map
 {
   struct hash_entry
   {
@@ -138,7 +139,15 @@ class hash_map
   };
 
 public:
-  explicit hash_map (size_t n = 13) : m_table (n) {}
+  explicit hash_map (size_t n = 13, bool ggc = false) : m_table (n, ggc) {}
+
+  /* Create a hash_map in ggc memory.  */
+  static hash_map *create_ggc (size_t size)
+    {
+      hash_map *map = ggc_alloc<hash_map> ();
+      new (map) hash_map (size, true);
+      return map;
+    }
 
   /* If key k isn't already in the map add key k with value v to the map, and
      return false.  Otherwise set the value of the entry for key k to be v and
@@ -208,7 +217,88 @@ public:
     }
 
 private:
+
+  template<typename T, typename U, typename V> friend void gt_ggc_mx (hash_map<T, U, V> *);
+  template<typename T, typename U, typename V> friend void gt_pch_nx (hash_map<T, U, V> *);
+    template<typename T, typename U, typename V> friend void hashmap_entry_note_pointers (void *, void *, gt_pointer_operator, void *);
+      template<typename T, typename U, typename V> friend void gt_pch_nx (hash_map<T, U, V> *, gt_pointer_operator, void *);
   hash_table<hash_entry> m_table;
 };
+
+template<typename K, typename V, typename H>
+static inline void
+gt_ggc_mx (hash_map<K, V, H> *h)
+{
+  if (!ggc_test_and_set_mark (h->m_table.m_entries))
+    return;
+
+  for (size_t i = 0; i < h->m_table.m_size; i++)
+    {
+      if (H::is_empty (h->m_table.m_entries[i])
+	  || H::is_deleted (h->m_table.m_entries[i]))
+	continue;
+
+      gt_ggc_mx (h->m_table.m_entries[i].m_key);
+      gt_ggc_mx (h->m_table.m_entries[i].m_value);
+    }
+}
+
+/* Helpers to do pch walking for keys and values.  */
+
+template<typename T>
+static inline void
+hashmap_pch_note_pointer_helper (T &x, gt_pointer_operator op, void *cookie)
+{
+  gt_pch_nx (&x, op, cookie);
+}
+
+template<typename T>
+static inline void
+hashmap_pch_note_pointer_helper (T *x, gt_pointer_operator op, void *cookie)
+{
+  op (x, cookie);
+}
+
+template<typename K, typename V, typename H>
+static inline void
+hashmap_entry_note_pointers (void *obj, void *h, gt_pointer_operator op,
+			     void *cookie)
+{
+  hash_map<K, V, H> *map = static_cast<hash_map<K, V, H> *> (h);
+  gcc_assert (map->m_table.m_entries == obj);
+  for (size_t i = 0; i < map->m_table.m_size; i++)
+    {
+      if (H::is_empty (map->m_table.m_entries[i])
+	  || H::is_deleted (map->m_table.m_entries[i]))
+	continue;
+
+      hashmap_pch_note_pointer_helper (map->m_table.m_entries[i].m_key, op, cookie);
+      hashmap_pch_note_pointer_helper (map->m_table.m_entries[i].m_value, op, cookie);
+    }
+}
+
+template<typename K, typename V, typename H>
+static void
+gt_pch_nx (hash_map<K, V, H> *h)
+{
+  gcc_assert (gt_pch_note_object (h->m_table.m_entries, h,
+				  hashmap_entry_note_pointers<K, V, H>));
+  for (size_t i = 0; i < h->m_table.m_size; i++)
+    {
+      if (H::is_empty (h->m_table.m_entries[i])
+	  || H::is_deleted (h->m_table.m_entries[i]))
+	continue;
+
+      gt_pch_nx (h->m_table.m_entries[i].m_key);
+      gt_pch_nx (h->m_table.m_entries[i].m_value);
+    }
+}
+
+template<typename K, typename V, typename H>
+static inline void
+gt_pch_nx (hash_map<K, V, H> *h, gt_pointer_operator op, void *cookie)
+{
+  op (&h->m_table.m_entries, cookie);
+}
 
 #endif

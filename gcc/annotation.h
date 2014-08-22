@@ -80,22 +80,16 @@ struct annotation_hashmap_traits: default_hashmap_traits
 };
 
 template <class T>
-class GTY((skip)) cgraph_annotation
+class GTY() cgraph_annotation
 {
 public:
-  cgraph_annotation (symbol_table *symtab): m_symtab (symtab)
-  {
-    m_symtab_insertion_hook =
-      symtab->add_cgraph_insertion_hook
-	(cgraph_annotation::symtab_insertion, this);
-
-    m_symtab_removal_hook =
-      symtab->add_cgraph_removal_hook
-	(cgraph_annotation::symtab_removal, this);
-    m_symtab_duplication_hook =
-      symtab->add_cgraph_duplication_hook
-        (cgraph_annotation::symtab_duplication, this);
-  }
+  /* Create a hash_map in ggc memory.  */
+  static cgraph_annotation *create_ggc (symbol_table *table)
+    {
+      cgraph_annotation *annotation = ggc_alloc<cgraph_annotation> ();
+      new (annotation) cgraph_annotation (table);
+      return annotation;
+    }
 
   ~cgraph_annotation ()
   {
@@ -103,7 +97,7 @@ public:
     m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
     m_symtab->remove_cgraph_duplication_hook (m_symtab_duplication_hook);
 
-    m_map.traverse <cgraph_annotation::release> (NULL);
+    m_map->traverse <cgraph_annotation::release> (NULL);
   }
 
   template <typename Arg, void (*f) (const cgraph_node *, T *)>
@@ -122,9 +116,13 @@ public:
   {
     gcc_assert (uid < m_symtab->cgraph_max_superuid);
 
-    T **v = m_map.get (uid);
+    T **v = m_map->get (uid);
     if (!(*v))
-      m_map.put (uid, new T ());
+      {
+	T *new_value = ggc_alloc<T> ();
+	new (new_value) T();
+        m_map->put (uid, new_value);
+      }
 
     return *v;
   }
@@ -162,7 +160,7 @@ public:
   static void symtab_removal (cgraph_node *node, void *data)
   {
     cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
-    T **v = annotation->m_map.get (node->superuid);
+    T **v = annotation->m_map->get (node->superuid);
 
     if (*v)
       annotation->call_removal_hooks (node, *v);
@@ -172,24 +170,42 @@ public:
 				  void *data)
   {
     cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
-    T **v = annotation->m_map.get (node->superuid);
+    T **v = annotation->m_map->get (node->superuid);
 
     if (*v)
     {
-      annotation->m_map.put (node2->superuid, new T (*v));
+      T *duplicate = ggc_alloc<T> ();
+      new (duplicate) T(*v);
+      annotation->m_map->put (node2->superuid, duplicate);
       annotation->call_duplication_hooks (node, node2, *v);
     }
   }
 
-  hash_map <int, T *, annotation_hashmap_traits> m_map;
+  hash_map <int, T *, annotation_hashmap_traits> *m_map;
 
 private:  
+  cgraph_annotation (symbol_table *symtab): m_symtab (symtab)
+  {
+    m_map = hash_map<cgraph_node *, T*>::create_ggc (13);
+
+    m_symtab_insertion_hook =
+      symtab->add_cgraph_insertion_hook
+	(cgraph_annotation::symtab_insertion, this);
+
+    m_symtab_removal_hook =
+      symtab->add_cgraph_removal_hook
+	(cgraph_annotation::symtab_removal, this);
+    m_symtab_duplication_hook =
+      symtab->add_cgraph_duplication_hook
+        (cgraph_annotation::symtab_duplication, this);
+  }
+
   inline void remove (int uid)
   {
-    T *v = m_map.get (uid);
+    T *v = m_map->get (uid);
 
     if (v)
-      m_map.erase (uid);
+      m_map->erase (uid);
   }
 
   inline static void release (int const &node, T * const &v, void *)
