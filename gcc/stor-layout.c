@@ -298,7 +298,7 @@ finalize_size_functions (void)
       dump_function (TDI_original, fndecl);
       gimplify_function_tree (fndecl);
       dump_function (TDI_generic, fndecl);
-      cgraph_finalize_function (fndecl, false);
+      cgraph_node::finalize_function (fndecl, false);
     }
 
   vec_free (size_functions);
@@ -2388,6 +2388,27 @@ layout_type (tree type)
      should not call layout_type on not incomplete aggregates.  */
   if (AGGREGATE_TYPE_P (type))
     gcc_assert (!TYPE_ALIAS_SET_KNOWN_P (type));
+}
+
+/* Return the least alignment required for type TYPE.  */
+
+unsigned int
+min_align_of_type (tree type)
+{
+  unsigned int align = TYPE_ALIGN (type);
+  align = MIN (align, BIGGEST_ALIGNMENT);
+#ifdef BIGGEST_FIELD_ALIGNMENT
+  align = MIN (align, BIGGEST_FIELD_ALIGNMENT);
+#endif
+  unsigned int field_align = align;
+#ifdef ADJUST_FIELD_ALIGN
+  tree field = build_decl (UNKNOWN_LOCATION, FIELD_DECL, NULL_TREE,
+			   type);
+  field_align = ADJUST_FIELD_ALIGN (field, field_align);
+  ggc_free (field);
+#endif
+  align = MIN (align, field_align);
+  return align / BITS_PER_UNIT;
 }
 
 /* Vector types need to re-check the target flags each time we report

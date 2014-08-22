@@ -96,7 +96,7 @@ can_remove_node_now_p_1 (struct cgraph_node *node)
 	  && !DECL_VIRTUAL_P (node->decl)
 	  /* During early inlining some unanalyzed cgraph nodes might be in the
 	     callgraph and they might reffer the function in question.  */
-	  && !cgraph_new_nodes);
+	  && !cgraph_new_nodes.exists ());
 }
 
 /* We are going to eliminate last direct call to NODE (or alias of it) via edge E.
@@ -421,7 +421,7 @@ save_inline_function_body (struct cgraph_node *node)
 static bool
 preserve_function_body_p (struct cgraph_node *node)
 {
-  gcc_assert (symtab->cgraph_global_info_ready);
+  gcc_assert (symtab->global_info_ready);
   gcc_assert (!node->alias && !node->thunk.thunk_p);
 
   /* Look if there is any clone around.  */

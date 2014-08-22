@@ -2221,25 +2221,6 @@ ira_bad_reload_regno (int regno, rtx in, rtx out)
 	  || ira_bad_reload_regno_1 (regno, out));
 }
 
-/* Return TRUE if *LOC contains an asm.  */
-static int
-insn_contains_asm_1 (rtx *loc, void *data ATTRIBUTE_UNUSED)
-{
-  if ( !*loc)
-    return FALSE;
-  if (GET_CODE (*loc) == ASM_OPERANDS)
-    return TRUE;
-  return FALSE;
-}
-
-
-/* Return TRUE if INSN contains an ASM.  */
-static bool
-insn_contains_asm (rtx insn)
-{
-  return for_each_rtx (&insn, insn_contains_asm_1, NULL);
-}
-
 /* Add register clobbers from asm statements.  */
 static void
 compute_regs_asm_clobbered (void)
@@ -2253,7 +2234,7 @@ compute_regs_asm_clobbered (void)
 	{
 	  df_ref def;
 
-	  if (insn_contains_asm (insn))
+	  if (NONDEBUG_INSN_P (insn) && extract_asm_operands (PATTERN (insn)))
 	    FOR_EACH_INSN_DEF (def, insn)
 	      {
 		unsigned int dregno = DF_REF_REGNO (def);
@@ -3779,7 +3760,7 @@ update_equiv_regs (void)
 		      REG_LIVE_LENGTH (regno) = 2;
 
 		      if (insn == BB_HEAD (bb))
-			BB_HEAD (bb) = PREV_INSN (insn);
+			SET_BB_HEAD (bb) = PREV_INSN (insn);
 
 		      ira_reg_equiv[regno].init_insns
 			= gen_rtx_INSN_LIST (VOIDmode, new_insn, NULL_RTX);

@@ -1218,6 +1218,17 @@ package body Sem_Elab is
          return;
       end if;
 
+      --  Nothing to do if this is a call to a postcondition, which is always
+      --  within a subprogram body, even though the current scope may be the
+      --  enclosing scope of the subprogram.
+
+      if Nkind (N) = N_Procedure_Call_Statement
+        and then Is_Entity_Name (Name (N))
+        and then Chars (Entity (Name (N))) = Name_uPostconditions
+      then
+         return;
+      end if;
+
       --  Here we have a call at elaboration time which must be checked
 
       if Debug_Flag_LL then
@@ -2429,8 +2440,8 @@ package body Sem_Elab is
                       Decl);
                   Error_Msg_N ("\Program_Error [<<", Decl);
 
-               elsif
-                 Present (Corresponding_Body (Unit_Declaration_Node (Proc)))
+               elsif Present
+                       (Corresponding_Body (Unit_Declaration_Node (Proc)))
                then
                   Append_Elmt (Proc, Intra_Procs);
                end if;

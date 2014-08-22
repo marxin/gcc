@@ -1631,7 +1631,7 @@ change_scope (rtx orig_insn, tree s1, tree s2)
   s = s1;
   while (s != com)
     {
-      rtx note = emit_note_before (NOTE_INSN_BLOCK_END, insn);
+      rtx_note *note = emit_note_before (NOTE_INSN_BLOCK_END, insn);
       NOTE_BLOCK (note) = s;
       s = BLOCK_SUPERCONTEXT (s);
     }
@@ -1653,7 +1653,8 @@ static void
 reemit_insn_block_notes (void)
 {
   tree cur_block = DECL_INITIAL (cfun->decl);
-  rtx insn, note;
+  rtx_insn *insn;
+  rtx_note *note;
 
   insn = get_insns ();
   for (; insn; insn = NEXT_INSN (insn))
@@ -1666,7 +1667,7 @@ reemit_insn_block_notes (void)
           for (tree s = cur_block; s != DECL_INITIAL (cfun->decl);
                s = BLOCK_SUPERCONTEXT (s))
             {
-              rtx note = emit_note_before (NOTE_INSN_BLOCK_END, insn);
+              rtx_note *note = emit_note_before (NOTE_INSN_BLOCK_END, insn);
               NOTE_BLOCK (note) = s;
               note = emit_note_after (NOTE_INSN_BLOCK_BEG, insn);
               NOTE_BLOCK (note) = s;
@@ -2054,7 +2055,8 @@ get_insn_template (int code, rtx insn)
       return insn_data[code].output.multi[which_alternative];
     case INSN_OUTPUT_FORMAT_FUNCTION:
       gcc_assert (insn);
-      return (*insn_data[code].output.function) (recog_data.operand, insn);
+      return (*insn_data[code].output.function) (recog_data.operand,
+						 as_a <rtx_insn *> (insn));
 
     default:
       gcc_unreachable ();
@@ -2341,7 +2343,7 @@ final_scan_insn (rtx insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	case NOTE_INSN_VAR_LOCATION:
 	case NOTE_INSN_CALL_ARG_LOCATION:
 	  if (!DECL_IGNORED_P (current_function_decl))
-	    debug_hooks->var_location (insn);
+	    debug_hooks->var_location (as_a <rtx_insn *> (insn));
 	  break;
 
 	default:
@@ -2379,7 +2381,7 @@ final_scan_insn (rtx insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
       CC_STATUS_INIT;
 
       if (!DECL_IGNORED_P (current_function_decl) && LABEL_NAME (insn))
-	debug_hooks->label (insn);
+	debug_hooks->label (as_a <rtx_code_label *> (insn));
 
       app_disable ();
 
@@ -2856,12 +2858,12 @@ final_scan_insn (rtx insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 		   when generating a far jump in a delayed branch
 		   sequence.  */
 		note = NEXT_INSN (insn);
-		PREV_INSN (note) = prev;
-		NEXT_INSN (prev) = note;
-		NEXT_INSN (PREV_INSN (next)) = insn;
-		PREV_INSN (insn) = PREV_INSN (next);
-		NEXT_INSN (insn) = next;
-		PREV_INSN (next) = insn;
+		SET_PREV_INSN (note) = prev;
+		SET_NEXT_INSN (prev) = note;
+		SET_NEXT_INSN (PREV_INSN (next)) = insn;
+		SET_PREV_INSN (insn) = PREV_INSN (next);
+		SET_NEXT_INSN (insn) = next;
+		SET_PREV_INSN (next) = insn;
 	      }
 
 	    /* PEEPHOLE might have changed this.  */
@@ -2982,7 +2984,7 @@ final_scan_insn (rtx insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 		  assemble_external (t);
 	      }
 	    if (!DECL_IGNORED_P (current_function_decl))
-	      debug_hooks->var_location (insn);
+	      debug_hooks->var_location (as_a <rtx_insn *> (insn));
 	  }
 
 	/* Output assembler code from the template.  */
@@ -4628,8 +4630,8 @@ rest_of_clean_state (void)
   for (insn = get_insns (); insn; insn = next)
     {
       next = NEXT_INSN (insn);
-      NEXT_INSN (insn) = NULL;
-      PREV_INSN (insn) = NULL;
+      SET_NEXT_INSN (insn) = NULL;
+      SET_PREV_INSN (insn) = NULL;
 
       if (final_output
 	  && (!NOTE_P (insn) ||
@@ -4689,8 +4691,8 @@ rest_of_clean_state (void)
       unsigned int pref = crtl->preferred_stack_boundary;
       if (crtl->stack_alignment_needed > crtl->preferred_stack_boundary)
         pref = crtl->stack_alignment_needed;
-      cgraph_rtl_info (current_function_decl)->preferred_incoming_stack_boundary
-        = pref;
+      cgraph_node::rtl_info (current_function_decl)
+	->preferred_incoming_stack_boundary = pref;
     }
 
   /* Make sure volatile mem refs aren't considered valid operands for
@@ -4812,7 +4814,7 @@ collect_fn_hard_reg_usage (void)
   if (hard_reg_set_subset_p (call_used_reg_set, function_used_regs))
     return;
 
-  node = cgraph_rtl_info (current_function_decl);
+  node = cgraph_node::rtl_info (current_function_decl);
   gcc_assert (node != NULL);
 
   COPY_HARD_REG_SET (node->function_used_regs, function_used_regs);
@@ -4853,7 +4855,7 @@ get_call_cgraph_rtl_info (rtx insn)
       || !decl_binds_to_current_def_p (fndecl))
     return NULL;
 
-  return cgraph_rtl_info (fndecl);
+  return cgraph_node::rtl_info (fndecl);
 }
 
 /* Find hard registers used by function call instruction INSN, and return them

@@ -633,7 +633,7 @@ ipa_profile (void)
 			    n2 = alias;
 			}
 		      nconverted++;
-		      e->turn_to_speculative
+		      e->make_speculative
 			(n2,
 			 apply_scale (e->count,
 				      e->indirect_info->common_target_probability),

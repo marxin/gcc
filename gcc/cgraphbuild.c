@@ -23,7 +23,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
-#include "pointer-set.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -57,7 +56,7 @@ record_reference (tree *tp, int *walk_subtrees, void *data)
 {
   tree t = *tp;
   tree decl;
-  struct record_reference_ctx *ctx = (struct record_reference_ctx *)data;
+  record_reference_ctx *ctx = (record_reference_ctx *)data;
 
   t = canonicalize_constructor_val (t, NULL);
   if (!t)
@@ -79,7 +78,7 @@ record_reference (tree *tp, int *walk_subtrees, void *data)
       decl = get_base_var (*tp);
       if (TREE_CODE (decl) == FUNCTION_DECL)
 	{
-	  struct cgraph_node *node = cgraph_node::get_create (decl);
+	  cgraph_node *node = cgraph_node::get_create (decl);
 	  if (!ctx->only_vars)
 	    node->mark_address_taken ();
 	  ctx->varpool_node->add_reference (node, IPA_REF_ADDR);
@@ -110,7 +109,7 @@ record_reference (tree *tp, int *walk_subtrees, void *data)
 /* Record references to typeinfos in the type list LIST.  */
 
 static void
-record_type_list (struct cgraph_node *node, tree list)
+record_type_list (cgraph_node *node, tree list)
 {
   for (; list; list = TREE_CHAIN (list))
     {
@@ -135,14 +134,14 @@ record_type_list (struct cgraph_node *node, tree list)
    for NODE.  */
 
 static void
-record_eh_tables (struct cgraph_node *node, struct function *fun)
+record_eh_tables (cgraph_node *node, function *fun)
 {
   eh_region i;
 
   if (DECL_FUNCTION_PERSONALITY (node->decl))
     {
       tree per_decl = DECL_FUNCTION_PERSONALITY (node->decl);
-      struct cgraph_node *per_node = cgraph_node::get_create (per_decl);
+      cgraph_node *per_node = cgraph_node::get_create (per_decl);
 
       node->add_reference (per_node, IPA_REF_ADDR);
       per_node->mark_address_taken ();
@@ -223,7 +222,7 @@ mark_address (gimple stmt, tree addr, tree, void *data)
   addr = get_base_address (addr);
   if (TREE_CODE (addr) == FUNCTION_DECL)
     {
-      struct cgraph_node *node = cgraph_node::get_create (addr);
+      cgraph_node *node = cgraph_node::get_create (addr);
       node->mark_address_taken ();
       ((symtab_node *)data)->add_reference (node, IPA_REF_ADDR, stmt);
     }
@@ -248,7 +247,7 @@ mark_load (gimple stmt, tree t, tree, void *data)
     {
       /* ??? This can happen on platforms with descriptors when these are
 	 directly manipulated in the code.  Pretend that it's an address.  */
-      struct cgraph_node *node = cgraph_node::get_create (t);
+      cgraph_node *node = cgraph_node::get_create (t);
       node->mark_address_taken ();
       ((symtab_node *)data)->add_reference (node, IPA_REF_ADDR, stmt);
     }
@@ -321,8 +320,7 @@ unsigned int
 pass_build_cgraph_edges::execute (function *fun)
 {
   basic_block bb;
-  struct cgraph_node *node = cgraph_node::get (current_function_decl);
-  struct pointer_set_t *visited_nodes = pointer_set_create ();
+  cgraph_node *node = cgraph_node::get (current_function_decl);
   gimple_stmt_iterator gsi;
   tree decl;
   unsigned ix;
@@ -385,7 +383,6 @@ pass_build_cgraph_edges::execute (function *fun)
       varpool_node::finalize_decl (decl);
   record_eh_tables (node, fun);
 
-  pointer_set_destroy (visited_nodes);
   return 0;
 }
 
@@ -404,25 +401,24 @@ make_pass_build_cgraph_edges (gcc::context *ctxt)
 void
 record_references_in_initializer (tree decl, bool only_vars)
 {
-  struct pointer_set_t *visited_nodes = pointer_set_create ();
   varpool_node *node = varpool_node::get_create (decl);
-  struct record_reference_ctx ctx = {false, NULL};
+  hash_set<tree> visited_nodes;
+  record_reference_ctx ctx = {false, NULL};
 
   ctx.varpool_node = node;
   ctx.only_vars = only_vars;
   walk_tree (&DECL_INITIAL (decl), record_reference,
-             &ctx, visited_nodes);
-  pointer_set_destroy (visited_nodes);
+             &ctx, &visited_nodes);
 }
 
 /* Rebuild cgraph edges for current function node.  This needs to be run after
    passes that don't update the cgraph.  */
 
 unsigned int
-symbol_table::rebuild_edges (void)
+cgraph_edge::rebuild_edges (void)
 {
   basic_block bb;
-  struct cgraph_node *node = cgraph_node::get (current_function_decl);
+  cgraph_node *node = cgraph_node::get (current_function_decl);
   gimple_stmt_iterator gsi;
 
   node->remove_callees ();
@@ -467,12 +463,12 @@ symbol_table::rebuild_edges (void)
    after passes that don't update the cgraph.  */
 
 void
-symbol_table::rebuild_references (void)
+cgraph_edge::rebuild_references (void)
 {
   basic_block bb;
-  struct cgraph_node *node = cgraph_node::get (current_function_decl);
+  cgraph_node *node = cgraph_node::get (current_function_decl);
   gimple_stmt_iterator gsi;
-  struct ipa_ref *ref = NULL;
+  ipa_ref *ref = NULL;
   int i;
 
   /* Keep speculative references for further cgraph edge expansion.  */
@@ -518,7 +514,10 @@ public:
 
   /* opt_pass methods: */
   opt_pass * clone () { return new pass_rebuild_cgraph_edges (m_ctxt); }
-  virtual unsigned int execute (function *) { return symtab->rebuild_edges (); }
+  virtual unsigned int execute (function *)
+  {
+    return cgraph_edge::rebuild_edges ();
+  }
 
 }; // class pass_rebuild_cgraph_edges
 
@@ -564,7 +563,7 @@ public:
 unsigned int
 pass_remove_cgraph_callee_edges::execute (function *)
 {
-  struct cgraph_node *node = cgraph_node::get (current_function_decl);
+  cgraph_node *node = cgraph_node::get (current_function_decl);
   node->remove_callees ();
   node->remove_all_references ();
   return 0;

@@ -2,7 +2,7 @@
 --                                                                          --
 --                         GNAT COMPILER COMPONENTS                         --
 --                                                                          --
---                              P R J . P R O C                             --
+--                             P R J . P R O C                              --
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
@@ -519,6 +519,8 @@ package body Prj.Proc is
       Last : String_List_Id := Nil_String;
       --  Reference to the last string elements in Result, when Kind is List
 
+      Current_Term_Kind : Project_Node_Kind;
+
    begin
       Result.Project := Project;
       Result.Location := Location_Of (First_Term, From_Project_Node_Tree);
@@ -528,8 +530,10 @@ package body Prj.Proc is
       The_Term := First_Term;
       while Present (The_Term) loop
          The_Current_Term := Current_Term (The_Term, From_Project_Node_Tree);
+         Current_Term_Kind :=
+           Kind_Of (The_Current_Term, From_Project_Node_Tree);
 
-         case Kind_Of (The_Current_Term, From_Project_Node_Tree) is
+         case Current_Term_Kind is
 
             when N_Literal_String =>
 
@@ -700,6 +704,13 @@ package body Prj.Proc is
                   Index           : Name_Id := No_Name;
 
                begin
+                  <<Object_Dir_Restart>>
+                  The_Project := Project;
+                  The_Package := Pkg;
+                  The_Name := No_Name;
+                  The_Variable_Id := No_Variable;
+                  Index := No_Name;
+
                   if Present (Term_Project)
                     and then Term_Project /= From_Project_Node
                   then
@@ -741,9 +752,7 @@ package body Prj.Proc is
                   The_Name :=
                     Name_Of (The_Current_Term, From_Project_Node_Tree);
 
-                  if Kind_Of (The_Current_Term, From_Project_Node_Tree) =
-                                                        N_Attribute_Reference
-                  then
+                  if Current_Term_Kind = N_Attribute_Reference then
                      Index :=
                        Associative_Array_Index_Of
                          (The_Current_Term, From_Project_Node_Tree);
@@ -759,9 +768,7 @@ package body Prj.Proc is
 
                         --  First, if there is a package, look into the package
 
-                        if Kind_Of (The_Current_Term, From_Project_Node_Tree) =
-                                                        N_Variable_Reference
-                        then
+                        if Current_Term_Kind = N_Variable_Reference then
                            The_Variable_Id :=
                              Shared.Packages.Table
                                (The_Package).Decl.Variables;
@@ -786,9 +793,7 @@ package body Prj.Proc is
 
                         --  If we have not found it, look into the project
 
-                        if Kind_Of (The_Current_Term, From_Project_Node_Tree) =
-                             N_Variable_Reference
-                        then
+                        if Current_Term_Kind = N_Variable_Reference then
                            The_Variable_Id := The_Project.Decl.Variables;
                         else
                            The_Variable_Id := The_Project.Decl.Attributes;
@@ -882,8 +887,65 @@ package body Prj.Proc is
                      end;
                   end if;
 
-                  case Kind is
+                  --  Check the defaults
 
+                  if Current_Term_Kind = N_Attribute_Reference
+                    and then The_Variable.Default
+                  then
+                     declare
+                        The_Default : constant Attribute_Default_Value :=
+                          Default_Of
+                            (The_Current_Term, From_Project_Node_Tree);
+
+                     begin
+                        case The_Variable.Kind is
+                           when Undefined =>
+                              null;
+
+                           when Single =>
+                              case The_Default is
+                                 when Read_Only_Value =>
+                                    null;
+
+                                 when Empty_Value =>
+                                    The_Variable.Value := Empty_String;
+
+                                 when Dot_Value =>
+                                    The_Variable.Value := Dot_String;
+
+                                 when Object_Dir_Value =>
+                                    From_Project_Node_Tree.Project_Nodes.Table
+                                      (The_Current_Term).Name :=
+                                      Snames.Name_Object_Dir;
+                                    From_Project_Node_Tree.Project_Nodes.Table
+                                      (The_Current_Term).Default :=
+                                      Dot_Value;
+                                    goto Object_Dir_Restart;
+
+                                 when Target_Value =>
+                                    null;
+                              end case;
+
+                           when List =>
+                              case The_Default is
+                                 when Read_Only_Value =>
+                                    null;
+
+                                 when Empty_Value =>
+                                    The_Variable.Values := Nil_String;
+
+                                 when Dot_Value =>
+                                    The_Variable.Values :=
+                                      Shared.Dot_String_List;
+
+                                 when Object_Dir_Value | Target_Value =>
+                                    null;
+                              end case;
+                        end case;
+                     end;
+                  end if;
+
+                  case Kind is
                      when Undefined =>
 
                         --  Should never happen
@@ -892,7 +954,6 @@ package body Prj.Proc is
                         null;
 
                      when Single =>
-
                         case The_Variable.Kind is
 
                            when Undefined =>
@@ -2845,20 +2906,43 @@ package body Prj.Proc is
                return;
             end if;
 
-            Project :=
-              new Project_Data'
-                (Empty_Project
-                  (Project_Qualifier_Of
-                    (From_Project_Node, From_Project_Node_Tree)));
+            --  Check if the project is already in the tree
 
-            --  Note that at this point we do not know yet if the project has
-            --  been withed from an encapsulated library or not.
+            Project := No_Project;
 
-            In_Tree.Projects :=
-              new Project_List_Element'
-             (Project               => Project,
-              From_Encapsulated_Lib => False,
-              Next                  => In_Tree.Projects);
+            declare
+               List : Project_List := In_Tree.Projects;
+               Path : constant Path_Name_Type :=
+                        Path_Name_Of (From_Project_Node,
+                                      From_Project_Node_Tree);
+
+            begin
+               while List /= null loop
+                  if List.Project.Path.Display_Name = Path then
+                     Project := List.Project;
+                     exit;
+                  end if;
+
+                  List := List.Next;
+               end loop;
+            end;
+
+            if Project = No_Project then
+               Project :=
+                 new Project_Data'
+                   (Empty_Project
+                      (Project_Qualifier_Of
+                         (From_Project_Node, From_Project_Node_Tree)));
+
+               --  Note that at this point we do not know yet if the project
+               --  has been withed from an encapsulated library or not.
+
+               In_Tree.Projects :=
+                 new Project_List_Element'
+                   (Project               => Project,
+                    From_Encapsulated_Lib => False,
+                    Next                  => In_Tree.Projects);
+            end if;
 
             --  Keep track of this point
 

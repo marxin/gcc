@@ -284,16 +284,7 @@ init_local_tick (void)
 static void
 init_random_seed (void)
 {
-  if (flag_random_seed)
-    {
-      char *endp;
-
-      /* When the driver passed in a hex number don't crc it again */
-      random_seed = strtoul (flag_random_seed, &endp, 0);
-      if (!(endp > flag_random_seed && *endp == 0))
-        random_seed = crc32_string (0, flag_random_seed);
-    }
-  else if (!random_seed)
+  if (!random_seed)
     random_seed = local_tick ^ getpid ();  /* Old racey fallback method */
 }
 
@@ -316,6 +307,15 @@ set_random_seed (const char *val)
 {
   const char *old = flag_random_seed;
   flag_random_seed = val;
+  if (flag_random_seed)
+    {
+      char *endp;
+
+      /* When the driver passed in a hex number don't crc it again */
+      random_seed = strtoul (flag_random_seed, &endp, 0);
+      if (!(endp > flag_random_seed && *endp == 0))
+        random_seed = crc32_string (0, flag_random_seed);
+    }
   return old;
 }
 
@@ -403,7 +403,7 @@ wrapup_global_declaration_2 (tree decl)
 	needed = false;
       else if (node && node->alias)
 	needed = false;
-      else if (!symtab->cgraph_global_info_ready
+      else if (!symtab->global_info_ready
 	       && (TREE_USED (decl)
 		   || TREE_USED (DECL_ASSEMBLER_NAME (decl))))
 	/* needed */;
@@ -1117,11 +1117,6 @@ general_init (const char *argv0)
   /* Set a default printer.  Language specific initializations will
      override it later.  */
   tree_diagnostics_defaults (global_dc);
-  /* FIXME: This should probably be moved to C-family
-     language-specific initializations.  */
-  /* By default print macro expansion contexts in the diagnostic
-     finalizer -- for tokens resulting from macro expansion.  */
-  diagnostic_finalizer (global_dc) = virt_loc_aware_diagnostic_finalizer;
 
   global_dc->show_caret
     = global_options_init.x_flag_diagnostics_show_caret;
@@ -1278,15 +1273,15 @@ process_options (void)
   else
     aux_base_name = "gccaux";
 
-#ifndef HAVE_cloog
+#ifndef HAVE_isl
   if (flag_graphite
       || flag_graphite_identity
       || flag_loop_block
       || flag_loop_interchange
       || flag_loop_strip_mine
       || flag_loop_parallelize_all)
-    sorry ("Graphite loop optimizations cannot be used (-fgraphite, "
-	   "-fgraphite-identity, -floop-block, "
+    sorry ("Graphite loop optimizations cannot be used (ISL is not available)" 
+	   "(-fgraphite, -fgraphite-identity, -floop-block, "
 	   "-floop-interchange, -floop-strip-mine, -floop-parallelize-all, "
 	   "and -ftree-loop-linear)");
 #endif
@@ -1558,9 +1553,18 @@ process_options (void)
     warn_stack_protect = 0;
 
   /* Address Sanitizer needs porting to each target architecture.  */
+
   if ((flag_sanitize & SANITIZE_ADDRESS)
-      && (targetm.asan_shadow_offset == NULL
-	  || !FRAME_GROWS_DOWNWARD))
+      && !FRAME_GROWS_DOWNWARD)
+    {
+      warning (0,
+	       "-fsanitize=address and -fsanitize=kernel-address "
+	       "are not supported for this target");
+      flag_sanitize &= ~SANITIZE_ADDRESS;
+    }
+
+  if ((flag_sanitize & SANITIZE_USER_ADDRESS)
+      && targetm.asan_shadow_offset == NULL)
     {
       warning (0, "-fsanitize=address not supported for this target");
       flag_sanitize &= ~SANITIZE_ADDRESS;

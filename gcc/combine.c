@@ -1545,7 +1545,7 @@ setup_incoming_promotions (rtx first)
          function lie within the current compilation unit.  (This does
 	 take into account the exporting of a function via taking its
 	 address, and so forth.)  */
-      strictly_local = cgraph_local_info (current_function_decl)->local;
+      strictly_local = cgraph_node::local_info (current_function_decl)->local;
 
       /* The mode and signedness of the argument before any promotions happen
          (equal to the mode of the pseudo holding it at that stage).  */
@@ -2420,11 +2420,11 @@ update_cfg_for_uncondjump (rtx insn)
 	if (BARRIER_P (insn))
 	  {
 	    if (PREV_INSN (insn))
-	      NEXT_INSN (PREV_INSN (insn)) = NEXT_INSN (insn);
+	      SET_NEXT_INSN (PREV_INSN (insn)) = NEXT_INSN (insn);
 	    else
-	      BB_FOOTER (bb) = NEXT_INSN (insn);
+	      SET_BB_FOOTER (bb) = NEXT_INSN (insn);
 	    if (NEXT_INSN (insn))
-	      PREV_INSN (NEXT_INSN (insn)) = PREV_INSN (insn);
+	      SET_PREV_INSN (NEXT_INSN (insn)) = PREV_INSN (insn);
 	  }
 	else if (LABEL_P (insn))
 	  break;
@@ -12458,7 +12458,7 @@ record_promoted_value (rtx insn, rtx subreg)
       rsp = &reg_stat[regno];
       if (rsp->last_set == insn)
 	{
-	  if (SUBREG_PROMOTED_UNSIGNED_P (subreg) > 0)
+	  if (SUBREG_PROMOTED_UNSIGNED_P (subreg))
 	    rsp->last_set_nonzero_bits &= GET_MODE_MASK (mode);
 	}
 

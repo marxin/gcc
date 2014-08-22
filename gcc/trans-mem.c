@@ -4174,7 +4174,7 @@ ipa_tm_scan_calls_transaction (struct tm_ipa_cg_data *d,
 
   // ??? copy_bbs should maintain cgraph edges for the blocks as it is
   // copying them, rather than forcing us to do this externally.
-  symtab->rebuild_edges ();
+  cgraph_edge::rebuild_edges ();
 
   // ??? In ipa_uninstrument_transaction we don't try to update dominators
   // because copy_bbs doesn't return a VEC like iterate_fix_dominators expects.
@@ -4715,7 +4715,7 @@ ipa_tm_diagnose_transaction (struct cgraph_node *node,
 	      if (is_tm_callable (fndecl))
 		continue;
 
-	      if (cgraph_local_info (fndecl)->tm_may_enter_irr)
+	      if (cgraph_node::local_info (fndecl)->tm_may_enter_irr)
 		error_at (gimple_location (stmt),
 			  "unsafe function call %qD within "
 			  "atomic transaction", fndecl);
@@ -5042,6 +5042,9 @@ ipa_tm_insert_gettmclone_call (struct cgraph_node *node,
   }
 
   update_stmt (stmt);
+  cgraph_edge *e = cgraph_node::get (current_function_decl)->get_edge (stmt);
+  if (e && e->indirect_info)
+    e->indirect_info->polymorphic = false;
 
   return true;
 }

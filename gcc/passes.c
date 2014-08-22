@@ -333,8 +333,8 @@ execute_all_early_local_passes (void)
      none of the sub-passes are IPA passes and do not create new
      functions, this is ok.  We're setting this value for the benefit
      of IPA passes that follow.  */
-  if (symtab->cgraph_state < CGRAPH_STATE_IPA_SSA)
-    symtab->cgraph_state = CGRAPH_STATE_IPA_SSA;
+  if (symtab->state < IPA_SSA)
+    symtab->state = IPA_SSA;
   return 0;
 }
 
@@ -350,7 +350,9 @@ const pass_data pass_data_early_local_passes =
   0, /* properties_provided */
   0, /* properties_destroyed */
   0, /* todo_flags_start */
-  TODO_remove_functions, /* todo_flags_finish */
+  /* todo_flags_finish is executed before subpases. For this reason
+     it makes no sense to remove unreachable functions here.  */
+  0, /* todo_flags_finish */
 };
 
 class pass_early_local_passes : public simple_ipa_opt_pass
@@ -1478,7 +1480,7 @@ do_per_function (void (*callback) (function *, void *data), void *data)
     {
       struct cgraph_node *node;
       FOR_EACH_DEFINED_FUNCTION (node)
-	if (node->analyzed && gimple_has_body_p (node->decl)
+	if (node->analyzed && (gimple_has_body_p (node->decl) && !in_lto_p)
 	    && (!node->clone_of || node->decl != node->clone_of->decl))
 	  callback (DECL_STRUCT_FUNCTION (node->decl), data);
     }
@@ -1730,7 +1732,7 @@ execute_function_todo (function *fn, void *data)
     rebuild_frequencies ();
 
   if (flags & TODO_rebuild_cgraph_edges)
-    symtab->rebuild_edges ();
+    cgraph_edge::rebuild_edges ();
 
   /* If we've seen errors do not bother running any verifiers.  */
   if (!seen_error ())
@@ -2111,7 +2113,7 @@ execute_one_pass (opt_pass *pass)
 		node->get_body ();
 		push_cfun (DECL_STRUCT_FUNCTION (node->decl));
 		execute_all_ipa_transforms ();
-		symtab->rebuild_edges ();
+		cgraph_edge::rebuild_edges ();
 		free_dominance_info (CDI_DOMINATORS);
 		free_dominance_info (CDI_POST_DOMINATORS);
 		pop_cfun ();
@@ -2119,7 +2121,7 @@ execute_one_pass (opt_pass *pass)
 	      }
 	  }
       if (applied)
-	symtab->remove_unreachable_nodes (true, dump_file);
+	symtab->remove_unreachable_nodes (false, dump_file);
       /* Restore current_pass.  */
       current_pass = pass;
     }

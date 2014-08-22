@@ -30,7 +30,6 @@
 #include "tree.h"
 #include "stor-layout.h"
 #include "stmt.h"
-#include "pointer-set.h"
 #include "hash-table.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -319,7 +318,7 @@ static inline bool type_can_have_subvars (const_tree);
 static alloc_pool variable_info_pool;
 
 /* Map varinfo to final pt_solution.  */
-static pointer_map_t *final_solutions;
+static hash_map<varinfo_t, pt_solution *> *final_solutions;
 struct obstack final_solutions_obstack;
 
 /* Table of variable info structures for constraint variables.
@@ -345,7 +344,7 @@ vi_next (varinfo_t vi)
 
 /* Static IDs for the special variables.  Variable ID zero is unused
    and used as terminator for the sub-variable chain.  */
-enum { nothing_id = 1, anything_id = 2, readonly_id = 3,
+enum { nothing_id = 1, anything_id = 2, string_id = 3,
        escaped_id = 4, nonlocal_id = 5,
        storedanything_id = 6, integer_id = 7 };
 
@@ -393,19 +392,19 @@ new_var_info (tree t, const char *name)
 
 /* A map mapping call statements to per-stmt variables for uses
    and clobbers specific to the call.  */
-static struct pointer_map_t *call_stmt_vars;
+static hash_map<gimple, varinfo_t> *call_stmt_vars;
 
 /* Lookup or create the variable for the call statement CALL.  */
 
 static varinfo_t
 get_call_vi (gimple call)
 {
-  void **slot_p;
   varinfo_t vi, vi2;
 
-  slot_p = pointer_map_insert (call_stmt_vars, call);
-  if (*slot_p)
-    return (varinfo_t) *slot_p;
+  bool existed;
+  varinfo_t *slot_p = &call_stmt_vars->get_or_insert (call, &existed);
+  if (existed)
+    return *slot_p;
 
   vi = new_var_info (NULL_TREE, "CALLUSED");
   vi->offset = 0;
@@ -421,7 +420,7 @@ get_call_vi (gimple call)
 
   vi->next = vi2->id;
 
-  *slot_p = (void *) vi;
+  *slot_p = vi;
   return vi;
 }
 
@@ -431,11 +430,9 @@ get_call_vi (gimple call)
 static varinfo_t
 lookup_call_use_vi (gimple call)
 {
-  void **slot_p;
-
-  slot_p = pointer_map_contains (call_stmt_vars, call);
+  varinfo_t *slot_p = call_stmt_vars->get (call);
   if (slot_p)
-    return (varinfo_t) *slot_p;
+    return *slot_p;
 
   return NULL;
 }
@@ -2794,7 +2791,7 @@ solve_graph (constraint_graph_t graph)
 }
 
 /* Map from trees to variable infos.  */
-static struct pointer_map_t *vi_for_tree;
+static hash_map<tree, varinfo_t> *vi_for_tree;
 
 
 /* Insert ID as the variable id for tree T in the vi_for_tree map.  */
@@ -2802,10 +2799,8 @@ static struct pointer_map_t *vi_for_tree;
 static void
 insert_vi_for_tree (tree t, varinfo_t vi)
 {
-  void **slot = pointer_map_insert (vi_for_tree, t);
   gcc_assert (vi);
-  gcc_assert (*slot == NULL);
-  *slot = vi;
+  gcc_assert (!vi_for_tree->put (t, vi));
 }
 
 /* Find the variable info for tree T in VI_FOR_TREE.  If T does not
@@ -2814,11 +2809,11 @@ insert_vi_for_tree (tree t, varinfo_t vi)
 static varinfo_t
 lookup_vi_for_tree (tree t)
 {
-  void **slot = pointer_map_contains (vi_for_tree, t);
+  varinfo_t *slot = vi_for_tree->get (t);
   if (slot == NULL)
     return NULL;
 
-  return (varinfo_t) *slot;
+  return *slot;
 }
 
 /* Return a printable name for DECL  */
@@ -2876,11 +2871,11 @@ alias_get_name (tree decl)
 static varinfo_t
 get_vi_for_tree (tree t)
 {
-  void **slot = pointer_map_contains (vi_for_tree, t);
+  varinfo_t *slot = vi_for_tree->get (t);
   if (slot == NULL)
     return get_varinfo (create_variable_info_for (t, alias_get_name (t)));
 
-  return (varinfo_t) *slot;
+  return *slot;
 }
 
 /* Get a scalar constraint expression for a new temporary variable.  */
@@ -2943,14 +2938,6 @@ get_constraint_for_ssa_var (tree t, vec<ce_s> *results, bool address_p)
   cexpr.var = vi->id;
   cexpr.type = SCALAR;
   cexpr.offset = 0;
-  /* If we determine the result is "anything", and we know this is readonly,
-     say it points to readonly memory instead.  */
-  if (cexpr.var == anything_id && TREE_READONLY (t))
-    {
-      gcc_unreachable ();
-      cexpr.type = ADDRESSOF;
-      cexpr.var = readonly_id;
-    }
 
   /* If we are not taking the address of the constraint expr, add all
      sub-fiels of the variable as well.  */
@@ -3385,10 +3372,11 @@ get_constraint_for_1 (tree t, vec<ce_s> *results, bool address_p,
       return;
     }
 
-  /* String constants are read-only.  */
+  /* String constants are read-only, ideally we'd have a CONST_DECL
+     for those.  */
   if (TREE_CODE (t) == STRING_CST)
     {
-      temp.var = readonly_id;
+      temp.var = string_id;
       temp.type = SCALAR;
       temp.offset = 0;
       results->safe_push (temp);
@@ -6077,7 +6065,6 @@ find_what_var_points_to (varinfo_t orig_vi)
   bitmap finished_solution;
   bitmap result;
   varinfo_t vi;
-  void **slot;
   struct pt_solution *pt;
 
   /* This variable may have been collapsed, let's get the real
@@ -6085,9 +6072,9 @@ find_what_var_points_to (varinfo_t orig_vi)
   vi = get_varinfo (find (orig_vi->id));
 
   /* See if we have already computed the solution and return it.  */
-  slot = pointer_map_insert (final_solutions, vi);
+  pt_solution **slot = &final_solutions->get_or_insert (vi);
   if (*slot != NULL)
-    return *(struct pt_solution *)*slot;
+    return **slot;
 
   *slot = pt = XOBNEW (&final_solutions_obstack, struct pt_solution);
   memset (pt, 0, sizeof (struct pt_solution));
@@ -6118,8 +6105,8 @@ find_what_var_points_to (varinfo_t orig_vi)
 	  else if (vi->is_heap_var)
 	    /* We represent heapvars in the points-to set properly.  */
 	    ;
-	  else if (vi->id == readonly_id)
-	    /* Nobody cares.  */
+	  else if (vi->id == string_id)
+	    /* Nobody cares - STRING_CSTs are read-only entities.  */
 	    ;
 	  else if (vi->id == anything_id
 		   || vi->id == integer_id)
@@ -6507,7 +6494,7 @@ init_base_vars (void)
   struct constraint_expr lhs, rhs;
   varinfo_t var_anything;
   varinfo_t var_nothing;
-  varinfo_t var_readonly;
+  varinfo_t var_string;
   varinfo_t var_escaped;
   varinfo_t var_nonlocal;
   varinfo_t var_storedanything;
@@ -6553,27 +6540,17 @@ init_base_vars (void)
      but this one are redundant.  */
   constraints.safe_push (new_constraint (lhs, rhs));
 
-  /* Create the READONLY variable, used to represent that a variable
-     points to readonly memory.  */
-  var_readonly = new_var_info (NULL_TREE, "READONLY");
-  gcc_assert (var_readonly->id == readonly_id);
-  var_readonly->is_artificial_var = 1;
-  var_readonly->offset = 0;
-  var_readonly->size = ~0;
-  var_readonly->fullsize = ~0;
-  var_readonly->is_special_var = 1;
-
-  /* readonly memory points to anything, in order to make deref
-     easier.  In reality, it points to anything the particular
-     readonly variable can point to, but we don't track this
-     separately. */
-  lhs.type = SCALAR;
-  lhs.var = readonly_id;
-  lhs.offset = 0;
-  rhs.type = ADDRESSOF;
-  rhs.var = readonly_id;  /* FIXME */
-  rhs.offset = 0;
-  process_constraint (new_constraint (lhs, rhs));
+  /* Create the STRING variable, used to represent that a variable
+     points to a string literal.  String literals don't contain
+     pointers so STRING doesn't point to anything.  */
+  var_string = new_var_info (NULL_TREE, "STRING");
+  gcc_assert (var_string->id == string_id);
+  var_string->is_artificial_var = 1;
+  var_string->offset = 0;
+  var_string->size = ~0;
+  var_string->fullsize = ~0;
+  var_string->is_special_var = 1;
+  var_string->may_have_pointers = 0;
 
   /* Create the ESCAPED variable, used to represent the set of escaped
      memory.  */
@@ -6687,8 +6664,8 @@ init_alias_vars (void)
 					  sizeof (struct variable_info), 30);
   constraints.create (8);
   varmap.create (8);
-  vi_for_tree = pointer_map_create ();
-  call_stmt_vars = pointer_map_create ();
+  vi_for_tree = new hash_map<tree, varinfo_t>;
+  call_stmt_vars = new hash_map<gimple, varinfo_t>;
 
   memset (&stats, 0, sizeof (stats));
   shared_bitmap_table = new hash_table<shared_bitmap_hasher> (511);
@@ -6696,7 +6673,7 @@ init_alias_vars (void)
 
   gcc_obstack_init (&fake_var_decl_obstack);
 
-  final_solutions = pointer_map_create ();
+  final_solutions = new hash_map<varinfo_t, pt_solution *>;
   gcc_obstack_init (&final_solutions_obstack);
 }
 
@@ -6945,8 +6922,8 @@ delete_points_to_sets (void)
     fprintf (dump_file, "Points to sets created:%d\n",
 	     stats.points_to_sets_created);
 
-  pointer_map_destroy (vi_for_tree);
-  pointer_map_destroy (call_stmt_vars);
+  delete vi_for_tree;
+  delete call_stmt_vars;
   bitmap_obstack_release (&pta_obstack);
   constraints.release ();
 
@@ -6967,7 +6944,7 @@ delete_points_to_sets (void)
 
   obstack_free (&fake_var_decl_obstack, NULL);
 
-  pointer_map_destroy (final_solutions);
+  delete final_solutions;
   obstack_free (&final_solutions_obstack, NULL);
 }
 

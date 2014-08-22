@@ -961,7 +961,6 @@ package body Exp_Intr is
       --  them to the tree, and that can disturb current value settings.
 
       Dummy : Entity_Id;
-      pragma Unreferenced (Dummy);
       --  This variable captures an unused dummy internal entity, see the
       --  comment associated with its use.
 
@@ -1107,9 +1106,11 @@ package body Exp_Intr is
          end if;
       end if;
 
-      --  Normal processing for non-controlled types
+      --  Normal processing for non-controlled types. The argument to free is
+      --  a renaming rather than a constant to ensure that the original context
+      --  is always set to null after the deallocation takes place.
 
-      Free_Arg := Duplicate_Subexpr_No_Checks (Arg);
+      Free_Arg  := Duplicate_Subexpr_No_Checks (Arg, Renaming_Req => True);
       Free_Node := Make_Free_Statement (Loc, Empty);
       Append_To (Stmts, Free_Node);
       Set_Storage_Pool (Free_Node, Pool);
