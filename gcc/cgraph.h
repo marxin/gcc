@@ -1192,6 +1192,7 @@ public:
   int count_materialization_scale;
   /* Unique id of the node.  */
   int uid;
+  int superuid;
   /* ID assigned by the profiling.  */
   unsigned int profile_id;
   /* Time profiler: first run of function.  */
@@ -1838,6 +1839,7 @@ public:
 
   int cgraph_count;
   int cgraph_max_uid;
+  int cgraph_max_superuid;
 
   int edges_count;
   int edges_max_uid;
@@ -2143,6 +2145,7 @@ symbol_table::allocate_cgraph_symbol (void)
     {
       node = ggc_cleared_alloc<cgraph_node> ();
       node->uid = cgraph_max_uid++;
+      node->superuid = cgraph_max_superuid++;
     }
 
   return node;
