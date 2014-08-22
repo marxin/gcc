@@ -514,7 +514,10 @@ public:
 
   /* opt_pass methods: */
   opt_pass * clone () { return new pass_rebuild_cgraph_edges (m_ctxt); }
-  virtual unsigned int execute (function *) { return cgraph_edge::rebuild_edges (); }
+  virtual unsigned int execute (function *)
+  {
+    return cgraph_edge::rebuild_edges ();
+  }
 
 }; // class pass_rebuild_cgraph_edges
 
