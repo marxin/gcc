@@ -81,13 +81,13 @@ record_reference (tree *tp, int *walk_subtrees, void *data)
 	  cgraph_node *node = cgraph_node::get_create (decl);
 	  if (!ctx->only_vars)
 	    node->mark_address_taken ();
-	  ctx->varpool_node->add_reference (node, IPA_REF_ADDR);
+	  ctx->varpool_node->create_reference (node, IPA_REF_ADDR);
 	}
 
       if (TREE_CODE (decl) == VAR_DECL)
 	{
 	  varpool_node *vnode = varpool_node::get_create (decl);
-	  ctx->varpool_node->add_reference (vnode, IPA_REF_ADDR);
+	  ctx->varpool_node->create_reference (vnode, IPA_REF_ADDR);
 	}
       *walk_subtrees = 0;
       break;
@@ -124,7 +124,7 @@ record_type_list (cgraph_node *node, tree list)
 	  if (TREE_CODE (type) == VAR_DECL)
 	    {
 	      varpool_node *vnode = varpool_node::get_create (type);
-	      node->add_reference (vnode, IPA_REF_ADDR);
+	      node->create_reference (vnode, IPA_REF_ADDR);
 	    }
 	}
     }
@@ -143,7 +143,7 @@ record_eh_tables (cgraph_node *node, function *fun)
       tree per_decl = DECL_FUNCTION_PERSONALITY (node->decl);
       cgraph_node *per_node = cgraph_node::get_create (per_decl);
 
-      node->add_reference (per_node, IPA_REF_ADDR);
+      node->create_reference (per_node, IPA_REF_ADDR);
       per_node->mark_address_taken ();
     }
 
@@ -224,14 +224,14 @@ mark_address (gimple stmt, tree addr, tree, void *data)
     {
       cgraph_node *node = cgraph_node::get_create (addr);
       node->mark_address_taken ();
-      ((symtab_node *)data)->add_reference (node, IPA_REF_ADDR, stmt);
+      ((symtab_node *)data)->create_reference (node, IPA_REF_ADDR, stmt);
     }
   else if (addr && TREE_CODE (addr) == VAR_DECL
 	   && (TREE_STATIC (addr) || DECL_EXTERNAL (addr)))
     {
       varpool_node *vnode = varpool_node::get_create (addr);
 
-      ((symtab_node *)data)->add_reference (vnode, IPA_REF_ADDR, stmt);
+      ((symtab_node *)data)->create_reference (vnode, IPA_REF_ADDR, stmt);
     }
 
   return false;
@@ -249,14 +249,14 @@ mark_load (gimple stmt, tree t, tree, void *data)
 	 directly manipulated in the code.  Pretend that it's an address.  */
       cgraph_node *node = cgraph_node::get_create (t);
       node->mark_address_taken ();
-      ((symtab_node *)data)->add_reference (node, IPA_REF_ADDR, stmt);
+      ((symtab_node *)data)->create_reference (node, IPA_REF_ADDR, stmt);
     }
   else if (t && TREE_CODE (t) == VAR_DECL
 	   && (TREE_STATIC (t) || DECL_EXTERNAL (t)))
     {
       varpool_node *vnode = varpool_node::get_create (t);
 
-      ((symtab_node *)data)->add_reference (vnode, IPA_REF_LOAD, stmt);
+      ((symtab_node *)data)->create_reference (vnode, IPA_REF_LOAD, stmt);
     }
   return false;
 }
@@ -272,7 +272,7 @@ mark_store (gimple stmt, tree t, tree, void *data)
     {
       varpool_node *vnode = varpool_node::get_create (t);
 
-      ((symtab_node *)data)->add_reference (vnode, IPA_REF_STORE, stmt);
+      ((symtab_node *)data)->create_reference (vnode, IPA_REF_STORE, stmt);
      }
   return false;
 }
@@ -356,18 +356,18 @@ pass_build_cgraph_edges::execute (function *fun)
 	      && gimple_omp_parallel_child_fn (stmt))
 	    {
 	      tree fn = gimple_omp_parallel_child_fn (stmt);
-	      node->add_reference (cgraph_node::get_create (fn),
+	      node->create_reference (cgraph_node::get_create (fn),
 				      IPA_REF_ADDR, stmt);
 	    }
 	  if (gimple_code (stmt) == GIMPLE_OMP_TASK)
 	    {
 	      tree fn = gimple_omp_task_child_fn (stmt);
 	      if (fn)
-		node->add_reference (cgraph_node::get_create (fn),
+		node->create_reference (cgraph_node::get_create (fn),
 					IPA_REF_ADDR, stmt);
 	      fn = gimple_omp_task_copy_fn (stmt);
 	      if (fn)
-		node->add_reference (cgraph_node::get_create (fn),
+		node->create_reference (cgraph_node::get_create (fn),
 					IPA_REF_ADDR, stmt);
 	    }
 	}

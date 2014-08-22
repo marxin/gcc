@@ -502,10 +502,10 @@ symtab_node::name () const
    of the use.  */
 
 ipa_ref *
-symtab_node::add_reference (symtab_node *referred_node,
-			    enum ipa_ref_use use_type)
+symtab_node::create_reference (symtab_node *referred_node,
+			       enum ipa_ref_use use_type)
 {
-  return add_reference (referred_node, use_type, NULL);
+  return create_reference (referred_node, use_type, NULL);
 }
 
 
@@ -514,8 +514,8 @@ symtab_node::add_reference (symtab_node *referred_node,
    of the use and STMT the statement (if it exists).  */
 
 ipa_ref *
-symtab_node::add_reference (symtab_node *referred_node,
-			    enum ipa_ref_use use_type, gimple stmt)
+symtab_node::create_reference (symtab_node *referred_node,
+			       enum ipa_ref_use use_type, gimple stmt)
 {
   ipa_ref *ref = NULL, *ref2 = NULL;
   ipa_ref_list *list, *list2;
@@ -569,8 +569,8 @@ symtab_node::add_reference (symtab_node *referred_node,
    reference or NULL if none was created.  */
 
 ipa_ref *
-symtab_node::maybe_add_reference (tree val, enum ipa_ref_use use_type,
-				  gimple stmt)
+symtab_node::maybe_create_reference (tree val, enum ipa_ref_use use_type,
+				     gimple stmt)
 {
   STRIP_NOPS (val);
   if (TREE_CODE (val) != ADDR_EXPR)
@@ -581,7 +581,7 @@ symtab_node::maybe_add_reference (tree val, enum ipa_ref_use use_type,
     {
       symtab_node *referred = symtab_node::get (val);
       gcc_checking_assert (referred);
-      return add_reference (referred, use_type, stmt);
+      return create_reference (referred, use_type, stmt);
     }
   return NULL;
 }
@@ -598,7 +598,7 @@ symtab_node::clone_references (symtab_node *node)
       bool speculative = ref->speculative;
       unsigned int stmt_uid = ref->lto_stmt_uid;
 
-      ref2 = add_reference (ref->referred, ref->use, ref->stmt);
+      ref2 = create_reference (ref->referred, ref->use, ref->stmt);
       ref2->speculative = speculative;
       ref2->lto_stmt_uid = stmt_uid;
     }
@@ -616,7 +616,7 @@ symtab_node::clone_referring (symtab_node *node)
       bool speculative = ref->speculative;
       unsigned int stmt_uid = ref->lto_stmt_uid;
 
-      ref2 = ref->referring->add_reference (this, ref->use, ref->stmt);
+      ref2 = ref->referring->create_reference (this, ref->use, ref->stmt);
       ref2->speculative = speculative;
       ref2->lto_stmt_uid = stmt_uid;
     }
@@ -631,7 +631,7 @@ symtab_node::clone_reference (ipa_ref *ref, gimple stmt)
   unsigned int stmt_uid = ref->lto_stmt_uid;
   ipa_ref *ref2;
 
-  ref2 = add_reference (ref->referred, ref->use, stmt);
+  ref2 = create_reference (ref->referred, ref->use, stmt);
   ref2->speculative = speculative;
   ref2->lto_stmt_uid = stmt_uid;
   return ref2;
@@ -1620,7 +1620,7 @@ symtab_node::resolve_alias (symtab_node *target)
   definition = true;
   alias = true;
   analyzed = true;
-  add_reference (target, IPA_REF_ALIAS, NULL);
+  create_reference (target, IPA_REF_ALIAS, NULL);
 
   /* Add alias into the comdat group of its target unless it is already there.  */
   if (same_comdat_group)

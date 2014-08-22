@@ -789,7 +789,7 @@ add_node_to (lto_symtab_encoder_t encoder, struct cgraph_node *node,
 /* Add all references in NODE to encoders.  */
 
 static void
-add_references (lto_symtab_encoder_t encoder, symtab_node *node)
+create_references (lto_symtab_encoder_t encoder, symtab_node *node)
 {
   int i;
   struct ipa_ref *ref = NULL;
@@ -828,7 +828,7 @@ compute_ltrans_boundary (lto_symtab_encoder_t in_encoder)
       struct cgraph_node *node = lsei_cgraph_node (lsei);
       add_node_to (encoder, node, true);
       lto_set_symtab_encoder_in_partition (encoder, node);
-      add_references (encoder, node);
+      create_references (encoder, node);
       /* For proper debug info, we need to ship the origins, too.  */
       if (DECL_ABSTRACT_ORIGIN (node->decl))
 	{
@@ -844,7 +844,7 @@ compute_ltrans_boundary (lto_symtab_encoder_t in_encoder)
 
       lto_set_symtab_encoder_in_partition (encoder, vnode);
       lto_set_symtab_encoder_encode_initializer (encoder, vnode);
-      add_references (encoder, vnode);
+      create_references (encoder, vnode);
       /* For proper debug info, we need to ship the origins, too.  */
       if (DECL_ABSTRACT_ORIGIN (vnode->decl))
 	{
@@ -866,7 +866,7 @@ compute_ltrans_boundary (lto_symtab_encoder_t in_encoder)
 	      && vnode->ctor_useable_for_folding_p ())
 	    {
 	      lto_set_symtab_encoder_encode_initializer (encoder, vnode);
-	      add_references (encoder, vnode);
+	      create_references (encoder, vnode);
 	    }
        }
     }
@@ -1307,7 +1307,7 @@ input_ref (struct lto_input_block *ib,
   use = (enum ipa_ref_use) bp_unpack_value (&bp, 2);
   speculative = (enum ipa_ref_use) bp_unpack_value (&bp, 1);
   node = nodes[streamer_read_hwi (ib)];
-  ref = referring_node->add_reference (node, use);
+  ref = referring_node->create_reference (node, use);
   ref->speculative = speculative;
   if (is_a <cgraph_node *> (referring_node))
     ref->lto_stmt_uid = streamer_read_hwi (ib);

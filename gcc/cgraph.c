@@ -1051,7 +1051,7 @@ cgraph_edge::make_speculative (cgraph_node *n2, gcov_type direct_count,
   count -= e2->count;
   frequency -= e2->frequency;
   symtab->call_edge_duplication_hooks (this, e2);
-  ref = n->add_reference (n2, IPA_REF_ADDR, call_stmt);
+  ref = n->create_reference (n2, IPA_REF_ADDR, call_stmt);
   ref->lto_stmt_uid = lto_stmt_uid;
   ref->speculative = speculative;
   n2->mark_address_taken ();

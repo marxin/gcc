@@ -118,21 +118,21 @@ public:
   /* Return ipa reference from this symtab_node to
      REFERED_NODE or REFERED_VARPOOL_NODE. USE_TYPE specify type
      of the use and STMT the statement (if it exists).  */
-  ipa_ref *add_reference (symtab_node *referred_node,
-			  enum ipa_ref_use use_type);
+  ipa_ref *create_reference (symtab_node *referred_node,
+			     enum ipa_ref_use use_type);
 
   /* Return ipa reference from this symtab_node to
      REFERED_NODE or REFERED_VARPOOL_NODE. USE_TYPE specify type
      of the use and STMT the statement (if it exists).  */
-  ipa_ref *add_reference (symtab_node *referred_node,
-			  enum ipa_ref_use use_type, gimple stmt);
+  ipa_ref *create_reference (symtab_node *referred_node,
+			     enum ipa_ref_use use_type, gimple stmt);
 
   /* If VAL is a reference to a function or a variable, add a reference from
      this symtab_node to the corresponding symbol table node.  USE_TYPE specify
      type of the use and STMT the statement (if it exists).  Return the new
      reference or NULL if none was created.  */
-  ipa_ref *maybe_add_reference (tree val, enum ipa_ref_use use_type,
-				gimple stmt);
+  ipa_ref *maybe_create_reference (tree val, enum ipa_ref_use use_type,
+				   gimple stmt);
 
   /* Clone all references from symtab NODE to this symtab_node.  */
   void clone_references (symtab_node *node);
@@ -292,7 +292,7 @@ public:
 
   /* Determine if symbol declaration is needed.  That is, visible to something
      either outside this translation unit, something magic in the system
-     configury */
+     configury. This function is used just during symbol creation.  */
   bool needed_p (void);
 
   /* Return true when there are references to the node.  */
@@ -1602,6 +1602,13 @@ struct varpool_node_hook_list;
 struct cgraph_2edge_hook_list;
 struct cgraph_2node_hook_list;
 
+/* Map from a symbol to initialization/finalization priorities.  */
+struct GTY(()) symbol_priority_map {
+  symtab_node *symbol;
+  priority_type init;
+  priority_type fini;
+};
+
 enum symtab_state
 {
   /* Frontend is parsing and finalizing functions.  */
@@ -1618,13 +1625,6 @@ enum symtab_state
   EXPANSION,
   /* All cgraph expansion is done.  */
   FINISHED
-};
-
-/* Map from a symbol to initialization/finalization priorities.  */
-struct GTY(()) symbol_priority_map {
-  symtab_node *symbol;
-  priority_type init;
-  priority_type fini;
 };
 
 class GTY((tag ("SYMTAB"))) symbol_table
@@ -1648,17 +1648,17 @@ public:
   /* Analyze the whole compilation unit once it is parsed completely.  */
   void finalize_compilation_unit (void);
 
-  /* Process CGRAPH_NEW_FUNCTIONS and perform actions necessary to add these
-     functions into callgraph in a way so they look like ordinary reachable
-     functions inserted into callgraph already at construction time.  */
-  void process_new_functions (void);
-
   /* C++ frontend produce same body aliases all over the place, even before PCH
      gets streamed out. It relies on us linking the aliases with their function
      in order to do the fixups, but ipa-ref is not PCH safe.  Consequentely we
      first produce aliases without links, but once C++ FE is sure he won't sream
      PCH we build the links via this function.  */
   void process_same_body_aliases (void);
+
+  /* Process CGRAPH_NEW_FUNCTIONS and perform actions necessary to add these
+     functions into callgraph in a way so they look like ordinary reachable
+     functions inserted into callgraph already at construction time.  */
+  void process_new_functions (void);
 
   /* Once all functions from compilation unit are in memory, produce all clones
      and update all calls.  We might also do this on demand if we don't want to
