@@ -2915,7 +2915,7 @@ read_cgraph_and_symbols (unsigned nfiles, const char **fnames)
       /* True, since the plugin splits the archives.  */
       gcc_assert (num_objects == nfiles);
     }
-  symtab->state = CGRAPH_LTO_STREAMING;
+  symtab->state = LTO_STREAMING;
 
   canonical_type_hash_cache = new hash_map<const_tree, hashval_t> (251);
   gimple_canonical_types = htab_create_ggc (16381, gimple_canonical_type_hash,
@@ -3090,7 +3090,7 @@ read_cgraph_and_symbols (unsigned nfiles, const char **fnames)
      We could also just remove them while merging.  */
   symtab->remove_unreachable_nodes (true, dump_file);
   ggc_collect ();
-  symtab->state = CGRAPH_STATE_IPA_SSA;
+  symtab->state = IPA_SSA;
 
   timevar_pop (TV_IPA_LTO_CGRAPH_MERGE);
 
@@ -3242,13 +3242,10 @@ do_whole_program_analysis (void)
   if (symtab->dump_file)
     symtab_node::dump_table (symtab->dump_file);
   bitmap_obstack_initialize (NULL);
-  symtab->state = CGRAPH_STATE_IPA_SSA;
+  symtab->state = IPA_SSA;
 
   execute_ipa_pass_list (g->get_passes ()->all_regular_ipa_passes);
-#ifdef ENABLE_CHECKING
-  /* Verify that IPA passes cleans up after themselves.  */
-  gcc_assert (!symtab->remove_unreachable_nodes (false, dump_file));
-#endif
+  symtab->remove_unreachable_nodes (false, dump_file);
 
   if (symtab->dump_file)
     {

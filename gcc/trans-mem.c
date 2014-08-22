@@ -4174,7 +4174,7 @@ ipa_tm_scan_calls_transaction (struct tm_ipa_cg_data *d,
 
   // ??? copy_bbs should maintain cgraph edges for the blocks as it is
   // copying them, rather than forcing us to do this externally.
-  symtab->rebuild_edges ();
+  cgraph_edge::rebuild_edges ();
 
   // ??? In ipa_uninstrument_transaction we don't try to update dominators
   // because copy_bbs doesn't return a VEC like iterate_fix_dominators expects.

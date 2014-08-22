@@ -114,7 +114,7 @@ process_references (symtab_node *snode,
       if (node->definition && !node->in_other_partition
 	  && ((!DECL_EXTERNAL (node->decl) || node->alias)
 	      || (((before_inlining_p
-		    && (symtab->state < CGRAPH_STATE_IPA_SSA
+		    && (symtab->state < IPA_SSA
 		        || !lookup_attribute ("always_inline",
 					      DECL_ATTRIBUTES (node->decl)))))
 		  /* We use variable constructors during late complation for
@@ -169,7 +169,7 @@ walk_polymorphic_call_targets (hash_set<void *> *reachable_call_targets,
 	     devirtualization.  */
 	   if (n->definition
 	       && (before_inlining_p
-		   && (symtab->state < CGRAPH_STATE_IPA_SSA
+		   && (symtab->state < IPA_SSA
 		       || !lookup_attribute ("always_inline",
 					     DECL_ATTRIBUTES (n->decl)))))
 	     reachable->add (n);

@@ -831,8 +831,8 @@ cgraph_edge *
 cgraph_node::create_edge (cgraph_node *callee,
 			  gimple call_stmt, gcov_type count, int freq)
 {
-  cgraph_edge *edge = symtab->create_edge (this, callee, call_stmt,
-						     count, freq, false);
+  cgraph_edge *edge = symtab->create_edge (this, callee, call_stmt, count,
+					   freq, false);
 
   initialize_inline_failed (edge);
 
@@ -1025,8 +1025,8 @@ cgraph_set_edge_callee (cgraph_edge *e, cgraph_node *n)
    Return direct edge created.  */
 
 cgraph_edge *
-cgraph_edge::turn_to_speculative (cgraph_node *n2, gcov_type direct_count,
-				  int direct_frequency)
+cgraph_edge::make_speculative (cgraph_node *n2, gcov_type direct_count,
+			       int direct_frequency)
 {
   cgraph_node *n = caller;
   ipa_ref *ref = NULL;
@@ -1646,7 +1646,7 @@ void
 cgraph_node::release_body (void)
 {
   ipa_transforms_to_apply.release ();
-  if (!used_as_abstract_origin && symtab->state != CGRAPH_STATE_PARSING)
+  if (!used_as_abstract_origin && symtab->state != PARSING)
     {
       DECL_RESULT (decl) = NULL;
       DECL_ARGUMENTS (decl) = NULL;
@@ -1731,7 +1731,7 @@ cgraph_node::remove (void)
      itself is kept in the cgraph even after it is compiled.  Check whether
      we are done with this body and reclaim it proactively if this is the case.
      */
-  if (symtab->state != CGRAPH_LTO_STREAMING)
+  if (symtab->state != LTO_STREAMING)
     {
       n = cgraph_node::get (decl);
       if (!n
@@ -2550,7 +2550,7 @@ verify_edge_corresponds_to_fndecl (cgraph_edge *e, tree decl)
 
   if (!decl || e->callee->global.inlined_to)
     return false;
-  if (symtab->state == CGRAPH_LTO_STREAMING)
+  if (symtab->state == LTO_STREAMING)
     return false;
   node = cgraph_node::get (decl);
 

@@ -1058,7 +1058,8 @@ public:
   static void dump_cgraph (FILE *f);
 
   /* Dump the call graph to stderr.  */
-  static inline void debug_cgraph (void)
+  static inline
+  void debug_cgraph (void)
   {
     dump_cgraph (stderr);
   }
@@ -1297,14 +1298,10 @@ struct GTY(()) cgraph_indirect_call_info
 };
 
 struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgraph_edge {
+  friend class cgraph_node;
+
   /* Remove the edge in the cgraph.  */
   void remove (void);
-
-  /* Remove the edge from the list of the callers of the callee.  */
-  void remove_caller (void);
-
-  /* Remove the edge from the list of the callees of the caller.  */
-  void remove_callee (void);
 
   /* Change field call_stmt of edge to NEW_STMT.
      If UPDATE_SPECULATIVE and E is any component of speculative
@@ -1324,26 +1321,26 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
   /* Turn edge into speculative call calling N2. Update
      the profile so the direct call is taken COUNT times
      with FREQUENCY.  */
-  cgraph_edge *turn_to_speculative (cgraph_node *n2, gcov_type direct_count,
-				    int direct_frequency);
-
-  /* If necessary, change the function declaration in the call statement
-     associated with the edge so that it corresponds to the edge callee.  */
-  gimple redirect_call_stmt_to_callee (void);
+  cgraph_edge *make_speculative (cgraph_node *n2, gcov_type direct_count,
+				 int direct_frequency);
 
    /* Given speculative call edge, return all three components.  */
   void speculative_call_info (cgraph_edge *&direct, cgraph_edge *&indirect,
 			      ipa_ref *&reference);
 
-  /* Create clone of edge in the node N represented
-     by CALL_EXPR the callgraph.  */
-  cgraph_edge * clone (cgraph_node *n, gimple call_stmt, unsigned stmt_uid,
-		       gcov_type count_scale, int freq_scale, bool update_original);
-
   /* Speculative call edge turned out to be direct call to CALLE_DECL.
      Remove the speculative call sequence and return edge representing the call.
      It is up to caller to redirect the call as appropriate. */
   cgraph_edge *resolve_speculation (tree callee_decl = NULL);
+
+  /* If necessary, change the function declaration in the call statement
+     associated with the edge so that it corresponds to the edge callee.  */
+  gimple redirect_call_stmt_to_callee (void);
+
+  /* Create clone of edge in the node N represented
+     by CALL_EXPR the callgraph.  */
+  cgraph_edge * clone (cgraph_node *n, gimple call_stmt, unsigned stmt_uid,
+		       gcov_type count_scale, int freq_scale, bool update_original);
 
   /* Return true when call of edge can not lead to return from caller
      and thus it is safe to ignore its side effects for IPA analysis
@@ -1355,6 +1352,14 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
 
   /* Return true if the call can be hot.  */
   bool maybe_hot_p (void);
+
+  /* Rebuild cgraph edges for current function node.  This needs to be run after
+     passes that don't update the cgraph.  */
+  static unsigned int rebuild_edges (void);
+
+  /* Rebuild cgraph references for current function node.  This needs to be run
+     after passes that don't update the cgraph.  */
+  static void rebuild_references (void);
 
   /* Expected number of executions: calculated in profile.c.  */
   gcov_type count;
@@ -1409,6 +1414,13 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"))) cgrap
      Optimizers may later redirect direct call to clone, so 1) and 3)
      do not need to necesarily agree with destination.  */
   unsigned int speculative : 1;
+
+private:
+  /* Remove the edge from the list of the callers of the callee.  */
+  void remove_caller (void);
+
+  /* Remove the edge from the list of the callees of the caller.  */
+  void remove_callee (void);
 };
 
 #define CGRAPH_FREQ_BASE 1000
@@ -1590,22 +1602,22 @@ struct varpool_node_hook_list;
 struct cgraph_2edge_hook_list;
 struct cgraph_2node_hook_list;
 
-enum cgraph_state
+enum symtab_state
 {
   /* Frontend is parsing and finalizing functions.  */
-  CGRAPH_STATE_PARSING,
+  PARSING,
   /* Callgraph is being constructed.  It is safe to add new functions.  */
-  CGRAPH_STATE_CONSTRUCTION,
+  CONSTRUCTION,
   /* Callgraph is being at LTO time.  */
-  CGRAPH_LTO_STREAMING,
+  LTO_STREAMING,
   /* Callgraph is built and IPA passes are being run.  */
-  CGRAPH_STATE_IPA,
+  IPA,
   /* Callgraph is built and all functions are transformed to SSA form.  */
-  CGRAPH_STATE_IPA_SSA,
+  IPA_SSA,
   /* Functions are now ordered and being passed to RTL expanders.  */
-  CGRAPH_STATE_EXPANSION,
+  EXPANSION,
   /* All cgraph expansion is done.  */
-  CGRAPH_STATE_FINISHED
+  FINISHED
 };
 
 /* Map from a symbol to initialization/finalization priorities.  */
@@ -1618,6 +1630,10 @@ struct GTY(()) symbol_priority_map {
 class GTY((tag ("SYMTAB"))) symbol_table
 {
 public:
+  friend class symtab_node;
+  friend class cgraph_node;
+  friend class cgraph_edge;
+
   /* Initialize callgraph dump file.  */
   inline void
   initialize (void)
@@ -1626,11 +1642,36 @@ public:
       dump_file = dump_begin (TDI_cgraph, NULL);
   }
 
-  /* Register a symbol NODE.  */
-  inline void register_symbol (symtab_node *node);
-
   /* Register a top-level asm statement ASM_STR.  */
   inline asm_node *finalize_toplevel_asm (tree asm_str);
+
+  /* Analyze the whole compilation unit once it is parsed completely.  */
+  void finalize_compilation_unit (void);
+
+  /* Process CGRAPH_NEW_FUNCTIONS and perform actions necessary to add these
+     functions into callgraph in a way so they look like ordinary reachable
+     functions inserted into callgraph already at construction time.  */
+  void process_new_functions (void);
+
+  /* C++ frontend produce same body aliases all over the place, even before PCH
+     gets streamed out. It relies on us linking the aliases with their function
+     in order to do the fixups, but ipa-ref is not PCH safe.  Consequentely we
+     first produce aliases without links, but once C++ FE is sure he won't sream
+     PCH we build the links via this function.  */
+  void process_same_body_aliases (void);
+
+  /* Once all functions from compilation unit are in memory, produce all clones
+     and update all calls.  We might also do this on demand if we don't want to
+     bring all functions to memory prior compilation, but current WHOPR
+     implementation does that and it is is bit easier to keep everything right
+     in this order.  */
+  void materialize_all_clones (void);
+
+  /* Perform simple optimizations based on callgraph.  */
+  void compile (void);
+
+  /* Register a symbol NODE.  */
+  inline void register_symbol (symtab_node *node);
 
   inline void
   clear_asm_symbols (void)
@@ -1648,17 +1689,15 @@ public:
      or was referred from the asm output routines.  */
   void remove_unreferenced_decls (void);
 
-  /* Process CGRAPH_NEW_FUNCTIONS and perform actions necessary to add these
-     functions into callgraph in a way so they look like ordinary reachable
-     functions inserted into callgraph already at construction time.  */
-  void process_new_functions (void);
+  /* Unregister a symbol NODE.  */
+  inline void unregister (symtab_node *node);
 
-  /* C++ frontend produce same body aliases all over the place, even before PCH
-     gets streamed out. It relies on us linking the aliases with their function
-     in order to do the fixups, but ipa-ref is not PCH safe.  Consequentely we
-     first produce aliases without links, but once C++ FE is sure he won't sream
-     PCH we build the links via this function.  */
-  void process_same_body_aliases (void);
+  /* Allocate new callgraph node and insert it into basic data structures.  */
+  cgraph_node *create_empty (void);
+
+  /* Release a callgraph NODE with UID and put in to the list
+     of free nodes.  */
+  void release_symbol (cgraph_node *node, int uid);
 
   /* Output all variables enqueued to be assembled.  */
   bool output_variables (void);
@@ -1666,30 +1705,14 @@ public:
   /* Output all asm statements we have stored up to be output.  */
   void output_asm_statements (void);
 
-  /* Analyze the whole compilation unit once it is parsed completely.  */
-  void finalize_compilation_unit (void);
-
-  /* Perform simple optimizations based on callgraph.  */
-  void compile (void);
-
   /* Weakrefs may be associated to external decls and thus not output
      at expansion time.  Emit all necessary aliases.  */
   void output_weakrefs (void);
 
-  /* Unregister a symbol NODE.  */
-  inline void unregister (symtab_node *node);
-
-  /* Allocate new callgraph node and insert it into basic data structures.  */
-  cgraph_node *create_empty (void);
-
-  void release_symbol (cgraph_node *node, int uid);
-
-  /* Allocate new callgraph node.  */
-  inline cgraph_node * allocate_cgraph_symbol (void);
-
   /* Return first static symbol with definition.  */
   inline symtab_node *first_symbol (void);
 
+  /* Return first assembler symbol.  */
   inline asm_node *
   first_asm_symbol (void)
   {
@@ -1732,41 +1755,56 @@ public:
   /* Return first function with body defined.  */
   cgraph_node *first_function_with_gimple_body (void);
 
-  /* Allocate a cgraph_edge structure and fill it with data according to the
-     parameters of which only CALLEE can be NULL (when creating an indirect call
-     edge).  */
-  cgraph_edge *create_edge (cgraph_node *caller, cgraph_node *callee,
-			    gimple call_stmt, gcov_type count, int freq,
-			    bool indir_unknown_callee);
-
-  /* Put the edge onto the free list.  */
-  void free_edge (cgraph_edge *e);
-
   /* Return next reachable static variable with initializer after NODE.  */
   inline cgraph_node *next_function_with_gimple_body (cgraph_node *node);
 
-  cgraph_edge_hook_list *add_edge_removal_hook (cgraph_edge_hook, void *);
-  void remove_edge_removal_hook (cgraph_edge_hook_list *);
+  /* Register HOOK to be called with DATA on each removed edge.  */
+  cgraph_edge_hook_list *add_edge_removal_hook (cgraph_edge_hook hook,
+						void *data);
 
-  cgraph_node_hook_list *add_cgraph_removal_hook (cgraph_node_hook, void *);
-  void remove_cgraph_removal_hook (cgraph_node_hook_list *);
+  /* Remove ENTRY from the list of hooks called on removing edges.  */
+  void remove_edge_removal_hook (cgraph_edge_hook_list *entry);
 
-  varpool_node_hook_list *add_varpool_removal_hook (varpool_node_hook,
-								void *);
-  void remove_varpool_removal_hook (varpool_node_hook_list *);
-  cgraph_node_hook_list *add_cgraph_insertion_hook (cgraph_node_hook,
-						       void *);
+  /* Register HOOK to be called with DATA on each removed node.  */
+  cgraph_node_hook_list *add_cgraph_removal_hook (cgraph_node_hook hook,
+						  void *data);
 
-  void remove_cgraph_insertion_hook (cgraph_node_hook_list *);
-  varpool_node_hook_list *add_varpool_insertion_hook (varpool_node_hook,
-								      void *);
-  void remove_varpool_insertion_hook (varpool_node_hook_list *);
-  cgraph_2edge_hook_list *add_edge_duplication_hook (cgraph_2edge_hook, void *);
-  void remove_edge_duplication_hook (cgraph_2edge_hook_list *);
+  /* Remove ENTRY from the list of hooks called on removing nodes.  */
+  void remove_cgraph_removal_hook (cgraph_node_hook_list *entry);
 
-  cgraph_2node_hook_list *add_cgraph_duplication_hook (cgraph_2node_hook,
-						       void *);
-  void remove_cgraph_duplication_hook (cgraph_2node_hook_list *);
+  /* Register HOOK to be called with DATA on each removed node.  */
+  varpool_node_hook_list *add_varpool_removal_hook (varpool_node_hook hook,
+						    void *data);
+
+  /* Remove ENTRY from the list of hooks called on removing nodes.  */
+  void remove_varpool_removal_hook (varpool_node_hook_list *entry);
+
+  /* Register HOOK to be called with DATA on each inserted node.  */
+  cgraph_node_hook_list *add_cgraph_insertion_hook (cgraph_node_hook hook,
+						    void *data);
+
+  /* Remove ENTRY from the list of hooks called on inserted nodes.  */
+  void remove_cgraph_insertion_hook (cgraph_node_hook_list *entry);
+
+  /* Register HOOK to be called with DATA on each inserted node.  */
+  varpool_node_hook_list *add_varpool_insertion_hook (varpool_node_hook hook,
+						      void *data);
+
+  /* Remove ENTRY from the list of hooks called on inserted nodes.  */
+  void remove_varpool_insertion_hook (varpool_node_hook_list *entry);
+
+  /* Register HOOK to be called with DATA on each duplicated edge.  */
+  cgraph_2edge_hook_list *add_edge_duplication_hook (cgraph_2edge_hook hook,
+						     void *data);
+  /* Remove ENTRY from the list of hooks called on duplicating edges.  */
+  void remove_edge_duplication_hook (cgraph_2edge_hook_list *entry);
+
+  /* Register HOOK to be called with DATA on each duplicated node.  */
+  cgraph_2node_hook_list *add_cgraph_duplication_hook (cgraph_2node_hook hook,
+						       void *data);
+
+  /* Remove ENTRY from the list of hooks called on duplicating nodes.  */
+  void remove_cgraph_duplication_hook (cgraph_2node_hook_list *entry);
 
   /* Call all edge removal hooks.  */
   void call_edge_removal_hooks (cgraph_edge *e);
@@ -1789,12 +1827,6 @@ public:
   /* Call all node insertion hooks.  */
   void call_varpool_insertion_hooks (varpool_node *node);
 
-  /* Insert NODE to assembler name hash.  */
-  void insert_to_assembler_name_hash (symtab_node *node, bool with_clones);
-
-  /* Remove NODE from assembler name hash.  */
-  void unlink_from_assembler_name_hash (symtab_node *node, bool with_clones);
-
   /* Arrange node to be first in its entry of assembler_name_hash.  */
   void symtab_prevail_in_asm_name_hash (symtab_node *node);
 
@@ -1803,33 +1835,6 @@ public:
 
   /* Set the DECL_ASSEMBLER_NAME and update symtab hashtables.  */
   void change_decl_assembler_name (tree decl, tree name);
-
-  /* Rebuild cgraph edges for current function node.  This needs to be run after
-     passes that don't update the cgraph.  */
-  unsigned int rebuild_edges (void);
-
-  /* Rebuild cgraph references for current function node.  This needs to be run
-     after passes that don't update the cgraph.  */
-  void rebuild_references (void);
-
-  /* Once all functions from compilation unit are in memory, produce all clones
-     and update all calls.  We might also do this on demand if we don't want to
-     bring all functions to memory prior compilation, but current WHOPR
-     implementation does that and it is is bit easier to keep everything right
-     in this order.  */
-  void materialize_all_clones (void);
-
-  /* Hash asmnames ignoring the user specified marks.  */
-  static hashval_t decl_assembler_name_hash (const_tree asmname);
-
-  /* Compare ASMNAME with the DECL_ASSEMBLER_NAME of DECL.  */
-  static bool decl_assembler_name_equal (tree decl, const_tree asmname);
-
-  /* Returns a hash code for P.  */
-  static hashval_t hash_node_by_assembler_name (const void *p);
-
-  /* Returns nonzero if P1 and P2 are equal.  */
-  static int eq_assembler_name (const void *p1, const void *p2);
 
   int cgraph_count;
   int cgraph_max_uid;
@@ -1854,7 +1859,7 @@ public:
   /* Set when whole unit has been analyzed so we can access global info.  */
   bool global_info_ready;
   /* What state callgraph is in right now.  */
-  enum cgraph_state state;
+  enum symtab_state state;
   /* Set when the cgraph is fully build and the basic flags are computed.  */
   bool function_flags_ready;
 
@@ -1872,6 +1877,37 @@ public:
   FILE* GTY ((skip)) dump_file;
 
 private:
+  /* Allocate new callgraph node.  */
+  inline cgraph_node * allocate_cgraph_symbol (void);
+
+  /* Allocate a cgraph_edge structure and fill it with data according to the
+     parameters of which only CALLEE can be NULL (when creating an indirect call
+     edge).  */
+  cgraph_edge *create_edge (cgraph_node *caller, cgraph_node *callee,
+			    gimple call_stmt, gcov_type count, int freq,
+			    bool indir_unknown_callee);
+
+  /* Put the edge onto the free list.  */
+  void free_edge (cgraph_edge *e);
+
+  /* Insert NODE to assembler name hash.  */
+  void insert_to_assembler_name_hash (symtab_node *node, bool with_clones);
+
+  /* Remove NODE from assembler name hash.  */
+  void unlink_from_assembler_name_hash (symtab_node *node, bool with_clones);
+
+  /* Hash asmnames ignoring the user specified marks.  */
+  static hashval_t decl_assembler_name_hash (const_tree asmname);
+
+  /* Compare ASMNAME with the DECL_ASSEMBLER_NAME of DECL.  */
+  static bool decl_assembler_name_equal (tree decl, const_tree asmname);
+
+  /* Returns a hash code for P.  */
+  static hashval_t hash_node_by_assembler_name (const void *p);
+
+  /* Returns nonzero if P1 and P2 are equal.  */
+  static int eq_assembler_name (const void *p1, const void *p2);
+
   /* List of hooks triggered when an edge is removed.  */
   cgraph_edge_hook_list * GTY((skip)) m_first_edge_removal_hook;
   /* List of hooks triggem_red when a cgraph node is removed.  */
@@ -2074,6 +2110,8 @@ symbol_table::create_empty (void)
 
   return node;
 }
+
+/* Release a callgraph NODE with UID and put in to the list of free nodes.  */
 
 inline void
 symbol_table::release_symbol (cgraph_node *node, int uid)

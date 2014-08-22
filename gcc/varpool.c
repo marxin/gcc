@@ -166,7 +166,7 @@ varpool_node::remove (void)
   unregister ();
 
   /* When streaming we can have multiple nodes associated with decl.  */
-  if (symtab->state == CGRAPH_LTO_STREAMING)
+  if (symtab->state == LTO_STREAMING)
     ;
   /* Keep constructor when it may be used for folding. We remove
      references to external variables before final compilation.  */
@@ -190,7 +190,7 @@ varpool_node::remove_initializer (void)
 	 entries for given decl.  Do not attempt to remove
 	 the boides, or we will end up remiving
 	 wrong one.  */
-      && symtab->state != CGRAPH_LTO_STREAMING)
+      && symtab->state != LTO_STREAMING)
     DECL_INITIAL (decl) = error_mark_node;
 }
 

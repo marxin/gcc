@@ -415,7 +415,7 @@ record_references_in_initializer (tree decl, bool only_vars)
    passes that don't update the cgraph.  */
 
 unsigned int
-symbol_table::rebuild_edges (void)
+cgraph_edge::rebuild_edges (void)
 {
   basic_block bb;
   cgraph_node *node = cgraph_node::get (current_function_decl);
@@ -463,7 +463,7 @@ symbol_table::rebuild_edges (void)
    after passes that don't update the cgraph.  */
 
 void
-symbol_table::rebuild_references (void)
+cgraph_edge::rebuild_references (void)
 {
   basic_block bb;
   cgraph_node *node = cgraph_node::get (current_function_decl);
@@ -514,7 +514,7 @@ public:
 
   /* opt_pass methods: */
   opt_pass * clone () { return new pass_rebuild_cgraph_edges (m_ctxt); }
-  virtual unsigned int execute (function *) { return symtab->rebuild_edges (); }
+  virtual unsigned int execute (function *) { return cgraph_edge::rebuild_edges (); }
 
 }; // class pass_rebuild_cgraph_edges
 

@@ -302,7 +302,7 @@ symbol_table::process_new_functions (void)
       fndecl = node->decl;
       switch (state)
 	{
-	case CGRAPH_STATE_CONSTRUCTION:
+	case CONSTRUCTION:
 	  /* At construction time we just need to finalize function and move
 	     it into reachable functions list.  */
 
@@ -311,8 +311,8 @@ symbol_table::process_new_functions (void)
 	  enqueue_node (node);
 	  break;
 
-	case CGRAPH_STATE_IPA:
-	case CGRAPH_STATE_IPA_SSA:
+	case IPA:
+	case IPA_SSA:
 	  /* When IPA optimization already started, do all essential
 	     transformations that has been already performed on the whole
 	     cgraph but not on this function.  */
@@ -321,7 +321,7 @@ symbol_table::process_new_functions (void)
 	  if (!node->analyzed)
 	    node->analyze ();
 	  push_cfun (DECL_STRUCT_FUNCTION (fndecl));
-	  if (state == CGRAPH_STATE_IPA_SSA
+	  if (state == IPA_SSA
 	      && !gimple_in_ssa_p (DECL_STRUCT_FUNCTION (fndecl)))
 	    g->get_passes ()->execute_early_local_passes ();
 	  else if (inline_summary_vec != NULL)
@@ -331,7 +331,7 @@ symbol_table::process_new_functions (void)
 	  pop_cfun ();
 	  break;
 
-	case CGRAPH_STATE_EXPANSION:
+	case EXPANSION:
 	  /* Functions created during expansion shall be compiled
 	     directly.  */
 	  node->process = 0;
@@ -455,7 +455,7 @@ cgraph_node::finalize_function (tree decl, bool no_collect)
   if (!no_collect)
     ggc_collect ();
 
-  if (symtab->state == CGRAPH_STATE_CONSTRUCTION
+  if (symtab->state == CONSTRUCTION
       && (node->needed_p () || node->referred_to_p ()))
     enqueue_node (node);
 }
@@ -479,10 +479,10 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
   cgraph_node *node;
   switch (symtab->state)
     {
-      case CGRAPH_STATE_PARSING:
+      case PARSING:
 	cgraph_node::finalize_function (fndecl, false);
 	break;
-      case CGRAPH_STATE_CONSTRUCTION:
+      case CONSTRUCTION:
 	/* Just enqueue function to be processed at nearest occurrence.  */
 	node = cgraph_node::get_create (fndecl);
 	if (lowered)
@@ -490,16 +490,16 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 	cgraph_new_nodes.safe_push (node);
         break;
 
-      case CGRAPH_STATE_IPA:
-      case CGRAPH_STATE_IPA_SSA:
-      case CGRAPH_STATE_EXPANSION:
+      case IPA:
+      case IPA_SSA:
+      case EXPANSION:
 	/* Bring the function into finalized state and enqueue for later
 	   analyzing and compilation.  */
 	node = cgraph_node::get_create (fndecl);
 	node->local.local = false;
 	node->definition = true;
 	node->force_output = true;
-	if (!lowered && symtab->state == CGRAPH_STATE_EXPANSION)
+	if (!lowered && symtab->state == EXPANSION)
 	  {
 	    push_cfun (DECL_STRUCT_FUNCTION (fndecl));
 	    gimple_register_cfg_hooks ();
@@ -516,7 +516,7 @@ cgraph_node::add_new_function (tree fndecl, bool lowered)
 	cgraph_new_nodes.safe_push (node);
         break;
 
-      case CGRAPH_STATE_FINISHED:
+      case FINISHED:
 	/* At the very end of compilation we have to do all the work up
 	   to expansion.  */
 	node = cgraph_node::create (fndecl);
@@ -790,16 +790,16 @@ varpool_node::finalize_decl (tree decl)
 	  && !DECL_ARTIFICIAL (node->decl)))
     node->force_output = true;
 
-  if (symtab->state == CGRAPH_STATE_CONSTRUCTION
+  if (symtab->state == CONSTRUCTION
       && (node->needed_p () || node->referred_to_p ()))
     enqueue_node (node);
-  if (symtab->state >= CGRAPH_STATE_IPA_SSA)
+  if (symtab->state >= IPA_SSA)
     node->analyze ();
   /* Some frontends produce various interface variables after compilation
      finished.  */
-  if (symtab->state == CGRAPH_STATE_FINISHED
+  if (symtab->state == FINISHED
       || (!flag_toplevel_reorder
-	&& symtab->state == CGRAPH_STATE_EXPANSION))
+	&& symtab->state == EXPANSION))
     node->assemble_decl ();
 }
 
@@ -909,7 +909,7 @@ analyze_functions (void)
   location_t saved_loc = input_location;
 
   bitmap_obstack_initialize (NULL);
-  symtab->state = CGRAPH_STATE_CONSTRUCTION;
+  symtab->state = CONSTRUCTION;
   input_location = UNKNOWN_LOCATION;
 
   /* Ugly, but the fixup can not happen at a time same body alias is created;
@@ -2023,8 +2023,8 @@ ipa_passes (void)
 
   /* If pass_all_early_optimizations was not scheduled, the state of
      the cgraph will not be properly updated.  Update it now.  */
-  if (symtab->state < CGRAPH_STATE_IPA_SSA)
-    symtab->state = CGRAPH_STATE_IPA_SSA;
+  if (symtab->state < IPA_SSA)
+    symtab->state = IPA_SSA;
 
   if (!in_lto_p)
     {
@@ -2123,7 +2123,7 @@ symbol_table::compile (void)
     }
   if (!quiet_flag)
     fprintf (stderr, "Performing interprocedural optimizations\n");
-  symtab->state = CGRAPH_STATE_IPA;
+  symtab->state = IPA;
 
   /* If LTO is enabled, initialize the streamer hooks needed by GIMPLE.  */
   if (flag_lto)
@@ -2198,7 +2198,7 @@ symbol_table::compile (void)
       }
 #endif
 
-  symtab->state = CGRAPH_STATE_EXPANSION;
+  symtab->state = EXPANSION;
 
   if (!flag_toplevel_reorder)
     output_in_order ();
@@ -2211,7 +2211,7 @@ symbol_table::compile (void)
     }
 
   symtab->process_new_functions ();
-  symtab->state = CGRAPH_STATE_FINISHED;
+  symtab->state = FINISHED;
   symtab->output_weakrefs ();
 
   if (symtab->dump_file)
