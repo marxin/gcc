@@ -399,7 +399,7 @@ extern unsigned int free_bb_for_insn (void);
 extern void update_bb_for_insn (basic_block);
 
 extern void insert_insn_on_edge (rtx, edge);
-basic_block split_edge_and_insert (edge, rtx);
+basic_block split_edge_and_insert (edge, rtx_insn *);
 
 extern void commit_one_edge_insertion (edge e);
 extern void commit_edge_insertions (void);
@@ -821,10 +821,10 @@ enum replace_direction { dir_none, dir_forward, dir_backward, dir_both };
 
 /* In cfgcleanup.c.  */
 extern bool cleanup_cfg (int);
-extern int flow_find_cross_jump (basic_block, basic_block, rtx *, rtx *,
-                                 enum replace_direction*);
+extern int flow_find_cross_jump (basic_block, basic_block, rtx_insn **,
+				 rtx_insn **, enum replace_direction*);
 extern int flow_find_head_matching_sequence (basic_block, basic_block,
-					     rtx *, rtx *, int);
+					     rtx_insn **, rtx_insn **, int);
 
 extern bool delete_unreachable_blocks (void);
 

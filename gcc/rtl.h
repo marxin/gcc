@@ -3056,8 +3056,8 @@ extern unsigned int reg_or_subregno (const_rtx);
 extern int redirect_jump_1 (rtx, rtx);
 extern void redirect_jump_2 (rtx, rtx, rtx, int, int);
 extern int redirect_jump (rtx, rtx, int);
-extern void rebuild_jump_labels (rtx);
-extern void rebuild_jump_labels_chain (rtx);
+extern void rebuild_jump_labels (rtx_insn *);
+extern void rebuild_jump_labels_chain (rtx_insn *);
 extern rtx reversed_comparison (const_rtx, enum machine_mode);
 extern enum rtx_code reversed_comparison_code (const_rtx, const_rtx);
 extern enum rtx_code reversed_comparison_code_parts (enum rtx_code, const_rtx,
@@ -3132,9 +3132,9 @@ extern const char *print_rtx_head;
 extern void debug (const rtx_def &ref);
 extern void debug (const rtx_def *ptr);
 extern void debug_rtx (const_rtx);
-extern void debug_rtx_list (const_rtx, int);
-extern void debug_rtx_range (const_rtx, const_rtx);
-extern const_rtx debug_rtx_find (const_rtx, int);
+extern void debug_rtx_list (const rtx_insn *, int);
+extern void debug_rtx_range (const rtx_insn *, const rtx_insn *);
+extern const_rtx debug_rtx_find (const rtx_insn *, int);
 extern void print_mem_expr (FILE *, const_tree);
 extern void print_rtl (FILE *, const_rtx);
 extern void print_simple_rtl (FILE *, const_rtx);
@@ -3188,7 +3188,7 @@ extern void init_lower_subreg (void);
 /* In gcse.c */
 extern bool can_copy_p (enum machine_mode);
 extern bool can_assign_to_reg_without_clobbers_p (rtx);
-extern rtx fis_get_condition (rtx);
+extern rtx fis_get_condition (rtx_insn *);
 
 /* In ira.c */
 #ifdef HARD_CONST
@@ -3207,7 +3207,7 @@ extern void init_fake_stack_mems (void);
 extern void save_register_info (void);
 extern void init_reg_sets (void);
 extern void regclass (rtx, int);
-extern void reg_scan (rtx, unsigned int);
+extern void reg_scan (rtx_insn *, unsigned int);
 extern void fix_register (const char *, int, int);
 extern bool invalid_mode_change_p (unsigned int, enum reg_class);
 

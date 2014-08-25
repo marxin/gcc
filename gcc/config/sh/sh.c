@@ -886,6 +886,12 @@ sh_option_override (void)
        targetm.asm_out.aligned_op.di = NULL;
        targetm.asm_out.unaligned_op.di = NULL;
     }
+
+  /* User/priviledged mode is supported only on SH3*, SH4* and SH5*.
+     Disable it for everything else.  */
+  if (! (TARGET_SH3 || TARGET_SH5) && TARGET_USERMODE)
+    TARGET_USERMODE = false;
+
   if (TARGET_SH1)
     {
       if (! strcmp (sh_div_str, "call-div1"))
@@ -11094,7 +11100,7 @@ find_insn_regmode_weight (rtx insn, enum machine_mode mode)
 static void
 find_regmode_weight (basic_block b, enum machine_mode mode)
 {
-  rtx insn, next_tail, head, tail;
+  rtx_insn *insn, *next_tail, *head, *tail;
 
   get_ebb_head_tail (b, b, &head, &tail);
   next_tail = NEXT_INSN (tail);
