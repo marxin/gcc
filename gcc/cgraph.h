@@ -1655,6 +1655,9 @@ public:
      PCH we build the links via this function.  */
   void process_same_body_aliases (void);
 
+  /* Perform simple optimizations based on callgraph.  */
+  void compile (void);
+
   /* Process CGRAPH_NEW_FUNCTIONS and perform actions necessary to add these
      functions into callgraph in a way so they look like ordinary reachable
      functions inserted into callgraph already at construction time.  */
@@ -1666,9 +1669,6 @@ public:
      implementation does that and it is is bit easier to keep everything right
      in this order.  */
   void materialize_all_clones (void);
-
-  /* Perform simple optimizations based on callgraph.  */
-  void compile (void);
 
   /* Register a symbol NODE.  */
   inline void register_symbol (symtab_node *node);
