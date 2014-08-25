@@ -632,9 +632,9 @@ symbol_table::remove_unreferenced_decls (void)
     }
   if (dump_file)
     fprintf (dump_file, "\nRemoving variables:");
-  for (node = symtab->first_defined_variable (); node; node = next)
+  for (node = first_defined_variable (); node; node = next)
     {
-      next = symtab->next_defined_variable (node);
+      next = next_defined_variable (node);
       if (!node->aux)
 	{
 	  if (dump_file)
@@ -677,7 +677,7 @@ symbol_table::output_variables (void)
   if (seen_error ())
     return false;
 
-  symtab->remove_unreferenced_decls ();
+  remove_unreferenced_decls ();
 
   timevar_push (TV_VAROUT);
 

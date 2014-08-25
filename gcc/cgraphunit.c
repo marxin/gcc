@@ -2123,7 +2123,7 @@ symbol_table::compile (void)
     }
   if (!quiet_flag)
     fprintf (stderr, "Performing interprocedural optimizations\n");
-  symtab->state = IPA;
+  state = IPA;
 
   /* If LTO is enabled, initialize the streamer hooks needed by GIMPLE.  */
   if (flag_lto)
@@ -2144,12 +2144,12 @@ symbol_table::compile (void)
   /* This pass remove bodies of extern inline functions we never inlined.
      Do this later so other IPA passes see what is really going on.
      FIXME: This should be run just after inlining by pasmanager.  */
-  symtab->remove_unreachable_nodes (false, dump_file);
-  symtab->global_info_ready = true;
-  if (symtab->dump_file)
+  remove_unreachable_nodes (false, dump_file);
+  global_info_ready = true;
+  if (dump_file)
     {
-      fprintf (symtab->dump_file, "Optimized ");
-      symtab_node:: dump_table (symtab->dump_file);
+      fprintf (dump_file, "Optimized ");
+      symtab_node:: dump_table (dump_file);
     }
   if (post_ipa_mem_report)
     {
@@ -2166,7 +2166,7 @@ symbol_table::compile (void)
   symtab_node::verify_symtab_nodes ();
 #endif
 
-  symtab->materialize_all_clones ();
+  materialize_all_clones ();
   bitmap_obstack_initialize (NULL);
   execute_ipa_pass_list (g->get_passes ()->all_late_ipa_passes);
   bitmap_obstack_release (NULL);
@@ -2198,26 +2198,26 @@ symbol_table::compile (void)
       }
 #endif
 
-  symtab->state = EXPANSION;
+  state = EXPANSION;
 
   if (!flag_toplevel_reorder)
     output_in_order ();
   else
     {
-      symtab->output_asm_statements ();
+      output_asm_statements ();
 
       expand_all_functions ();
-      symtab->output_variables ();
+      output_variables ();
     }
 
-  symtab->process_new_functions ();
-  symtab->state = FINISHED;
-  symtab->output_weakrefs ();
+  process_new_functions ();
+  state = FINISHED;
+  output_weakrefs ();
 
-  if (symtab->dump_file)
+  if (dump_file)
     {
-      fprintf (symtab->dump_file, "\nFinal ");
-      symtab_node::dump_table (symtab->dump_file);
+      fprintf (dump_file, "\nFinal ");
+      symtab_node::dump_table (dump_file);
     }
 #ifdef ENABLE_CHECKING
   symtab_node::verify_symtab_nodes ();
