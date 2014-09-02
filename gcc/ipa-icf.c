@@ -729,7 +729,7 @@ sem_function::merge (sem_item *alias_item)
     {
       /* Remove the function's body.  */
       ipa_merge_profiles (original, alias);
-      alias->release_body ();
+      alias->release_body (true);
       alias->reset ();
 
       /* Create the alias.  */
