@@ -226,6 +226,9 @@ namespace __gnu_pbds
 #endif
 
       void
+      dump_subtree(node_pointer, int);
+
+      void
       splay(node_pointer);
 
       inline void

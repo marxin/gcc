@@ -38,6 +38,27 @@
  * Contains an implementation class for splay_tree_.
  */
 
+#include <stdio.h>
+
+PB_DS_CLASS_T_DEC
+void
+PB_DS_CLASS_C_DEC::
+dump_subtree(node_pointer p_nd, int indentation)
+{
+  fprintf (stderr, "%*snode: %p\n", indentation, "", p_nd);
+  fprintf (stderr, "%*sL: %p\n", indentation, "", p_nd->m_p_left);
+
+  if (p_nd->m_p_left)
+    dump_subtree (p_nd->m_p_left, indentation + 1);
+  fprintf (stderr, "%*sR: %p\n", indentation, "", p_nd->m_p_right);
+  
+  if (p_nd->m_p_right)
+    dump_subtree (p_nd->m_p_right, indentation + 1);
+
+  if (indentation == 0)
+    fprintf(stderr, "\n");
+}
+
 PB_DS_CLASS_T_DEC
 void
 PB_DS_CLASS_C_DEC::
@@ -52,11 +73,13 @@ splay(node_pointer p_nd)
       }
 #endif
 
+      dump_subtree (p_nd, 0);
       PB_DS_ASSERT_BASE_NODE_CONSISTENT(p_nd)
 
       if (p_nd->m_p_parent->m_p_parent == base_type::m_p_head)
 	{
 	  base_type::rotate_parent(p_nd);
+
 	  _GLIBCXX_DEBUG_ASSERT(p_nd == this->m_p_head->m_p_parent);
 	}
       else
