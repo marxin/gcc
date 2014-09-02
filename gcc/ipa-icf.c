@@ -705,11 +705,11 @@ sem_function::merge (sem_item *alias_item)
       while (alias->callers)
 	{
 	  cgraph_edge *e = alias->callers;
-	  cgraph_redirect_edge_callee (e, local_original);
+	  e->redirect_callee (local_original);
 	  push_cfun (DECL_STRUCT_FUNCTION (e->caller->decl));
 
 	  if (e->call_stmt)
-	    cgraph_redirect_edge_call_stmt_to_callee (e);
+	    e->redirect_call_stmt_to_callee ();
 
 	  pop_cfun ();
 	  redirected = true;
@@ -1907,11 +1907,11 @@ sem_item_optimizer::read_summary (void)
 void
 sem_item_optimizer::register_hooks (void)
 {
-  m_cgraph_node_hooks = cgraph_add_node_removal_hook (
-			  &sem_item_optimizer::cgraph_removal_hook, this);
+  m_cgraph_node_hooks = symtab->add_cgraph_removal_hook
+    (&sem_item_optimizer::cgraph_removal_hook, this);
 
-  m_varpool_node_hooks = varpool_add_node_removal_hook (
-			   &sem_item_optimizer::varpool_removal_hook, this);
+  m_varpool_node_hooks = symtab->add_varpool_removal_hook
+    (&sem_item_optimizer::varpool_removal_hook, this);
 }
 
 /* Unregister callgraph and varpool hooks.  */
@@ -1920,10 +1920,10 @@ void
 sem_item_optimizer::unregister_hooks (void)
 {
   if (m_cgraph_node_hooks)
-    cgraph_remove_node_removal_hook (m_cgraph_node_hooks);
+    symtab->remove_cgraph_removal_hook (m_cgraph_node_hooks);
 
   if (m_varpool_node_hooks)
-    varpool_remove_node_removal_hook (m_varpool_node_hooks);
+    symtab->remove_varpool_removal_hook (m_varpool_node_hooks);
 }
 
 /* Adds a CLS to hashtable associated by hash value.  */
