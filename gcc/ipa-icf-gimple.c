@@ -170,7 +170,7 @@ sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
-  return compare_operand (t1, t2, func1, func2);
+  return compare_operand (t1, t2, func1, func2, false);
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
@@ -201,7 +201,7 @@ sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1,
       arg1 = gimple_op (s1, i);
       arg2 = gimple_op (s2, i);
 
-      if (!compare_operand (arg1, arg2, func1, func2))
+      if (!compare_operand (arg1, arg2, func1, func2, i != 0))
 	return false;
     }
 

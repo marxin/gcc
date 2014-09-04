@@ -117,7 +117,7 @@ public:
   ~func_checker();
 
   /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
-  bool compare_ssa_name (tree t1, tree t2);
+  bool compare_ssa_name (tree t1, tree t2, bool strict = true);
 
   /* Verification function for edges E1 and E2.  */
   bool compare_edge (edge e1, edge e2);
@@ -404,13 +404,18 @@ public:
   /* Array of structures for all basic blocks.  */
   vec <sem_bb *> bb_sorted;
 
+
+  /* Function checker stores binding between functions.   */
+  func_checker *m_checker;
+  /* Basic block equivalence comparison function that returns true if
+     basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
+  bool compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2);
+
+
 private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
   hashval_t get_bb_hash (const sem_bb *basic_block);
 
-  /* Basic block equivalence comparison function that returns true if
-     basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
-  bool compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2);
 
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
      true value is returned if phi nodes are semantically
@@ -473,11 +478,11 @@ private:
 
   /* Function compares two operands T1 and T2 and returns true if these
      two trees from FUNC1 (respectively FUNC2) are semantically equivalent.  */
-  bool compare_operand (tree t1, tree t2, tree func1, tree func2);
+  bool compare_operand (tree t1, tree t2, tree func1, tree func2, bool strict = true);
 
   /* If T1 and T2 are SSA names, dictionary comparison is processed. Otherwise,
      declaration comparasion is executed.  */
-  bool compare_ssa_name (tree t1, tree t2, tree func1, tree func2);
+  bool compare_ssa_name (tree t1, tree t2, tree func1, tree func2, bool strict = true);
 
   /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
      corresponds to TARGET.  */
@@ -499,9 +504,6 @@ private:
 
   /* Returns true if tree T can be compared as a handled component.  */
   static bool icf_handled_component_p (tree t);
-
-  /* Function checker stores binding between functions.   */
-  func_checker *m_checker;
 
   /* COMPARED_FUNC is a function that we compare to.  */
   sem_function *m_compared_func;

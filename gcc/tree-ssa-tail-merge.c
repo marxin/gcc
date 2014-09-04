@@ -218,6 +218,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "trans-mem.h"
 
+#include "cgraph.h"
+#include "ipa-icf.h"
+//#include "tree-ssanames.h"
+
+using namespace ipa_icf;
+
 /* Describes a group of bbs with the same successors.  The successor bbs are
    cached in succs, and the successor edge flags are cached in succ_flags.
    If a bb has the EDGE_TRUE/VALSE_VALUE flags swapped compared to succ_flags,
@@ -1217,7 +1223,11 @@ gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
 	{
 	  *vuse = lvuse;
 	  if (!ZERO_SSA_OPERANDS (stmt, SSA_OP_DEF))
+	  {
+//	    fprintf (stderr, "XXX_VUSE_SEEN\n");
+//	    debug_gimple_stmt (stmt);
 	    *vuse_escaped = true;
+	  }
 	}
 
       if (!stmt_local_def (stmt))
@@ -1226,16 +1236,39 @@ gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
     }
 }
 
+static sem_bb *create_sem_bb (basic_block &bb)
+{
+  unsigned nondbg_stmt_count = 0;
+
+  for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+    {
+      gimple stmt = gsi_stmt (gsi);
+
+      if (gimple_code (stmt) != GIMPLE_DEBUG)
+	  nondbg_stmt_count++;
+    }
+
+  return new sem_bb (bb, nondbg_stmt_count, 0);
+}
+
+static bool ddd = false;
+
 /* Determines whether BB1 and BB2 (members of same_succ) are duplicates.  If so,
    clusters them.  */
 
 static void
-find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2)
+find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_function &f, unsigned ssa_names_count)
 {
   gimple_stmt_iterator gsi1 = gsi_last_nondebug_bb (bb1);
   gimple_stmt_iterator gsi2 = gsi_last_nondebug_bb (bb2);
   tree vuse1 = NULL_TREE, vuse2 = NULL_TREE;
   bool vuse_escaped = false;
+
+  sem_bb *sem_bb1 = create_sem_bb (bb1);
+  sem_bb *sem_bb2 = create_sem_bb (bb2);
+
+  f.m_checker = new func_checker (ssa_names_count, ssa_names_count, true);
+  bool icf_result = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl);
 
   gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
   gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
@@ -1250,10 +1283,10 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2)
 	 same_succ_hash.  */
       if (is_tm_ending (stmt1)
 	  || is_tm_ending (stmt2))
-	return;
+	goto different;
 
       if (!gimple_equal_p (same_succ, stmt1, stmt2))
-	return;
+	goto different;
 
       gsi_prev_nondebug (&gsi1);
       gsi_prev_nondebug (&gsi2);
@@ -1262,7 +1295,36 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2)
     }
 
   if (!(gsi_end_p (gsi1) && gsi_end_p (gsi2)))
-    return;
+    goto different;
+
+
+  if (!icf_result)
+  {
+    if (ddd) {
+    fprintf (stderr, "XXX_DIFFERENT_ICF(%u)\n", sem_bb1->nondbg_stmt_count == sem_bb2->nondbg_stmt_count);
+     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
+    fprintf (stderr, "===BB1===\n");
+    dump_bb (stderr, bb1, 0, TDF_DETAILS);
+    fprintf (stderr, "===BB2===\n");
+    dump_bb (stderr, bb2, 0, TDF_DETAILS);
+    fprintf (stderr, "===END===\n"); }
+
+    if (sem_bb1->nondbg_stmt_count == sem_bb2->nondbg_stmt_count)
+    {
+      bool icf_result2 = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl);
+    }
+//    gcc_assert (icf_result);
+  }
+  else if (sem_bb1->nondbg_stmt_count > 0)
+  {
+    if (ddd) {
+    fprintf (stderr, "___EQUAL___(%u)\n", sem_bb1->nondbg_stmt_count);
+    fprintf (stderr, "===BB1===\n");
+    dump_bb (stderr, bb1, 0, TDF_DETAILS);
+    fprintf (stderr, "===BB2===\n");
+    dump_bb (stderr, bb2, 0, TDF_DETAILS);
+    fprintf (stderr, "===END===\n"); }
+  }
 
   /* If the incoming vuses are not the same, and the vuse escaped into an
      SSA_OP_DEF, then merging the 2 blocks will change the value of the def,
@@ -1276,6 +1338,28 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2)
 	     bb1->index, bb2->index);
 
   set_cluster (bb1, bb2);
+  return;
+
+  different:
+  if (icf_result)
+  {
+//    bool icf_result3 = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl);
+
+//    gcc_unreachable ();
+
+  if (vuse_escaped && vuse1 != vuse2)
+    return;
+
+if (ddd) {
+     fprintf (stderr, "XXX_ICF_HIT\n");
+     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
+     fprintf (stderr, "===BB1===\n");
+     dump_bb (stderr, bb1, 0, TDF_DETAILS);
+     fprintf (stderr, "===BB2===\n");
+     dump_bb (stderr, bb2, 0, TDF_DETAILS);
+     fprintf (stderr, "===END===\n"); }
+    set_cluster (bb1, bb2);
+  }
 }
 
 /* Returns whether for all phis in DEST the phi alternatives for E1 and
@@ -1397,7 +1481,7 @@ deps_ok_for_redirect (basic_block bb1, basic_block bb2)
 /* Within SAME_SUCC->bbs, find clusters of bbs which can be merged.  */
 
 static void
-find_clusters_1 (same_succ same_succ)
+find_clusters_1 (same_succ same_succ, sem_function &f, unsigned ssa_names_count)
 {
   basic_block bb1, bb2;
   unsigned int i, j;
@@ -1439,7 +1523,7 @@ find_clusters_1 (same_succ same_succ)
 	  if (!(same_phi_alternatives (same_succ, bb1, bb2)))
 	    continue;
 
-	  find_duplicate (same_succ, bb1, bb2);
+	  find_duplicate (same_succ, bb1, bb2, f, ssa_names_count);
         }
     }
 }
@@ -1447,7 +1531,7 @@ find_clusters_1 (same_succ same_succ)
 /* Find clusters of bbs which can be merged.  */
 
 static void
-find_clusters (void)
+find_clusters (sem_function &f, unsigned int ssa_names_count)
 {
   same_succ same;
 
@@ -1460,7 +1544,7 @@ find_clusters (void)
 	  fprintf (dump_file, "processing worklist entry\n");
 	  same_succ_print (dump_file, same);
 	}
-      find_clusters_1 (same);
+      find_clusters_1 (same, f, ssa_names_count);
     }
 }
 
@@ -1670,6 +1754,12 @@ tail_merge_optimize (unsigned int todo)
     }
   init_worklist ();
 
+  /* sem_function initialization */
+
+  bitmap_obstack b;
+  bitmap_obstack_initialize (&b);
+  cgraph_node *node = cgraph_node::get (cfun->decl);
+
   while (!worklist.is_empty ())
     {
       if (!loop_entered)
@@ -1685,7 +1775,10 @@ tail_merge_optimize (unsigned int todo)
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "worklist iteration #%d\n", iteration_nr);
 
-      find_clusters ();
+      sem_function f (node, 0, &b);
+      unsigned ssa_names_count = cfun->gimple_df->ssa_names->length ();
+
+      find_clusters (f, ssa_names_count);
       gcc_assert (worklist.is_empty ());
       if (all_clusters.is_empty ())
 	break;
@@ -1724,6 +1817,8 @@ tail_merge_optimize (unsigned int todo)
 
       mark_virtual_operands_for_renaming (cfun);
     }
+
+  bitmap_obstack_release (&b);
 
   delete_worklist ();
   if (loop_entered)

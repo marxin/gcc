@@ -65,6 +65,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-prop.h"
 #include "tree-ssa-propagate.h"
 #include "ipa-utils.h"
+#include "ipa-icf.h"
 
 /* TODO:
 
@@ -4855,6 +4856,7 @@ pass_pre::execute (function *fun)
      - call merge_blocks after all tail merge iterations
      - mark TODO_cleanup_cfg when necessary
      - share the cfg cleanup with fini_pre.  */
+//  dump_function_to_file (fun->decl, stderr, TDF_DETAILS);     
   todo |= tail_merge_optimize (todo);
 
   free_scc_vn ();

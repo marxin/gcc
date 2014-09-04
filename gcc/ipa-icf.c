@@ -113,10 +113,13 @@ func_checker::~func_checker ()
 /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
 
 bool
-func_checker::compare_ssa_name (tree t1, tree t2)
+func_checker::compare_ssa_name (tree t1, tree t2, bool strict)
 {
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
+
+  if (strict)
+    return t1 == t2 || (m_source_ssa_names[i1] != -1 && m_source_ssa_names[i1] == (int) i2);
 
   if (m_source_ssa_names[i1] == -1)
     m_source_ssa_names[i1] = i2;
@@ -156,6 +159,8 @@ func_checker::compare_edge (edge e1, edge e2)
 bool
 func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
 {
+  return t1 == t2;
+
   if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
     return RETURN_WITH_DEBUG (t1 == t2);
 
@@ -1204,12 +1209,12 @@ sem_function::bb_dict_test (int* bb_dict, int source, int target)
    declaration comparasion is executed.  */
 
 bool
-sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
+sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2, bool strict)
 {
   tree b1, b2;
   bool ret;
 
-  if (!m_checker->compare_ssa_name (t1, t2))
+  if (!m_checker->compare_ssa_name (t1, t2, strict))
     return RETURN_FALSE ();
 
   if (SSA_NAME_IS_DEFAULT_DEF (t1))
@@ -1245,7 +1250,7 @@ sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
 
 bool
 sem_function::compare_operand (tree t1, tree t2,
-			       tree func1, tree func2)
+			       tree func1, tree func2, bool strict)
 {
   tree base1, base2, x1, x2, y1, y2, z1, z2;
   HOST_WIDE_INT offset1 = 0, offset2 = 0;
@@ -1377,7 +1382,7 @@ sem_function::compare_operand (tree t1, tree t2,
       }
     case SSA_NAME:
       {
-	ret = compare_ssa_name (t1, t2, func1, func2);
+	ret = compare_ssa_name (t1, t2, func1, func2, strict);
 	return RETURN_WITH_DEBUG (ret);
       }
     case INTEGER_CST:
