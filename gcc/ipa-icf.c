@@ -820,7 +820,7 @@ sem_function::init (void)
     bb_sizes.safe_push (nondbg_stmt_count);
 
     /* Inserting basic block to hash table.  */
-    sem_bb *semantic_bb = new sem_bb (bb, nondbg_stmt_count,
+    sem_bb *semantic_bb = new sem_bb (bb, nondbg_stmt_count, 0,
 				      EDGE_COUNT (bb->preds) + EDGE_COUNT (bb->succs));
 
     bb_sorted.safe_push (semantic_bb);

@@ -199,14 +199,16 @@ public:
 class sem_bb
 {
 public:
-  sem_bb (basic_block bb_, unsigned nondbg_stmt_count_, unsigned edge_count_):
-    bb (bb_), nondbg_stmt_count (nondbg_stmt_count_), edge_count (edge_count_) {}
+  sem_bb (basic_block bb_, unsigned nondbg_stmt_count_, unsigned nondbg_nonlocal_stmt_count_, unsigned edge_count_):
+    bb (bb_), nondbg_stmt_count (nondbg_stmt_count_), nondbg_nonlocal_stmt_count(nondbg_nonlocal_stmt_count_), edge_count (edge_count_) {}
 
   /* Basic block the structure belongs to.  */
   basic_block bb;
 
   /* Number of non-debug statements in the basic block.  */
   unsigned nondbg_stmt_count;
+  
+  unsigned nondbg_nonlocal_stmt_count;
 
   /* Number of edges connected to the block.  */
   unsigned edge_count;
@@ -409,7 +411,7 @@ public:
   func_checker *m_checker;
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
-  bool compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2);
+  bool compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2, bool skip_local_defs = true);
 
 
 private:

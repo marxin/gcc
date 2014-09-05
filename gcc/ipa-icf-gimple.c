@@ -43,32 +43,111 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-utils.h"
 #include "ipa-icf.h"
 
+#include "tree-phinodes.h"
+#include "ssa-iterators.h"
+#include "tree-eh.h"
+
 namespace ipa_icf {
+
+static bool
+stmt_local_def (gimple stmt)
+{
+  basic_block bb, def_bb;
+  imm_use_iterator iter;
+  use_operand_p use_p;
+  tree val;
+  def_operand_p def_p;
+
+  if (gimple_has_side_effects (stmt)
+      || stmt_could_throw_p (stmt)
+      || gimple_vdef (stmt) != NULL_TREE)
+    return false;
+
+  def_p = SINGLE_SSA_DEF_OPERAND (stmt, SSA_OP_DEF);
+  if (def_p == NULL)
+    return false;
+
+  val = DEF_FROM_PTR (def_p);
+  if (val == NULL_TREE || TREE_CODE (val) != SSA_NAME)
+    return false;
+
+  def_bb = gimple_bb (stmt);
+
+  FOR_EACH_IMM_USE_FAST (use_p, iter, val)
+    {
+      if (is_gimple_debug (USE_STMT (use_p)))
+	continue;
+      bb = gimple_bb (USE_STMT (use_p));
+      if (bb == def_bb)
+	continue;
+
+      if (gimple_code (USE_STMT (use_p)) == GIMPLE_PHI
+	  && EDGE_PRED (bb, PHI_ARG_INDEX_FROM_USE (use_p))->src == def_bb)
+	continue;
+
+      return false;
+    }
+
+  return true;
+}
+
+static void
+gsi_advance_fw_nondebug_nonlocal (gimple_stmt_iterator *gsi, bool skip_local_defs)
+{
+  gimple stmt;
+
+  while (true)
+    {
+      if (gsi_end_p (*gsi))
+	return;
+      stmt = gsi_stmt (*gsi);
+      if (!stmt_local_def (stmt) || !skip_local_defs)
+	return;
+
+      gsi_next_nondebug (gsi);
+    }
+}
+
 
 /* Basic block equivalence comparison function that returns true if
    basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
 
 bool
-sem_function::compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2)
+sem_function::compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2, bool skip_local_defs)
 {
   unsigned i;
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
 
-  if (bb1->nondbg_stmt_count != bb2->nondbg_stmt_count
-      || bb1->edge_count != bb2->edge_count)
+  if (bb1->edge_count != bb2->edge_count)
     return RETURN_FALSE ();
+
+  if (skip_local_defs)
+  {
+    if (bb1->nondbg_nonlocal_stmt_count != bb2->nondbg_nonlocal_stmt_count)
+      return false;
+  }
+  else
+  {
+    if (bb1->nondbg_stmt_count != bb2->nondbg_stmt_count)
+      return false;
+  }
+
+  unsigned int boundary = skip_local_defs ? bb1->nondbg_nonlocal_stmt_count : bb1->nondbg_stmt_count;
 
   gsi1 = gsi_start_bb (bb1->bb);
   gsi2 = gsi_start_bb (bb2->bb);
 
-  for (i = 0; i < bb1->nondbg_stmt_count; i++)
+  for (i = 0; i < boundary; i++)
     {
-      if (is_gimple_debug (gsi_stmt (gsi1)))
-	gsi_next_nondebug (&gsi1);
+      s1 = gsi_stmt (gsi1);
+      s2 = gsi_stmt (gsi2);
 
-      if (is_gimple_debug (gsi_stmt (gsi2)))
-	gsi_next_nondebug (&gsi2);
+      if (is_gimple_debug (s1) || stmt_local_def (s1))
+	gsi_advance_fw_nondebug_nonlocal (&gsi1, skip_local_defs);
+
+      if (is_gimple_debug (s2) || stmt_local_def (s2))
+	gsi_advance_fw_nondebug_nonlocal (&gsi2, skip_local_defs);
 
       s1 = gsi_stmt (gsi1);
       s2 = gsi_stmt (gsi2);

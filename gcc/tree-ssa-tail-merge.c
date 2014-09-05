@@ -1239,19 +1239,60 @@ gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
 static sem_bb *create_sem_bb (basic_block &bb)
 {
   unsigned nondbg_stmt_count = 0;
+  unsigned nondbg_nonlocal_stmt_count = 0;
 
   for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       gimple stmt = gsi_stmt (gsi);
 
       if (gimple_code (stmt) != GIMPLE_DEBUG)
+      {
 	  nondbg_stmt_count++;
+
+	  if (!stmt_local_def (stmt))
+	    nondbg_nonlocal_stmt_count++;
+      }      
     }
 
-  return new sem_bb (bb, nondbg_stmt_count, 0);
+  return new sem_bb (bb, nondbg_stmt_count, nondbg_nonlocal_stmt_count, 0);
 }
 
 static bool ddd = false;
+static int counter;
+
+static bool
+check_edges_correspondence (basic_block bb1, basic_block bb2)
+{
+  edge e1, e2;
+  edge_iterator ei2 = ei_start (bb2->succs);
+
+  for (edge_iterator ei1 = ei_start (bb1->succs); ei_cond (ei1, &e1); ei_next (&ei1))
+    {
+      ei_cond (ei2, &e2);
+
+      if (e1->dest->index != e2->dest->index)
+      {
+	return false;
+//	fprintf (stderr, "different edges e1:%u->%u, e2:%u->%u\n", e1->src->index, e1->dest->index,
+//		 e2->src->index, e2->dest->index);
+      }
+
+      ei_next (&ei2);
+    }
+
+  return true;
+}
+
+static bool
+compare_bb_wrapper (sem_function &f, sem_bb *bb1, sem_bb *bb2)
+{
+  bool r = f.compare_bb (bb1, bb2, f.decl, f.decl, false);
+
+  if (r)
+    return true;
+
+  return f.compare_bb (bb1, bb2, f.decl, f.decl, true);
+}
 
 /* Determines whether BB1 and BB2 (members of same_succ) are duplicates.  If so,
    clusters them.  */
@@ -1268,7 +1309,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
   sem_bb *sem_bb2 = create_sem_bb (bb2);
 
   f.m_checker = new func_checker (ssa_names_count, ssa_names_count, true);
-  bool icf_result = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl);
+  bool icf_result = compare_bb_wrapper (f, sem_bb1, sem_bb2);
 
   gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
   gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
@@ -1283,7 +1324,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
 	 same_succ_hash.  */
       if (is_tm_ending (stmt1)
 	  || is_tm_ending (stmt2))
-	goto different;
+	return;
 
       if (!gimple_equal_p (same_succ, stmt1, stmt2))
 	goto different;
@@ -1302,7 +1343,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
   {
     if (ddd) {
     fprintf (stderr, "XXX_DIFFERENT_ICF(%u)\n", sem_bb1->nondbg_stmt_count == sem_bb2->nondbg_stmt_count);
-     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
+//     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
     fprintf (stderr, "===BB1===\n");
     dump_bb (stderr, bb1, 0, TDF_DETAILS);
     fprintf (stderr, "===BB2===\n");
@@ -1311,7 +1352,8 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
 
     if (sem_bb1->nondbg_stmt_count == sem_bb2->nondbg_stmt_count)
     {
-      bool icf_result2 = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl);
+      bool icf_result2 = compare_bb_wrapper (f, sem_bb1, sem_bb2);
+//      gcc_unreachable ();
     }
 //    gcc_assert (icf_result);
   }
@@ -1343,22 +1385,31 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
   different:
   if (icf_result)
   {
-//    bool icf_result3 = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl);
 
 //    gcc_unreachable ();
 
   if (vuse_escaped && vuse1 != vuse2)
     return;
 
+  if (!check_edges_correspondence (bb1, bb2))
+    return;
+
 if (ddd) {
+  counter++;
+
+//  if (counter > 1)
+//    return;
+
      fprintf (stderr, "XXX_ICF_HIT\n");
-     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
+//     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
      fprintf (stderr, "===BB1===\n");
      dump_bb (stderr, bb1, 0, TDF_DETAILS);
      fprintf (stderr, "===BB2===\n");
      dump_bb (stderr, bb2, 0, TDF_DETAILS);
      fprintf (stderr, "===END===\n"); }
-    set_cluster (bb1, bb2);
+     bool icf_result22 = compare_bb_wrapper (f, sem_bb1, sem_bb2);
+//     gcc_unreachable ();
+     set_cluster (bb1, bb2);
   }
 }
 
