@@ -101,6 +101,7 @@ gsi_advance_fw_nondebug_nonlocal (gimple_stmt_iterator *gsi, bool skip_local_def
       if (gsi_end_p (*gsi))
 	return;
       stmt = gsi_stmt (*gsi);
+ 
       if (!stmt_local_def (stmt) || !skip_local_defs)
 	return;
 

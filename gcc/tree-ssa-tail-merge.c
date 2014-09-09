@@ -1232,6 +1232,7 @@ gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
 
       if (!stmt_local_def (stmt))
 	return;
+
       gsi_prev_nondebug (gsi);
     }
 }
@@ -1258,7 +1259,6 @@ static sem_bb *create_sem_bb (basic_block &bb)
 }
 
 static bool ddd = false;
-static int counter;
 
 static bool
 check_edges_correspondence (basic_block bb1, basic_block bb2)
@@ -1284,14 +1284,27 @@ check_edges_correspondence (basic_block bb1, basic_block bb2)
 }
 
 static bool
-compare_bb_wrapper (sem_function &f, sem_bb *bb1, sem_bb *bb2)
+compare_bb_wrapper (sem_function &f, basic_block bb1, basic_block bb2, bool *skipped, unsigned int ssa_names_count)
 {
-  bool r = f.compare_bb (bb1, bb2, f.decl, f.decl, false);
+  sem_bb *sem_bb1 = create_sem_bb (bb1);
+  sem_bb *sem_bb2 = create_sem_bb (bb2);
+
+  f.m_checker = new func_checker (ssa_names_count, ssa_names_count, true);
+
+  bool r = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl, false);
+  *skipped = false;
 
   if (r)
     return true;
 
-  return f.compare_bb (bb1, bb2, f.decl, f.decl, true);
+  sem_bb1 = create_sem_bb (bb1);
+  sem_bb2 = create_sem_bb (bb2);
+
+  f.m_checker = new func_checker (ssa_names_count, ssa_names_count, true);
+  r = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl, true);
+  *skipped = true;
+
+  return r;
 }
 
 /* Determines whether BB1 and BB2 (members of same_succ) are duplicates.  If so,
@@ -1308,8 +1321,12 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
   sem_bb *sem_bb1 = create_sem_bb (bb1);
   sem_bb *sem_bb2 = create_sem_bb (bb2);
 
-  f.m_checker = new func_checker (ssa_names_count, ssa_names_count, true);
-  bool icf_result = compare_bb_wrapper (f, sem_bb1, sem_bb2);
+  if (ddd)
+    fprintf (stderr, "XXX_CALLED_FOR: %u\n", sem_bb1->nondbg_stmt_count);
+
+  bool skipped = false;
+
+  bool icf_result = compare_bb_wrapper (f, bb1, bb2, &skipped, ssa_names_count);
 
   gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
   gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
@@ -1343,24 +1360,19 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
   {
     if (ddd) {
     fprintf (stderr, "XXX_DIFFERENT_ICF(%u)\n", sem_bb1->nondbg_stmt_count == sem_bb2->nondbg_stmt_count);
-//     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
+//    dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
     fprintf (stderr, "===BB1===\n");
     dump_bb (stderr, bb1, 0, TDF_DETAILS);
     fprintf (stderr, "===BB2===\n");
     dump_bb (stderr, bb2, 0, TDF_DETAILS);
     fprintf (stderr, "===END===\n"); }
 
-    if (sem_bb1->nondbg_stmt_count == sem_bb2->nondbg_stmt_count)
-    {
-      bool icf_result2 = compare_bb_wrapper (f, sem_bb1, sem_bb2);
-//      gcc_unreachable ();
-    }
-//    gcc_assert (icf_result);
+//    gcc_unreachable ();
   }
-  else if (sem_bb1->nondbg_stmt_count > 0)
+  else
   {
     if (ddd) {
-    fprintf (stderr, "___EQUAL___(%u)\n", sem_bb1->nondbg_stmt_count);
+    fprintf (stderr, "XXX___EQUAL___(%u)\n", sem_bb1->nondbg_stmt_count);
     fprintf (stderr, "===BB1===\n");
     dump_bb (stderr, bb1, 0, TDF_DETAILS);
     fprintf (stderr, "===BB2===\n");
@@ -1380,6 +1392,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
 	     bb1->index, bb2->index);
 
   set_cluster (bb1, bb2);
+
   return;
 
   different:
@@ -1395,20 +1408,15 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
     return;
 
 if (ddd) {
-  counter++;
 
-//  if (counter > 1)
-//    return;
-
-     fprintf (stderr, "XXX_ICF_HIT\n");
+     fprintf (stderr, "XXX_ICF_HIT (skipped: %u)\n", skipped);
 //     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
      fprintf (stderr, "===BB1===\n");
      dump_bb (stderr, bb1, 0, TDF_DETAILS);
      fprintf (stderr, "===BB2===\n");
      dump_bb (stderr, bb2, 0, TDF_DETAILS);
      fprintf (stderr, "===END===\n"); }
-     bool icf_result22 = compare_bb_wrapper (f, sem_bb1, sem_bb2);
-//     gcc_unreachable ();
+
      set_cluster (bb1, bb2);
   }
 }
