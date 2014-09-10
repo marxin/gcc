@@ -266,9 +266,6 @@ bool func_checker::types_are_compatible_p (tree t1, tree t2,
   if (!types_compatible_p (t1, t2))
     return RETURN_FALSE_WITH_MSG ("types are not compatible");
 
-  if (get_alias_set (t1) != get_alias_set (t2))
-    return RETURN_FALSE_WITH_MSG ("alias sets are different");
-
   /* We call contains_polymorphic_type_p with this pointer type.  */
   if (first_argument && TREE_CODE (t1) == POINTER_TYPE)
     {
@@ -1234,11 +1231,11 @@ func_checker::compare_operand (tree t1, tree t2)
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
   base2 = get_addr_base_and_unit_offset (t2, &offset2);
 
-  if (offset1 != offset2)
-    return RETURN_FALSE_WITH_MSG ("base offsets are different");
-
   if (base1 && base2)
     {
+      if (offset1 != offset2)
+	return RETURN_FALSE_WITH_MSG ("base offsets are different");
+
       t1 = base1;
       t2 = base2;
     }
