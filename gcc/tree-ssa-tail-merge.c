@@ -1310,6 +1310,8 @@ compare_bb_wrapper (sem_function &f, basic_block bb1, basic_block bb2, bool *ski
 /* Determines whether BB1 and BB2 (members of same_succ) are duplicates.  If so,
    clusters them.  */
 
+static int counter = 0;
+
 static void
 find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_function &f, unsigned ssa_names_count)
 {
@@ -1323,6 +1325,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
 
   if (ddd)
     fprintf (stderr, "XXX_CALLED_FOR: %u\n", sem_bb1->nondbg_stmt_count);
+
 
   bool skipped = false;
 
@@ -1409,7 +1412,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
 
 if (ddd) {
 
-     fprintf (stderr, "XXX_ICF_HIT (skipped: %u)\n", skipped);
+     fprintf (stderr, "XXX_ICF_HIT (skipped: %u), counter: %u\n", skipped, ++counter);
 //     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
      fprintf (stderr, "===BB1===\n");
      dump_bb (stderr, bb1, 0, TDF_DETAILS);
@@ -1417,7 +1420,21 @@ if (ddd) {
      dump_bb (stderr, bb2, 0, TDF_DETAILS);
      fprintf (stderr, "===END===\n"); }
 
+     if (counter == 4)
+       compare_bb_wrapper (f, bb1, bb2, &skipped, ssa_names_count);
+   
      set_cluster (bb1, bb2);
+  }
+  else if(sem_bb1->nondbg_stmt_count == sem_bb2->nondbg_stmt_count || sem_bb1->nondbg_nonlocal_stmt_count == sem_bb2->nondbg_nonlocal_stmt_count)
+  {
+  if (dump_file) {
+    fprintf (dump_file, "XXX_FIND_DUPLICATE\n");
+    dump_bb (dump_file, bb1, 0, TDF_DETAILS);
+    fprintf (dump_file, "XXX_BB1_END:\n");
+    dump_bb (dump_file, bb2, 0, TDF_DETAILS);
+    fprintf (dump_file, "XXX_BB2_END:\n");
+  }
+
   }
 }
 
