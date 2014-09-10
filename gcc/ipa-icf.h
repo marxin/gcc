@@ -101,6 +101,7 @@ return_different_stmts (gimple s1, gimple s2, const char *code,
 namespace ipa_icf {
 
 class sem_item;
+class sem_bb;
 
 /* A class aggregating all connections and semantic equivalents
    for a given pair of semantic function candidates.  */
@@ -110,11 +111,16 @@ public:
   /* Initialize internal structures according to given number of
      source and target SSA names. The number of source names is SSA_SOURCE,
      respectively SSA_TARGET.  */
-  func_checker (unsigned ssa_source, unsigned ssa_target,
-		bool compare_polymorphic);
+     // TODO
+  func_checker (tree source_func_decl, tree target_func_decl, bool compare_polymorphic, hash_set<tree> *ignored_source_decls = NULL, hash_set<tree> *ignored_target_decls = NULL);
 
   /* Memory release routine.  */
   ~func_checker();
+
+  // TODO
+  /* Basic block equivalence comparison function that returns true if
+     basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
+  bool compare_bb (sem_bb *bb1, sem_bb *bb2);
 
   /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
   bool compare_ssa_name (tree t1, tree t2);
@@ -122,9 +128,69 @@ public:
   /* Verification function for edges E1 and E2.  */
   bool compare_edge (edge e1, edge e2);
 
+/// TODO: comment
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     call statements are semantically equivalent.  */
+  bool compare_gimple_call (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     assignment statements are semantically equivalent.  */
+  bool compare_gimple_assign (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     condition statements are semantically equivalent.  */
+  bool compare_gimple_cond (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     label statements are semantically equivalent.  */
+  bool compare_gimple_label (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     switch statements are semantically equivalent.  */
+  bool compare_gimple_switch (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     return statements are semantically equivalent.  */
+  bool compare_gimple_return (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     goto statements are semantically equivalent.  */
+  bool compare_gimple_goto (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+     resx statements are semantically equivalent.  */
+  bool compare_gimple_resx (gimple s1, gimple s2);
+
+  /* Verifies for given GIMPLEs S1 and S2 that ASM statements are equivalent.
+     For the beginning, the pass only supports equality for
+     '__asm__ __volatile__ ("", "", "", "memory")'.  */
+  bool compare_gimple_asm (gimple s1, gimple s2);
+
   /* Verification function for declaration trees T1 and T2 that
      come from functions FUNC1 and FUNC2.  */
-  bool compare_decl (tree t1, tree t2, tree func1, tree func2);
+  bool compare_decl (tree t1, tree t2);
+
+  /* Verifies that tree labels T1 and T2 correspond in FUNC1 and FUNC2.  */
+  bool compare_tree_ssa_label (tree t1, tree t2);
+
+  /* Function compares two operands T1 and T2 and returns true if these
+     two trees from FUNC1 (respectively FUNC2) are semantically equivalent.  */
+  bool compare_operand (tree t1, tree t2);
+
+  /* Verifies that trees T1 and T2, representing function declarations
+     are equivalent from perspective of ICF.  */
+  bool compare_function_decl (tree t1, tree t2);
+
+  /* Verifies that trees T1 and T2 do correspond.  */
+  bool compare_variable_decl (tree t1, tree t2);
+
+  /* Return true if types are compatible from perspective of ICF.
+     FIRST_ARGUMENT indicates if the comparison is called for
+     first parameter of a function.  */
+  static bool types_are_compatible_p (tree t1, tree t2,
+				      bool compare_polymorphic = true,
+				      bool first_argument = false);
+
 
 private:
   /* Vector mapping source SSA names to target ones.  */
@@ -132,6 +198,12 @@ private:
 
   /* Vector mapping target SSA names to source ones.  */
   vec <int> m_target_ssa_names;
+
+  // TODO
+  tree m_source_func_decl;
+  tree m_target_func_decl;
+  hash_set<tree> *m_ignored_source_decls;
+  hash_set<tree> *m_ignored_target_decls;
 
   /* Source to target edge map.  */
   hash_map <edge, edge> m_edge_map;
@@ -141,6 +213,8 @@ private:
 
   /* Flag if polymorphic comparison should be executed.  */
   bool m_compare_polymorphic;
+
+  hash_set <tree> m_ignored_declarations;
 };
 
 /* Congruence class encompasses a collection of either functions or
@@ -274,13 +348,6 @@ public:
 
   static bool get_base_types (tree *t1, tree *t2);
 
-  /* Return true if types are compatible from perspective of ICF.
-     FIRST_ARGUMENT indicates if the comparison is called for
-     first parameter of a function.  */
-  static bool types_are_compatible_p (tree t1, tree t2,
-				      bool compare_polymorphic = true,
-				      bool first_argument = false);
-
   /* Item type.  */
   sem_item_type type;
 
@@ -408,76 +475,15 @@ private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
   hashval_t get_bb_hash (const sem_bb *basic_block);
 
-  /* Basic block equivalence comparison function that returns true if
-     basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
-  bool compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2);
-
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
      true value is returned if phi nodes are semantically
      equivalent in these blocks .  */
-  bool compare_phi_node (basic_block bb1, basic_block bb2, tree func1,
-			 tree func2);
+  bool compare_phi_node (basic_block bb1, basic_block bb2);
 
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
      true value is returned if exception handling regions are equivalent
      in these blocks.  */
-  bool compare_eh_region (eh_region r1, eh_region r2, tree func1, tree func2);
-
-  /* Verifies that trees T1 and T2, representing function declarations
-     are equivalent from perspective of ICF.  */
-  bool compare_function_decl (tree t1, tree t2);
-
-  /* Verifies that trees T1 and T2 do correspond.  */
-  bool compare_variable_decl (tree t1, tree t2, tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     call statements are semantically equivalent.  */
-  bool compare_gimple_call (gimple s1, gimple s2,
-			    tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     assignment statements are semantically equivalent.  */
-  bool compare_gimple_assign (gimple s1, gimple s2, tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     condition statements are semantically equivalent.  */
-  bool compare_gimple_cond (gimple s1, gimple s2, tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     label statements are semantically equivalent.  */
-  bool compare_gimple_label (gimple s1, gimple s2, tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     switch statements are semantically equivalent.  */
-  bool compare_gimple_switch (gimple s1, gimple s2, tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     return statements are semantically equivalent.  */
-  bool compare_gimple_return (gimple s1, gimple s2, tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     goto statements are semantically equivalent.  */
-  bool compare_gimple_goto (gimple s1, gimple s2, tree func1, tree func2);
-
-  /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
-     resx statements are semantically equivalent.  */
-  bool compare_gimple_resx (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that ASM statements are equivalent.
-     For the beginning, the pass only supports equality for
-     '__asm__ __volatile__ ("", "", "", "memory")'.  */
-  bool compare_gimple_asm (gimple s1, gimple s2);
-
-  /* Verifies that tree labels T1 and T2 correspond in FUNC1 and FUNC2.  */
-  bool compare_tree_ssa_label (tree t1, tree t2, tree func1, tree func2);
-
-  /* Function compares two operands T1 and T2 and returns true if these
-     two trees from FUNC1 (respectively FUNC2) are semantically equivalent.  */
-  bool compare_operand (tree t1, tree t2, tree func1, tree func2);
-
-  /* If T1 and T2 are SSA names, dictionary comparison is processed. Otherwise,
-     declaration comparasion is executed.  */
-  bool compare_ssa_name (tree t1, tree t2, tree func1, tree func2);
+  bool compare_eh_region (eh_region r1, eh_region r2);
 
   /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
      corresponds to TARGET.  */

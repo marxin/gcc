@@ -88,17 +88,24 @@ namespace ipa_icf {
    source and target SSA names. The number of source names is SSA_SOURCE,
    respectively SSA_TARGET.  */
 
-func_checker::func_checker (unsigned ssa_source, unsigned ssa_target,
-			    bool compare_polymorphic)
-  : m_compare_polymorphic (compare_polymorphic)
+func_checker::func_checker (tree source_func_decl, tree target_func_decl, bool compare_polymorphic,
+  hash_set<tree> *ignored_source_decls, hash_set<tree> *ignored_target_decls)
+  : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
+  m_ignored_source_decls (ignored_source_decls), m_ignored_target_decls (ignored_target_decls), m_compare_polymorphic (compare_polymorphic)
 {
+  function *source_func = DECL_STRUCT_FUNCTION (source_func_decl);
+  function *target_func = DECL_STRUCT_FUNCTION (target_func_decl);
+
+  unsigned ssa_source = SSANAMES (source_func)->length ();
+  unsigned ssa_target = SSANAMES (target_func)->length ();
+
   m_source_ssa_names.create (ssa_source);
   m_target_ssa_names.create (ssa_target);
 
-  for (unsigned int i = 0; i < ssa_source; i++)
+  for (unsigned i = 0; i < ssa_source; i++)
     m_source_ssa_names.safe_push (-1);
 
-  for (unsigned int i = 0; i < ssa_target; i++)
+  for (unsigned i = 0; i < ssa_target; i++)
     m_target_ssa_names.safe_push (-1);
 }
 
@@ -154,12 +161,12 @@ func_checker::compare_edge (edge e1, edge e2)
    come from functions FUNC1 and FUNC2.  */
 
 bool
-func_checker::compare_decl (tree t1, tree t2, tree func1, tree func2)
+func_checker::compare_decl (tree t1, tree t2)
 {
-  if (!auto_var_in_fn_p (t1, func1) || !auto_var_in_fn_p (t2, func2))
+  if (!auto_var_in_fn_p (t1, m_source_func_decl) || !auto_var_in_fn_p (t2, m_target_func_decl))
     return RETURN_WITH_DEBUG (t1 == t2);
 
-  if (!sem_item::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
+  if (!types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
 					 m_compare_polymorphic))
     return RETURN_FALSE ();
 
@@ -249,7 +256,7 @@ sem_item::dump (void)
 }
 
 /* Return true if types are compatible from perspective of ICF.  */
-bool sem_item::types_are_compatible_p (tree t1, tree t2,
+bool func_checker::types_are_compatible_p (tree t1, tree t2,
 				       bool compare_polymorphic,
 				       bool first_argument)
 {
@@ -373,13 +380,13 @@ sem_function::equals_wpa (sem_item *item)
       if (!arg_types[i] || !m_compared_func->arg_types[i])
 	return RETURN_FALSE_WITH_MSG ("NULL argument type");
 
-      if (!types_are_compatible_p (arg_types[i], m_compared_func->arg_types[i],
+      if (!func_checker::types_are_compatible_p (arg_types[i], m_compared_func->arg_types[i],
 				   true, i == 0))
 	return RETURN_FALSE_WITH_MSG ("argument type is different");
     }
 
   /* Result type checking.  */
-  if (!types_are_compatible_p (result_type, m_compared_func->result_type))
+  if (!func_checker::types_are_compatible_p (result_type, m_compared_func->result_type))
     return RETURN_FALSE_WITH_MSG ("result types are different");
 
   return true;
@@ -439,6 +446,7 @@ sem_function::equals_private (sem_item *item)
   tree decl1 = DECL_ATTRIBUTES (decl);
   tree decl2 = DECL_ATTRIBUTES (m_compared_func->decl);
 
+  m_checker = new func_checker (decl, m_compared_func->decl, compare_polymorphic_p (), &tree_refs_set, &m_compared_func->tree_refs_set);
   while (decl1)
     {
       if (decl2 == NULL)
@@ -452,9 +460,8 @@ sem_function::equals_private (sem_item *item)
 
       if (attr_value1 && attr_value2)
 	{
-	  bool ret = compare_operand (TREE_VALUE (attr_value1),
-				      TREE_VALUE (attr_value2), decl,
-				      m_compared_func->decl);
+	  bool ret = m_checker->compare_operand (TREE_VALUE (attr_value1),
+				      TREE_VALUE (attr_value2));
 	  if (!ret)
 	    return RETURN_FALSE_WITH_MSG ("attribute values are different");
 	}
@@ -470,24 +477,20 @@ sem_function::equals_private (sem_item *item)
   if (decl1 != decl2)
     return RETURN_FALSE();
 
-  m_checker = new func_checker (ssa_names_size, m_compared_func->ssa_names_size,
-				compare_polymorphic_p ());
 
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
-    if (!m_checker->compare_decl (arg1, arg2, decl, m_compared_func->decl))
+    if (!m_checker->compare_decl (arg1, arg2))
       return RETURN_FALSE ();
 
   /* Exception handling regions comparison.  */
-  if (!compare_eh_region (region_tree, m_compared_func->region_tree, decl,
-			  m_compared_func->decl))
+  if (!compare_eh_region (region_tree, m_compared_func->region_tree))
     return RETURN_FALSE();
 
   /* Checking all basic blocks.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
-    if(!compare_bb (bb_sorted[i], m_compared_func->bb_sorted[i], decl,
-		    m_compared_func->decl))
+    if(!m_checker->compare_bb (bb_sorted[i], m_compared_func->bb_sorted[i]))
       return RETURN_FALSE();
 
   DUMP_MESSAGE ("All BBs are equal\n");
@@ -525,8 +528,7 @@ sem_function::equals_private (sem_item *item)
 
   /* Basic block PHI nodes comparison.  */
   for (unsigned i = 0; i < bb_sorted.length (); i++)
-    if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb,
-			   decl, m_compared_func->decl))
+    if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb))
       return RETURN_FALSE_WITH_MSG ("PHI node comparison returns false");
 
   return result;
@@ -931,8 +933,7 @@ sem_function::parse_tree_args (void)
    return true if phi nodes are semantically equivalent in these blocks .  */
 
 bool
-sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
-				tree func1, tree func2)
+sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
 {
   gimple_stmt_iterator si1, si2;
   gimple phi1, phi2;
@@ -970,7 +971,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
 	  t1 = gimple_phi_arg (phi1, i)->def;
 	  t2 = gimple_phi_arg (phi2, i)->def;
 
-	  if (!compare_operand (t1, t2, func1, func2))
+	  if (!m_checker->compare_operand (t1, t2))
 	    return RETURN_FALSE ();
 
 	  e1 = gimple_phi_arg_edge (phi1, i);
@@ -991,8 +992,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2,
    in these blocks.  */
 
 bool
-sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
-				 tree func2)
+sem_function::compare_eh_region (eh_region r1, eh_region r2)
 {
   eh_landing_pad lp1, lp2;
   eh_catch c1, c2;
@@ -1027,7 +1027,7 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
 	      gcc_assert (TREE_CODE (t1) == LABEL_DECL);
 	      gcc_assert (TREE_CODE (t2) == LABEL_DECL);
 
-	      if (!compare_tree_ssa_label (t1, t2, func1, func2))
+	      if (!m_checker->compare_tree_ssa_label (t1, t2))
 		return false;
 	    }
 	  else if (lp1->post_landing_pad || lp2->post_landing_pad)
@@ -1051,8 +1051,7 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
 	      /* Catch label checking */
 	      if (c1->label && c2->label)
 		{
-		  if (!compare_tree_ssa_label (c1->label, c2->label,
-					       func1, func2))
+		  if (!m_checker->compare_tree_ssa_label (c1->label, c2->label))
 		    return false;
 		}
 	      else if (c1->label || c2->label)
@@ -1132,16 +1131,21 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2, tree func1,
    are equivalent from perspective of ICF.  */
 
 bool
-sem_function::compare_function_decl (tree t1, tree t2)
+func_checker::compare_function_decl (tree t1, tree t2)
 {
+  bool ret = false;
+
   if (t1 == t2)
     return true;
 
-  bool ret = tree_refs_set.contains (t1)
-	     && m_compared_func->tree_refs_set.contains (t2);
+  if (m_ignored_source_decls != NULL && m_ignored_target_decls != NULL)
+    {
+      ret = m_ignored_source_decls->contains (t1)
+		 && m_ignored_target_decls->contains (t2);
 
-  if (ret)
-    return true;
+      if (ret)
+	return true;
+    }
 
   /* If function decl is WEAKREF, we compare targets.  */
   cgraph_node *f1 = cgraph_node::get (t1);
@@ -1156,18 +1160,23 @@ sem_function::compare_function_decl (tree t1, tree t2)
 /* Verifies that trees T1 and T2 do correspond.  */
 
 bool
-sem_function::compare_variable_decl (tree t1, tree t2, tree func1, tree func2)
+func_checker::compare_variable_decl (tree t1, tree t2)
 {
+  bool ret = false;
+
   if (t1 == t2)
     return true;
 
-  bool ret = tree_refs_set.contains (t1)
-	     && m_compared_func->tree_refs_set.contains (t2);
+  if (m_ignored_source_decls != NULL && m_ignored_target_decls != NULL)
+    {
+      ret = m_ignored_source_decls->contains (t1)
+		 && m_ignored_target_decls->contains (t2);
 
-  if (ret)
-    return true;
+      if (ret)
+	return true;
+    }
 
-  ret = m_checker->compare_decl (t1, t2, func1, func2);
+  ret = compare_decl (t1, t2);
 
   return RETURN_WITH_DEBUG (ret);
 }
@@ -1200,52 +1209,12 @@ sem_function::bb_dict_test (int* bb_dict, int source, int target)
     return bb_dict[source] == target;
 }
 
-/* If T1 and T2 are SSA names, dictionary comparison is processed. Otherwise,
-   declaration comparasion is executed.  */
-
-bool
-sem_function::compare_ssa_name (tree t1, tree t2, tree func1, tree func2)
-{
-  tree b1, b2;
-  bool ret;
-
-  if (!m_checker->compare_ssa_name (t1, t2))
-    return RETURN_FALSE ();
-
-  if (SSA_NAME_IS_DEFAULT_DEF (t1))
-    {
-      b1 = SSA_NAME_VAR (t1);
-      b2 = SSA_NAME_VAR (t2);
-
-      if (b1 == NULL && b2 == NULL)
-	return true;
-
-      if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
-	return RETURN_FALSE ();
-
-      switch (TREE_CODE (b1))
-	{
-	case VAR_DECL:
-	  return RETURN_WITH_DEBUG (compare_variable_decl (t1, t2, func1, func2));
-	case PARM_DECL:
-	case RESULT_DECL:
-	  ret = m_checker->compare_decl (b1, b2, func1, func2);
-	  return RETURN_WITH_DEBUG (ret);
-	default:
-	  return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
-	}
-    }
-  else
-    return true;
-}
-
 /* Function responsible for comparison of handled components T1 and T2.
    If these components, from functions FUNC1 and FUNC2, are equal, true
    is returned.  */
 
 bool
-sem_function::compare_operand (tree t1, tree t2,
-			       tree func1, tree func2)
+func_checker::compare_operand (tree t1, tree t2)
 {
   tree base1, base2, x1, x2, y1, y2, z1, z2;
   HOST_WIDE_INT offset1 = 0, offset2 = 0;
@@ -1259,7 +1228,7 @@ sem_function::compare_operand (tree t1, tree t2,
   tree tt1 = TREE_TYPE (t1);
   tree tt2 = TREE_TYPE (t2);
 
-  if (!types_are_compatible_p (tt1, tt2))
+  if (!func_checker::types_are_compatible_p (tt1, tt2))
     return false;
 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
@@ -1289,7 +1258,7 @@ sem_function::compare_operand (tree t1, tree t2,
 
 	for (unsigned i = 0; i < length1; i++)
 	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
-				CONSTRUCTOR_ELT (t2, i)->value, func1, func2))
+				CONSTRUCTOR_ELT (t2, i)->value))
 	    return RETURN_FALSE();
 
 	return true;
@@ -1303,16 +1272,14 @@ sem_function::compare_operand (tree t1, tree t2,
 	y2 = TREE_OPERAND (t2, 1);
 
 	if (!compare_operand (array_ref_low_bound (t1),
-			      array_ref_low_bound (t2),
-			      func1, func2))
+			      array_ref_low_bound (t2)))
 	  return RETURN_FALSE_WITH_MSG ("");
 	if (!compare_operand (array_ref_element_size (t1),
-			      array_ref_element_size (t2),
-			      func1, func2))
+			      array_ref_element_size (t2)))
 	  return RETURN_FALSE_WITH_MSG ("");
-	if (!compare_operand (x1, x2, func1, func2))
+	if (!compare_operand (x1, x2))
 	  return RETURN_FALSE_WITH_MSG ("");
-	return compare_operand (y1, y2, func1, func2);
+	return compare_operand (y1, y2);
       }
 
     case MEM_REF:
@@ -1330,10 +1297,10 @@ sem_function::compare_operand (tree t1, tree t2,
 	we seek for equivalency classes, so simply require inclussion in
 	both directions.  */
 
-	if (!sem_item::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2)))
+	if (!func_checker::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2)))
 	  return RETURN_FALSE ();
 
-	if (!compare_operand (x1, x2, func1, func2))
+	if (!compare_operand (x1, x2))
 	  return RETURN_FALSE_WITH_MSG ("");
 
 	/* Type of the offset on MEM_REF does not matter.  */
@@ -1346,8 +1313,8 @@ sem_function::compare_operand (tree t1, tree t2,
 	y1 = TREE_OPERAND (t1, 1);
 	y2 = TREE_OPERAND (t2, 1);
 
-	ret = compare_operand (x1, x2, func1, func2)
-	      && compare_operand (y1, y2, func1, func2);
+	ret = compare_operand (x1, x2)
+	      && compare_operand (y1, y2);
 
 	return RETURN_WITH_DEBUG (ret);
       }
@@ -1361,9 +1328,9 @@ sem_function::compare_operand (tree t1, tree t2,
 	z1 = TREE_OPERAND (t1, 2);
 	z2 = TREE_OPERAND (t2, 2);
 
-	ret = compare_operand (x1, x2, func1, func2)
-	      && compare_operand (y1, y2, func1, func2)
-	      && compare_operand (z1, z2, func1, func2);
+	ret = compare_operand (x1, x2)
+	      && compare_operand (y1, y2)
+	      && compare_operand (z1, z2);
 
 	return RETURN_WITH_DEBUG (ret);
       }
@@ -1372,13 +1339,41 @@ sem_function::compare_operand (tree t1, tree t2,
 	x1 = TREE_OPERAND (t1, 0);
 	x2 = TREE_OPERAND (t2, 0);
 
-	ret = compare_operand (x1, x2, func1, func2);
+	ret = compare_operand (x1, x2);
 	return RETURN_WITH_DEBUG (ret);
       }
     case SSA_NAME:
       {
-	ret = compare_ssa_name (t1, t2, func1, func2);
-	return RETURN_WITH_DEBUG (ret);
+	ret = compare_ssa_name (t1, t2);
+
+	if (!ret)
+   	  return RETURN_WITH_DEBUG (ret);
+
+	if (SSA_NAME_IS_DEFAULT_DEF (t1))
+	  {
+	    tree b1 = SSA_NAME_VAR (t1);
+	    tree b2 = SSA_NAME_VAR (t2);
+
+	    if (b1 == NULL && b2 == NULL)
+	      return true;
+
+	    if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
+	      return RETURN_FALSE ();
+
+	    switch (TREE_CODE (b1))
+	      {
+	      case VAR_DECL:
+		return RETURN_WITH_DEBUG (compare_variable_decl (t1, t2));
+	      case PARM_DECL:
+	      case RESULT_DECL:
+		ret = compare_decl (b1, b2);
+		return RETURN_WITH_DEBUG (ret);
+	      default:
+		return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
+	      }
+	  }
+	  else
+	    return true;
       }
     case INTEGER_CST:
       {
@@ -1401,7 +1396,7 @@ sem_function::compare_operand (tree t1, tree t2,
 	return RETURN_WITH_DEBUG (ret);
       }
     case VAR_DECL:
-      return RETURN_WITH_DEBUG (compare_variable_decl (t1, t2, func1, func2));
+      return RETURN_WITH_DEBUG (compare_variable_decl (t1, t2));
     case FIELD_DECL:
       {
 	tree fctx1 = DECL_FCONTEXT (t1);
@@ -1410,8 +1405,8 @@ sem_function::compare_operand (tree t1, tree t2,
 	tree offset1 = DECL_FIELD_OFFSET (t1);
 	tree offset2 = DECL_FIELD_OFFSET (t1);
 
-	ret = compare_operand (fctx1, fctx2, func1, func2)
-	      && compare_operand (offset1, offset2, func1, func2);
+	ret = compare_operand (fctx1, fctx2)
+	      && compare_operand (offset1, offset2);
 
 	return RETURN_WITH_DEBUG (ret);
       }
@@ -1421,7 +1416,7 @@ sem_function::compare_operand (tree t1, tree t2,
     case CONST_DECL:
     case BIT_FIELD_REF:
       {
-	ret = m_checker->compare_decl (t1, t2, func1, func2);
+	ret = compare_decl (t1, t2);
 	return RETURN_WITH_DEBUG (ret);
       }
     default:
@@ -1454,7 +1449,7 @@ sem_function::compare_type_list (tree t1, tree t2, bool compare_polymorphic)
 	{}
       else if (tc1 == NOP_EXPR || tc2 == NOP_EXPR)
 	return false;
-      else if (!types_are_compatible_p (tv1, tv2, compare_polymorphic))
+      else if (!func_checker::types_are_compatible_p (tv1, tv2, compare_polymorphic))
 	return false;
 
       t1 = TREE_CHAIN (t1);
@@ -1527,7 +1522,7 @@ sem_variable::equals (tree t1, tree t2)
 	tree y1 = TREE_OPERAND (t1, 1);
 	tree y2 = TREE_OPERAND (t2, 1);
 
-	if (!sem_item::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2), true))
+	if (!func_checker::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2), true))
 	  return RETURN_FALSE ();
 
 	/* Type of the offset on MEM_REF does not matter.  */
@@ -1547,7 +1542,7 @@ sem_variable::equals (tree t1, tree t2)
     case LABEL_DECL:
       return t1 == t2;
     case INTEGER_CST:
-      return types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2), true)
+      return func_checker::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2), true)
 	     && wi::to_offset (t1) == wi::to_offset (t2);
     case STRING_CST:
     case REAL_CST:

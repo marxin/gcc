@@ -49,7 +49,7 @@ namespace ipa_icf {
    basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.  */
 
 bool
-sem_function::compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2)
+func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
 {
   unsigned i;
   gimple_stmt_iterator gsi1, gsi2;
@@ -79,19 +79,19 @@ sem_function::compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2)
       switch (gimple_code (s1))
 	{
 	case GIMPLE_CALL:
-	  if (!compare_gimple_call (s1, s2, func1, func2))
+	  if (!compare_gimple_call (s1, s2))
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_CALL");
 	  break;
 	case GIMPLE_ASSIGN:
-	  if (!compare_gimple_assign (s1, s2, func1, func2))
+	  if (!compare_gimple_assign (s1, s2))
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_ASSIGN");
 	  break;
 	case GIMPLE_COND:
-	  if (!compare_gimple_cond (s1, s2, func1, func2))
+	  if (!compare_gimple_cond (s1, s2))
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_COND");
 	  break;
 	case GIMPLE_SWITCH:
-	  if (!compare_gimple_switch (s1, s2, func1, func2))
+	  if (!compare_gimple_switch (s1, s2))
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_SWITCH");
 	  break;
 	case GIMPLE_DEBUG:
@@ -102,15 +102,15 @@ sem_function::compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2)
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_RESX");
 	  break;
 	case GIMPLE_LABEL:
-	  if (!compare_gimple_label (s1, s2, func1, func2))
+	  if (!compare_gimple_label (s1, s2))
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_LABEL");
 	  break;
 	case GIMPLE_RETURN:
-	  if (!compare_gimple_return (s1, s2, func1, func2))
+	  if (!compare_gimple_return (s1, s2))
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_RETURN");
 	  break;
 	case GIMPLE_GOTO:
-	  if (!compare_gimple_goto (s1, s2, func1, func2))
+	  if (!compare_gimple_goto (s1, s2))
 	    return RETURN_DIFFERENT_STMTS (s1, s2, "GIMPLE_GOTO");
 	  break;
 	case GIMPLE_ASM:
@@ -136,7 +136,7 @@ sem_function::compare_bb (sem_bb *bb1, sem_bb *bb2, tree func1, tree func2)
    call statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
+func_checker::compare_gimple_call (gimple s1, gimple s2)
 {
   unsigned i;
   tree t1, t2;
@@ -150,7 +150,7 @@ sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
   /* Function pointer variables are not supported yet.  */
   if (t1 == NULL || t2 == NULL)
     {
-      if (!compare_operand (t1, t2, func1, func2))
+      if (!compare_operand (t1, t2))
 	return RETURN_FALSE();
     }
   else if (!compare_function_decl (t1, t2))
@@ -162,7 +162,7 @@ sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
       t1 = gimple_call_arg (s1, i);
       t2 = gimple_call_arg (s2, i);
 
-      if (!compare_operand (t1, t2, func1, func2))
+      if (!compare_operand (t1, t2))
 	return false;
     }
 
@@ -170,15 +170,14 @@ sem_function::compare_gimple_call (gimple s1, gimple s2, tree func1, tree func2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
-  return compare_operand (t1, t2, func1, func2);
+  return compare_operand (t1, t2);
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
    assignment statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1,
-				     tree func2)
+func_checker::compare_gimple_assign (gimple s1, gimple s2)
 {
   tree arg1, arg2;
   tree_code code1, code2;
@@ -201,7 +200,7 @@ sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1,
       arg1 = gimple_op (s1, i);
       arg2 = gimple_op (s2, i);
 
-      if (!compare_operand (arg1, arg2, func1, func2))
+      if (!compare_operand (arg1, arg2))
 	return false;
     }
 
@@ -212,7 +211,7 @@ sem_function::compare_gimple_assign (gimple s1, gimple s2, tree func1,
    condition statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_cond (gimple s1, gimple s2, tree func1, tree func2)
+func_checker::compare_gimple_cond (gimple s1, gimple s2)
 {
   tree t1, t2;
   tree_code code1, code2;
@@ -226,42 +225,40 @@ sem_function::compare_gimple_cond (gimple s1, gimple s2, tree func1, tree func2)
   t1 = gimple_cond_lhs (s1);
   t2 = gimple_cond_lhs (s2);
 
-  if (!compare_operand (t1, t2, func1, func2))
+  if (!compare_operand (t1, t2))
     return false;
 
   t1 = gimple_cond_rhs (s1);
   t2 = gimple_cond_rhs (s2);
 
-  return compare_operand (t1, t2, func1, func2);
+  return compare_operand (t1, t2);
 }
 
 /* Verifies that tree labels T1 and T2 correspond in FUNC1 and FUNC2.  */
 
 bool
-sem_function::compare_tree_ssa_label (tree t1, tree t2, tree func1, tree func2)
+func_checker::compare_tree_ssa_label (tree t1, tree t2)
 {
-  return compare_operand (t1, t2, func1, func2);
+  return compare_operand (t1, t2);
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
    label statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_label (gimple g1, gimple g2, tree func1,
-				    tree func2)
+func_checker::compare_gimple_label (gimple g1, gimple g2)
 {
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
 
-  return compare_tree_ssa_label (t1, t2, func1, func2);
+  return compare_tree_ssa_label (t1, t2);
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
    switch statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_switch (gimple g1, gimple g2, tree func1,
-				     tree func2)
+func_checker::compare_gimple_switch (gimple g1, gimple g2)
 {
   unsigned lsize1, lsize2, i;
   tree t1, t2, low1, low2, high1, high2;
@@ -278,7 +275,7 @@ sem_function::compare_gimple_switch (gimple g1, gimple g2, tree func1,
   if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
     return false;
 
-  if (!compare_operand (t1, t2, func1, func2))
+  if (!compare_operand (t1, t2))
     return false;
 
   for (i = 0; i < lsize1; i++)
@@ -306,8 +303,7 @@ sem_function::compare_gimple_switch (gimple g1, gimple g2, tree func1,
    return statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_return (gimple g1, gimple g2, tree func1,
-				     tree func2)
+func_checker::compare_gimple_return (gimple g1, gimple g2)
 {
   tree t1, t2;
 
@@ -318,14 +314,14 @@ sem_function::compare_gimple_return (gimple g1, gimple g2, tree func1,
   if (t1 == NULL && t2 == NULL)
     return true;
   else
-    return compare_operand (t1, t2, func1, func2);
+    return compare_operand (t1, t2);
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
    goto statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_goto (gimple g1, gimple g2, tree func1, tree func2)
+func_checker::compare_gimple_goto (gimple g1, gimple g2)
 {
   tree dest1, dest2;
 
@@ -335,14 +331,14 @@ sem_function::compare_gimple_goto (gimple g1, gimple g2, tree func1, tree func2)
   if (TREE_CODE (dest1) != TREE_CODE (dest2) || TREE_CODE (dest1) != SSA_NAME)
     return false;
 
-  return compare_operand (dest1, dest2, func1, func2);
+  return compare_operand (dest1, dest2);
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
    resx statements are semantically equivalent.  */
 
 bool
-sem_function::compare_gimple_resx (gimple g1, gimple g2)
+func_checker::compare_gimple_resx (gimple g1, gimple g2)
 {
   return gimple_resx_region (g1) == gimple_resx_region (g2);
 }
@@ -352,7 +348,7 @@ sem_function::compare_gimple_resx (gimple g1, gimple g2)
    '__asm__ __volatile__ ("", "", "", "memory")'.  */
 
 bool
-sem_function::compare_gimple_asm (gimple g1, gimple g2)
+func_checker::compare_gimple_asm (gimple g1, gimple g2)
 {
   if (gimple_asm_volatile_p (g1) != gimple_asm_volatile_p (g2))
     return false;
