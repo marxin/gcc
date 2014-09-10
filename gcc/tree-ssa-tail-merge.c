@@ -1205,6 +1205,8 @@ gimple_equal_p (same_succ same_succ, gimple s1, gimple s2)
    Return true in VUSE_ESCAPED if the vuse influenced a SSA_OP_DEF of one of the
    processed statements.  */
 
+#include "print-tree.h"
+
 static void
 gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
 				  bool *vuse_escaped)
@@ -1223,11 +1225,7 @@ gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
 	{
 	  *vuse = lvuse;
 	  if (!ZERO_SSA_OPERANDS (stmt, SSA_OP_DEF))
-	  {
-//	    fprintf (stderr, "XXX_VUSE_SEEN\n");
-//	    debug_gimple_stmt (stmt);
 	    *vuse_escaped = true;
-	  }
 	}
 
       if (!stmt_local_def (stmt))
@@ -1270,12 +1268,14 @@ check_edges_correspondence (basic_block bb1, basic_block bb2)
     {
       ei_cond (ei2, &e2);
 
-      if (e1->dest->index != e2->dest->index)
+      if (e1->dest->index != e2->dest->index || (e1->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)) != (e2->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)))
       {
 	return false;
 //	fprintf (stderr, "different edges e1:%u->%u, e2:%u->%u\n", e1->src->index, e1->dest->index,
 //		 e2->src->index, e2->dest->index);
       }
+
+	
 
       ei_next (&ei2);
     }
@@ -1302,6 +1302,7 @@ compare_bb_wrapper (sem_function &f, basic_block bb1, basic_block bb2, bool *ski
 
   f.m_checker = new func_checker (ssa_names_count, ssa_names_count, true);
   r = f.compare_bb (sem_bb1, sem_bb2, f.decl, f.decl, true);
+
   *skipped = true;
 
   return r;
@@ -1370,7 +1371,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
     dump_bb (stderr, bb2, 0, TDF_DETAILS);
     fprintf (stderr, "===END===\n"); }
 
-//    gcc_unreachable ();
+///    gcc_unreachable ();
   }
   else
   {
@@ -1404,15 +1405,15 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2, sem_funct
 
 //    gcc_unreachable ();
 
-  if (vuse_escaped && vuse1 != vuse2)
-    return;
+//  if (vuse_escaped && vuse1 != vuse2)
+//    return;
 
   if (!check_edges_correspondence (bb1, bb2))
     return;
 
 if (ddd) {
 
-     fprintf (stderr, "XXX_ICF_HIT (skipped: %u), counter: %u\n", skipped, ++counter);
+     fprintf (stderr, "XXX_ICF_HIT (skipped: %u), (VUSE: %u), counter: %u\n", skipped, vuse_escaped && vuse1 != vuse2, ++counter);
 //     dump_function_to_file (current_function_decl, stderr, TDF_DETAILS);
      fprintf (stderr, "===BB1===\n");
      dump_bb (stderr, bb1, 0, TDF_DETAILS);
