@@ -605,6 +605,8 @@ sem_function::init_refs (void)
     }
 }
 
+static bool first_rotate_left_met = false;
+
 /* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
    be applied.  */
 bool
@@ -613,6 +615,21 @@ sem_function::merge (sem_item *alias_item)
   gcc_assert (alias_item->type == FUNC);
 
   sem_function *alias_func = static_cast<sem_function *> (alias_item);
+
+  if (!strstr(name(), "rotate_left"))
+    return false;
+  else
+  {
+    if (!first_rotate_left_met)
+    {
+      first_rotate_left_met = true;
+      return false;
+    }
+    else
+    {
+      // fprintf (stderr, "HIT:rotate_left (%u->%u)\n", node->order, alias_item->node->order);
+    }
+  }
 
   cgraph_node *original = get_node ();
   cgraph_node *local_original = original;
@@ -2648,21 +2665,23 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 	  {
 	    sem_item *alias = c->members[j];
 
-	    if (dump_file)
-	      {
-		fprintf (dump_file, "Semantic equality hit:%s->%s\n",
-			 source->name (), alias->name ());
-		fprintf (dump_file, "Assembler symbol names:%s->%s\n",
-			 source->asm_name (), alias->asm_name ());
-	      }
+	    bool r = source->merge (alias);
+            if (r)
+	    {
+	      if (dump_file)
+		{
+		  fprintf (dump_file, "Semantic equality hit:%s->%s\n",
+			   source->name (), alias->name ());
+		  fprintf (dump_file, "Assembler symbol names:%s->%s\n",
+			   source->asm_name (), alias->asm_name ());
+		}
 
-	    if (dump_file && (dump_flags & TDF_DETAILS))
-	      {
-		source->dump_to_file (dump_file);
-		alias->dump_to_file (dump_file);
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		{
+		  source->dump_to_file (dump_file);
+		  alias->dump_to_file (dump_file);
+		}
 	      }
-
-	    source->merge (alias);
 	  }
       }
 }

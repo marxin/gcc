@@ -173,10 +173,13 @@ func_checker::compare_gimple_call (gimple s1, gimple s2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
+  if (!compare_operand (t1, t2))
+    return false;
+
   if (t1 && (get_alias_set (t1) != get_alias_set (t2)))
     return RETURN_FALSE_WITH_MSG ("alias sets are different");
 
-  return compare_operand (t1, t2);
+  return true;
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
