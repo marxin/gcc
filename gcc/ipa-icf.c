@@ -423,10 +423,6 @@ sem_function::equals_private (sem_item *item)
   if (item->type != FUNC)
     return false;
 
-  if (!strstr(item->name (), "rotate_left") ||
-      !strstr(name(), "rotate_left"))
-    return false;
-
   basic_block bb1, bb2;
   edge e1, e2;
   edge_iterator ei1, ei2;
@@ -620,9 +616,6 @@ sem_function::merge (sem_item *alias_item)
   gcc_assert (alias_item->type == FUNC);
 
   sem_function *alias_func = static_cast<sem_function *> (alias_item);
-
-  if (!strstr(name(), "rotate_left"))
-    return false;
 
   cgraph_node *original = get_node ();
   cgraph_node *local_original = original;
@@ -1312,6 +1305,13 @@ func_checker::compare_operand (tree t1, tree t2)
 
 	if (get_alias_set (TREE_TYPE (y1)) != get_alias_set (TREE_TYPE (y2)))
 	  return RETURN_FALSE_WITH_MSG ("alias set for MEM_REF offsets are different");
+
+	ao_ref r1, r2;
+	ao_ref_init (&r1, t1);
+	ao_ref_init (&r2, t2);
+	if (ao_ref_alias_set (&r1) != ao_ref_alias_set (&r2)
+	    || ao_ref_base_alias_set (&r1) != ao_ref_base_alias_set (&r2))
+	  return RETURN_FALSE_WITH_MSG ("ao alias sets are different");
 
 	/* Type of the offset on MEM_REF does not matter.  */
 	return wi::to_offset  (y1) == wi::to_offset  (y2);
@@ -2661,22 +2661,20 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 	  {
 	    sem_item *alias = c->members[j];
 
-	    bool r = source->merge (alias);
-            if (r)
-	    {
-	      if (dump_file)
-		{
-		  fprintf (dump_file, "Semantic equality hit:%s->%s\n",
-			   source->name (), alias->name ());
-		  fprintf (dump_file, "Assembler symbol names:%s->%s\n",
-			   source->asm_name (), alias->asm_name ());
-		}
+	    source->merge (alias);
 
-	      if (dump_file && (dump_flags & TDF_DETAILS))
-		{
-		  source->dump_to_file (dump_file);
-		  alias->dump_to_file (dump_file);
-		}
+	    if (dump_file)
+	      {
+		fprintf (dump_file, "Semantic equality hit:%s->%s\n",
+			 source->name (), alias->name ());
+		fprintf (dump_file, "Assembler symbol names:%s->%s\n",
+			 source->asm_name (), alias->asm_name ());
+	      }
+
+	    if (dump_file && (dump_flags & TDF_DETAILS))
+	      {
+		source->dump_to_file (dump_file);
+		alias->dump_to_file (dump_file);
 	      }
 	  }
       }

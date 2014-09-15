@@ -32,5 +32,5 @@ int main()
   return foo(0) + bar(0);
 }
 
-/* { dg-final { scan-ipa-dump "Equal symbols: 1" "icf"  } } */
+/* { dg-final { scan-ipa-dump "Equal symbols: 0" "icf"  } } */
 /* { dg-final { cleanup-ipa-dump "icf" } } */
