@@ -423,6 +423,10 @@ sem_function::equals_private (sem_item *item)
   if (item->type != FUNC)
     return false;
 
+  if (!strstr(item->name (), "rotate_left") ||
+      !strstr(name(), "rotate_left"))
+    return false;
+
   basic_block bb1, bb2;
   edge e1, e2;
   edge_iterator ei1, ei2;
@@ -608,8 +612,6 @@ sem_function::init_refs (void)
     }
 }
 
-static bool first_rotate_left_met = false;
-
 /* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
    be applied.  */
 bool
@@ -621,18 +623,6 @@ sem_function::merge (sem_item *alias_item)
 
   if (!strstr(name(), "rotate_left"))
     return false;
-  else
-  {
-    if (!first_rotate_left_met)
-    {
-      first_rotate_left_met = true;
-      return false;
-    }
-    else
-    {
-      // fprintf (stderr, "HIT:rotate_left (%u->%u)\n", node->order, alias_item->node->order);
-    }
-  }
 
   cgraph_node *original = get_node ();
   cgraph_node *local_original = original;
