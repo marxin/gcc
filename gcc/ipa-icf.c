@@ -1310,7 +1310,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	if (!compare_operand (x1, x2))
 	  return RETURN_FALSE_WITH_MSG ("");
 
-	if (get_alias_set (y1) != get_alias_set (y2))
+	if (get_alias_set (TREE_TYPE (y1)) != get_alias_set (TREE_TYPE (y2)))
 	  return RETURN_FALSE_WITH_MSG ("alias set for MEM_REF offsets are different");
 
 	/* Type of the offset on MEM_REF does not matter.  */
