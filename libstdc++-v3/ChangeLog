@@ -1,3 +1,42 @@
+2014-09-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/debug/deque (__gnu_debug::deque): Make base class C++11
+	allocator aware.
+
+2014-09-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/59603
+	* include/bits/stl_algo.h (random_shuffle): Prevent self-swapping.
+	* testsuite/25_algorithms/random_shuffle/59603.cc: New.
+
+2014-09-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/63219
+	* include/bits/regex.h (match_results::format): Remove stray template
+	parameter.
+	* include/bits/regex_compiler.h (_RegexTranslator::_RegexTranslator):
+	Remove parameter name to avoid -Wunused-parameter warning.
+	* include/bits/regex_executor.h (_State_info::_State_info): Reorder
+	mem-initializers to avoid -Wreorder warning.
+	* include/bits/regex_executor.tcc (_Executor::_M_word_boundary):
+	Remove parameter name to avoid -Wunused-parameter warning.
+	* include/bits/regex_scanner.tcc (_Scanner::_M_advance): Add braces
+	to avoid -Wempty-body warning when not in debug mode.
+
+2014-09-10  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* python/hook.in: Load the xmethods.
+	* python/Makefile.am (nobase_python_DATA): Add xmethods.py.
+	* python/Makefile.in: Regenerated.
+	* python/libstdcxx/v6/xmethods.py: New file.
+	* testsuite/lib/gdb-test.exp (gdb_version_check_xmethods): New
+	function.
+	(gdb-test): New optional argument LOAD_XMETHODS.  Load xmethods
+	python script if LOAD_XMETHODS is true.
+	* testsuite/libstdc++-xmethods/unique_ptr.cc: New file.
+	* testsuite/libstdc++-xmethods/vector.cc: New file.
+	* testsuite/libstdc++-xmethods/xmethods.exp: New file.
+
 2014-09-10  Tony Wang  <tony.wang@arm.com>
 
 	PR target/56846
