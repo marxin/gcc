@@ -162,9 +162,6 @@ func_checker::compare_gimple_call (gimple s1, gimple s2)
       t1 = gimple_call_arg (s1, i);
       t2 = gimple_call_arg (s2, i);
 
-      if (get_alias_set (t1) != get_alias_set (t2))
-	return RETURN_FALSE_WITH_MSG ("alias sets are different");
-
       if (!compare_operand (t1, t2))
 	return false;
     }
@@ -173,13 +170,7 @@ func_checker::compare_gimple_call (gimple s1, gimple s2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
-  if (!compare_operand (t1, t2))
-    return false;
-
-  if (t1 && (get_alias_set (t1) != get_alias_set (t2)))
-    return RETURN_FALSE_WITH_MSG ("alias sets are different");
-
-  return true;
+  return compare_operand (t1, t2);
 }
 
 /* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
@@ -203,18 +194,6 @@ func_checker::compare_gimple_assign (gimple s1, gimple s2)
 
   if (code1 != code2)
     return false;
-
-  if (gimple_assign_load_p (s1) != gimple_assign_load_p (s2))
-      return false;
-  
-  if (gimple_assign_load_p (s1) && get_alias_set (gimple_assign_rhs1 (s1)) != get_alias_set (gimple_assign_rhs1 (s2)))
-      return RETURN_FALSE_WITH_MSG ("alias sets are different");
-
-    if (gimple_store_p (s1) != gimple_store_p (s2))
-      return false;
-    if (gimple_store_p (s1)
-	&& get_alias_set (gimple_assign_lhs (s1)) != get_alias_set (gimple_assign_lhs (s2)))
-      return RETURN_FALSE_WITH_MSG ("alias sets are different");
 
   for (i = 0; i < gimple_num_ops (s1); i++)
     {

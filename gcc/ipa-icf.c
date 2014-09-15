@@ -266,6 +266,9 @@ bool func_checker::types_are_compatible_p (tree t1, tree t2,
   if (!types_compatible_p (t1, t2))
     return RETURN_FALSE_WITH_MSG ("types are not compatible");
 
+  if (get_alias_set (t1) != get_alias_set (t2))
+    return RETURN_FALSE_WITH_MSG ("alias sets are different");
+
   /* We call contains_polymorphic_type_p with this pointer type.  */
   if (first_argument && TREE_CODE (t1) == POINTER_TYPE)
     {
@@ -1316,6 +1319,9 @@ func_checker::compare_operand (tree t1, tree t2)
 
 	if (!compare_operand (x1, x2))
 	  return RETURN_FALSE_WITH_MSG ("");
+
+	if (get_alias_set (y1) != get_alias_set (y2))
+	  return RETURN_FALSE_WITH_MSG ("alias set for MEM_REF offsets are different");
 
 	/* Type of the offset on MEM_REF does not matter.  */
 	return wi::to_offset  (y1) == wi::to_offset  (y2);
