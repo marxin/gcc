@@ -1,3 +1,40 @@
+2014-09-19  Olivier Hainque  <hainque@adacore.com>
+
+	* config.host (powerpc-wrs-vxworksmils): New configuration,
+	same as vxworksae.
+
+2014-09-18  Joseph Myers  <joseph@codesourcery.com>
+
+	* libgcc2.c (CEXT): Define using __LIBGCC_*_FUNC_EXT__.
+
+2014-09-18  Joseph Myers  <joseph@codesourcery.com>
+
+	* config/i386/sfp-machine.h (FP_TRAPPING_EXCEPTIONS): Treat clear
+	bits not set bits as indicating trapping exceptions.
+
+2014-09-17  Nathan sidwell  <nathan@acm.org>
+
+	* Makefile.in (LIBGCOV_INTERFACE): Add _gcov_dump from ...
+	(LIBGCOV_DRIVER): ... here.
+	* libgcov-driver.c (gcov_master): New.
+	(gcov_exit): Remove from master chain.
+	(__gcov_init): Add to master chain if version compatible.  Don't
+	clear the version.
+	* libgcov_interface (__gcov_flust): Call gcov_dump_int.
+	(gcov_reset_int): Clear master chain, if compatible.
+	(gcov_dump_int): New internal interface.  Dump master chain, if
+	compatible.
+	(gcov_dump): Alias for gcov_dump_int.
+	* libgcov.h (struct gcov_root): Add next and prev fields.
+	(struct gcov_master): New struct.
+	(__gcov_master): New.
+	(gcov_dump_int): Declare.
+
+2014-09-17  Olivier Hainque  <hainque@adacore.com>
+
+	* config.host (x86_64-*-mingw*): Add i386/t-cygming to tmake_file
+	and crtbegin.o + crtend.o to extra_parts.
+
 2014-09-12  Joseph Myers  <joseph@codesourcery.com>
 
 	* libgcc2.h (LIBGCC2_HAS_SF_MODE): Define using
