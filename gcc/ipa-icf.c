@@ -91,6 +91,7 @@ namespace ipa_icf {
    set IGNORE_LABELS to skip label comparison.
    Similarly, IGNORE_SOURCE_DECLS and IGNORE_TARGET_DECLS are sets
    of declarations that can be skipped.  */
+
 func_checker::func_checker (tree source_func_decl, tree target_func_decl, bool compare_polymorphic,
   bool ignore_labels,
   hash_set<tree> *ignored_source_decls, hash_set<tree> *ignored_target_decls)
