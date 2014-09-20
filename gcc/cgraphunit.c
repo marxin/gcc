@@ -1512,8 +1512,6 @@ cgraph_node::expand_thunk (bool output_asm_thunks, bool force_gimple_thunk)
 	get_body ();
       a = DECL_ARGUMENTS (thunk_fndecl);
 
-      cgraph_node *ut = callees->callee->ultimate_alias_target ();
-      
       current_function_decl = thunk_fndecl;
 
       /* Ensure thunks are emitted in their correct sections.  */
