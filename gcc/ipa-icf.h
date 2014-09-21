@@ -211,7 +211,7 @@ private:
   /* Source function declarations that should be skipped by
      declaration comparison.  */
   hash_set<tree> *m_ignored_source_decls;
-  
+
   /* Target function declarations that should be skipped by
      declaration comparison.  */
   hash_set<tree> *m_ignored_target_decls;

@@ -92,14 +92,15 @@ namespace ipa_icf {
    Similarly, IGNORE_SOURCE_DECLS and IGNORE_TARGET_DECLS are sets
    of declarations that can be skipped.  */
 
-func_checker::func_checker (tree source_func_decl, tree target_func_decl, bool compare_polymorphic,
-  bool ignore_labels,
-  hash_set<tree> *ignored_source_decls, hash_set<tree> *ignored_target_decls)
+func_checker::func_checker (tree source_func_decl, tree target_func_decl,
+			    bool compare_polymorphic,
+			    bool ignore_labels,
+			    hash_set<tree> *ignored_source_decls, hash_set<tree> *ignored_target_decls)
   : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
-  m_ignored_source_decls (ignored_source_decls),
-  m_ignored_target_decls (ignored_target_decls),
-  m_compare_polymorphic (compare_polymorphic),
-  m_ignore_labels (ignore_labels)
+    m_ignored_source_decls (ignored_source_decls),
+    m_ignored_target_decls (ignored_target_decls),
+    m_compare_polymorphic (compare_polymorphic),
+    m_ignore_labels (ignore_labels)
 {
   function *source_func = DECL_STRUCT_FUNCTION (source_func_decl);
   function *target_func = DECL_STRUCT_FUNCTION (target_func_decl);
@@ -171,11 +172,12 @@ func_checker::compare_edge (edge e1, edge e2)
 bool
 func_checker::compare_decl (tree t1, tree t2)
 {
-  if (!auto_var_in_fn_p (t1, m_source_func_decl) || !auto_var_in_fn_p (t2, m_target_func_decl))
+  if (!auto_var_in_fn_p (t1, m_source_func_decl)
+      || !auto_var_in_fn_p (t2, m_target_func_decl))
     return RETURN_WITH_DEBUG (t1 == t2);
 
   if (!types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
-					 m_compare_polymorphic))
+			       m_compare_polymorphic))
     return RETURN_FALSE ();
 
   bool existed_p;
@@ -265,8 +267,8 @@ sem_item::dump (void)
 
 /* Return true if types are compatible from perspective of ICF.  */
 bool func_checker::types_are_compatible_p (tree t1, tree t2,
-				       bool compare_polymorphic,
-				       bool first_argument)
+    bool compare_polymorphic,
+    bool first_argument)
 {
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return RETURN_FALSE_WITH_MSG ("different tree types");
@@ -388,13 +390,15 @@ sem_function::equals_wpa (sem_item *item)
       if (!arg_types[i] || !m_compared_func->arg_types[i])
 	return RETURN_FALSE_WITH_MSG ("NULL argument type");
 
-      if (!func_checker::types_are_compatible_p (arg_types[i], m_compared_func->arg_types[i],
-				   true, i == 0))
+      if (!func_checker::types_are_compatible_p (arg_types[i],
+	  m_compared_func->arg_types[i],
+	  true, i == 0))
 	return RETURN_FALSE_WITH_MSG ("argument type is different");
     }
 
   /* Result type checking.  */
-  if (!func_checker::types_are_compatible_p (result_type, m_compared_func->result_type))
+  if (!func_checker::types_are_compatible_p (result_type,
+      m_compared_func->result_type))
     return RETURN_FALSE_WITH_MSG ("result types are different");
 
   return true;
@@ -454,7 +458,8 @@ sem_function::equals_private (sem_item *item)
   tree decl1 = DECL_ATTRIBUTES (decl);
   tree decl2 = DECL_ATTRIBUTES (m_compared_func->decl);
 
-  m_checker = new func_checker (decl, m_compared_func->decl, compare_polymorphic_p (), &tree_refs_set, &m_compared_func->tree_refs_set);
+  m_checker = new func_checker (decl, m_compared_func->decl,
+				compare_polymorphic_p (), &tree_refs_set, &m_compared_func->tree_refs_set);
   while (decl1)
     {
       if (decl2 == NULL)
@@ -469,7 +474,7 @@ sem_function::equals_private (sem_item *item)
       if (attr_value1 && attr_value2)
 	{
 	  bool ret = m_checker->compare_operand (TREE_VALUE (attr_value1),
-				      TREE_VALUE (attr_value2));
+						 TREE_VALUE (attr_value2));
 	  if (!ret)
 	    return RETURN_FALSE_WITH_MSG ("attribute values are different");
 	}
@@ -1149,7 +1154,7 @@ func_checker::compare_function_decl (tree t1, tree t2)
   if (m_ignored_source_decls != NULL && m_ignored_target_decls != NULL)
     {
       ret = m_ignored_source_decls->contains (t1)
-		 && m_ignored_target_decls->contains (t2);
+	    && m_ignored_target_decls->contains (t2);
 
       if (ret)
 	return true;
@@ -1178,7 +1183,7 @@ func_checker::compare_variable_decl (tree t1, tree t2)
   if (m_ignored_source_decls != NULL && m_ignored_target_decls != NULL)
     {
       ret = m_ignored_source_decls->contains (t1)
-		 && m_ignored_target_decls->contains (t2);
+	    && m_ignored_target_decls->contains (t2);
 
       if (ret)
 	return true;
@@ -1365,7 +1370,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	ret = compare_ssa_name (t1, t2);
 
 	if (!ret)
-   	  return RETURN_WITH_DEBUG (ret);
+	  return RETURN_WITH_DEBUG (ret);
 
 	if (SSA_NAME_IS_DEFAULT_DEF (t1))
 	  {
@@ -1390,8 +1395,8 @@ func_checker::compare_operand (tree t1, tree t2)
 		return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
 	      }
 	  }
-	  else
-	    return true;
+	else
+	  return true;
       }
     case INTEGER_CST:
       {
@@ -1540,7 +1545,8 @@ sem_variable::equals (tree t1, tree t2)
 	tree y1 = TREE_OPERAND (t1, 1);
 	tree y2 = TREE_OPERAND (t2, 1);
 
-	if (!func_checker::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2), true))
+	if (!func_checker::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2),
+	    true))
 	  return RETURN_FALSE ();
 
 	/* Type of the offset on MEM_REF does not matter.  */
@@ -1560,7 +1566,8 @@ sem_variable::equals (tree t1, tree t2)
     case LABEL_DECL:
       return t1 == t2;
     case INTEGER_CST:
-      return func_checker::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2), true)
+      return func_checker::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
+	     true)
 	     && wi::to_offset (t1) == wi::to_offset (t2);
     case STRING_CST:
     case REAL_CST:
@@ -1921,10 +1928,10 @@ void
 sem_item_optimizer::register_hooks (void)
 {
   m_cgraph_node_hooks = symtab->add_cgraph_removal_hook
-    (&sem_item_optimizer::cgraph_removal_hook, this);
+			(&sem_item_optimizer::cgraph_removal_hook, this);
 
   m_varpool_node_hooks = symtab->add_varpool_removal_hook
-    (&sem_item_optimizer::varpool_removal_hook, this);
+			 (&sem_item_optimizer::varpool_removal_hook, this);
 }
 
 /* Unregister callgraph and varpool hooks.  */
