@@ -1,3 +1,133 @@
+2014-09-20  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* config/epiphany/epiphany.md (sub_f_add_imm): Change constraint of
+	operand 3 to "CnL".
+
+2014-09-20  Andreas Schwab  <schwab@suse.de>
+
+	* config/ia64/ia64.md: Remove constraints from define_split
+	patterns.
+
+2014-09-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-utils.h (ipa_polymorphic_call_context): Turn into class; add ctors.
+	(possible_polymorphic_call_targets, dump_possible_polymorphic_call_targets,
+	possible_polymorphic_call_target_p, possible_polymorphic_call_target_p): Simplify.
+	(get_dynamic_type): Remove.
+	* ipa-devirt.c (ipa_dummy_polymorphic_call_context): Remove.
+	(clear_speculation): Bring to ipa-deivrt.h
+	(get_class_context): Rename to ...
+	(ipa_polymorphic_call_context::restrict_to_inner_class): ... this one.
+	(contains_type_p): Update.
+	(get_dynamic_type): Rename to ...
+	ipa_polymorphic_call_context::get_dynamic_type(): ... this one.
+	(possible_polymorphic_call_targets): UPdate.
+	* tree-ssa-pre.c (eliminate_dom_walker::before_dom_children): Update.
+	* ipa-prop.c (ipa_analyze_call_uses): Update.
+
+2014-09-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-visibility.c (varpool_node::externally_visible_p): Do not
+	privatize dynamic TLS variables.
+
+2014-09-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	* diagnostic.c (warning_n): New function.
+	* diagnostic-core.h (warning_n): Declare.
+	* ipa-devirt.c (ipa_devirt): Handle singulars correctly;
+	output dynamic counts when available.
+
+2014-09-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR tree-optimization/63255
+	* ipa.c (symbol_table::remove_unreachable_nodes): Fix ordering
+	issue in setting body_removed flag.
+
+2014-09-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR c++/61825
+	* c-family/c-common.c (handle_alias_ifunc_attribute): Check
+	that visibility change is possible
+	(handle_weakref_attribute): Likewise.
+	* cgraph.h (symtab_node): Add method get_create and
+	field refuse_visibility_changes.
+	(symtab_node::get_create): New method.
+	* fold-const.c (tree_single_nonzero_warnv_p): Use get_create.
+	* varasm.c (mark_weak): Verify that visibility change is
+	possible.
+
+2014-09-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (fusion_gpr_mem_load): Move testing
+	for base_reg_operand to be common between LO_SUM and PLUS.
+	(fusion_gpr_mem_combo): New predicate to match a fused address
+	that combines the addis and memory offset address.
+
+	* config/rs6000/rs6000-protos.h (fusion_gpr_load_p): Change
+	calling signature.
+	(emit_fusion_gpr_load): Likewise.
+
+	* config/rs6000/rs6000.c (fusion_gpr_load_p): Change calling
+	signature to pass each argument separately, rather than
+	using an operands array.  Rewrite the insns found by peephole2 to
+	be a single insn, rather than hoping the insns will still be
+	together when the peephole pass is done.  Drop being called via a
+	normal peephole.
+	(emit_fusion_gpr_load): Change calling signature to be called from
+	the fusion_gpr_load_<mode> insns with a combined memory address
+	instead of the peephole pass passing the addis and offset
+	separately.
+
+	* config/rs6000/rs6000.md (UNSPEC_FUSION_GPR): New unspec for GPR
+	fusion.
+	(power8 fusion peephole): Drop support for doing power8 via a
+	normal peephole that was created by the peephole2 pass.
+	(power8 fusion peephole2): Create a new insn with the fused
+	address, so that the fused operation is kept together after
+	register allocation is done.
+	(fusion_gpr_load_<mode>): Likewise.
+
+2014-09-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR lto/63286
+	* tree.c (need_assembler_name_p): Do not mangle variadic types.
+
+2014-09-19  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* recog.c (scratch_operand): Do not simply allow all hard registers:
+	only allow those that are allocatable.
+
+2014-09-19  Felix Yang  <felix.yang@huawei.com>
+
+	* cfgrtl.c ira.c ira-color.c ira-conflicts ira-lives.c: Update
+	comments and fix spacing to conform to coding style.
+
+2014-09-19  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* genrecog.c (validate_pattern): Allow empty constraints in
+	a match_scratch.
+
+2014-09-19  Aldy Hernandez  <aldyh@redhat.com>
+
+	* dwarf2out.c (decl_ultimate_origin): Update comment.
+	* tree.c (block_ultimate_origin): Same.
+
+2014-09-19  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_special_adjust_field_align_p):
+	Update GCC version name to GCC 5.
+	(rs6000_function_arg_boundary): Likewise.
+	(rs6000_function_arg): Likewise.
+
+2014-09-19  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/sh/sh.md: Fix use of constraints in define_split.
+
+2014-09-19  Markus Trippelsdorf  <markus@trippelsdorf.de>
+
+	PR ipa/61998
+	* ipa-devirt.c (ipa_devirt): Bail out if odr_types_ptr is NULL.
+
 2014-09-19  James Greenhalgh  <james.greenhalgh@arm.com>
 
 	* doc/md.texi (Modifiers): Consistently use "read/write"

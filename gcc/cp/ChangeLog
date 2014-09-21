@@ -1,3 +1,19 @@
+2014-09-20  Jason Merrill  <jason@redhat.com>
+
+	PR c++/62017
+	* decl.c (begin_destructor_body): Only clobber the as-base part of
+	*this.
+
+2014-09-19  Jason Merrill  <jason@redhat.com>
+
+	PR c++/61392
+	* mangle.c (write_expression): Use unresolved-name mangling for
+	DR850 case.
+
+	PR c++/61465
+	* call.c (convert_like_real) [ck_identity]: Call mark_rvalue_use
+	after pulling out an element from a CONSTRUCTOR.
+
 2014-09-18  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/63248
