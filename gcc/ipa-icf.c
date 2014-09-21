@@ -84,14 +84,22 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-icf.h"
 
 namespace ipa_icf {
-/* Initialize internal structures according to given number of
-   source and target SSA names. The number of source names is SSA_SOURCE,
-   respectively SSA_TARGET.  */
+
+/* Initialize internal structures for a given SOURCE_FUNC_DECL and
+   TARGET_FUNC_DECL. Strict polymorphic comparison is processed if
+   an option COMPARE_POLYMORPHIC is true. For special cases, one can
+   set IGNORE_LABELS to skip label comparison.
+   Similarly, IGNORE_SOURCE_DECLS and IGNORE_TARGET_DECLS are sets
+   of declarations that can be skipped.  */
 
 func_checker::func_checker (tree source_func_decl, tree target_func_decl, bool compare_polymorphic,
+  bool ignore_labels,
   hash_set<tree> *ignored_source_decls, hash_set<tree> *ignored_target_decls)
   : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
-  m_ignored_source_decls (ignored_source_decls), m_ignored_target_decls (ignored_target_decls), m_compare_polymorphic (compare_polymorphic)
+  m_ignored_source_decls (ignored_source_decls),
+  m_ignored_target_decls (ignored_target_decls),
+  m_compare_polymorphic (compare_polymorphic),
+  m_ignore_labels (ignore_labels)
 {
   function *source_func = DECL_STRUCT_FUNCTION (source_func_decl);
   function *target_func = DECL_STRUCT_FUNCTION (target_func_decl);

@@ -131,8 +131,7 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
   return true;
 }
 
-
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+/* Verifies for given GIMPLEs S1 and S2 that
    call statements are semantically equivalent.  */
 
 bool
@@ -173,7 +172,8 @@ func_checker::compare_gimple_call (gimple s1, gimple s2)
   return compare_operand (t1, t2);
 }
 
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+
+/* Verifies for given GIMPLEs S1 and S2 that
    assignment statements are semantically equivalent.  */
 
 bool
@@ -208,7 +208,7 @@ func_checker::compare_gimple_assign (gimple s1, gimple s2)
   return true;
 }
 
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+/* Verifies for given GIMPLEs S1 and S2 that
    condition statements are semantically equivalent.  */
 
 bool
@@ -243,19 +243,22 @@ func_checker::compare_tree_ssa_label (tree t1, tree t2)
   return compare_operand (t1, t2);
 }
 
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+/* Verifies for given GIMPLEs S1 and S2 that
    label statements are semantically equivalent.  */
 
 bool
 func_checker::compare_gimple_label (gimple g1, gimple g2)
 {
+  if (m_ignore_labels)
+    return true;
+
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
 
   return compare_tree_ssa_label (t1, t2);
 }
 
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+/* Verifies for given GIMPLEs S1 and S2 that
    switch statements are semantically equivalent.  */
 
 bool
@@ -300,7 +303,7 @@ func_checker::compare_gimple_switch (gimple g1, gimple g2)
   return true;
 }
 
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+/* Verifies for given GIMPLEs S1 and S2 that
    return statements are semantically equivalent.  */
 
 bool
@@ -318,7 +321,7 @@ func_checker::compare_gimple_return (gimple g1, gimple g2)
     return compare_operand (t1, t2);
 }
 
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+/* Verifies for given GIMPLEs S1 and S2 that
    goto statements are semantically equivalent.  */
 
 bool
@@ -335,7 +338,7 @@ func_checker::compare_gimple_goto (gimple g1, gimple g2)
   return compare_operand (dest1, dest2);
 }
 
-/* Verifies for given GIMPLEs S1 and S2 (from function FUNC1, resp. FUNC2) that
+/* Verifies for given GIMPLEs S1 and S2 that
    resx statements are semantically equivalent.  */
 
 bool

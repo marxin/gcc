@@ -4232,15 +4232,6 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
     DECL_FUNCTION_PERSONALITY (cg_edge->caller->decl)
       = DECL_FUNCTION_PERSONALITY (cg_edge->callee->decl);
 
-/* TODO: remove
-  if (strstr(cg_edge->callee->name(), "rotate_left"))
-    {
-      fprintf (stderr, "tree_inline:rotate_left (\n  from_caller_asm_name: %s\n  caller_name%s\n  caller_order:%u)\n  callee_name:%s\n,  callee_order:%u\n", cg_edge->caller->asm_name(), cg_edge->caller->name(), cg_edge->caller->order, cg_edge->callee->asm_name(), cg_edge->callee->order);
-      dump_function_to_file (cg_edge->callee->decl, stderr, TDF_DETAILS);
-      fprintf (stderr, "\n\n");
-    }
-*/
-
   /* Split the block holding the GIMPLE_CALL.  */
   e = split_block (bb, stmt);
   bb = e->src;

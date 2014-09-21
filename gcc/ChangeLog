@@ -1,3 +1,131 @@
+2014-09-19  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* doc/md.texi (Modifiers): Consistently use "read/write"
+	nomenclature rather than "input/output".
+	* genrecog.c (constraints_supported_in_insn_p): New.
+	(validate_pattern): If needed, also check constraints on
+	MATCH_SCRATCH operands.
+	* genoutput.c (validate_insn_alternatives): Catch earlyclobber
+	operands with no '=' or '+' modifier.
+
+2014-09-19  James Greenhalgh  <james.greenhalgh@arm.com>
+
+	* config/aarch64/aarch64.md (stack_protect_test_<mode>): Mark
+	scratch register as written.
+
+2014-09-19  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* config/s390/s390.c (s390_emit_epilogue): Remove bogus
+	assignment.
+
+2014-09-19  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* config/s390/s390.md ("trunctdsd2", "extendsdtd2"): New
+	expanders.
+
+2014-09-19  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	PR target/62662
+	* config/s390/s390.c (s390_emit_epilogue): When doing the return
+	address load optimization force s390_optimize_prologue to leave it
+	that way.  Only do the optimization if we already decided to push
+	r14 into a stack slot.
+
+2014-09-19  Marat Zakirov  <m.zakirov@samsung.com>
+
+	* asan.c (build_check_stmt): Alignment arg was added.
+	(asan_expand_check_ifn): Optimization for alignment >= 8.
+
+2014-09-19  Olivier Hainque  <hainque@adacore.com>
+
+	* config/i386/vxworksae.h: Remove obsolete definitions.
+	(STACK_CHECK_PROTECT): Define.
+	* config/i386/vx-common.h: Remove.  Merge contents within
+	config/i386/vxworks.h.
+	* config.gcc (i?86-vxworks*): Use i386/vxworks.h instead of
+	i386/vx-common.h.
+
+2014-09-19  Olivier Hainque  <hainque@adacore.com>
+
+	* config.gcc (powerpc-wrs-vxworksmils): New configuration.
+	* config/rs6000/t-vxworksmils: New file.
+	* config/rs6000/vxworksmils.h: New file.
+
+2014-09-19  Olivier Hainque  <hainque@adacore.com>
+
+	* varasm.c (default_section_type_flags): Flag .persistent.bss
+	sections as SECTION_BSS.
+
+2014-09-19  Nick Clifton  <nickc@redhat.com>
+
+	* config/rl78/rl78.c (rl78_expand_epilogue): Generate a USE of the
+	pop'ed registers so that DCE does not eliminate them.
+
+2014-09-18  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR lto/63298
+	* ipa-devirt.c (odr_subtypes_equivalent_p): Fix thinko in a condition.
+
+2014-09-18  Joseph Myers  <joseph@codesourcery.com>
+
+	* system.h (LIBGCC2_TF_CEXT): Poison.
+	* config/i386/cygming.h (LIBGCC2_TF_CEXT): Remove.
+	* config/i386/darwin.h (LIBGCC2_TF_CEXT): Likewise.
+	* config/i386/dragonfly.h (LIBGCC2_TF_CEXT): Likewise.
+	* config/i386/freebsd.h (LIBGCC2_TF_CEXT): Likewise.
+	* config/i386/gnu-user-common.h (LIBGCC2_TF_CEXT): Likewise.
+	* config/i386/openbsdelf.h (LIBGCC2_TF_CEXT): Likewise.
+	* config/i386/sol2.h (LIBGCC2_TF_CEXT): Likewise.
+	* config/ia64/ia64.h (LIBGCC2_TF_CEXT): Likewise.
+	* config/ia64/linux.h (LIBGCC2_TF_CEXT): Likewise.
+
+2014-09-19  Kito Cheng  <kito@0xlab.org>
+
+	* except.h: Fix header guard.
+	* addresses.h: Add missing header guard.
+	* cfghooks.h: Likewise.
+	* collect-utils.h: Likewise.
+	* collect2-aix.h: Likewise.
+	* conditions.h: Likewise.
+	* cselib.h: Likewise.
+	* dwarf2asm.h: Likewise.
+	* graphds.h: Likewise.
+	* graphite-scop-detection.h: Likewise.
+	* gsyms.h: Likewise.
+	* hw-doloop.h: Likewise.
+	* incpath.h: Likewise.
+	* ipa-inline.h: Likewise.
+	* ipa-ref.h: Likewise.
+	* ira-int.h: Likewise.
+	* ira.h: Likewise.
+	* lra-int.h: Likewise.
+	* lra.h: Likewise.
+	* lto-section-names.h: Likewise.
+	* read-md.h: Likewise.
+	* reload.h: Likewise.
+	* rtl-error.h: Likewise.
+	* sdbout.h: Likewise.
+	* targhooks.h: Likewise.
+	* tree-affine.h: Likewise.
+	* xcoff.h: Likewise.
+	* xcoffout.h: Likewise.
+
+2014-09-18  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR debug/63285
+	* haifa-sched.c (schedule_block): Advance cycle at the end of BB
+	if advance != 0.
+
+2014-09-18  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR target/61360
+	* lra.c (lra): Call recog_init.
+
+2014-09-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/62017
+	* asan.c (transform_statements): Don't instrument clobber statements.
+
 2014-09-18  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
 
 	* config/arm/neon.md (*movmisalign<mode>_neon_load): Change type
