@@ -104,7 +104,7 @@ namespace detail
     // Sane defaults.
     size_t n = iter;
     size_t m = keys;
-    size_t sd = 1234567;// twister_rand_gen::get_time_determined_seed();
+    size_t sd = twister_rand_gen::get_time_determined_seed();
     double tp = 0.2;
     double ip = 0.6;
     double ep = 0.2; 
