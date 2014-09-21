@@ -22,7 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 /* Prints string STRING to a FILE with a given number of SPACE_COUNT.  */
 #define FPUTS_SPACES(file, space_count, string) \
   fprintf (file, "%*s" string, space_count, " "); \
- 
+
 /* fprintf function wrapper that transforms given FORMAT to follow given
    number for SPACE_COUNT and call fprintf for a FILE.  */
 #define FPRINTF_SPACES(file, space_count, format, ...) \
