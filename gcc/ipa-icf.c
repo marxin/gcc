@@ -459,7 +459,10 @@ sem_function::equals_private (sem_item *item)
   tree decl2 = DECL_ATTRIBUTES (m_compared_func->decl);
 
   m_checker = new func_checker (decl, m_compared_func->decl,
-				compare_polymorphic_p (), &tree_refs_set, &m_compared_func->tree_refs_set);
+				compare_polymorphic_p (),
+				false,
+				&tree_refs_set,
+				&m_compared_func->tree_refs_set);
   while (decl1)
     {
       if (decl2 == NULL)
@@ -1426,10 +1429,14 @@ func_checker::compare_operand (tree t1, tree t2)
 	tree fctx2 = DECL_FCONTEXT (t2);
 
 	tree offset1 = DECL_FIELD_OFFSET (t1);
-	tree offset2 = DECL_FIELD_OFFSET (t1);
+	tree offset2 = DECL_FIELD_OFFSET (t2);
+
+	tree bit_offset1 = DECL_FIELD_BIT_OFFSET (t1);
+	tree bit_offset2 = DECL_FIELD_BIT_OFFSET (t2);
 
 	ret = compare_operand (fctx1, fctx2)
-	      && compare_operand (offset1, offset2);
+	      && compare_operand (offset1, offset2)
+	      && compare_operand (bit_offset1, bit_offset2);
 
 	return RETURN_WITH_DEBUG (ret);
       }
@@ -2675,8 +2682,7 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 	for (unsigned int j = 1; j < c->members.length (); j++)
 	  {
 	    sem_item *alias = c->members[j];
-
-	    source->merge (alias);
+	    source->equals (alias);
 
 	    if (dump_file)
 	      {
@@ -2691,6 +2697,8 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 		source->dump_to_file (dump_file);
 		alias->dump_to_file (dump_file);
 	      }
+
+	    source->merge (alias);
 	  }
       }
 }
