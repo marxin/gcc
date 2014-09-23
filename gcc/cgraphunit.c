@@ -1511,7 +1511,7 @@ cgraph_node::expand_thunk (bool output_asm_thunks, bool force_gimple_thunk)
       if (in_lto_p)
 	get_body ();
       a = DECL_ARGUMENTS (thunk_fndecl);
-      
+
       current_function_decl = thunk_fndecl;
 
       /* Ensure thunks are emitted in their correct sections.  */
@@ -2300,7 +2300,7 @@ cgraph_node::create_wrapper (cgraph_node *target)
     tree decl_result = DECL_RESULT (decl);
 
     /* Remove the function's body.  */
-    release_body ();
+    release_body (true);
     reset ();
 
     DECL_RESULT (decl) = decl_result;
