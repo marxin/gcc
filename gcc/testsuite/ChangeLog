@@ -1,3 +1,110 @@
+2014-09-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/63316
+	* c-c++-common/asan/pr63316.c: New test.
+
+2014-09-24  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	PR tree-optimization/63266
+	* gcc.dg/optimize-bswapsi-1.c (swap32_d): New bswap pass test.
+
+2014-09-24  Zhenqiang Chen  <zhenqiang.chen@arm.com>
+
+	* gcc.target/arm/pr63210.c: New test.
+
+2014-09-23  Andi Kleen  <ak@linux.intel.com>
+
+	* gcc.dg/noreorder.c: New test.
+	* gcc.dg/noreorder2.c: New test.
+	* gcc.dg/noreorder3.c: New test.
+	* gcc.dg/noreorder4.c: New test.
+
+2014-09-23  Alan Lawrence  <alan.lawrence@arm.com>
+
+	* gcc.dg/combine_ashiftrt_1.c: New test.
+	* gcc.dg/combine_ashiftrt_2.c: Likewise.
+	* gcc.target/aarch64/singleton_intrinsics_1.c: Remove scan-assembler
+	workarounds for cmge.
+	* gcc.target/aarch64/simd/int_comparisons_1.c: Likewise; also check for
+	absence of mvn.
+
+2014-09-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/61857
+	* g++.dg/cpp1y/lambda-init10.C: New.
+
+2014-09-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/63331
+	* gfortran.dg/pr63331.f90: New test.
+
+2014-09-24  Renlin Li  <renlin.li@arm.com>
+
+	* gcc.dg/ira-shrinkwrap-prep-1.c: Enable aarch64.
+	* gcc.dg/ira-shrinkwrap-prep-2.c: Likewise.
+	* gcc.dg/pr10474.c: Likewise.
+
+2014-09-20  Mark Wielaard  <mjw@redhat.com>
+
+	* gcc.dg/guality/const-volatile.c (i): Mark as used.
+	(ci): Likewise.
+	(pci): Likewise.
+	(pvi): Likewise.
+	(pcvi): Likewise.
+	(cip): Likewise.
+	(foo): Likewise.
+	(cfoo): Likewise.
+
+2014-09-20  Mark Wielaard  <mjw@redhat.com>
+
+	* lib/gcc-gdb-test.exp (gdb-test): Transform gdb types "short int"
+	and "long int" to plain "short" and "long".
+	* gcc.dg/guality/const-volatile.c (struct bar): New struct
+	containing short and long long fields.
+	(bar): New variable to test the type.
+
+2014-09-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/62155
+	* g++.dg/cpp0x/lambda/lambda-62155.C: New.
+
+2014-09-22  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/62219
+	* g++.dg/cpp0x/lambda/lambda-template14.C: New.
+
+2014-09-22  Alan Lawrence  <alan.lawrence@arm.com>
+
+	* gcc.dg/vect/vect-reduc-or_1.c: New test.
+	* gcc.dg/vect/vect-reduc-or_2.c: Likewise.
+
+2014-09-22  Alan Lawrence  <alan.lawrence@arm.com>
+
+	* lib/target-supports.exp (check_effective_target_whole_vector_shift):
+	New.
+
+	* gcc.dg/vect/vect-reduc-mul_1.c: New test.
+	* gcc.dg/vect/vect-reduc-mul_2.c: New test.
+
+2014-09-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/63328
+	* c-c++-common/gomp/pr63328.c: New test.
+
+2014-09-22  Martin Liska  <mliska@suse.cz>
+
+	PR lto/63270
+	* g++.dg/lto/pr63270_0.C: New test.
+	* g++.dg/lto/pr63270_1.C: New test.
+
+2014-09-21  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/avx-vzeroupper-16.c (dg-final): Remove check
+	for call_value_rex64_ms_sysv.
+	* gcc.target/i386/avx-vzeroupper-17.c (dg-final): Ditto.
+	* gcc.target/i386/avx-vzeroupper-18.c (dg-final): Remove check
+	for call_rex64_ms_sysv.
+
 2014-09-20  Alessandro Fanfarillo  <fanfarillo.gcc@gmail.com>
 	    Tobias Burnus  <burnus@net-b.de>
 

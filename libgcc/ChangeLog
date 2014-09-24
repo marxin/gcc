@@ -1,3 +1,36 @@
+2014-09-22  Joseph Myers  <joseph@codesourcery.com>
+
+	* dfp-bit.h (LIBGCC2_LONG_DOUBLE_TYPE_SIZE): Remove.
+	(__LIBGCC_XF_MANT_DIG__): Define if not already defined.
+	(LONG_DOUBLE_HAS_XF_MODE): Define in terms of
+	__LIBGCC_XF_MANT_DIG__.
+	(__LIBGCC_TF_MANT_DIG__): Define if not already defined.
+	(LONG_DOUBLE_HAS_TF_MODE): Define in terms of
+	__LIBGCC_TF_MANT_DIG__.
+	* libgcc2.c (NOTRUNC): Define in terms of
+	__LIBGCC_*_EXCESS_PRECISION__, not LIBGCC2_LONG_DOUBLE_TYPE_SIZE.
+	* libgcc2.h (LIBGCC2_LONG_DOUBLE_TYPE_SIZE): Remove.
+
+2014-09-22  Joseph Myers  <joseph@codesourcery.com>
+
+	PR target/63312
+	* config/ia64/sfp-machine.h (FE_EX_ALL, FP_TRAPPING_EXCEPTIONS):
+	New macros.
+
+2014-09-22  Hans-Peter Nilsson  <hp@axis.com>
+
+	* crtstuff.c (USE_EH_FRAME_REGISTRY): Let USE_EH_FRAME_REGISTRY_ALWAYS
+	override USE_PT_GNU_EH_FRAME.
+	[__LIBGCC_EH_FRAME_SECTION_NAME__ && !USE_PT_GNU_EH_FRAME]: Sanity-
+	check USE_EH_FRAME_REGISTRY_ALWAYS against
+	__LIBGCC_EH_FRAME_SECTION_NAME__, emit error if unsane.
+	* Makefile.in (FORCE_EXPLICIT_EH_REGISTRY): New
+	variable for substituted force_explicit_eh_registry.
+	(CRTSTUFF_CFLAGS): Add FORCE_EXPLICIT_EH_REGISTRY.
+	* configure.ac (explicit-exception-frame-registration):
+	New AC_ARG_ENABLE.
+	* configure: Regenerate.
+
 2014-09-19  Olivier Hainque  <hainque@adacore.com>
 
 	* config.host (powerpc-wrs-vxworksmils): New configuration,

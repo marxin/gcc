@@ -24865,9 +24865,7 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
 		  rtx callarg2,
 		  rtx pop, bool sibcall)
 {
-  unsigned int const cregs_size
-    = ARRAY_SIZE (x86_64_ms_sysv_extra_clobbered_registers);
-  rtx vec[3 + cregs_size];
+  rtx vec[3];
   rtx use = NULL, call;
   unsigned int vec_len = 0;
 
@@ -24930,18 +24928,16 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
   if (TARGET_64BIT_MS_ABI
       && (!callarg2 || INTVAL (callarg2) != -2))
     {
-      unsigned i;
-
-      vec[vec_len++] = gen_rtx_UNSPEC (VOIDmode, gen_rtvec (1, const0_rtx),
-				       UNSPEC_MS_TO_SYSV_CALL);
+      int const cregs_size
+	= ARRAY_SIZE (x86_64_ms_sysv_extra_clobbered_registers);
+      int i;
 
       for (i = 0; i < cregs_size; i++)
 	{
 	  int regno = x86_64_ms_sysv_extra_clobbered_registers[i];
 	  enum machine_mode mode = SSE_REGNO_P (regno) ? TImode : DImode;
 
-	  vec[vec_len++]
-	    = gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (mode, regno));
+	  clobber_reg (&use, gen_rtx_REG (mode, regno));
 	}
     }
 
@@ -29965,8 +29961,8 @@ static const struct builtin_description bdesc_args[] =
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_permv4df, "__builtin_ia32_permdf256", IX86_BUILTIN_VPERMDF256, UNKNOWN, (int) V4DF_FTYPE_V4DF_INT },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_permv4di, "__builtin_ia32_permdi256", IX86_BUILTIN_VPERMDI256, UNKNOWN, (int) V4DI_FTYPE_V4DI_INT },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_permv2ti, "__builtin_ia32_permti256", IX86_BUILTIN_VPERMTI256, UNKNOWN, (int) V4DI_FTYPE_V4DI_V4DI_INT },
-  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_extracti128, "__builtin_ia32_extract128i256", IX86_BUILTIN_VEXTRACT128I256, UNKNOWN, (int) V2DI_FTYPE_V4DI_INT },
-  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_inserti128, "__builtin_ia32_insert128i256", IX86_BUILTIN_VINSERT128I256, UNKNOWN, (int) V4DI_FTYPE_V4DI_V2DI_INT },
+  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx_vextractf128v4di, "__builtin_ia32_extract128i256", IX86_BUILTIN_VEXTRACT128I256, UNKNOWN, (int) V2DI_FTYPE_V4DI_INT },
+  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx_vinsertf128v4di, "__builtin_ia32_insert128i256", IX86_BUILTIN_VINSERT128I256, UNKNOWN, (int) V4DI_FTYPE_V4DI_V2DI_INT },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_ashlvv4di, "__builtin_ia32_psllv4di", IX86_BUILTIN_PSLLVV4DI, UNKNOWN, (int) V4DI_FTYPE_V4DI_V4DI },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_ashlvv2di, "__builtin_ia32_psllv2di", IX86_BUILTIN_PSLLVV2DI, UNKNOWN, (int) V2DI_FTYPE_V2DI_V2DI },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_ashlvv8si, "__builtin_ia32_psllv8si", IX86_BUILTIN_PSLLVV8SI, UNKNOWN, (int) V8SI_FTYPE_V8SI_V8SI },
@@ -34057,8 +34053,8 @@ ix86_expand_args_builtin (const struct builtin_description *d,
 	  if (!match)
 	    switch (icode)
 	      {
-	      case CODE_FOR_avx2_inserti128:
-	      case CODE_FOR_avx2_extracti128:
+	      case CODE_FOR_avx_vinsertf128v4di:
+	      case CODE_FOR_avx_vextractf128v4di:
 		error ("the last argument must be an 1-bit immediate");
 		return const0_rtx;
 
@@ -34111,6 +34107,12 @@ ix86_expand_args_builtin (const struct builtin_description *d,
 	      case CODE_FOR_avx512f_vinserti32x4_mask:
 	      case CODE_FOR_avx512f_vextractf32x4_mask:
 	      case CODE_FOR_avx512f_vextracti32x4_mask:
+	      case CODE_FOR_sse2_shufpd:
+	      case CODE_FOR_sse2_shufpd_mask:
+	      case CODE_FOR_avx512dq_shuf_f64x2_mask:
+	      case CODE_FOR_avx512dq_shuf_i64x2_mask:
+	      case CODE_FOR_avx512vl_shuf_i32x4_mask:
+	      case CODE_FOR_avx512vl_shuf_f32x4_mask:
 		error ("the last argument must be a 2-bit immediate");
 		return const0_rtx;
 
@@ -34124,6 +34126,12 @@ ix86_expand_args_builtin (const struct builtin_description *d,
 	      case CODE_FOR_avx512f_vinserti64x4_mask:
 	      case CODE_FOR_avx512f_vextractf64x4_mask:
 	      case CODE_FOR_avx512f_vextracti64x4_mask:
+	      case CODE_FOR_avx512dq_vinsertf32x8_mask:
+	      case CODE_FOR_avx512dq_vinserti32x8_mask:
+	      case CODE_FOR_avx512vl_vinsertv4df:
+	      case CODE_FOR_avx512vl_vinsertv4di:
+	      case CODE_FOR_avx512vl_vinsertv8sf:
+	      case CODE_FOR_avx512vl_vinsertv8si:
 		error ("the last argument must be a 1-bit immediate");
 		return const0_rtx;
 
@@ -37525,13 +37533,6 @@ ix86_cannot_change_mode_class (enum machine_mode from, enum machine_mode to,
 	 drop the subreg from (subreg:SI (reg:HI 100) 0).  This affects
 	 the vec_dupv4hi pattern.  */
       if (GET_MODE_SIZE (from) < 4)
-	return true;
-
-      /* Vector registers do not support subreg with nonzero offsets, which
-	 are otherwise valid for integer registers.  Since we can't see
-	 whether we have a nonzero offset from here, prohibit all
-         nonparadoxical subregs changing size.  */
-      if (GET_MODE_SIZE (to) < GET_MODE_SIZE (from))
 	return true;
     }
 

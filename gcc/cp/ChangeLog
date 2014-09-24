@@ -1,3 +1,31 @@
+2014-09-23  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/61857
+	* parser.c (cp_parser_skip_to_closing_square_bracket,
+	cp_parser_array_designator_p): New.
+	(cp_parser_initializer_list): Use the latter.
+
+2014-09-22  Jason Merrill  <jason@redhat.com>
+
+	* semantics.c (finish_non_static_data_member): In diagnostic, give
+	error at point of use and note at point of declaration.
+
+	PR c++/63320
+	PR c++/60463
+	PR c++/60755
+	* lambda.c (maybe_resolve_dummy, lambda_expr_this_capture): Handle
+	not finding 'this'.
+
+2014-09-22  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/62219
+	* pt.c (check_default_tmpl_args): Check LAMBDA_FUNCTION_P.
+
+2014-09-22  Jason Merrill  <jason@redhat.com>
+
+	* decl.c (poplevel): Don't warn about unused vars in template scope.
+	* error.c (dump_decl): Handle variable templates.
+
 2014-09-20  Jason Merrill  <jason@redhat.com>
 
 	PR c++/62017
