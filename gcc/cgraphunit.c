@@ -2294,7 +2294,8 @@ cgraph_node::create_wrapper (cgraph_node *target)
     /* Preserve DECL_RESULT so we get right by reference flag.  */
     tree decl_result = DECL_RESULT (decl);
 
-    /* Remove the function's body.  */
+    /* Remove the function's body but keep arguments to be reused
+       for thunk.  */
     release_body (true);
     reset ();
 
