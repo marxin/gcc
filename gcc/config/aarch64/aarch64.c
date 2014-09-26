@@ -5986,20 +5986,33 @@ aarch64_register_move_cost (enum machine_mode mode,
     return aarch64_register_move_cost (mode, from, GENERAL_REGS)
             + aarch64_register_move_cost (mode, GENERAL_REGS, to);
 
+  if (GET_MODE_SIZE (mode) == 16)
+    {
+      /* 128-bit operations on general registers require 2 instructions.  */
+      if (from == GENERAL_REGS && to == GENERAL_REGS)
+	return regmove_cost->GP2GP * 2;
+      else if (from == GENERAL_REGS)
+	return regmove_cost->GP2FP * 2;
+      else if (to == GENERAL_REGS)
+	return regmove_cost->FP2GP * 2;
+
+      /* When AdvSIMD instructions are disabled it is not possible to move
+	 a 128-bit value directly between Q registers.  This is handled in
+	 secondary reload.  A general register is used as a scratch to move
+	 the upper DI value and the lower DI value is moved directly,
+	 hence the cost is the sum of three moves. */
+      if (! TARGET_SIMD)
+	return regmove_cost->GP2FP + regmove_cost->FP2GP + regmove_cost->FP2FP;
+
+      return regmove_cost->FP2FP;
+    }
+
   if (from == GENERAL_REGS && to == GENERAL_REGS)
     return regmove_cost->GP2GP;
   else if (from == GENERAL_REGS)
     return regmove_cost->GP2FP;
   else if (to == GENERAL_REGS)
     return regmove_cost->FP2GP;
-
-  /* When AdvSIMD instructions are disabled it is not possible to move
-     a 128-bit value directly between Q registers.  This is handled in
-     secondary reload.  A general register is used as a scratch to move
-     the upper DI value and the lower DI value is moved directly,
-     hence the cost is the sum of three moves. */
-  if (! TARGET_SIMD && GET_MODE_SIZE (mode) == 16)
-    return regmove_cost->GP2FP + regmove_cost->FP2GP + regmove_cost->FP2FP;
 
   return regmove_cost->FP2FP;
 }
@@ -7973,16 +7986,6 @@ aarch64_simd_lane_bounds (rtx operand, HOST_WIDE_INT low, HOST_WIDE_INT high)
 
   if (lane < low || lane >= high)
     error ("lane out of range");
-}
-
-void
-aarch64_simd_const_bounds (rtx operand, HOST_WIDE_INT low, HOST_WIDE_INT high)
-{
-  gcc_assert (CONST_INT_P (operand));
-  HOST_WIDE_INT lane = INTVAL (operand);
-
-  if (lane < low || lane >= high)
-    error ("constant out of range");
 }
 
 /* Emit code to place a AdvSIMD pair result in memory locations (with equal
