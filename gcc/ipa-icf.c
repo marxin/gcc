@@ -733,6 +733,8 @@ sem_function::merge (sem_item *alias_item)
 	  redirected = true;
 	}
 
+      alias->icf_merged = true;
+
       /* The alias function is removed if symbol address
          does not matter.  */
       if (!alias_address_matters)
@@ -745,6 +747,8 @@ sem_function::merge (sem_item *alias_item)
      function into real alias.  */
   else if (create_alias)
     {
+      alias->icf_merged = true;
+
       /* Remove the function's body.  */
       ipa_merge_profiles (original, alias);
       alias->release_body (true);
@@ -767,6 +771,7 @@ sem_function::merge (sem_item *alias_item)
 	  return 0;
 	}
 
+      alias->icf_merged = true;
       ipa_merge_profiles (local_original, alias);
       alias->create_wrapper (local_original);
 

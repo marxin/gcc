@@ -1902,6 +1902,8 @@ cgraph_node::dump (FILE *f)
     fprintf (f, " only_called_at_exit");
   if (tm_clone)
     fprintf (f, " tm_clone");
+  if (icf_merged)
+    fprintf (f, " icf_merged");
   if (DECL_STATIC_CONSTRUCTOR (decl))
     fprintf (f," static_constructor (priority:%i)", get_init_priority ());
   if (DECL_STATIC_DESTRUCTOR (decl))
@@ -2823,11 +2825,19 @@ cgraph_node::verify_node (void)
 			    {
 			      if (verify_edge_corresponds_to_fndecl (e, decl))
 				{
-				  error ("edge points to wrong declaration:");
-				  debug_tree (e->callee->decl);
-				  fprintf (stderr," Instead of:");
-				  debug_tree (decl);
-				  error_found = true;
+				  /* The edge can be redirected in WPA by IPA ICF.
+				     Following check really ensures that it's
+				     not the case.  */
+
+				  cgraph_node *current_node = cgraph_node::get (decl);
+				  if (!current_node || !current_node->icf_merged)
+				  {
+				    error ("edge points to wrong declaration:");
+				    debug_tree (e->callee->decl);
+				    fprintf (stderr," Instead of:");
+				    debug_tree (decl);
+				    error_found = true;
+				  }
 				}
 			    }
 			  else if (decl)

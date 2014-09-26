@@ -1230,6 +1230,8 @@ public:
   /* True if this decl calls a COMDAT-local function.  This is set up in
      compute_inline_parameters and inline_call.  */
   unsigned calls_comdat_local : 1;
+  /* True if node has been created by merge operation in IPA-ICF.  */
+  unsigned icf_merged: 1;
 };
 
 /* A cgraph node set is a collection of cgraph nodes.  A cgraph node
