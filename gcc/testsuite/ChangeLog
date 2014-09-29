@@ -1,3 +1,31 @@
+2014-09-28  Robert Suchanek  <robert.suchanek@imgtec.com>
+
+	* gcc.target/mips/20140928.c: New test.
+
+2014-09-27  Andi Kleen  <ak@linux.intel.com>
+
+	* gcc.target/i386/nop-mcount.c: Only run on Linux.
+	* gcc.target/i386/record-mcount.c: dito.
+
+2014-09-26  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/62121
+	* g++.dg/torture/pr62121.C: New testcase.
+
+2014-09-26  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR middle-end/35545
+	* g++.dg/tree-prof/pr35545.C: New testcase.
+
+2014-09-26  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/pr63335.c: Change effective target to
+	vsx_hw.
+
+2014-09-26  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gcc.target/i386/shrink_wrap_1.c: Skip ia32.
+
 2014-09-26  Jakub Jelinek  <jakub@redhat.com>
 
 	* g++.dg/compat/struct-layout-1_generate.c: Add -Wno-abi
