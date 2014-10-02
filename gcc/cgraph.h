@@ -172,6 +172,12 @@ public:
   /* Dump referring in list to FILE.  */
   void dump_referring (FILE *);
 
+  /* Get number of references for this node.  */
+  inline unsigned get_references_count (void)
+  {
+    return ref_list.references ? ref_list.references->length () : 0;
+  }
+
   /* Iterates I-th reference in the list, REF is also set.  */
   ipa_ref *iterate_reference (unsigned i, ipa_ref *&ref);
 

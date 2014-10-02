@@ -117,8 +117,8 @@ public:
   func_checker (tree source_func_decl, tree target_func_decl,
 		bool compare_polymorphic,
 		bool ignore_labels = false,
-		hash_set<tree> *ignored_source_decls = NULL,
-		hash_set<tree> *ignored_target_decls = NULL);
+		hash_set<symtab_node *> *ignored_source_nodes = NULL,
+		hash_set<symtab_node *> *ignored_target_nodes = NULL);
 
   /* Memory release routine.  */
   ~func_checker();
@@ -208,13 +208,13 @@ private:
   /* Target TREE function declaration.  */
   tree m_target_func_decl;
 
-  /* Source function declarations that should be skipped by
+  /* Source symbol nodes that should be skipped by
      declaration comparison.  */
-  hash_set<tree> *m_ignored_source_decls;
+  hash_set<symtab_node *> *m_ignored_source_nodes;
 
-  /* Target function declarations that should be skipped by
+  /* Target symbol nodes that should be skipped by
      declaration comparison.  */
-  hash_set<tree> *m_ignored_target_decls;
+  hash_set<symtab_node *> *m_ignored_target_nodes;
 
   /* Source to target edge map.  */
   hash_map <edge, edge> m_edge_map;
@@ -236,15 +236,13 @@ class congruence_class
 {
 public:
   /* Congruence class constructor for a new class with _ID.  */
-  congruence_class (unsigned int _id): id(_id)
+  congruence_class (unsigned int _id): in_worklist (false), id(_id)
   {
-    members.create (2);
   }
 
   /* Destructor.  */
   ~congruence_class ()
   {
-    members.release ();
   }
 
   /* Dump function prints all class members to a FILE with an INDENT.  */
@@ -253,8 +251,13 @@ public:
   /* Returns true if there's a member that is used from another group.  */
   bool is_class_used (void);
 
+  /* Flag is used in case we want to remove a class from worklist and
+     delete operation is quite expensive for
+     the data structure (linked list).  */
+  bool in_worklist;
+
   /* Vector of all group members.  */
-  vec <sem_item *> members;
+  auto_vec <sem_item *> members;
 
   /* Global unique class identifier.  */
   unsigned int id;
@@ -324,6 +327,9 @@ public:
   /* Semantic item initialization function.  */
   virtual void init (void) = 0;
 
+  /* Add reference to a semantic TARGET.  */
+  void add_reference (sem_item *target);
+
   /* Gets symbol name of the item.  */
   const char *name (void)
   {
@@ -336,14 +342,13 @@ public:
     return node->asm_name ();
   }
 
-  /* Initialize references to other semantic functions/variables.  */
-  virtual void init_refs () = 0;
-
   /* Fast equality function based on knowledge known in WPA.  */
-  virtual bool equals_wpa (sem_item *item) = 0;
+  virtual bool equals_wpa (sem_item *item,
+			   hash_map <symtab_node *, sem_item *> &ignored_nodes) = 0;
 
   /* Returns true if the item equals to ITEM given as arguemnt.  */
-  virtual bool equals (sem_item *item) = 0;
+  virtual bool equals (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes) = 0;
 
   /* References independent hash function.  */
   virtual hashval_t get_hash (void) = 0;
@@ -362,9 +367,6 @@ public:
 
   /* Item type.  */
   sem_item_type type;
-
-  /* Global unique function index.  */
-  unsigned int index;
 
   /* Symtab node.  */
   symtab_node *node;
@@ -390,8 +392,8 @@ public:
   /* List of tree references (either FUNC_DECL or VAR_DECL).  */
   vec <tree> tree_refs;
 
-  /* A set with tree references (either FUNC_DECL or VAR_DECL).  */
-  hash_set <tree> tree_refs_set;
+  /* A set with symbol table references.  */
+  hash_set <symtab_node *> refs_set;
 
 protected:
   /* Cached, once calculated hash for the item.  */
@@ -421,10 +423,11 @@ public:
   }
 
   virtual void init (void);
-  virtual bool equals_wpa (sem_item *item);
+  virtual bool equals_wpa (sem_item *item,
+			   hash_map <symtab_node *, sem_item *> &ignored_nodes);
   virtual hashval_t get_hash (void);
-  virtual bool equals (sem_item *item);
-  virtual void init_refs ();
+  virtual bool equals (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
   virtual bool merge (sem_item *alias_item);
 
   /* Dump symbol to FILE.  */
@@ -433,6 +436,10 @@ public:
     gcc_assert (file);
     dump_function_to_file (decl, file, TDF_DETAILS);
   }
+
+  bool compare_cgraph_references (hash_map <symtab_node *, sem_item *>
+				  &ignored_nodes,
+				  symtab_node *n1, symtab_node *n2);
 
   /* Parses function arguments and result type.  */
   void parse_tree_args (void);
@@ -507,13 +514,8 @@ private:
   bool compare_type_list (tree t1, tree t2, bool compare_polymorphic);
 
   /* Processes function equality comparison.  */
-  bool equals_private (sem_item *item);
-
-  /* Initialize references to another sem_item for gimple STMT of type assign.  */
-  void init_refs_for_assign (gimple stmt);
-
-  /* Initialize references to another sem_item for tree T.  */
-  void init_refs_for_tree (tree t);
+  bool equals_private (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
 
   /* Returns true if tree T can be compared as a handled component.  */
   static bool icf_handled_component_p (tree t);
@@ -545,19 +547,15 @@ public:
     ctor = ctor_for_folding (decl);
   }
 
-  /* Initialize references to other semantic functions/variables.  */
-  inline virtual void init_refs ()
-  {
-    parse_tree_refs (ctor);
-  }
-
   virtual hashval_t get_hash (void);
   virtual bool merge (sem_item *alias_item);
   virtual void dump_to_file (FILE *file);
-  virtual bool equals (sem_item *item);
+  virtual bool equals (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
 
   /* Fast equality variable based on knowledge known in WPA.  */
-  inline virtual bool equals_wpa (sem_item *item)
+  inline virtual bool equals_wpa (sem_item *item,
+				  hash_map <symtab_node *, sem_item *> & ARG_UNUSED(ignored_nodes))
   {
     gcc_assert (item->type == VAR);
     return true;
@@ -589,23 +587,6 @@ private:
 }; // class sem_variable
 
 class sem_item_optimizer;
-
-/* Congruence class set structure.  */
-struct congruence_class_var_hash: typed_noop_remove <congruence_class>
-{
-  typedef congruence_class value_type;
-  typedef congruence_class compare_type;
-
-  static inline hashval_t hash (const value_type *item)
-  {
-    return htab_hash_pointer (item);
-  }
-
-  static inline int equal (const value_type *item1, const compare_type *item2)
-  {
-    return item1 == item2;
-  }
-};
 
 struct congruence_class_group
 {
@@ -672,7 +653,10 @@ public:
 
   /* Worklist of congruence classes that can potentially
      refine classes of congruence.  */
-  hash_table <congruence_class_var_hash> worklist;
+  std::list<congruence_class *> worklist;
+
+  /* Remove semantic ITEM and release memory.  */
+  void remove_item (sem_item *item);
 
   /* Remove symtab NODE triggered by symtab removal hooks.  */
   void remove_symtab_node (symtab_node *node);
@@ -706,6 +690,9 @@ private:
   /* Debug function prints all informations about congruence classes.  */
   void dump_cong_classes (void);
 
+  /* Build references according to call graph.  */
+  void build_graph (void);
+
   /* Iterative congruence reduction function.  */
   void process_cong_reduction (void);
 
@@ -719,18 +706,6 @@ private:
 
   /* Pops a class from worklist. */
   congruence_class *worklist_pop ();
-
-  /* Returns true if a congruence class CLS is present in worklist.  */
-  inline bool worklist_contains (const congruence_class *cls)
-  {
-    return worklist.find (cls);
-  }
-
-  /* Removes given congruence class CLS from worklist.  */
-  inline void worklist_remove (const congruence_class *cls)
-  {
-    worklist.remove_elt (cls);
-  }
 
   /* Every usage of a congruence class CLS is a candidate that can split the
      collection of classes. Bitmap stack BMSTACK is used for bitmap
@@ -777,9 +752,6 @@ private:
 
   /* Count of congruence classes.  */
   unsigned int m_classes_count;
-
-  /* Map data structure maps trees to semantic items.  */
-  hash_map <tree, sem_item *> m_decl_map;
 
   /* Map data structure maps symtab nodes to semantic items.  */
   hash_map <symtab_node *, sem_item *> m_symtab_node_map;
