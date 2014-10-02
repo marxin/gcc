@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "except.h"
 #include "data-streamer.h"
 #include "ipa-utils.h"
+#include <list>
 #include "ipa-icf.h"
 
 namespace ipa_icf {

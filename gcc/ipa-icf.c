@@ -81,6 +81,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-streamer.h"
 #include "data-streamer.h"
 #include "ipa-utils.h"
+#include <list>
 #include "ipa-icf.h"
 
 namespace ipa_icf {
@@ -95,10 +96,11 @@ namespace ipa_icf {
 func_checker::func_checker (tree source_func_decl, tree target_func_decl,
 			    bool compare_polymorphic,
 			    bool ignore_labels,
-			    hash_set<tree> *ignored_source_decls, hash_set<tree> *ignored_target_decls)
+			    hash_set<symtab_node *> *ignored_source_nodes,
+			    hash_set<symtab_node *> *ignored_target_nodes)
   : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
-    m_ignored_source_decls (ignored_source_decls),
-    m_ignored_target_decls (ignored_target_decls),
+    m_ignored_source_nodes (ignored_source_nodes),
+    m_ignored_target_nodes (ignored_target_nodes),
     m_compare_polymorphic (compare_polymorphic),
     m_ignore_labels (ignore_labels)
 {
@@ -217,6 +219,18 @@ sem_item::sem_item (sem_item_type _type, symtab_node *_node,
 {
   decl = node->decl;
   setup (stack);
+}
+
+/* Add reference to a semantic TARGET.  */
+
+void
+sem_item::add_reference (sem_item *target)
+{
+  refs.safe_push (target);
+  unsigned index = refs.length ();
+  target->usages.safe_push (new sem_usage_pair(this, index));
+  bitmap_set_bit (target->usage_index_bitmap, index);
+  refs_set.add (target->node);
 }
 
 /* Initialize internal data structures. Bitmap STACK is used for
@@ -371,10 +385,29 @@ sem_function::get_hash (void)
   return hash;
 }
 
+bool
+sem_function::compare_cgraph_references (hash_map <symtab_node *, sem_item *>
+    &ignored_nodes,
+    symtab_node *n1, symtab_node *n2)
+{
+  if (n1 == n2 || (ignored_nodes.get (n1) && ignored_nodes.get (n2)))
+    return true;
+
+  cgraph_node *cn1 = dyn_cast <cgraph_node *> (n1);
+  cgraph_node *cn2 = dyn_cast <cgraph_node *> (n2);
+
+  if (cn1 && cn2 && cn1->weakref && cn2->weakref
+      && cn1->alias_target == cn2->alias_target)
+    return true;
+
+  return RETURN_FALSE_WITH_MSG ("different references");
+}
+
 /* Fast equality function based on knowledge known in WPA.  */
 
 bool
-sem_function::equals_wpa (sem_item *item)
+sem_function::equals_wpa (sem_item *item,
+			  hash_map <symtab_node *, sem_item *> &ignored_nodes)
 {
   gcc_assert (item->type == FUNC);
 
@@ -390,9 +423,12 @@ sem_function::equals_wpa (sem_item *item)
       if (!arg_types[i] || !m_compared_func->arg_types[i])
 	return RETURN_FALSE_WITH_MSG ("NULL argument type");
 
+      /* Polymorphic comparison is executed just for non-leaf functions.  */
+      bool is_not_leaf = get_node ()->callees != NULL;
+
       if (!func_checker::types_are_compatible_p (arg_types[i],
 	  m_compared_func->arg_types[i],
-	  true, i == 0))
+	  is_not_leaf, i == 0))
 	return RETURN_FALSE_WITH_MSG ("argument type is different");
     }
 
@@ -401,16 +437,44 @@ sem_function::equals_wpa (sem_item *item)
       m_compared_func->result_type))
     return RETURN_FALSE_WITH_MSG ("result types are different");
 
+  if (node->get_references_count () != item->node->get_references_count ())
+    return RETURN_FALSE_WITH_MSG ("different number of references");
+
+  ipa_ref *ref = NULL, *ref2 = NULL;
+  for (unsigned i = 0; node->iterate_reference (i, ref); i++)
+    {
+      item->node->iterate_reference (i, ref2);
+
+      if (!compare_cgraph_references (ignored_nodes, ref->referred, ref2->referred))
+	return false;
+    }
+
+  cgraph_edge *e1 = dyn_cast <cgraph_node *> (node)->callees;
+  cgraph_edge *e2 = dyn_cast <cgraph_node *> (item->node)->callees;
+
+  while (e1 && e2)
+    {
+      if (!compare_cgraph_references (ignored_nodes, e1->callee, e2->callee))
+	return false;
+
+      e1 = e1->next_callee;
+      e2 = e2->next_callee;
+    }
+
+  if (e1 || e2)
+    return RETURN_FALSE_WITH_MSG ("different number of edges");
+
   return true;
 }
 
 /* Returns true if the item equals to ITEM given as argument.  */
 
 bool
-sem_function::equals (sem_item *item)
+sem_function::equals (sem_item *item,
+		      hash_map <symtab_node *, sem_item *> &ignored_nodes)
 {
   gcc_assert (item->type == FUNC);
-  bool eq = equals_private (item);
+  bool eq = equals_private (item, ignored_nodes);
 
   if (m_checker != NULL)
     {
@@ -430,7 +494,8 @@ sem_function::equals (sem_item *item)
 /* Processes function equality comparison.  */
 
 bool
-sem_function::equals_private (sem_item *item)
+sem_function::equals_private (sem_item *item,
+			      hash_map <symtab_node *, sem_item *> &ignored_nodes)
 {
   if (item->type != FUNC)
     return false;
@@ -451,7 +516,7 @@ sem_function::equals_private (sem_item *item)
       || cfg_checksum != m_compared_func->cfg_checksum)
     return RETURN_FALSE ();
 
-  if (!equals_wpa (item))
+  if (!equals_wpa (item, ignored_nodes))
     return false;
 
   /* Checking function arguments.  */
@@ -461,8 +526,8 @@ sem_function::equals_private (sem_item *item)
   m_checker = new func_checker (decl, m_compared_func->decl,
 				compare_polymorphic_p (),
 				false,
-				&tree_refs_set,
-				&m_compared_func->tree_refs_set);
+				&refs_set,
+				&m_compared_func->refs_set);
   while (decl1)
     {
       if (decl2 == NULL)
@@ -548,80 +613,6 @@ sem_function::equals_private (sem_item *item)
       return RETURN_FALSE_WITH_MSG ("PHI node comparison returns false");
 
   return result;
-}
-
-/* Initialize references to another sem_item for tree T.  */
-
-void
-sem_function::init_refs_for_tree (tree t)
-{
-  switch (TREE_CODE (t))
-    {
-    case VAR_DECL:
-    case FUNCTION_DECL:
-      tree_refs.safe_push (t);
-      break;
-    case MEM_REF:
-    case ADDR_EXPR:
-    case OBJ_TYPE_REF:
-      init_refs_for_tree (TREE_OPERAND (t, 0));
-      break;
-    case FIELD_DECL:
-      init_refs_for_tree (DECL_FCONTEXT (t));
-      break;
-    default:
-      break;
-    }
-}
-
-/* Initialize references to another sem_item for gimple STMT of type assign.  */
-
-void
-sem_function::init_refs_for_assign (gimple stmt)
-{
-  if (gimple_num_ops (stmt) != 2)
-    return;
-
-  tree rhs = gimple_op (stmt, 1);
-
-  init_refs_for_tree (rhs);
-}
-
-/* Initialize references to other semantic functions/variables.  */
-
-void
-sem_function::init_refs (void)
-{
-  for (unsigned i = 0; i < bb_sorted.length (); i++)
-    {
-      basic_block bb = bb_sorted[i]->bb;
-
-      for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
-	   gsi_next (&gsi))
-	{
-	  gimple stmt = gsi_stmt (gsi);
-	  hashval_t code = (hashval_t) gimple_code (stmt);
-
-	  switch (code)
-	    {
-	    case GIMPLE_CALL:
-	      {
-		tree funcdecl = gimple_call_fndecl (stmt);
-
-		/* Function pointer variables are not supported yet.  */
-		if (funcdecl)
-		  tree_refs.safe_push (funcdecl);
-
-		break;
-	      }
-	    case GIMPLE_ASSIGN:
-	      init_refs_for_assign (stmt);
-	      break;
-	    default:
-	      break;
-	    }
-	}
-    }
 }
 
 /* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
@@ -733,6 +724,8 @@ sem_function::merge (sem_item *alias_item)
 	  redirected = true;
 	}
 
+      alias->icf_merged = true;
+
       /* The alias function is removed if symbol address
          does not matter.  */
       if (!alias_address_matters)
@@ -745,6 +738,8 @@ sem_function::merge (sem_item *alias_item)
      function into real alias.  */
   else if (create_alias)
     {
+      alias->icf_merged = true;
+
       /* Remove the function's body.  */
       ipa_merge_profiles (original, alias);
       alias->release_body (true);
@@ -767,6 +762,7 @@ sem_function::merge (sem_item *alias_item)
 	  return 0;
 	}
 
+      alias->icf_merged = true;
       ipa_merge_profiles (local_original, alias);
       alias->create_wrapper (local_original);
 
@@ -1154,10 +1150,13 @@ func_checker::compare_function_decl (tree t1, tree t2)
   if (t1 == t2)
     return true;
 
-  if (m_ignored_source_decls != NULL && m_ignored_target_decls != NULL)
+  symtab_node *n1 = symtab_node::get (t1);
+  symtab_node *n2 = symtab_node::get (t2);
+
+  if (m_ignored_source_nodes != NULL && m_ignored_target_nodes != NULL)
     {
-      ret = m_ignored_source_decls->contains (t1)
-	    && m_ignored_target_decls->contains (t2);
+      ret = m_ignored_source_nodes->contains (n1)
+	    && m_ignored_target_nodes->contains (n2);
 
       if (ret)
 	return true;
@@ -1183,15 +1182,20 @@ func_checker::compare_variable_decl (tree t1, tree t2)
   if (t1 == t2)
     return true;
 
-  if (m_ignored_source_decls != NULL && m_ignored_target_decls != NULL)
+  if (TREE_CODE (t1) == VAR_DECL && (DECL_EXTERNAL (t1) || TREE_STATIC (t1)))
     {
-      ret = m_ignored_source_decls->contains (t1)
-	    && m_ignored_target_decls->contains (t2);
+      symtab_node *n1 = symtab_node::get (t1);
+      symtab_node *n2 = symtab_node::get (t2);
 
-      if (ret)
-	return true;
+      if (m_ignored_source_nodes != NULL && m_ignored_target_nodes != NULL)
+	{
+	  ret = m_ignored_source_nodes->contains (n1)
+		&& m_ignored_target_nodes->contains (n2);
+
+	  if (ret)
+	    return true;
+	}
     }
-
   ret = compare_decl (t1, t2);
 
   return RETURN_WITH_DEBUG (ret);
@@ -1510,7 +1514,8 @@ sem_variable::sem_variable (varpool_node *node, hashval_t _hash,
 /* Returns true if the item equals to ITEM given as argument.  */
 
 bool
-sem_variable::equals (sem_item *item)
+sem_variable::equals (sem_item *item,
+		      hash_map <symtab_node *, sem_item *> & ARG_UNUSED (ignored_nodes))
 {
   gcc_assert (item->type == VAR);
 
@@ -2016,6 +2021,14 @@ sem_item_optimizer::remove_symtab_node (symtab_node *node)
   m_removed_items_set.add (node);
 }
 
+void
+sem_item_optimizer::remove_item (sem_item *item)
+{
+  if (m_symtab_node_map.get (item->node))
+    m_symtab_node_map.remove (item->node);
+  delete item;
+}
+
 /* Removes all callgraph and varpool nodes that are marked by symtab
    as deleted.  */
 
@@ -2029,10 +2042,16 @@ sem_item_optimizer::filter_removed_items (void)
       sem_item *item = m_items[i];
 
       if (!flag_ipa_icf_functions && item->type == FUNC)
-	continue;
+	{
+	  remove_item (item);
+	  continue;
+	}
 
       if (!flag_ipa_icf_variables && item->type == VAR)
-	continue;
+	{
+	  remove_item (item);
+	  continue;
+	}
 
       bool no_body_function = false;
 
@@ -2048,9 +2067,16 @@ sem_item_optimizer::filter_removed_items (void)
 	{
 	  if (item->type == VAR || (!DECL_CXX_CONSTRUCTOR_P (item->decl)
 				    && !DECL_CXX_DESTRUCTOR_P (item->decl)))
-	    filtered.safe_push (m_items[i]);
+	    {
+	      filtered.safe_push (m_items[i]);
+	      continue;
+	    }
 	}
+
+      remove_item (item);
     }
+
+  /* Clean-up of released semantic items.  */
 
   m_items.release ();
   for (unsigned int i = 0; i < filtered.length(); i++)
@@ -2072,10 +2098,21 @@ sem_item_optimizer::execute (void)
   for (unsigned int i = 0; i < m_items.length(); i++)
     m_items[i]->init_wpa ();
 
+  build_graph ();
+
   subdivide_classes_by_equality (true);
 
   if (dump_file)
     fprintf (dump_file, "Dump after WPA based types groups\n");
+
+  dump_cong_classes ();
+
+  process_cong_reduction ();
+  verify_classes ();
+
+  if (dump_file)
+    fprintf (dump_file, "Dump after callgraph-based congruence reduction\n");
+
   dump_cong_classes ();
 
   parse_nonsingleton_classes ();
@@ -2090,6 +2127,7 @@ sem_item_optimizer::execute (void)
 
   process_cong_reduction ();
   dump_cong_classes ();
+  verify_classes ();
   merge_classes (prev_class_count);
 
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -2170,66 +2208,60 @@ sem_item_optimizer::build_hash_based_classes (void)
     }
 }
 
+/* Build references according to call graph.  */
+
+void
+sem_item_optimizer::build_graph (void)
+{
+  for (unsigned i = 0; i < m_items.length (); i++)
+    {
+      sem_item *item = m_items[i];
+      m_symtab_node_map.put (item->node, item);
+    }
+
+  for (unsigned i = 0; i < m_items.length (); i++)
+    {
+      sem_item *item = m_items[i];
+
+      if (item->type == FUNC)
+	{
+	  cgraph_node *cnode = dyn_cast <cgraph_node *> (item->node);
+
+	  cgraph_edge *e = cnode->callees;
+	  while (e)
+	    {
+	      sem_item **slot = m_symtab_node_map.get (e->callee);
+	      if (slot)
+		item->add_reference (*slot);
+
+	      e = e->next_callee;
+	    }
+	}
+
+      ipa_ref *ref = NULL;
+      for (unsigned i = 0; item->node->iterate_reference (i, ref); i++)
+	{
+	  sem_item **slot = m_symtab_node_map.get (ref->referred);
+	  if (slot)
+	    item->add_reference (*slot);
+	}
+    }
+}
+
 /* Semantic items in classes having more than one element and initialized.
    In case of WPA, we load function body.  */
 
 void
 sem_item_optimizer::parse_nonsingleton_classes (void)
 {
-  for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
-       it != m_classes.end (); ++it)
-    {
-      for (unsigned i = 0; i < (*it)->classes.length (); i++)
-	{
-	  congruence_class *c = (*it)->classes [i];
-
-	  if (c->members.length() > 1)
-	    for (unsigned j = 0; j < c->members.length (); j++)
-	      {
-		sem_item *item = c->members[j];
-		m_decl_map.put (item->decl, item);
-	      }
-	}
-    }
-
   unsigned int init_called_count = 0;
 
-  for (hash_table <congruence_class_group_hash>::iterator it = m_classes.begin ();
-       it != m_classes.end (); ++it)
-    {
-      /* We fill in all declarations for sem_items.  */
-      for (unsigned i = 0; i < (*it)->classes.length (); i++)
-	{
-	  congruence_class *c = (*it)->classes [i];
-
-	  if (c->members.length() > 1)
-	    for (unsigned j = 0; j < c->members.length (); j++)
-	      {
-		sem_item *item = c->members[j];
-
-		item->init ();
-		item->init_refs ();
-
-		init_called_count++;
-
-		for (unsigned j = 0; j < item->tree_refs.length (); j++)
-		  {
-		    sem_item **result = m_decl_map.get (item->tree_refs[j]);
-
-		    if(result)
-		      {
-			sem_item *target = *result;
-			item->refs.safe_push (target);
-
-			unsigned index = item->refs.length ();
-			target->usages.safe_push (new sem_usage_pair(item, index));
-			bitmap_set_bit (target->usage_index_bitmap, index);
-			item->tree_refs_set.add (item->tree_refs[j]);
-		      }
-		  }
-	      }
-	}
-    }
+  for (unsigned i = 0; i < m_items.length (); i++)
+    if (m_items[i]->cls->members.length () > 1)
+      {
+	m_items[i]->init ();
+	init_called_count++;
+      }
 
   if (dump_file)
     fprintf (dump_file, "Init called for %u items (%.2f%%).\n", init_called_count,
@@ -2264,7 +2296,8 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 		{
 		  sem_item *item = c->members[j];
 
-		  bool equals = in_wpa ? first->equals_wpa (item) : first->equals (item);
+		  bool equals = in_wpa ? first->equals_wpa (item,
+				m_symtab_node_map) : first->equals (item, m_symtab_node_map);
 
 		  if (equals)
 		    new_vector.safe_push (item);
@@ -2275,7 +2308,8 @@ sem_item_optimizer::subdivide_classes_by_equality (bool in_wpa)
 		      for (unsigned k = class_split_first; k < (*it)->classes.length (); k++)
 			{
 			  sem_item *x = (*it)->classes[k]->members[0];
-			  bool equals = in_wpa ? x->equals_wpa (item) : x->equals (item);
+			  bool equals = in_wpa ? x->equals_wpa (item,
+								m_symtab_node_map) : x->equals (item, m_symtab_node_map);
 
 			  if (equals)
 			    {
@@ -2331,6 +2365,7 @@ sem_item_optimizer::verify_classes (void)
 	      sem_item *item = cls->members[j];
 
 	      gcc_checking_assert (item);
+	      gcc_checking_assert (item->cls == cls);
 
 	      for (unsigned k = 0; k < item->usages.length (); k++)
 		{
@@ -2395,10 +2430,10 @@ sem_item_optimizer::traverse_congruence_split (congruence_class * const &cls,
 	optimizer->splitter_class_removed = true;
 
       /* Remove old class from worklist if presented.  */
-      bool in_work_list = optimizer->worklist_contains (cls);
+      bool in_worklist = cls->in_worklist;
 
-      if (in_work_list)
-	optimizer->worklist_remove (cls);
+      if (in_worklist)
+	cls->in_worklist = false;
 
       congruence_class_group g;
       g.hash = cls->members[0]->get_hash ();
@@ -2421,8 +2456,8 @@ sem_item_optimizer::traverse_congruence_split (congruence_class * const &cls,
       optimizer->m_classes_count++;
 
       /* If OLD class was presented in the worklist, we remove the class
-         are replace it will both newly created classes.  */
-      if (in_work_list)
+         and replace it will both newly created classes.  */
+      if (in_worklist)
 	for (unsigned int i = 0; i < 2; i++)
 	  optimizer->worklist_push (newclasses[i]);
       else /* Just smaller class is inserted.  */
@@ -2443,7 +2478,9 @@ sem_item_optimizer::traverse_congruence_split (congruence_class * const &cls,
 	    newclasses[i]->dump (dump_file, 4);
 	}
 
-      delete cls;
+      /* Release class if not presented in work list.  */
+      if (!in_worklist)
+	delete cls;
     }
 
 
@@ -2540,12 +2577,12 @@ sem_item_optimizer::do_congruence_step (congruence_class *cls)
 void
 sem_item_optimizer::worklist_push (congruence_class *cls)
 {
-  congruence_class **slot = worklist.find_slot (cls, INSERT);
-
-  if (*slot)
+  /* Return if the class CLS is already presented in work list.  */
+  if (cls->in_worklist)
     return;
 
-  *slot = cls;
+  cls->in_worklist = true;
+  worklist.push_back (cls);
 }
 
 /* Pops a class from worklist. */
@@ -2553,12 +2590,28 @@ sem_item_optimizer::worklist_push (congruence_class *cls)
 congruence_class *
 sem_item_optimizer::worklist_pop (void)
 {
-  gcc_assert (worklist.elements ());
+  congruence_class *cls;
 
-  congruence_class *cls = *worklist.begin ();
-  worklist.remove_elt (cls);
+  while (!worklist.empty ())
+    {
+      cls = worklist.front ();
+      worklist.pop_front ();
+      if (cls->in_worklist)
+	{
+	  cls->in_worklist = false;
 
-  return cls;
+	  return cls;
+	}
+      else
+	{
+	  /* Work list item was already intended to be removed.
+	     The only reason for doing it is to split a class.
+	     Thus, the class CLS is deleted.  */
+	  delete cls;
+	}
+    }
+
+  return NULL;
 }
 
 /* Iterative congruence reduction function.  */
@@ -2574,16 +2627,14 @@ sem_item_optimizer::process_cong_reduction (void)
 
   if (dump_file)
     fprintf (dump_file, "Worklist has been filled with: %lu\n",
-	     worklist.elements ());
+	     worklist.size ());
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file, "Congruence class reduction\n");
 
-  while (worklist.elements ())
-    {
-      congruence_class *cls = worklist_pop ();
-      do_congruence_step (cls);
-    }
+  congruence_class *cls;
+  while ((cls = worklist_pop ()) != NULL)
+    do_congruence_step (cls);
 }
 
 /* Debug function prints all informations about congruence classes.  */
@@ -2682,7 +2733,7 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 	for (unsigned int j = 1; j < c->members.length (); j++)
 	  {
 	    sem_item *alias = c->members[j];
-	    source->equals (alias);
+	    source->equals (alias, m_symtab_node_map);
 
 	    if (dump_file)
 	      {

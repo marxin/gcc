@@ -2264,7 +2264,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
 	}
 
       /* Preserve abstractness on cloned [cd]tors.  */
-      DECL_ABSTRACT (newdecl) = DECL_ABSTRACT (olddecl);
+      DECL_ABSTRACT_P (newdecl) = DECL_ABSTRACT_P (olddecl);
 
       /* Update newdecl's parms to point at olddecl.  */
       for (parm = DECL_ARGUMENTS (newdecl); parm;
@@ -10280,7 +10280,7 @@ grokdeclarator (const cp_declarator *declarator,
 	       clones.  The decloning optimization (for space) may
                revert this subsequently if it determines that
                the clones should share a common implementation.  */
-	    DECL_ABSTRACT (decl) = 1;
+	    DECL_ABSTRACT_P (decl) = true;
 	}
       else if (current_class_type
 	       && constructor_name_p (unqualified_id, current_class_type))
@@ -11476,11 +11476,7 @@ grok_special_member_properties (tree decl)
 	    TYPE_HAS_CONST_COPY_CTOR (class_type) = 1;
 	}
       else if (sufficient_parms_p (FUNCTION_FIRST_USER_PARMTYPE (decl)))
-	{
-	  TYPE_HAS_DEFAULT_CONSTRUCTOR (class_type) = 1;
-	  if (user_provided_p (decl))
-	    TYPE_HAS_COMPLEX_DFLT (class_type) = 1;
-	}
+	TYPE_HAS_DEFAULT_CONSTRUCTOR (class_type) = 1;
       else if (move_fn_p (decl) && user_provided_p (decl))
 	TYPE_HAS_COMPLEX_MOVE_CTOR (class_type) = 1;
       else if (is_list_ctor (decl))

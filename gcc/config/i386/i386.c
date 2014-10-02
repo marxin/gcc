@@ -3975,6 +3975,13 @@ ix86_option_override_internal (bool main_args_p,
 	}
     }
 
+#ifndef NO_PROFILE_COUNTERS
+  if (flag_nop_mcount)
+    error ("-mnop-mcount is not compatible with this target");
+#endif
+  if (flag_nop_mcount && flag_pic)
+    error ("-mnop-mcount is not implemented for -fPIC");
+
   /* Accept -msseregparm only if at least SSE support is enabled.  */
   if (TARGET_SSEREGPARM_P (opts->x_target_flags)
       && ! TARGET_SSE_P (opts->x_ix86_isa_flags))
@@ -29961,8 +29968,8 @@ static const struct builtin_description bdesc_args[] =
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_permv4df, "__builtin_ia32_permdf256", IX86_BUILTIN_VPERMDF256, UNKNOWN, (int) V4DF_FTYPE_V4DF_INT },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_permv4di, "__builtin_ia32_permdi256", IX86_BUILTIN_VPERMDI256, UNKNOWN, (int) V4DI_FTYPE_V4DI_INT },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_permv2ti, "__builtin_ia32_permti256", IX86_BUILTIN_VPERMTI256, UNKNOWN, (int) V4DI_FTYPE_V4DI_V4DI_INT },
-  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_extracti128, "__builtin_ia32_extract128i256", IX86_BUILTIN_VEXTRACT128I256, UNKNOWN, (int) V2DI_FTYPE_V4DI_INT },
-  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_inserti128, "__builtin_ia32_insert128i256", IX86_BUILTIN_VINSERT128I256, UNKNOWN, (int) V4DI_FTYPE_V4DI_V2DI_INT },
+  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx_vextractf128v4di, "__builtin_ia32_extract128i256", IX86_BUILTIN_VEXTRACT128I256, UNKNOWN, (int) V2DI_FTYPE_V4DI_INT },
+  { OPTION_MASK_ISA_AVX2, CODE_FOR_avx_vinsertf128v4di, "__builtin_ia32_insert128i256", IX86_BUILTIN_VINSERT128I256, UNKNOWN, (int) V4DI_FTYPE_V4DI_V2DI_INT },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_ashlvv4di, "__builtin_ia32_psllv4di", IX86_BUILTIN_PSLLVV4DI, UNKNOWN, (int) V4DI_FTYPE_V4DI_V4DI },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_ashlvv2di, "__builtin_ia32_psllv2di", IX86_BUILTIN_PSLLVV2DI, UNKNOWN, (int) V2DI_FTYPE_V2DI_V2DI },
   { OPTION_MASK_ISA_AVX2, CODE_FOR_avx2_ashlvv8si, "__builtin_ia32_psllv8si", IX86_BUILTIN_PSLLVV8SI, UNKNOWN, (int) V8SI_FTYPE_V8SI_V8SI },
@@ -30246,7 +30253,7 @@ static const struct builtin_description bdesc_round_args[] =
   { OPTION_MASK_ISA_AVX512F, CODE_FOR_floatv16siv16sf2_mask_round, "__builtin_ia32_cvtdq2ps512_mask", IX86_BUILTIN_CVTDQ2PS512, UNKNOWN, (int) V16SF_FTYPE_V16SI_V16SF_HI_INT },
   { OPTION_MASK_ISA_AVX512F, CODE_FOR_avx512f_cvtpd2dq512_mask_round, "__builtin_ia32_cvtpd2dq512_mask", IX86_BUILTIN_CVTPD2DQ512, UNKNOWN, (int) V8SI_FTYPE_V8DF_V8SI_QI_INT },
   { OPTION_MASK_ISA_AVX512F, CODE_FOR_avx512f_cvtpd2ps512_mask_round,  "__builtin_ia32_cvtpd2ps512_mask", IX86_BUILTIN_CVTPD2PS512, UNKNOWN, (int) V8SF_FTYPE_V8DF_V8SF_QI_INT },
-  { OPTION_MASK_ISA_AVX512F, CODE_FOR_avx512f_ufix_notruncv8dfv8si_mask_round, "__builtin_ia32_cvtpd2udq512_mask", IX86_BUILTIN_CVTPD2UDQ512, UNKNOWN, (int) V8SI_FTYPE_V8DF_V8SI_QI_INT },
+  { OPTION_MASK_ISA_AVX512F, CODE_FOR_ufix_notruncv8dfv8si2_mask_round, "__builtin_ia32_cvtpd2udq512_mask", IX86_BUILTIN_CVTPD2UDQ512, UNKNOWN, (int) V8SI_FTYPE_V8DF_V8SI_QI_INT },
   { OPTION_MASK_ISA_AVX512F, CODE_FOR_avx512f_vcvtph2ps512_mask_round,  "__builtin_ia32_vcvtph2ps512_mask", IX86_BUILTIN_CVTPH2PS512, UNKNOWN, (int) V16SF_FTYPE_V16HI_V16SF_HI_INT },
   { OPTION_MASK_ISA_AVX512F, CODE_FOR_avx512f_fix_notruncv16sfv16si_mask_round, "__builtin_ia32_cvtps2dq512_mask", IX86_BUILTIN_CVTPS2DQ512, UNKNOWN, (int) V16SI_FTYPE_V16SF_V16SI_HI_INT },
   { OPTION_MASK_ISA_AVX512F, CODE_FOR_avx512f_cvtps2pd512_mask_round, "__builtin_ia32_cvtps2pd512_mask", IX86_BUILTIN_CVTPS2PD512, UNKNOWN, (int) V8DF_FTYPE_V8SF_V8DF_QI_INT },
@@ -34053,8 +34060,8 @@ ix86_expand_args_builtin (const struct builtin_description *d,
 	  if (!match)
 	    switch (icode)
 	      {
-	      case CODE_FOR_avx2_inserti128:
-	      case CODE_FOR_avx2_extracti128:
+	      case CODE_FOR_avx_vinsertf128v4di:
+	      case CODE_FOR_avx_vextractf128v4di:
 		error ("the last argument must be an 1-bit immediate");
 		return const0_rtx;
 
@@ -34107,6 +34114,12 @@ ix86_expand_args_builtin (const struct builtin_description *d,
 	      case CODE_FOR_avx512f_vinserti32x4_mask:
 	      case CODE_FOR_avx512f_vextractf32x4_mask:
 	      case CODE_FOR_avx512f_vextracti32x4_mask:
+	      case CODE_FOR_sse2_shufpd:
+	      case CODE_FOR_sse2_shufpd_mask:
+	      case CODE_FOR_avx512dq_shuf_f64x2_mask:
+	      case CODE_FOR_avx512dq_shuf_i64x2_mask:
+	      case CODE_FOR_avx512vl_shuf_i32x4_mask:
+	      case CODE_FOR_avx512vl_shuf_f32x4_mask:
 		error ("the last argument must be a 2-bit immediate");
 		return const0_rtx;
 
@@ -34120,6 +34133,12 @@ ix86_expand_args_builtin (const struct builtin_description *d,
 	      case CODE_FOR_avx512f_vinserti64x4_mask:
 	      case CODE_FOR_avx512f_vextractf64x4_mask:
 	      case CODE_FOR_avx512f_vextracti64x4_mask:
+	      case CODE_FOR_avx512dq_vinsertf32x8_mask:
+	      case CODE_FOR_avx512dq_vinserti32x8_mask:
+	      case CODE_FOR_avx512vl_vinsertv4df:
+	      case CODE_FOR_avx512vl_vinsertv4di:
+	      case CODE_FOR_avx512vl_vinsertv8sf:
+	      case CODE_FOR_avx512vl_vinsertv8si:
 		error ("the last argument must be a 1-bit immediate");
 		return const0_rtx;
 
@@ -39028,6 +39047,17 @@ x86_field_alignment (tree field, int computed)
   return computed;
 }
 
+/* Print call to TARGET to FILE.  */
+
+static void
+x86_print_call_or_nop (FILE *file, const char *target)
+{
+  if (flag_nop_mcount)
+    fprintf (file, "1:\tnopl 0x00(%%eax,%%eax,1)\n"); /* 5 byte nop.  */
+  else
+    fprintf (file, "1:\tcall\t%s\n", target);
+}
+
 /* Output assembler code to FILE to increment profiler label # LABELNO
    for profiling a function entry.  */
 void
@@ -39035,7 +39065,6 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
 {
   const char *mcount_name = (flag_fentry ? MCOUNT_NAME_BEFORE_PROLOGUE
 					 : MCOUNT_NAME);
-
   if (TARGET_64BIT)
     {
 #ifndef NO_PROFILE_COUNTERS
@@ -39043,9 +39072,9 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
 #endif
 
       if (!TARGET_PECOFF && flag_pic)
-	fprintf (file, "\tcall\t*%s@GOTPCREL(%%rip)\n", mcount_name);
+	fprintf (file, "1:\tcall\t*%s@GOTPCREL(%%rip)\n", mcount_name);
       else
-	fprintf (file, "\tcall\t%s\n", mcount_name);
+	x86_print_call_or_nop (file, mcount_name);
     }
   else if (flag_pic)
     {
@@ -39053,7 +39082,7 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
       fprintf (file, "\tleal\t%sP%d@GOTOFF(%%ebx),%%" PROFILE_COUNT_REGISTER "\n",
 	       LPREFIX, labelno);
 #endif
-      fprintf (file, "\tcall\t*%s@GOT(%%ebx)\n", mcount_name);
+      fprintf (file, "1:\tcall\t*%s@GOT(%%ebx)\n", mcount_name);
     }
   else
     {
@@ -39061,7 +39090,14 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
       fprintf (file, "\tmovl\t$%sP%d,%%" PROFILE_COUNT_REGISTER "\n",
 	       LPREFIX, labelno);
 #endif
-      fprintf (file, "\tcall\t%s\n", mcount_name);
+      x86_print_call_or_nop (file, mcount_name);
+    }
+
+  if (flag_record_mcount)
+    {
+      fprintf (file, "\t.section __mcount_loc, \"a\",@progbits\n");
+      fprintf (file, "\t.%s 1b\n", TARGET_64BIT ? "quad" : "long");
+      fprintf (file, "\t.previous\n");
     }
 }
 
@@ -39600,6 +39636,7 @@ struct expand_vec_perm_d
 static bool canonicalize_perm (struct expand_vec_perm_d *d);
 static bool expand_vec_perm_1 (struct expand_vec_perm_d *d);
 static bool expand_vec_perm_broadcast_1 (struct expand_vec_perm_d *d);
+static bool expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool);
 
 /* Get a vector mode of the same size as the original but with elements
    twice as wide.  This is only guaranteed to apply to integral vectors.  */
@@ -42925,8 +42962,8 @@ expand_vec_perm_pshufb (struct expand_vec_perm_d *d)
 	      op0 = gen_lowpart (V4DImode, d->op0);
 	      op1 = gen_lowpart (V4DImode, d->op1);
 	      rperm[0]
-		= GEN_INT (((d->perm[0] & (nelt / 2)) ? 1 : 0)
-			   || ((d->perm[nelt / 2] & (nelt / 2)) ? 2 : 0));
+		= GEN_INT ((d->perm[0] / (nelt / 2))
+			   | ((d->perm[nelt / 2] / (nelt / 2)) * 16));
 	      emit_insn (gen_avx2_permv2ti (target, op0, op1, rperm[0]));
 	      if (target != d->target)
 		emit_move_insn (d->target, gen_lowpart (d->vmode, target));
@@ -43189,6 +43226,10 @@ expand_vec_perm_1 (struct expand_vec_perm_d *d)
   if (expand_vec_perm_pshufb (d))
     return true;
 
+  /* Try the AVX2 vpalignr instruction.  */
+  if (expand_vec_perm_palignr (d, true))
+    return true;
+
   /* Try the AVX512F vpermi2 instructions.  */
   rtx vec[64];
   enum machine_mode mode = d->vmode;
@@ -43250,10 +43291,11 @@ expand_vec_perm_pshuflw_pshufhw (struct expand_vec_perm_d *d)
    the permutation using the SSSE3 palignr instruction.  This succeeds
    when all of the elements in PERM fit within one vector and we merely
    need to shift them down so that a single vector permutation has a
-   chance to succeed.  */
+   chance to succeed.  If SINGLE_INSN_ONLY_P, succeed if only
+   the vpalignr instruction itself can perform the requested permutation.  */
 
 static bool
-expand_vec_perm_palignr (struct expand_vec_perm_d *d)
+expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool single_insn_only_p)
 {
   unsigned i, nelt = d->nelt;
   unsigned min, max;
@@ -43261,44 +43303,79 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d)
   rtx shift, target;
   struct expand_vec_perm_d dcopy;
 
-  /* Even with AVX, palignr only operates on 128-bit vectors.  */
-  if (!TARGET_SSSE3 || GET_MODE_SIZE (d->vmode) != 16)
+  /* Even with AVX, palignr only operates on 128-bit vectors,
+     in AVX2 palignr operates on both 128-bit lanes.  */
+  if ((!TARGET_SSSE3 || GET_MODE_SIZE (d->vmode) != 16)
+      && (!TARGET_AVX2 || GET_MODE_SIZE (d->vmode) != 32))
     return false;
 
-  min = nelt, max = 0;
+  min = 2 * nelt, max = 0;
   for (i = 0; i < nelt; ++i)
     {
       unsigned e = d->perm[i];
+      if (GET_MODE_SIZE (d->vmode) == 32)
+	e = (e & ((nelt / 2) - 1)) | ((e & nelt) >> 1);
       if (e < min)
 	min = e;
       if (e > max)
 	max = e;
     }
-  if (min == 0 || max - min >= nelt)
+  if (min == 0
+      || max - min >= (GET_MODE_SIZE (d->vmode) == 32 ? nelt / 2 : nelt))
     return false;
 
   /* Given that we have SSSE3, we know we'll be able to implement the
-     single operand permutation after the palignr with pshufb.  */
-  if (d->testing_p)
+     single operand permutation after the palignr with pshufb for
+     128-bit vectors.  If SINGLE_INSN_ONLY_P, in_order has to be computed
+     first.  */
+  if (d->testing_p && GET_MODE_SIZE (d->vmode) == 16 && !single_insn_only_p)
     return true;
 
   dcopy = *d;
-  shift = GEN_INT (min * GET_MODE_BITSIZE (GET_MODE_INNER (d->vmode)));
-  target = gen_reg_rtx (TImode);
-  emit_insn (gen_ssse3_palignrti (target, gen_lowpart (TImode, d->op1),
-				  gen_lowpart (TImode, d->op0), shift));
-
-  dcopy.op0 = dcopy.op1 = gen_lowpart (d->vmode, target);
-  dcopy.one_operand_p = true;
 
   in_order = true;
   for (i = 0; i < nelt; ++i)
     {
-      unsigned e = dcopy.perm[i] - min;
+      unsigned e = dcopy.perm[i];
+      if (GET_MODE_SIZE (d->vmode) == 32
+	  && e >= nelt
+	  && (e & (nelt / 2 - 1)) < min)
+	e = e - min - (nelt / 2);
+      else
+	e = e - min;
       if (e != i)
 	in_order = false;
       dcopy.perm[i] = e;
     }
+  dcopy.one_operand_p = true;
+
+  if (single_insn_only_p && !in_order)
+    return false;
+
+  /* For AVX2, test whether we can permute the result in one instruction.  */
+  if (d->testing_p)
+    {
+      if (in_order)
+	return true;
+      dcopy.op1 = dcopy.op0;
+      return expand_vec_perm_1 (&dcopy);
+    }
+
+  shift = GEN_INT (min * GET_MODE_BITSIZE (GET_MODE_INNER (d->vmode)));
+  if (GET_MODE_SIZE (d->vmode) == 16)
+    {
+      target = gen_reg_rtx (TImode);
+      emit_insn (gen_ssse3_palignrti (target, gen_lowpart (TImode, d->op1),
+				      gen_lowpart (TImode, d->op0), shift));
+    }
+  else
+    {
+      target = gen_reg_rtx (V2TImode);
+      emit_insn (gen_avx2_palignrv2ti (target, gen_lowpart (V2TImode, d->op1),
+				       gen_lowpart (V2TImode, d->op0), shift));
+    }
+
+  dcopy.op0 = dcopy.op1 = gen_lowpart (d->vmode, target);
 
   /* Test for the degenerate case where the alignment by itself
      produces the desired permutation.  */
@@ -43309,7 +43386,7 @@ expand_vec_perm_palignr (struct expand_vec_perm_d *d)
     }
 
   ok = expand_vec_perm_1 (&dcopy);
-  gcc_assert (ok);
+  gcc_assert (ok || GET_MODE_SIZE (d->vmode) == 32);
 
   return ok;
 }
@@ -43838,15 +43915,16 @@ expand_vec_perm_vperm2f128 (struct expand_vec_perm_d *d)
 	    dfirst.perm[i] = (i & (nelt2 - 1))
 			     + ((perm >> (2 * (i >= nelt2))) & 3) * nelt2;
 
+	  canonicalize_perm (&dfirst);
 	  ok = expand_vec_perm_1 (&dfirst);
 	  gcc_assert (ok);
 
 	  /* And dsecond is some single insn shuffle, taking
 	     d->op0 and result of vperm2f128 (if perm < 16) or
 	     d->op1 and result of vperm2f128 (otherwise).  */
-	  dsecond.op1 = dfirst.target;
 	  if (perm >= 16)
-	    dsecond.op0 = dfirst.op1;
+	    dsecond.op0 = dsecond.op1;
+	  dsecond.op1 = dfirst.target;
 
 	  ok = expand_vec_perm_1 (&dsecond);
 	  gcc_assert (ok);
@@ -43854,7 +43932,8 @@ expand_vec_perm_vperm2f128 (struct expand_vec_perm_d *d)
 	  return true;
 	}
 
-      /* For one operand, the only useful vperm2f128 permutation is 0x10.  */
+      /* For one operand, the only useful vperm2f128 permutation is 0x01
+	 aka lanes swap.  */
       if (d->one_operand_p)
 	return false;
     }
@@ -44743,7 +44822,7 @@ ix86_expand_vec_perm_const_1 (struct expand_vec_perm_d *d)
   if (expand_vec_perm_pshuflw_pshufhw (d))
     return true;
 
-  if (expand_vec_perm_palignr (d))
+  if (expand_vec_perm_palignr (d, false))
     return true;
 
   if (expand_vec_perm_interleave2 (d))

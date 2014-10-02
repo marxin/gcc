@@ -893,16 +893,7 @@ cgraph_node::create_indirect_edge (gimple call_stmt, int ecf_flags,
 	 = tree_to_uhwi (OBJ_TYPE_REF_TOKEN (target));
       edge->indirect_info->otr_type = obj_type_ref_class (target);
       gcc_assert (TREE_CODE (edge->indirect_info->otr_type) == RECORD_TYPE);
-      edge->indirect_info->outer_type = context.outer_type;
-      edge->indirect_info->speculative_outer_type
-	 = context.speculative_outer_type;
-      edge->indirect_info->offset = context.offset;
-      edge->indirect_info->speculative_offset = context.speculative_offset;
-      edge->indirect_info->maybe_in_construction
-	 = context.maybe_in_construction;
-      edge->indirect_info->maybe_derived_type = context.maybe_derived_type;
-      edge->indirect_info->speculative_maybe_derived_type
-	 = context.speculative_maybe_derived_type;
+      edge->indirect_info->context = context;
     }
 
   edge->next_callee = indirect_calls;
@@ -1634,7 +1625,8 @@ release_function_body (tree decl)
 /* Release memory used to represent body of function.
    Use this only for functions that are released before being translated to
    target code (i.e. RTL).  Functions that are compiled to RTL and beyond
-   are free'd in final.c via free_after_compilation().  */
+   are free'd in final.c via free_after_compilation().
+   KEEP_ARGUMENTS are useful only if you want to rebuild body as thunk.  */
 
 void
 cgraph_node::release_body (bool keep_arguments)
@@ -1853,6 +1845,26 @@ cgraph_inline_failed_type (cgraph_inline_failed_t reason)
 const char * const cgraph_availability_names[] =
   {"unset", "not_available", "overwritable", "available", "local"};
 
+/* Output flags of edge E.  */
+
+static void
+dump_edge_flags (FILE *f, struct cgraph_edge *edge)
+{
+  if (edge->speculative)
+    fprintf (f, "(speculative) ");
+  if (!edge->inline_failed)
+    fprintf (f, "(inlined) ");
+  if (edge->indirect_inlining_edge)
+    fprintf (f, "(indirect_inlining) ");
+  if (edge->count)
+    fprintf (f, "(%"PRId64"x) ",
+	     (int64_t)edge->count);
+  if (edge->frequency)
+    fprintf (f, "(%.2f per call) ",
+	     edge->frequency / (double)CGRAPH_FREQ_BASE);
+  if (edge->can_throw_external)
+    fprintf (f, "(can throw external) ");
+}
 
 /* Dump call graph node to file F.  */
 
@@ -1860,7 +1872,6 @@ void
 cgraph_node::dump (FILE *f)
 {
   cgraph_edge *edge;
-  int indirect_calls_count = 0;
 
   dump_base (f);
 
@@ -1902,6 +1913,8 @@ cgraph_node::dump (FILE *f)
     fprintf (f, " only_called_at_exit");
   if (tm_clone)
     fprintf (f, " tm_clone");
+  if (icf_merged)
+    fprintf (f, " icf_merged");
   if (DECL_STATIC_CONSTRUCTOR (decl))
     fprintf (f," static_constructor (priority:%i)", get_init_priority ());
   if (DECL_STATIC_DESTRUCTOR (decl))
@@ -1939,20 +1952,7 @@ cgraph_node::dump (FILE *f)
     {
       fprintf (f, "%s/%i ", edge->caller->asm_name (),
 	       edge->caller->order);
-      if (count)
-	fprintf (f, "(%"PRId64"x) ",
-		 (int64_t)count);
-      if (frequency)
-	fprintf (f, "(%.2f per call) ",
-		 frequency / (double)CGRAPH_FREQ_BASE);
-      if (edge->speculative)
-	fprintf (f, "(speculative) ");
-      if (!edge->inline_failed)
-	fprintf (f, "(inlined) ");
-      if (edge->indirect_inlining_edge)
-	fprintf (f, "(indirect_inlining) ");
-      if (edge->can_throw_external)
-	fprintf (f, "(can throw external) ");
+      dump_edge_flags (f, edge);
     }
 
   fprintf (f, "\n  Calls: ");
@@ -1960,28 +1960,34 @@ cgraph_node::dump (FILE *f)
     {
       fprintf (f, "%s/%i ", edge->callee->asm_name (),
 	       edge->callee->order);
-      if (edge->speculative)
-	fprintf (f, "(speculative) ");
-      if (!edge->inline_failed)
-	fprintf (f, "(inlined) ");
-      if (edge->indirect_inlining_edge)
-	fprintf (f, "(indirect_inlining) ");
-      if (edge->count)
-	fprintf (f, "(%"PRId64"x) ",
-		 (int64_t)count);
-      if (edge->frequency)
-	fprintf (f, "(%.2f per call) ",
-		 frequency / (double)CGRAPH_FREQ_BASE);
-      if (edge->can_throw_external)
-	fprintf (f, "(can throw external) ");
+      dump_edge_flags (f, edge);
     }
   fprintf (f, "\n");
 
   for (edge = indirect_calls; edge; edge = edge->next_callee)
-    indirect_calls_count++;
-  if (indirect_calls_count)
-    fprintf (f, "  Has %i outgoing edges for indirect calls.\n",
-	     indirect_calls_count);
+    {
+      if (edge->indirect_info->polymorphic)
+	{
+          fprintf (f, "   Polymorphic indirect call of type ");
+	  print_generic_expr (f, edge->indirect_info->otr_type, TDF_SLIM);
+	  fprintf (f, " token:%i", (int) edge->indirect_info->otr_token);
+	}
+      else
+        fprintf (f, "   Indirect call");
+      dump_edge_flags (f, edge);
+      if (edge->indirect_info->param_index != -1)
+	{
+	  fprintf (f, " of param:%i", edge->indirect_info->param_index);
+	  if (edge->indirect_info->agg_contents)
+	   fprintf (f, " loaded from %s %s at offset %i",
+		    edge->indirect_info->member_ptr ? "member ptr" : "aggregate",
+		    edge->indirect_info->by_ref ? "passed by reference":"",
+		    (int)edge->indirect_info->offset);
+	}
+      fprintf (f, "\n");
+      if (edge->indirect_info->polymorphic)
+	edge->indirect_info->context.dump (f);
+    }
 }
 
 /* Dump call graph node NODE to stderr.  */
@@ -2823,11 +2829,19 @@ cgraph_node::verify_node (void)
 			    {
 			      if (verify_edge_corresponds_to_fndecl (e, decl))
 				{
-				  error ("edge points to wrong declaration:");
-				  debug_tree (e->callee->decl);
-				  fprintf (stderr," Instead of:");
-				  debug_tree (decl);
-				  error_found = true;
+				  /* The edge can be redirected in WPA by IPA ICF.
+				     Following check really ensures that it's
+				     not the case.  */
+
+				  cgraph_node *current_node = cgraph_node::get (decl);
+				  if (!current_node || !current_node->icf_merged)
+				  {
+				    error ("edge points to wrong declaration:");
+				    debug_tree (e->callee->decl);
+				    fprintf (stderr," Instead of:");
+				    debug_tree (decl);
+				    error_found = true;
+				  }
 				}
 			    }
 			  else if (decl)
