@@ -447,7 +447,7 @@ public:
   }
 
   /* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
-  void improve_hash (inchash::hash *inchash, gimple stmt);
+  void hash_stmt (inchash::hash *inchash, gimple stmt);
 
   /* Return true if polymorphic comparison must be processed.  */
   bool compare_polymorphic_p (void);

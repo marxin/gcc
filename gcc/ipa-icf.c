@@ -847,7 +847,7 @@ sem_function::init (void)
 
 	if (gimple_code (stmt) != GIMPLE_DEBUG)
 	  {
-	    improve_hash (&hstate, stmt);
+	    hash_stmt (&hstate, stmt);
 	    nondbg_stmt_count++;
 	  }
       }
@@ -868,7 +868,7 @@ sem_function::init (void)
 /* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
 
 void
-sem_function::improve_hash (inchash::hash *hstate, gimple stmt)
+sem_function::hash_stmt (inchash::hash *hstate, gimple stmt)
 {
   enum gimple_code code = gimple_code (stmt);
 
@@ -888,6 +888,15 @@ sem_function::improve_hash (inchash::hash *hstate, gimple stmt)
 		hstate->add_wide_int (tree_to_shwi (argument));
 	      else if (tree_fits_uhwi_p (argument))
 		hstate->add_wide_int (tree_to_uhwi (argument));
+	      break;
+	    case REAL_CST:
+	      REAL_VALUE_TYPE c;
+	      HOST_WIDE_INT n;
+
+	      c = TREE_REAL_CST (argument);
+	      n = real_to_integer (&c);
+
+	      hstate->add_wide_int (n);
 	      break;
 	    case ADDR_EXPR:
 	      {
@@ -923,6 +932,8 @@ sem_function::parse (cgraph_node *node, bitmap_obstack *stack)
 {
   tree fndecl = node->decl;
   function *func = DECL_STRUCT_FUNCTION (fndecl);
+
+  /* TODO: add support for thunks and aliases.  */
 
   if (!func || !node->has_gimple_body_p ())
     return NULL;
@@ -1456,17 +1467,13 @@ func_checker::compare_operand (tree t1, tree t2)
       return RETURN_WITH_DEBUG (compare_variable_decl (t1, t2));
     case FIELD_DECL:
       {
-	tree fctx1 = DECL_FCONTEXT (t1);
-	tree fctx2 = DECL_FCONTEXT (t2);
-
 	tree offset1 = DECL_FIELD_OFFSET (t1);
 	tree offset2 = DECL_FIELD_OFFSET (t2);
 
 	tree bit_offset1 = DECL_FIELD_BIT_OFFSET (t1);
 	tree bit_offset2 = DECL_FIELD_BIT_OFFSET (t2);
 
-	ret = compare_operand (fctx1, fctx2)
-	      && compare_operand (offset1, offset2)
+	ret = compare_operand (offset1, offset2)
 	      && compare_operand (bit_offset1, bit_offset2);
 
 	return RETURN_WITH_DEBUG (ret);
@@ -1572,7 +1579,8 @@ sem_variable::equals (tree t1, tree t2)
 
 	for (unsigned i = 0; i < len1; i++)
 	  if (!sem_variable::equals (CONSTRUCTOR_ELT (t1, i)->value,
-				     CONSTRUCTOR_ELT (t2, i)->value))
+				     CONSTRUCTOR_ELT (t2, i)->value)
+	      || CONSTRUCTOR_ELT (t1, i)->index != CONSTRUCTOR_ELT (t2, i)->index)
 	    return false;
 
 	return true;
