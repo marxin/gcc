@@ -190,9 +190,9 @@ public:
   /* Return true if types are compatible from perspective of ICF.
      FIRST_ARGUMENT indicates if the comparison is called for
      first parameter of a function.  */
-  static bool types_are_compatible_p (tree t1, tree t2,
-				      bool compare_polymorphic = true,
-				      bool first_argument = false);
+  static bool compatible_types_p (tree t1, tree t2,
+				  bool compare_polymorphic = true,
+				  bool first_argument = false);
 
 
 private:
@@ -360,7 +360,7 @@ public:
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file) = 0;
 
-  /* Return base tree that can be used for types_compatible_p and
+  /* Return base tree that can be used for compatible_types_p and
      contains_polymorphic_type_p comparison.  */
 
   static bool get_base_types (tree *t1, tree *t2);
@@ -437,10 +437,6 @@ public:
     dump_function_to_file (decl, file, TDF_DETAILS);
   }
 
-  bool compare_cgraph_references (hash_map <symtab_node *, sem_item *>
-				  &ignored_nodes,
-				  symtab_node *n1, symtab_node *n2);
-
   /* Parses function arguments and result type.  */
   void parse_tree_args (void);
 
@@ -512,6 +508,17 @@ private:
      are compatible. If COMPARE_POLYMORPHIC is set to true,
      more strict comparison is executed.  */
   bool compare_type_list (tree t1, tree t2, bool compare_polymorphic);
+
+  /* If cgraph edges E1 and E2 are indirect calls, verify that
+     ICF flags are the same.  */
+  bool compare_edge_flags (cgraph_edge *e1, cgraph_edge *e2);
+
+  /* For a given symbol table nodes N1 and N2, we check that FUNCTION_DECLs
+     point to a same function. Comparison can be skipped if IGNORED_NODES
+     contains these nodes.  */
+  bool compare_cgraph_references (hash_map <symtab_node *, sem_item *>
+				  &ignored_nodes,
+				  symtab_node *n1, symtab_node *n2);
 
   /* Processes function equality comparison.  */
   bool equals_private (sem_item *item,

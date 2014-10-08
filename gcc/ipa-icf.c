@@ -165,6 +165,8 @@ func_checker::compare_edge (edge e1, edge e2)
   else
     slot = e2;
 
+  /* TODO: filter edge probabilities for profile feedback match.  */
+
   return true;
 }
 
@@ -178,8 +180,11 @@ func_checker::compare_decl (tree t1, tree t2)
       || !auto_var_in_fn_p (t2, m_target_func_decl))
     return RETURN_WITH_DEBUG (t1 == t2);
 
-  if (!types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
-			       m_compare_polymorphic))
+  if (DECL_BY_REFERENCE (t1) != DECL_BY_REFERENCE (t1))
+    return RETURN_FALSE_WITH_MSG ("DECL_BY_REFERENCE flags are different");
+
+  if (!compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2),
+			   m_compare_polymorphic))
     return RETURN_FALSE ();
 
   bool existed_p;
@@ -280,9 +285,9 @@ sem_item::dump (void)
 }
 
 /* Return true if types are compatible from perspective of ICF.  */
-bool func_checker::types_are_compatible_p (tree t1, tree t2,
-    bool compare_polymorphic,
-    bool first_argument)
+bool func_checker::compatible_types_p (tree t1, tree t2,
+				       bool compare_polymorphic,
+				       bool first_argument)
 {
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return RETURN_FALSE_WITH_MSG ("different tree types");
@@ -300,16 +305,15 @@ bool func_checker::types_are_compatible_p (tree t1, tree t2,
       t2 = TREE_TYPE (t2);
     }
 
-  if (compare_polymorphic
-      && (contains_polymorphic_type_p (t1) || contains_polymorphic_type_p (t2)))
-    {
-      if (!contains_polymorphic_type_p (t1) || !contains_polymorphic_type_p (t2))
-	return RETURN_FALSE_WITH_MSG ("one type is not polymorphic");
+  if (compare_polymorphic)
+    if (contains_polymorphic_type_p (t1) || contains_polymorphic_type_p (t2))
+      {
+	if (!contains_polymorphic_type_p (t1) || !contains_polymorphic_type_p (t2))
+	  return RETURN_FALSE_WITH_MSG ("one type is not polymorphic");
 
-      if (TYPE_MAIN_VARIANT (t1) != TYPE_MAIN_VARIANT (t2))
-	return RETURN_FALSE_WITH_MSG ("type variants are different for "
-				      "polymorphic type");
-    }
+	if (!types_must_be_same_for_odr (t1, t2))
+	  return RETURN_FALSE_WITH_MSG ("types are not same for ODR");
+      }
 
   return true;
 }
@@ -385,6 +389,10 @@ sem_function::get_hash (void)
   return hash;
 }
 
+/* For a given symbol table nodes N1 and N2, we check that FUNCTION_DECLs
+   point to a same function. Comparison can be skipped if IGNORED_NODES
+   contains these nodes.  */
+
 bool
 sem_function::compare_cgraph_references (hash_map <symtab_node *, sem_item *>
     &ignored_nodes,
@@ -401,6 +409,25 @@ sem_function::compare_cgraph_references (hash_map <symtab_node *, sem_item *>
     return true;
 
   return RETURN_FALSE_WITH_MSG ("different references");
+}
+
+/* If cgraph edges E1 and E2 are indirect calls, verify that
+   ECF flags are the same.  */
+
+bool sem_function::compare_edge_flags (cgraph_edge *e1, cgraph_edge *e2)
+{
+  if (e1->indirect_info && e2->indirect_info)
+    {
+      int e1_flags = e1->indirect_info->ecf_flags;
+      int e2_flags = e2->indirect_info->ecf_flags;
+
+      if (e1_flags != e2_flags)
+	return RETURN_FALSE_WITH_MSG ("ICF flags are different");
+    }
+  else if (e1->indirect_info || e2->indirect_info)
+    return false;
+
+  return true;
 }
 
 /* Fast equality function based on knowledge known in WPA.  */
@@ -426,15 +453,15 @@ sem_function::equals_wpa (sem_item *item,
       /* Polymorphic comparison is executed just for non-leaf functions.  */
       bool is_not_leaf = get_node ()->callees != NULL;
 
-      if (!func_checker::types_are_compatible_p (arg_types[i],
-	  m_compared_func->arg_types[i],
-	  is_not_leaf, i == 0))
+      if (!func_checker::compatible_types_p (arg_types[i],
+					     m_compared_func->arg_types[i],
+					     is_not_leaf, i == 0))
 	return RETURN_FALSE_WITH_MSG ("argument type is different");
     }
 
   /* Result type checking.  */
-  if (!func_checker::types_are_compatible_p (result_type,
-      m_compared_func->result_type))
+  if (!func_checker::compatible_types_p (result_type,
+					 m_compared_func->result_type))
     return RETURN_FALSE_WITH_MSG ("result types are different");
 
   if (node->get_references_count () != item->node->get_references_count ())
@@ -1248,7 +1275,7 @@ func_checker::compare_operand (tree t1, tree t2)
   tree tt1 = TREE_TYPE (t1);
   tree tt2 = TREE_TYPE (t2);
 
-  if (!func_checker::types_are_compatible_p (tt1, tt2))
+  if (!func_checker::compatible_types_p (tt1, tt2))
     return false;
 
   base1 = get_addr_base_and_unit_offset (t1, &offset1);
@@ -1317,7 +1344,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	we seek for equivalency classes, so simply require inclussion in
 	both directions.  */
 
-	if (!func_checker::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2)))
+	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2)))
 	  return RETURN_FALSE ();
 
 	if (!compare_operand (x1, x2))
@@ -1407,7 +1434,7 @@ func_checker::compare_operand (tree t1, tree t2)
       }
     case INTEGER_CST:
       {
-	ret = types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2))
+	ret = compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2))
 	      && wi::to_offset  (t1) == wi::to_offset  (t2);
 
 	return RETURN_WITH_DEBUG (ret);
@@ -1483,7 +1510,7 @@ sem_function::compare_type_list (tree t1, tree t2, bool compare_polymorphic)
 	{}
       else if (tc1 == NOP_EXPR || tc2 == NOP_EXPR)
 	return false;
-      else if (!func_checker::types_are_compatible_p (tv1, tv2, compare_polymorphic))
+      else if (!func_checker::compatible_types_p (tv1, tv2, compare_polymorphic))
 	return false;
 
       t1 = TREE_CHAIN (t1);
@@ -1557,8 +1584,8 @@ sem_variable::equals (tree t1, tree t2)
 	tree y1 = TREE_OPERAND (t1, 1);
 	tree y2 = TREE_OPERAND (t2, 1);
 
-	if (!func_checker::types_are_compatible_p (TREE_TYPE (x1), TREE_TYPE (x2),
-	    true))
+	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2),
+					       true))
 	  return RETURN_FALSE ();
 
 	/* Type of the offset on MEM_REF does not matter.  */
@@ -1578,7 +1605,7 @@ sem_variable::equals (tree t1, tree t2)
     case LABEL_DECL:
       return t1 == t2;
     case INTEGER_CST:
-      return func_checker::types_are_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
+      return func_checker::compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2),
 	     true)
 	     && wi::to_offset (t1) == wi::to_offset (t2);
     case STRING_CST:

@@ -2563,6 +2563,7 @@ verify_edge_corresponds_to_fndecl (cgraph_edge *e, tree decl)
   if (!node
       || node->body_removed
       || node->in_other_partition
+      || node->icf_merged
       || e->callee->in_other_partition)
     return false;
 
@@ -2829,19 +2830,11 @@ cgraph_node::verify_node (void)
 			    {
 			      if (verify_edge_corresponds_to_fndecl (e, decl))
 				{
-				  /* The edge can be redirected in WPA by IPA ICF.
-				     Following check really ensures that it's
-				     not the case.  */
-
-				  cgraph_node *current_node = cgraph_node::get (decl);
-				  if (!current_node || !current_node->icf_merged)
-				  {
-				    error ("edge points to wrong declaration:");
-				    debug_tree (e->callee->decl);
-				    fprintf (stderr," Instead of:");
-				    debug_tree (decl);
-				    error_found = true;
-				  }
+				  error ("edge points to wrong declaration:");
+				  debug_tree (e->callee->decl);
+				  fprintf (stderr," Instead of:");
+				  debug_tree (decl);
+				  error_found = true;
 				}
 			    }
 			  else if (decl)
