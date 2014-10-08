@@ -82,122 +82,12 @@ along with GCC; see the file COPYING3.  If not see
 #include "data-streamer.h"
 #include "ipa-utils.h"
 #include <list>
+#include "ipa-icf-gimple.h"
 #include "ipa-icf.h"
 
+using namespace ipa_icf_gimple;
+
 namespace ipa_icf {
-
-/* Initialize internal structures for a given SOURCE_FUNC_DECL and
-   TARGET_FUNC_DECL. Strict polymorphic comparison is processed if
-   an option COMPARE_POLYMORPHIC is true. For special cases, one can
-   set IGNORE_LABELS to skip label comparison.
-   Similarly, IGNORE_SOURCE_DECLS and IGNORE_TARGET_DECLS are sets
-   of declarations that can be skipped.  */
-
-func_checker::func_checker (tree source_func_decl, tree target_func_decl,
-			    bool compare_polymorphic,
-			    bool ignore_labels,
-			    hash_set<symtab_node *> *ignored_source_nodes,
-			    hash_set<symtab_node *> *ignored_target_nodes)
-  : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
-    m_ignored_source_nodes (ignored_source_nodes),
-    m_ignored_target_nodes (ignored_target_nodes),
-    m_compare_polymorphic (compare_polymorphic),
-    m_ignore_labels (ignore_labels)
-{
-  function *source_func = DECL_STRUCT_FUNCTION (source_func_decl);
-  function *target_func = DECL_STRUCT_FUNCTION (target_func_decl);
-
-  unsigned ssa_source = SSANAMES (source_func)->length ();
-  unsigned ssa_target = SSANAMES (target_func)->length ();
-
-  m_source_ssa_names.create (ssa_source);
-  m_target_ssa_names.create (ssa_target);
-
-  for (unsigned i = 0; i < ssa_source; i++)
-    m_source_ssa_names.safe_push (-1);
-
-  for (unsigned i = 0; i < ssa_target; i++)
-    m_target_ssa_names.safe_push (-1);
-}
-
-/* Memory release routine.  */
-
-func_checker::~func_checker ()
-{
-  m_source_ssa_names.release();
-  m_target_ssa_names.release();
-}
-
-/* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
-
-bool
-func_checker::compare_ssa_name (tree t1, tree t2)
-{
-  unsigned i1 = SSA_NAME_VERSION (t1);
-  unsigned i2 = SSA_NAME_VERSION (t2);
-
-  if (m_source_ssa_names[i1] == -1)
-    m_source_ssa_names[i1] = i2;
-  else if (m_source_ssa_names[i1] != (int) i2)
-    return false;
-
-  if(m_target_ssa_names[i2] == -1)
-    m_target_ssa_names[i2] = i1;
-  else if (m_target_ssa_names[i2] != (int) i1)
-    return false;
-
-  return true;
-}
-
-/* Verification function for edges E1 and E2.  */
-
-bool
-func_checker::compare_edge (edge e1, edge e2)
-{
-  if (e1->flags != e2->flags)
-    return false;
-
-  bool existed_p;
-
-  edge &slot = m_edge_map.get_or_insert (e1, &existed_p);
-  if (existed_p)
-    return RETURN_WITH_DEBUG (slot == e2);
-  else
-    slot = e2;
-
-  /* TODO: filter edge probabilities for profile feedback match.  */
-
-  return true;
-}
-
-/* Verification function for declaration trees T1 and T2 that
-   come from functions FUNC1 and FUNC2.  */
-
-bool
-func_checker::compare_decl (tree t1, tree t2)
-{
-  if (!auto_var_in_fn_p (t1, m_source_func_decl)
-      || !auto_var_in_fn_p (t2, m_target_func_decl))
-    return RETURN_WITH_DEBUG (t1 == t2);
-
-  if (DECL_BY_REFERENCE (t1) != DECL_BY_REFERENCE (t1))
-    return RETURN_FALSE_WITH_MSG ("DECL_BY_REFERENCE flags are different");
-
-  if (!compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2),
-			   m_compare_polymorphic))
-    return RETURN_FALSE ();
-
-  bool existed_p;
-
-  tree &slot = m_decl_map.get_or_insert (t1, &existed_p);
-  if (existed_p)
-    return RETURN_WITH_DEBUG (slot == t2);
-  else
-    slot = t2;
-
-  return true;
-}
-
 /* Constructor for key value pair, where _ITEM is key and _INDEX is a target.  */
 
 sem_usage_pair::sem_usage_pair (sem_item *_item, unsigned int _index):
@@ -282,40 +172,6 @@ sem_item::dump (void)
 
       fprintf (dump_file, "\n");
     }
-}
-
-/* Return true if types are compatible from perspective of ICF.  */
-bool func_checker::compatible_types_p (tree t1, tree t2,
-				       bool compare_polymorphic,
-				       bool first_argument)
-{
-  if (TREE_CODE (t1) != TREE_CODE (t2))
-    return RETURN_FALSE_WITH_MSG ("different tree types");
-
-  if (!types_compatible_p (t1, t2))
-    return RETURN_FALSE_WITH_MSG ("types are not compatible");
-
-  if (get_alias_set (t1) != get_alias_set (t2))
-    return RETURN_FALSE_WITH_MSG ("alias sets are different");
-
-  /* We call contains_polymorphic_type_p with this pointer type.  */
-  if (first_argument && TREE_CODE (t1) == POINTER_TYPE)
-    {
-      t1 = TREE_TYPE (t1);
-      t2 = TREE_TYPE (t2);
-    }
-
-  if (compare_polymorphic)
-    if (contains_polymorphic_type_p (t1) || contains_polymorphic_type_p (t2))
-      {
-	if (!contains_polymorphic_type_p (t1) || !contains_polymorphic_type_p (t2))
-	  return RETURN_FALSE_WITH_MSG ("one type is not polymorphic");
-
-	if (!types_must_be_same_for_odr (t1, t2))
-	  return RETURN_FALSE_WITH_MSG ("types are not same for ODR");
-      }
-
-  return true;
 }
 
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
@@ -408,7 +264,7 @@ sem_function::compare_cgraph_references (hash_map <symtab_node *, sem_item *>
       && cn1->alias_target == cn2->alias_target)
     return true;
 
-  return RETURN_FALSE_WITH_MSG ("different references");
+  return return_false_with_msg ("different references");
 }
 
 /* If cgraph edges E1 and E2 are indirect calls, verify that
@@ -422,7 +278,7 @@ bool sem_function::compare_edge_flags (cgraph_edge *e1, cgraph_edge *e2)
       int e2_flags = e2->indirect_info->ecf_flags;
 
       if (e1_flags != e2_flags)
-	return RETURN_FALSE_WITH_MSG ("ICF flags are different");
+	return return_false_with_msg ("ICF flags are different");
     }
   else if (e1->indirect_info || e2->indirect_info)
     return false;
@@ -441,14 +297,14 @@ sem_function::equals_wpa (sem_item *item,
   m_compared_func = static_cast<sem_function *> (item);
 
   if (arg_types.length () != m_compared_func->arg_types.length ())
-    return RETURN_FALSE_WITH_MSG ("different number of arguments");
+    return return_false_with_msg ("different number of arguments");
 
   /* Checking types of arguments.  */
   for (unsigned i = 0; i < arg_types.length (); i++)
     {
       /* This guard is here for function pointer with attributes (pr59927.c).  */
       if (!arg_types[i] || !m_compared_func->arg_types[i])
-	return RETURN_FALSE_WITH_MSG ("NULL argument type");
+	return return_false_with_msg ("NULL argument type");
 
       /* Polymorphic comparison is executed just for non-leaf functions.  */
       bool is_not_leaf = get_node ()->callees != NULL;
@@ -456,16 +312,16 @@ sem_function::equals_wpa (sem_item *item,
       if (!func_checker::compatible_types_p (arg_types[i],
 					     m_compared_func->arg_types[i],
 					     is_not_leaf, i == 0))
-	return RETURN_FALSE_WITH_MSG ("argument type is different");
+	return return_false_with_msg ("argument type is different");
     }
 
   /* Result type checking.  */
   if (!func_checker::compatible_types_p (result_type,
 					 m_compared_func->result_type))
-    return RETURN_FALSE_WITH_MSG ("result types are different");
+    return return_false_with_msg ("result types are different");
 
   if (node->get_references_count () != item->node->get_references_count ())
-    return RETURN_FALSE_WITH_MSG ("different number of references");
+    return return_false_with_msg ("different number of references");
 
   ipa_ref *ref = NULL, *ref2 = NULL;
   for (unsigned i = 0; node->iterate_reference (i, ref); i++)
@@ -489,7 +345,7 @@ sem_function::equals_wpa (sem_item *item,
     }
 
   if (e1 || e2)
-    return RETURN_FALSE_WITH_MSG ("different number of edges");
+    return return_false_with_msg ("different number of edges");
 
   return true;
 }
@@ -541,7 +397,7 @@ sem_function::equals_private (sem_item *item,
   if (bb_sorted.length () != m_compared_func->bb_sorted.length ()
       || edge_count != m_compared_func->edge_count
       || cfg_checksum != m_compared_func->cfg_checksum)
-    return RETURN_FALSE ();
+    return return_false ();
 
   if (!equals_wpa (item, ignored_nodes))
     return false;
@@ -558,10 +414,10 @@ sem_function::equals_private (sem_item *item,
   while (decl1)
     {
       if (decl2 == NULL)
-	return RETURN_FALSE ();
+	return return_false ();
 
       if (get_attribute_name (decl1) != get_attribute_name (decl2))
-	return RETURN_FALSE ();
+	return return_false ();
 
       tree attr_value1 = TREE_VALUE (decl1);
       tree attr_value2 = TREE_VALUE (decl2);
@@ -571,37 +427,37 @@ sem_function::equals_private (sem_item *item,
 	  bool ret = m_checker->compare_operand (TREE_VALUE (attr_value1),
 						 TREE_VALUE (attr_value2));
 	  if (!ret)
-	    return RETURN_FALSE_WITH_MSG ("attribute values are different");
+	    return return_false_with_msg ("attribute values are different");
 	}
       else if (!attr_value1 && !attr_value2)
 	{}
       else
-	return RETURN_FALSE ();
+	return return_false ();
 
       decl1 = TREE_CHAIN (decl1);
       decl2 = TREE_CHAIN (decl2);
     }
 
   if (decl1 != decl2)
-    return RETURN_FALSE();
+    return return_false();
 
 
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
     if (!m_checker->compare_decl (arg1, arg2))
-      return RETURN_FALSE ();
+      return return_false ();
 
   /* Exception handling regions comparison.  */
   if (!compare_eh_region (region_tree, m_compared_func->region_tree))
-    return RETURN_FALSE();
+    return return_false();
 
   /* Checking all basic blocks.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
     if(!m_checker->compare_bb (bb_sorted[i], m_compared_func->bb_sorted[i]))
-      return RETURN_FALSE();
+      return return_false();
 
-  DUMP_MESSAGE ("All BBs are equal\n");
+  dump_message ("All BBs are equal\n");
 
   /* Basic block edges check.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
@@ -619,16 +475,16 @@ sem_function::equals_private (sem_item *item,
 	  ei_cond (ei2, &e2);
 
 	  if (e1->flags != e2->flags)
-	    return RETURN_FALSE_WITH_MSG ("flags comparison returns false");
+	    return return_false_with_msg ("flags comparison returns false");
 
 	  if (!bb_dict_test (bb_dict, e1->src->index, e2->src->index))
-	    return RETURN_FALSE_WITH_MSG ("edge comparison returns false");
+	    return return_false_with_msg ("edge comparison returns false");
 
 	  if (!bb_dict_test (bb_dict, e1->dest->index, e2->dest->index))
-	    return RETURN_FALSE_WITH_MSG ("BB comparison returns false");
+	    return return_false_with_msg ("BB comparison returns false");
 
 	  if (!m_checker->compare_edge (e1, e2))
-	    return RETURN_FALSE_WITH_MSG ("edge comparison returns false");
+	    return return_false_with_msg ("edge comparison returns false");
 
 	  ei_next (&ei2);
 	}
@@ -637,7 +493,7 @@ sem_function::equals_private (sem_item *item,
   /* Basic block PHI nodes comparison.  */
   for (unsigned i = 0; i < bb_sorted.length (); i++)
     if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb))
-      return RETURN_FALSE_WITH_MSG ("PHI node comparison returns false");
+      return return_false_with_msg ("PHI node comparison returns false");
 
   return result;
 }
@@ -1005,7 +861,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
 	break;
 
       if (gsi_end_p (si1) || gsi_end_p (si2))
-	return RETURN_FALSE();
+	return return_false();
 
       phi1 = gsi_stmt (si1);
       phi2 = gsi_stmt (si2);
@@ -1014,7 +870,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
       size2 = gimple_phi_num_args (phi2);
 
       if (size1 != size2)
-	return RETURN_FALSE ();
+	return return_false ();
 
       for (i = 0; i < size1; ++i)
 	{
@@ -1022,13 +878,13 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
 	  t2 = gimple_phi_arg (phi2, i)->def;
 
 	  if (!m_checker->compare_operand (t1, t2))
-	    return RETURN_FALSE ();
+	    return return_false ();
 
 	  e1 = gimple_phi_arg_edge (phi1, i);
 	  e2 = gimple_phi_arg_edge (phi2, i);
 
 	  if (!m_checker->compare_edge (e1, e2))
-	    return RETURN_FALSE ();
+	    return return_false ();
 	}
 
       gsi_next (&si2);
@@ -1177,68 +1033,6 @@ sem_function::compare_eh_region (eh_region r1, eh_region r2)
   return false;
 }
 
-/* Verifies that trees T1 and T2, representing function declarations
-   are equivalent from perspective of ICF.  */
-
-bool
-func_checker::compare_function_decl (tree t1, tree t2)
-{
-  bool ret = false;
-
-  if (t1 == t2)
-    return true;
-
-  symtab_node *n1 = symtab_node::get (t1);
-  symtab_node *n2 = symtab_node::get (t2);
-
-  if (m_ignored_source_nodes != NULL && m_ignored_target_nodes != NULL)
-    {
-      ret = m_ignored_source_nodes->contains (n1)
-	    && m_ignored_target_nodes->contains (n2);
-
-      if (ret)
-	return true;
-    }
-
-  /* If function decl is WEAKREF, we compare targets.  */
-  cgraph_node *f1 = cgraph_node::get (t1);
-  cgraph_node *f2 = cgraph_node::get (t2);
-
-  if(f1 && f2 && f1->weakref && f2->weakref)
-    ret = f1->alias_target == f2->alias_target;
-
-  return ret;
-}
-
-/* Verifies that trees T1 and T2 do correspond.  */
-
-bool
-func_checker::compare_variable_decl (tree t1, tree t2)
-{
-  bool ret = false;
-
-  if (t1 == t2)
-    return true;
-
-  if (TREE_CODE (t1) == VAR_DECL && (DECL_EXTERNAL (t1) || TREE_STATIC (t1)))
-    {
-      symtab_node *n1 = symtab_node::get (t1);
-      symtab_node *n2 = symtab_node::get (t2);
-
-      if (m_ignored_source_nodes != NULL && m_ignored_target_nodes != NULL)
-	{
-	  ret = m_ignored_source_nodes->contains (n1)
-		&& m_ignored_target_nodes->contains (n2);
-
-	  if (ret)
-	    return true;
-	}
-    }
-  ret = compare_decl (t1, t2);
-
-  return RETURN_WITH_DEBUG (ret);
-}
-
 
 /* Returns true if tree T can be compared as a handled component.  */
 
@@ -1265,231 +1059,6 @@ sem_function::bb_dict_test (int* bb_dict, int source, int target)
     }
   else
     return bb_dict[source] == target;
-}
-
-/* Function responsible for comparison of handled components T1 and T2.
-   If these components, from functions FUNC1 and FUNC2, are equal, true
-   is returned.  */
-
-bool
-func_checker::compare_operand (tree t1, tree t2)
-{
-  tree base1, base2, x1, x2, y1, y2, z1, z2;
-  HOST_WIDE_INT offset1 = 0, offset2 = 0;
-  bool ret;
-
-  if (!t1 && !t2)
-    return true;
-  else if (!t1 || !t2)
-    return false;
-
-  tree tt1 = TREE_TYPE (t1);
-  tree tt2 = TREE_TYPE (t2);
-
-  if (!func_checker::compatible_types_p (tt1, tt2))
-    return false;
-
-  base1 = get_addr_base_and_unit_offset (t1, &offset1);
-  base2 = get_addr_base_and_unit_offset (t2, &offset2);
-
-  if (base1 && base2)
-    {
-      if (offset1 != offset2)
-	return RETURN_FALSE_WITH_MSG ("base offsets are different");
-
-      t1 = base1;
-      t2 = base2;
-    }
-
-  if (TREE_CODE (t1) != TREE_CODE (t2))
-    return RETURN_FALSE ();
-
-  switch (TREE_CODE (t1))
-    {
-    case CONSTRUCTOR:
-      {
-	unsigned length1 = vec_safe_length (CONSTRUCTOR_ELTS (t1));
-	unsigned length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
-
-	if (length1 != length2)
-	  return RETURN_FALSE ();
-
-	for (unsigned i = 0; i < length1; i++)
-	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
-				CONSTRUCTOR_ELT (t2, i)->value))
-	    return RETURN_FALSE();
-
-	return true;
-      }
-    case ARRAY_REF:
-    case ARRAY_RANGE_REF:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-	y1 = TREE_OPERAND (t1, 1);
-	y2 = TREE_OPERAND (t2, 1);
-
-	if (!compare_operand (array_ref_low_bound (t1),
-			      array_ref_low_bound (t2)))
-	  return RETURN_FALSE_WITH_MSG ("");
-	if (!compare_operand (array_ref_element_size (t1),
-			      array_ref_element_size (t2)))
-	  return RETURN_FALSE_WITH_MSG ("");
-	if (!compare_operand (x1, x2))
-	  return RETURN_FALSE_WITH_MSG ("");
-	return compare_operand (y1, y2);
-      }
-
-    case MEM_REF:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-	y1 = TREE_OPERAND (t1, 1);
-	y2 = TREE_OPERAND (t2, 1);
-
-	/* See if operand is an memory access (the test originate from
-	 gimple_load_p).
-
-	In this case the alias set of the function being replaced must
-	be subset of the alias set of the other function.  At the moment
-	we seek for equivalency classes, so simply require inclussion in
-	both directions.  */
-
-	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2)))
-	  return RETURN_FALSE ();
-
-	if (!compare_operand (x1, x2))
-	  return RETURN_FALSE_WITH_MSG ("");
-
-	if (get_alias_set (TREE_TYPE (y1)) != get_alias_set (TREE_TYPE (y2)))
-	  return RETURN_FALSE_WITH_MSG ("alias set for MEM_REF offsets are different");
-
-	ao_ref r1, r2;
-	ao_ref_init (&r1, t1);
-	ao_ref_init (&r2, t2);
-	if (ao_ref_alias_set (&r1) != ao_ref_alias_set (&r2)
-	    || ao_ref_base_alias_set (&r1) != ao_ref_base_alias_set (&r2))
-	  return RETURN_FALSE_WITH_MSG ("ao alias sets are different");
-
-	/* Type of the offset on MEM_REF does not matter.  */
-	return wi::to_offset  (y1) == wi::to_offset  (y2);
-      }
-    case COMPONENT_REF:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-	y1 = TREE_OPERAND (t1, 1);
-	y2 = TREE_OPERAND (t2, 1);
-
-	ret = compare_operand (x1, x2)
-	      && compare_operand (y1, y2);
-
-	return RETURN_WITH_DEBUG (ret);
-      }
-    /* Virtual table call.  */
-    case OBJ_TYPE_REF:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-	y1 = TREE_OPERAND (t1, 1);
-	y2 = TREE_OPERAND (t2, 1);
-	z1 = TREE_OPERAND (t1, 2);
-	z2 = TREE_OPERAND (t2, 2);
-
-	ret = compare_operand (x1, x2)
-	      && compare_operand (y1, y2)
-	      && compare_operand (z1, z2);
-
-	return RETURN_WITH_DEBUG (ret);
-      }
-    case ADDR_EXPR:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-
-	ret = compare_operand (x1, x2);
-	return RETURN_WITH_DEBUG (ret);
-      }
-    case SSA_NAME:
-      {
-	ret = compare_ssa_name (t1, t2);
-
-	if (!ret)
-	  return RETURN_WITH_DEBUG (ret);
-
-	if (SSA_NAME_IS_DEFAULT_DEF (t1))
-	  {
-	    tree b1 = SSA_NAME_VAR (t1);
-	    tree b2 = SSA_NAME_VAR (t2);
-
-	    if (b1 == NULL && b2 == NULL)
-	      return true;
-
-	    if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
-	      return RETURN_FALSE ();
-
-	    switch (TREE_CODE (b1))
-	      {
-	      case VAR_DECL:
-		return RETURN_WITH_DEBUG (compare_variable_decl (t1, t2));
-	      case PARM_DECL:
-	      case RESULT_DECL:
-		ret = compare_decl (b1, b2);
-		return RETURN_WITH_DEBUG (ret);
-	      default:
-		return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
-	      }
-	  }
-	else
-	  return true;
-      }
-    case INTEGER_CST:
-      {
-	ret = compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2))
-	      && wi::to_offset  (t1) == wi::to_offset  (t2);
-
-	return RETURN_WITH_DEBUG (ret);
-      }
-    case COMPLEX_CST:
-    case VECTOR_CST:
-    case STRING_CST:
-    case REAL_CST:
-      {
-	ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
-	return RETURN_WITH_DEBUG (ret);
-      }
-    case FUNCTION_DECL:
-      {
-	ret = compare_function_decl (t1, t2);
-	return RETURN_WITH_DEBUG (ret);
-      }
-    case VAR_DECL:
-      return RETURN_WITH_DEBUG (compare_variable_decl (t1, t2));
-    case FIELD_DECL:
-      {
-	tree offset1 = DECL_FIELD_OFFSET (t1);
-	tree offset2 = DECL_FIELD_OFFSET (t2);
-
-	tree bit_offset1 = DECL_FIELD_BIT_OFFSET (t1);
-	tree bit_offset2 = DECL_FIELD_BIT_OFFSET (t2);
-
-	ret = compare_operand (offset1, offset2)
-	      && compare_operand (bit_offset1, bit_offset2);
-
-	return RETURN_WITH_DEBUG (ret);
-      }
-    case PARM_DECL:
-    case LABEL_DECL:
-    case RESULT_DECL:
-    case CONST_DECL:
-    case BIT_FIELD_REF:
-      {
-	ret = compare_decl (t1, t2);
-	return RETURN_WITH_DEBUG (ret);
-      }
-    default:
-      return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
-    }
 }
 
 /* Iterates all tree types in T1 and T2 and returns true if all types
@@ -1594,7 +1163,7 @@ sem_variable::equals (tree t1, tree t2)
 
 	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2),
 					       true))
-	  return RETURN_FALSE ();
+	  return return_false ();
 
 	/* Type of the offset on MEM_REF does not matter.  */
 	return sem_variable::equals (x1, x2)
@@ -1632,9 +1201,9 @@ sem_variable::equals (tree t1, tree t2)
 	return sem_variable::equals (x1, x2) && sem_variable::equals (y1, y2);
       }
     case ERROR_MARK:
-      return RETURN_FALSE_WITH_MSG ("ERROR_MARK");
+      return return_false_with_msg ("ERROR_MARK");
     default:
-      return RETURN_FALSE_WITH_MSG ("Unknown TREE code reached");
+      return return_false_with_msg ("Unknown TREE code reached");
     }
 }
 
