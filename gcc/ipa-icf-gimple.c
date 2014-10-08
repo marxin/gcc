@@ -42,9 +42,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "data-streamer.h"
 #include "ipa-utils.h"
 #include <list>
+#include "tree-ssanames.h"
+#include "tree-eh.h"
+
 #include "ipa-icf-gimple.h"
 #include "ipa-icf.h"
-#include "tree-ssanames.h"
 
 namespace ipa_icf_gimple {
 
@@ -519,6 +521,14 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
 
       s1 = gsi_stmt (gsi1);
       s2 = gsi_stmt (gsi2);
+
+      int eh1 = lookup_stmt_eh_lp_fn
+        (DECL_STRUCT_FUNCTION (m_source_func_decl), s1);
+      int eh2 = lookup_stmt_eh_lp_fn
+        (DECL_STRUCT_FUNCTION (m_target_func_decl), s2);
+
+      if (eh1 != eh2)
+	return return_false_with_msg ("EH regions are different");
 
       if (gimple_code (s1) != gimple_code (s2))
 	return return_false_with_msg ("gimple codes are different");

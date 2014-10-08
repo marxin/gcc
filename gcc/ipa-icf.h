@@ -271,11 +271,6 @@ private:
      equivalent in these blocks .  */
   bool compare_phi_node (basic_block bb1, basic_block bb2);
 
-  /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
-     true value is returned if exception handling regions are equivalent
-     in these blocks.  */
-  bool compare_eh_region (eh_region r1, eh_region r2);
-
   /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
      corresponds to TARGET.  */
   bool bb_dict_test (int* bb_dict, int source, int target);
