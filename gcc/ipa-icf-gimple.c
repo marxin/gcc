@@ -411,8 +411,19 @@ func_checker::compare_operand (tree t1, tree t2)
 
 	return return_with_debug (ret);
       }
-    case PARM_DECL:
     case LABEL_DECL:
+      {
+	int *bb1 = m_label_bb_map.get (t1);
+	int *bb2 = m_label_bb_map.get (t2);
+
+	if (!(bb1 && bb2))
+	{
+	  gcc_unreachable ();
+	}
+
+	return return_with_debug (*bb1 == *bb2);
+      }
+    case PARM_DECL:
     case RESULT_DECL:
     case CONST_DECL:
     case BIT_FIELD_REF:
@@ -488,7 +499,23 @@ func_checker::compare_variable_decl (tree t1, tree t2)
   return return_with_debug (ret);
 }
 
+void
+func_checker::parse_labels (sem_bb *bb)
+{
+  for (gimple_stmt_iterator gsi = gsi_start_bb (bb->bb); !gsi_end_p (gsi);
+       gsi_next (&gsi))
+  {
+    gimple stmt = gsi_stmt (gsi);
 
+    if (gimple_code (stmt) == GIMPLE_LABEL)
+    {
+      tree t = gimple_label_label (stmt);
+      gcc_assert (TREE_CODE (t) == LABEL_DECL);
+
+      m_label_bb_map.put (t, bb->bb->index);
+    }
+  }
+}
 
 /* Basic block equivalence comparison function that returns true if
    basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.

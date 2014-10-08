@@ -448,6 +448,13 @@ sem_function::equals_private (sem_item *item,
     if (!m_checker->compare_decl (arg1, arg2))
       return return_false ();
 
+  /* Fill-up label dictionary.  */
+  for (unsigned i = 0; i < bb_sorted.length (); ++i)
+    {
+      m_checker->parse_labels (bb_sorted[i]);
+      m_checker->parse_labels (m_compared_func->bb_sorted[i]);
+    }
+
   /* Checking all basic blocks.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
     if(!m_checker->compare_bb (bb_sorted[i], m_compared_func->bb_sorted[i]))

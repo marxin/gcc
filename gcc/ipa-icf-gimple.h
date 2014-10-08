@@ -137,6 +137,8 @@ public:
   /* Memory release routine.  */
   ~func_checker();
 
+  void parse_labels (sem_bb *bb);
+
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 correspond.  */
   bool compare_bb (sem_bb *bb1, sem_bb *bb2);
@@ -235,6 +237,9 @@ private:
 
   /* Source to target declaration map.  */
   hash_map <tree, tree> m_decl_map;
+
+  /* Label to basic block index mapping.  */
+  hash_map <tree, int> m_label_bb_map;
 
   /* Flag if polymorphic comparison should be executed.  */
   bool m_compare_polymorphic;
