@@ -23,6 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "vec.h"
 #include "cgraph.h"
 #include "alloc-pool.h"
+#include "annotation.h"
 
 /* The following definitions and interfaces are used by
    interprocedural analyses or parameters.  */
@@ -359,12 +360,14 @@ struct ipcp_lattice;
 
 struct ipa_node_params
 {
+  ~ipa_node_params ();
+
   /* Information about individual formal parameters that are gathered when
      summaries are generated. */
-  vec<ipa_param_descriptor> descriptors;
+  vec<ipa_param_descriptor> GTY ((skip)) descriptors;
   /* Pointer to an array of structures describing individual formal
      parameters.  */
-  struct ipcp_param_lattices *lattices;
+  struct GTY((skip)) ipcp_param_lattices *lattices;
   /* Only for versioned nodes this field would not be NULL,
      it points to the node that IPA cp cloned from.  */
   struct cgraph_node *ipcp_orig_node;
@@ -473,7 +476,7 @@ struct GTY(()) ipa_agg_replacement_value
 
 typedef struct ipa_agg_replacement_value *ipa_agg_replacement_value_p;
 
-void ipa_set_node_agg_value_chain (struct cgraph_node *node,
+void ipa_set_node_agg_value_chain (const struct cgraph_node *node,
 				   struct ipa_agg_replacement_value *aggvals);
 
 /* ipa_edge_args stores information related to a callsite and particularly its
@@ -519,7 +522,8 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
 /* Types of vectors holding the infos.  */
 
 /* Vector where the parameter infos are actually stored. */
-extern vec<ipa_node_params> ipa_node_params_vector;
+extern cgraph_annotation <ipa_node_params> *ipa_node_params_annotation;
+extern vec <ipa_node_params> ipa_node_params_vector;
 /* Vector of known aggregate values in cloned nodes.  */
 extern GTY(()) vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
 /* Vector where the parameter infos are actually stored. */
@@ -527,7 +531,12 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
-#define IPA_NODE_REF(NODE) (&ipa_node_params_vector[(NODE)->uid])
+static ipa_node_params *IPA_NODE_REF(cgraph_node *NODE)
+{
+  ipa_node_params *x = ipa_node_params_annotation->get_or_add (NODE);
+  fprintf (stderr, "IPA_NODE_REF: %u (%u), %p\n", NODE->order, x->descriptors.length (), x);
+  return x;
+}
 #define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */
@@ -537,11 +546,15 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 void ipa_create_all_node_params (void);
 void ipa_create_all_edge_args (void);
 void ipa_free_edge_args_substructures (struct ipa_edge_args *);
-void ipa_free_node_params_substructures (struct ipa_node_params *);
 void ipa_free_all_node_params (void);
 void ipa_free_all_edge_args (void);
 void ipa_free_all_structures_after_ipa_cp (void);
 void ipa_free_all_structures_after_iinln (void);
+void  ipa_node_duplication_hook (const struct cgraph_node *src,
+				 const struct cgraph_node *dst,
+				 struct ipa_node_params *old_info,
+				 struct ipa_node_params *new_info);
+
 void ipa_register_cgraph_hooks (void);
 int count_formal_params (tree fndecl);
 
@@ -556,6 +569,9 @@ ipa_check_create_node_params (void)
 
   if (ipa_node_params_vector.length () <= (unsigned) symtab->cgraph_max_uid)
     ipa_node_params_vector.safe_grow_cleared (symtab->cgraph_max_uid + 1);
+
+  if (!ipa_node_params_annotation)
+    ipa_node_params_annotation = cgraph_annotation <ipa_node_params>::create_ggc (symtab);
 }
 
 /* This function ensures the array of edge arguments infos is big enough to
@@ -582,7 +598,7 @@ ipa_edge_args_info_available_for_edge_p (struct cgraph_edge *edge)
 /* Return the aggregate replacements for NODE, if there are any.  */
 
 static inline struct ipa_agg_replacement_value *
-ipa_get_agg_replacements_for_node (struct cgraph_node *node)
+ipa_get_agg_replacements_for_node (const struct cgraph_node *node)
 {
   if ((unsigned) node->uid >= vec_safe_length (ipa_node_agg_replacements))
     return NULL;

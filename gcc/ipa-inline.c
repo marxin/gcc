@@ -2415,7 +2415,7 @@ pass_early_inline::execute (function *fun)
      it.  This may confuse ourself when early inliner decide to inline call to
      function clone, because function clones don't have parameter list in
      ipa-prop matching their signature.  */
-  if (ipa_node_params_vector.exists ())
+  if (ipa_node_params_annotation)
     return 0;
 
 #ifdef ENABLE_CHECKING

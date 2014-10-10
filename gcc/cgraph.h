@@ -1200,6 +1200,8 @@ public:
   int count_materialization_scale;
   /* Unique id of the node.  */
   int uid;
+  /* Annotation unique id of the node.  */
+  int annotation_uid;
   /* ID assigned by the profiling.  */
   unsigned int profile_id;
   /* Time profiler: first run of function.  */
@@ -1737,6 +1739,10 @@ public:
   friend class cgraph_node;
   friend class cgraph_edge;
 
+  symbol_table (): cgraph_max_annotation_uid (1)
+  {
+  }
+
   /* Initialize callgraph dump file.  */
   inline void
   initialize (void)
@@ -1938,6 +1944,7 @@ public:
 
   int cgraph_count;
   int cgraph_max_uid;
+  int cgraph_max_annotation_uid;
 
   int edges_count;
   int edges_max_uid;
@@ -2202,6 +2209,9 @@ inline cgraph_node *
 symbol_table::create_empty (void)
 {
   cgraph_node *node = allocate_cgraph_symbol ();
+
+  // TODO
+  node->annotation_uid = (cgraph_max_annotation_uid++) + 1;
 
   node->type = SYMTAB_FUNCTION;
   node->frequency = NODE_FREQUENCY_NORMAL;
