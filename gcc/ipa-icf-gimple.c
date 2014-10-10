@@ -416,11 +416,6 @@ func_checker::compare_operand (tree t1, tree t2)
 	int *bb1 = m_label_bb_map.get (t1);
 	int *bb2 = m_label_bb_map.get (t2);
 
-	if (!(bb1 && bb2))
-	{
-	  gcc_unreachable ();
-	}
-
 	return return_with_debug (*bb1 == *bb2);
       }
     case PARM_DECL:
@@ -504,17 +499,17 @@ func_checker::parse_labels (sem_bb *bb)
 {
   for (gimple_stmt_iterator gsi = gsi_start_bb (bb->bb); !gsi_end_p (gsi);
        gsi_next (&gsi))
-  {
-    gimple stmt = gsi_stmt (gsi);
-
-    if (gimple_code (stmt) == GIMPLE_LABEL)
     {
-      tree t = gimple_label_label (stmt);
-      gcc_assert (TREE_CODE (t) == LABEL_DECL);
+      gimple stmt = gsi_stmt (gsi);
 
-      m_label_bb_map.put (t, bb->bb->index);
+      if (gimple_code (stmt) == GIMPLE_LABEL)
+	{
+	  tree t = gimple_label_label (stmt);
+	  gcc_assert (TREE_CODE (t) == LABEL_DECL);
+
+	  m_label_bb_map.put (t, bb->bb->index);
+	}
     }
-  }
 }
 
 /* Basic block equivalence comparison function that returns true if
@@ -550,9 +545,9 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
       s2 = gsi_stmt (gsi2);
 
       int eh1 = lookup_stmt_eh_lp_fn
-        (DECL_STRUCT_FUNCTION (m_source_func_decl), s1);
+		(DECL_STRUCT_FUNCTION (m_source_func_decl), s1);
       int eh2 = lookup_stmt_eh_lp_fn
-        (DECL_STRUCT_FUNCTION (m_target_func_decl), s2);
+		(DECL_STRUCT_FUNCTION (m_target_func_decl), s2);
 
       if (eh1 != eh2)
 	return return_false_with_msg ("EH regions are different");
@@ -749,7 +744,6 @@ bool
 func_checker::compare_gimple_switch (gimple g1, gimple g2)
 {
   unsigned lsize1, lsize2, i;
-  tree t1, t2, low1, low2, high1, high2;
 
   lsize1 = gimple_switch_num_labels (g1);
   lsize2 = gimple_switch_num_labels (g2);
@@ -757,31 +751,31 @@ func_checker::compare_gimple_switch (gimple g1, gimple g2)
   if (lsize1 != lsize2)
     return false;
 
-  t1 = gimple_switch_index (g1);
-  t2 = gimple_switch_index (g2);
+  tree t1 = gimple_switch_index (g1);
+  tree t2 = gimple_switch_index (g2);
 
   if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
-    return false;
+    gcc_unreachable ();
 
   if (!compare_operand (t1, t2))
     return false;
 
   for (i = 0; i < lsize1; i++)
     {
-      low1 = CASE_LOW (gimple_switch_label (g1, i));
-      low2 = CASE_LOW (gimple_switch_label (g2, i));
+      tree label1 = gimple_switch_label (g1, i);
+      tree label2 = gimple_switch_label (g2, i);
 
-      if ((low1 != NULL) != (low2 != NULL)
-	  || (low1 && low2 && TREE_INT_CST_LOW (low1) != TREE_INT_CST_LOW (low2)))
-	return false;
+      if (TREE_CODE (label1) == CASE_LABEL_EXPR
+	  && TREE_CODE (label2) == CASE_LABEL_EXPR)
+	{
+	  label1 = CASE_LABEL (label1);
+	  label2 = CASE_LABEL (label2);
 
-      high1 = CASE_HIGH (gimple_switch_label (g1, i));
-      high2 = CASE_HIGH (gimple_switch_label (g2, i));
-
-      if ((high1 != NULL) != (high2 != NULL)
-	  || (high1 && high2
-	      && TREE_INT_CST_LOW (high1) != TREE_INT_CST_LOW (high2)))
-	return false;
+	  if (!compare_operand (label1, label2))
+	    return return_false_with_msg ("switch label_exprs are different");
+	}
+      else if (!tree_int_cst_equal (label1, label2))
+	return return_false_with_msg ("switch labels are different");
     }
 
   return true;
@@ -841,17 +835,44 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
   if (gimple_asm_volatile_p (g1) != gimple_asm_volatile_p (g2))
     return false;
 
-  if (gimple_asm_ninputs (g1) || gimple_asm_ninputs (g2))
+  if (gimple_asm_ninputs (g1) != gimple_asm_ninputs (g2))
     return false;
 
-  if (gimple_asm_noutputs (g1) || gimple_asm_noutputs (g2))
+  if (gimple_asm_noutputs (g1) != gimple_asm_noutputs (g2))
     return false;
 
-  if (gimple_asm_nlabels (g1) || gimple_asm_nlabels (g2))
+  if (gimple_asm_nlabels (g1) != gimple_asm_nlabels (g2))
     return false;
 
   if (gimple_asm_nclobbers (g1) != gimple_asm_nclobbers (g2))
     return false;
+
+  for (unsigned i = 0; i < gimple_asm_ninputs (g1); i++)
+    {
+      tree input1 = TREE_VALUE (gimple_asm_input_op (g1, i));
+      tree input2 = TREE_VALUE (gimple_asm_input_op (g2, i));
+
+      if (!compare_operand (input1, input2))
+	return return_false_with_msg ("ASM input is different");
+    }
+
+  for (unsigned i = 0; i < gimple_asm_noutputs (g1); i++)
+    {
+      tree output1 = TREE_VALUE (gimple_asm_output_op (g1, i));
+      tree output2 = TREE_VALUE (gimple_asm_output_op (g2, i));
+
+      if (!compare_operand (output1, output2))
+	return return_false_with_msg ("ASM output is different");
+    }
+
+  for (unsigned i = 0; i < gimple_asm_nlabels (g1); i++)
+    {
+      tree label1 = TREE_VALUE (gimple_asm_label_op (g1, i));
+      tree label2 = TREE_VALUE (gimple_asm_label_op (g2, i));
+
+      if (!compare_operand (label1, label2))
+	return return_false_with_msg ("ASM label is different");
+    }
 
   for (unsigned i = 0; i < gimple_asm_nclobbers (g1); i++)
     {
@@ -859,7 +880,7 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
       tree clobber2 = TREE_VALUE (gimple_asm_clobber_op (g2, i));
 
       if (!operand_equal_p (clobber1, clobber2, OEP_ONLY_CONST))
-	return false;
+	return return_false_with_msg ("ASM clobber is different");
     }
 
   return true;
