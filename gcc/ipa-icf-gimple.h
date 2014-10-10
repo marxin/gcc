@@ -19,6 +19,14 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+/* Gimple identical code folding (class func_checker) is an infastructure
+   capable of comparing two given functions. The class compares every
+   gimple statement and uses many dictionaries to map source and target
+   SSA_NAMEs, declarations and other components.
+
+   To use the infrastructure, create an instanse of func_checker and call
+   a comparsion function based on type of gimple statement.  */
+
 /* Prints string STRING to a FILE with a given number of SPACE_COUNT.  */
 #define FPUTS_SPACES(file, space_count, string) \
   fprintf (file, "%*s" string, space_count, " ");
