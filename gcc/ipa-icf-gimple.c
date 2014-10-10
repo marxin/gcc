@@ -754,9 +754,6 @@ func_checker::compare_gimple_switch (gimple g1, gimple g2)
   tree t1 = gimple_switch_index (g1);
   tree t2 = gimple_switch_index (g2);
 
-  if (TREE_CODE (t1) != SSA_NAME || TREE_CODE(t2) != SSA_NAME)
-    gcc_unreachable ();
-
   if (!compare_operand (t1, t2))
     return false;
 
