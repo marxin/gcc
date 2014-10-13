@@ -849,6 +849,8 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
       tree input1 = TREE_VALUE (gimple_asm_input_op (g1, i));
       tree input2 = TREE_VALUE (gimple_asm_input_op (g2, i));
 
+      gcc_assert (TREE_CODE (input1) != TREE_LIST);
+
       if (!compare_operand (input1, input2))
 	return return_false_with_msg ("ASM input is different");
     }
@@ -857,6 +859,8 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
     {
       tree output1 = TREE_VALUE (gimple_asm_output_op (g1, i));
       tree output2 = TREE_VALUE (gimple_asm_output_op (g2, i));
+
+      gcc_assert (TREE_CODE (output1) != TREE_LIST);
 
       if (!compare_operand (output1, output2))
 	return return_false_with_msg ("ASM output is different");
@@ -867,6 +871,8 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
       tree label1 = TREE_VALUE (gimple_asm_label_op (g1, i));
       tree label2 = TREE_VALUE (gimple_asm_label_op (g2, i));
 
+      gcc_assert (TREE_CODE (label1) != TREE_LIST);
+
       if (!compare_operand (label1, label2))
 	return return_false_with_msg ("ASM label is different");
     }
@@ -875,6 +881,8 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
     {
       tree clobber1 = TREE_VALUE (gimple_asm_clobber_op (g1, i));
       tree clobber2 = TREE_VALUE (gimple_asm_clobber_op (g2, i));
+
+      gcc_assert (TREE_CODE (clobber1) != TREE_LIST);
 
       if (!operand_equal_p (clobber1, clobber2, OEP_ONLY_CONST))
 	return return_false_with_msg ("ASM clobber is different");

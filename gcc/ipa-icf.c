@@ -984,7 +984,12 @@ sem_variable::equals (sem_item *item,
 {
   gcc_assert (item->type == VAR);
 
-  return sem_variable::equals (ctor, static_cast<sem_variable *>(item)->ctor);
+  sem_variable *v = static_cast<sem_variable *>(item);
+
+  if (!ctor || !v->ctor)
+    return return_false_with_msg ("ctor is missing for semantic variable");
+
+  return sem_variable::equals (ctor, v->ctor);
 }
 
 /* Compares trees T1 and T2 for semantic equality.  */
