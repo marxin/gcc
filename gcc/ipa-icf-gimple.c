@@ -198,8 +198,6 @@ bool func_checker::compatible_types_p (tree t1, tree t2,
   return true;
 }
 
-
-
 /* Function responsible for comparison of handled components T1 and T2.
    If these components, from functions FUNC1 and FUNC2, are equal, true
    is returned.  */
@@ -431,6 +429,31 @@ func_checker::compare_operand (tree t1, tree t2)
     }
 }
 
+/* Compares two tree list operands T1 and T2 and returns true if these
+   two trees are semantically equivalent.  */
+
+bool
+func_checker::compare_tree_list_operand (tree t1, tree t2)
+{
+  gcc_assert (TREE_CODE (t1) == TREE_LIST);
+  gcc_assert (TREE_CODE (t2) == TREE_LIST);
+
+  for (; t1; t1 = TREE_CHAIN (t1))
+    {
+      if (!t2)
+	return false;
+
+      if (!compare_operand (TREE_VALUE (t1), TREE_VALUE (t2)))
+	return return_false ();
+
+      t2 = TREE_CHAIN (t2);
+    }
+
+  if (t2)
+    return return_false ();
+
+  return true;
+}
 
 /* Verifies that trees T1 and T2, representing function declarations
    are equivalent from perspective of ICF.  */
@@ -734,6 +757,9 @@ func_checker::compare_gimple_label (gimple g1, gimple g2)
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
 
+  if (FORCED_LABEL (t1) || FORCED_LABEL (t2))
+    return return_false_with_msg ("FORCED_LABEL");
+
   return compare_tree_ssa_label (t1, t2);
 }
 
@@ -846,45 +872,38 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
 
   for (unsigned i = 0; i < gimple_asm_ninputs (g1); i++)
     {
-      tree input1 = TREE_VALUE (gimple_asm_input_op (g1, i));
-      tree input2 = TREE_VALUE (gimple_asm_input_op (g2, i));
+      tree input1 = gimple_asm_input_op (g1, i);
+      tree input2 = gimple_asm_input_op (g2, i);
 
-      gcc_assert (TREE_CODE (input1) != TREE_LIST);
-
-      if (!compare_operand (input1, input2))
+      if (!compare_tree_list_operand (input1, input2))
 	return return_false_with_msg ("ASM input is different");
     }
 
   for (unsigned i = 0; i < gimple_asm_noutputs (g1); i++)
     {
-      tree output1 = TREE_VALUE (gimple_asm_output_op (g1, i));
-      tree output2 = TREE_VALUE (gimple_asm_output_op (g2, i));
+      tree output1 = gimple_asm_output_op (g1, i);
+      tree output2 = gimple_asm_output_op (g2, i);
 
-      gcc_assert (TREE_CODE (output1) != TREE_LIST);
-
-      if (!compare_operand (output1, output2))
+      if (!compare_tree_list_operand (output1, output2))
 	return return_false_with_msg ("ASM output is different");
     }
 
   for (unsigned i = 0; i < gimple_asm_nlabels (g1); i++)
     {
-      tree label1 = TREE_VALUE (gimple_asm_label_op (g1, i));
-      tree label2 = TREE_VALUE (gimple_asm_label_op (g2, i));
+      tree label1 = gimple_asm_label_op (g1, i);
+      tree label2 = gimple_asm_label_op (g2, i);
 
-      gcc_assert (TREE_CODE (label1) != TREE_LIST);
-
-      if (!compare_operand (label1, label2))
+      if (!compare_tree_list_operand (label1, label2))
 	return return_false_with_msg ("ASM label is different");
     }
 
   for (unsigned i = 0; i < gimple_asm_nclobbers (g1); i++)
     {
-      tree clobber1 = TREE_VALUE (gimple_asm_clobber_op (g1, i));
-      tree clobber2 = TREE_VALUE (gimple_asm_clobber_op (g2, i));
+      tree clobber1 = gimple_asm_clobber_op (g1, i);
+      tree clobber2 = gimple_asm_clobber_op (g2, i);
 
-      gcc_assert (TREE_CODE (clobber1) != TREE_LIST);
-
-      if (!operand_equal_p (clobber1, clobber2, OEP_ONLY_CONST))
+      if (!operand_equal_p (TREE_VALUE (clobber1), TREE_VALUE (clobber2),
+			    OEP_ONLY_CONST))
 	return return_false_with_msg ("ASM clobber is different");
     }
 

@@ -2175,6 +2175,21 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
   unsigned int class_count = m_classes_count;
   unsigned int equal_items = item_count - class_count;
 
+  unsigned int non_singular_classes_count = 0;
+  unsigned int non_singular_classes_sum = 0;
+
+  for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
+    for (unsigned int i = 0; i < (*it)->classes.length (); i++)
+      {
+	congruence_class *c = (*it)->classes[i];
+	if (c->members.length () > 1)
+	{
+	  non_singular_classes_count++;
+	  non_singular_classes_sum += c->members.length ();
+	}
+      }
+
   if (dump_file)
     {
       fprintf (dump_file, "\nItem count: %u\n", item_count);
@@ -2183,6 +2198,9 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
       fprintf (dump_file, "Average class size before: %.2f, after: %.2f\n",
 	       1.0f * item_count / prev_class_count,
 	       1.0f * item_count / class_count);
+      fprintf (dump_file, "Average non-singular class size: %.2f, count: %u\n",
+	       1.0f * non_singular_classes_sum / non_singular_classes_count,
+	       non_singular_classes_count);
       fprintf (dump_file, "Equal symbols: %u\n", equal_items);
       fprintf (dump_file, "Fraction of visited symbols: %.2f%%\n\n",
 	       100.0f * equal_items / item_count);

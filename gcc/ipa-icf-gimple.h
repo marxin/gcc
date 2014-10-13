@@ -200,9 +200,14 @@ public:
   /* Verifies that tree labels T1 and T2 correspond.  */
   bool compare_tree_ssa_label (tree t1, tree t2);
 
-  /* Function compares two operands T1 and T2 and returns true if these
-     two trees are semantically equivalent.  */
+  /* Function responsible for comparison of handled components T1 and T2.
+     If these components, from functions FUNC1 and FUNC2, are equal, true
+     is returned.  */
   bool compare_operand (tree t1, tree t2);
+
+  /* Compares two tree list operands T1 and T2 and returns true if these
+     two trees are semantically equivalent.  */
+  bool compare_tree_list_operand (tree t1, tree t2);
 
   /* Verifies that trees T1 and T2, representing function declarations
      are equivalent from perspective of ICF.  */
