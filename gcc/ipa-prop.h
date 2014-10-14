@@ -364,10 +364,10 @@ struct ipa_node_params
 
   /* Information about individual formal parameters that are gathered when
      summaries are generated. */
-  vec<ipa_param_descriptor> GTY ((skip)) descriptors;
+  vec<ipa_param_descriptor> descriptors;
   /* Pointer to an array of structures describing individual formal
      parameters.  */
-  struct GTY((skip)) ipcp_param_lattices *lattices;
+  struct ipcp_param_lattices *lattices;
   /* Only for versioned nodes this field would not be NULL,
      it points to the node that IPA cp cloned from.  */
   struct cgraph_node *ipcp_orig_node;

@@ -2275,8 +2275,8 @@ symbol_table::create_empty (void)
 {
   cgraph_node *node = allocate_cgraph_symbol ();
 
-  // TODO
-  node->annotation_uid = (cgraph_max_annotation_uid++) + 1;
+  gcc_assert (cgraph_max_annotation_uid);
+  node->annotation_uid = cgraph_max_annotation_uid++;
 
   node->type = SYMTAB_FUNCTION;
   node->frequency = NODE_FREQUENCY_NORMAL;
