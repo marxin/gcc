@@ -864,7 +864,8 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
   if (gimple_asm_noutputs (g1) != gimple_asm_noutputs (g2))
     return false;
 
-  if (gimple_asm_nlabels (g1) != gimple_asm_nlabels (g2))
+  /* We do not suppport goto ASM statement comparison.  */
+  if (gimple_asm_nlabels (g1) || gimple_asm_nlabels (g2))
     return false;
 
   if (gimple_asm_nclobbers (g1) != gimple_asm_nclobbers (g2))
@@ -886,15 +887,6 @@ func_checker::compare_gimple_asm (gimple g1, gimple g2)
 
       if (!compare_tree_list_operand (output1, output2))
 	return return_false_with_msg ("ASM output is different");
-    }
-
-  for (unsigned i = 0; i < gimple_asm_nlabels (g1); i++)
-    {
-      tree label1 = gimple_asm_label_op (g1, i);
-      tree label2 = gimple_asm_label_op (g2, i);
-
-      if (!compare_tree_list_operand (label1, label2))
-	return return_false_with_msg ("ASM label is different");
     }
 
   for (unsigned i = 0; i < gimple_asm_nclobbers (g1); i++)
