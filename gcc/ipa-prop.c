@@ -248,10 +248,7 @@ ipa_alloc_node_params (struct cgraph_node *node, int param_count)
   struct ipa_node_params *info = IPA_NODE_REF (node);
 
   if (!info->descriptors.exists () && param_count)
-  {
     info->descriptors.safe_grow_cleared (param_count);
-    gcc_assert (info->descriptors.length ());
-  }
 }
 
 /* Initialize the ipa_node_params structure associated with NODE by counting
@@ -3624,7 +3621,6 @@ ipa_free_all_node_params (void)
   ipa_node_params_vector.release ();
 }
 
-
 /* Set the aggregate replacements of NODE to be AGGVALS.  */
 
 void
@@ -3784,7 +3780,7 @@ ipa_add_new_function (struct cgraph_node *node, void *data ATTRIBUTE_UNUSED)
 
 /* Hook that is called by cgraph.c when a node is duplicated.  */
 
-void 
+void
 ipa_node_duplication_hook (const struct cgraph_node *src, const struct cgraph_node *dst,
                           struct ipa_node_params *old_info, struct ipa_node_params *new_info)
 {

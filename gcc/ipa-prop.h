@@ -523,7 +523,6 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
 
 /* Vector where the parameter infos are actually stored. */
 extern cgraph_annotation <ipa_node_params> *ipa_node_params_annotation;
-extern vec <ipa_node_params> ipa_node_params_vector;
 /* Vector of known aggregate values in cloned nodes.  */
 extern GTY(()) vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
 /* Vector where the parameter infos are actually stored. */
@@ -559,12 +558,6 @@ int count_formal_params (tree fndecl);
 static inline void
 ipa_check_create_node_params (void)
 {
-  if (!ipa_node_params_vector.exists ())
-    ipa_node_params_vector.create (symtab->cgraph_max_uid);
-
-  if (ipa_node_params_vector.length () <= (unsigned) symtab->cgraph_max_uid)
-    ipa_node_params_vector.safe_grow_cleared (symtab->cgraph_max_uid + 1);
-
   if (!ipa_node_params_annotation)
     ipa_node_params_annotation = new cgraph_annotation <ipa_node_params> (symtab);
 }
