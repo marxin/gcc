@@ -3822,7 +3822,7 @@ ipa_register_cgraph_hooks (void)
 {
   if (!ipa_node_params_annotation)
     {
-      ipa_node_params_annotation = cgraph_annotation <ipa_node_params>::create_ggc (symtab);
+      ipa_node_params_annotation = new cgraph_annotation <ipa_node_params> (symtab);
       ipa_node_params_annotation->add_duplication_hook <ipa_node_duplication_hook> ();
     }
 

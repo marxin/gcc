@@ -83,13 +83,30 @@ template <class T>
 class cgraph_annotation
 {
 public:
-  /* Create a cgraph_annotation in ggc memory.  */
-  static cgraph_annotation *create_ggc (symbol_table *table)
+  cgraph_annotation (symbol_table *symtab)
+  {
+    cgraph_node *node;
+
+    FOR_EACH_FUNCTION (node)
     {
-      // cgraph_annotation *annotation = ggc_alloc<cgraph_annotation> ();
-      // new (annotation) cgraph_annotation (table);
-      return new cgraph_annotation (table);
+      gcc_assert (node->annotation_uid > 0);
+      m_reverse_map.put (node, node->annotation_uid);
     }
+
+    m_map = new  hash_map<int, T*, annotation_hashmap_traits>();
+
+    m_symtab_insertion_hook =
+      symtab->add_cgraph_insertion_hook
+      (cgraph_annotation::symtab_insertion, this);
+
+    m_symtab_removal_hook =
+      symtab->add_cgraph_removal_hook
+      (cgraph_annotation::symtab_removal, this);
+    m_symtab_duplication_hook =
+      symtab->add_cgraph_duplication_hook
+      (cgraph_annotation::symtab_duplication, this);
+
+  }
 
   ~cgraph_annotation ()
   {
@@ -97,7 +114,7 @@ public:
     m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
     m_symtab->remove_cgraph_duplication_hook (m_symtab_duplication_hook);
 
-//    m_map->traverse <void *, cgraph_annotation::release> (NULL);
+    m_map->traverse <void *, cgraph_annotation::release> (NULL);
   }
 
   template<typename Arg, bool (*f)(const T &, Arg)>
@@ -130,10 +147,8 @@ public:
     T **v = m_map->get (uid);
     if (!v)
       {
-	// T *new_value = ggc_alloc<T> ();
-	// new (new_value) T();
-	T *new_value = new T(); 
-        m_map->put (uid, new_value);
+	T *new_value = new T();
+	m_map->put (uid, new_value);
 
 	v = &new_value;
       }
@@ -166,7 +181,6 @@ public:
 
   static void symtab_insertion (cgraph_node *node, void *data)
   {
-    gcc_unreachable ();
     cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
     annotation->call_insertion_hooks (node);
   }
@@ -190,6 +204,7 @@ public:
 
     if (annotation->m_map->get (annotation_uid))
       annotation->m_map->remove (annotation_uid);
+
   }
 
   static void symtab_duplication (cgraph_node *node, cgraph_node *node2,
@@ -202,42 +217,19 @@ public:
     annotation->m_reverse_map.put (node2, node2->annotation_uid);
 
     if (v)
-    {
-      T *data = *v;
-      T *duplicate = new T();
-      annotation->m_map->put (node2->annotation_uid, duplicate);
-      annotation->call_duplication_hooks (node, node2, data);
-    }
+      {
+	T *data = *v;
+	T *duplicate = new T();
+	annotation->m_map->put (node2->annotation_uid, duplicate);
+	annotation->call_duplication_hooks (node, node2, data);
+      }
+
   }
 
   hash_map <int, T *, annotation_hashmap_traits> *m_map;
   hash_map <cgraph_node *, int> m_reverse_map;
 
-private:  
-  cgraph_annotation (symbol_table *symtab): m_symtab (symtab)
-  {
-    cgraph_node *node;
-
-    FOR_EACH_FUNCTION (node)
-    {
-      gcc_assert (node->annotation_uid > 0);
-      m_reverse_map.put (node, node->annotation_uid);
-    }
-
-    m_map = new  hash_map<int, T*, annotation_hashmap_traits>();
-
-    m_symtab_insertion_hook =
-      symtab->add_cgraph_insertion_hook
-	(cgraph_annotation::symtab_insertion, this);
-
-    m_symtab_removal_hook =
-      symtab->add_cgraph_removal_hook
-	(cgraph_annotation::symtab_removal, this);
-    m_symtab_duplication_hook =
-      symtab->add_cgraph_duplication_hook
-        (cgraph_annotation::symtab_duplication, this);
-  }
-
+private:
   inline void remove (int uid)
   {
     T *v = m_map->get (uid);
@@ -249,13 +241,13 @@ private:
   static bool release (int const &, T * const &v, void *)
   {
     delete (v);
-
     return true;
   }
 
   auto_vec <void (*) (cgraph_node *, T *)> m_insertion_hooks;
-  auto_vec <void (*) (cgraph_node *, T *)> m_removal_hooks;  
-  auto_vec <void (*) (const cgraph_node *, const cgraph_node *, T *, T *)> m_duplication_hooks;  
+  auto_vec <void (*) (cgraph_node *, T *)> m_removal_hooks;
+  auto_vec <void (*) (const cgraph_node *, const cgraph_node *, T *, T *)>
+  m_duplication_hooks;
 
   cgraph_node_hook_list *m_symtab_insertion_hook;
   cgraph_node_hook_list *m_symtab_removal_hook;

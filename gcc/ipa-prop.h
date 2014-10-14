@@ -566,7 +566,7 @@ ipa_check_create_node_params (void)
     ipa_node_params_vector.safe_grow_cleared (symtab->cgraph_max_uid + 1);
 
   if (!ipa_node_params_annotation)
-    ipa_node_params_annotation = cgraph_annotation <ipa_node_params>::create_ggc (symtab);
+    ipa_node_params_annotation = new cgraph_annotation <ipa_node_params> (symtab);
 }
 
 /* This function ensures the array of edge arguments infos is big enough to
