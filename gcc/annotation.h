@@ -83,7 +83,7 @@ template <class T>
 class cgraph_annotation
 {
 public:
-  cgraph_annotation (symbol_table *symtab)
+  cgraph_annotation (symbol_table *symtab): m_symtab (symtab)
   {
     cgraph_node *node;
 
