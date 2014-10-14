@@ -127,10 +127,6 @@ public:
 
   inline T* get_or_add (int uid)
   {
-    //fprintf (stderr, "get_or_add called for: %d\n", uid);
-    // TODO
-    // gcc_assert (uid < m_symtab->cgraph_max_annotation_uid);
-
     T **v = m_map->get (uid);
     if (!v)
       {
@@ -141,8 +137,6 @@ public:
 
 	v = &new_value;
       }
-
-    //fprintf (stderr, "PC: %d\n", ipa_get_param_count (*v));
 
     return *v;
   }
@@ -179,9 +173,7 @@ public:
 
   static void symtab_removal (cgraph_node *node, void *data)
   {
-    fprintf (stderr, "symtab_removal: %p/%u\n", node, node->annotation_uid);
     cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
-
     int *annotation_uid_ptr = annotation->m_reverse_map.get (node);
 
     if (!annotation_uid_ptr)
@@ -195,7 +187,6 @@ public:
       annotation->call_removal_hooks (node, *v);
 
     annotation->m_reverse_map.remove (node);
-    fprintf (stderr, "removing annotation id: %u\n", annotation_uid);
 
     if (annotation->m_map->get (annotation_uid))
       annotation->m_map->remove (annotation_uid);
@@ -204,13 +195,6 @@ public:
   static void symtab_duplication (cgraph_node *node, cgraph_node *node2,
 				  void *data)
   {
-    fprintf (stderr, "symtab_duplication: %p/source_ann_id: %u\n", node2, node->annotation_uid);
-
-    if (node->annotation_uid == 3552)
-    {
-      int a = 2;
-    }
-
     cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
     T **v = annotation->m_map->get (node->annotation_uid);
 
@@ -219,10 +203,10 @@ public:
 
     if (v)
     {
-      T *duplicate = ggc_alloc<T> ();
-      new (duplicate) T();
+      T *data = *v;
+      T *duplicate = new T();
       annotation->m_map->put (node2->annotation_uid, duplicate);
-      annotation->call_duplication_hooks (node, node2, *v);
+      annotation->call_duplication_hooks (node, node2, data);
     }
   }
 
@@ -236,7 +220,6 @@ private:
 
     FOR_EACH_FUNCTION (node)
     {
-      fprintf (stderr, "cgraph_annotation: %p/%u\n", node, node->annotation_uid);
       gcc_assert (node->annotation_uid > 0);
       m_reverse_map.put (node, node->annotation_uid);
     }

@@ -531,12 +531,7 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
-static ipa_node_params *IPA_NODE_REF(cgraph_node *NODE)
-{
-  ipa_node_params *x = ipa_node_params_annotation->get_or_add (NODE);
-  fprintf (stderr, "IPA_NODE_REF: %u (%u), %p\n", NODE->order, x->descriptors.length (), x);
-  return x;
-}
+#define IPA_NODE_REF(NODE) (ipa_node_params_annotation->get_or_add (NODE))
 #define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */

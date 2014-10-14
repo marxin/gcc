@@ -3544,7 +3544,6 @@ inline_merge_summary (struct cgraph_edge *edge)
 		}
 	    }
 	  operand_map[i] = map;
-	  fprintf (stderr, "to: %u, %u\n", to->order, ipa_get_param_count (IPA_NODE_REF (to)));
 	  gcc_assert (map < ipa_get_param_count (IPA_NODE_REF (to)));
 	}
     }

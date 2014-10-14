@@ -249,7 +249,6 @@ ipa_alloc_node_params (struct cgraph_node *node, int param_count)
 
   if (!info->descriptors.exists () && param_count)
   {
-    fprintf (stderr, "ipa_alloc_node_params: %u, node: %u, info:%p\n", param_count, node->order, info);
     info->descriptors.safe_grow_cleared (param_count);
     gcc_assert (info->descriptors.length ());
   }
@@ -2536,7 +2535,6 @@ ipa_analyze_node (struct cgraph_node *node)
 
   ipa_check_create_node_params ();
   ipa_check_create_edge_args ();
-  fprintf (stderr, "ipa_analyze_node: %p/%u\n", node, node->annotation_uid);
   info = IPA_NODE_REF (node);
 
   if (info->analysis_done)
@@ -3620,14 +3618,8 @@ ipa_node_params::~ipa_node_params ()
 void
 ipa_free_all_node_params (void)
 {
-  int i;
-  struct ipa_node_params *info;
-
   delete ipa_node_params_annotation;
   ipa_node_params_annotation = NULL;
-
-//  FOR_EACH_VEC_ELT (ipa_node_params_vector, i, info)
-//    ipa_free_node_params_substructures (info);
 
   ipa_node_params_vector.release ();
 }
