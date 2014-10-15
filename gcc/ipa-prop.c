@@ -3816,11 +3816,7 @@ ipa_node_duplication_hook (const struct cgraph_node *src, const struct cgraph_no
 void
 ipa_register_cgraph_hooks (void)
 {
-  if (!ipa_node_params_annotation)
-    {
-      ipa_node_params_annotation = new cgraph_annotation <ipa_node_params> (symtab);
-      ipa_node_params_annotation->add_duplication_hook <ipa_node_duplication_hook> ();
-    }
+  ipa_check_create_node_params ();
 
   if (!edge_removal_hook_holder)
     edge_removal_hook_holder =

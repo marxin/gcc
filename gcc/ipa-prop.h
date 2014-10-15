@@ -559,7 +559,10 @@ static inline void
 ipa_check_create_node_params (void)
 {
   if (!ipa_node_params_annotation)
-    ipa_node_params_annotation = new cgraph_annotation <ipa_node_params> (symtab);
+    {
+      ipa_node_params_annotation = new cgraph_annotation <ipa_node_params> (symtab);
+      ipa_node_params_annotation->add_duplication_hook <ipa_node_duplication_hook> ();
+    }
 }
 
 /* This function ensures the array of edge arguments infos is big enough to
