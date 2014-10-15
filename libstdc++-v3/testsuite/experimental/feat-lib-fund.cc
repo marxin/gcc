@@ -12,9 +12,9 @@
 //#  error "<experimental/net>"
 //#endif
 
-//#if !__has_include(<experimental/any>)
-//#  error "<experimental/any>"
-//#endif
+#if !__has_include(<experimental/any>)
+#  error "<experimental/any>"
+#endif
 
 //#if !__has_include(<experimental/memory_resource>)
 //#  error "<experimental/memory_resource>"
@@ -22,4 +22,8 @@
 
 #if !__has_include(<experimental/string_view>)
 #  error "<experimental/string_view>"
+#endif
+
+#if !__has_include(<experimental/tuple>)
+#  error "<experimental/tuple>"
 #endif

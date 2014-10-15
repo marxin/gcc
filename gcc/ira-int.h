@@ -318,7 +318,7 @@ struct ira_allocno
      number (0, ...) - 2.  Value -1 is used for allocnos spilled by the
      reload (at this point pseudo-register has only one allocno) which
      did not get stack slot yet.  */
-  int hard_regno : 16;
+  signed int hard_regno : 16;
   /* Allocnos with the same regno are linked by the following member.
      Allocnos corresponding to inner loops are first in the list (it
      corresponds to depth-first traverse of the loops).  */
@@ -531,7 +531,7 @@ extern ira_object_t *ira_object_id_map;
 /* The size of the previous array.  */
 extern int ira_objects_num;
 
-/* The following structure represents a hard register prefererence of
+/* The following structure represents a hard register preference of
    allocno.  The preference represent move insns or potential move
    insns usually because of two operand insn constraints.  One move
    operand is a hard register.  */
@@ -546,7 +546,7 @@ struct ira_allocno_pref
   int freq;
   /* Given allocno.  */
   ira_allocno_t allocno;
-  /* All prefernces with the same allocno are linked by the following
+  /* All preferences with the same allocno are linked by the following
      member.  */
   ira_pref_t next_pref;
 };
