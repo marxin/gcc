@@ -890,6 +890,8 @@ evaluate_properties_for_edge (struct cgraph_edge *e, bool inline_p,
 
   if (clause_ptr)
     *clause_ptr = inline_p ? 0 : 1 << predicate_not_inlined_condition;
+  if (known_vals_ptr)
+    known_vals_ptr->create (0);
   if (known_binfos_ptr)
     known_binfos_ptr->create (0);
 
