@@ -8080,7 +8080,7 @@ Nevertheless the behavior is similar to Gold Linker ICF optimization, GCC ICF
 works on different levels and thus the optimizations are not same - there are
 equivalences that are found only by GCC and equivalences found only by Gold.
 
-This flag is enabled by default at @option{-O2}.
+This flag is enabled by default at @option{-O2} and @option{-Os}.
 
 @item -fisolate-erroneous-paths-dereference
 Detect paths which trigger erroneous or undefined behaviour due to

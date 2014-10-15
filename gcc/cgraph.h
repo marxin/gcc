@@ -173,7 +173,7 @@ public:
   void dump_referring (FILE *);
 
   /* Get number of references for this node.  */
-  inline unsigned get_references_count (void)
+  inline unsigned num_references (void)
   {
     return ref_list.references ? ref_list.references->length () : 0;
   }

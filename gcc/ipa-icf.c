@@ -257,12 +257,7 @@ sem_function::compare_cgraph_references (hash_map <symtab_node *, sem_item *>
   if (n1 == n2 || (ignored_nodes.get (n1) && ignored_nodes.get (n2)))
     return true;
 
-  cgraph_node *cn1 = dyn_cast <cgraph_node *> (n1);
-  cgraph_node *cn2 = dyn_cast <cgraph_node *> (n2);
-
-  if (cn1 && cn2 && cn1->weakref && cn2->weakref
-      && cn1->alias_target == cn2->alias_target)
-    return true;
+  /* TODO: add more precise comparison for weakrefs, etc.  */
 
   return return_false_with_msg ("different references");
 }
@@ -320,7 +315,7 @@ sem_function::equals_wpa (sem_item *item,
 					 m_compared_func->result_type))
     return return_false_with_msg ("result types are different");
 
-  if (node->get_references_count () != item->node->get_references_count ())
+  if (node->num_references () != item->node->num_references ())
     return return_false_with_msg ("different number of references");
 
   ipa_ref *ref = NULL, *ref2 = NULL;
@@ -2184,10 +2179,10 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
       {
 	congruence_class *c = (*it)->classes[i];
 	if (c->members.length () > 1)
-	{
-	  non_singular_classes_count++;
-	  non_singular_classes_sum += c->members.length ();
-	}
+	  {
+	    non_singular_classes_count++;
+	    non_singular_classes_sum += c->members.length ();
+	  }
       }
 
   if (dump_file)

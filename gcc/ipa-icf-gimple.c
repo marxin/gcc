@@ -254,23 +254,20 @@ func_checker::compare_operand (tree t1, tree t2)
       }
     case ARRAY_REF:
     case ARRAY_RANGE_REF:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-	y1 = TREE_OPERAND (t1, 1);
-	y2 = TREE_OPERAND (t2, 1);
+      x1 = TREE_OPERAND (t1, 0);
+      x2 = TREE_OPERAND (t2, 0);
+      y1 = TREE_OPERAND (t1, 1);
+      y2 = TREE_OPERAND (t2, 1);
 
-	if (!compare_operand (array_ref_low_bound (t1),
-			      array_ref_low_bound (t2)))
-	  return return_false_with_msg ("");
-	if (!compare_operand (array_ref_element_size (t1),
-			      array_ref_element_size (t2)))
-	  return return_false_with_msg ("");
-	if (!compare_operand (x1, x2))
-	  return return_false_with_msg ("");
-	return compare_operand (y1, y2);
-      }
-
+      if (!compare_operand (array_ref_low_bound (t1),
+			    array_ref_low_bound (t2)))
+	return return_false_with_msg ("");
+      if (!compare_operand (array_ref_element_size (t1),
+			    array_ref_element_size (t2)))
+	return return_false_with_msg ("");
+      if (!compare_operand (x1, x2))
+	return return_false_with_msg ("");
+      return compare_operand (y1, y2);
     case MEM_REF:
       {
 	x1 = TREE_OPERAND (t1, 0);
@@ -649,13 +646,8 @@ func_checker::compare_gimple_call (gimple s1, gimple s2)
   t2 = gimple_call_fndecl (s2);
 
   /* Function pointer variables are not supported yet.  */
-  if (t1 == NULL || t2 == NULL)
-    {
-      if (!compare_operand (t1, t2))
-	return return_false();
-    }
-  else if (!compare_function_decl (t1, t2))
-    return false;
+  if (!compare_operand (t1, t2))
+    return return_false();
 
   /* Checking of argument.  */
   for (i = 0; i < gimple_call_num_args (s1); ++i)
