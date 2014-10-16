@@ -2468,7 +2468,7 @@ do_stream_out (char *temp_filename, lto_symtab_encoder_t encoder)
 }
 
 /* Wait for forked process and signal errors.  */
-#ifdef HAVE_WORKING_FORK && 0
+#if 0
 static void
 wait_for_child ()
 {
@@ -2498,7 +2498,7 @@ static void
 stream_out (char *temp_filename, lto_symtab_encoder_t encoder,
 	    bool ARG_UNUSED (last))
 {
-#ifdef HAVE_WORKING_FORK && 0
+#if 0
   static int nruns;
 
   if (lto_parallelism <= 1)
