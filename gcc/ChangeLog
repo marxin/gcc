@@ -1,3 +1,93 @@
+2014-10-16  Alexander Ivchenko  <alexander.ivchenko@intel.com>
+	    Maxim Kuznetsov  <maxim.kuznetsov@intel.com>
+	    Anna Tikhonova  <anna.tikhonova@intel.com>
+	    Ilya Tocar  <ilya.tocar@intel.com>
+	    Andrey Turetskiy  <andrey.turetskiy@intel.com>
+	    Ilya Verbin  <ilya.verbin@intel.com>
+	    Kirill Yukhin  <kirill.yukhin@intel.com>
+	    Michael Zolotukhin  <michael.v.zolotukhin@intel.com>
+
+	* config/i386/sse.md
+	(define_expand "floatuns<sseintvecmodelower><mode>2"): Extend to
+	support AVX-512VL instructions.
+
+2014-10-16  DJ Delorie  <dj@redhat.com>
+
+	* tree-core.h: Fix comment to not assume pointers are multiples of
+	bytes.
+
+2014-10-15  Tom Tromey  <tromey@redhat.com>
+
+	* timevar.h (class auto_timevar): New class.
+
+2014-10-15  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR go/59432
+	* config/i386/sync.md (atomic_compare_and_swap<dwi>_doubleword):
+	Remove the second alternative.
+	(regprefix): Remove mode attribute.
+	(atomic_compare_and_swap<mode>): Do not fixup operand 2.
+	* config/i386/predicates.md (cmpxchg8b_pic_memory_operand): Remove.
+
+	Revert:
+	2013-11-05  Ian Lance Taylor  <iant@google.com>
+
+	* config/i386/sync.md (atomic_compare_and_swap<dwi>_doubleword):
+	If possible, add .cfi directives to record change to bx.
+	* config/i386/i386.c (ix86_emit_cfi): New function.
+	* config/i386/i386-protos.h (ix86_emit_cfi): Declare.
+
+2014-10-15  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR lto/62026
+	* cgraphclones.c (duplicate_thunk_for_node): Get body to have args
+	to duplicate.
+	* lto-streamer-out.c (lto_output): Handle correctly thunks that was born
+	at WPA time.
+
+2014-10-15  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/63448
+	* lra-int.h (LRA_MAX_CONSTRAINT_ITERATION_NUMBER): Remove.
+	(LRA_MAX_ASSIGNMENT_ITERATION_NUMBER): New.
+	(LRA_MAX_INHERITANCE_PASSES): Use it.
+	(lra_constraint_iter_after_spill): Remove.
+	(lra_assignment_iter): New.
+	(lra_assignment_iter_after_spill): New.
+	* lra-assigns.c (lra_assignment_iter): New.
+	(lra_assignment_iter_after_spill): New.
+	(former_reload_pseudo_spill_p): New.
+	(spill_for): Set up former_reload_pseudo_spill_p.
+	(setup_live_pseudos_and_spill_after_risky): Ditto.
+	(assign_by_spills): Ditto.
+	(lra_assign): Increment lra_assignment_iter.  Print the iteration
+	number.  Reset former_reload_pseudo_spill_p.  Check
+	lra_assignment_iter_after_spill.
+	* lra.c (lra): Remove lra_constraint_iter_after_spill.  Initialize
+	lra_assignment_iter and lra_assignment_iter_after_spill.
+	* lra-constraints.c (lra_constraint_iter_after_spill): Remove.
+	(lra_constraints): Remove code with
+	lra_assignment_iter_after_spill.
+
+2014-10-15  Teresa Johnson  <tejohnson@google.com>
+
+	PR bootstrap/63432
+	* tree-ssa-threadupdate.c (recompute_probabilities): Better
+	overflow checking.
+
+2014-10-15  Renlin Li <renlin.li@arm.com>
+
+	* config/aarch64/aarch64.h (TARGET_CPU_CPP_BUILTINS): Define
+	__ARM_BIG_ENDIAN, __ARM_SIZEOF_MINIMAL_ENUM. Add __ARM_64BIT_STATE,
+	__ARM_ARCH_ISA_A64, __ARM_FEATURE_CLZ, __ARM_FEATURE_IDIV,
+	__ARM_FEATURE_UNALIGNED, __ARM_PCS_AAPCS64, __ARM_SIZEOF_WCHAR_T.
+
+2014-10-15  Richard Biener  <rguenther@suse.de>
+
+	* gimple-fold.c (gimple_fold_call): Properly keep virtual
+	SSA form up-to-date when devirtualizing a call to
+	__builtin_unreachable and avoid fixing up EH info here.
+
 2014-10-15  Alexander Ivchenko  <alexander.ivchenko@intel.com>
 	    Maxim Kuznetsov  <maxim.kuznetsov@intel.com>
 	    Anna Tikhonova  <anna.tikhonova@intel.com>
