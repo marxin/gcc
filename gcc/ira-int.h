@@ -283,6 +283,9 @@ struct ira_allocno
   /* Mode of the allocno which is the mode of the corresponding
      pseudo-register.  */
   ENUM_BITFIELD (machine_mode) mode : 8;
+  /* Widest mode of the allocno which in at least one case could be
+     for paradoxical subregs where wmode > mode.  */
+  ENUM_BITFIELD (machine_mode) wmode : 8;
   /* Register class which should be used for allocation for given
      allocno.  NO_REGS means that we should use memory.  */
   ENUM_BITFIELD (reg_class) aclass : 16;
@@ -315,7 +318,7 @@ struct ira_allocno
      number (0, ...) - 2.  Value -1 is used for allocnos spilled by the
      reload (at this point pseudo-register has only one allocno) which
      did not get stack slot yet.  */
-  short int hard_regno;
+  signed int hard_regno : 16;
   /* Allocnos with the same regno are linked by the following member.
      Allocnos corresponding to inner loops are first in the list (it
      corresponds to depth-first traverse of the loops).  */
@@ -436,6 +439,7 @@ struct ira_allocno
 #define ALLOCNO_BAD_SPILL_P(A) ((A)->bad_spill_p)
 #define ALLOCNO_ASSIGNED_P(A) ((A)->assigned_p)
 #define ALLOCNO_MODE(A) ((A)->mode)
+#define ALLOCNO_WMODE(A) ((A)->wmode)
 #define ALLOCNO_PREFS(A) ((A)->allocno_prefs)
 #define ALLOCNO_COPIES(A) ((A)->allocno_copies)
 #define ALLOCNO_HARD_REG_COSTS(A) ((A)->hard_reg_costs)
@@ -527,7 +531,7 @@ extern ira_object_t *ira_object_id_map;
 /* The size of the previous array.  */
 extern int ira_objects_num;
 
-/* The following structure represents a hard register prefererence of
+/* The following structure represents a hard register preference of
    allocno.  The preference represent move insns or potential move
    insns usually because of two operand insn constraints.  One move
    operand is a hard register.  */
@@ -542,7 +546,7 @@ struct ira_allocno_pref
   int freq;
   /* Given allocno.  */
   ira_allocno_t allocno;
-  /* All prefernces with the same allocno are linked by the following
+  /* All preferences with the same allocno are linked by the following
      member.  */
   ira_pref_t next_pref;
 };

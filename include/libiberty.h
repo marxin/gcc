@@ -227,6 +227,11 @@ extern char *make_relative_prefix (const char *, const char *,
 extern char *make_relative_prefix_ignore_links (const char *, const char *,
 						const char *) ATTRIBUTE_MALLOC;
 
+/* Returns a pointer to a directory path suitable for creating temporary
+   files in.  */
+
+extern const char *choose_tmpdir (void) ATTRIBUTE_RETURNS_NONNULL;
+
 /* Choose a temporary directory to use for scratch files.  */
 
 extern char *choose_temp_base (void) ATTRIBUTE_MALLOC ATTRIBUTE_RETURNS_NONNULL;
@@ -445,6 +450,11 @@ extern struct pex_obj *pex_init (int flags, const char *pname,
    on Unix.  */
 #define PEX_BINARY_ERROR	0x80
 
+/* Append stdout to existing file instead of truncating it.  */
+#define PEX_STDOUT_APPEND	0x100
+
+/* Thes same as PEX_STDOUT_APPEND, but for STDERR.  */
+#define PEX_STDERR_APPEND	0x200
 
 /* Execute one program.  Returns NULL on success.  On error returns an
    error string (typically just the name of a system call); the error

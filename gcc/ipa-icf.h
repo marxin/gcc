@@ -19,215 +19,8 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-/* Prints string STRING to a FILE with a given number of SPACE_COUNT.  */
-#define FPUTS_SPACES(file, space_count, string) \
-  fprintf (file, "%*s" string, space_count, " "); \
-
-/* fprintf function wrapper that transforms given FORMAT to follow given
-   number for SPACE_COUNT and call fprintf for a FILE.  */
-#define FPRINTF_SPACES(file, space_count, format, ...) \
-  fprintf (file, "%*s" format, space_count, " ", ##__VA_ARGS__);
-
-/* Prints a MESSAGE to dump_file if exists. FUNC is name of function and
-   LINE is location in the source file.  */
-
-static inline void
-dump_message (const char *message, const char *func, unsigned int line)
-{
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, "  debug message: %s (%s:%u)\n", message, func, line);
-}
-
-/* Prints a MESSAGE to dump_file if exists.  */
-#define DUMP_MESSAGE(message) dump_message (message, __func__, __LINE__)
-
-/* Logs a MESSAGE to dump_file if exists and returns false. FUNC is name
-   of function and LINE is location in the source file.  */
-
-static inline bool
-return_false_with_message (const char *message, const char *func,
-			   unsigned int line)
-{
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, "  false returned: '%s' (%s:%u)\n", message, func, line);
-  return false;
-}
-
-/* Logs a MESSAGE to dump_file if exists and returns false.  */
-#define RETURN_FALSE_WITH_MSG(message) \
-  return_false_with_message (message, __func__, __LINE__)
-
-/* Return false and log that false value is returned.  */
-#define RETURN_FALSE() RETURN_FALSE_WITH_MSG ("")
-
-/* Logs return value if RESULT is false. FUNC is name of function and LINE
-   is location in the source file.  */
-
-static inline bool
-return_with_result (bool result, const char *func, unsigned int line)
-{
-  if (!result && dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, "  false returned (%s:%u)\n", func, line);
-
-  return result;
-}
-
-/* Logs return value if RESULT is false.  */
-#define RETURN_WITH_DEBUG(result) return_with_result (result, __func__, __LINE__)
-
-/* Verbose logging function logging statements S1 and S2 of a CODE.
-   FUNC is name of function and LINE is location in the source file.  */
-
-static inline bool
-return_different_stmts (gimple s1, gimple s2, const char *code,
-			const char *func, unsigned int line)
-{
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    {
-      fprintf (dump_file, "  different statement for code: %s (%s:%u):\n",
-	       code, func, line);
-
-      print_gimple_stmt (dump_file, s1, 3, TDF_DETAILS);
-      print_gimple_stmt (dump_file, s2, 3, TDF_DETAILS);
-    }
-
-  return false;
-}
-
-/* Verbose logging function logging statements S1 and S2 of a CODE.  */
-#define RETURN_DIFFERENT_STMTS(s1, s2, code) \
-  return_different_stmts (s1, s2, code, __func__, __LINE__)
-
 namespace ipa_icf {
-
 class sem_item;
-class sem_bb;
-
-/* A class aggregating all connections and semantic equivalents
-   for a given pair of semantic function candidates.  */
-class func_checker
-{
-public:
-  /* Initialize internal structures for a given SOURCE_FUNC_DECL and
-     TARGET_FUNC_DECL. Strict polymorphic comparison is processed if
-     an option COMPARE_POLYMORPHIC is true. For special cases, one can
-     set IGNORE_LABELS to skip label comparison.
-     Similarly, IGNORE_SOURCE_DECLS and IGNORE_TARGET_DECLS are sets
-     of declarations that can be skipped.  */
-  func_checker (tree source_func_decl, tree target_func_decl,
-		bool compare_polymorphic,
-		bool ignore_labels = false,
-		hash_set<tree> *ignored_source_decls = NULL,
-		hash_set<tree> *ignored_target_decls = NULL);
-
-  /* Memory release routine.  */
-  ~func_checker();
-
-  /* Basic block equivalence comparison function that returns true if
-     basic blocks BB1 and BB2 correspond.  */
-  bool compare_bb (sem_bb *bb1, sem_bb *bb2);
-
-  /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
-  bool compare_ssa_name (tree t1, tree t2);
-
-  /* Verification function for edges E1 and E2.  */
-  bool compare_edge (edge e1, edge e2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     call statements are semantically equivalent.  */
-  bool compare_gimple_call (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     assignment statements are semantically equivalent.  */
-  bool compare_gimple_assign (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     condition statements are semantically equivalent.  */
-  bool compare_gimple_cond (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     label statements are semantically equivalent.  */
-  bool compare_gimple_label (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     switch statements are semantically equivalent.  */
-  bool compare_gimple_switch (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     return statements are semantically equivalent.  */
-  bool compare_gimple_return (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     goto statements are semantically equivalent.  */
-  bool compare_gimple_goto (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that
-     resx statements are semantically equivalent.  */
-  bool compare_gimple_resx (gimple s1, gimple s2);
-
-  /* Verifies for given GIMPLEs S1 and S2 that ASM statements are equivalent.
-     For the beginning, the pass only supports equality for
-     '__asm__ __volatile__ ("", "", "", "memory")'.  */
-  bool compare_gimple_asm (gimple s1, gimple s2);
-
-  /* Verification function for declaration trees T1 and T2.  */
-  bool compare_decl (tree t1, tree t2);
-
-  /* Verifies that tree labels T1 and T2 correspond.  */
-  bool compare_tree_ssa_label (tree t1, tree t2);
-
-  /* Function compares two operands T1 and T2 and returns true if these
-     two trees are semantically equivalent.  */
-  bool compare_operand (tree t1, tree t2);
-
-  /* Verifies that trees T1 and T2, representing function declarations
-     are equivalent from perspective of ICF.  */
-  bool compare_function_decl (tree t1, tree t2);
-
-  /* Verifies that trees T1 and T2 do correspond.  */
-  bool compare_variable_decl (tree t1, tree t2);
-
-  /* Return true if types are compatible from perspective of ICF.
-     FIRST_ARGUMENT indicates if the comparison is called for
-     first parameter of a function.  */
-  static bool types_are_compatible_p (tree t1, tree t2,
-				      bool compare_polymorphic = true,
-				      bool first_argument = false);
-
-
-private:
-  /* Vector mapping source SSA names to target ones.  */
-  vec <int> m_source_ssa_names;
-
-  /* Vector mapping target SSA names to source ones.  */
-  vec <int> m_target_ssa_names;
-
-  /* Source TREE function declaration.  */
-  tree m_source_func_decl;
-
-  /* Target TREE function declaration.  */
-  tree m_target_func_decl;
-
-  /* Source function declarations that should be skipped by
-     declaration comparison.  */
-  hash_set<tree> *m_ignored_source_decls;
-
-  /* Target function declarations that should be skipped by
-     declaration comparison.  */
-  hash_set<tree> *m_ignored_target_decls;
-
-  /* Source to target edge map.  */
-  hash_map <edge, edge> m_edge_map;
-
-  /* Source to target declaration map.  */
-  hash_map <tree, tree> m_decl_map;
-
-  /* Flag if polymorphic comparison should be executed.  */
-  bool m_compare_polymorphic;
-
-  /* Flag if ignore labels in comparison.  */
-  bool m_ignore_labels;
-};
 
 /* Congruence class encompasses a collection of either functions or
    read-only variables. These items are considered to be equivalent
@@ -236,15 +29,13 @@ class congruence_class
 {
 public:
   /* Congruence class constructor for a new class with _ID.  */
-  congruence_class (unsigned int _id): id(_id)
+  congruence_class (unsigned int _id): in_worklist (false), id(_id)
   {
-    members.create (2);
   }
 
   /* Destructor.  */
   ~congruence_class ()
   {
-    members.release ();
   }
 
   /* Dump function prints all class members to a FILE with an INDENT.  */
@@ -253,8 +44,13 @@ public:
   /* Returns true if there's a member that is used from another group.  */
   bool is_class_used (void);
 
+  /* Flag is used in case we want to remove a class from worklist and
+     delete operation is quite expensive for
+     the data structure (linked list).  */
+  bool in_worklist;
+
   /* Vector of all group members.  */
-  vec <sem_item *> members;
+  auto_vec <sem_item *> members;
 
   /* Global unique class identifier.  */
   unsigned int id;
@@ -279,23 +75,6 @@ public:
 
   /* Index of usage of such an item.  */
   unsigned int index;
-};
-
-/* Basic block struct for semantic equality pass.  */
-class sem_bb
-{
-public:
-  sem_bb (basic_block bb_, unsigned nondbg_stmt_count_, unsigned edge_count_):
-    bb (bb_), nondbg_stmt_count (nondbg_stmt_count_), edge_count (edge_count_) {}
-
-  /* Basic block the structure belongs to.  */
-  basic_block bb;
-
-  /* Number of non-debug statements in the basic block.  */
-  unsigned nondbg_stmt_count;
-
-  /* Number of edges connected to the block.  */
-  unsigned edge_count;
 };
 
 /* Semantic item is a base class that encapsulates all shared functionality
@@ -324,6 +103,9 @@ public:
   /* Semantic item initialization function.  */
   virtual void init (void) = 0;
 
+  /* Add reference to a semantic TARGET.  */
+  void add_reference (sem_item *target);
+
   /* Gets symbol name of the item.  */
   const char *name (void)
   {
@@ -336,14 +118,13 @@ public:
     return node->asm_name ();
   }
 
-  /* Initialize references to other semantic functions/variables.  */
-  virtual void init_refs () = 0;
-
   /* Fast equality function based on knowledge known in WPA.  */
-  virtual bool equals_wpa (sem_item *item) = 0;
+  virtual bool equals_wpa (sem_item *item,
+			   hash_map <symtab_node *, sem_item *> &ignored_nodes) = 0;
 
   /* Returns true if the item equals to ITEM given as arguemnt.  */
-  virtual bool equals (sem_item *item) = 0;
+  virtual bool equals (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes) = 0;
 
   /* References independent hash function.  */
   virtual hashval_t get_hash (void) = 0;
@@ -355,16 +136,13 @@ public:
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file) = 0;
 
-  /* Return base tree that can be used for types_compatible_p and
+  /* Return base tree that can be used for compatible_types_p and
      contains_polymorphic_type_p comparison.  */
 
   static bool get_base_types (tree *t1, tree *t2);
 
   /* Item type.  */
   sem_item_type type;
-
-  /* Global unique function index.  */
-  unsigned int index;
 
   /* Symtab node.  */
   symtab_node *node;
@@ -390,8 +168,8 @@ public:
   /* List of tree references (either FUNC_DECL or VAR_DECL).  */
   vec <tree> tree_refs;
 
-  /* A set with tree references (either FUNC_DECL or VAR_DECL).  */
-  hash_set <tree> tree_refs_set;
+  /* A set with symbol table references.  */
+  hash_set <symtab_node *> refs_set;
 
 protected:
   /* Cached, once calculated hash for the item.  */
@@ -421,10 +199,11 @@ public:
   }
 
   virtual void init (void);
-  virtual bool equals_wpa (sem_item *item);
+  virtual bool equals_wpa (sem_item *item,
+			   hash_map <symtab_node *, sem_item *> &ignored_nodes);
   virtual hashval_t get_hash (void);
-  virtual bool equals (sem_item *item);
-  virtual void init_refs ();
+  virtual bool equals (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
   virtual bool merge (sem_item *alias_item);
 
   /* Dump symbol to FILE.  */
@@ -444,7 +223,7 @@ public:
   }
 
   /* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
-  void improve_hash (inchash::hash *inchash, gimple stmt);
+  void hash_stmt (inchash::hash *inchash, gimple stmt);
 
   /* Return true if polymorphic comparison must be processed.  */
   bool compare_polymorphic_p (void);
@@ -481,21 +260,16 @@ public:
   unsigned ssa_names_size;
 
   /* Array of structures for all basic blocks.  */
-  vec <sem_bb *> bb_sorted;
+  vec <ipa_icf_gimple::sem_bb *> bb_sorted;
 
 private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
-  hashval_t get_bb_hash (const sem_bb *basic_block);
+  hashval_t get_bb_hash (const ipa_icf_gimple::sem_bb *basic_block);
 
   /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
      true value is returned if phi nodes are semantically
      equivalent in these blocks .  */
   bool compare_phi_node (basic_block bb1, basic_block bb2);
-
-  /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
-     true value is returned if exception handling regions are equivalent
-     in these blocks.  */
-  bool compare_eh_region (eh_region r1, eh_region r2);
 
   /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
      corresponds to TARGET.  */
@@ -506,20 +280,26 @@ private:
      more strict comparison is executed.  */
   bool compare_type_list (tree t1, tree t2, bool compare_polymorphic);
 
+  /* If cgraph edges E1 and E2 are indirect calls, verify that
+     ICF flags are the same.  */
+  bool compare_edge_flags (cgraph_edge *e1, cgraph_edge *e2);
+
+  /* For a given symbol table nodes N1 and N2, we check that FUNCTION_DECLs
+     point to a same function. Comparison can be skipped if IGNORED_NODES
+     contains these nodes.  */
+  bool compare_cgraph_references (hash_map <symtab_node *, sem_item *>
+				  &ignored_nodes,
+				  symtab_node *n1, symtab_node *n2);
+
   /* Processes function equality comparison.  */
-  bool equals_private (sem_item *item);
-
-  /* Initialize references to another sem_item for gimple STMT of type assign.  */
-  void init_refs_for_assign (gimple stmt);
-
-  /* Initialize references to another sem_item for tree T.  */
-  void init_refs_for_tree (tree t);
+  bool equals_private (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
 
   /* Returns true if tree T can be compared as a handled component.  */
   static bool icf_handled_component_p (tree t);
 
   /* Function checker stores binding between functions.   */
-  func_checker *m_checker;
+  ipa_icf_gimple::func_checker *m_checker;
 
   /* COMPARED_FUNC is a function that we compare to.  */
   sem_function *m_compared_func;
@@ -545,19 +325,15 @@ public:
     ctor = ctor_for_folding (decl);
   }
 
-  /* Initialize references to other semantic functions/variables.  */
-  inline virtual void init_refs ()
-  {
-    parse_tree_refs (ctor);
-  }
-
   virtual hashval_t get_hash (void);
   virtual bool merge (sem_item *alias_item);
   virtual void dump_to_file (FILE *file);
-  virtual bool equals (sem_item *item);
+  virtual bool equals (sem_item *item,
+		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
 
   /* Fast equality variable based on knowledge known in WPA.  */
-  inline virtual bool equals_wpa (sem_item *item)
+  inline virtual bool equals_wpa (sem_item *item,
+				  hash_map <symtab_node *, sem_item *> & ARG_UNUSED(ignored_nodes))
   {
     gcc_assert (item->type == VAR);
     return true;
@@ -589,23 +365,6 @@ private:
 }; // class sem_variable
 
 class sem_item_optimizer;
-
-/* Congruence class set structure.  */
-struct congruence_class_var_hash: typed_noop_remove <congruence_class>
-{
-  typedef congruence_class value_type;
-  typedef congruence_class compare_type;
-
-  static inline hashval_t hash (const value_type *item)
-  {
-    return htab_hash_pointer (item);
-  }
-
-  static inline int equal (const value_type *item1, const compare_type *item2)
-  {
-    return item1 == item2;
-  }
-};
 
 struct congruence_class_group
 {
@@ -672,7 +431,10 @@ public:
 
   /* Worklist of congruence classes that can potentially
      refine classes of congruence.  */
-  hash_table <congruence_class_var_hash> worklist;
+  std::list<congruence_class *> worklist;
+
+  /* Remove semantic ITEM and release memory.  */
+  void remove_item (sem_item *item);
 
   /* Remove symtab NODE triggered by symtab removal hooks.  */
   void remove_symtab_node (symtab_node *node);
@@ -706,6 +468,9 @@ private:
   /* Debug function prints all informations about congruence classes.  */
   void dump_cong_classes (void);
 
+  /* Build references according to call graph.  */
+  void build_graph (void);
+
   /* Iterative congruence reduction function.  */
   void process_cong_reduction (void);
 
@@ -719,18 +484,6 @@ private:
 
   /* Pops a class from worklist. */
   congruence_class *worklist_pop ();
-
-  /* Returns true if a congruence class CLS is present in worklist.  */
-  inline bool worklist_contains (const congruence_class *cls)
-  {
-    return worklist.find (cls);
-  }
-
-  /* Removes given congruence class CLS from worklist.  */
-  inline void worklist_remove (const congruence_class *cls)
-  {
-    worklist.remove_elt (cls);
-  }
 
   /* Every usage of a congruence class CLS is a candidate that can split the
      collection of classes. Bitmap stack BMSTACK is used for bitmap
@@ -777,9 +530,6 @@ private:
 
   /* Count of congruence classes.  */
   unsigned int m_classes_count;
-
-  /* Map data structure maps trees to semantic items.  */
-  hash_map <tree, sem_item *> m_decl_map;
 
   /* Map data structure maps symtab nodes to semantic items.  */
   hash_map <symtab_node *, sem_item *> m_symtab_node_map;

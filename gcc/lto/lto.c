@@ -1048,7 +1048,7 @@ lto_register_function_decl_in_symtab (struct data_in *data_in, tree decl,
 {
   /* If this variable has already been declared, queue the
      declaration for merging.  */
-  if (TREE_PUBLIC (decl) && !DECL_ABSTRACT (decl))
+  if (TREE_PUBLIC (decl) && !DECL_ABSTRACT_P (decl))
     register_resolution (data_in->file_data,
 			 decl, get_resolution (data_in, ix));
 }
@@ -1249,7 +1249,7 @@ compare_tree_sccs_1 (tree t1, tree t2, tree **map)
       compare_values (DECL_NONLOCAL);
       compare_values (DECL_VIRTUAL_P);
       compare_values (DECL_IGNORED_P);
-      compare_values (DECL_ABSTRACT);
+      compare_values (DECL_ABSTRACT_P);
       compare_values (DECL_ARTIFICIAL);
       compare_values (DECL_USER_ALIGN);
       compare_values (DECL_PRESERVE_P);
@@ -2495,7 +2495,8 @@ wait_for_child ()
    Fork if that seems to help.  */
 
 static void
-stream_out (char *temp_filename, lto_symtab_encoder_t encoder, bool last)
+stream_out (char *temp_filename, lto_symtab_encoder_t encoder,
+	    bool ARG_UNUSED (last))
 {
 #ifdef HAVE_WORKING_FORK && 0
   static int nruns;

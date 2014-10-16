@@ -817,7 +817,7 @@ hash_tree (struct streamer_tree_cache_d *cache, hash_map<tree, hashval_t> *map, 
       hstate.add_flag (DECL_NONLOCAL (t));
       hstate.add_flag (DECL_VIRTUAL_P (t));
       hstate.add_flag (DECL_IGNORED_P (t));
-      hstate.add_flag (DECL_ABSTRACT (t));
+      hstate.add_flag (DECL_ABSTRACT_P (t));
       hstate.add_flag (DECL_ARTIFICIAL (t));
       hstate.add_flag (DECL_USER_ALIGN (t));
       hstate.add_flag (DECL_PRESERVE_P (t));
@@ -2249,7 +2249,10 @@ lto_output (void)
 #endif
 	      decl_state = lto_new_out_decl_state ();
 	      lto_push_out_decl_state (decl_state);
-	      if (gimple_has_body_p (node->decl) || !flag_wpa)
+	      if (gimple_has_body_p (node->decl) || !flag_wpa
+		  /* Thunks have no body but they may be synthetized
+		     at WPA time.  */
+		  || DECL_ARGUMENTS (node->decl))
 		output_function (node);
 	      else
 		copy_function_or_variable (node);
@@ -2422,7 +2425,7 @@ write_symbol (struct streamer_tree_cache_d *cache,
 {
   const char *name;
   enum gcc_plugin_symbol_kind kind;
-  enum gcc_plugin_symbol_visibility visibility;
+  enum gcc_plugin_symbol_visibility visibility = GCCPV_DEFAULT;
   unsigned slot_num;
   uint64_t size;
   const char *comdat;
@@ -2432,7 +2435,7 @@ write_symbol (struct streamer_tree_cache_d *cache,
      symbol table.  */
   if (!TREE_PUBLIC (t)
       || is_builtin_fn (t)
-      || DECL_ABSTRACT (t)
+      || DECL_ABSTRACT_P (t)
       || (TREE_CODE (t) == VAR_DECL && DECL_HARD_REGISTER (t)))
     return;
   gcc_assert (TREE_CODE (t) != RESULT_DECL);

@@ -879,8 +879,13 @@ save_call_clobbered_regs (void)
 		  if (GET_CODE (pat) == PARALLEL)
 		    pat = XVECEXP (pat, 0, 0);
 		  dest = SET_DEST (pat);
-		  newpat = gen_rtx_SET (VOIDmode, cheap, copy_rtx (dest));
-		  chain = insert_one_insn (chain, 0, -1, newpat);
+		  /* For multiple return values dest is PARALLEL.
+		     Currently we handle only single return value case.  */
+		  if (REG_P (dest))
+		    {
+		      newpat = gen_rtx_SET (VOIDmode, cheap, copy_rtx (dest));
+		      chain = insert_one_insn (chain, 0, -1, newpat);
+		    }
 		}
 	    }
           last = chain;
@@ -1153,9 +1158,12 @@ replace_reg_with_saved_mem (rtx *loc,
 	  }
 	else
 	  {
-	    gcc_assert (save_mode[regno] != VOIDmode);
-	    XVECEXP (mem, 0, i) = gen_rtx_REG (save_mode [regno],
-					       regno + i);
+	    enum machine_mode smode = save_mode[regno];
+	    gcc_assert (smode != VOIDmode);
+	    if (hard_regno_nregs [regno][smode] > 1)
+	      smode = mode_for_size (GET_MODE_SIZE (mode) / nregs,
+				     GET_MODE_CLASS (mode), 0);
+	    XVECEXP (mem, 0, i) = gen_rtx_REG (smode, regno + i);
 	  }
     }
 

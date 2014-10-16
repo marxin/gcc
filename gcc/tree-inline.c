@@ -496,6 +496,8 @@ remap_type_1 (tree type, copy_body_data *id)
       if (TYPE_MAIN_VARIANT (new_tree) != new_tree
 	  && TREE_TYPE (type) == TREE_TYPE (TYPE_MAIN_VARIANT (type)))
 	TREE_TYPE (new_tree) = TREE_TYPE (TYPE_MAIN_VARIANT (new_tree));
+      else
+	TREE_TYPE (new_tree) = remap_type (TREE_TYPE (new_tree), id);
 
       if (TYPE_MAIN_VARIANT (new_tree) != new_tree)
 	{
@@ -5092,7 +5094,7 @@ copy_decl_no_change (tree decl, copy_body_data *id)
   copy = copy_node (decl);
 
   /* The COPY is not abstract; it will be generated in DST_FN.  */
-  DECL_ABSTRACT (copy) = 0;
+  DECL_ABSTRACT_P (copy) = false;
   lang_hooks.dup_lang_specific_decl (copy);
 
   /* TREE_ADDRESSABLE isn't used to indicate that a label's address has
