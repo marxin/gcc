@@ -452,6 +452,17 @@ func_checker::compare_tree_list_operand (tree t1, tree t2)
   return true;
 }
 
+/* Compares if both trees T1 and T2 have equal volatility.  */
+
+bool
+func_checker::compare_volatility (tree t1, tree t2)
+{
+  if (t1 && t2)
+    return TREE_THIS_VOLATILE (t1) == TREE_THIS_VOLATILE (t2);
+
+  return !(t1 || t2);
+}
+
 /* Verifies that trees T1 and T2, representing function declarations
    are equivalent from perspective of ICF.  */
 
@@ -663,6 +674,9 @@ func_checker::compare_gimple_call (gimple s1, gimple s2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
+  if (!compare_volatility (t1, t2))
+    return return_false_with_msg ("different volatility for call statement");
+
   return compare_operand (t1, t2);
 }
 
@@ -696,8 +710,11 @@ func_checker::compare_gimple_assign (gimple s1, gimple s2)
 
       if (!compare_operand (arg1, arg2))
 	return false;
-    }
 
+      if (!compare_volatility (arg1, arg2))
+	return return_false_with_msg ("different volatility for assignment "
+	  "statement");
+    }
 
   return true;
 }

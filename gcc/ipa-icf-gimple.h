@@ -209,6 +209,10 @@ public:
      two trees are semantically equivalent.  */
   bool compare_tree_list_operand (tree t1, tree t2);
 
+  /* Compares two tree list operands T1 and T2 and returns true if these
+     two trees are semantically equivalent.  */
+  bool compare_volatility (tree t1, tree t2);
+
   /* Verifies that trees T1 and T2, representing function declarations
      are equivalent from perspective of ICF.  */
   bool compare_function_decl (tree t1, tree t2);
