@@ -436,6 +436,17 @@ sem_function::equals_private (sem_item *item,
   if (decl1 != decl2)
     return return_false();
 
+  tree fn_opts1 = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (decl);
+  tree fn_opts2 = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (m_compared_func->decl);
+
+  if (fn_opts1 != fn_opts2)
+    return return_false_with_msg ("different function specific options are used");
+
+  tree fn_target1 = DECL_FUNCTION_SPECIFIC_TARGET (decl);
+  tree fn_target2 = DECL_FUNCTION_SPECIFIC_TARGET (m_compared_func->decl);
+
+  if (fn_target1 != fn_target2)
+    return return_false_with_msg ("different target specific options are used");
 
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
