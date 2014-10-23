@@ -175,9 +175,6 @@ bool func_checker::compatible_types_p (tree t1, tree t2,
   if (!types_compatible_p (t1, t2))
     return return_false_with_msg ("types are not compatible");
 
-  if (get_alias_set (t1) != get_alias_set (t2))
-    return return_false_with_msg ("alias sets are different");
-
   /* We call contains_polymorphic_type_p with this pointer type.  */
   if (first_argument && TREE_CODE (t1) == POINTER_TYPE)
     {
@@ -196,6 +193,46 @@ bool func_checker::compatible_types_p (tree t1, tree t2,
       }
 
   return true;
+}
+
+/* Process comparison for memory access of trees T1 and T2.  */
+
+bool
+func_checker::compare_memory_access (tree t1, tree t2)
+{
+  switch (TREE_CODE (t1))
+    {
+    case MEM_REF:
+      {
+	tree x1 = TREE_OPERAND (t1, 0);
+	tree x2 = TREE_OPERAND (t2, 0);
+	tree y1 = TREE_OPERAND (t1, 1);
+	tree y2 = TREE_OPERAND (t2, 1);
+
+	/* See if operand is an memory access (the test originate from
+	 gimple_load_p).
+
+	In this case the alias set of the function being replaced must
+	be subset of the alias set of the other function.  At the moment
+	we seek for equivalency classes, so simply require inclussion in
+	both directions.  */
+
+	if (get_alias_set (t1) != get_alias_set (t2))
+	  return return_false_with_msg ("alias sets are different");
+
+	if (!compare_operand (x1, x2))
+	  return return_false_with_msg ("");
+
+	if (get_alias_set (TREE_TYPE (y1)) != get_alias_set (TREE_TYPE (y2)))
+	  return return_false_with_msg ("alias set for MEM_REF offsets are different");
+
+	/* Type of the offset on MEM_REF does not matter.  */
+	return tree_int_cst_equal (y1, y2);
+
+      }
+    default:
+      gcc_unreachable ();
+    }
 }
 
 /* Function responsible for comparison of handled components T1 and T2.
@@ -269,39 +306,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	return return_false_with_msg ("");
       return compare_operand (y1, y2);
     case MEM_REF:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-	y1 = TREE_OPERAND (t1, 1);
-	y2 = TREE_OPERAND (t2, 1);
-
-	/* See if operand is an memory access (the test originate from
-	 gimple_load_p).
-
-	In this case the alias set of the function being replaced must
-	be subset of the alias set of the other function.  At the moment
-	we seek for equivalency classes, so simply require inclussion in
-	both directions.  */
-
-	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2)))
-	  return return_false ();
-
-	if (!compare_operand (x1, x2))
-	  return return_false_with_msg ("");
-
-	if (get_alias_set (TREE_TYPE (y1)) != get_alias_set (TREE_TYPE (y2)))
-	  return return_false_with_msg ("alias set for MEM_REF offsets are different");
-
-	ao_ref r1, r2;
-	ao_ref_init (&r1, t1);
-	ao_ref_init (&r2, t2);
-	if (ao_ref_alias_set (&r1) != ao_ref_alias_set (&r2)
-	    || ao_ref_base_alias_set (&r1) != ao_ref_base_alias_set (&r2))
-	  return return_false_with_msg ("ao alias sets are different");
-
-	/* Type of the offset on MEM_REF does not matter.  */
-	return wi::to_offset  (y1) == wi::to_offset  (y2);
-      }
+      return compare_memory_access (t1, t2);
     case COMPONENT_REF:
       {
 	x1 = TREE_OPERAND (t1, 0);
