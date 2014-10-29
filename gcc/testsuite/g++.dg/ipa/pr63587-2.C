@@ -2,8 +2,7 @@
 // { dg-do compile { target c++11 } }
 // { dg-options "-O2" }
 
-namespace boost
-{
+namespace boost {
 class basic_cstring
 {
 public:
@@ -45,7 +44,7 @@ public:
   template <typename Functor> function0 (Functor)
   {
     typedef typename apply<Functor>::invoker_type invoker_type;
-    basic_vtable0 stored_vtable{ invoker_type::invoke };
+    basic_vtable0 stored_vtable { invoker_type::invoke };
     stored_vtable.assign_to (0, functor);
   }
   function_buffer functor;
@@ -71,7 +70,7 @@ template <typename F> F unwrap (F, int);
 struct for_each_impl
 {
   template <typename Iterator, typename LastIterator, typename TransformFunc,
-            typename F>
+	    typename F>
   static void
   execute (Iterator, LastIterator, TransformFunc, F f)
   {
@@ -88,13 +87,16 @@ for_each (F f)
 template <typename TestCaseTemplate> class test_case_template_invoker
 {
 public:
-  void operator()() { TestCaseTemplate::run (0); }
+  void operator()()
+  {
+    TestCaseTemplate::run (0);
+  }
 };
 template <typename Generator, typename TestCaseTemplate>
 struct generate_test_case_4_type
 {
   generate_test_case_4_type (basic_cstring, basic_cstring, int, Generator G)
-      : m_test_case_name (0), m_test_case_file (0), m_holder (G)
+    : m_test_case_name (0), m_test_case_file (0), m_holder (G)
   {
   }
   template <typename TestType> void operator()(identity<TestType>)
@@ -112,8 +114,8 @@ public:
   template_test_case_gen (basic_cstring, basic_cstring, int)
   {
     for_each<int, make_identity> (
-        generate_test_case_4_type<template_test_case_gen, TestCaseTemplate> (
-            0, 0, 0, *this));
+      generate_test_case_4_type<template_test_case_gen, TestCaseTemplate> (
+	0, 0, 0, *this));
   }
 };
 class attribute_name
@@ -124,8 +126,7 @@ public:
   attribute_name (char);
 };
 template <typename> struct term;
-namespace exprns_
-{
+namespace exprns_ {
 template <typename> struct expr;
 }
 using exprns_::expr;
@@ -133,8 +134,7 @@ template <typename T> struct Trans_NS_proto_terminal
 {
   typedef expr<term<T> > type;
 };
-namespace exprns_
-{
+namespace exprns_ {
 template <typename Arg0> struct expr<term<Arg0> >
 {
   Arg0 child0;
@@ -148,14 +148,13 @@ template <template <typename> class Actor = actor> struct terminal
 {
   typedef Actor<int> type;
 };
-namespace log
-{
+namespace log {
 struct to_log_fun
 {
 };
 class value_extractor;
 template <typename, typename = value_extractor, typename = void,
-          template <typename> class = actor>
+	  template <typename> class = actor>
 class attribute_actor;
 class attribute_terminal
 {
@@ -200,7 +199,7 @@ template <typename LeftT> struct make_output_expression
 template <typename, typename RightT, typename = typename RightT::value_type>
 struct make_output_actor;
 template <template <typename> class ActorT, typename LeftExprT,
-          typename RightT, typename ValueT>
+	  typename RightT, typename ValueT>
 struct make_output_actor<ActorT<LeftExprT>, RightT, ValueT>
 {
   typedef make_output_expression<ActorT<LeftExprT> > make_expression;
@@ -208,14 +207,14 @@ struct make_output_actor<ActorT<LeftExprT>, RightT, ValueT>
   static type
   make (ActorT<LeftExprT> left, RightT &right)
   {
-    type{ make_expression::make (left, right) };
+    type { make_expression::make (left, right) };
   }
 };
 template <typename LeftExprT, typename T, typename FallbackPolicyT,
-          typename TagT>
+	  typename TagT>
 typename make_output_actor<actor<LeftExprT>, attribute_actor<TagT> >::type
 operator<<(actor<LeftExprT> left,
-           attribute_actor<T, FallbackPolicyT, TagT> right)
+	   attribute_actor<T, FallbackPolicyT, TagT> right)
 {
   make_output_actor<actor<LeftExprT>, attribute_actor<T> >::make (left, right);
 }
@@ -223,8 +222,7 @@ operator<<(actor<LeftExprT> left,
 }
 namespace logging = boost::log;
 namespace expr = logging;
-namespace
-{
+namespace {
 class my_class;
 }
 template <typename> struct default_formatting
@@ -241,12 +239,12 @@ struct default_formatting_invoker
   }
 };
 boost::auto_test_unit_registrar default_formatting_registrar56 (
-    boost::template_test_case_gen<default_formatting_invoker> (0, 0, 0));
+  boost::template_test_case_gen<default_formatting_invoker> (0, 0, 0));
 template <typename CharT>
 void
 default_formatting<CharT>::test_method ()
 {
   expr::stream << expr::attr<my_class> (0);
   expr::stream << expr::attr<int> (0) << expr::attr<int> (0)
-               << expr::attr<int> (0);
+	       << expr::attr<int> (0);
 }
