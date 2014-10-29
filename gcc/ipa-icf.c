@@ -191,6 +191,18 @@ sem_item::dump (void)
     }
 }
 
+/* Return true if target supports aliasing.  */
+
+bool
+sem_item::target_supports_aliasing_p (void)
+{
+#if !defined (ASM_OUTPUT_DEF) || (!defined(ASM_OUTPUT_WEAK_ALIAS) && !defined (ASM_WEAKEN_DECL))
+  return false;
+#else
+  return true;
+#endif
+}
+
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
 sem_function::sem_function (bitmap_obstack *stack): sem_item (FUNC, stack),
@@ -588,7 +600,8 @@ sem_function::merge (sem_item *alias_item)
       redirect_callers = false;
     }
 
-  if (create_alias && DECL_COMDAT_GROUP (alias->decl))
+  if (create_alias && (DECL_COMDAT_GROUP (alias->decl)
+		       || !sem_item::target_supports_aliasing_p ()))
     {
       create_alias = false;
       create_thunk = true;
@@ -648,7 +661,7 @@ sem_function::merge (sem_item *alias_item)
       alias->resolve_alias (original);
 
       /* Workaround for PR63566 that forces equal calling convention
-	 to be used.  */
+       to be used.  */
       alias->local.local = false;
       original->local.local = false;
 
@@ -1154,6 +1167,13 @@ sem_variable::merge (sem_item *alias_item)
 {
   gcc_assert (alias_item->type == VAR);
 
+  if (!sem_item::target_supports_aliasing_p ())
+    {
+      if (dump_file)
+	fprintf (dump_file, "Aliasing is not supported by target\n\n");
+      return false;
+    }
+
   sem_variable *alias_var = static_cast<sem_variable *> (alias_item);
 
   varpool_node *original = get_node ();
@@ -1236,6 +1256,7 @@ sem_variable::dump_to_file (FILE *file)
   print_node (file, "", decl, 0);
   fprintf (file, "\n\n");
 }
+
 
 /* Iterates though a constructor and identifies tree references
    we are interested in semantic function equality.  */
