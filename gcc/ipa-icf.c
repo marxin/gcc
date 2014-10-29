@@ -2383,8 +2383,7 @@ public:
   /* opt_pass methods: */
   virtual bool gate (function *)
   {
-    return false;
-    //return flag_ipa_icf_variables || flag_ipa_icf_functions;
+    return flag_ipa_icf_variables || flag_ipa_icf_functions;
   }
 
   virtual unsigned int execute (function *)
