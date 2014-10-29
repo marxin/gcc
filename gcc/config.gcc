@@ -364,7 +364,8 @@ i[34567]86-*-*)
 		       adxintrin.h fxsrintrin.h xsaveintrin.h xsaveoptintrin.h
 		       avx512cdintrin.h avx512erintrin.h avx512pfintrin.h
 		       shaintrin.h clflushoptintrin.h xsavecintrin.h
-		       xsavesintrin.h"
+		       xsavesintrin.h avx512dqintrin.h avx512bwintrin.h
+		       avx512vlintrin.h avx512vlbwintrin.h avx512vldqintrin.h"
 	;;
 x86_64-*-*)
 	cpu_type=i386
@@ -382,7 +383,8 @@ x86_64-*-*)
 		       adxintrin.h fxsrintrin.h xsaveintrin.h xsaveoptintrin.h
 		       avx512cdintrin.h avx512erintrin.h avx512pfintrin.h
 		       shaintrin.h clflushoptintrin.h xsavecintrin.h
-		       xsavesintrin.h"
+		       xsavesintrin.h avx512dqintrin.h avx512bwintrin.h
+		       avx512vlintrin.h avx512vlbwintrin.h avx512vldqintrin.h"
 	;;
 ia64-*-*)
 	extra_headers=ia64intrin.h
@@ -3180,6 +3182,9 @@ if test x$with_cpu = x ; then
 	*-leon[3-9]*)
 	  with_cpu=leon3
 	  ;;
+	*-leon[3-9]v7*)
+	  with_cpu=leon3v7
+	  ;;
 	*)
 	  with_cpu="`echo ${target} | sed 's/-.*$//'`"
 	  ;;
@@ -3974,7 +3979,7 @@ case "${target}" in
 			case ${val} in
 			"" | sparc | sparcv9 | sparc64 \
 			| v7 | cypress \
-			| v8 | supersparc | hypersparc | leon | leon3 \
+			| v8 | supersparc | hypersparc | leon | leon3 | leon3v7 \
 			| sparclite | f930 | f934 | sparclite86x \
 			| sparclet | tsc701 \
 			| v9 | ultrasparc | ultrasparc3 | niagara | niagara2 \

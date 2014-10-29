@@ -30,6 +30,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "tree-object-size.h"
 #include "realmpfr.h"
+#include "predict.h"
+#include "vec.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "cfgrtl.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -38,13 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "flags.h"
 #include "regs.h"
-#include "hard-reg-set.h"
 #include "except.h"
-#include "hashtab.h"
-#include "hash-set.h"
-#include "vec.h"
-#include "input.h"
-#include "function.h"
 #include "insn-config.h"
 #include "expr.h"
 #include "optabs.h"
@@ -52,7 +54,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "recog.h"
 #include "output.h"
 #include "typeclass.h"
-#include "predict.h"
 #include "tm_p.h"
 #include "target.h"
 #include "langhooks.h"
@@ -61,6 +62,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "value-prof.h"
 #include "diagnostic-core.h"
 #include "builtins.h"
+#include "asan.h"
 #include "ubsan.h"
 #include "cilk.h"
 
@@ -5763,6 +5765,14 @@ expand_builtin (tree exp, rtx target, rtx subtarget, enum machine_mode mode,
   enum built_in_function fcode = DECL_FUNCTION_CODE (fndecl);
   enum machine_mode target_mode = TYPE_MODE (TREE_TYPE (exp));
   int flags;
+
+  /* When ASan is enabled, we don't want to expand some memory/string
+     builtins and rely on libsanitizer's hooks.  This allows us to avoid
+     redundant checks and be sure, that possible overflow will be detected
+     by ASan.  */
+
+  if ((flag_sanitize & SANITIZE_ADDRESS) && asan_intercepted_p (fcode))
+    return expand_call (exp, target, ignore);
 
   if (DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_MD)
     return targetm.expand_builtin (exp, target, subtarget, mode, ignore);

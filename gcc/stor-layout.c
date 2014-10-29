@@ -43,6 +43,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "regs.h"
 #include "params.h"
+#include "hash-map.h"
+#include "is-a.h"
+#include "plugin-api.h"
+#include "ipa-ref.h"
 #include "cgraph.h"
 #include "tree-inline.h"
 #include "tree-dump.h"
@@ -1860,6 +1864,8 @@ finish_bitfield_representative (tree repr, tree field)
 
   size = size_diffop (DECL_FIELD_OFFSET (field),
 		      DECL_FIELD_OFFSET (repr));
+  while (TREE_CODE (size) == COMPOUND_EXPR)
+    size = TREE_OPERAND (size, 1);
   gcc_assert (tree_fits_uhwi_p (size));
   bitsize = (tree_to_uhwi (size) * BITS_PER_UNIT
 	     + tree_to_uhwi (DECL_FIELD_BIT_OFFSET (field))
@@ -1957,10 +1963,10 @@ finish_bitfield_representative (tree repr, tree field)
 }
 
 /* Compute and set FIELD_DECLs for the underlying objects we should
-   use for bitfield access for the structure laid out with RLI.  */
+   use for bitfield access for the structure T.  */
 
-static void
-finish_bitfield_layout (record_layout_info rli)
+void
+finish_bitfield_layout (tree t)
 {
   tree field, prev;
   tree repr = NULL_TREE;
@@ -1969,10 +1975,10 @@ finish_bitfield_layout (record_layout_info rli)
      we could use the underlying type as hint for the representative
      if the bitfield would fit and the representative would not exceed
      the union in size.  */
-  if (TREE_CODE (rli->t) != RECORD_TYPE)
+  if (TREE_CODE (t) != RECORD_TYPE)
     return;
 
-  for (prev = NULL_TREE, field = TYPE_FIELDS (rli->t);
+  for (prev = NULL_TREE, field = TYPE_FIELDS (t);
        field; field = DECL_CHAIN (field))
     {
       if (TREE_CODE (field) != FIELD_DECL)
@@ -2059,7 +2065,7 @@ finish_record_layout (record_layout_info rli, int free_p)
   finalize_type_size (rli->t);
 
   /* Compute bitfield representatives.  */
-  finish_bitfield_layout (rli);
+  finish_bitfield_layout (rli->t);
 
   /* Propagate TYPE_PACKED to variants.  With C++ templates,
      handle_packed_attribute is too early to do this.  */

@@ -64,8 +64,8 @@
    ])
 
 (define_constants
-  [ (TMP_REGNO_TINY 16)  ; r16 is temp register for AVR_TINY
-    (ZERO_REGNO_TINY 17) ; r17 is zero register for AVR_TINY
+  [(TMP_REGNO_TINY  16) ; r16 is temp register for AVR_TINY
+   (ZERO_REGNO_TINY 17) ; r17 is zero register for AVR_TINY
   ])
 
 (define_c_enum "unspec"
@@ -147,7 +147,7 @@
 ;; Otherwise do special processing depending on the attribute.
 
 (define_attr "adjust_len"
-  "out_bitop, plus, addto_sp,
+  "out_bitop, plus, addto_sp, sext,
    tsthi, tstpsi, tstsi, compare, compare64, call,
    mov8, mov16, mov24, mov32, reload_in16, reload_in24, reload_in32,
    ufract, sfract, round,
@@ -640,32 +640,31 @@
         DONE;
       }
 
-    /* AVRTC-579
-    if the source operand expression is out of range for 'lds' instruction
-      copy source operand expression to register
-    For tiny core, LDS instruction's memory access range limited to 0x40..0xbf
-    */
-    if (!tiny_valid_direct_memory_access_range(src,<MODE>mode))
+    // AVRTC-579
+    // If the source operand expression is out of range for LDS instruction
+    // copy source operand expression to register.
+    // For tiny core, LDS instruction's memory access range limited to 0x40..0xbf.
+
+    if (!tiny_valid_direct_memory_access_range (src, <MODE>mode))
       {
-        rtx srcx = XEXP(src,0);
-        operands[1] = src = replace_equiv_address (src,copy_to_mode_reg (GET_MODE(srcx),srcx));
-        emit_move_insn(dest,src);
+        rtx srcx = XEXP (src, 0);
+        operands[1] = src = replace_equiv_address (src, copy_to_mode_reg (GET_MODE (srcx), srcx));
+        emit_move_insn (dest, src);
         DONE;
       }
 
-    /* AVRTC-579
-    if the destination operand expression is out of range for 'sts' instruction
-      copy destination operand expression to register
-    For tiny core, STS instruction's memory access range limited to 0x40..0xbf
-    */
-    if (!tiny_valid_direct_memory_access_range(dest,<MODE>mode))
-    {
-      rtx destx = XEXP(dest,0);
-      operands[0] = dest = replace_equiv_address (dest,copy_to_mode_reg (GET_MODE(destx),destx));
-      emit_move_insn(dest,src);
-      DONE;
-    }
+    // AVRTC-579
+    // If the destination operand expression is out of range for STS instruction
+    // copy destination operand expression to register.
+    // For tiny core, STS instruction's memory access range limited to 0x40..0xbf.
 
+    if (!tiny_valid_direct_memory_access_range (dest, <MODE>mode))
+      {
+        rtx destx = XEXP (dest, 0);
+        operands[0] = dest = replace_equiv_address (dest, copy_to_mode_reg (GET_MODE (destx), destx));
+        emit_move_insn (dest, src);
+        DONE;
+      }
   })
 
 ;;========================================================================
@@ -683,12 +682,12 @@
   [(set (match_operand:ALL1 0 "nonimmediate_operand" "=r    ,d    ,Qm   ,r ,q,r,*r")
         (match_operand:ALL1 1 "nox_general_operand"   "r Y00,n Ynn,r Y00,Qm,r,q,i"))]
   "(register_operand (operands[0], <MODE>mode)
-   || reg_or_0_operand (operands[1], <MODE>mode)) &&
-   /* skip if operands are out of lds/sts memory access range(0x40..0xbf)
-   though access range is checked during define_expand, it is required
-   here to avoid merging rtls during combine pass */
-   tiny_valid_direct_memory_access_range(operands[0],QImode) &&
-   tiny_valid_direct_memory_access_range(operands[1],QImode)"
+    || reg_or_0_operand (operands[1], <MODE>mode))
+   /* Skip if operands are out of lds/sts memory access range(0x40..0xbf)
+      though access range is checked during define_expand, it is required
+      here to avoid merging RTXes during combine pass.  */
+   && tiny_valid_direct_memory_access_range (operands[0], QImode)
+   && tiny_valid_direct_memory_access_range (operands[1], QImode)"
   {
     return output_movqi (insn, operands, NULL);
   }
@@ -782,12 +781,12 @@
   [(set (match_operand:ALL2 0 "nonimmediate_operand" "=r,r  ,r,m    ,d,*r,q,r")
         (match_operand:ALL2 1 "nox_general_operand"   "r,Y00,m,r Y00,i,i ,r,q"))]
   "(register_operand (operands[0], <MODE>mode)
-   || reg_or_0_operand (operands[1], <MODE>mode)) &&
-   /* skip if operands are out of lds/sts memory access range(0x40..0xbf)
-   though access range is checked during define_expand, it is required
-   here to avoid merging rtls during combine pass */
-   tiny_valid_direct_memory_access_range(operands[0],HImode) &&
-   tiny_valid_direct_memory_access_range(operands[1],HImode)"
+    || reg_or_0_operand (operands[1], <MODE>mode))
+   /* Skip if operands are out of lds/sts memory access range(0x40..0xbf)
+      though access range is checked during define_expand, it is required
+      here to avoid merging RTXes during combine pass.  */
+   && tiny_valid_direct_memory_access_range (operands[0], HImode)
+   && tiny_valid_direct_memory_access_range (operands[1], HImode)"
   {
     return output_movhi (insn, operands, NULL);
   }
@@ -936,12 +935,12 @@
   [(set (match_operand:ALL4 0 "nonimmediate_operand" "=r,r  ,r ,Qm   ,!d,r")
         (match_operand:ALL4 1 "nox_general_operand"   "r,Y00,Qm,r Y00,i ,i"))]
   "(register_operand (operands[0], <MODE>mode)
-   || reg_or_0_operand (operands[1], <MODE>mode)) &&
-   /* skip if operands are out of lds/sts memory access range(0x40..0xbf)
-   though access range is checked during define_expand, it is required
-   here to avoid merging rtls during combine pass */
-   tiny_valid_direct_memory_access_range(operands[0],SImode) &&
-   tiny_valid_direct_memory_access_range(operands[1],SImode)"
+    || reg_or_0_operand (operands[1], <MODE>mode))
+   /* Skip if operands are out of lds/sts memory access range(0x40..0xbf)
+      though access range is checked during define_expand, it is required
+      here to avoid merging RTXes during combine pass.  */
+   && tiny_valid_direct_memory_access_range (operands[0], SImode)
+   && tiny_valid_direct_memory_access_range (operands[1], SImode)"
   {
     return output_movsisf (insn, operands, NULL);
   }
@@ -956,12 +955,12 @@
   [(set (match_operand:SF 0 "nonimmediate_operand" "=r,r,r ,Qm,!d,r")
         (match_operand:SF 1 "nox_general_operand"   "r,G,Qm,rG,F ,F"))]
   "(register_operand (operands[0], SFmode)
-   || reg_or_0_operand (operands[1], SFmode)) &&
-   /* skip if operands are out of lds/sts memory access range(0x40..0xbf)
-   though access range is checked during define_expand, it is required
-   here to avoid merging rtls during combine pass */
-   tiny_valid_direct_memory_access_range(operands[0],SFmode) &&
-   tiny_valid_direct_memory_access_range(operands[1],SFmode)"
+    || reg_or_0_operand (operands[1], SFmode))
+   /* Skip if operands are out of lds/sts memory access range(0x40..0xbf)
+      though access range is checked during define_expand, it is required
+      here to avoid merging rtls during combine pass.  */
+   && tiny_valid_direct_memory_access_range (operands[0], SFmode)
+   && tiny_valid_direct_memory_access_range (operands[1], SFmode)"
   {
     return output_movsisf (insn, operands, NULL);
   }
@@ -2229,10 +2228,10 @@
         DONE;
       }
 
-    /* For small constants we can do better by extending them on the fly.
-       The constant can be loaded in one instruction and the widening
-       multiplication is shorter.  First try the unsigned variant because it
-       allows constraint "d" instead of "a" for the signed version.  */
+    /* ; For small constants we can do better by extending them on the fly.
+       ; The constant can be loaded in one instruction and the widening
+       ; multiplication is shorter.  First try the unsigned variant because it
+       ; allows constraint "d" instead of "a" for the signed version.  */
 
     if (s9_operand (operands[2], HImode))
       {
@@ -3255,7 +3254,7 @@
 	swap %0\;lsl %0\;adc %0,__zero_reg__
 	swap %0\;lsl %0\;adc %0,__zero_reg__\;lsl %0\;adc %0,__zero_reg__
 	bst %0,0\;ror %0\;bld %0,7
-	"
+	" ; empty
   [(set_attr "length" "2,4,4,1,3,5,3,0")
    (set_attr "cc" "set_n,set_n,clobber,none,set_n,set_n,clobber,none")])
 
@@ -4175,62 +4174,66 @@
   [(set (match_operand:HI 0 "register_operand" "=r,r")
         (sign_extend:HI (match_operand:QI 1 "combine_pseudo_register_operand" "0,*r")))]
   ""
-  "@
-	clr %B0\;sbrc %0,7\;com %B0
-	mov %A0,%A1\;clr %B0\;sbrc %A0,7\;com %B0"
+  {
+    return avr_out_sign_extend (insn, operands, NULL);
+  }
   [(set_attr "length" "3,4")
-   (set_attr "cc" "set_n,set_n")])
+   (set_attr "adjust_len" "sext")
+   (set_attr "cc" "set_n")])
 
 (define_insn "extendqipsi2"
   [(set (match_operand:PSI 0 "register_operand" "=r,r")
         (sign_extend:PSI (match_operand:QI 1 "combine_pseudo_register_operand" "0,*r")))]
   ""
-  "@
-	clr %B0\;sbrc %A0,7\;com %B0\;mov %C0,%B0
-	mov %A0,%A1\;clr %B0\;sbrc %A0,7\;com %B0\;mov %C0,%B0"
+  {
+    return avr_out_sign_extend (insn, operands, NULL);
+  }
   [(set_attr "length" "4,5")
-   (set_attr "cc" "set_n,set_n")])
+   (set_attr "adjust_len" "sext")
+   (set_attr "cc" "set_n")])
 
 (define_insn "extendqisi2"
   [(set (match_operand:SI 0 "register_operand" "=r,r")
         (sign_extend:SI (match_operand:QI 1 "combine_pseudo_register_operand" "0,*r")))]
   ""
-  "@
-	clr %B0\;sbrc %A0,7\;com %B0\;mov %C0,%B0\;mov %D0,%B0
-	mov %A0,%A1\;clr %B0\;sbrc %A0,7\;com %B0\;mov %C0,%B0\;mov %D0,%B0"
+  {
+    return avr_out_sign_extend (insn, operands, NULL);
+  }
   [(set_attr "length" "5,6")
-   (set_attr "cc" "set_n,set_n")])
+   (set_attr "adjust_len" "sext")
+   (set_attr "cc" "set_n")])
 
 (define_insn "extendhipsi2"
-  [(set (match_operand:PSI 0 "register_operand"                               "=r,r ,r")
-        (sign_extend:PSI (match_operand:HI 1 "combine_pseudo_register_operand" "0,*r,*r")))]
+  [(set (match_operand:PSI 0 "register_operand"                               "=r,r")
+        (sign_extend:PSI (match_operand:HI 1 "combine_pseudo_register_operand" "0,*r")))]
   ""
-  "@
-	clr %C0\;sbrc %B0,7\;com %C0
-	mov %A0,%A1\;mov %B0,%B1\;clr %C0\;sbrc %B0,7\;com %C0
-	movw %A0,%A1\;clr %C0\;sbrc %B0,7\;com %C0"
-  [(set_attr "length" "3,5,4")
-   (set_attr "isa" "*,mov,movw")
+  {
+    return avr_out_sign_extend (insn, operands, NULL);
+  }
+  [(set_attr "length" "3,5")
+   (set_attr "adjust_len" "sext")
    (set_attr "cc" "set_n")])
 
 (define_insn "extendhisi2"
-  [(set (match_operand:SI 0 "register_operand"                               "=r,r ,r")
-        (sign_extend:SI (match_operand:HI 1 "combine_pseudo_register_operand" "0,*r,*r")))]
+  [(set (match_operand:SI 0 "register_operand"                               "=r,r")
+        (sign_extend:SI (match_operand:HI 1 "combine_pseudo_register_operand" "0,*r")))]
   ""
-  "@
-	clr %C0\;sbrc %B0,7\;com %C0\;mov %D0,%C0
-	mov %A0,%A1\;mov %B0,%B1\;clr %C0\;sbrc %B0,7\;com %C0\;mov %D0,%C0
-	movw %A0,%A1\;clr %C0\;sbrc %B0,7\;com %C0\;mov %D0,%C0"
-  [(set_attr "length" "4,6,5")
-   (set_attr "isa" "*,mov,movw")
+  {
+    return avr_out_sign_extend (insn, operands, NULL);
+  }
+  [(set_attr "length" "4,6")
+   (set_attr "adjust_len" "sext")
    (set_attr "cc" "set_n")])
 
 (define_insn "extendpsisi2"
   [(set (match_operand:SI 0 "register_operand"                                "=r")
         (sign_extend:SI (match_operand:PSI 1 "combine_pseudo_register_operand" "0")))]
   ""
-  "clr %D0\;sbrc %C0,7\;com %D0"
+  {
+    return avr_out_sign_extend (insn, operands, NULL);
+  }
   [(set_attr "length" "3")
+   (set_attr "adjust_len" "sext")
    (set_attr "cc" "set_n")])
 
 ;; xx<---x xx<---x xx<---x xx<---x xx<---x xx<---x xx<---x xx<---x xx<---x
@@ -5059,7 +5062,7 @@
       }
     else
       {
-        operands[7] = gen_rtx_PLUS (HImode, operands[6], 
+        operands[7] = gen_rtx_PLUS (HImode, operands[6],
                                     gen_rtx_LABEL_REF (VOIDmode, operands[3]));
         operands[8] = const0_rtx;
         operands[10] = operands[6];
@@ -5611,7 +5614,7 @@
    (clobber (match_scratch:QI 2 "=&d"))]
   ""
   "ldi %2,lo8(%0)
-	1: dec %2
+1:	dec %2
 	brne 1b"
   [(set_attr "length" "3")
    (set_attr "cc" "clobber")])
@@ -5625,8 +5628,8 @@
    (clobber (match_scratch:HI 2 "=&w,&d"))]
   ""
   "@
-    ldi %A2,lo8(%0)\;ldi %B2,hi8(%0)\;1: sbiw %A2,1\;brne 1b
-    ldi %A2,lo8(%0)\;ldi %B2,hi8(%0)\;1: subi %A2,1\;sbci %B2,0\;brne 1b"
+	ldi %A2,lo8(%0)\;ldi %B2,hi8(%0)\n1:	sbiw %A2,1\;brne 1b
+	ldi %A2,lo8(%0)\;ldi %B2,hi8(%0)\n1:	subi %A2,1\;sbci %B2,0\;brne 1b"
   [(set_attr "length" "4,5")
    (set_attr "isa" "no_tiny,tiny")
    (set_attr "cc" "clobber")])
@@ -5644,7 +5647,7 @@
   "ldi %2,lo8(%0)
 	ldi %3,hi8(%0)
 	ldi %4,hlo8(%0)
-	1: subi %2,1
+1:	subi %2,1
 	sbci %3,0
 	sbci %4,0
 	brne 1b"
@@ -5666,7 +5669,7 @@
 	ldi %3,hi8(%0)
 	ldi %4,hlo8(%0)
 	ldi %5,hhi8(%0)
-	1: subi %2,1
+1:	subi %2,1
 	sbci %3,0
 	sbci %4,0
 	sbci %5,0
