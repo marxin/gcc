@@ -365,7 +365,7 @@ struct ipa_node_params
   struct ipcp_param_lattices *lattices;
   /* Only for versioned nodes this field would not be NULL,
      it points to the node that IPA cp cloned from.  */
-  struct cgraph_node *ipcp_orig_node;
+  cgraph_node *ipcp_orig_node;
   /* If this node is an ipa-cp clone, these are the known values that describe
      what it has been specialized for.  */
   vec<tree> known_vals;
@@ -471,7 +471,7 @@ struct GTY(()) ipa_agg_replacement_value
 
 typedef struct ipa_agg_replacement_value *ipa_agg_replacement_value_p;
 
-void ipa_set_node_agg_value_chain (const struct cgraph_node *node,
+void ipa_set_node_agg_value_chain (const cgraph_node *node,
 				   struct ipa_agg_replacement_value *aggvals);
 
 /* ipa_edge_args stores information related to a callsite and particularly its
@@ -590,7 +590,7 @@ ipa_edge_args_info_available_for_edge_p (struct cgraph_edge *edge)
 /* Return the aggregate replacements for NODE, if there are any.  */
 
 static inline struct ipa_agg_replacement_value *
-ipa_get_agg_replacements_for_node (const struct cgraph_node *node)
+ipa_get_agg_replacements_for_node (const cgraph_node *node)
 {
   if ((unsigned) node->uid >= vec_safe_length (ipa_node_agg_replacements))
     return NULL;
@@ -598,7 +598,7 @@ ipa_get_agg_replacements_for_node (const struct cgraph_node *node)
 }
 
 /* Function formal parameters related computations.  */
-void ipa_initialize_node_params (struct cgraph_node *node);
+void ipa_initialize_node_params (cgraph_node *node);
 bool ipa_propagate_indirect_call_infos (struct cgraph_edge *cs,
 					vec<cgraph_edge *> *new_edges);
 
@@ -613,7 +613,7 @@ tree ipa_binfo_from_known_type_jfunc (struct ipa_jump_func *);
 tree ipa_impossible_devirt_target (struct cgraph_edge *, tree);
 
 /* Functions related to both.  */
-void ipa_analyze_node (struct cgraph_node *);
+void ipa_analyze_node (cgraph_node *);
 
 /* Aggregate jump function related functions.  */
 tree ipa_find_agg_cst_for_param (struct ipa_agg_jump_function *, HOST_WIDE_INT,
@@ -622,9 +622,9 @@ bool ipa_load_from_parm_agg (struct ipa_node_params *, gimple, tree, int *,
 			     HOST_WIDE_INT *, bool *);
 
 /* Debugging interface.  */
-void ipa_print_node_params (FILE *, struct cgraph_node *node);
+void ipa_print_node_params (FILE *, cgraph_node *node);
 void ipa_print_all_params (FILE *);
-void ipa_print_node_jump_functions (FILE *f, struct cgraph_node *node);
+void ipa_print_node_jump_functions (FILE *f, cgraph_node *node);
 void ipa_print_all_jump_functions (FILE * f);
 void ipcp_verify_propagated_values (void);
 
@@ -728,7 +728,7 @@ void ipa_update_after_lto_read (void);
 int ipa_get_param_decl_index (struct ipa_node_params *, tree);
 tree ipa_value_from_jfunc (struct ipa_node_params *info,
 			   struct ipa_jump_func *jfunc);
-unsigned int ipcp_transform_function (struct cgraph_node *node);
+unsigned int ipcp_transform_function (cgraph_node *node);
 void ipa_dump_param (FILE *, struct ipa_node_params *info, int i);
 bool ipa_modify_expr (tree *, bool, ipa_parm_adjustment_vec);
 ipa_parm_adjustment *ipa_get_adjustment_candidate (tree **, bool *,
