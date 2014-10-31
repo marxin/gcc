@@ -3795,7 +3795,7 @@ ipa_add_new_function (cgraph_node *node, void *data ATTRIBUTE_UNUSED)
     ipa_analyze_node (node);
 }
 
-/* Hook that is called by cgraph.c when a node is duplicated.  */
+/* Hook that is called by annotation when a node is duplicated.  */
 
 void
 ipa_node_params_cgraph_annotation::duplication_hook(const cgraph_node *src,

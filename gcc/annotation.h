@@ -101,6 +101,11 @@ public:
     return operator[] (node->annotation_uid);
   }
 
+  size_t elements ()
+  {
+    return m_map->elements ();
+  }
+
   /* Symbol insertion hook that is registered to symbol table.  */
   static void symtab_insertion (cgraph_node *node, void *data)
   {

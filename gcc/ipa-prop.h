@@ -514,15 +514,14 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
   return &(*args->polymorphic_call_contexts)[i];
 }
 
-/* Types of vectors holding the infos.  */
-
-
+/* Callgraph annotation for ipa_node_params.  */
 class ipa_node_params_cgraph_annotation: public cgraph_annotation <ipa_node_params>
 {
 public:
   ipa_node_params_cgraph_annotation (symbol_table *table):
     cgraph_annotation <ipa_node_params> (table) { }
 
+  /* Hook that is called by annotation when a node is duplicated.  */
   virtual void duplication_hook (const cgraph_node *node,
 				 const cgraph_node *node2,
 				 ipa_node_params *data,
