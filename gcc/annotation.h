@@ -91,7 +91,6 @@ public:
     FOR_EACH_FUNCTION (node)
     {
       gcc_assert (node->annotation_uid > 0);
-      m_reverse_map.put (node, node->annotation_uid);
     }
 
     m_map = new  hash_map<int, T*, annotation_hashmap_traits>();
@@ -110,7 +109,7 @@ public:
   }
 
   /* Destructor.  */
-  ~cgraph_annotation ()
+  virtual ~cgraph_annotation ()
   {
     m_symtab->remove_cgraph_insertion_hook (m_symtab_insertion_hook);
     m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
@@ -127,29 +126,18 @@ public:
     m_map->traverse <f> (a);
   }
 
-  /* Function for registering insertion hook.  */
-  template <void (*f) (const cgraph_node *, T *)>
-  inline void add_insertion_hook (void)
-  {
-    m_insertion_hooks.safe_push (f);
-  }
+  /* Basic implementation of insertion hook.  */
+  virtual void insertion_hook (const cgraph_node *, T *) {}
 
-  /* Function for registering removal hook.  */
-  template <void (*f) (const cgraph_node *, T *)>
-  inline void add_removal_hook (void)
-  {
-    m_removal_hooks.safe_push (f);
-  }
+  /* Basic implementation of removal hook.  */
+  virtual void removal_hook (const cgraph_node *, T *) {}
 
-  /* Function for registering duplication hook.  */
-  template <void (*f) (const cgraph_node *, const cgraph_node *, T *, T *)>
-  inline void add_duplication_hook (void)
-  {
-    m_duplication_hooks.safe_push (f);
-  }
+  /* Basic implementation of duplication hook.  */
+  virtual void duplication_hook (const cgraph_node *,
+				 const cgraph_node *, T *, T *) {}
 
   /* Getter for annotation callgraph ID.  */
-  inline T* get_or_add (int uid)
+  inline T* operator[] (int uid)
   {
     T **v = m_map->get (uid);
     if (!v)
@@ -164,39 +152,35 @@ public:
   }
 
   /* Getter for annotation callgraph node pointer.  */
-  inline T *get_or_add (cgraph_node *node)
+  inline T * operator[] (cgraph_node *node)
   {
-    return get_or_add (node->annotation_uid);
+    return operator[] (node->annotation_uid);
   }
 
   /* Symbol insertion hook that is registered to symbol table.  */
   static void symtab_insertion (cgraph_node *node, void *data)
   {
     cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
-    annotation->call_insertion_hooks (node);
+    annotation->insertion_hook (node, (*annotation)[node]);
   }
 
   /* Symbol removal hook that is registered to symbol table.  */
   static void symtab_removal (cgraph_node *node, void *data)
   {
+    gcc_assert (node->annotation_uid);
     cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
-    int *annotation_uid_ptr = annotation->m_reverse_map.get (node);
 
-    if (!annotation_uid_ptr)
-      return;
-
-    int annotation_uid = *annotation_uid_ptr;
-
+    int annotation_uid = node->annotation_uid;
     T **v = annotation->m_map->get (annotation_uid);
 
     if (v)
-      annotation->call_removal_hooks (node, *v);
-
-    annotation->m_reverse_map.remove (node);
+    {
+      annotation->removal_hook (node, *v);
+      delete (*v);
+    }
 
     if (annotation->m_map->get (annotation_uid))
       annotation->m_map->remove (annotation_uid);
-
   }
 
   /* Symbol duplication hook that is registered to symbol table.  */
@@ -207,23 +191,18 @@ public:
     T **v = annotation->m_map->get (node->annotation_uid);
 
     gcc_assert (node2->annotation_uid > 0);
-    annotation->m_reverse_map.put (node2, node2->annotation_uid);
 
     if (v)
       {
 	T *data = *v;
 	T *duplicate = new T();
 	annotation->m_map->put (node2->annotation_uid, duplicate);
-	annotation->call_duplication_hooks (node, node2, data);
+	annotation->duplication_hook (node, node2, data, (*annotation)[node2]);
       }
-
   }
 
   /* Main annotation store, where annotation ID is used as key.  */
   hash_map <int, T *, annotation_hashmap_traits> *m_map;
-
-  /* Inverse mapping structure used in cgraph deletion context.  */
-  hash_map <cgraph_node *, int> m_reverse_map;
 
 private:
   /* Remove annotation for annotation UID.  */
@@ -242,36 +221,6 @@ private:
     return true;
   }
 
-  /* Call insertion hook for callgraph NODE.  */
-  inline void call_insertion_hooks (cgraph_node *node)
-  {
-    for (unsigned int i = 0; i < m_insertion_hooks.length (); i++)
-      m_insertion_hooks[i] (node, get_or_add (node));
-  }
-
-  /* Call removal hook for callgraph NODE.  */
-  inline void call_removal_hooks (cgraph_node *node, T *v)
-  {
-    for (unsigned int i = 0; i < m_removal_hooks.length (); i++)
-      m_removal_hooks[i] (node, v);
-  }
-
-  /* Call duplication hook for callgraph NODE.  */
-  inline void call_duplication_hooks (cgraph_node *node, cgraph_node *node2, T *v)
-  {
-    for (unsigned int i = 0; i < m_duplication_hooks.length (); i++)
-      m_duplication_hooks[i] (node, node2, v, get_or_add (node2));
-  }
-
-  /* List of symbol insertion hooks.  */
-  auto_vec <void (*) (cgraph_node *, T *)> m_insertion_hooks;
-  /* List of symbol removal hooks.  */
-  auto_vec <void (*) (cgraph_node *, T *)> m_removal_hooks;
-  /* List of symbol duplication hooks.  */
-  auto_vec <void (*) (const cgraph_node *, const cgraph_node *, T *, T *)>
-  m_duplication_hooks;
-
-  /* Internal annotation insertion hook pointer.  */
   cgraph_node_hook_list *m_symtab_insertion_hook;
   /* Internal annotation removal hook pointer.  */
   cgraph_node_hook_list *m_symtab_removal_hook;

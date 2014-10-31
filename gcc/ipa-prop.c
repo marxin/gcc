@@ -116,7 +116,7 @@ struct func_body_info
 };
 
 /* Callgraph annotation where the parameter infos are actually stored. */
-cgraph_annotation <struct ipa_node_params> *ipa_node_params_annotation = NULL;
+ipa_node_params_cgraph_annotation *ipa_node_params_annotation = NULL;
 vec<ipa_node_params> ipa_node_params_vector;
 /* Vector of known aggregate values in cloned nodes.  */
 vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
@@ -3781,8 +3781,10 @@ ipa_add_new_function (struct cgraph_node *node, void *data ATTRIBUTE_UNUSED)
 /* Hook that is called by cgraph.c when a node is duplicated.  */
 
 void
-ipa_node_duplication_hook (const struct cgraph_node *src, const struct cgraph_node *dst,
-                          struct ipa_node_params *old_info, struct ipa_node_params *new_info)
+ipa_node_params_cgraph_annotation::duplication_hook(const cgraph_node *src,
+						    const cgraph_node *dst,
+						    ipa_node_params *old_info,
+						    ipa_node_params *new_info)
 {
   struct ipa_agg_replacement_value *old_av, *new_av;
 

@@ -521,8 +521,21 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
 
 /* Types of vectors holding the infos.  */
 
+
+class ipa_node_params_cgraph_annotation: public cgraph_annotation <ipa_node_params>
+{
+public:
+  ipa_node_params_cgraph_annotation (symbol_table *table):
+    cgraph_annotation <ipa_node_params> (table) { }
+
+  virtual void duplication_hook (const cgraph_node *node,
+				 const cgraph_node *node2,
+				 ipa_node_params *data,
+				 ipa_node_params *data2);
+};
+
 /* Vector where the parameter infos are actually stored. */
-extern cgraph_annotation <ipa_node_params> *ipa_node_params_annotation;
+extern ipa_node_params_cgraph_annotation *ipa_node_params_annotation;
 /* Vector of known aggregate values in cloned nodes.  */
 extern GTY(()) vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
 /* Vector where the parameter infos are actually stored. */
@@ -530,7 +543,7 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
-#define IPA_NODE_REF(NODE) (ipa_node_params_annotation->get_or_add (NODE))
+#define IPA_NODE_REF(NODE) ((*ipa_node_params_annotation)[NODE])
 #define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */
@@ -544,10 +557,6 @@ void ipa_free_all_node_params (void);
 void ipa_free_all_edge_args (void);
 void ipa_free_all_structures_after_ipa_cp (void);
 void ipa_free_all_structures_after_iinln (void);
-void  ipa_node_duplication_hook (const struct cgraph_node *src,
-				 const struct cgraph_node *dst,
-				 struct ipa_node_params *old_info,
-				 struct ipa_node_params *new_info);
 
 void ipa_register_cgraph_hooks (void);
 int count_formal_params (tree fndecl);
@@ -559,10 +568,7 @@ static inline void
 ipa_check_create_node_params (void)
 {
   if (!ipa_node_params_annotation)
-    {
-      ipa_node_params_annotation = new cgraph_annotation <ipa_node_params> (symtab);
-      ipa_node_params_annotation->add_duplication_hook <ipa_node_duplication_hook> ();
-    }
+    ipa_node_params_annotation = new ipa_node_params_cgraph_annotation (symtab);
 }
 
 /* This function ensures the array of edge arguments infos is big enough to
