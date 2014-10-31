@@ -24,43 +24,6 @@ along with GCC; see the file COPYING3.  If not see
 #define ANNOTATION_DELETED_VALUE -1
 #define ANNOTATION_EMPTY_VALUE 0
 
-struct annotation_hashmap_traits: default_hashmap_traits
-{
-  static inline
-  hashval_t hash (const int v)
-  {
-    return (hashval_t)v;
-  }
-
-  template<typename T>
-  static inline
-  bool is_deleted (T &e)
-  {
-    return e.m_key == ANNOTATION_DELETED_VALUE;
-  }
-
-  template<typename T>
-  static inline
-  bool is_empty (T &e)
-  {
-    return e.m_key == ANNOTATION_EMPTY_VALUE;
-  }
-
-  template<typename T>
-  static inline
-  void mark_deleted (T &e)
-  {
-    e.m_key = ANNOTATION_DELETED_VALUE;
-  }
-
-  template<typename T>
-  static inline
-  void mark_empty (T &e)
-  {
-    e.m_key = ANNOTATION_EMPTY_VALUE;
-  }
-};
-
 template <class T>
 class cgraph_annotation
 {
@@ -183,6 +146,43 @@ public:
   }
 
 private:
+  struct annotation_hashmap_traits: default_hashmap_traits
+  {
+    static inline
+    hashval_t hash (const int v)
+    {
+      return (hashval_t)v;
+    }
+
+    template<typename Type>
+    static inline
+    bool is_deleted (Type &e)
+    {
+      return e.m_key == ANNOTATION_DELETED_VALUE;
+    }
+
+    template<typename Type>
+    static inline
+    bool is_empty (Type &e)
+    {
+      return e.m_key == ANNOTATION_EMPTY_VALUE;
+    }
+
+    template<typename Type>
+    static inline
+    void mark_deleted (Type &e)
+    {
+      e.m_key = ANNOTATION_DELETED_VALUE;
+    }
+
+    template<typename Type>
+    static inline
+    void mark_empty (Type &e)
+    {
+      e.m_key = ANNOTATION_EMPTY_VALUE;
+    }
+  };
+
   /* Remove annotation for annotation UID.  */
   inline void remove (int uid)
   {
