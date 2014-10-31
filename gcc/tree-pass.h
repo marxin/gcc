@@ -449,6 +449,7 @@ extern simple_ipa_opt_pass *make_pass_ipa_lower_emutls (gcc::context *ctxt);
 extern simple_ipa_opt_pass
 							      *make_pass_ipa_function_and_variable_visibility (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_tree_profile (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_ipa_auto_profile (gcc::context *ctxt);
 
 extern simple_ipa_opt_pass *make_pass_early_local_passes (gcc::context *ctxt);
 
@@ -461,6 +462,7 @@ extern simple_ipa_opt_pass *make_pass_ipa_free_lang_data (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_free_inline_summary (gcc::context
 							       *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_cp (gcc::context *ctxt);
+extern ipa_opt_pass_d *make_pass_ipa_icf (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_devirt (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_reference (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_pure_const (gcc::context *ctxt);

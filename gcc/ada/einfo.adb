@@ -251,6 +251,7 @@ package body Einfo is
    --    Thunk_Entity                    Node31
 
    --    SPARK_Pragma                    Node32
+   --    No_Tagged_Streams_Pragma        Node32
 
    --    Linker_Section_Pragma           Node33
    --    SPARK_Aux_Pragma                Node33
@@ -2594,6 +2595,12 @@ package body Einfo is
       return Flag136 (Base_Type (Id));
    end No_Strict_Aliasing;
 
+   function No_Tagged_Streams_Pragma (Id : E) return N is
+   begin
+      pragma Assert (Is_Tagged_Type (Id));
+      return Node32 (Id);
+   end No_Tagged_Streams_Pragma;
+
    function Non_Binary_Modulus (Id : E) return B is
    begin
       pragma Assert (Is_Type (Id));
@@ -3090,7 +3097,7 @@ package body Einfo is
 
    function Suppress_Initialization (Id : E) return B is
    begin
-      pragma Assert (Is_Type (Id));
+      pragma Assert (Is_Type (Id) or else Ekind (Id) = E_Variable);
       return Flag105 (Id);
    end Suppress_Initialization;
 
@@ -5419,6 +5426,12 @@ package body Einfo is
       Set_Flag136 (Id, V);
    end Set_No_Strict_Aliasing;
 
+   procedure Set_No_Tagged_Streams_Pragma (Id : E; V : E) is
+   begin
+      pragma Assert (Is_Tagged_Type (Id));
+      Set_Node32 (Id, V);
+   end Set_No_Tagged_Streams_Pragma;
+
    procedure Set_Non_Binary_Modulus (Id : E; V : B := True) is
    begin
       pragma Assert (Is_Type (Id) and then Is_Base_Type (Id));
@@ -5943,7 +5956,7 @@ package body Einfo is
 
    procedure Set_Suppress_Initialization (Id : E; V : B := True) is
    begin
-      pragma Assert (Is_Type (Id));
+      pragma Assert (Is_Type (Id) or else Ekind (Id) = E_Variable);
       Set_Flag105 (Id, V);
    end Set_Suppress_Initialization;
 
@@ -6671,31 +6684,32 @@ package body Einfo is
 
    function Get_Pragma (E : Entity_Id; Id : Pragma_Id) return Node_Id is
       Is_CDG  : constant Boolean :=
-                  Id = Pragma_Abstract_State    or else
-                  Id = Pragma_Async_Readers     or else
-                  Id = Pragma_Async_Writers     or else
-                  Id = Pragma_Depends           or else
-                  Id = Pragma_Effective_Reads   or else
-                  Id = Pragma_Effective_Writes  or else
-                  Id = Pragma_Global            or else
-                  Id = Pragma_Initial_Condition or else
-                  Id = Pragma_Initializes       or else
-                  Id = Pragma_Part_Of           or else
-                  Id = Pragma_Refined_Depends   or else
-                  Id = Pragma_Refined_Global    or else
+                  Id = Pragma_Abstract_State     or else
+                  Id = Pragma_Async_Readers      or else
+                  Id = Pragma_Async_Writers      or else
+                  Id = Pragma_Depends            or else
+                  Id = Pragma_Effective_Reads    or else
+                  Id = Pragma_Effective_Writes   or else
+                  Id = Pragma_Extensions_Visible or else
+                  Id = Pragma_Global             or else
+                  Id = Pragma_Initial_Condition  or else
+                  Id = Pragma_Initializes        or else
+                  Id = Pragma_Part_Of            or else
+                  Id = Pragma_Refined_Depends    or else
+                  Id = Pragma_Refined_Global     or else
                   Id = Pragma_Refined_State;
       Is_CTC : constant Boolean :=
-                  Id = Pragma_Contract_Cases    or else
+                  Id = Pragma_Contract_Cases     or else
                   Id = Pragma_Test_Case;
       Is_PPC : constant Boolean :=
-                  Id = Pragma_Precondition      or else
-                  Id = Pragma_Postcondition     or else
+                  Id = Pragma_Precondition       or else
+                  Id = Pragma_Postcondition      or else
                   Id = Pragma_Refined_Post;
 
       In_Contract : constant Boolean := Is_CDG or Is_CTC or Is_PPC;
 
-      Item   : Node_Id;
-      Items  : Node_Id;
+      Item  : Node_Id;
+      Items : Node_Id;
 
    begin
       --  Handle pragmas that appear in N_Contract nodes. Those have to be
@@ -9741,6 +9755,9 @@ package body Einfo is
               E_Procedure                                  |
               E_Subprogram_Body                            =>
             Write_Str ("SPARK_Pragma");
+
+         when Type_Kind                                    =>
+            Write_Str ("No_Tagged_Streams_Pragma");
 
          when others                                       =>
             Write_Str ("Field32??");

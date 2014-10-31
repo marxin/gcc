@@ -21,24 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_ANNOTATION_H
 #define GCC_ANNOTATION_H
 
-#include "config.h"
-#include "system.h"
-#include "coretypes.h"
-#include "tm.h"
-#include "tree.h"
-#include "varasm.h"
-#include "calls.h"
-#include "print-tree.h"
-#include "tree-inline.h"
-#include "langhooks.h"
-#include "hashtab.h"
-#include "toplev.h"
-#include "flags.h"
-#include "debug.h"
-#include "target.h"
-#include "cgraph.h"
-#include "hash-map.h"
-
 #define ANNOTATION_DELETED_VALUE -1
 #define ANNOTATION_EMPTY_VALUE 0
 
@@ -93,7 +75,7 @@ public:
       gcc_assert (node->annotation_uid > 0);
     }
 
-    m_map = new  hash_map<int, T*, annotation_hashmap_traits>();
+    m_map = new hash_map<int, T*, annotation_hashmap_traits>();
 
     m_symtab_insertion_hook =
       symtab->add_cgraph_insertion_hook
@@ -105,7 +87,6 @@ public:
     m_symtab_duplication_hook =
       symtab->add_cgraph_duplication_hook
       (cgraph_annotation::symtab_duplication, this);
-
   }
 
   /* Destructor.  */
@@ -174,10 +155,10 @@ public:
     T **v = annotation->m_map->get (annotation_uid);
 
     if (v)
-    {
-      annotation->removal_hook (node, *v);
-      delete (*v);
-    }
+      {
+	annotation->removal_hook (node, *v);
+	delete (*v);
+      }
 
     if (annotation->m_map->get (annotation_uid))
       annotation->m_map->remove (annotation_uid);
@@ -201,9 +182,6 @@ public:
       }
   }
 
-  /* Main annotation store, where annotation ID is used as key.  */
-  hash_map <int, T *, annotation_hashmap_traits> *m_map;
-
 private:
   /* Remove annotation for annotation UID.  */
   inline void remove (int uid)
@@ -221,6 +199,10 @@ private:
     return true;
   }
 
+  /* Main annotation store, where annotation ID is used as key.  */
+  hash_map <int, T *, annotation_hashmap_traits> *m_map;
+
+  /* Internal annotation insertion hook pointer.  */
   cgraph_node_hook_list *m_symtab_insertion_hook;
   /* Internal annotation removal hook pointer.  */
   cgraph_node_hook_list *m_symtab_removal_hook;

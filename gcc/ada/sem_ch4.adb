@@ -2156,6 +2156,7 @@ package body Sem_Ch4 is
       ---------------------------
 
       procedure Process_Function_Call is
+         Loc    : constant Source_Ptr := Sloc (N);
          Actual : Node_Id;
 
       begin
@@ -2187,7 +2188,26 @@ package body Sem_Ch4 is
             --  subsequent crashes or loops if there is an attempt to continue
             --  analysis of the program.
 
-            Next (Actual);
+            --  IF there is a single actual and it is a type name, the node
+            --  can only be interpreted as a slice of a parameterless call.
+            --  Rebuild the node as such and analyze.
+
+            if No (Next (Actual))
+              and then Is_Entity_Name (Actual)
+              and then Is_Type (Entity (Actual))
+              and then Is_Discrete_Type (Entity (Actual))
+            then
+               Replace (N,
+                 Make_Slice (Loc,
+                   Prefix         => P,
+                   Discrete_Range =>
+                     New_Occurrence_Of (Entity (Actual), Loc)));
+               Analyze (N);
+               return;
+
+            else
+               Next (Actual);
+            end if;
          end loop;
 
          Analyze_Call (N);
@@ -4924,14 +4944,13 @@ package body Sem_Ch4 is
 
    procedure Analyze_Type_Conversion (N : Node_Id) is
       Expr : constant Node_Id := Expression (N);
-      T    : Entity_Id;
+      Typ  : Entity_Id;
 
    begin
-      --  If Conversion_OK is set, then the Etype is already set, and the
-      --  only processing required is to analyze the expression. This is
-      --  used to construct certain "illegal" conversions which are not
-      --  allowed by Ada semantics, but can be handled OK by Gigi, see
-      --  Sinfo for further details.
+      --  If Conversion_OK is set, then the Etype is already set, and the only
+      --  processing required is to analyze the expression. This is used to
+      --  construct certain "illegal" conversions which are not allowed by Ada
+      --  semantics, but can be handled by Gigi, see Sinfo for further details.
 
       if Conversion_OK (N) then
          Analyze (Expr);
@@ -4942,9 +4961,9 @@ package body Sem_Ch4 is
       --  checks to make sure the argument of the conversion is appropriate.
 
       Find_Type (Subtype_Mark (N));
-      T := Entity (Subtype_Mark (N));
-      Set_Etype (N, T);
-      Check_Fully_Declared (T, N);
+      Typ := Entity (Subtype_Mark (N));
+      Set_Etype (N, Typ);
+      Check_Fully_Declared (Typ, N);
       Analyze_Expression (Expr);
       Validate_Remote_Type_Type_Conversion (N);
 
@@ -4982,7 +5001,7 @@ package body Sem_Ch4 is
 
       elsif Nkind (Expr) = N_Character_Literal then
          if Ada_Version = Ada_83 then
-            Resolve (Expr, T);
+            Resolve (Expr, Typ);
          else
             Error_Msg_N ("argument of conversion cannot be character literal",
               N);
@@ -4990,13 +5009,22 @@ package body Sem_Ch4 is
          end if;
 
       elsif Nkind (Expr) = N_Attribute_Reference
-        and then
-          Nam_In (Attribute_Name (Expr), Name_Access,
-                                         Name_Unchecked_Access,
-                                         Name_Unrestricted_Access)
+        and then Nam_In (Attribute_Name (Expr), Name_Access,
+                                                Name_Unchecked_Access,
+                                                Name_Unrestricted_Access)
       then
          Error_Msg_N ("argument of conversion cannot be access", N);
          Error_Msg_N ("\use qualified expression instead", N);
+      end if;
+
+      --  A formal parameter of a specific tagged type whose related subprogram
+      --  is subject to pragma Extensions_Visible with value "False" cannot
+      --  appear in a class-wide conversion (SPARK RM 6.1.7(3)).
+
+      if Is_Class_Wide_Type (Typ) and then Is_EVF_Expression (Expr) then
+         Error_Msg_N
+           ("formal parameter with Extensions_Visible False cannot be "
+            & "converted to class-wide type", Expr);
       end if;
    end Analyze_Type_Conversion;
 
@@ -7571,7 +7599,7 @@ package body Sem_Ch4 is
                  or else not Is_Variable (Obj)
                then
                   Error_Msg_NE
-                    ("actual for& must be a variable", Obj, Control);
+                    ("actual for & must be a variable", Obj, Control);
                end if;
             end if;
 
@@ -7582,9 +7610,8 @@ package body Sem_Ch4 is
 
             if not Is_Aliased_View (Obj) then
                Error_Msg_NE
-                 ("object in prefixed call to& must be aliased"
-                      & " (RM-2005 4.3.1 (13))",
-                 Prefix (First_Actual), Subprog);
+                 ("object in prefixed call to & must be aliased "
+                  & "(RM-2005 4.3.1 (13))", Prefix (First_Actual), Subprog);
             end if;
 
             Analyze (First_Actual);
@@ -7596,6 +7623,17 @@ package body Sem_Ch4 is
 
             Rewrite (First_Actual, Obj);
          end if;
+
+         --  The operation is obtained from the dispatch table and not by
+         --  visibility, and may be declared in a unit that is not explicitly
+         --  referenced in the source, but is nevertheless required in the
+         --  context of the current unit. Indicate that operation and its scope
+         --  are referenced, to prevent spurious and misleading warnings. If
+         --  the operation is overloaded, all primitives are in the same scope
+         --  and we can use any of them.
+
+         Set_Referenced (Entity (Subprog), True);
+         Set_Referenced (Scope (Entity (Subprog)), True);
 
          Rewrite (Node_To_Replace, Call_Node);
 

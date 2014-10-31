@@ -72,7 +72,7 @@ static void builtin_define_float_constants (const char *,
    point types.  */
 
 static bool
-mode_has_fma (enum machine_mode mode)
+mode_has_fma (machine_mode mode)
 {
   switch (mode)
     {
@@ -671,7 +671,7 @@ cpp_atomic_builtins (cpp_reader *pfile)
 
   /* ptr_type_node can't be used here since ptr_mode is only set when
      toplev calls backend_init which is not done with -E  or pch.  */
-  psize = POINTER_SIZE / BITS_PER_UNIT;
+  psize = POINTER_SIZE_UNITS;
   if (psize >= SWAP_LIMIT)
     psize = 0;
   builtin_define_with_int_value ("__GCC_ATOMIC_POINTER_LOCK_FREE", 
@@ -1006,7 +1006,7 @@ c_cpp_builtins (cpp_reader *pfile)
   if (flag_building_libgcc)
     {
       /* Properties of floating-point modes for libgcc2.c.  */
-      for (enum machine_mode mode = GET_CLASS_NARROWEST_MODE (MODE_FLOAT);
+      for (machine_mode mode = GET_CLASS_NARROWEST_MODE (MODE_FLOAT);
 	   mode != VOIDmode;
 	   mode = GET_MODE_WIDER_MODE (mode))
 	{
@@ -1364,7 +1364,7 @@ struct GTY(()) lazy_hex_fp_value_struct
 {
   const char *hex_str;
   cpp_macro *macro;
-  enum machine_mode mode;
+  machine_mode mode;
   int digits;
   const char *fp_suffix;
 };

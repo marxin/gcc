@@ -3201,6 +3201,8 @@ package body Sem_Prag is
       function Is_Static_String_Expression (Arg : Node_Id) return Boolean;
       --  Analyzes the argument, and determines if it is a static string
       --  expression, returns True if so, False if non-static or not String.
+      --  A special case is that a string literal returns True in Ada 83 mode
+      --  (which has no such thing as static string expressions).
 
       procedure Pragma_Misplaced;
       pragma No_Return (Pragma_Misplaced);
@@ -3840,9 +3842,9 @@ package body Sem_Prag is
                --  pragma is inserted in its declarative part.
 
                elsif From_Aspect_Specification (N)
+                 and then  Ent = Current_Scope
                  and then
                    Nkind (Unit_Declaration_Node (Ent)) = N_Subprogram_Body
-                 and then  Ent = Current_Scope
                then
                   OK := True;
 
@@ -5368,7 +5370,9 @@ package body Sem_Prag is
          ---------------
 
          procedure Chain_CTC (PO : Node_Id) is
-            S   : Entity_Id;
+            Name : constant String_Id := Get_Name_From_CTC_Pragma (N);
+            CTC  : Node_Id;
+            S    : Entity_Id;
 
          begin
             if Nkind (PO) = N_Abstract_Subprogram_Declaration then
@@ -5397,31 +5401,23 @@ package body Sem_Prag is
             --  There should not be another test-case with the same name
             --  associated to this subprogram.
 
-            declare
-               Name : constant String_Id := Get_Name_From_CTC_Pragma (N);
-               CTC  : Node_Id;
+            CTC := Contract_Test_Cases (Contract (S));
+            while Present (CTC) loop
 
-            begin
-               CTC := Contract_Test_Cases (Contract (S));
-               while Present (CTC) loop
+               --  Omit pragma Contract_Cases because it does not introduce
+               --  a unique case name and it does not follow the syntax of
+               --  Test_Case.
 
-                  --  Omit pragma Contract_Cases because it does not introduce
-                  --  a unique case name and it does not follow the syntax of
-                  --  Test_Case.
+               if Pragma_Name (CTC) = Name_Contract_Cases then
+                  null;
 
-                  if Pragma_Name (CTC) = Name_Contract_Cases then
-                     null;
+               elsif String_Equal (Name, Get_Name_From_CTC_Pragma (CTC)) then
+                  Error_Msg_Sloc := Sloc (CTC);
+                  Error_Pragma ("name for pragma% is already used#");
+               end if;
 
-                  elsif String_Equal
-                          (Name, Get_Name_From_CTC_Pragma (CTC))
-                  then
-                     Error_Msg_Sloc := Sloc (CTC);
-                     Error_Pragma ("name for pragma% is already used#");
-                  end if;
-
-                  CTC := Next_Pragma (CTC);
-               end loop;
-            end;
+               CTC := Next_Pragma (CTC);
+            end loop;
 
             --  Chain spec CTC pragma to list for subprogram
 
@@ -6220,11 +6216,25 @@ package body Sem_Prag is
 
       function Is_Static_String_Expression (Arg : Node_Id) return Boolean is
          Argx : constant Node_Id := Get_Pragma_Arg (Arg);
+         Lit  : constant Boolean := Nkind (Argx) = N_String_Literal;
 
       begin
          Analyze_And_Resolve (Argx);
-         return Is_OK_Static_Expression (Argx)
-           and then Nkind (Argx) = N_String_Literal;
+
+         --  Special case Ada 83, where the expression will never be static,
+         --  but we will return true if we had a string literal to start with.
+
+         if Ada_Version = Ada_83 then
+            return Lit;
+
+         --  Normal case, true only if we end up with a string literal that
+         --  is marked as being the result of evaluating a static expression.
+
+         else
+            return Is_OK_Static_Expression (Argx)
+              and then Nkind (Argx) = N_String_Literal;
+         end if;
+
       end Is_Static_String_Expression;
 
       ----------------------
@@ -10502,6 +10512,7 @@ package body Sem_Prag is
 
          begin
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_Arg_Count (1);
             Ensure_Aggregate_Form (Arg1);
 
@@ -12276,6 +12287,7 @@ package body Sem_Prag is
 
          begin
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_Arg_Count (1);
             Ensure_Aggregate_Form (Arg1);
 
@@ -12789,12 +12801,11 @@ package body Sem_Prag is
                     Expression => Get_Pragma_Arg (Arg1)))));
             Analyze (N);
 
-         --------------------------------------
-         -- Pragma_Default_Initial_Condition --
-         --------------------------------------
+         -------------------------------
+         -- Default_Initial_Condition --
+         -------------------------------
 
-         --  pragma Pragma_Default_Initial_Condition
-         --           [ (null | boolean_EXPRESSION) ];
+         --  pragma Default_Initial_Condition [ (null | boolean_EXPRESSION) ];
 
          when Pragma_Default_Initial_Condition => Default_Init_Cond : declare
             Discard : Boolean;
@@ -12803,6 +12814,7 @@ package body Sem_Prag is
 
          begin
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_At_Most_N_Arguments (1);
 
             Stmt := Prev (N);
@@ -13867,6 +13879,135 @@ package body Sem_Prag is
                Ada_Version_Pragma := Empty;
             end if;
 
+         ------------------------
+         -- Extensions_Visible --
+         ------------------------
+
+         --  pragma Extensions_Visible [ (boolean_EXPRESSION) ];
+
+         when Pragma_Extensions_Visible => Extensions_Visible : declare
+            Context : constant Node_Id := Parent (N);
+            Expr    : Node_Id;
+            Formal  : Entity_Id;
+            Subp    : Entity_Id;
+            Stmt    : Node_Id;
+
+            Has_OK_Formal : Boolean := False;
+
+         begin
+            GNAT_Pragma;
+            Check_No_Identifiers;
+            Check_At_Most_N_Arguments  (1);
+
+            Subp := Empty;
+            Stmt := Prev (N);
+            while Present (Stmt) loop
+
+               --  Skip prior pragmas, but check for duplicates
+
+               if Nkind (Stmt) = N_Pragma then
+                  if Pragma_Name (Stmt) = Pname then
+                     Error_Msg_Name_1 := Pname;
+                     Error_Msg_Sloc   := Sloc (Stmt);
+                     Error_Msg_N ("pragma % duplicates pragma declared#", N);
+                  end if;
+
+               --  Skip internally generated code
+
+               elsif not Comes_From_Source (Stmt) then
+                  null;
+
+               --  The associated [generic] subprogram declaration has been
+               --  found, stop the search.
+
+               elsif Nkind_In (Stmt, N_Generic_Subprogram_Declaration,
+                                     N_Subprogram_Declaration)
+               then
+                  Subp := Defining_Entity (Stmt);
+                  exit;
+
+               --  The pragma does not apply to a legal construct, issue an
+               --  error and stop the analysis.
+
+               else
+                  Error_Pragma ("pragma % must apply to a subprogram");
+                  return;
+               end if;
+
+               Stmt := Prev (Stmt);
+            end loop;
+
+            --  When the pragma applies to a stand alone subprogram body, it
+            --  appears within the declarations of the body. In that case the
+            --  enclosing construct is the proper context. This check is done
+            --  after the traversal above to allow for duplicate detection.
+
+            if Nkind (Context) = N_Subprogram_Body
+              and then No (Corresponding_Spec (Context))
+            then
+               Subp := Defining_Entity (Context);
+            end if;
+
+            if No (Subp) then
+               Error_Pragma ("pragma % must apply to a subprogram");
+               return;
+            end if;
+
+            --  Examine the formals of the related subprogram
+
+            Formal := First_Formal (Subp);
+            while Present (Formal) loop
+
+               --  At least one of the formals is of a specific tagged type,
+               --  the pragma is legal.
+
+               if Is_Specific_Tagged_Type (Etype (Formal)) then
+                  Has_OK_Formal := True;
+                  exit;
+
+               --  A generic subprogram with at least one formal of a private
+               --  type ensures the legality of the pragma because the actual
+               --  may be specifically tagged. Note that this is verified by
+               --  the check above at instantiation time.
+
+               elsif Is_Private_Type (Etype (Formal))
+                 and then Is_Generic_Type (Etype (Formal))
+               then
+                  Has_OK_Formal := True;
+                  exit;
+               end if;
+
+               Next_Formal (Formal);
+            end loop;
+
+            if not Has_OK_Formal then
+               Error_Msg_Name_1 := Pname;
+               Error_Msg_N (Fix_Error ("incorrect placement of pragma %"), N);
+               Error_Msg_NE
+                 ("\subprogram & lacks parameter of specific tagged or "
+                  & "generic private type", N, Subp);
+               return;
+            end if;
+
+            --  Analyze the Boolean expression (if any)
+
+            if Present (Arg1) then
+               Expr := Get_Pragma_Arg (Arg1);
+
+               Analyze_And_Resolve (Expr, Standard_Boolean);
+
+               if not Is_OK_Static_Expression (Expr) then
+                  Error_Pragma_Arg
+                    ("expression of pragma % must be static", Expr);
+                  return;
+               end if;
+            end if;
+
+            --  Chain the pragma on the contract for further processing
+
+            Add_Contract_Item (N, Subp);
+         end Extensions_Visible;
+
          --------------
          -- External --
          --------------
@@ -14697,6 +14838,7 @@ package body Sem_Prag is
 
          begin
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_Arg_Count (1);
 
             --  Ensure the proper placement of the pragma. Initial_Condition
@@ -14811,6 +14953,7 @@ package body Sem_Prag is
 
          begin
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_Arg_Count (1);
             Ensure_Aggregate_Form (Arg1);
 
@@ -14878,12 +15021,21 @@ package body Sem_Prag is
 
          when Pragma_Inline =>
 
-            --  Inline status is Enabled if inlining option is active
+            --  Pragma always active unless in GNATprove mode. It is disabled
+            --  in GNATprove mode because frontend inlining is applied
+            --  independently of pragmas Inline and Inline_Always for
+            --  formal verification, see Can_Be_Inlined_In_GNATprove_Mode
+            --  in inline.ads.
 
-            if Inline_Active then
-               Process_Inline (Enabled);
-            else
-               Process_Inline (Disabled);
+            if not GNATprove_Mode then
+
+               --  Inline status is Enabled if inlining option is active
+
+               if Inline_Active then
+                  Process_Inline (Enabled);
+               else
+                  Process_Inline (Disabled);
+               end if;
             end if;
 
          -------------------
@@ -14895,15 +15047,15 @@ package body Sem_Prag is
          when Pragma_Inline_Always =>
             GNAT_Pragma;
 
-            --  Pragma always active unless in CodePeer mode. It is disabled
-            --  in CodePeer mode because inlining is not helpful, and enabling
-            --  if caused walk order issues.
+            --  Pragma always active unless in CodePeer mode or GNATprove
+            --  mode. It is disabled in CodePeer mode because inlining is
+            --  not helpful, and enabling it caused walk order issues. It
+            --  is disabled in GNATprove mode because frontend inlining is
+            --  applied independently of pragmas Inline and Inline_Always for
+            --  formal verification, see Can_Be_Inlined_In_GNATprove_Mode in
+            --  inline.ads.
 
-            --  Historical note: this pragma used to be disabled in GNATprove
-            --  mode as well, but that was odd since walk order should not be
-            --  an issue in that case.
-
-            if not CodePeer_Mode then
+            if not CodePeer_Mode and not GNATprove_Mode then
                Process_Inline (Enabled);
             end if;
 
@@ -15735,6 +15887,15 @@ package body Sem_Prag is
 
          when Pragma_License =>
             GNAT_Pragma;
+
+            --  Do not analyze pragma any further in CodePeer mode, to avoid
+            --  extraneous errors in this implementation-dependent pragma,
+            --  which has a different profile on other compilers.
+
+            if CodePeer_Mode then
+               return;
+            end if;
+
             Check_Arg_Count (1);
             Check_No_Identifiers;
             Check_Valid_Configuration_Pragma;
@@ -16400,12 +16561,19 @@ package body Sem_Prag is
 
             Set_No_Elab_Code_All (Current_Sem_Unit);
 
-            --  Set restriction No_Elaboration_Code, including adding it to the
-            --  set of configuration restrictions so it will apply to all units
-            --  in the extended main source.
+            --  Set restriction No_Elaboration_Code
 
             Set_Restriction (No_Elaboration_Code, N);
-            Add_To_Config_Boolean_Restrictions (No_Elaboration_Code);
+
+            --  If we are in the main unit or in an extended main source unit,
+            --  then we also add it to the configuration restrictions so that
+            --  it will apply to all units in the extended main source.
+
+            if Current_Sem_Unit = Main_Unit
+              or else In_Extended_Main_Source_Unit (N)
+            then
+               Add_To_Config_Boolean_Restrictions (No_Elaboration_Code);
+            end if;
 
             --  If in main extended unit, activate transitive with test
 
@@ -16525,6 +16693,58 @@ package body Sem_Prag is
             Set_Restriction (No_Exception_Handlers, N);
             Set_Restriction (Max_Tasks, N, 0);
             Set_Restriction (No_Tasking, N);
+
+            -----------------------
+            -- No_Tagged_Streams --
+            -----------------------
+
+            --  pragma No_Tagged_Streams;
+            --  pragma No_Tagged_Streams ([Entity => ]tagged_type_local_NAME);
+
+         when Pragma_No_Tagged_Streams => No_Tagged_Strms : declare
+            E_Id : Node_Id;
+            E    : Entity_Id;
+
+         begin
+            GNAT_Pragma;
+            Check_At_Most_N_Arguments (1);
+
+            --  One argument case
+
+            if Arg_Count = 1 then
+               Check_Optional_Identifier (Arg1, Name_Entity);
+               Check_Arg_Is_Local_Name (Arg1);
+               E_Id := Get_Pragma_Arg (Arg1);
+
+               if Etype (E_Id) = Any_Type then
+                  return;
+               end if;
+
+               E := Entity (E_Id);
+
+               Check_Duplicate_Pragma (E);
+
+               if not Is_Tagged_Type (E) or else Is_Derived_Type (E) then
+                  Error_Pragma_Arg
+                    ("argument for pragma% must be root tagged type", Arg1);
+               end if;
+
+               if Rep_Item_Too_Early (E, N)
+                    or else
+                  Rep_Item_Too_Late (E, N)
+               then
+                  return;
+               else
+                  Set_No_Tagged_Streams_Pragma (E, N);
+               end if;
+
+            --  Zero argument case
+
+            else
+               Check_Is_In_Decl_Part_Or_Package_Spec;
+               No_Tagged_Streams := N;
+            end if;
+         end No_Tagged_Strms;
 
          ------------------------
          -- No_Strict_Aliasing --
@@ -17212,6 +17432,7 @@ package body Sem_Prag is
 
          begin
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_Arg_Count (1);
 
             --  Ensure the proper placement of the pragma. Part_Of must appear
@@ -18591,6 +18812,7 @@ package body Sem_Prag is
 
          begin
             GNAT_Pragma;
+            Check_No_Identifiers;
             Check_Arg_Count (1);
 
             --  Ensure the proper placement of the pragma. Refined states must
@@ -19911,8 +20133,9 @@ package body Sem_Prag is
 
             E := Entity (E_Id);
 
-            if not Is_Type (E) then
-               Error_Pragma_Arg ("pragma% requires type or subtype", Arg1);
+            if not Is_Type (E) and then Ekind (E) /= E_Variable then
+               Error_Pragma_Arg
+                 ("pragma% requires variable, type or subtype", Arg1);
             end if;
 
             if Rep_Item_Too_Early (E, N)
@@ -19937,7 +20160,7 @@ package body Sem_Prag is
             elsif Is_First_Subtype (E) then
                Set_Suppress_Initialization (Base_Type (E));
 
-            --  For other than first subtype, set flag on subtype itself
+            --  For other than first subtype, set flag on subtype or variable
 
             else
                Set_Suppress_Initialization (E);
@@ -21917,9 +22140,11 @@ package body Sem_Prag is
       Analyze_Depends_In_Decl_Part (N);
 
       --  Do not match dependencies against refinements if Refined_Depends is
-      --  illegal to avoid emitting misleading error.
+      --  illegal to avoid emitting misleading error. Matching is disabled in
+      --  ASIS because clauses are not normalized as this is a tree altering
+      --  activity similar to expansion.
 
-      if Serious_Errors_Detected = Errors then
+      if Serious_Errors_Detected = Errors and then not ASIS_Mode then
 
          --  Multiple dependency clauses appear as component associations of an
          --  aggregate. Note that the clauses are copied because the algorithm
@@ -24831,6 +25056,7 @@ package body Sem_Prag is
       Pragma_Export_Valued_Procedure        => -1,
       Pragma_Extend_System                  => -1,
       Pragma_Extensions_Allowed             =>  0,
+      Pragma_Extensions_Visible             =>  0,
       Pragma_External                       => -1,
       Pragma_Favor_Top_Level                =>  0,
       Pragma_External_Name_Casing           =>  0,
@@ -24887,6 +25113,7 @@ package body Sem_Prag is
       Pragma_No_Inline                      =>  0,
       Pragma_No_Run_Time                    => -1,
       Pragma_No_Strict_Aliasing             => -1,
+      Pragma_No_Tagged_Streams              =>  0,
       Pragma_Normalize_Scalars              =>  0,
       Pragma_Obsolescent                    =>  0,
       Pragma_Optimize                       =>  0,

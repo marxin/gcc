@@ -361,8 +361,11 @@ struct c_common_resword
 /* A token type for pre-parsed C++0x decltype.  */
 #define CPP_DECLTYPE ((enum cpp_ttype) (CPP_NESTED_NAME_SPECIFIER + 1))
 
+/* A token type for pre-parsed primary-expression (lambda- or statement-).  */
+#define CPP_PREPARSED_EXPR ((enum cpp_ttype) (CPP_DECLTYPE + 1))
+
 /* The number of token types, including C++-specific ones.  */
-#define N_CP_TTYPES ((int) (CPP_DECLTYPE + 1))
+#define N_CP_TTYPES ((int) (CPP_PREPARSED_EXPR + 1))
 
 /* Disable mask.  Keywords are disabled if (reswords[i].disable &
    mask) is _true_.  Thus for keywords which are present in all
@@ -759,7 +762,7 @@ extern bool attribute_takes_identifier_p (const_tree);
 extern bool c_common_handle_option (size_t, const char *, int, int, location_t,
 				    const struct cl_option_handlers *);
 extern bool default_handle_c_option (size_t, const char *, int);
-extern tree c_common_type_for_mode (enum machine_mode, int);
+extern tree c_common_type_for_mode (machine_mode, int);
 extern tree c_common_type_for_size (unsigned int, int);
 extern tree c_common_fixed_point_type_for_size (unsigned int, unsigned int,
 						int, int);
@@ -842,7 +845,7 @@ extern tree build_va_arg (location_t, tree, tree);
 
 extern const unsigned int c_family_lang_mask;
 extern unsigned int c_common_option_lang_mask (void);
-extern void c_common_initialize_diagnostics (diagnostic_context *);
+extern void c_common_diagnostics_set_defaults (diagnostic_context *);
 extern bool c_common_complain_wrong_lang_p (const struct cl_option *);
 extern void c_common_init_options_struct (struct gcc_options *);
 extern void c_common_init_options (unsigned int, struct cl_decoded_option *);

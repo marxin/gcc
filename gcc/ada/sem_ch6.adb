@@ -312,8 +312,11 @@ package body Sem_Ch6 is
 
       --  If there are previous overloadable entities with the same name,
       --  check whether any of them is completed by the expression function.
+      --  In a generic context a formal subprogram has no completion.
 
-      if Present (Prev) and then Is_Overloadable (Prev) then
+      if Present (Prev) and then Is_Overloadable (Prev)
+        and then not Is_Formal_Subprogram (Prev)
+      then
          Def_Id := Analyze_Subprogram_Specification (Spec);
          Prev   := Find_Corresponding_Spec (N);
       end if;
@@ -358,7 +361,9 @@ package body Sem_Ch6 is
       --  scope. The entity itself may be internally created if within a body
       --  to be inlined.
 
-      elsif Present (Prev) and then Comes_From_Source (Parent (Prev)) then
+      elsif Present (Prev) and then Comes_From_Source (Parent (Prev))
+        and then not Is_Formal_Subprogram (Prev)
+      then
          Set_Has_Completion (Prev, False);
 
          --  An expression function that is a completion freezes the
@@ -448,6 +453,24 @@ package body Sem_Ch6 is
          end if;
 
          Analyze (N);
+
+         --  Within a generic pre-analyze the original expression for name
+         --  capture. The body is also generated but plays no role in
+         --  this because it is not part of the original source.
+
+         if Inside_A_Generic then
+            declare
+               Id : constant Entity_Id := Defining_Entity (N);
+
+            begin
+               Set_Has_Completion (Id);
+               Push_Scope (Id);
+               Install_Formals (Id);
+               Preanalyze_Spec_Expression (Expr, Etype (Id));
+               End_Scope;
+            end;
+         end if;
+
          Set_Is_Inlined (Defining_Entity (N));
 
          --  Establish the linkages between the spec and the body. These are
@@ -4051,8 +4074,12 @@ package body Sem_Ch6 is
 
             if Nam = Name_Depends then
                Depends := Prag;
-            else pragma Assert (Nam = Name_Global);
+
+            elsif Nam = Name_Global then
                Global := Prag;
+
+            --  Note that pragma Extensions_Visible has already been analyzed
+
             end if;
 
             Prag := Next_Pragma (Prag);
@@ -5673,10 +5700,12 @@ package body Sem_Ch6 is
                  and then Present (Alias (Overridden_Subp))
                  and then Comes_From_Source (Alias (Overridden_Subp))
                then
-                  Set_Overridden_Operation (Subp, Alias (Overridden_Subp));
+                  Set_Overridden_Operation    (Subp, Alias (Overridden_Subp));
+                  Inherit_Subprogram_Contract (Subp, Alias (Overridden_Subp));
 
                else
-                  Set_Overridden_Operation (Subp, Overridden_Subp);
+                  Set_Overridden_Operation    (Subp, Overridden_Subp);
+                  Inherit_Subprogram_Contract (Subp, Overridden_Subp);
                end if;
             end if;
          end if;
@@ -9434,9 +9463,12 @@ package body Sem_Ch6 is
                   --  E overrides the operation from which S is inherited.
 
                   if Present (Alias (S)) then
-                     Set_Overridden_Operation (E, Alias (S));
+                     Set_Overridden_Operation    (E, Alias (S));
+                     Inherit_Subprogram_Contract (E, Alias (S));
+
                   else
-                     Set_Overridden_Operation (E, S);
+                     Set_Overridden_Operation    (E, S);
+                     Inherit_Subprogram_Contract (E, S);
                   end if;
 
                   if Comes_From_Source (E) then
@@ -9602,7 +9634,8 @@ package body Sem_Ch6 is
                        and then Present (Alias (E))
                        and then Comes_From_Source (Alias (E))
                      then
-                        Set_Overridden_Operation (S, Alias (E));
+                        Set_Overridden_Operation    (S, Alias (E));
+                        Inherit_Subprogram_Contract (S, Alias (E));
 
                      --  Normal case of setting entity as overridden
 
@@ -9614,7 +9647,8 @@ package body Sem_Ch6 is
                      --  must check whether the target is an init_proc.
 
                      elsif not Is_Init_Proc (S) then
-                        Set_Overridden_Operation (S, E);
+                        Set_Overridden_Operation    (S, E);
+                        Inherit_Subprogram_Contract (S, E);
                      end if;
 
                      Check_Overriding_Indicator (S, E, Is_Primitive => True);
@@ -9637,7 +9671,8 @@ package body Sem_Ch6 is
                              Is_Predefined_Dispatching_Operation (Alias (E)))
                      then
                         if Present (Alias (E)) then
-                           Set_Overridden_Operation (S, Alias (E));
+                           Set_Overridden_Operation    (S, Alias (E));
+                           Inherit_Subprogram_Contract (S, Alias (E));
                         end if;
                      end if;
 
@@ -9919,7 +9954,9 @@ package body Sem_Ch6 is
                         --  (Note that the same is done for controlling access
                         --  parameter cases in function Access_Definition.)
 
-                        Set_Has_Delayed_Freeze (Current_Scope);
+                        if not Is_Thunk (Current_Scope) then
+                           Set_Has_Delayed_Freeze (Current_Scope);
+                        end if;
                      end if;
                   end if;
 
