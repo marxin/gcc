@@ -165,7 +165,27 @@ struct GTY(()) inline_summary
 /* Need a typedef for inline_summary because of inline function
    'inline_summary' below.  */
 typedef struct inline_summary inline_summary_t;
-extern GTY(()) vec<inline_summary_t, va_gc> *inline_summary_vec;
+
+class GTY((user)) inline_summary_cgraph_annotation: public cgraph_annotation <inline_summary *>
+{
+public:
+  inline_summary_cgraph_annotation (symbol_table *symtab):
+    cgraph_annotation <inline_summary *> (symtab) {}
+  
+  static inline_summary_cgraph_annotation *create_ggc (symbol_table *symtab)
+  {
+    inline_summary_cgraph_annotation *annotation = new (ggc_cleared_alloc <inline_summary_cgraph_annotation> ()) inline_summary_cgraph_annotation(symtab);
+    annotation->m_ggc = true;
+    return annotation;
+  }
+
+
+  virtual void insertion_hook (cgraph_node *, inline_summary *);
+  virtual void removal_hook (cgraph_node *node, inline_summary *);
+  virtual void duplication_hook (cgraph_node *src, cgraph_node *dst, inline_summary *src_data, inline_summary *dst_data);
+};
+
+extern GTY(()) cgraph_annotation <inline_summary *> *inline_summary_annotation;
 
 /* Information kept about parameter of call site.  */
 struct inline_param_summary
@@ -250,9 +270,9 @@ extern int ncalls_inlined;
 extern int nfunctions_inlined;
 
 static inline struct inline_summary *
-inline_summary (struct cgraph_node *node)
+inline_summary2 (const struct cgraph_node *node)
 {
-  return &(*inline_summary_vec)[node->uid];
+  return (*inline_summary_annotation)[node->annotation_uid];
 }
 
 static inline struct inline_edge_summary *

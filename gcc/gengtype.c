@@ -2606,6 +2606,12 @@ filter_type_name (const char *type_name)
 {
   if (strchr (type_name, '<') || strchr (type_name, ':'))
     {
+      // TODO: remove HACK
+      if (strstr (type_name, "cgraph_annotation"))
+      {
+	int a = 2;
+      }
+
       size_t i;
       char *s = xstrdup (type_name);
       for (i = 0; i < strlen (s); i++)

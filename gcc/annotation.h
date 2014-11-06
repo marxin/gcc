@@ -27,9 +27,16 @@ along with GCC; see the file COPYING3.  If not see
 template <class T>
 class cgraph_annotation
 {
+  private:
+    cgraph_annotation();
+};
+
+template <class T>
+class GTY((user)) cgraph_annotation <T *>
+{
 public:
   /* Default construction takes SYMTAB as an argument.  */
-  cgraph_annotation (symbol_table *symtab): m_symtab (symtab)
+  cgraph_annotation (symbol_table *symtab): m_ggc (false), m_symtab (symtab)
   {
     cgraph_node *node;
 
@@ -52,14 +59,36 @@ public:
       (cgraph_annotation::symtab_duplication, this);
   }
 
+  static cgraph_annotation <T *> *create_ggc (symbol_table *symtab)
+  {
+    cgraph_annotation <T *> *annotation = new (ggc_cleared_alloc <T *> ()) cgraph_annotation <T *>(symtab);
+    annotation->m_ggc = true;
+    return annotation;
+  }
+
   /* Destructor.  */
   virtual ~cgraph_annotation ()
   {
-    m_symtab->remove_cgraph_insertion_hook (m_symtab_insertion_hook);
-    m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
-    m_symtab->remove_cgraph_duplication_hook (m_symtab_duplication_hook);
+    destroy ();
+  }
 
-    m_map->traverse <void *, cgraph_annotation::release> (NULL);
+  void destroy ()
+  {
+    if (m_symtab_insertion_hook)
+      m_symtab->remove_cgraph_insertion_hook (m_symtab_insertion_hook);
+
+    if (m_symtab_removal_hook)
+      m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
+
+    if (m_symtab_duplication_hook)
+      m_symtab->remove_cgraph_duplication_hook (m_symtab_duplication_hook);
+
+    m_symtab_insertion_hook = NULL;
+    m_symtab_removal_hook = NULL;
+    m_symtab_duplication_hook = NULL;
+
+    if (!m_ggc)
+      m_map->traverse <void *, cgraph_annotation::release> (NULL);
   }
 
   /* Traverses all annotations with a function F called with
@@ -71,14 +100,14 @@ public:
   }
 
   /* Basic implementation of insertion hook.  */
-  virtual void insertion_hook (const cgraph_node *, T *) {}
+  virtual void insertion_hook (cgraph_node *, T *) {}
 
   /* Basic implementation of removal hook.  */
-  virtual void removal_hook (const cgraph_node *, T *) {}
+  virtual void removal_hook (cgraph_node *, T *) {}
 
   /* Basic implementation of duplication hook.  */
-  virtual void duplication_hook (const cgraph_node *,
-				 const cgraph_node *, T *, T *) {}
+  virtual void duplication_hook (cgraph_node *,
+				 cgraph_node *, T *, T *) {}
 
   /* Getter for annotation callgraph ID.  */
   inline T* operator[] (int uid)
@@ -86,7 +115,11 @@ public:
     T **v = m_map->get (uid);
     if (!v)
       {
-	T *new_value = new T();
+	T *new_value;
+	if (m_ggc)
+	  new_value = new (ggc_alloc <T> ()) T();
+	else
+	  new_value = new T();
 	m_map->put (uid, new_value);
 
 	v = &new_value;
@@ -109,7 +142,7 @@ public:
   /* Symbol insertion hook that is registered to symbol table.  */
   static void symtab_insertion (cgraph_node *node, void *data)
   {
-    cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
+    cgraph_annotation *annotation = (cgraph_annotation <T *> *) (data);
     annotation->insertion_hook (node, (*annotation)[node]);
   }
 
@@ -117,7 +150,7 @@ public:
   static void symtab_removal (cgraph_node *node, void *data)
   {
     gcc_assert (node->annotation_uid);
-    cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
+    cgraph_annotation *annotation = (cgraph_annotation <T *> *) (data);
 
     int annotation_uid = node->annotation_uid;
     T **v = annotation->m_map->get (annotation_uid);
@@ -125,7 +158,9 @@ public:
     if (v)
       {
 	annotation->removal_hook (node, *v);
-	delete (*v);
+
+	if (!annotation->m_ggc)
+	  delete (*v);
       }
 
     if (annotation->m_map->get (annotation_uid))
@@ -136,7 +171,7 @@ public:
   static void symtab_duplication (cgraph_node *node, cgraph_node *node2,
 				  void *data)
   {
-    cgraph_annotation *annotation = (cgraph_annotation <T> *) (data);
+    cgraph_annotation *annotation = (cgraph_annotation <T *> *) (data);
     T **v = annotation->m_map->get (node->annotation_uid);
 
     gcc_assert (node2->annotation_uid > 0);
@@ -149,6 +184,9 @@ public:
 	annotation->duplication_hook (node, node2, data, (*annotation)[node2]);
       }
   }
+
+  /* Indicatation if we use ggc annotation.  */
+  bool m_ggc;
 
 private:
   struct annotation_hashmap_traits: default_hashmap_traits
@@ -216,6 +254,38 @@ private:
 
   /* Symbol table the annotation is registered to.  */
   symbol_table *m_symtab;
+
+  template <typename U> friend void gt_ggc_mx (cgraph_annotation <U *> * const &);
+  template <typename U> friend void gt_pch_nx (cgraph_annotation <U *> * const &);
+  template <typename U> friend void gt_pch_nx (cgraph_annotation <U *> * const &,
+					       gt_pointer_operator, void *);
 };
+
+template <typename T>
+void
+gt_ggc_mx(cgraph_annotation<T *>* const &annotation)
+{
+  gcc_unreachable ();
+  if (annotation->m_ggc)
+    gt_ggc_mx (annotation->m_map);
+}
+
+template <typename T>
+void
+gt_pch_nx(cgraph_annotation<T *>* const &annotation)
+{
+  gcc_unreachable ();
+  if (annotation->m_ggc)
+    gt_pch_nx (annotation->m_map);
+}
+
+template <typename T>
+void
+gt_pch_nx(cgraph_annotation<T *>* const& annotation, gt_pointer_operator op, void *cookie)
+{
+  gcc_unreachable ();
+  if (annotation->m_map)
+    gt_pch_nx (annotation->m_map, op, cookie);
+}
 
 #endif  /* GCC_ANNOTATION_H  */
