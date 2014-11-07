@@ -1,4 +1,4 @@
-/* { dg-options "-O2" } */
+/* { dg-options "-O2 -fdump-ipa-icf" } */
 /* { dg-do run } */
 
 static int __attribute__((noinline))
@@ -35,3 +35,6 @@ int main()
 {
   return foo(0) + bar(4);
 }
+
+/* { dg-final { scan-ipa-dump "Equal symbols: 0" "icf"  } } */
+/* { dg-final { cleanup-ipa-dump "icf" } } */
