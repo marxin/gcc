@@ -1645,11 +1645,6 @@ read_state_user_struct_type (type_p type)
       else
 	{
 	  type->u.s.tag = xstrdup (t0->stok_un.stok_string);
-	  if (strstr(type->u.s.tag, "cgraph_annot"))
-	  {
-	    int a = 2;
-	  }
-
 	  DBGPRINTF ("read struct type @%p #%d '%s'",
 		     (void *) type, type->state_number, type->u.s.tag);
 	}
