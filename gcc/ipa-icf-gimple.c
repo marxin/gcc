@@ -554,7 +554,7 @@ func_checker::parse_labels (sem_bb *bb)
 
    In general, a collection of equivalence dictionaries is built for types
    like SSA names, declarations (VAR_DECL, PARM_DECL, ..). This infrastructure
-   is utilized by every statement-by-stament comparison function.  */
+   is utilized by every statement-by-statement comparison function.  */
 
 bool
 func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
@@ -662,9 +662,36 @@ func_checker::compare_gimple_call (gimple s1, gimple s2)
   t1 = gimple_call_fndecl (s1);
   t2 = gimple_call_fndecl (s2);
 
-  /* Function pointer variables are not supported yet.  */
   if (!compare_operand (t1, t2))
-    return return_false();
+    return return_false ();
+
+  if (t1 == NULL)
+    {
+      t1 = gimple_call_fn (s1);
+      t2 = gimple_call_fn (s2);
+      if (!compare_operand (t1, t2))
+	return return_false ();
+    }
+
+  /* Compare flags.  */
+  if (gimple_call_internal_p (s1) != gimple_call_internal_p (s2)
+      || gimple_call_ctrl_altering_p (s1) != gimple_call_ctrl_altering_p (s2)
+      || gimple_call_tail_p (s1) != gimple_call_tail_p (s2)
+      || gimple_call_return_slot_opt_p (s1) != gimple_call_return_slot_opt_p (s2)
+      || gimple_call_from_thunk_p (s1) != gimple_call_from_thunk_p (s2)
+      || gimple_call_va_arg_pack_p (s1) != gimple_call_va_arg_pack_p (s2)
+      || gimple_call_alloca_for_var_p (s1) != gimple_call_alloca_for_var_p (s2))
+    return false;
+
+  if (gimple_call_internal_p (s1)
+      && gimple_call_internal_fn (s1) != gimple_call_internal_fn (s2))
+    return false;
+
+  tree chain1 = gimple_call_chain (s1);
+  tree chain2 = gimple_call_chain (s2);
+
+  if ((chain1 && !chain2) || (!chain1 && chain2))
+    return return_false_with_msg ("Tree call chains are different");
 
   /* Checking of argument.  */
   for (i = 0; i < gimple_call_num_args (s1); ++i)
