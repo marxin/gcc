@@ -1,3 +1,52 @@
+2014-10-30  Joseph Myers  <joseph@codesourcery.com>
+
+	* Makefile.in (libgcc.map.in): New target.
+	(libgcc.map): Use libgcc.map.in.
+	* config/t-softfp (softfp_compat): New variable to be set by
+	users.
+	[$(softfp_compat) = y] (softfp_map_dep, softfp_set_symver): New
+	variables.
+	[$(softfp_compat) = y] (softfp_file_list): Use files in the build
+	directory.
+	[$(softfp_compat) = y] ($(softfp_file_list)): Generate wrappers
+	that use compat symbols and disable all code unless [SHARED].
+	* config/t-softfp-compat: New file.
+	* find-symver.awk: New file.
+	* configure.ac (--with-glibc-version): New configure option.
+	(ppc_fp_compat): New variable set for powerpc*-*-linux*.
+	* configure: Regenerate.
+	* config.host (powerpc*-*-linux*): Use ${ppc_fp_compat} for
+	soft-float and e500.
+
+2014-10-29  Joseph Myers  <joseph@codesourcery.com>
+
+	* config/t-hardfp (hardfp_exclusions): Document new variable for
+	user to define.
+	(hardfp_func_list): Exclude functions from $(hardfp_exclusions).
+	* config/t-softfp (softfp_extras): Document new variable for user
+	to define.
+	(softfp_func_list): Add functions from $(softfp_extras).
+	* config/rs6000/t-e500v1-fp, config/rs6000/t-e500v2-fp: New files.
+	* config.host (powerpc*-*-linux*): For e500v1, use
+	rs6000/t-e500v1-fp and t-hardfp; do not use t-softfp-sfdf and
+	t-softfp-excl.  For e500v2, use t-hardfp-sfdf, rs6000/t-e500v2-fp
+	and t-hardfp; do not use t-softfp-sfdf and t-softfp-excl.
+
+2014-10-26  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/linux-unwind.h (pa32_read_access_ok): New function.
+	(pa32_fallback_frame_state): Use pa32_read_access_ok to check if
+	memory read accesses are ok.
+
+2014-10-25  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure.ac (ppc_fp_type): Set variable on powerpc*-*-linux*.
+	* configure: Regenerate.
+	* config.host (powerpc*-*-linux*): Use $ppc_fp_type to determine
+	additions to tmake_file.  Use t-hardfp-sfdf and t-hardfp instead
+	of soft-fp for 32-bit classic hard float.  Do not use
+	t-softfp-excl for soft float.
+
 2014-10-22  Joseph Myers  <joseph@codesourcery.com>
 
 	* config.host (powerpc*-*-linux*): Only use soft-fp for 32-bit

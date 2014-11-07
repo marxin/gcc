@@ -23,17 +23,28 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "bconfig.h"
 #include <new>
-#include <map>
-#include <utility>
-#include <string>
 #include "system.h"
 #include "coretypes.h"
+#include "ggc.h"
 #include <cpplib.h>
 #include "errors.h"
 #include "hashtab.h"
 #include "hash-table.h"
+#include "hash-map.h"
 #include "vec.h"
 #include "is-a.h"
+
+
+/* Stubs for GGC referenced through instantiations triggered by hash-map.  */
+void *ggc_internal_cleared_alloc (size_t, void (*)(void *),
+				  size_t, size_t
+				  CXX_MEM_STAT_INFO)
+{
+  return NULL;
+}
+void ggc_free (void *)
+{
+}
 
 
 /* libccp helpers.  */
@@ -350,6 +361,28 @@ get_operator (const char *id)
 }
 
 
+/* Helper for the capture-id map.  */
+
+struct capture_id_map_hasher : default_hashmap_traits
+{
+  static inline hashval_t hash (const char *);
+  static inline bool equal_keys (const char *, const char *);
+};
+
+inline hashval_t
+capture_id_map_hasher::hash (const char *id)
+{
+  return htab_hash_string (id);
+}
+
+inline bool
+capture_id_map_hasher::equal_keys (const char *id1, const char *id2)
+{
+  return strcmp (id1, id2) == 0;
+}
+
+typedef hash_map<const char *, unsigned, capture_id_map_hasher> cid_map_t;
+
 
 /* The AST produced by parsing of the pattern definitions.  */
 
@@ -410,13 +443,13 @@ struct c_expr : public operand
   };
 
   c_expr (cpp_reader *r_, vec<cpp_token> code_, unsigned nr_stmts_,
-	  vec<id_tab> ids_, std::map<std::string, unsigned> *capture_ids_)
+	  vec<id_tab> ids_, cid_map_t *capture_ids_)
     : operand (OP_C_EXPR), r (r_), code (code_), capture_ids (capture_ids_),
       nr_stmts (nr_stmts_), ids (ids_) {}
   /* cpplib tokens and state to transform this back to source.  */
   cpp_reader *r;
   vec<cpp_token> code;
-  std::map<std::string, unsigned> *capture_ids;
+  cid_map_t *capture_ids;
   /* The number of statements parsed (well, the number of ';'s).  */
   unsigned nr_stmts;
   /* The identifier replacement vector.  */
@@ -492,11 +525,11 @@ struct simplify
   simplify (operand *match_, source_location match_location_,
 	    struct operand *result_, source_location result_location_,
 	    vec<if_or_with> ifexpr_vec_, vec<vec<user_id *> > for_vec_,
-	    std::map<std::string, unsigned> *capture_ids_)
+	    cid_map_t *capture_ids_)
       : match (match_), match_location (match_location_),
       result (result_), result_location (result_location_),
       ifexpr_vec (ifexpr_vec_), for_vec (for_vec_),
-      capture_ids (capture_ids_), capture_max (capture_ids_->size () - 1) {}
+      capture_ids (capture_ids_), capture_max (capture_ids_->elements () - 1) {}
 
   /* The expression that is matched against the GENERIC or GIMPLE IL.  */
   operand *match;
@@ -513,7 +546,7 @@ struct simplify
      in the lowering phase.  */
   vec<vec<user_id *> > for_vec;
   /* A map of capture identifiers to indexes.  */
-  std::map<std::string, unsigned> *capture_ids;
+  cid_map_t *capture_ids;
   int capture_max;
 };
 
@@ -1351,14 +1384,19 @@ expr::gen_transform (FILE *f, const char *dest, bool gimple, int depth,
       ops[i]->gen_transform (f, dest, gimple, depth + 1, optype, indexes);
     }
 
+  const char *opr;
+  if (*operation == CONVERT_EXPR)
+    opr = "NOP_EXPR";
+  else
+    opr = operation->id;
+
   if (gimple)
     {
       /* ???  Have another helper that is like gimple_build but may
 	 fail if seq == NULL.  */
       fprintf (f, "  if (!seq)\n"
 	       "    {\n"
-	       "      res = gimple_simplify (%s, %s",
-	       operation->id, type);
+	       "      res = gimple_simplify (%s, %s", opr, type);
       for (unsigned i = 0; i < ops.length (); ++i)
 	fprintf (f, ", ops%d[%u]", depth, i);
       fprintf (f, ", seq, valueize);\n");
@@ -1366,7 +1404,7 @@ expr::gen_transform (FILE *f, const char *dest, bool gimple, int depth,
       fprintf (f, "    }\n");
       fprintf (f, "  else\n");
       fprintf (f, "    res = gimple_build (seq, UNKNOWN_LOCATION, %s, %s",
-	       operation->id, type);
+	       opr, type);
       for (unsigned i = 0; i < ops.length (); ++i)
 	fprintf (f, ", ops%d[%u]", depth, i);
       fprintf (f, ", valueize);\n");
@@ -1374,11 +1412,11 @@ expr::gen_transform (FILE *f, const char *dest, bool gimple, int depth,
   else
     {
       if (operation->kind == id_base::CODE)
-	fprintf (f, "  res = fold_build%d (%s, %s",
-		 ops.length(), operation->id, type);
+	fprintf (f, "  res = fold_build%d_loc (loc, %s, %s",
+		 ops.length(), opr, type);
       else
-	fprintf (f, "  res = build_call_expr (builtin_decl_implicit (%s), %d",
-		 operation->id, ops.length());
+	fprintf (f, "  res = build_call_expr_loc (loc, "
+		 "builtin_decl_implicit (%s), %d", opr, ops.length());
       for (unsigned i = 0; i < ops.length (); ++i)
 	fprintf (f, ", ops%d[%u]", depth, i);
       fprintf (f, ");\n");
@@ -1418,7 +1456,7 @@ c_expr::gen_transform (FILE *f, const char *dest,
 		id = (const char *)n->val.str.text;
 	      else
 		id = (const char *)CPP_HASHNODE (n->val.node.node)->ident.str;
-	      fprintf (f, "captures[%u]", (*capture_ids)[id]);
+	      fprintf (f, "captures[%u]", *capture_ids->get(id));
 	      ++i;
 	      continue;
 	    }
@@ -1860,6 +1898,180 @@ dt_operand::gen (FILE *f, bool gimple)
     fprintf (f, "}\n");
 }
 
+
+/* For GENERIC we have to take care of wrapping multiple-used
+   expressions with side-effects in save_expr and preserve side-effects
+   of expressions with omit_one_operand.  Analyze captures in
+   match, result and with expressions and perform early-outs
+   on the outermost match expression operands for cases we cannot
+   handle.  */
+
+struct capture_info
+{
+  capture_info (simplify *s);
+  void walk_match (operand *o, unsigned toplevel_arg, bool);
+  void walk_result (operand *o, bool);
+  void walk_c_expr (c_expr *);
+
+  struct cinfo
+    {
+      bool expr_p;
+      bool cse_p;
+      bool force_no_side_effects_p;
+      unsigned long toplevel_msk;
+      int result_use_count;
+    };
+
+  auto_vec<cinfo> info;
+  unsigned long force_no_side_effects;
+};
+
+/* Analyze captures in S.  */
+
+capture_info::capture_info (simplify *s)
+{
+  expr *e;
+  if (!s->result
+      || ((e = dyn_cast <expr *> (s->result))
+	  && is_a <predicate_id *> (e->operation)))
+    {
+      force_no_side_effects = -1;
+      return;
+    }
+
+  force_no_side_effects = 0;
+  info.safe_grow_cleared (s->capture_max + 1);
+  e = as_a <expr *> (s->match);
+  for (unsigned i = 0; i < e->ops.length (); ++i)
+    walk_match (e->ops[i], i, false);
+
+  walk_result (s->result, false);
+
+  for (unsigned i = 0; i < s->ifexpr_vec.length (); ++i)
+    if (s->ifexpr_vec[i].is_with)
+      walk_c_expr (as_a <c_expr *>(s->ifexpr_vec[i].cexpr));
+}
+
+/* Analyze captures in the match expression piece O.  */
+
+void
+capture_info::walk_match (operand *o, unsigned toplevel_arg, bool conditional_p)
+{
+  if (capture *c = dyn_cast <capture *> (o))
+    {
+      info[c->where].toplevel_msk |= 1 << toplevel_arg;
+      info[c->where].force_no_side_effects_p |= conditional_p;
+      /* Mark expr (non-leaf) captures and recurse.  */
+      if (c->what
+	  && is_a <expr *> (c->what))
+	{
+	  info[c->where].expr_p = true;
+	  walk_match (c->what, toplevel_arg, conditional_p);
+	}
+    }
+  else if (expr *e = dyn_cast <expr *> (o))
+    {
+      for (unsigned i = 0; i < e->ops.length (); ++i)
+	{
+	  bool cond_p = conditional_p;
+	  if (i == 0
+	      && *e->operation == COND_EXPR)
+	    cond_p = true;
+	  else if (*e->operation == TRUTH_ANDIF_EXPR
+		   || *e->operation == TRUTH_ORIF_EXPR)
+	    cond_p = true;
+	  walk_match (e->ops[i], toplevel_arg, cond_p);
+	}
+    }
+  else if (is_a <predicate *> (o))
+    {
+      /* Mark non-captured leafs toplevel arg for checking.  */
+      force_no_side_effects |= 1 << toplevel_arg;
+    }
+  else
+    gcc_unreachable ();
+}
+
+/* Analyze captures in the result expression piece O.  */
+
+void
+capture_info::walk_result (operand *o, bool conditional_p)
+{
+  if (capture *c = dyn_cast <capture *> (o))
+    {
+      info[c->where].result_use_count++;
+      /* If we substitute an expression capture we don't know
+         which captures this will end up using (well, we don't
+	 compute that).  Force the uses to be side-effect free
+	 which means forcing the toplevels that reach the
+	 expression side-effect free.  */
+      if (info[c->where].expr_p)
+	force_no_side_effects |= info[c->where].toplevel_msk;
+      /* Mark CSE capture capture uses as forced to have
+         no side-effects. */
+      if (c->what
+	  && is_a <expr *> (c->what))
+	{
+	  info[c->where].cse_p = true;
+	  walk_result (c->what, true);
+	}
+    }
+  else if (expr *e = dyn_cast <expr *> (o))
+    {
+      for (unsigned i = 0; i < e->ops.length (); ++i)
+	{
+	  bool cond_p = conditional_p;
+	  if (i == 0
+	      && *e->operation == COND_EXPR)
+	    cond_p = true;
+	  else if (*e->operation == TRUTH_ANDIF_EXPR
+		   || *e->operation == TRUTH_ORIF_EXPR)
+	    cond_p = true;
+	  walk_result (e->ops[i], cond_p);
+	}
+    }
+  else if (c_expr *e = dyn_cast <c_expr *> (o))
+    walk_c_expr (e);
+  else
+    gcc_unreachable ();
+}
+
+/* Look for captures in the C expr E.  */
+
+void
+capture_info::walk_c_expr (c_expr *e)
+{
+  /* Give up for C exprs mentioning captures not inside TREE_TYPE ().  */
+  unsigned p_depth = 0;
+  for (unsigned i = 0; i < e->code.length (); ++i)
+    {
+      const cpp_token *t = &e->code[i];
+      const cpp_token *n = i < e->code.length () - 1 ? &e->code[i+1] : NULL;
+      if (t->type == CPP_NAME
+	  && strcmp ((const char *)CPP_HASHNODE
+		       (t->val.node.node)->ident.str, "TREE_TYPE") == 0
+	  && n->type == CPP_OPEN_PAREN)
+	p_depth++;
+      else if (t->type == CPP_CLOSE_PAREN
+	       && p_depth > 0)
+	p_depth--;
+      else if (p_depth == 0
+	       && t->type == CPP_ATSIGN
+	       && (n->type == CPP_NUMBER
+		   || n->type == CPP_NAME)
+	       && !(n->flags & PREV_WHITE))
+	{
+	  const char *id;
+	  if (n->type == CPP_NUMBER)
+	    id = (const char *)n->val.str.text;
+	  else
+	    id = (const char *)CPP_HASHNODE (n->val.node.node)->ident.str;
+	  info[*e->capture_ids->get(id)].force_no_side_effects_p = true;
+	}
+    }
+}
+
+
 /* Generate code for the '(if ...)', '(with ..)' and actual transform
    step of a '(simplify ...)' or '(match ...)'.  This handles everything
    that is not part of the decision tree (simplify->match).  */
@@ -1928,24 +2140,59 @@ dt_simplify::gen (FILE *f, bool gimple)
       n_braces++;
     }
 
+  /* Analyze captures and perform early-outs on the incoming arguments
+     that cover cases we cannot handle.  */
+  capture_info cinfo (s);
+  expr *e;
+  if (!gimple
+      && s->result
+      && !((e = dyn_cast <expr *> (s->result))
+	   && is_a <predicate_id *> (e->operation)))
+    {
+      for (unsigned i = 0; i < as_a <expr *> (s->match)->ops.length (); ++i)
+	if (cinfo.force_no_side_effects & (1 << i))
+	  fprintf (f, "if (TREE_SIDE_EFFECTS (op%d)) return NULL_TREE;\n", i);
+      for (int i = 0; i <= s->capture_max; ++i)
+	if (cinfo.info[i].cse_p)
+	  ;
+	else if (cinfo.info[i].force_no_side_effects_p
+		 && (cinfo.info[i].toplevel_msk
+		     & cinfo.force_no_side_effects) == 0)
+	  fprintf (f, "if (TREE_SIDE_EFFECTS (captures[%d])) "
+		   "return NULL_TREE;\n", i);
+	else if ((cinfo.info[i].toplevel_msk
+		  & cinfo.force_no_side_effects) != 0)
+	  /* Mark capture as having no side-effects if we had to verify
+	     that via forced toplevel operand checks.  */
+	  cinfo.info[i].force_no_side_effects_p = true;
+    }
+
   fprintf (f, "if (dump_file && (dump_flags & TDF_DETAILS)) "
 	   "fprintf (dump_file, \"Applying pattern ");
   output_line_directive (f, s->result_location, true);
   fprintf (f, ", %%s:%%d\\n\", __FILE__, __LINE__);\n");
 
-  if (!s->result)
+  operand *result = s->result;
+  if (!result)
     {
       /* If there is no result then this is a predicate implementation.  */
       fprintf (f, "return true;\n");
     }
   else if (gimple)
     {
-      if (s->result->type == operand::OP_EXPR)
+      /* For GIMPLE simply drop NON_LVALUE_EXPR (which only appears
+         in outermost position).  */
+      if (result->type == operand::OP_EXPR
+	  && *as_a <expr *> (result)->operation == NON_LVALUE_EXPR)
+	result = as_a <expr *> (result)->ops[0];
+      if (result->type == operand::OP_EXPR)
 	{
-	  expr *e = as_a <expr *> (s->result);
+	  expr *e = as_a <expr *> (result);
 	  bool is_predicate = is_a <predicate_id *> (e->operation);
 	  if (!is_predicate)
-	    fprintf (f, "*res_code = %s;\n", e->operation->id);
+	    fprintf (f, "*res_code = %s;\n",
+		     *e->operation == CONVERT_EXPR
+		     ? "NOP_EXPR" : e->operation->id);
 	  for (unsigned j = 0; j < e->ops.length (); ++j)
 	    {
 	      char dest[32];
@@ -1964,10 +2211,10 @@ dt_simplify::gen (FILE *f, bool gimple)
 	    fprintf (f, "gimple_resimplify%d (seq, res_code, type, "
 		     "res_ops, valueize);\n", e->ops.length ());
 	}
-      else if (s->result->type == operand::OP_CAPTURE
-	       || s->result->type == operand::OP_C_EXPR)
+      else if (result->type == operand::OP_CAPTURE
+	       || result->type == operand::OP_C_EXPR)
 	{
-	  s->result->gen_transform (f, "res_ops[0]", true, 1, "type", indexes);
+	  result->gen_transform (f, "res_ops[0]", true, 1, "type", indexes);
 	  fprintf (f, "*res_code = TREE_CODE (res_ops[0]);\n");
 	}
       else
@@ -1976,10 +2223,22 @@ dt_simplify::gen (FILE *f, bool gimple)
     }
   else /* GENERIC */
     {
-      if (s->result->type == operand::OP_EXPR)
+      bool is_predicate = false;
+      if (result->type == operand::OP_EXPR)
 	{
-	  expr *e = as_a <expr *> (s->result);
-	  bool is_predicate = is_a <predicate_id *> (e->operation);
+	  expr *e = as_a <expr *> (result);
+	  is_predicate = is_a <predicate_id *> (e->operation);
+	  /* Search for captures used multiple times in the result expression
+	     and dependent on TREE_SIDE_EFFECTS emit a SAVE_EXPR.  */
+	  if (!is_predicate)
+	    for (int i = 0; i < s->capture_max + 1; ++i)
+	      {
+		if (!cinfo.info[i].force_no_side_effects_p
+		    && cinfo.info[i].result_use_count > 1)
+		  fprintf (f, "  if (TREE_SIDE_EFFECTS (captures[%d]))\n"
+			   "    captures[%d] = save_expr (captures[%d]);\n",
+			   i, i, i);
+	      }
 	  for (unsigned j = 0; j < e->ops.length (); ++j)
 	    {
 	      char dest[32];
@@ -1997,32 +2256,58 @@ dt_simplify::gen (FILE *f, bool gimple)
 				    ? NULL : "TREE_TYPE (res_op0)");
 	      e->ops[j]->gen_transform (f, dest, false, 1, optype, indexes);
 	    }
-	  if (is_a <predicate_id *> (e->operation))
+	  if (is_predicate)
 	    fprintf (f, "return true;\n");
 	  else
 	    {
-	      /* Re-fold the toplevel result.  */
-	      if (e->operation->kind == id_base::CODE)
-		fprintf (f, "  return fold_build%d (%s, type",
-			 e->ops.length (), e->operation->id);
+	      fprintf (f, "  tree res;\n");
+	      /* Re-fold the toplevel result.  Use non_lvalue to
+	         build NON_LVALUE_EXPRs so they get properly
+		 ignored when in GIMPLE form.  */
+	      if (*e->operation == NON_LVALUE_EXPR)
+		fprintf (f, "  res = non_lvalue_loc (loc, res_op0);\n");
 	      else
-		fprintf (f, "  return build_call_expr "
-			 "(builtin_decl_implicit (%s), %d",
-			 e->operation->id, e->ops.length());
-	      for (unsigned j = 0; j < e->ops.length (); ++j)
-		fprintf (f, ", res_op%d", j);
-	      fprintf (f, ");\n");
+		{
+		  if (e->operation->kind == id_base::CODE)
+		    fprintf (f, "  res = fold_build%d_loc (loc, %s, type",
+			     e->ops.length (),
+			     *e->operation == CONVERT_EXPR
+			     ? "NOP_EXPR" : e->operation->id);
+		  else
+		    fprintf (f, "  res = build_call_expr_loc "
+			     "(loc, builtin_decl_implicit (%s), %d",
+			     e->operation->id, e->ops.length());
+		  for (unsigned j = 0; j < e->ops.length (); ++j)
+		    fprintf (f, ", res_op%d", j);
+		  fprintf (f, ");\n");
+		}
 	    }
 	}
-      else if (s->result->type == operand::OP_CAPTURE
-	       || s->result->type == operand::OP_C_EXPR)
+      else if (result->type == operand::OP_CAPTURE
+	       || result->type == operand::OP_C_EXPR)
+
 	{
 	  fprintf (f, "  tree res;\n");
 	  s->result->gen_transform (f, " res", false, 1, "type", indexes);
-	  fprintf (f, "  return res;\n");
 	}
       else
 	gcc_unreachable ();
+      if (!is_predicate)
+	{
+	  /* Search for captures not used in the result expression and dependent
+	     on TREE_SIDE_EFFECTS emit omit_one_operand.  */
+	  for (int i = 0; i < s->capture_max + 1; ++i)
+	    {
+	      if (!cinfo.info[i].force_no_side_effects_p
+		  && !cinfo.info[i].expr_p
+		  && cinfo.info[i].result_use_count == 0)
+		fprintf (f, "  if (TREE_SIDE_EFFECTS (captures[%d]))\n"
+			 "    res = build2_loc (loc, COMPOUND_EXPR, type,"
+			 " fold_ignored_result (captures[%d]), res);\n",
+			 i, i);
+	    }
+	  fprintf (f, "  return res;\n");
+	}
     }
 
   for (unsigned i = 0; i < n_braces; ++i)
@@ -2086,24 +2371,12 @@ decision_tree::gen_generic (FILE *f)
   for (unsigned n = 1; n <= 3; ++n)
     {
       fprintf (f, "\ntree\n"
-	       "generic_simplify (enum tree_code code, "
+	       "generic_simplify (location_t loc, enum tree_code code, "
 	       "tree type ATTRIBUTE_UNUSED");
       for (unsigned i = 0; i < n; ++i)
 	fprintf (f, ", tree op%d", i);
       fprintf (f, ")\n");
       fprintf (f, "{\n");
-
-      /* ???  For now reject all simplifications on operands with
-         side-effects as we are not prepared to properly wrap
-	 omitted parts with omit_one_operand and friends.  In
-	 principle we can do that automagically for a subset of
-	 transforms (and only reject the remaining cases).
-	 This fixes for example gcc.c-torture/execute/20050131-1.c.  */
-      fprintf (f, "if ((op0 && TREE_SIDE_EFFECTS (op0))");
-      for (unsigned i = 1; i < n; ++i)
-	fprintf (f, "|| (op%d && TREE_SIDE_EFFECTS (op%d))", i, i);
-      fprintf (f, ")\n"
-	       "  return NULL_TREE;\n");
 
       fprintf (f, "switch (code)\n"
 	       "{\n");
@@ -2207,7 +2480,7 @@ private:
   vec<if_or_with> active_ifs;
   vec<vec<user_id *> > active_fors;
 
-  std::map<std::string, unsigned> *capture_ids;
+  cid_map_t *capture_ids;
 
 public:
   vec<simplify *> simplifiers;
@@ -2383,10 +2656,12 @@ parser::parse_capture (operand *op)
     id = get_ident ();
   else
     fatal_at (token, "expected number or identifier");
-  unsigned next_id = capture_ids->size ();
-  std::pair<std::map<std::string, unsigned>::iterator, bool> res
-    = capture_ids->insert (std::pair<std::string, unsigned>(id, next_id));
-  return new capture ((*res.first).second, op);
+  unsigned next_id = capture_ids->elements ();
+  bool existed;
+  unsigned &num = capture_ids->get_or_insert (id, &existed);
+  if (!existed)
+    num = next_id;
+  return new capture (num, op);
 }
 
 /* Parse an expression
@@ -2567,7 +2842,7 @@ parser::parse_simplify (source_location match_location,
 			expr *result)
 {
   /* Reset the capture map.  */
-  capture_ids = new std::map<std::string, unsigned>;
+  capture_ids = new cid_map_t;
 
   const cpp_token *loc = peek ();
   struct operand *match = parse_op ();

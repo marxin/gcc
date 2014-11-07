@@ -27,6 +27,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "expr.h"
 #include "hash-set.h"
 #include "hash-table.h"
+#include "predict.h"
+#include "vec.h"
+#include "hashtab.h"
+#include "machmode.h"
+#include "tm.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -49,6 +57,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "bitmap.h"
 #include "gimple-ssa.h"
+#include "hash-map.h"
+#include "plugin-api.h"
+#include "ipa-ref.h"
 #include "cgraph.h"
 #include "tree-cfg.h"
 #include "tree-ssanames.h"
@@ -1727,6 +1738,10 @@ gimplify_conversion (tree *expr_p)
   if (CONVERT_EXPR_P (*expr_p) && !is_gimple_reg_type (TREE_TYPE (*expr_p)))
     *expr_p = fold_build1_loc (loc, VIEW_CONVERT_EXPR, TREE_TYPE (*expr_p),
 			       TREE_OPERAND (*expr_p, 0));
+
+  /* Canonicalize CONVERT_EXPR to NOP_EXPR.  */
+  if (TREE_CODE (*expr_p) == CONVERT_EXPR)
+    TREE_SET_CODE (*expr_p, NOP_EXPR);
 
   return GS_OK;
 }

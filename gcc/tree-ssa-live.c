@@ -27,6 +27,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 #include "bitmap.h"
 #include "sbitmap.h"
+#include "predict.h"
+#include "vec.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -47,6 +57,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-core.h"
 #include "debug.h"
 #include "flags.h"
+#include "tree-ssa.h"
 
 #ifdef ENABLE_CHECKING
 static void  verify_live_on_entry (tree_live_info_p);
@@ -1093,6 +1104,10 @@ set_var_live_on_entry (tree ssa_name, tree_live_info_p live)
   else
     def_bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
 
+  /* An undefined local variable does not need to be very alive.  */
+  if (ssa_undefined_value_p (ssa_name, false))
+    return;
+
   /* Visit each use of SSA_NAME and if it isn't in the same block as the def,
      add it to the list of live on entry blocks.  */
   FOR_EACH_IMM_USE_FAST (use, imm_iter, ssa_name)
@@ -1429,6 +1444,11 @@ verify_live_on_entry (tree_live_info_p live)
 	  else
 	    if (d == var)
 	      {
+		/* An undefined local variable does not need to be very
+		   alive.  */
+		if (ssa_undefined_value_p (var, false))
+		  continue;
+
 		/* The only way this var shouldn't be marked live on entry is
 		   if it occurs in a PHI argument of the block.  */
 		size_t z;
