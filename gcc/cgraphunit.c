@@ -1549,7 +1549,11 @@ cgraph_node::expand_thunk (bool output_asm_thunks, bool force_gimple_thunk)
 	    {
 	      restmp = gimple_fold_indirect_ref (resdecl);
 	      if (!restmp)
-		restmp = build2 (MEM_REF, TREE_TYPE (TREE_TYPE (DECL_RESULT (alias))), resdecl, build_int_cst (TREE_TYPE (DECL_RESULT (alias)), 0));
+		restmp = build2 (MEM_REF,
+				 TREE_TYPE (TREE_TYPE (DECL_RESULT (alias))),
+				 resdecl,
+				 build_int_cst (TREE_TYPE
+				   (DECL_RESULT (alias)), 0));
 	    }
 	  else if (!is_gimple_reg_type (restype))
 	    {
