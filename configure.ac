@@ -769,10 +769,11 @@ case "${target}" in
     ;;
   *-*-lynxos*)
     noconfigdirs="$noconfigdirs ${libgcj}"
-    ;; 
+    ;;
 esac
 
-# Disable the go frontend on systems where it is known to not work.
+# Disable the go frontend on systems where it is known to not work. Please keep
+# this in sync with contrib/config-list.mk.
 case "${target}" in
 *-*-darwin* | *-*-cygwin* | *-*-mingw* | *-*-aix*)
     unsupported_languages="$unsupported_languages go"
@@ -1136,6 +1137,10 @@ case "${target}" in
     ;;
   mips*-*-*)
     noconfigdirs="$noconfigdirs gprof"
+    ;;
+  nvptx*-*-*)
+    # nvptx is just a compiler
+    noconfigdirs="$noconfigdirs target-libssp target-libstdc++-v3 target-libobjc"
     ;;
   sh-*-* | sh64-*-*)
     case "${target}" in

@@ -1126,7 +1126,7 @@ dt_node::append_op (operand *op, dt_node *parent, unsigned pos)
 dt_node *
 dt_node::append_true_op (dt_node *parent, unsigned pos)
 {
-  dt_operand *parent_ = as_a<dt_operand *> (parent);
+  dt_operand *parent_ = safe_as_a<dt_operand *> (parent);
   dt_operand *n = new dt_operand (DT_TRUE, 0, 0, parent_, pos);
   return append_node (n);
 }
@@ -1232,9 +1232,6 @@ at_assert_elm:
 void
 decision_tree::insert (struct simplify *s, unsigned pattern_no)
 {
-  if (s->match->type != operand::OP_EXPR)
-    return;
-
   dt_operand **indexes = XCNEWVEC (dt_operand *, s->capture_max + 1);
   dt_node *p = decision_tree::insert_operand (root, s->match, indexes);
   p->append_simplify (s, pattern_no, indexes);
@@ -1384,14 +1381,19 @@ expr::gen_transform (FILE *f, const char *dest, bool gimple, int depth,
       ops[i]->gen_transform (f, dest, gimple, depth + 1, optype, indexes);
     }
 
+  const char *opr;
+  if (*operation == CONVERT_EXPR)
+    opr = "NOP_EXPR";
+  else
+    opr = operation->id;
+
   if (gimple)
     {
       /* ???  Have another helper that is like gimple_build but may
 	 fail if seq == NULL.  */
       fprintf (f, "  if (!seq)\n"
 	       "    {\n"
-	       "      res = gimple_simplify (%s, %s",
-	       operation->id, type);
+	       "      res = gimple_simplify (%s, %s", opr, type);
       for (unsigned i = 0; i < ops.length (); ++i)
 	fprintf (f, ", ops%d[%u]", depth, i);
       fprintf (f, ", seq, valueize);\n");
@@ -1399,7 +1401,7 @@ expr::gen_transform (FILE *f, const char *dest, bool gimple, int depth,
       fprintf (f, "    }\n");
       fprintf (f, "  else\n");
       fprintf (f, "    res = gimple_build (seq, UNKNOWN_LOCATION, %s, %s",
-	       operation->id, type);
+	       opr, type);
       for (unsigned i = 0; i < ops.length (); ++i)
 	fprintf (f, ", ops%d[%u]", depth, i);
       fprintf (f, ", valueize);\n");
@@ -1408,11 +1410,10 @@ expr::gen_transform (FILE *f, const char *dest, bool gimple, int depth,
     {
       if (operation->kind == id_base::CODE)
 	fprintf (f, "  res = fold_build%d_loc (loc, %s, %s",
-		 ops.length(), operation->id, type);
+		 ops.length(), opr, type);
       else
 	fprintf (f, "  res = build_call_expr_loc (loc, "
-		 "builtin_decl_implicit (%s), %d",
-		 operation->id, ops.length());
+		 "builtin_decl_implicit (%s), %d", opr, ops.length());
       for (unsigned i = 0; i < ops.length (); ++i)
 	fprintf (f, ", ops%d[%u]", depth, i);
       fprintf (f, ");\n");
@@ -1614,7 +1615,7 @@ dt_operand::gen_gimple_expr (FILE *f)
       else
 	fprintf (f, "tree %s = gimple_call_arg (def_stmt, %u);\n",
 		 child_opname, i);
-      fprintf (f, "if ((%s = do_valueize (valueize, %s)) != 0)\n",
+      fprintf (f, "if ((%s = do_valueize (valueize, %s)))\n",
 	       child_opname, child_opname);
       fprintf (f, "{\n");
     }
@@ -1725,6 +1726,7 @@ dt_node::gen_kids (FILE *f, bool gimple)
   if (exprs_len || fns_len)
     {
       fprintf (f, "case SSA_NAME:\n");
+      fprintf (f, "if (do_valueize (valueize, %s) != NULL_TREE)\n", kid_opname);
       fprintf (f, "{\n");
       fprintf (f, "gimple def_stmt = SSA_NAME_DEF_STMT (%s);\n", kid_opname);
 
@@ -2186,7 +2188,9 @@ dt_simplify::gen (FILE *f, bool gimple)
 	  expr *e = as_a <expr *> (result);
 	  bool is_predicate = is_a <predicate_id *> (e->operation);
 	  if (!is_predicate)
-	    fprintf (f, "*res_code = %s;\n", e->operation->id);
+	    fprintf (f, "*res_code = %s;\n",
+		     *e->operation == CONVERT_EXPR
+		     ? "NOP_EXPR" : e->operation->id);
 	  for (unsigned j = 0; j < e->ops.length (); ++j)
 	    {
 	      char dest[32];
@@ -2264,7 +2268,9 @@ dt_simplify::gen (FILE *f, bool gimple)
 		{
 		  if (e->operation->kind == id_base::CODE)
 		    fprintf (f, "  res = fold_build%d_loc (loc, %s, type",
-			     e->ops.length (), e->operation->id);
+			     e->ops.length (),
+			     *e->operation == CONVERT_EXPR
+			     ? "NOP_EXPR" : e->operation->id);
 		  else
 		    fprintf (f, "  res = build_call_expr_loc "
 			     "(loc, builtin_decl_implicit (%s), %d",
