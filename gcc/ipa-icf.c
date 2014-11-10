@@ -618,6 +618,14 @@ sem_function::merge (sem_item *alias_item)
     local_original
       = dyn_cast <cgraph_node *> (original->noninterposable_alias ());
 
+    if (!local_original)
+      {
+	if (dump_file)
+	  fprintf (dump_file, "Noninterposable alias cannot be created.\n\n");
+
+	return false;
+      }
+
   if (redirect_callers)
     {
       /* If alias is non-overwritable then
