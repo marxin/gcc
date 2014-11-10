@@ -1339,7 +1339,8 @@ wide_int_to_tree (tree type, const wide_int_ref &pcst)
 
 	case POINTER_TYPE:
 	case REFERENCE_TYPE:
-	  /* Cache NULL pointer.  */
+	case POINTER_BOUNDS_TYPE:
+	  /* Cache NULL pointer and zero bounds.  */
 	  if (hwi == 0)
 	    {
 	      limit = 1;
@@ -3413,6 +3414,7 @@ type_contains_placeholder_1 (const_tree type)
   switch (TREE_CODE (type))
     {
     case VOID_TYPE:
+    case POINTER_BOUNDS_TYPE:
     case COMPLEX_TYPE:
     case ENUMERAL_TYPE:
     case BOOLEAN_TYPE:
@@ -7554,7 +7556,7 @@ add_expr (const_tree t, inchash::hash &hstate)
    constructed, reuse it.  */
 
 tree
-build_pointer_type_for_mode (tree to_type, enum machine_mode mode,
+build_pointer_type_for_mode (tree to_type, machine_mode mode,
 			     bool can_alias_all)
 {
   tree t;
@@ -7614,14 +7616,14 @@ build_pointer_type (tree to_type)
 {
   addr_space_t as = to_type == error_mark_node? ADDR_SPACE_GENERIC
 					      : TYPE_ADDR_SPACE (to_type);
-  enum machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
+  machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
   return build_pointer_type_for_mode (to_type, pointer_mode, false);
 }
 
 /* Same as build_pointer_type_for_mode, but for REFERENCE_TYPE.  */
 
 tree
-build_reference_type_for_mode (tree to_type, enum machine_mode mode,
+build_reference_type_for_mode (tree to_type, machine_mode mode,
 			       bool can_alias_all)
 {
   tree t;
@@ -7681,7 +7683,7 @@ build_reference_type (tree to_type)
 {
   addr_space_t as = to_type == error_mark_node? ADDR_SPACE_GENERIC
 					      : TYPE_ADDR_SPACE (to_type);
-  enum machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
+  machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
   return build_reference_type_for_mode (to_type, pointer_mode, false);
 }
 
@@ -9422,7 +9424,7 @@ omp_clause_operand_check_failed (int idx, const_tree t, const char *file,
    the information necessary for debugging output.  */
 
 static tree
-make_vector_type (tree innertype, int nunits, enum machine_mode mode)
+make_vector_type (tree innertype, int nunits, machine_mode mode)
 {
   tree t;
   inchash::hash hstate;
@@ -9728,6 +9730,8 @@ build_common_tree_nodes (bool signed_char, bool short_double)
 
   void_type_node = make_node (VOID_TYPE);
   layout_type (void_type_node);
+
+  pointer_bounds_type_node = targetm.chkp_bound_type ();
 
   /* We are not going to have real types in C with less than byte alignment,
      so we might as well not have any types that claim to have it.  */
@@ -10120,7 +10124,7 @@ build_common_builtin_nodes (void)
 	if (targetm.libfunc_gnu_prefix)
 	  prefix = "__gnu_";
 
-	type = lang_hooks.types.type_for_mode ((enum machine_mode) mode, 0);
+	type = lang_hooks.types.type_for_mode ((machine_mode) mode, 0);
 	if (type == NULL)
 	  continue;
 	inner_type = TREE_TYPE (type);
@@ -10217,7 +10221,7 @@ reconstruct_complex_type (tree type, tree bottom)
 /* Returns a vector tree node given a mode (integer, vector, or BLKmode) and
    the inner type.  */
 tree
-build_vector_type_for_mode (tree innertype, enum machine_mode mode)
+build_vector_type_for_mode (tree innertype, machine_mode mode)
 {
   int nunits;
 

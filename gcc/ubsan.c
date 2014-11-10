@@ -1113,7 +1113,7 @@ instrument_bool_enum_load (gimple_stmt_iterator *gsi)
   int modebitsize = GET_MODE_BITSIZE (TYPE_MODE (type));
   HOST_WIDE_INT bitsize, bitpos;
   tree offset;
-  enum machine_mode mode;
+  machine_mode mode;
   int volatilep = 0, unsignedp = 0;
   tree base = get_inner_reference (rhs, &bitsize, &bitpos, &offset, &mode,
 				   &unsignedp, &volatilep, false);
@@ -1197,7 +1197,7 @@ ubsan_instrument_float_cast (location_t loc, tree type, tree expr)
 {
   tree expr_type = TREE_TYPE (expr);
   tree t, tt, fn, min, max;
-  enum machine_mode mode = TYPE_MODE (expr_type);
+  machine_mode mode = TYPE_MODE (expr_type);
   int prec = TYPE_PRECISION (type);
   bool uns_p = TYPE_UNSIGNED (type);
 
@@ -1438,6 +1438,7 @@ instrument_object_size (gimple_stmt_iterator *gsi, bool is_lhs)
   location_t loc = gimple_location (stmt);
   tree t = is_lhs ? gimple_get_lhs (stmt) : gimple_assign_rhs1 (stmt);
   tree type;
+  tree index = NULL_TREE;
   HOST_WIDE_INT size_in_bytes;
 
   type = TREE_TYPE (t);
@@ -1456,6 +1457,8 @@ instrument_object_size (gimple_stmt_iterator *gsi, bool is_lhs)
 	}
       break;
     case ARRAY_REF:
+      index = TREE_OPERAND (t, 1);
+      break;
     case INDIRECT_REF:
     case MEM_REF:
     case VAR_DECL:
@@ -1472,7 +1475,7 @@ instrument_object_size (gimple_stmt_iterator *gsi, bool is_lhs)
 
   HOST_WIDE_INT bitsize, bitpos;
   tree offset;
-  enum machine_mode mode;
+  machine_mode mode;
   int volatilep = 0, unsignedp = 0;
   tree inner = get_inner_reference (t, &bitsize, &bitpos, &offset, &mode,
 				    &unsignedp, &volatilep, false);
@@ -1536,6 +1539,24 @@ instrument_object_size (gimple_stmt_iterator *gsi, bool is_lhs)
       && TREE_CODE (sizet) == INTEGER_CST
       && tree_int_cst_le (t, sizet))
     return;
+
+  if (index != NULL_TREE
+      && TREE_CODE (index) == SSA_NAME
+      && TREE_CODE (sizet) == INTEGER_CST)
+    {
+      gimple def = SSA_NAME_DEF_STMT (index);
+      if (is_gimple_assign (def)
+	  && gimple_assign_rhs_code (def) == BIT_AND_EXPR
+	  && TREE_CODE (gimple_assign_rhs2 (def)) == INTEGER_CST)
+	{
+	  tree cst = gimple_assign_rhs2 (def);
+	  tree sz = fold_build2 (EXACT_DIV_EXPR, sizetype, sizet,
+				 TYPE_SIZE_UNIT (type));
+	  if (tree_int_cst_sgn (cst) >= 0
+	      && tree_int_cst_lt (cst, sz))
+	    return;
+	}
+    }
 
   /* Nope.  Emit the check.  */
   t = force_gimple_operand_gsi (gsi, t, true, NULL_TREE, true,
