@@ -169,13 +169,13 @@ typedef struct inline_summary inline_summary_t;
 class GTY((user)) inline_summary_cgraph_annotation: public cgraph_annotation <inline_summary *>
 {
 public:
-  inline_summary_cgraph_annotation (symbol_table *symtab):
-    cgraph_annotation <inline_summary *> (symtab) {}
+  inline_summary_cgraph_annotation (symbol_table *symtab, bool ggc):
+    cgraph_annotation <inline_summary *> (symtab, ggc) {}
   
   static inline_summary_cgraph_annotation *create_ggc (symbol_table *symtab)
   {
-    inline_summary_cgraph_annotation *annotation = new (ggc_cleared_alloc <inline_summary_cgraph_annotation> ()) inline_summary_cgraph_annotation(symtab);
-    annotation->m_ggc = true;
+    inline_summary_cgraph_annotation *annotation = new (ggc_cleared_alloc <inline_summary_cgraph_annotation> ()) inline_summary_cgraph_annotation(symtab, true);
+    annotation->m_insertion_enabled = false;
     return annotation;
   }
 

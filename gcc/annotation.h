@@ -36,7 +36,8 @@ class GTY((user)) cgraph_annotation <T *>
 {
 public:
   /* Default construction takes SYMTAB as an argument.  */
-  cgraph_annotation (symbol_table *symtab): m_ggc (false), m_symtab (symtab)
+  cgraph_annotation (symbol_table *symtab, bool ggc = false): m_ggc (ggc),
+    m_insertion_enabled (true), m_symtab (symtab)
   {
     cgraph_node *node;
 
@@ -45,7 +46,7 @@ public:
       gcc_assert (node->annotation_uid > 0);
     }
 
-    m_map = new hash_map<int, T*, annotation_hashmap_traits>();
+    m_map = new hash_map<int, T*, annotation_hashmap_traits>(13, m_ggc);
 
     m_symtab_insertion_hook =
       symtab->add_cgraph_insertion_hook
@@ -61,8 +62,7 @@ public:
 
   static cgraph_annotation <T *> *create_ggc (symbol_table *symtab)
   {
-    cgraph_annotation <T *> *annotation = new (ggc_cleared_alloc <T *> ()) cgraph_annotation <T *>(symtab);
-    annotation->m_ggc = true;
+    cgraph_annotation <T *> *annotation = new (ggc_cleared_alloc <T *> ()) cgraph_annotation <T *>(symtab, true);
     return annotation;
   }
 
@@ -109,17 +109,18 @@ public:
   virtual void duplication_hook (cgraph_node *,
 				 cgraph_node *, T *, T *) {}
 
+  inline T* allocate_new ()
+  {
+    return m_ggc ? new (ggc_alloc <T> ()) T() : new T () ;
+  }
+
   /* Getter for annotation callgraph ID.  */
   inline T* operator[] (int uid)
   {
     T **v = m_map->get (uid);
     if (!v)
       {
-	T *new_value;
-	if (m_ggc)
-	  new_value = new (ggc_alloc <T> ()) T();
-	else
-	  new_value = new T();
+	T *new_value = allocate_new ();
 	m_map->put (uid, new_value);
 
 	v = &new_value;
@@ -143,7 +144,9 @@ public:
   static void symtab_insertion (cgraph_node *node, void *data)
   {
     cgraph_annotation *annotation = (cgraph_annotation <T *> *) (data);
-    annotation->insertion_hook (node, (*annotation)[node]);
+
+    if (annotation->m_insertion_enabled)
+      annotation->insertion_hook (node, (*annotation)[node]);
   }
 
   /* Symbol removal hook that is registered to symbol table.  */
@@ -179,7 +182,7 @@ public:
     if (v)
       {
 	T *data = *v;
-	T *duplicate = new T();
+	T *duplicate = annotation->allocate_new ();
 	annotation->m_map->put (node2->annotation_uid, duplicate);
 	annotation->duplication_hook (node, node2, data, (*annotation)[node2]);
       }
@@ -187,6 +190,8 @@ public:
 
   /* Indicatation if we use ggc annotation.  */
   bool m_ggc;
+
+  bool m_insertion_enabled;
 
 private:
   struct annotation_hashmap_traits: default_hashmap_traits
@@ -265,7 +270,6 @@ template <typename T>
 void
 gt_ggc_mx(cgraph_annotation<T *>* const &annotation)
 {
-  gcc_unreachable ();
   if (annotation->m_ggc)
     gt_ggc_mx (annotation->m_map);
 }
@@ -274,7 +278,6 @@ template <typename T>
 void
 gt_pch_nx(cgraph_annotation<T *>* const &annotation)
 {
-  gcc_unreachable ();
   if (annotation->m_ggc)
     gt_pch_nx (annotation->m_map);
 }
@@ -283,7 +286,6 @@ template <typename T>
 void
 gt_pch_nx(cgraph_annotation<T *>* const& annotation, gt_pointer_operator op, void *cookie)
 {
-  gcc_unreachable ();
   if (annotation->m_map)
     gt_pch_nx (annotation->m_map, op, cookie);
 }

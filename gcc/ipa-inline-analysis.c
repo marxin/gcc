@@ -1102,7 +1102,7 @@ remap_hint_predicate_after_duplication (struct predicate **p,
 void
 inline_summary_cgraph_annotation::duplication_hook (cgraph_node *src,
 			      cgraph_node *dst,
-			      inline_summary *src_data,
+			      inline_summary *,
 			      inline_summary *info)
 {
   memcpy (info, inline_summary2 (src), sizeof (struct inline_summary));
@@ -4009,6 +4009,11 @@ inline_generate_summary (void)
   if (!optimize && !flag_lto && !flag_wpa)
     return;
 
+  if (!inline_summary_annotation)
+    inline_summary_annotation = (inline_summary_cgraph_annotation *) inline_summary_cgraph_annotation::create_ggc (symtab);
+
+  inline_summary_annotation->m_insertion_enabled = true;
+
   ipa_register_cgraph_hooks ();
   inline_free_summary ();
 
@@ -4190,6 +4195,9 @@ inline_read_summary (void)
       if (!flag_ipa_cp)
 	ipa_prop_read_jump_functions ();
     }
+
+  gcc_assert (inline_summary_annotation);
+  inline_summary_annotation->m_insertion_enabled = true;
 }
 
 
