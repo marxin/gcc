@@ -1,3 +1,100 @@
+2014-11-10  Andi Kleen  <ak@linux.intel.com>
+
+	* c-c++-common/cilk-plus/AN/misc.c (main): Handle
+	new cilk errors.
+
+2014-11-10  Andi Kleen  <ak@linux.intel.com>
+
+	* c-c++-common/cilk-plus/CK/errors.c: New test.
+
+2014-11-11  Uros Bizjak  <ubizjak@gmail.com>
+	    Ilya Enkovich  <ilya.enkovich@intel.com>
+
+	PR target/63620
+	* gcc.target/i386/pr63620.c: New test.
+
+2014-11-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/tm/memopt-15.c: Add -msse2 to dg-options.
+
+	* gcc.dg/ubsan/ipa-icf-1.c: New test.
+	* gcc.dg/ipa/ipa-icf-31.c: New test.
+
+2014-11-10  Patrick Palka  <ppalka@gcc.gnu.org>
+
+	PR middle-end/63748
+	* gcc.dg/pr63748.c: New testcase.
+
+2014-11-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gcc.dg/pr44194-1.c (dg-do): Add missing braces.
+
+2014-11-10 Roman Gareev  <gareevroman@gmail.com>
+
+	* gcc.dg/graphite/isl-ast-gen-blocks-1.c: Remove using of
+	fgraphite-code-generator flag.
+	* gcc.dg/graphite/isl-ast-gen-blocks-2.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-blocks-3.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-blocks-4.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-user-1.c: Likewise.
+	* gcc.dg/graphite/isl-codegen-loop-dumping.c: Likewise.
+	* gcc.dg/graphite/pr35356-2.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-single-loop-1.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-single-loop-2.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-single-loop-3.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-if-1.c: Likewise.
+	* gcc.dg/graphite/isl-ast-gen-if-2.c: Likewise.
+
+2014-11-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gcc.c-torture/compile/pr35468.c: Revert the last change.
+
+2014-11-10  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* c-c++-common/Wshift-count-overflow-1.c: New.
+	* c-c++-common/Wshift-count-overflow-2.c: Likewise.
+	* c-c++-common/Wshift-count-negative-1.c: Likewise.
+	* c-c++-common/Wshift-count-negative-2.c: Likewise.
+
+2014-11-10  Andreas Tobler  <andreast@gcc.gnu.org>
+
+	* gcc.dg/fshort-wchar.c: Use arm_eabi instead of arm*-*-*eabi*.
+	* gcc.target/arm/aapcs/neon-vect1.c: Likewise.
+	* gcc.target/arm/aapcs/neon-vect2.c: Likewise.
+	* gcc.target/arm/aapcs/neon-vect3.c: Likewise.
+	* gcc.target/arm/aapcs/neon-vect4.c: Likewise.
+	* gcc.target/arm/aapcs/neon-vect5.c: Likewise.
+	* gcc.target/arm/aapcs/neon-vect6.c: Likewise.
+	* gcc.target/arm/aapcs/neon-vect7.c: Likewise.
+	* gcc.target/arm/aapcs/neon-vect8.c: Likewise.
+	* gcc.target/arm/aapcs/vfp1.c: Likewise.
+	* gcc.target/arm/aapcs/vfp2.c: Likewise.
+	* gcc.target/arm/aapcs/vfp3.c: Likewise.
+	* gcc.target/arm/aapcs/vfp4.c: Likewise.
+	* gcc.target/arm/aapcs/vfp5.c: Likewise.
+	* gcc.target/arm/aapcs/vfp6.c: Likewise.
+	* gcc.target/arm/aapcs/vfp7.c: Likewise.
+	* gcc.target/arm/aapcs/vfp8.c: Likewise.
+	* gcc.target/arm/aapcs/vfp9.c: Likewise.
+	* gcc.target/arm/aapcs/vfp10.c: Likewise.
+	* gcc.target/arm/aapcs/vfp11.c: Likewise.
+	* gcc.target/arm/aapcs/vfp12.c: Likewise.
+	* gcc.target/arm/aapcs/vfp13.c: Likewise.
+	* gcc.target/arm/aapcs/vfp14.c: Likewise.
+	* gcc.target/arm/aapcs/vfp15.c: Likewise.
+	* gcc.target/arm/aapcs/vfp16.c: Likewise.
+	* gcc.target/arm/aapcs/vfp17.c: Likewise.
+
+2014-11-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR tree-optimization/63778
+	* gfortran.dg/pr63778.f: New test.
+
+2014-11-10  Renlin Li  <renlin.li@arm.com>
+
+	PR middle-end/61529
+	* gcc.dg/pr61529.c: New.
+
 2014-11-10  Bernd Schmidt  <bernds@codesourcery.com>
 
 	* lib/target-supports.exp (check_effective_target_return_address):
