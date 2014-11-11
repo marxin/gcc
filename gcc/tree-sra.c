@@ -4991,7 +4991,7 @@ ipa_sra_preliminary_function_checks (struct cgraph_node *node)
     }
 
   if ((DECL_COMDAT (node->decl) || DECL_EXTERNAL (node->decl))
-      && inline_summary2 (node)->size >= MAX_INLINE_INSNS_AUTO)
+      && get_inline_summary (node)->size >= MAX_INLINE_INSNS_AUTO)
     {
       if (dump_file)
 	fprintf (dump_file, "Function too big to be made truly local.\n");

@@ -60,12 +60,6 @@ public:
       (cgraph_summary::symtab_duplication, this);
   }
 
-  static cgraph_summary <T *> *create_ggc (symbol_table *symtab)
-  {
-    cgraph_summary <T *> *summary = new (ggc_cleared_alloc <T *> ()) cgraph_summary <T *>(symtab, true);
-    return summary;
-  }
-
   /* Destructor.  */
   virtual ~cgraph_summary ()
   {

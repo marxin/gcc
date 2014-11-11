@@ -1225,7 +1225,7 @@ public:
   int count_materialization_scale;
   /* Unique id of the node.  */
   int uid;
-  /* Annotation unique id of the node.  */
+  /* Summary unique id of the node.  */
   int summary_uid;
   /* ID assigned by the profiling.  */
   unsigned int profile_id;

@@ -162,10 +162,6 @@ struct GTY(()) inline_summary
   int scc_no;
 };
 
-/* Need a typedef for inline_summary because of inline function
-   'inline_summary' below.  */
-typedef struct inline_summary inline_summary_t;
-
 class GTY((user)) inline_summary_cgraph_summary: public cgraph_summary <inline_summary *>
 {
 public:
@@ -269,8 +265,8 @@ void clone_inlined_nodes (struct cgraph_edge *e, bool, bool, int *,
 extern int ncalls_inlined;
 extern int nfunctions_inlined;
 
-static inline struct inline_summary *
-inline_summary2 (const struct cgraph_node *node)
+static inline inline_summary *
+get_inline_summary (const struct cgraph_node *node)
 {
   return (*inline_summary_summary)[node->summary_uid];
 }
