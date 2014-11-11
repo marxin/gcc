@@ -72,6 +72,7 @@ public:
     destroy ();
   }
 
+  /* Destruction method that can be called for GGT purpose.  */
   void destroy ()
   {
     if (m_symtab_insertion_hook)
@@ -109,6 +110,7 @@ public:
   virtual void duplication_hook (cgraph_node *,
 				 cgraph_node *, T *, T *) {}
 
+  /* Allocates new data that are stored within map.  */
   inline T* allocate_new ()
   {
     return m_ggc ? new (ggc_alloc <T> ()) T() : new T () ;
@@ -135,9 +137,22 @@ public:
     return operator[] (node->summary_uid);
   }
 
+  /* Return number of elements handled by data structure.  */
   size_t elements ()
   {
     return m_map->elements ();
+  }
+
+  /* Enable insertin hook invocation.  */
+  inline void enable_insertion_hook ()
+  {
+    m_insertion_enabled = true;
+  }
+
+  /* Enable insertin hook invocation.  */
+  inline void disable_insertion_hook ()
+  {
+    m_insertion_enabled = false;
   }
 
   /* Symbol insertion hook that is registered to symbol table.  */
@@ -188,10 +203,9 @@ public:
       }
   }
 
+protected:
   /* Indicatation if we use ggc summary.  */
   bool m_ggc;
-
-  bool m_insertion_enabled;
 
 private:
   struct summary_hashmap_traits: default_hashmap_traits
@@ -249,14 +263,14 @@ private:
 
   /* Main summary store, where summary ID is used as key.  */
   hash_map <int, T *, summary_hashmap_traits> *m_map;
-
   /* Internal summary insertion hook pointer.  */
   cgraph_node_hook_list *m_symtab_insertion_hook;
   /* Internal summary removal hook pointer.  */
   cgraph_node_hook_list *m_symtab_removal_hook;
   /* Internal summary duplication hook pointer.  */
   cgraph_2node_hook_list *m_symtab_duplication_hook;
-
+  /* Indicates if insertion hook is enabled.  */
+  bool m_insertion_enabled;
   /* Symbol table the summary is registered to.  */
   symbol_table *m_symtab;
 

@@ -175,7 +175,7 @@ public:
   static inline_summary_cgraph_summary *create_ggc (symbol_table *symtab)
   {
     inline_summary_cgraph_summary *summary = new (ggc_cleared_alloc <inline_summary_cgraph_summary> ()) inline_summary_cgraph_summary(symtab, true);
-    summary->m_insertion_enabled = false;
+    summary->disable_insertion_hook ();
     return summary;
   }
 

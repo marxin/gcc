@@ -4011,7 +4011,7 @@ inline_generate_summary (void)
   if (!inline_summary_summary)
     inline_summary_summary = (inline_summary_cgraph_summary *) inline_summary_cgraph_summary::create_ggc (symtab);
 
-  inline_summary_summary->m_insertion_enabled = true;
+  inline_summary_summary->enable_insertion_hook ();
 
   ipa_register_cgraph_hooks ();
   inline_free_summary ();
@@ -4196,7 +4196,7 @@ inline_read_summary (void)
     }
 
   gcc_assert (inline_summary_summary);
-  inline_summary_summary->m_insertion_enabled = true;
+  inline_summary_summary->enable_insertion_hook ();
 }
 
 
