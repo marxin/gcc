@@ -20,7 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef IPA_PROP_H
 #define IPA_PROP_H
 
-
 /* The following definitions and interfaces are used by
    interprocedural analyses or parameters.  */
 
@@ -356,6 +355,8 @@ struct ipcp_lattice;
 
 struct ipa_node_params
 {
+  ~ipa_node_params ();
+
   /* Information about individual formal parameters that are gathered when
      summaries are generated. */
   vec<ipa_param_descriptor> descriptors;
@@ -364,7 +365,7 @@ struct ipa_node_params
   struct ipcp_param_lattices *lattices;
   /* Only for versioned nodes this field would not be NULL,
      it points to the node that IPA cp cloned from.  */
-  struct cgraph_node *ipcp_orig_node;
+  cgraph_node *ipcp_orig_node;
   /* If this node is an ipa-cp clone, these are the known values that describe
      what it has been specialized for.  */
   vec<tree> known_vals;
@@ -470,7 +471,7 @@ struct GTY(()) ipa_agg_replacement_value
 
 typedef struct ipa_agg_replacement_value *ipa_agg_replacement_value_p;
 
-void ipa_set_node_agg_value_chain (struct cgraph_node *node,
+void ipa_set_node_agg_value_chain (const cgraph_node *node,
 				   struct ipa_agg_replacement_value *aggvals);
 
 /* ipa_edge_args stores information related to a callsite and particularly its
@@ -513,10 +514,22 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
   return &(*args->polymorphic_call_contexts)[i];
 }
 
-/* Types of vectors holding the infos.  */
+/* Callgraph summary for ipa_node_params.  */
+class ipa_node_params_t: public function_summary <ipa_node_params *>
+{
+public:
+  ipa_node_params_t (symbol_table *table):
+    function_summary<ipa_node_params *> (table) { }
 
-/* Vector where the parameter infos are actually stored. */
-extern vec<ipa_node_params> ipa_node_params_vector;
+  /* Hook that is called by summary when a node is duplicated.  */
+  virtual void duplication_hook (cgraph_node *node,
+				 cgraph_node *node2,
+				 ipa_node_params *data,
+				 ipa_node_params *data2);
+};
+
+/* Function summary where the parameter infos are actually stored. */
+extern ipa_node_params_t *ipa_node_params_d;
 /* Vector of known aggregate values in cloned nodes.  */
 extern GTY(()) vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
 /* Vector where the parameter infos are actually stored. */
@@ -524,7 +537,7 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
-#define IPA_NODE_REF(NODE) (&ipa_node_params_vector[(NODE)->uid])
+#define IPA_NODE_REF(NODE) ((*ipa_node_params_d)[NODE])
 #define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */
@@ -534,11 +547,11 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 void ipa_create_all_node_params (void);
 void ipa_create_all_edge_args (void);
 void ipa_free_edge_args_substructures (struct ipa_edge_args *);
-void ipa_free_node_params_substructures (struct ipa_node_params *);
 void ipa_free_all_node_params (void);
 void ipa_free_all_edge_args (void);
 void ipa_free_all_structures_after_ipa_cp (void);
 void ipa_free_all_structures_after_iinln (void);
+
 void ipa_register_cgraph_hooks (void);
 int count_formal_params (tree fndecl);
 
@@ -548,11 +561,8 @@ int count_formal_params (tree fndecl);
 static inline void
 ipa_check_create_node_params (void)
 {
-  if (!ipa_node_params_vector.exists ())
-    ipa_node_params_vector.create (symtab->cgraph_max_uid);
-
-  if (ipa_node_params_vector.length () <= (unsigned) symtab->cgraph_max_uid)
-    ipa_node_params_vector.safe_grow_cleared (symtab->cgraph_max_uid + 1);
+  if (!ipa_node_params_d)
+    ipa_node_params_d = new ipa_node_params_t (symtab);
 }
 
 /* This function ensures the array of edge arguments infos is big enough to
@@ -579,7 +589,7 @@ ipa_edge_args_info_available_for_edge_p (struct cgraph_edge *edge)
 /* Return the aggregate replacements for NODE, if there are any.  */
 
 static inline struct ipa_agg_replacement_value *
-ipa_get_agg_replacements_for_node (struct cgraph_node *node)
+ipa_get_agg_replacements_for_node (const cgraph_node *node)
 {
   if ((unsigned) node->uid >= vec_safe_length (ipa_node_agg_replacements))
     return NULL;
@@ -587,7 +597,7 @@ ipa_get_agg_replacements_for_node (struct cgraph_node *node)
 }
 
 /* Function formal parameters related computations.  */
-void ipa_initialize_node_params (struct cgraph_node *node);
+void ipa_initialize_node_params (const cgraph_node *node);
 bool ipa_propagate_indirect_call_infos (struct cgraph_edge *cs,
 					vec<cgraph_edge *> *new_edges);
 
@@ -602,7 +612,7 @@ tree ipa_binfo_from_known_type_jfunc (struct ipa_jump_func *);
 tree ipa_impossible_devirt_target (struct cgraph_edge *, tree);
 
 /* Functions related to both.  */
-void ipa_analyze_node (struct cgraph_node *);
+void ipa_analyze_node (cgraph_node *);
 
 /* Aggregate jump function related functions.  */
 tree ipa_find_agg_cst_for_param (struct ipa_agg_jump_function *, HOST_WIDE_INT,
@@ -611,9 +621,9 @@ bool ipa_load_from_parm_agg (struct ipa_node_params *, gimple, tree, int *,
 			     HOST_WIDE_INT *, bool *);
 
 /* Debugging interface.  */
-void ipa_print_node_params (FILE *, struct cgraph_node *node);
+void ipa_print_node_params (FILE *, cgraph_node *node);
 void ipa_print_all_params (FILE *);
-void ipa_print_node_jump_functions (FILE *f, struct cgraph_node *node);
+void ipa_print_node_jump_functions (FILE *f, cgraph_node *node);
 void ipa_print_all_jump_functions (FILE * f);
 void ipcp_verify_propagated_values (void);
 
@@ -717,7 +727,7 @@ void ipa_update_after_lto_read (void);
 int ipa_get_param_decl_index (struct ipa_node_params *, tree);
 tree ipa_value_from_jfunc (struct ipa_node_params *info,
 			   struct ipa_jump_func *jfunc);
-unsigned int ipcp_transform_function (struct cgraph_node *node);
+unsigned int ipcp_transform_function (cgraph_node *node);
 void ipa_dump_param (FILE *, struct ipa_node_params *info, int i);
 bool ipa_modify_expr (tree *, bool, ipa_parm_adjustment_vec);
 ipa_parm_adjustment *ipa_get_adjustment_candidate (tree **, bool *,

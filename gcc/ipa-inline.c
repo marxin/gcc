@@ -129,6 +129,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-ref.h"
 #include "cgraph.h"
 #include "alloc-pool.h"
+#include "symbol-summary.h"
 #include "ipa-prop.h"
 #include "except.h"
 #include "target.h"
@@ -2400,7 +2401,7 @@ early_inliner (function *fun)
      it.  This may confuse ourself when early inliner decide to inline call to
      function clone, because function clones don't have parameter list in
      ipa-prop matching their signature.  */
-  if (ipa_node_params_vector.exists ())
+  if (ipa_node_params_d)
     return 0;
 
 #ifdef ENABLE_CHECKING

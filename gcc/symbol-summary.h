@@ -166,7 +166,7 @@ public:
     function_summary *summary = (function_summary <T *> *) (data);
 
     if (summary->m_insertion_enabled)
-      summary->insertion_hook (node, (*summary)[node]);
+      summary->insert (node, (*summary)[node]);
   }
 
   /* Symbol removal hook that is registered to symbol table.  */
@@ -180,7 +180,7 @@ public:
 
     if (v)
       {
-	summary->removal_hook (node, *v);
+	summary->remove (node, *v);
 
 	if (!summary->m_ggc)
 	  delete (*v);
@@ -204,7 +204,7 @@ public:
 	T *data = *v;
 	T *duplicate = summary->allocate_new ();
 	summary->m_map->put (node2->summary_uid, duplicate);
-	summary->duplication_hook (node, node2, data, (*summary)[node2]);
+	summary->duplicate (node, node2, data, (*summary)[node2]);
       }
   }
 
