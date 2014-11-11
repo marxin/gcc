@@ -29,6 +29,6 @@
 #include "cgraph.h"
 #include "ipa-utils.h"
 #include "alloc-pool.h"
-#include "annotation.h"
+#include "cgraph_summary.h"
 #include "ipa-prop.h"
 #include "hash-map.h"

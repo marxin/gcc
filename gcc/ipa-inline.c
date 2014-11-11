@@ -129,7 +129,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-ref.h"
 #include "cgraph.h"
 #include "alloc-pool.h"
-#include "annotation.h"
+#include "cgraph_summary.h"
 #include "ipa-prop.h"
 #include "except.h"
 #include "target.h"
@@ -458,7 +458,7 @@ want_early_inline_function_p (struct cgraph_edge *e)
 
   if (DECL_DISREGARD_INLINE_LIMITS (callee->decl))
     ;
-  /* For AutoFDO, we need to make sure that before profile annotation, all
+  /* For AutoFDO, we need to make sure that before profile summary, all
      hot paths' IR look exactly the same as profiled binary. As a result,
      in einliner, we will disregard size limit and inline those callsites
      that are:
@@ -2402,7 +2402,7 @@ early_inliner (function *fun)
      it.  This may confuse ourself when early inliner decide to inline call to
      function clone, because function clones don't have parameter list in
      ipa-prop matching their signature.  */
-  if (ipa_node_params_annotation)
+  if (ipa_node_params_summary)
     return 0;
 
 #ifdef ENABLE_CHECKING

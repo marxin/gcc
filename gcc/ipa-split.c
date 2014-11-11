@@ -109,7 +109,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-ref.h"
 #include "cgraph.h"
 #include "alloc-pool.h"
-#include "annotation.h"
+#include "cgraph_summary.h"
 #include "ipa-prop.h"
 #include "gimple-ssa.h"
 #include "tree-cfg.h"

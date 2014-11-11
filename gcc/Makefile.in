@@ -1174,7 +1174,7 @@ OBJS = \
 	cfgrtl.o \
 	symtab.o \
 	cgraph.o \
-	annotation.o \
+	cgraph_summary.o \
 	cgraphbuild.o \
 	cgraphunit.o \
 	cgraphclones.o \

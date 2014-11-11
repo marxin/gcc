@@ -54,7 +54,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-ref.h"
 #include "cgraph.h"
 #include "alloc-pool.h"
-#include "annotation.h"
+#include "cgraph_summary.h"
 #include "ipa-prop.h"
 #include "bitmap.h"
 #include "gimple-ssa.h"
@@ -132,8 +132,8 @@ struct func_body_info
   unsigned int aa_walked;
 };
 
-/* Callgraph annotation where the parameter infos are actually stored. */
-ipa_node_params_cgraph_annotation *ipa_node_params_annotation = NULL;
+/* Callgraph summary where the parameter infos are actually stored. */
+ipa_node_params_cgraph_summary *ipa_node_params_summary = NULL;
 vec<ipa_node_params> ipa_node_params_vector;
 /* Vector of known aggregate values in cloned nodes.  */
 vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
@@ -3570,7 +3570,7 @@ ipa_propagate_indirect_call_infos (cgraph_edge *cs,
   bool changed;
   /* Do nothing if the preparation phase has not been carried out yet
      (i.e. during early inlining).  */
-  if (!ipa_node_params_annotation)
+  if (!ipa_node_params_summary)
     return false;
   gcc_assert (ipa_edge_args_vector);
 
@@ -3632,8 +3632,8 @@ ipa_node_params::~ipa_node_params ()
 void
 ipa_free_all_node_params (void)
 {
-  delete ipa_node_params_annotation;
-  ipa_node_params_annotation = NULL;
+  delete ipa_node_params_summary;
+  ipa_node_params_summary = NULL;
 
   ipa_node_params_vector.release ();
 }
@@ -3795,10 +3795,10 @@ ipa_add_new_function (cgraph_node *node, void *data ATTRIBUTE_UNUSED)
     ipa_analyze_node (node);
 }
 
-/* Hook that is called by annotation when a node is duplicated.  */
+/* Hook that is called by summary when a node is duplicated.  */
 
 void
-ipa_node_params_cgraph_annotation::duplication_hook(cgraph_node *src,
+ipa_node_params_cgraph_summary::duplication_hook(cgraph_node *src,
 						    cgraph_node *dst,
 						    ipa_node_params *old_info,
 						    ipa_node_params *new_info)
@@ -5025,7 +5025,7 @@ ipa_prop_write_jump_functions (void)
   lto_symtab_encoder_iterator lsei;
   lto_symtab_encoder_t encoder;
 
-  if (!ipa_node_params_annotation)
+  if (!ipa_node_params_summary)
     return;
 
   ob = create_output_block (LTO_section_jump_functions);

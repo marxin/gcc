@@ -110,7 +110,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-ref.h"
 #include "cgraph.h"
 #include "alloc-pool.h"
-#include "annotation.h"
+#include "cgraph_summary.h"
 #include "ipa-prop.h"
 #include "lto-streamer.h"
 #include "data-streamer.h"
@@ -156,7 +156,7 @@ static void inline_edge_duplication_hook (struct cgraph_edge *,
 
 /* VECtor holding inline summaries.  
    In GGC memory because conditions might point to constant trees.  */
-cgraph_annotation <inline_summary *> *inline_summary_annotation;
+cgraph_summary <inline_summary *> *inline_summary_summary;
 vec<inline_edge_summary_t> inline_edge_summary_vec;
 
 /* Cached node/edge growths.  */
@@ -905,7 +905,7 @@ evaluate_properties_for_edge (struct cgraph_edge *e, bool inline_p,
   if (known_binfos_ptr)
     known_binfos_ptr->create (0);
 
-  if (ipa_node_params_annotation
+  if (ipa_node_params_summary
       && !e->call_stmt_cannot_inline_p
       && ((clause_ptr && info->conds) || known_vals_ptr || known_binfos_ptr))
     {
@@ -975,8 +975,8 @@ inline_summary_alloc (void)
     edge_duplication_hook_holder =
       symtab->add_edge_duplication_hook (&inline_edge_duplication_hook, NULL);
 
-  if (!inline_summary_annotation)
-    inline_summary_annotation = (inline_summary_cgraph_annotation *) inline_summary_cgraph_annotation::create_ggc (symtab);
+  if (!inline_summary_summary)
+    inline_summary_summary = (inline_summary_cgraph_summary *) inline_summary_cgraph_summary::create_ggc (symtab);
 
   if (inline_edge_summary_vec.length () <= (unsigned) symtab->edges_max_uid)
     inline_edge_summary_vec.safe_grow_cleared (symtab->edges_max_uid + 1);
@@ -1046,7 +1046,7 @@ reset_inline_summary (const struct cgraph_node *node,
 /* Hook that is called by cgraph.c when a node is removed.  */
 
 void
-inline_summary_cgraph_annotation::removal_hook (cgraph_node *node, inline_summary *info)
+inline_summary_cgraph_summary::removal_hook (cgraph_node *node, inline_summary *info)
 {
   reset_inline_summary (node, info);
 }
@@ -1100,7 +1100,7 @@ remap_hint_predicate_after_duplication (struct predicate **p,
 /* Hook that is called by cgraph.c when a node is duplicated.  */
 
 void
-inline_summary_cgraph_annotation::duplication_hook (cgraph_node *src,
+inline_summary_cgraph_summary::duplication_hook (cgraph_node *src,
 			      cgraph_node *dst,
 			      inline_summary *,
 			      inline_summary *info)
@@ -1112,7 +1112,7 @@ inline_summary_cgraph_annotation::duplication_hook (cgraph_node *src,
 
   /* When there are any replacements in the function body, see if we can figure
      out that something was optimized out.  */
-  if (ipa_node_params_annotation && dst->clone.tree_map)
+  if (ipa_node_params_summary && dst->clone.tree_map)
     {
       vec<size_time_entry, va_gc> *entry = info->entry;
       /* Use SRC parm info since it may not be copied yet.  */
@@ -2458,7 +2458,7 @@ estimate_function_body_sizes (struct cgraph_node *node, bool early)
       calculate_dominance_info (CDI_DOMINATORS);
       loop_optimizer_init (LOOPS_NORMAL | LOOPS_HAVE_RECORDED_EXITS);
 
-      if (ipa_node_params_annotation)
+      if (ipa_node_params_summary)
 	{
 	  parms_info = IPA_NODE_REF (node);
 	  nonconstant_names.safe_grow_cleared
@@ -2606,7 +2606,7 @@ estimate_function_body_sizes (struct cgraph_node *node, bool early)
 		  nonconstant_names[SSA_NAME_VERSION (gimple_call_lhs (stmt))]
 		    = false_p;
 		}
-	      if (ipa_node_params_annotation)
+	      if (ipa_node_params_summary)
 		{
 		  int count = gimple_call_num_args (stmt);
 		  int i;
@@ -3349,7 +3349,7 @@ static void
 remap_edge_change_prob (struct cgraph_edge *inlined_edge,
 			struct cgraph_edge *edge)
 {
-  if (ipa_node_params_annotation)
+  if (ipa_node_params_summary)
     {
       int i;
       struct ipa_edge_args *args = IPA_EDGE_REF (edge);
@@ -3505,7 +3505,7 @@ inline_merge_summary (struct cgraph_edge *edge)
   else
     toplev_predicate = true_predicate ();
 
-  if (ipa_node_params_annotation && callee_info->conds)
+  if (ipa_node_params_summary && callee_info->conds)
     {
       struct ipa_edge_args *args = IPA_EDGE_REF (edge);
       int count = ipa_get_cs_argument_count (args);
@@ -3991,7 +3991,7 @@ inline_analyze_function (struct cgraph_node *node)
 /* Called when new function is inserted to callgraph late.  */
 
 void
-inline_summary_cgraph_annotation::insertion_hook (cgraph_node *node, inline_summary *)
+inline_summary_cgraph_summary::insertion_hook (cgraph_node *node, inline_summary *)
 {
   inline_analyze_function (node);
 }
@@ -4008,10 +4008,10 @@ inline_generate_summary (void)
   if (!optimize && !flag_lto && !flag_wpa)
     return;
 
-  if (!inline_summary_annotation)
-    inline_summary_annotation = (inline_summary_cgraph_annotation *) inline_summary_cgraph_annotation::create_ggc (symtab);
+  if (!inline_summary_summary)
+    inline_summary_summary = (inline_summary_cgraph_summary *) inline_summary_cgraph_summary::create_ggc (symtab);
 
-  inline_summary_annotation->m_insertion_enabled = true;
+  inline_summary_summary->m_insertion_enabled = true;
 
   ipa_register_cgraph_hooks ();
   inline_free_summary ();
@@ -4195,8 +4195,8 @@ inline_read_summary (void)
 	ipa_prop_read_jump_functions ();
     }
 
-  gcc_assert (inline_summary_annotation);
-  inline_summary_annotation->m_insertion_enabled = true;
+  gcc_assert (inline_summary_summary);
+  inline_summary_summary->m_insertion_enabled = true;
 }
 
 
@@ -4334,8 +4334,8 @@ inline_free_summary (void)
   if (edge_duplication_hook_holder)
     symtab->remove_edge_duplication_hook (edge_duplication_hook_holder);
   edge_duplication_hook_holder = NULL;
-  inline_summary_annotation->destroy ();
-  inline_summary_annotation = NULL;
+  inline_summary_summary->destroy ();
+  inline_summary_summary = NULL;
   inline_edge_summary_vec.release ();
   if (edge_predicate_pool)
     free_alloc_pool (edge_predicate_pool);

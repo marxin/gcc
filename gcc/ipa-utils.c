@@ -55,7 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "lto-streamer.h"
 #include "alloc-pool.h"
-#include "annotation.h"
+#include "cgraph_summary.h"
 #include "ipa-prop.h"
 #include "ipa-inline.h"
 

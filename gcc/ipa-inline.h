@@ -166,17 +166,17 @@ struct GTY(()) inline_summary
    'inline_summary' below.  */
 typedef struct inline_summary inline_summary_t;
 
-class GTY((user)) inline_summary_cgraph_annotation: public cgraph_annotation <inline_summary *>
+class GTY((user)) inline_summary_cgraph_summary: public cgraph_summary <inline_summary *>
 {
 public:
-  inline_summary_cgraph_annotation (symbol_table *symtab, bool ggc):
-    cgraph_annotation <inline_summary *> (symtab, ggc) {}
+  inline_summary_cgraph_summary (symbol_table *symtab, bool ggc):
+    cgraph_summary <inline_summary *> (symtab, ggc) {}
   
-  static inline_summary_cgraph_annotation *create_ggc (symbol_table *symtab)
+  static inline_summary_cgraph_summary *create_ggc (symbol_table *symtab)
   {
-    inline_summary_cgraph_annotation *annotation = new (ggc_cleared_alloc <inline_summary_cgraph_annotation> ()) inline_summary_cgraph_annotation(symtab, true);
-    annotation->m_insertion_enabled = false;
-    return annotation;
+    inline_summary_cgraph_summary *summary = new (ggc_cleared_alloc <inline_summary_cgraph_summary> ()) inline_summary_cgraph_summary(symtab, true);
+    summary->m_insertion_enabled = false;
+    return summary;
   }
 
 
@@ -185,7 +185,7 @@ public:
   virtual void duplication_hook (cgraph_node *src, cgraph_node *dst, inline_summary *src_data, inline_summary *dst_data);
 };
 
-extern GTY(()) cgraph_annotation <inline_summary *> *inline_summary_annotation;
+extern GTY(()) cgraph_summary <inline_summary *> *inline_summary_summary;
 
 /* Information kept about parameter of call site.  */
 struct inline_param_summary
@@ -272,7 +272,7 @@ extern int nfunctions_inlined;
 static inline struct inline_summary *
 inline_summary2 (const struct cgraph_node *node)
 {
-  return (*inline_summary_annotation)[node->annotation_uid];
+  return (*inline_summary_summary)[node->summary_uid];
 }
 
 static inline struct inline_edge_summary *

@@ -514,14 +514,14 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
   return &(*args->polymorphic_call_contexts)[i];
 }
 
-/* Callgraph annotation for ipa_node_params.  */
-class ipa_node_params_cgraph_annotation: public cgraph_annotation <ipa_node_params *>
+/* Callgraph summary for ipa_node_params.  */
+class ipa_node_params_cgraph_summary: public cgraph_summary <ipa_node_params *>
 {
 public:
-  ipa_node_params_cgraph_annotation (symbol_table *table):
-    cgraph_annotation <ipa_node_params *> (table) { }
+  ipa_node_params_cgraph_summary (symbol_table *table):
+    cgraph_summary <ipa_node_params *> (table) { }
 
-  /* Hook that is called by annotation when a node is duplicated.  */
+  /* Hook that is called by summary when a node is duplicated.  */
   virtual void duplication_hook (cgraph_node *node,
 				 cgraph_node *node2,
 				 ipa_node_params *data,
@@ -529,7 +529,7 @@ public:
 };
 
 /* Vector where the parameter infos are actually stored. */
-extern ipa_node_params_cgraph_annotation *ipa_node_params_annotation;
+extern ipa_node_params_cgraph_summary *ipa_node_params_summary;
 /* Vector of known aggregate values in cloned nodes.  */
 extern GTY(()) vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
 /* Vector where the parameter infos are actually stored. */
@@ -537,7 +537,7 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
-#define IPA_NODE_REF(NODE) ((*ipa_node_params_annotation)[NODE])
+#define IPA_NODE_REF(NODE) ((*ipa_node_params_summary)[NODE])
 #define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */
@@ -561,8 +561,8 @@ int count_formal_params (tree fndecl);
 static inline void
 ipa_check_create_node_params (void)
 {
-  if (!ipa_node_params_annotation)
-    ipa_node_params_annotation = new ipa_node_params_cgraph_annotation (symtab);
+  if (!ipa_node_params_summary)
+    ipa_node_params_summary = new ipa_node_params_cgraph_summary (symtab);
 }
 
 /* This function ensures the array of edge arguments infos is big enough to

@@ -1842,7 +1842,7 @@ open_base_files (void)
       "tree-ssa-loop-niter.h", "tree-into-ssa.h", "tree-dfa.h", 
       "tree-ssa.h", "reload.h", "cpp-id-data.h", "tree-chrec.h",
       "except.h", "output.h",  "cfgloop.h", "target.h", "lto-streamer.h",
-      "target-globals.h", "ipa-ref.h", "cgraph.h", "annotation.h", "ipa-prop.h", 
+      "target-globals.h", "ipa-ref.h", "cgraph.h", "cgraph_summary.h", "ipa-prop.h", 
       "ipa-inline.h", "dwarf2out.h", NULL
     };
     const char *const *ifp;

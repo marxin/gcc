@@ -1,4 +1,4 @@
-/* Annotations handling code.
+/* Callgraph summary data structure.
    Copyright (C) 2014 Free Software Foundation, Inc.
    Contributed by Martin Liska
 
@@ -18,56 +18,56 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#ifndef GCC_ANNOTATION_H
-#define GCC_ANNOTATION_H
+#ifndef GCC_CGRAPH_SUMMARY_H
+#define GCC_CGRAPH_SUMMARY_H
 
-#define ANNOTATION_DELETED_VALUE -1
-#define ANNOTATION_EMPTY_VALUE 0
+#define CGRAPH_SUMMARY_DELETED_VALUE -1
+#define CGRAPH_SUMMARY_EMPTY_VALUE 0
 
 template <class T>
-class cgraph_annotation
+class cgraph_summary
 {
   private:
-    cgraph_annotation();
+    cgraph_summary();
 };
 
 template <class T>
-class GTY((user)) cgraph_annotation <T *>
+class GTY((user)) cgraph_summary <T *>
 {
 public:
   /* Default construction takes SYMTAB as an argument.  */
-  cgraph_annotation (symbol_table *symtab, bool ggc = false): m_ggc (ggc),
+  cgraph_summary (symbol_table *symtab, bool ggc = false): m_ggc (ggc),
     m_insertion_enabled (true), m_symtab (symtab)
   {
     cgraph_node *node;
 
     FOR_EACH_FUNCTION (node)
     {
-      gcc_assert (node->annotation_uid > 0);
+      gcc_assert (node->summary_uid > 0);
     }
 
-    m_map = new hash_map<int, T*, annotation_hashmap_traits>(13, m_ggc);
+    m_map = new hash_map<int, T*, summary_hashmap_traits>(13, m_ggc);
 
     m_symtab_insertion_hook =
       symtab->add_cgraph_insertion_hook
-      (cgraph_annotation::symtab_insertion, this);
+      (cgraph_summary::symtab_insertion, this);
 
     m_symtab_removal_hook =
       symtab->add_cgraph_removal_hook
-      (cgraph_annotation::symtab_removal, this);
+      (cgraph_summary::symtab_removal, this);
     m_symtab_duplication_hook =
       symtab->add_cgraph_duplication_hook
-      (cgraph_annotation::symtab_duplication, this);
+      (cgraph_summary::symtab_duplication, this);
   }
 
-  static cgraph_annotation <T *> *create_ggc (symbol_table *symtab)
+  static cgraph_summary <T *> *create_ggc (symbol_table *symtab)
   {
-    cgraph_annotation <T *> *annotation = new (ggc_cleared_alloc <T *> ()) cgraph_annotation <T *>(symtab, true);
-    return annotation;
+    cgraph_summary <T *> *summary = new (ggc_cleared_alloc <T *> ()) cgraph_summary <T *>(symtab, true);
+    return summary;
   }
 
   /* Destructor.  */
-  virtual ~cgraph_annotation ()
+  virtual ~cgraph_summary ()
   {
     destroy ();
   }
@@ -88,10 +88,10 @@ public:
     m_symtab_duplication_hook = NULL;
 
     if (!m_ggc)
-      m_map->traverse <void *, cgraph_annotation::release> (NULL);
+      m_map->traverse <void *, cgraph_summary::release> (NULL);
   }
 
-  /* Traverses all annotations with a function F called with
+  /* Traverses all summarys with a function F called with
      ARG as argument.  */
   template<typename Arg, bool (*f)(const T &, Arg)>
   void traverse (Arg a) const
@@ -114,7 +114,7 @@ public:
     return m_ggc ? new (ggc_alloc <T> ()) T() : new T () ;
   }
 
-  /* Getter for annotation callgraph ID.  */
+  /* Getter for summary callgraph ID.  */
   inline T* operator[] (int uid)
   {
     T **v = m_map->get (uid);
@@ -129,10 +129,10 @@ public:
     return *v;
   }
 
-  /* Getter for annotation callgraph node pointer.  */
+  /* Getter for summary callgraph node pointer.  */
   inline T * operator[] (cgraph_node *node)
   {
-    return operator[] (node->annotation_uid);
+    return operator[] (node->summary_uid);
   }
 
   size_t elements ()
@@ -143,58 +143,58 @@ public:
   /* Symbol insertion hook that is registered to symbol table.  */
   static void symtab_insertion (cgraph_node *node, void *data)
   {
-    cgraph_annotation *annotation = (cgraph_annotation <T *> *) (data);
+    cgraph_summary *summary = (cgraph_summary <T *> *) (data);
 
-    if (annotation->m_insertion_enabled)
-      annotation->insertion_hook (node, (*annotation)[node]);
+    if (summary->m_insertion_enabled)
+      summary->insertion_hook (node, (*summary)[node]);
   }
 
   /* Symbol removal hook that is registered to symbol table.  */
   static void symtab_removal (cgraph_node *node, void *data)
   {
-    gcc_assert (node->annotation_uid);
-    cgraph_annotation *annotation = (cgraph_annotation <T *> *) (data);
+    gcc_assert (node->summary_uid);
+    cgraph_summary *summary = (cgraph_summary <T *> *) (data);
 
-    int annotation_uid = node->annotation_uid;
-    T **v = annotation->m_map->get (annotation_uid);
+    int summary_uid = node->summary_uid;
+    T **v = summary->m_map->get (summary_uid);
 
     if (v)
       {
-	annotation->removal_hook (node, *v);
+	summary->removal_hook (node, *v);
 
-	if (!annotation->m_ggc)
+	if (!summary->m_ggc)
 	  delete (*v);
       }
 
-    if (annotation->m_map->get (annotation_uid))
-      annotation->m_map->remove (annotation_uid);
+    if (summary->m_map->get (summary_uid))
+      summary->m_map->remove (summary_uid);
   }
 
   /* Symbol duplication hook that is registered to symbol table.  */
   static void symtab_duplication (cgraph_node *node, cgraph_node *node2,
 				  void *data)
   {
-    cgraph_annotation *annotation = (cgraph_annotation <T *> *) (data);
-    T **v = annotation->m_map->get (node->annotation_uid);
+    cgraph_summary *summary = (cgraph_summary <T *> *) (data);
+    T **v = summary->m_map->get (node->summary_uid);
 
-    gcc_assert (node2->annotation_uid > 0);
+    gcc_assert (node2->summary_uid > 0);
 
     if (v)
       {
 	T *data = *v;
-	T *duplicate = annotation->allocate_new ();
-	annotation->m_map->put (node2->annotation_uid, duplicate);
-	annotation->duplication_hook (node, node2, data, (*annotation)[node2]);
+	T *duplicate = summary->allocate_new ();
+	summary->m_map->put (node2->summary_uid, duplicate);
+	summary->duplication_hook (node, node2, data, (*summary)[node2]);
       }
   }
 
-  /* Indicatation if we use ggc annotation.  */
+  /* Indicatation if we use ggc summary.  */
   bool m_ggc;
 
   bool m_insertion_enabled;
 
 private:
-  struct annotation_hashmap_traits: default_hashmap_traits
+  struct summary_hashmap_traits: default_hashmap_traits
   {
     static inline
     hashval_t hash (const int v)
@@ -206,32 +206,32 @@ private:
     static inline
     bool is_deleted (Type &e)
     {
-      return e.m_key == ANNOTATION_DELETED_VALUE;
+      return e.m_key == CGRAPH_SUMMARY_DELETED_VALUE;
     }
 
     template<typename Type>
     static inline
     bool is_empty (Type &e)
     {
-      return e.m_key == ANNOTATION_EMPTY_VALUE;
+      return e.m_key == CGRAPH_SUMMARY_EMPTY_VALUE;
     }
 
     template<typename Type>
     static inline
     void mark_deleted (Type &e)
     {
-      e.m_key = ANNOTATION_DELETED_VALUE;
+      e.m_key = CGRAPH_SUMMARY_DELETED_VALUE;
     }
 
     template<typename Type>
     static inline
     void mark_empty (Type &e)
     {
-      e.m_key = ANNOTATION_EMPTY_VALUE;
+      e.m_key = CGRAPH_SUMMARY_EMPTY_VALUE;
     }
   };
 
-  /* Remove annotation for annotation UID.  */
+  /* Remove summary for summary UID.  */
   inline void remove (int uid)
   {
     T *v = m_map->get (uid);
@@ -240,54 +240,54 @@ private:
       m_map->erase (uid);
   }
 
-  /* Annotation class release function called by traverse method.  */
+  /* Summary class release function called by traverse method.  */
   static bool release (int const &, T * const &v, void *)
   {
     delete (v);
     return true;
   }
 
-  /* Main annotation store, where annotation ID is used as key.  */
-  hash_map <int, T *, annotation_hashmap_traits> *m_map;
+  /* Main summary store, where summary ID is used as key.  */
+  hash_map <int, T *, summary_hashmap_traits> *m_map;
 
-  /* Internal annotation insertion hook pointer.  */
+  /* Internal summary insertion hook pointer.  */
   cgraph_node_hook_list *m_symtab_insertion_hook;
-  /* Internal annotation removal hook pointer.  */
+  /* Internal summary removal hook pointer.  */
   cgraph_node_hook_list *m_symtab_removal_hook;
-  /* Internal annotation duplication hook pointer.  */
+  /* Internal summary duplication hook pointer.  */
   cgraph_2node_hook_list *m_symtab_duplication_hook;
 
-  /* Symbol table the annotation is registered to.  */
+  /* Symbol table the summary is registered to.  */
   symbol_table *m_symtab;
 
-  template <typename U> friend void gt_ggc_mx (cgraph_annotation <U *> * const &);
-  template <typename U> friend void gt_pch_nx (cgraph_annotation <U *> * const &);
-  template <typename U> friend void gt_pch_nx (cgraph_annotation <U *> * const &,
+  template <typename U> friend void gt_ggc_mx (cgraph_summary <U *> * const &);
+  template <typename U> friend void gt_pch_nx (cgraph_summary <U *> * const &);
+  template <typename U> friend void gt_pch_nx (cgraph_summary <U *> * const &,
 					       gt_pointer_operator, void *);
 };
 
 template <typename T>
 void
-gt_ggc_mx(cgraph_annotation<T *>* const &annotation)
+gt_ggc_mx(cgraph_summary<T *>* const &summary)
 {
-  if (annotation->m_ggc)
-    gt_ggc_mx (annotation->m_map);
+  if (summary->m_ggc)
+    gt_ggc_mx (summary->m_map);
 }
 
 template <typename T>
 void
-gt_pch_nx(cgraph_annotation<T *>* const &annotation)
+gt_pch_nx(cgraph_summary<T *>* const &summary)
 {
-  if (annotation->m_ggc)
-    gt_pch_nx (annotation->m_map);
+  if (summary->m_ggc)
+    gt_pch_nx (summary->m_map);
 }
 
 template <typename T>
 void
-gt_pch_nx(cgraph_annotation<T *>* const& annotation, gt_pointer_operator op, void *cookie)
+gt_pch_nx(cgraph_summary<T *>* const& summary, gt_pointer_operator op, void *cookie)
 {
-  if (annotation->m_map)
-    gt_pch_nx (annotation->m_map, op, cookie);
+  if (summary->m_map)
+    gt_pch_nx (summary->m_map, op, cookie);
 }
 
-#endif  /* GCC_ANNOTATION_H  */
+#endif  /* GCC_CGRAPH_SUMMARY_H  */

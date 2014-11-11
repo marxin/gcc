@@ -93,7 +93,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dwarf2out.h"
 #include "bitmap.h"
 #include "ipa-reference.h"
-#include "annotation.h"
+#include "cgraph_summary.h"
 #include "ipa-prop.h"
 #include "gcse.h"
 #include "insn-codes.h"
