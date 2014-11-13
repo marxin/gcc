@@ -171,4 +171,14 @@ inline bool operator>= (const sreal &a, const sreal &b)
   return a == b || a > b;
 }
 
+inline sreal operator<< (const sreal &a, int exp)
+{
+  return a.shift (exp);
+}
+
+inline sreal operator>> (const sreal &a, int exp)
+{
+  return a.shift (-exp);
+}
+
 #endif
