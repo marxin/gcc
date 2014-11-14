@@ -514,7 +514,7 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
   return &(*args->polymorphic_call_contexts)[i];
 }
 
-/* Callgraph summary for ipa_node_params.  */
+/* Function summary for ipa_node_params.  */
 class ipa_node_params_t: public function_summary <ipa_node_params *>
 {
 public:
@@ -537,7 +537,7 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
-#define IPA_NODE_REF(NODE) ((*ipa_node_params_d)[NODE])
+#define IPA_NODE_REF(NODE) (ipa_node_params_d->get (NODE))
 #define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */
