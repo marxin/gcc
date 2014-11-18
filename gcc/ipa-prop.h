@@ -20,7 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef IPA_PROP_H
 #define IPA_PROP_H
 
-
 /* The following definitions and interfaces are used by
    interprocedural analyses or parameters.  */
 
@@ -287,6 +286,8 @@ struct ipa_param_descriptor
 
 struct ipa_node_params
 {
+  ~ipa_node_params ();
+
   /* Information about individual formal parameters that are gathered when
      summaries are generated. */
   vec<ipa_param_descriptor> descriptors;
@@ -404,7 +405,7 @@ struct GTY(()) ipa_agg_replacement_value
 
 typedef struct ipa_agg_replacement_value *ipa_agg_replacement_value_p;
 
-void ipa_set_node_agg_value_chain (struct cgraph_node *node,
+void ipa_set_node_agg_value_chain (const cgraph_node *node,
 				   struct ipa_agg_replacement_value *aggvals);
 
 /* ipa_edge_args stores information related to a callsite and particularly its
@@ -447,10 +448,22 @@ ipa_get_ith_polymorhic_call_context (struct ipa_edge_args *args, int i)
   return &(*args->polymorphic_call_contexts)[i];
 }
 
-/* Types of vectors holding the infos.  */
+/* Callgraph summary for ipa_node_params.  */
+class ipa_node_params_t: public function_summary <ipa_node_params *>
+{
+public:
+  ipa_node_params_t (symbol_table *table):
+    function_summary<ipa_node_params *> (table) { }
 
-/* Vector where the parameter infos are actually stored. */
-extern vec<ipa_node_params> ipa_node_params_vector;
+  /* Hook that is called by summary when a node is duplicated.  */
+  virtual void duplicate (cgraph_node *node,
+			  cgraph_node *node2,
+			  ipa_node_params *data,
+			  ipa_node_params *data2);
+};
+
+/* Function summary where the parameter infos are actually stored. */
+extern ipa_node_params_t *ipa_node_params_d;
 /* Vector of known aggregate values in cloned nodes.  */
 extern GTY(()) vec<ipa_agg_replacement_value_p, va_gc> *ipa_node_agg_replacements;
 /* Vector where the parameter infos are actually stored. */
@@ -458,7 +471,7 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
-#define IPA_NODE_REF(NODE) (&ipa_node_params_vector[(NODE)->uid])
+#define IPA_NODE_REF(NODE) (ipa_node_params_d->get (NODE))
 #define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */
@@ -468,11 +481,11 @@ extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
 void ipa_create_all_node_params (void);
 void ipa_create_all_edge_args (void);
 void ipa_free_edge_args_substructures (struct ipa_edge_args *);
-void ipa_free_node_params_substructures (struct ipa_node_params *);
 void ipa_free_all_node_params (void);
 void ipa_free_all_edge_args (void);
 void ipa_free_all_structures_after_ipa_cp (void);
 void ipa_free_all_structures_after_iinln (void);
+
 void ipa_register_cgraph_hooks (void);
 int count_formal_params (tree fndecl);
 
@@ -482,11 +495,8 @@ int count_formal_params (tree fndecl);
 static inline void
 ipa_check_create_node_params (void)
 {
-  if (!ipa_node_params_vector.exists ())
-    ipa_node_params_vector.create (symtab->cgraph_max_uid);
-
-  if (ipa_node_params_vector.length () <= (unsigned) symtab->cgraph_max_uid)
-    ipa_node_params_vector.safe_grow_cleared (symtab->cgraph_max_uid + 1);
+  if (!ipa_node_params_d)
+    ipa_node_params_d = new ipa_node_params_t (symtab);
 }
 
 /* This function ensures the array of edge arguments infos is big enough to
