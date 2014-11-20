@@ -331,4 +331,18 @@ gsi_seq (gimple_stmt_iterator i)
   return *i.seq;
 }
 
+/* Return number of nondebug statements in basic block BB.  */
+
+static inline unsigned
+gsi_nondebug_stmt_count (basic_block bb)
+{
+  unsigned c = 0;
+  for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+       gsi_next (&gsi))
+    if (!is_gimple_debug (gsi_stmt (gsi)))
+      c++;
+
+  return c;
+}
+
 #endif /* GCC_GIMPLE_ITERATOR_H */

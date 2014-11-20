@@ -563,6 +563,9 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
 
+  bb1->nondbg_stmt_count = gsi_nondebug_stmt_count (bb1->bb);
+  bb2->nondbg_stmt_count = gsi_nondebug_stmt_count (bb2->bb);
+
   if (bb1->nondbg_stmt_count != bb2->nondbg_stmt_count
       || bb1->edge_count != bb2->edge_count)
     return return_false ();
