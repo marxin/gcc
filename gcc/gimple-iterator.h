@@ -211,6 +211,19 @@ gsi_stmt (gimple_stmt_iterator i)
   return i.ptr;
 }
 
+/* Return a new iterator pointing to the first non-debug statement
+   in basic block BB.  */
+
+static inline gimple_stmt_iterator
+gsi_start_bb_nondebug (basic_block bb)
+{
+  gimple_stmt_iterator gsi = gsi_start_bb (bb);
+  while (!gsi_end_p (gsi) && is_gimple_debug (gsi_stmt (gsi)))
+    gsi_next (&gsi);
+
+  return gsi;
+}
+
 /* Return a block statement iterator that points to the first non-label
    statement in block BB.  */
 
@@ -329,20 +342,6 @@ static inline gimple_seq
 gsi_seq (gimple_stmt_iterator i)
 {
   return *i.seq;
-}
-
-/* Return number of nondebug statements in basic block BB.  */
-
-static inline unsigned
-gsi_nondebug_stmt_count (basic_block bb)
-{
-  unsigned c = 0;
-  for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
-       gsi_next (&gsi))
-    if (!is_gimple_debug (gsi_stmt (gsi)))
-      c++;
-
-  return c;
 }
 
 #endif /* GCC_GIMPLE_ITERATOR_H */
