@@ -60,6 +60,11 @@ public:
 
   bool operator< (const sreal &other) const
   {
+    /* We negate result in case of negative numbers and
+       it would return true for equal negative numbers.  */
+    if (*this == other)
+      return false;
+
     if (m_negative != other.m_negative)
       return m_negative > other.m_negative;
 
