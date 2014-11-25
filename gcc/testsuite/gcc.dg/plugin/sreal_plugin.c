@@ -84,7 +84,7 @@ sreal_pass::verify_aritmetics (int a, int b)
 void
 sreal_pass::verify_shifting (int a)
 {
-  sreal v = a;  
+  sreal v = a;
 
   for (unsigned i = 0; i < 16; i++)
     assert ((a << i) == (v << i).to_int());
