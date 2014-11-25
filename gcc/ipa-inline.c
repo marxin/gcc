@@ -906,7 +906,6 @@ relative_time_benefit (struct inline_summary *callee_info,
 static sreal
 edge_badness (struct cgraph_edge *edge, bool dump)
 {
-//  check_sreal ();
   sreal badness;
   int growth, edge_time;
   struct cgraph_node *callee = edge->callee->ultimate_alias_target ();

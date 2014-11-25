@@ -91,10 +91,19 @@ public:
     return tmp;
   }
 
-  sreal shift (int sig) const
+  sreal shift (int s) const
   {
+    gcc_checking_assert (s <= SREAL_BITS);
+    gcc_checking_assert (s >= -SREAL_BITS);
+
+    /* Exponent should never be so large because shift_right is used only by
+     sreal_add and sreal_sub ant thus the number cannot be shifted out from
+     exponent range.  */
+    gcc_checking_assert (m_exp + s <= SREAL_MAX_EXP);
+    gcc_checking_assert (m_exp + s >= -SREAL_MAX_EXP);
+
     sreal tmp = *this;
-    tmp.m_sig += sig;
+    tmp.m_exp += s;
 
     return tmp;
   }
@@ -177,62 +186,5 @@ inline sreal operator>> (const sreal &a, int exp)
 {
   return a.shift (-exp);
 }
-
-static void verify_numbers (int a, int b)
-{
-  gcc_assert ((a < b) == (sreal (a) < sreal (b)));
-  gcc_assert ((a <= b) == (sreal (a) <= sreal (b)));
-  gcc_assert ((a == b) == (sreal (a) == sreal (b)));
-  gcc_assert ((a != b) == (sreal (a) != sreal (b)));
-  gcc_assert ((a > b) == (sreal (a) > sreal (b)));
-  gcc_assert ((a >= b) == (sreal (a) >= sreal (b)));
-  gcc_assert ((a + b) == (sreal (a) + sreal (b)).to_int ());
-  gcc_assert ((a - b) == (sreal (a) - sreal (b)).to_int ());
-  gcc_assert ((b + a) == (sreal (b) + sreal (a)).to_int ());
-  gcc_assert ((b - a) == (sreal (b) - sreal (a)).to_int ());
-}
-
-static void check_sreal ()
-{
-  sreal minimum = INT_MIN;
-  sreal maximum = INT_MAX;
-  sreal seven = 7;
-  sreal minus_two = -2;
-  sreal minus_nine = -9;
-
-  gcc_assert (minimum.to_int () == INT_MIN);
-  gcc_assert (maximum.to_int () == INT_MAX);
-
-  gcc_assert (!(minus_two < minus_two));
-  gcc_assert (!(seven < seven));
-  gcc_assert (seven > minus_two);
-  gcc_assert (minus_two < seven);
-  gcc_assert (minus_two != seven);
-  gcc_assert (minus_two == minus_two);
-  gcc_assert (seven == seven);
-
-  gcc_assert (seven == ((seven >> 40) << 40));
-
-  gcc_assert ((seven + minus_two) == 5);
-  gcc_assert ((seven + minus_nine) == -2);
-
-  for (int a = -100; a < 100; a++)
-    for (int b = -100; b < 100; b++)
-      {
-        verify_numbers (a, b);
-        verify_numbers (INT_MIN + 100, b);
-        verify_numbers (INT_MAX - 100, b);
-      }
-
-
-  srand (123456);
-
-  for (int i = 0; i < 1000 * 1000; i++)
-    {
-      verify_numbers (rand () % 10, rand () % 1000000);
-      verify_numbers (rand () % 100, rand () % 10000);
-    }
-}
-
 
 #endif
