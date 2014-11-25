@@ -1,3 +1,39 @@
+2014-11-25  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config/rs6000/rs6000.c (rs6000_call_aix): For the AIX ABI, do not
+	load the static chain if the call was originally direct.
+
+2014-11-25  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/64059
+	* ipa-prop.c (ipa_analyze_call_uses): Don't call get_dynamic_type when
+	devirtualization is disabled.
+
+2014-11-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/63965
+	* config/rs6000/rs6000.c (rs6000_setup_reg_addr_masks): Do not set
+	Altivec & -16 mask if the type is not valid for Altivec registers.
+	(rs6000_secondary_reload_memory): Add support for ((reg + const) +
+	reg) that occurs during push_reload processing.
+
+	* config/rs6000/altivec.md (altivec_mov<mode>): Add instruction
+	alternative for moving constant vectors which are easy altivec
+	constants to GPRs.  Set the length attribute each of the
+	alternatives.
+
+	* config/rs6000/rs6000-cpus.def: Undo November 21st changes, a
+	work in progress patch was committed instead of the fixes for
+	63965.
+	* config/rs6000/rs6000.c: Likewise.
+
+2014-11-22  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/63671
+	* ipa-inline-transform.c (can_remove_node_now_p_1): Handle alises
+	and -fno-devirtualize more carefully.
+	(can_remove_node_now_p): Update.
+
 2014-11-24  Andrew Pinski  <apinski@cavium.com>
 
 	PR rtl-opt/63972
