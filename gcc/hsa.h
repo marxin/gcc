@@ -28,6 +28,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-table.h"
 #include "basic-block.h"
 
+// TODO?
+#define BRIG_OPCODE_ARG_BLOCK 65535
+
 struct hsa_insn_basic;
 typedef hsa_insn_basic *hsa_insn_basic_p;
 
@@ -165,21 +168,24 @@ is_a_helper <hsa_op_address *>::test (hsa_op_base *p)
   return p->kind == BRIG_KIND_OPERAND_ADDRESS;
 }
 
-/* A reference-to-label HSA operand.  In reality this is a reference to a start
-   of a BB.  */
+/* A reference to code HSA operand. It can be either reference
+   to a start of a BB or a start of a function.  */
 
-struct hsa_op_label : public hsa_op_base
+struct hsa_op_code_ref : public hsa_op_base
 {
-  /* Offset in the code section that this label refers to.  */
+  /* Offset in the code section that this refers to.  */
   unsigned directive_offset;
+
+  /* Type of reference.  */
+  BrigKinds16_t *ref_type;
 };
 
-/* Report whether or not P is a label reference operand.  */
+/* Report whether or not P is a code reference operand.  */
 
 template <>
 template <>
 inline bool
-is_a_helper <hsa_op_label *>::test (hsa_op_base *p)
+is_a_helper <hsa_op_code_ref *>::test (hsa_op_base *p)
 {
   return p->kind == BRIG_KIND_OPERAND_CODE_REF;
 }
@@ -367,6 +373,50 @@ is_a_helper <hsa_insn_seg *>::test (hsa_insn_basic *p)
 	  || p->opcode == BRIG_OPCODE_FTOS);
 }
 
+/* HSA instruction for function call.  */
+
+struct hsa_insn_call: hsa_insn_basic
+{
+  /* Called function */
+  tree called_function;
+
+  /* Call arguments.  */
+  vec <hsa_op_address *> arguments;
+
+  /* Call result.  */
+  hsa_op_address * result;
+};
+
+/* Report whether or not P is a call instruction.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_insn_call *>::test (hsa_insn_basic *p)
+{
+  return (p->opcode == BRIG_OPCODE_CALL);
+}
+
+/* HSA instruction for arg block start and end.
+   These instructions are virtual and will be used to mark
+   a collection of insns that is responsible for a function call. */
+
+struct hsa_insn_arg_block: hsa_insn_basic
+{
+  /* Start of end */
+  bool is_start;
+};
+
+/* Report whether or not P is a arg block instruction.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_insn_arg_block*>::test (hsa_insn_basic *p)
+{
+  return (p->opcode == BRIG_OPCODE_ARG_BLOCK);
+}
+
 /* Basic block of HSA instructions.  */
 
 struct hsa_bb
@@ -375,7 +425,7 @@ struct hsa_bb
   basic_block bb;
 
   /* The operand that referes to the label to this BB.  */
-  hsa_op_label label_ref;
+  hsa_op_code_ref label_ref;
 
   /* The first and last instruction.  */
   struct hsa_insn_basic *first_insn, *last_insn;

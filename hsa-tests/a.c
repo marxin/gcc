@@ -1,17 +1,16 @@
 #include <stdio.h>
 
-void __attribute__((hsa))
+int __attribute__((hsa))
 square (int a, int x)
 {
-  int b = a + 4;
-  a += 55;
+  return a;
 }
 
 void __attribute__((hsakernel))
 foo (int *a, int *b, ...)
 {
   int i = a[__builtin_omp_get_thread_num ()];
-  square (i, i);
+  int r = square (i, i + 5);
   b[__builtin_omp_get_thread_num ()] = i * i;
   a[__builtin_omp_get_thread_num ()] = __builtin_omp_get_thread_num ();
 }

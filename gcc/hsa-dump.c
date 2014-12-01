@@ -844,6 +844,31 @@ dump_hsa_insn (FILE *f, hsa_insn_basic *insn, int indent)
 	  }
       fprintf (f, "BB %i\n", hsa_bb_for_bb (target)->index);
     }
+  else if (is_a <hsa_insn_arg_block *> (insn))
+    {
+      hsa_insn_arg_block *arg_block = as_a <hsa_insn_arg_block *> (insn);
+
+      fprintf (f, arg_block->is_start ? "{\n" : "}\n");
+    }
+  else if (is_a <hsa_insn_call *> (insn))
+    {
+      hsa_insn_call *call = as_a <hsa_insn_call *> (insn);
+      const char *name = xstrdup (IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (call->called_function)));
+
+      fprintf (f, "call &%s", name);
+
+      if (call->result)
+	fprintf (f, "(%%%s) ", call->result->symbol->name);
+
+      fprintf (f, "(");
+      for (unsigned i = 0; i < call->arguments.length (); i++)
+        {
+	  fprintf (f, "%%%s", call->arguments[i]->symbol->name);
+	  if (i != call->arguments.length () - 1)
+	    fprintf (f, ", ");
+	}
+      fprintf (f, ")\n");
+    }
   else
     {
       bool first = true;

@@ -683,7 +683,7 @@ enqueue_op (hsa_op_base *op)
     {
     op_queue.projected_size += sizeof (struct BrigOperandAddress);
     }
-  else if (is_a <hsa_op_label *> (op))
+  else if (is_a <hsa_op_code_ref *> (op))
     op_queue.projected_size += sizeof (struct BrigOperandCodeRef);
   else
     gcc_unreachable ();
@@ -860,14 +860,14 @@ emit_address_operand (hsa_op_address *addr)
 /* Emit a label BRIG operand LABEL.  */
 
 static void
-emit_label_operand (hsa_op_label *lbl)
+emit_code_ref_operand (hsa_op_code_ref *ref)
 {
   struct BrigOperandCodeRef out;
 
-  gcc_assert (lbl->directive_offset);
+  gcc_assert (ref->directive_offset);
   out.base.byteCount = htole16 (sizeof (out));
   out.base.kind = htole16 (BRIG_KIND_OPERAND_CODE_REF);
-  out.ref = htole32 (lbl->directive_offset);
+  out.ref = htole32 (ref->directive_offset);
   brig_operand.add (&out, sizeof (out));
 }
 
@@ -885,8 +885,8 @@ emit_queued_operands (void)
 	emit_register_operand (reg);
       else if (hsa_op_address *addr = dyn_cast <hsa_op_address *> (op))
 	emit_address_operand (addr);
-      else if (hsa_op_label *lbl = dyn_cast <hsa_op_label *> (op))
-	emit_label_operand (lbl);
+      else if (hsa_op_code_ref *ref = dyn_cast <hsa_op_code_ref *> (op))
+	emit_code_ref_operand (ref);
       else
 	gcc_unreachable ();
     }
@@ -1203,6 +1203,28 @@ emit_cvt_insn (hsa_insn_basic *insn)
   brig_insn_count++;
 }
 
+static void
+emit_arg_block_insn (hsa_insn_arg_block *insn)
+{
+  struct BrigDirectiveArgBlock repr;
+  repr.base.byteCount = htole16 (sizeof (repr));
+
+  BrigKinds16_t kind = insn->is_start ? BRIG_KIND_DIRECTIVE_ARG_BLOCK_START
+    : BRIG_KIND_DIRECTIVE_ARG_BLOCK_END;
+  repr.base.kind = htole16 (kind);
+
+  brig_code.add (&repr, sizeof (repr));
+
+  // TODO: should we count it?
+  brig_insn_count++;
+}
+
+static void
+emit_call_insn (hsa_insn_basic *insn)
+{
+
+}
+
 /* Emit a basic HSA instruction and all necessary directives, schedule
    necessary operands for writing .  */
 
@@ -1315,6 +1337,16 @@ emit_insn (hsa_insn_basic *insn)
   if (hsa_insn_br *br = dyn_cast <hsa_insn_br *> (insn))
     {
       emit_branch_insn (br);
+      return;
+    }
+  if (hsa_insn_arg_block *arg_block = dyn_cast <hsa_insn_arg_block *> (insn))
+    {
+      emit_arg_block_insn (arg_block);
+      return;
+    }
+  if (hsa_insn_call *call = dyn_cast <hsa_insn_call *> (insn))
+    {
+      emit_call_insn (call);
       return;
     }
   emit_basic_insn (insn);
