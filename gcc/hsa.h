@@ -480,6 +480,9 @@ struct hsa_function_representation
 
   /* Whether or not we could check and enforce SSA properties.  */
   bool in_ssa;
+
+  /* True if the function is kernel function.  */
+  bool kern_p;
 };
 
 /* In hsa-gen.c.  */

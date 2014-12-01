@@ -998,6 +998,23 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> ssa_map)
   return hsa_alloc_addr_op (symbol, reg, offset);
 }
 
+static hsa_op_address *
+gen_hsa_addr_for_arg (tree parm, unsigned int index)
+{
+  hsa_symbol *sym = (struct hsa_symbol *) pool_alloc (hsa_allocp_symbols);
+  memset (sym, 0, sizeof (hsa_symbol));
+  sym->segment = BRIG_SEGMENT_ARG;
+
+  fillup_sym_for_decl (parm, sym);
+  sym->decl = NULL;
+
+  char *name = (char *) pool_alloc (hsa_allocp_symbols);
+  sprintf (name, "arg_%d", index);
+  sym->name = name;
+
+  return hsa_alloc_addr_op (sym, NULL, 0);
+}
+
 /* Generate HSA instructions that calculate address of VAL including all
    necessary conversions to flat addressing and place the result into DEST.
    Instructions are appended to HBB.  SSA_MAP maps gimple SSA names to HSA
@@ -1568,6 +1585,25 @@ gen_hsa_insns_for_cond_stmt (gimple cond, hsa_bb *hbb,
   hsa_append_insn (hbb, cbr);
 }
 
+static void
+gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
+			       vec <hsa_op_reg_p> ssa_map)
+{
+  for (unsigned i = 0; i < gimple_call_num_args (stmt); ++i)
+    {
+      tree parm = gimple_call_arg (stmt, i);
+      hsa_op_address *addr;
+      hsa_insn_mem *mem = hsa_alloc_mem_insn ();
+      hsa_op_reg *src = hsa_reg_for_gimple_ssa (parm, ssa_map);
+
+      addr = gen_hsa_addr_for_arg (parm, i);
+      mem->opcode = BRIG_OPCODE_ST;
+      mem->type = mem_type_for_type (hsa_type_for_scalar_tree_type (TREE_TYPE (parm), false));
+      mem->operands[0] = src;
+      mem->operands[1] = addr;
+      hsa_append_insn (hbb, mem);
+    }
+}
 
 static void
 gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
@@ -1580,7 +1616,8 @@ gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
 
   if (!gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
     {
-      sorry ("Support for HSA does not implement calling user functions");
+      gen_hsa_insns_for_direct_call (stmt, hbb, ssa_map);
+      //sorry ("Support for HSA does not implement calling user functions");
       return;
     }
 
@@ -1890,7 +1927,8 @@ gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
       struct hsa_symbol **slot;
 
       fillup_sym_for_decl (parm, &hsa_cfun.input_args[i]);
-      hsa_cfun.input_args[i].segment = BRIG_SEGMENT_KERNARG;
+      hsa_cfun.input_args[i].segment = hsa_cfun.kern_p ? BRIG_SEGMENT_KERNARG :
+				       BRIG_SEGMENT_ARG;
       if (!DECL_NAME (parm))
 	{
 	  /* FIXME: Just generate some UID.  */
@@ -2109,6 +2147,7 @@ wrap_hsa (void)
 	    str = build_string_literal (1, "");
 	    bool kern_p = lookup_attribute ("hsakernel",
 					    DECL_ATTRIBUTES (fndecl));
+	    hsa_cfun.kern_p = kern_p;
 	    if (!in_lto_p && main_input_filename)
 	      {
 		char *filename;
