@@ -175,9 +175,6 @@ struct hsa_op_code_ref : public hsa_op_base
 {
   /* Offset in the code section that this refers to.  */
   unsigned directive_offset;
-
-  /* Type of reference.  */
-  BrigKinds16_t *ref_type;
 };
 
 /* Report whether or not P is a code reference operand.  */
@@ -188,6 +185,24 @@ inline bool
 is_a_helper <hsa_op_code_ref *>::test (hsa_op_base *p)
 {
   return p->kind == BRIG_KIND_OPERAND_CODE_REF;
+}
+
+/* Code list HSA operand.  */
+struct hsa_op_code_list: public hsa_op_base
+{
+  /* Offset to variable-sized array in hsa_data section, where
+     are offsets to entries in the hsa_code section.  */
+  vec<unsigned> offsets;
+};
+
+/* Report whether or not P is a code list operand.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_op_code_list *>::test (hsa_op_base *p)
+{
+  return p->kind == BRIG_KIND_OPERAND_CODE_LIST;
 }
 
 #define HSA_OPERANDS_PER_INSN 5
@@ -380,11 +395,20 @@ struct hsa_insn_call: hsa_insn_basic
   /* Called function */
   tree called_function;
 
+  /* Called function code reference.  */
+  struct hsa_op_code_ref func;
+
   /* Call arguments.  */
   vec <hsa_op_address *> arguments;
 
+  // TODO
+  hsa_op_code_list *arguments_list;
+
   /* Call result.  */
   hsa_op_address * result;
+
+  // TODO
+  hsa_op_code_list *result_list;
 };
 
 /* Report whether or not P is a call instruction.  */

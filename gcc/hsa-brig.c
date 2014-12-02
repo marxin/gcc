@@ -36,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "vec.h"
 #include "gimple-pretty-print.h"
 #include "diagnostic-core.h"
+#include "hash-map.h"
 
 #define BRIG_SECTION_DATA_NAME    "hsa_data"
 #define BRIG_SECTION_CODE_NAME    "hsa_code"
@@ -85,6 +86,8 @@ public:
 static struct hsa_brig_section brig_data, brig_code, brig_operand;
 static uint32_t brig_insn_count;
 static bool brig_initialized = false;
+
+static hash_map <tree, BrigCodeOffset32_t> function_offsets;
 
 /* Add a new chunk, allocate data for it and initialize it.  */
 
@@ -493,6 +496,9 @@ emit_function_directives (void)
                                     + brig_code.cur_chunk->size
                                     - sizeof (fndir));
 
+  /* TODO */
+  function_offsets.put (cfun->decl, brig_code.cur_chunk->size - sizeof (fndir));
+
   if (hsa_cfun.output_arg)
     emit_directive_variable(hsa_cfun.output_arg);
   for (int i = 0; i < hsa_cfun.input_args_count; i++)
@@ -685,6 +691,8 @@ enqueue_op (hsa_op_base *op)
     }
   else if (is_a <hsa_op_code_ref *> (op))
     op_queue.projected_size += sizeof (struct BrigOperandCodeRef);
+  else if (is_a <hsa_op_code_list *> (op))
+    op_queue.projected_size += sizeof (struct BrigOperandCodeList);
   else
     gcc_unreachable ();
   return ret;
@@ -857,7 +865,7 @@ emit_address_operand (hsa_op_address *addr)
   brig_operand.add (&out, sizeof (out));
 }
 
-/* Emit a label BRIG operand LABEL.  */
+/* Emit a code reference operand REF.  */
 
 static void
 emit_code_ref_operand (hsa_op_code_ref *ref)
@@ -869,6 +877,27 @@ emit_code_ref_operand (hsa_op_code_ref *ref)
   out.base.kind = htole16 (BRIG_KIND_OPERAND_CODE_REF);
   out.ref = htole32 (ref->directive_offset);
   brig_operand.add (&out, sizeof (out));
+}
+
+static void
+emit_code_list_operand (hsa_op_code_list *code_list)
+{
+  struct BrigOperandCodeList out;
+  unsigned args = code_list->offsets.length ();
+
+  gcc_assert (args);
+
+  for (unsigned i = 0; i < args; i++)
+    gcc_assert (code_list->offsets[i]);
+
+  out.base.byteCount = htole16 (sizeof (out));
+  out.base.kind = htole16 (BRIG_KIND_OPERAND_CODE_LIST);
+
+  uint32_t byteCount = htole32 (4 * args);
+
+  out.elements = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
+  brig_data.add (code_list->offsets.address (), args * sizeof (uint32_t));
+  brig_data.round_size_up (4);
 }
 
 /* Emit all operands queued for writing.  */
@@ -887,6 +916,8 @@ emit_queued_operands (void)
 	emit_address_operand (addr);
       else if (hsa_op_code_ref *ref = dyn_cast <hsa_op_code_ref *> (op))
 	emit_code_ref_operand (ref);
+      else if (hsa_op_code_list *code_list = dyn_cast <hsa_op_code_list *> (op))
+	emit_code_list_operand (code_list);
       else
 	gcc_unreachable ();
     }
@@ -1222,7 +1253,51 @@ emit_arg_block_insn (hsa_insn_arg_block *insn)
 static void
 emit_call_insn (hsa_insn_basic *insn)
 {
+  hsa_insn_call *call = dyn_cast <hsa_insn_call *> (insn);
+  struct BrigInstBr repr;
+  uint32_t byteCount;
 
+  /* TODO */
+  BrigCodeOffset32_t *offset = function_offsets.get (call->called_function);
+  gcc_assert (*offset);
+  call->func.directive_offset = *offset;
+
+  BrigOperandOffset32_t operand_offsets[4];
+
+  repr.base.base.byteCount = htole16 (sizeof (repr));
+  repr.base.base.kind = htole16 (BRIG_KIND_INST_BR);
+  repr.base.opcode = htole16 (BRIG_OPCODE_CALL);
+  repr.base.type = htole16 (BRIG_TYPE_NONE);
+
+  /* Operand 0: out-args.  */
+  if (call->result)
+    {
+      unsigned offset = emit_directive_variable (call->result->symbol);
+
+      call->result_list->offsets[0] = offset;
+      operand_offsets[0] = htole32 (enqueue_op (call->result_list));
+    }
+
+  /* Operand 1: func */
+  operand_offsets[1] = htole32 (enqueue_op (&call->func));
+
+  /* Operand 2: in-args.  */
+  for (unsigned i = 0; i < call->arguments.length (); i++)
+    call->arguments_list->offsets[i] = emit_directive_variable (call->arguments[i]->symbol);
+
+
+  operand_offsets[2] = htole32 (enqueue_op (call->arguments_list));
+
+  /* We have 4 operands so use 4 * 4 for the byteCount */
+  byteCount = htole32 (4 * 4);
+  repr.base.operands = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
+  brig_data.add (&operand_offsets, sizeof (operand_offsets));
+  brig_data.round_size_up (4);
+  repr.width = BRIG_WIDTH_1; // TODO: ???
+  memset (&repr.reserved, 0, sizeof (repr.reserved));
+
+  brig_code.add (&repr, sizeof (repr));
+  brig_insn_count++;
 }
 
 /* Emit a basic HSA instruction and all necessary directives, schedule
