@@ -2141,6 +2141,11 @@ generate_hsa (void)
 
   hsa_init_data_for_cfun ();
 
+  bool kern_p = lookup_attribute ("hsakernel",
+					    DECL_ATTRIBUTES (current_function_decl));
+	    hsa_cfun.kern_p = kern_p;
+
+
   ssa_map.safe_grow_cleared (SSANAMES (cfun)->length ());
   hsa_cfun.name
     = xstrdup (IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (current_function_decl)));
