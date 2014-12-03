@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int __attribute__((hsa))
+int __attribute__((hsafunc))
 mul (int a, int b)
 {
   return a * b;

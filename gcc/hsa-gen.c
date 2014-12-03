@@ -2493,6 +2493,8 @@ unsigned int
 pass_gen_hsail::execute (function *)
 {
   if (lookup_attribute ("hsa", DECL_ATTRIBUTES (current_function_decl))
+      || lookup_attribute ("hsafunc",
+			   DECL_ATTRIBUTES (current_function_decl))
       || lookup_attribute ("hsakernel",
 			   DECL_ATTRIBUTES (current_function_decl)))
     return generate_hsa ();
