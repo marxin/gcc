@@ -2303,7 +2303,9 @@ wrap_hsa (void)
 		    strcpy (extension, "\0");
 		    asprintf (&extension, "%s", ".o\0");
 		    strcat (filename, extension);
+		    free (extension);
 		    str = build_string_literal (strlen(filename)+1,filename);
+		    free (filename);
 		  }
 	      }
 	    CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, str);
@@ -2316,6 +2318,7 @@ wrap_hsa (void)
 	    sanitize_hsa_name (tmpname + 1);
 
 	    str = build_string_literal (slen + 2, tmpname);
+	    free (tmpname);
 	    CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, str);
 	    int discard_arguents;
 	    int num_args = gimple_call_num_args (call_stmt);
