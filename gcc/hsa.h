@@ -29,7 +29,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "basic-block.h"
 
 // TODO?
-#define BRIG_OPCODE_ARG_BLOCK 65535
+#define BRIG_OPCODE_CALL_BLOCK 65535
 
 struct hsa_insn_basic;
 typedef hsa_insn_basic *hsa_insn_basic_p;
@@ -401,17 +401,17 @@ struct hsa_insn_call: hsa_insn_basic
   /* Called function code reference.  */
   struct hsa_op_code_ref func;
 
-  /* Call arguments.  */
-  vec <hsa_op_address *> arguments;
+  /* Argument symbols.  */
+  vec <hsa_symbol *> args_symbols;
 
-  // TODO
-  hsa_op_code_list *arguments_list;
+  /* Code list for arguments of the function.  */
+  hsa_op_code_list *args_code_list;
 
-  /* Call result.  */
-  hsa_op_address * result;
+  /* Result symbol.  */
+  hsa_symbol *result_symbol;
 
-  // TODO
-  hsa_op_code_list *result_list;
+  /* Code list for result of the function.  */
+  hsa_op_code_list *result_code_list;
 };
 
 /* Report whether or not P is a call instruction.  */
@@ -424,24 +424,36 @@ is_a_helper <hsa_insn_call *>::test (hsa_insn_basic *p)
   return (p->opcode == BRIG_OPCODE_CALL);
 }
 
-/* HSA instruction for arg block start and end.
-   These instructions are virtual and will be used to mark
-   a collection of insns that is responsible for a function call. */
+/* HSA call instruction block encapsulates definition of arguments,
+   result type, corresponding loads and a possible store.
+   Moreover, it contains a single call instruction.  */
 
-struct hsa_insn_arg_block: hsa_insn_basic
+struct hsa_insn_call_block: hsa_insn_basic
 {
-  /* Start of end */
-  bool is_start;
+  /* Input formal arguments.  */
+  vec <hsa_symbol *> input_args;
+
+  /* Input arguments store instructions.  */
+  vec <hsa_insn_mem *> input_arg_insns;
+
+  /* Output argument, can be NULL for void functions.  */
+  hsa_symbol *output_arg;
+
+  /* Output argument load instruction.  */
+  hsa_insn_mem *output_arg_insn;
+
+  /* Call isntruction.  */
+  hsa_insn_call *call_insn;
 };
 
-/* Report whether or not P is a arg block instruction.  */
+/* Report whether or not P is a call block instruction.  */
 
 template <>
 template <>
 inline bool
-is_a_helper <hsa_insn_arg_block*>::test (hsa_insn_basic *p)
+is_a_helper <hsa_insn_call_block *>::test (hsa_insn_basic *p)
 {
-  return (p->opcode == BRIG_OPCODE_ARG_BLOCK);
+  return (p->opcode == BRIG_OPCODE_CALL_BLOCK);
 }
 
 /* Basic block of HSA instructions.  */
