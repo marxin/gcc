@@ -28,7 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-table.h"
 #include "basic-block.h"
 
-// TODO?
+/* Special opcode for call block instruction.  */
 #define BRIG_OPCODE_CALL_BLOCK 65535
 
 struct hsa_insn_basic;
@@ -426,7 +426,9 @@ is_a_helper <hsa_insn_call *>::test (hsa_insn_basic *p)
 
 /* HSA call instruction block encapsulates definition of arguments,
    result type, corresponding loads and a possible store.
-   Moreover, it contains a single call instruction.  */
+   Moreover, it contains a single call instruction.
+   Emission of the instruction will produce multiple
+   HSAIL instructions.  */
 
 struct hsa_insn_call_block: hsa_insn_basic
 {

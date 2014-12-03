@@ -1752,9 +1752,11 @@ gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
 
   if (!gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
     {
-      // TODO: verify that function has 'hsa' attribute
-      gen_hsa_insns_for_direct_call (stmt, hbb, ssa_map);
-      //sorry ("Support for HSA does not implement calling user functions");
+      if (!lookup_attribute ("hsafunc", DECL_ATTRIBUTES (gimple_call_fndecl (stmt))))
+	sorry ("HSA does support only call for functions with 'hsafunc' attribute");
+      else
+        gen_hsa_insns_for_direct_call (stmt, hbb, ssa_map);
+
       return;
     }
 
