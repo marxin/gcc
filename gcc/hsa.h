@@ -60,6 +60,9 @@ struct hsa_symbol
   /* The HSA segment this will eventually end up in.  */
   BrigSegment8_t segment;
 
+  /* The HSA kind of linkage.  */
+  BrigLinkage8_t linkage;
+
   /* Array dimensions, if non-zero.  */
   uint32_t dimLo, dimHi;
 };
@@ -548,6 +551,10 @@ struct hsa_function_representation
   /* Instructions to be executed before the first BB from gimple.  It's label
    is zero and must not be referenced, of course there are no PHIs.  */
   hsa_bb prologue;
+
+  /* Instructions to be executed before the last BB from gimple.
+     It is responsible for fill up of result value.  */
+  hsa_bb epilogue;
 
   /* Number of HBB BBs.  */
   int hbb_count;

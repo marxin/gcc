@@ -500,6 +500,7 @@ get_symbol_for_decl (tree decl)
 	return *slot;
       sym = XCNEW (struct hsa_symbol);
       sym->segment = BRIG_SEGMENT_GLOBAL;
+      sym->linkage = BRIG_LINKAGE_FUNCTION;
       warning (0, "referring to global symbol %q+D by name from HSA code won't work", decl);
     }
   else
@@ -512,6 +513,7 @@ get_symbol_for_decl (tree decl)
       sym = (struct hsa_symbol *) pool_alloc (hsa_allocp_symbols);
       memset (sym, 0, sizeof (hsa_symbol));
       sym->segment = BRIG_SEGMENT_PRIVATE;
+      sym->linkage = BRIG_LINKAGE_FUNCTION;
     }
 
   fillup_sym_for_decl (decl, sym);
@@ -531,6 +533,7 @@ hsa_get_spill_symbol (BrigType16_t type)
   hsa_symbol *sym = (struct hsa_symbol *) pool_alloc (hsa_allocp_symbols);
   memset (sym, 0, sizeof (hsa_symbol));
   sym->segment = BRIG_SEGMENT_SPILL;
+  sym->linkage = BRIG_LINKAGE_FUNCTION;
   sym->type = type;
   hsa_cfun.spill_symbols.safe_push(sym);
   return sym;
@@ -595,6 +598,7 @@ hsa_alloc_code_list_op (unsigned elements)
   hsa_op_code_list *list;
   list = (hsa_op_code_list *) pool_alloc (hsa_allocp_operand_code_list);
 
+  memset (list, 0, sizeof (hsa_op_code_list));
   list->kind = BRIG_KIND_OPERAND_CODE_LIST;
   list->offsets.create (1);
   list->offsets.safe_grow_cleared (elements);
@@ -1061,6 +1065,7 @@ gen_hsa_addr_for_arg (tree parm, int index)
   hsa_symbol *sym = (struct hsa_symbol *) pool_alloc (hsa_allocp_symbols);
   memset (sym, 0, sizeof (hsa_symbol));
   sym->segment = BRIG_SEGMENT_ARG;
+  sym->linkage = BRIG_LINKAGE_ARG;
 
   fillup_sym_for_decl (parm, sym);
   sym->decl = NULL;
@@ -1697,6 +1702,8 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
       call_insn->result = addr;
       call_insn->result_list = hsa_alloc_code_list_op (1);
     }
+  else
+    call_insn->result_list = hsa_alloc_code_list_op (0);
 
   hsa_append_insn (hbb, call_insn);
 
@@ -2039,6 +2046,8 @@ gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
       fillup_sym_for_decl (parm, &hsa_cfun.input_args[i]);
       hsa_cfun.input_args[i].segment = hsa_cfun.kern_p ? BRIG_SEGMENT_KERNARG :
 				       BRIG_SEGMENT_ARG;
+
+      hsa_cfun.input_args[i].linkage = BRIG_LINKAGE_FUNCTION;
       if (!DECL_NAME (parm))
 	{
 	  /* FIXME: Just generate some UID.  */
@@ -2072,6 +2081,8 @@ gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
 	}
     }
 
+  // TODO
+  /*
   if (!VOID_TYPE_P (TREE_TYPE (TREE_TYPE (cfun->decl))))
     {
       struct hsa_symbol **slot;
@@ -2085,6 +2096,7 @@ gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
       *slot = hsa_cfun.output_arg;
     }
   else
+  */
     hsa_cfun.output_arg = NULL;
 }
 
