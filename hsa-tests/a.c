@@ -20,6 +20,7 @@ foo (int *a, int *b, ...)
 {
   int i = a[__builtin_omp_get_thread_num ()];
   int aaa = 12345;
+  mul_recursive (123, i, &aaa);
   b[__builtin_omp_get_thread_num ()] = mul_recursive (123, i, &aaa);
   a[__builtin_omp_get_thread_num ()] = __builtin_omp_get_thread_num ();
 }

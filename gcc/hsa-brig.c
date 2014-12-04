@@ -1319,7 +1319,7 @@ emit_call_insn (hsa_insn_basic *insn)
   /* Operand 2: in-args.  */
   operand_offsets[2] = htole32 (enqueue_op (call->args_code_list));
 
-  /* We have 3 operands so use 4 * 4 for the byteCount */
+  /* We have 3 operands so use 3 * 4 for the byteCount */
   byteCount = htole32 (3 * 4);
   repr.base.operands = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
   brig_data.add (&operand_offsets, sizeof (operand_offsets));
@@ -1348,7 +1348,7 @@ emit_call_block_insn (hsa_insn_call_block *insn)
       brig_insn_count++;
     }
 
-  if (insn->output_arg)
+  if (insn->call_insn->result_symbol)
     {
       insn->call_insn->result_code_list->offsets[0] = htole32
 	(emit_directive_variable (insn->output_arg));

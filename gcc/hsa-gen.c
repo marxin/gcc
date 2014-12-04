@@ -1059,15 +1059,15 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> ssa_map)
 }
 
 static hsa_op_address *
-gen_hsa_addr_for_arg (tree parm, int index)
+gen_hsa_addr_for_arg (tree tree_type, int index)
 {
   hsa_symbol *sym = (struct hsa_symbol *) pool_alloc (hsa_allocp_symbols);
   memset (sym, 0, sizeof (hsa_symbol));
   sym->segment = BRIG_SEGMENT_ARG;
   sym->linkage = BRIG_LINKAGE_ARG;
 
-  fillup_sym_for_decl (parm, sym);
-  sym->decl = NULL;
+  sym->type = hsa_type_for_tree_type (tree_type, &sym->dimLo,
+				      &sym->dimHi, false);
 
   if (index == -1) /* Function result.  */
     sym->name = "res";
@@ -1672,7 +1672,7 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
       hsa_op_base *src = hsa_reg_or_immed_for_gimple_op (parm, hbb, ssa_map,
 							 NULL);
 
-      addr = gen_hsa_addr_for_arg (parm, i);
+      addr = gen_hsa_addr_for_arg (TREE_TYPE (parm), i);
       mem->opcode = BRIG_OPCODE_ST;
       mem->type = mem_type_for_type (hsa_type_for_scalar_tree_type (TREE_TYPE (parm), false));
       mem->operands[0] = src;
@@ -1686,23 +1686,30 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
 
   call_insn->args_code_list = hsa_alloc_code_list_op (args);
 
+  tree result_type = TREE_TYPE (TREE_TYPE (gimple_call_fndecl (stmt)));
+
   tree result = gimple_call_lhs (stmt);
   hsa_insn_mem *result_insn = NULL;
-  if (result)
+  if (!VOID_TYPE_P (result_type))
     {
-      hsa_op_address *addr;
-      result_insn = hsa_alloc_mem_insn ();
-      hsa_op_reg *dst = hsa_reg_for_gimple_ssa (result, ssa_map);
+      hsa_op_address *addr = gen_hsa_addr_for_arg (result_type, -1);
 
-      addr = gen_hsa_addr_for_arg (result, -1);
-      result_insn->opcode = BRIG_OPCODE_LD;
-      result_insn->type = mem_type_for_type (hsa_type_for_scalar_tree_type (TREE_TYPE (result), false));
-      result_insn->operands[0] = dst;
-      result_insn->operands[1] = addr;
+      /* Even if result of a function call is unused, we have to emit
+	 declaration for the result.  */
+      if (result)
+	{
+	  result_insn = hsa_alloc_mem_insn ();
+	  hsa_op_reg *dst = hsa_reg_for_gimple_ssa (result, ssa_map);
+
+	  result_insn->opcode = BRIG_OPCODE_LD;
+	  result_insn->type = mem_type_for_type (hsa_type_for_scalar_tree_type (TREE_TYPE (result), false));
+	  result_insn->operands[0] = dst;
+	  result_insn->operands[1] = addr;
+
+	  call_block_insn->output_arg_insn = result_insn;
+	}
 
       call_block_insn->output_arg = addr->symbol;
-      call_block_insn->output_arg_insn = result_insn;
-
       call_insn->result_symbol = addr->symbol;
       call_insn->result_code_list = hsa_alloc_code_list_op (1);
     }
