@@ -6,12 +6,21 @@ mul (int a, int b, int *c)
   return a * b;
 }
 
+int __attribute__((hsafunc))
+mul_recursive (int a, int b, int *c)
+{
+  if (a > 0)
+    return b + mul_recursive (a - 1, b, c);
+  else
+    return b;
+}
+
 void __attribute__((hsakernel))
 foo (int *a, int *b, ...)
 {
   int i = a[__builtin_omp_get_thread_num ()];
   int aaa = 12345;
-  b[__builtin_omp_get_thread_num ()] = mul (123, i, &aaa);
+  b[__builtin_omp_get_thread_num ()] = mul_recursive (123, i, &aaa);
   a[__builtin_omp_get_thread_num ()] = __builtin_omp_get_thread_num ();
 }
 
