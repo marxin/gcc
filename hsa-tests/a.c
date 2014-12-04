@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 int __attribute__((hsafunc))
-mul (int a, int b)
+mul (int a, int b, int *c)
 {
   return a * b;
 }
@@ -10,7 +10,8 @@ void __attribute__((hsakernel))
 foo (int *a, int *b, ...)
 {
   int i = a[__builtin_omp_get_thread_num ()];
-  b[__builtin_omp_get_thread_num ()] = mul (i, i);
+  int aaa = 12345;
+  b[__builtin_omp_get_thread_num ()] = mul (123, i, &aaa);
   a[__builtin_omp_get_thread_num ()] = __builtin_omp_get_thread_num ();
 }
 

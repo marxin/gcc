@@ -1669,7 +1669,8 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
       tree parm = gimple_call_arg (stmt, (int)i);
       hsa_op_address *addr;
       hsa_insn_mem *mem = hsa_alloc_mem_insn ();
-      hsa_op_reg *src = hsa_reg_for_gimple_ssa (parm, ssa_map);
+      hsa_op_base *src = hsa_reg_or_immed_for_gimple_op (parm, hbb, ssa_map,
+							 NULL);
 
       addr = gen_hsa_addr_for_arg (parm, i);
       mem->opcode = BRIG_OPCODE_ST;
@@ -2142,9 +2143,8 @@ generate_hsa (void)
   hsa_init_data_for_cfun ();
 
   bool kern_p = lookup_attribute ("hsakernel",
-					    DECL_ATTRIBUTES (current_function_decl));
-	    hsa_cfun.kern_p = kern_p;
-
+    DECL_ATTRIBUTES (current_function_decl));
+  hsa_cfun.kern_p = kern_p;
 
   ssa_map.safe_grow_cleared (SSANAMES (cfun)->length ());
   hsa_cfun.name
