@@ -203,6 +203,10 @@ public:
   /* Verifies that tree labels T1 and T2 correspond.  */
   bool compare_tree_ssa_label (tree t1, tree t2);
 
+  bool compare_memory_operand (tree t1, tree t2);
+
+  bool compare_cst_or_decl (tree t1, tree t2);
+
   /* Function responsible for comparison of handled components T1 and T2.
      If these components, from functions FUNC1 and FUNC2, are equal, true
      is returned.  */

@@ -57,6 +57,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <list>
 #include "tree-ssanames.h"
 #include "tree-eh.h"
+#include "print-tree.h"
 
 #include "ipa-icf-gimple.h"
 #include "ipa-icf.h"
@@ -110,6 +111,9 @@ func_checker::~func_checker ()
 bool
 func_checker::compare_ssa_name (tree t1, tree t2)
 {
+  gcc_assert (TREE_CODE (t1) == SSA_NAME);
+  gcc_assert (TREE_CODE (t2) == SSA_NAME);
+
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
 
@@ -122,6 +126,20 @@ func_checker::compare_ssa_name (tree t1, tree t2)
     m_target_ssa_names[i2] = i1;
   else if (m_target_ssa_names[i2] != (int) i1)
     return false;
+
+  if (SSA_NAME_IS_DEFAULT_DEF (t1))
+    {
+      tree b1 = SSA_NAME_VAR (t1);
+      tree b2 = SSA_NAME_VAR (t2);
+
+      if (b1 == NULL && b2 == NULL)
+	return true;
+
+      if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
+	return return_false ();
+
+      return compare_cst_or_decl (b1, b2);
+    }
 
   return true;
 }
@@ -211,78 +229,29 @@ bool func_checker::compatible_types_p (tree t1, tree t2,
   return true;
 }
 
-/* Function responsible for comparison of handled components T1 and T2.
-   If these components, from functions FUNC1 and FUNC2, are equal, true
-   is returned.  */
-
-bool
-func_checker::compare_operand (tree t1, tree t2)
+bool func_checker::compare_memory_operand (tree t1, tree t2)
 {
-  tree base1, base2, x1, x2, y1, y2, z1, z2;
+  bool ret = false;
+
+  tree x1, x2, y1, y2;
   HOST_WIDE_INT offset1 = 0, offset2 = 0;
-  bool ret;
-
-  if (!t1 && !t2)
-    return true;
-  else if (!t1 || !t2)
-    return false;
-
-  tree tt1 = TREE_TYPE (t1);
-  tree tt2 = TREE_TYPE (t2);
-
-  if (!func_checker::compatible_types_p (tt1, tt2))
-    return false;
-
-  base1 = get_addr_base_and_unit_offset (t1, &offset1);
-  base2 = get_addr_base_and_unit_offset (t2, &offset2);
-
-  if (base1 && base2)
-    {
-      if (offset1 != offset2)
-	return return_false_with_msg ("base offsets are different");
-
-      t1 = base1;
-      t2 = base2;
-    }
-
-  if (TREE_CODE (t1) != TREE_CODE (t2))
-    return return_false ();
 
   switch (TREE_CODE (t1))
     {
-    case CONSTRUCTOR:
-      {
-	unsigned length1 = vec_safe_length (CONSTRUCTOR_ELTS (t1));
-	unsigned length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
-
-	if (length1 != length2)
-	  return return_false ();
-
-	for (unsigned i = 0; i < length1; i++)
-	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
-				CONSTRUCTOR_ELT (t2, i)->value))
-	    return return_false();
-
-	return true;
-      }
-    case ARRAY_REF:
-    case ARRAY_RANGE_REF:
-      x1 = TREE_OPERAND (t1, 0);
-      x2 = TREE_OPERAND (t2, 0);
-      y1 = TREE_OPERAND (t1, 1);
-      y2 = TREE_OPERAND (t2, 1);
-
-      if (!compare_operand (array_ref_low_bound (t1),
-			    array_ref_low_bound (t2)))
-	return return_false_with_msg ("");
-      if (!compare_operand (array_ref_element_size (t1),
-			    array_ref_element_size (t2)))
-	return return_false_with_msg ("");
-      if (!compare_operand (x1, x2))
-	return return_false_with_msg ("");
-      return compare_operand (y1, y2);
     case MEM_REF:
       {
+	tree base1 = get_addr_base_and_unit_offset (t1, &offset1);
+	tree base2 = get_addr_base_and_unit_offset (t2, &offset2);
+
+	if (base1 && base2)
+	  {
+	    if (offset1 != offset2)
+	      return return_false_with_msg ("base offsets are different");
+
+	    if (base1 != t1 && base2 != t2)
+	      return func_checker::compare_operand (base1, base2);
+	  }
+
 	x1 = TREE_OPERAND (t1, 0);
 	x2 = TREE_OPERAND (t2, 0);
 	y1 = TREE_OPERAND (t1, 1);
@@ -323,67 +292,22 @@ func_checker::compare_operand (tree t1, tree t2)
 	y2 = TREE_OPERAND (t2, 1);
 
 	ret = compare_operand (x1, x2)
-	      && compare_operand (y1, y2);
+	      && compare_cst_or_decl (y1, y2);
 
 	return return_with_debug (ret);
       }
-    /* Virtual table call.  */
-    case OBJ_TYPE_REF:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-	y1 = TREE_OPERAND (t1, 1);
-	y2 = TREE_OPERAND (t2, 1);
-	z1 = TREE_OPERAND (t1, 2);
-	z2 = TREE_OPERAND (t2, 2);
+   default:
+     gcc_unreachable ();
+  }
+}
 
-	ret = compare_operand (x1, x2)
-	      && compare_operand (y1, y2)
-	      && compare_operand (z1, z2);
+bool
+func_checker::compare_cst_or_decl (tree t1, tree t2)
+{
+  bool ret;
 
-	return return_with_debug (ret);
-      }
-    case ADDR_EXPR:
-      {
-	x1 = TREE_OPERAND (t1, 0);
-	x2 = TREE_OPERAND (t2, 0);
-
-	ret = compare_operand (x1, x2);
-	return return_with_debug (ret);
-      }
-    case SSA_NAME:
-      {
-	ret = compare_ssa_name (t1, t2);
-
-	if (!ret)
-	  return return_with_debug (ret);
-
-	if (SSA_NAME_IS_DEFAULT_DEF (t1))
-	  {
-	    tree b1 = SSA_NAME_VAR (t1);
-	    tree b2 = SSA_NAME_VAR (t2);
-
-	    if (b1 == NULL && b2 == NULL)
-	      return true;
-
-	    if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
-	      return return_false ();
-
-	    switch (TREE_CODE (b1))
-	      {
-	      case VAR_DECL:
-		return return_with_debug (compare_variable_decl (t1, t2));
-	      case PARM_DECL:
-	      case RESULT_DECL:
-		ret = compare_decl (b1, b2);
-		return return_with_debug (ret);
-	      default:
-		return return_false_with_msg ("Unknown TREE code reached");
-	      }
-	  }
-	else
-	  return true;
-      }
+  switch (TREE_CODE (t1))
+    {
     case INTEGER_CST:
       {
 	ret = compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2))
@@ -434,6 +358,119 @@ func_checker::compare_operand (tree t1, tree t2)
 	ret = compare_decl (t1, t2);
 	return return_with_debug (ret);
       }
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Function responsible for comparison of handled components T1 and T2.
+   If these components, from functions FUNC1 and FUNC2, are equal, true
+   is returned.  */
+
+bool
+func_checker::compare_operand (tree t1, tree t2)
+{
+  tree x1, x2, y1, y2, z1, z2;
+  bool ret;
+
+  if (!t1 && !t2)
+    return true;
+  else if (!t1 || !t2)
+    return false;
+
+  tree tt1 = TREE_TYPE (t1);
+  tree tt2 = TREE_TYPE (t2);
+
+  if (!func_checker::compatible_types_p (tt1, tt2))
+    return false;
+
+  if (TREE_THIS_VOLATILE (t1) != TREE_THIS_VOLATILE (t2))
+    return return_false_with_msg ("different operand volatility");
+
+  if (TREE_CODE (t1) != TREE_CODE (t2))
+    return return_false ();
+
+  switch (TREE_CODE (t1))
+    {
+    case CONSTRUCTOR:
+      {
+	unsigned length1 = vec_safe_length (CONSTRUCTOR_ELTS (t1));
+	unsigned length2 = vec_safe_length (CONSTRUCTOR_ELTS (t2));
+
+	if (length1 != length2)
+	  return return_false ();
+
+	for (unsigned i = 0; i < length1; i++)
+	{
+	  debug_tree (CONSTRUCTOR_ELT (t1, i)->value);
+	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
+				CONSTRUCTOR_ELT (t2, i)->value))
+	    return return_false();
+	}
+
+	return true;
+      }
+    case ARRAY_REF:
+    case ARRAY_RANGE_REF:
+      /* First argument is the array, second is the index.  */
+      x1 = TREE_OPERAND (t1, 0);
+      x2 = TREE_OPERAND (t2, 0);
+      y1 = TREE_OPERAND (t1, 1);
+      y2 = TREE_OPERAND (t2, 1);
+
+      if (!compare_operand (array_ref_low_bound (t1),
+			    array_ref_low_bound (t2)))
+	return return_false_with_msg ("");
+      if (!compare_operand (array_ref_element_size (t1),
+			    array_ref_element_size (t2)))
+	return return_false_with_msg ("");
+
+      if (!compare_operand (x1, x2))
+	return return_false_with_msg ("");
+      return compare_operand (y1, y2);
+    case MEM_REF:
+    case COMPONENT_REF:
+      return compare_memory_operand (t1, t2);
+    /* Virtual table call.  */
+    case OBJ_TYPE_REF:
+      {
+	x1 = TREE_OPERAND (t1, 0);
+	x2 = TREE_OPERAND (t2, 0);
+	y1 = TREE_OPERAND (t1, 1);
+	y2 = TREE_OPERAND (t2, 1);
+	z1 = TREE_OPERAND (t1, 2);
+	z2 = TREE_OPERAND (t2, 2);
+
+	ret = compare_ssa_name (x1, x2)
+	      && compare_ssa_name (y1, y2)
+	      && compare_cst_or_decl (z1, z2);
+
+	return return_with_debug (ret);
+      }
+    case ADDR_EXPR:
+      {
+	x1 = TREE_OPERAND (t1, 0);
+	x2 = TREE_OPERAND (t2, 0);
+
+	ret = compare_operand (x1, x2);
+	return return_with_debug (ret);
+      }
+    case SSA_NAME:
+	return compare_ssa_name (t1, t2);
+    case INTEGER_CST:
+    case COMPLEX_CST:
+    case VECTOR_CST:
+    case STRING_CST:
+    case REAL_CST:
+    case FUNCTION_DECL:
+    case VAR_DECL:
+    case FIELD_DECL:
+    case LABEL_DECL:
+    case PARM_DECL:
+    case RESULT_DECL:
+    case CONST_DECL:
+    case BIT_FIELD_REF:
+      return compare_cst_or_decl (t1, t2);
     default:
       return return_false_with_msg ("Unknown TREE code reached");
     }
