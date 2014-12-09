@@ -394,8 +394,7 @@ func_checker::compare_operand (tree t1, tree t2)
 
 	for (unsigned i = 0; i < length1; i++)
 	{
-	  debug_tree (CONSTRUCTOR_ELT (t1, i)->value);
-	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
+	  if (!compare_ssa_name (CONSTRUCTOR_ELT (t1, i)->value,
 				CONSTRUCTOR_ELT (t2, i)->value))
 	    return return_false();
 	}
