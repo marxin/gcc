@@ -229,29 +229,18 @@ bool func_checker::compatible_types_p (tree t1, tree t2,
   return true;
 }
 
+/* Function compare for equality given memory operands T1 and T2.  */
+
 bool func_checker::compare_memory_operand (tree t1, tree t2)
 {
   bool ret = false;
 
   tree x1, x2, y1, y2;
-  HOST_WIDE_INT offset1 = 0, offset2 = 0;
 
   switch (TREE_CODE (t1))
     {
     case MEM_REF:
       {
-	tree base1 = get_addr_base_and_unit_offset (t1, &offset1);
-	tree base2 = get_addr_base_and_unit_offset (t2, &offset2);
-
-	if (base1 && base2)
-	  {
-	    if (offset1 != offset2)
-	      return return_false_with_msg ("base offsets are different");
-
-	    if (base1 != t1 && base2 != t2)
-	      return func_checker::compare_operand (base1, base2);
-	  }
-
 	x1 = TREE_OPERAND (t1, 0);
 	x2 = TREE_OPERAND (t2, 0);
 	y1 = TREE_OPERAND (t1, 1);
@@ -300,6 +289,9 @@ bool func_checker::compare_memory_operand (tree t1, tree t2)
      gcc_unreachable ();
   }
 }
+
+/* Function compare for equality given trees T1 and T2 which
+   can be either a constant or a declaration type.  */
 
 bool
 func_checker::compare_cst_or_decl (tree t1, tree t2)
@@ -363,7 +355,7 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
     }
 }
 
-/* Function responsible for comparison of handled components T1 and T2.
+/* Function responsible for comparison of various operands T1 and T2.
    If these components, from functions FUNC1 and FUNC2, are equal, true
    is returned.  */
 
