@@ -97,4 +97,6 @@ extern bool walk_stmt_load_store_addr_ops (gimple, void *,
 extern bool walk_stmt_load_store_ops (gimple, void *,
 				      walk_stmt_load_store_addr_fn,
 				      walk_stmt_load_store_addr_fn);
+extern tree get_base_loadstore (tree op, bool unpack_handled_component = true);
+
 #endif /* GCC_GIMPLE_WALK_H */

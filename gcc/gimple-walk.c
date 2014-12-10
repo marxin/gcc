@@ -672,10 +672,10 @@ walk_gimple_stmt (gimple_stmt_iterator *gsi, walk_stmt_fn callback_stmt,
 /* From a tree operand OP return the base of a load or store operation
    or NULL_TREE if OP is not a load or a store.  */
 
-static tree
-get_base_loadstore (tree op)
+tree
+get_base_loadstore (tree op, bool unpack_handled_component)
 {
-  while (handled_component_p (op))
+  while (handled_component_p (op) && unpack_handled_component)
     op = TREE_OPERAND (op, 0);
   if (DECL_P (op)
       || INDIRECT_REF_P (op)
