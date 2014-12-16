@@ -235,6 +235,9 @@ func_checker::compatible_types_p (tree t1, tree t2,
 bool
 func_checker::compare_memory_operand (tree t1, tree t2)
 {
+  if (TREE_THIS_VOLATILE (t1) != TREE_THIS_VOLATILE (t2))
+    return return_false_with_msg ("different operand volatility");
+
   ao_ref r1, r2;
   ao_ref_init (&r1, t1);
   ao_ref_init (&r2, t2);
