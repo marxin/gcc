@@ -464,7 +464,6 @@ sem_function::equals_private (sem_item *item,
   if (decl1 != decl2)
     return return_false();
 
-
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
@@ -623,6 +622,13 @@ sem_function::merge (sem_item *alias_item)
 
 	return false;
       }
+
+  if (create_alias )
+  {
+    create_thunk = true;
+    create_alias = false;
+  }
+
 
   if (redirect_callers)
     {
