@@ -44,7 +44,7 @@ public:
 
     FOR_EACH_FUNCTION (node)
     {
-      gcc_checking_assert (node->summary_uid > 0);
+      gcc_checking_assert (node->uid > 0);
     }
 #endif
 
@@ -109,7 +109,7 @@ public:
   /* Getter for summary callgraph node pointer.  */
   T* get (cgraph_node *node)
   {
-    return get (node->summary_uid);
+    return get (node->uid);
   }
 
   /* Return number of elements handled by data structure.  */
@@ -142,11 +142,11 @@ public:
   /* Symbol removal hook that is registered to symbol table.  */
   static void symtab_removal (cgraph_node *node, void *data)
   {
-    gcc_checking_assert (node->summary_uid);
+    gcc_checking_assert (node->uid);
     function_summary *summary = (function_summary <T *> *) (data);
 
-    int summary_uid = node->summary_uid;
-    T **v = summary->m_map.get (summary_uid);
+    int uid = node->uid;
+    T **v = summary->m_map.get (uid);
 
     if (v)
       {
@@ -155,7 +155,7 @@ public:
 	if (!summary->m_ggc)
 	  delete (*v);
 
-	summary->m_map.remove (summary_uid);
+	summary->m_map.remove (uid);
       }
   }
 
@@ -164,16 +164,16 @@ public:
 				  void *data)
   {
     function_summary *summary = (function_summary <T *> *) (data);
-    T **v = summary->m_map.get (node->summary_uid);
+    T **v = summary->m_map.get (node->uid);
 
-    gcc_checking_assert (node2->summary_uid > 0);
+    gcc_checking_assert (node2->uid > 0);
 
     if (v)
       {
 	/* This load is necessary, because we insert a new value!  */
 	T *data = *v;
 	T *duplicate = summary->allocate_new ();
-	summary->m_map.put (node2->summary_uid, duplicate);
+	summary->m_map.put (node2->uid, duplicate);
 	summary->duplicate (node, node2, data, duplicate);
       }
   }

@@ -449,7 +449,8 @@ lto_balanced_map (int n_lto_partitions)
 {
   int n_nodes = 0;
   int n_varpool_nodes = 0, varpool_pos = 0, best_varpool_pos = 0;
-  struct cgraph_node **order = XNEWVEC (cgraph_node *, symtab->cgraph_max_uid);
+
+  auto_vec<cgraph_node *> order;
   auto_vec<cgraph_node *> noreorder;
   auto_vec<varpool_node *> varpool_order;
   int i;
@@ -475,17 +476,19 @@ lto_balanced_map (int n_lto_partitions)
 	if (node->no_reorder)
 	  noreorder.safe_push (node);
 	else
-	  order[n_nodes++] = node;
+	  order.safe_push (node);
 	if (!node->alias)
 	  total_size += inline_summaries->get (node)->size;
       }
+
+  n_nodes = order.length ();
 
   /* Streaming works best when the source units do not cross partition
      boundaries much.  This is because importing function from a source
      unit tends to import a lot of global trees defined there.  We should
      get better about minimizing the function bounday, but until that
      things works smoother if we order in source order.  */
-  qsort (order, n_nodes, sizeof (struct cgraph_node *), node_cmp);
+  order.qsort(node_cmp);
   noreorder.qsort (node_cmp);
 
   if (symtab->dump_file)
@@ -772,8 +775,6 @@ lto_balanced_map (int n_lto_partitions)
   while (noreorder_pos < (int)noreorder.length ())
     next_nodes.safe_push (noreorder[noreorder_pos++]);
   add_sorted_nodes (next_nodes, partition);
-
-  free (order);
 }
 
 /* Mangle NODE symbol name into a local name.  

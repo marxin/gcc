@@ -1646,6 +1646,33 @@ do_per_function (void (*callback) (function *, void *data), void *data)
 static int nnodes;
 static GTY ((length ("nnodes"))) cgraph_node **order;
 
+struct cgraph_order_traits : default_hashmap_traits
+{
+  template<typename T>
+  static bool
+  is_empty (T &e)
+  {
+    return e.m_key == INT_MIN;
+  }
+
+  template<typename  T>
+  static bool
+  is_deleted (T &e)
+  {
+    return e.m_key == (INT_MIN + 1);
+  }
+
+  template<typename T> static void mark_empty (T &e) { e.m_key = INT_MIN; }
+
+  template<typename T>
+  static void
+  mark_deleted (T &e)
+  {
+    e.m_key = INT_MIN + 1;
+  }
+};
+
+
 /* Hook called when NODE is removed and therefore should be
    excluded from order vector.  DATA is an array of integers.
    DATA[0] holds max index it may be accessed by.  For cgraph
@@ -1654,12 +1681,13 @@ static GTY ((length ("nnodes"))) cgraph_node **order;
 static void
 remove_cgraph_node_from_order (cgraph_node *node, void *data)
 {
-  int *order_idx = (int *)data;
+  hash_map<int, int, cgraph_order_traits> *order_idx_map =
+    (hash_map <int, int, cgraph_order_traits> *)data;
 
-  if (node->uid >= order_idx[0])
+  if (node->uid >= *order_idx_map->get (0))
     return;
 
-  int idx = order_idx[node->uid + 1];
+  int idx = *order_idx_map->get (node->uid + 1);
   if (idx >= 0 && idx < nnodes && order[idx] == node)
     order[idx] = NULL;
 }
@@ -1678,22 +1706,20 @@ do_per_function_toporder (void (*callback) (function *, void *data), void *data)
   else
     {
       cgraph_node_hook_list *hook;
-      int *order_idx;
       gcc_assert (!order);
       order = ggc_vec_alloc<cgraph_node *> (symtab->cgraph_count);
 
-      order_idx = XALLOCAVEC (int, symtab->cgraph_max_uid + 1);
-      memset (order_idx + 1, -1, sizeof (int) * symtab->cgraph_max_uid);
-      order_idx[0] = symtab->cgraph_max_uid;
+      hash_map<int, int, cgraph_order_traits> order_idx_map;
+      order_idx_map.put (0, symtab->cgraph_max_uid);
 
       nnodes = ipa_reverse_postorder (order);
       for (i = nnodes - 1; i >= 0; i--)
 	{
 	  order[i]->process = 1;
-	  order_idx[order[i]->uid + 1] = i;
+	  order_idx_map.put (order[i]->uid + 1, i);
 	}
       hook = symtab->add_cgraph_removal_hook (remove_cgraph_node_from_order,
-					      order_idx);
+					      &order_idx_map);
       for (i = nnodes - 1; i >= 0; i--)
 	{
 	  /* Function could be inlined and removed as unreachable.  */
