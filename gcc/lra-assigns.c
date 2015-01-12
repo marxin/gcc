@@ -1,5 +1,5 @@
 /* Assign reload pseudos.
-   Copyright (C) 2010-2013 Free Software Foundation, Inc.
+   Copyright (C) 2010-2015 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -87,14 +87,33 @@ along with GCC; see the file COPYING3.	If not see
 #include "recog.h"
 #include "output.h"
 #include "regs.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "vec.h"
+#include "machmode.h"
+#include "input.h"
 #include "function.h"
+#include "symtab.h"
 #include "expr.h"
+#include "predict.h"
+#include "dominance.h"
+#include "cfg.h"
 #include "basic-block.h"
 #include "except.h"
 #include "df.h"
 #include "ira.h"
 #include "sparseset.h"
+#include "params.h"
 #include "lra-int.h"
+
+/* Current iteration number of the pass and current iteration number
+   of the pass after the latest spill pass when any former reload
+   pseudo was spilled.  */
+int lra_assignment_iter;
+int lra_assignment_iter_after_spill;
+
+/* Flag of spilling former reload pseudos on this pass.  */
+static bool former_reload_pseudo_spill_p;
 
 /* Array containing corresponding values of function
    lra_get_allocno_class.  It is used to speed up the code.  */
@@ -450,23 +469,29 @@ adjust_hard_regno_cost (int hard_regno, int incr)
    that register.  (If several registers have equal cost, the one with
    the highest priority wins.)  Return -1 on failure.
 
+   If FIRST_P, return the first available hard reg ignoring other
+   criteria, e.g. allocation cost.  This approach results in less hard
+   reg pool fragmentation and permit to allocate hard regs to reload
+   pseudos in complicated situations where pseudo sizes are different.
+
    If TRY_ONLY_HARD_REGNO >= 0, consider only that hard register,
    otherwise consider all hard registers in REGNO's class.  */
 static int
-find_hard_regno_for (int regno, int *cost, int try_only_hard_regno)
+find_hard_regno_for (int regno, int *cost, int try_only_hard_regno,
+		     bool first_p)
 {
   HARD_REG_SET conflict_set;
   int best_cost = INT_MAX, best_priority = INT_MIN, best_usage = INT_MAX;
   lra_live_range_t r;
   int p, i, j, rclass_size, best_hard_regno, priority, hard_regno;
   int hr, conflict_hr, nregs;
-  enum machine_mode biggest_mode;
+  machine_mode biggest_mode;
   unsigned int k, conflict_regno;
   int offset, val, biggest_nregs, nregs_diff;
   enum reg_class rclass;
   bitmap_iterator bi;
   bool *rclass_intersect_p;
-  HARD_REG_SET impossible_start_hard_regs;
+  HARD_REG_SET impossible_start_hard_regs, available_regs;
 
   COPY_HARD_REG_SET (conflict_set, lra_no_alloc_regs);
   rclass = regno_allocno_class_array[regno];
@@ -579,6 +604,8 @@ find_hard_regno_for (int regno, int *cost, int try_only_hard_regno)
   biggest_nregs = hard_regno_nregs[hard_regno][biggest_mode];
   nregs_diff = (biggest_nregs
 		- hard_regno_nregs[hard_regno][PSEUDO_REGNO_MODE (regno)]);
+  COPY_HARD_REG_SET (available_regs, reg_class_contents[rclass]);
+  AND_COMPL_HARD_REG_SET (available_regs, lra_no_alloc_regs);
   for (i = 0; i < rclass_size; i++)
     {
       if (try_only_hard_regno >= 0)
@@ -594,9 +621,9 @@ find_hard_regno_for (int regno, int *cost, int try_only_hard_regno)
 	  && (nregs_diff == 0
 	      || (WORDS_BIG_ENDIAN
 		  ? (hard_regno - nregs_diff >= 0
-		     && TEST_HARD_REG_BIT (reg_class_contents[rclass],
+		     && TEST_HARD_REG_BIT (available_regs,
 					   hard_regno - nregs_diff))
-		  : TEST_HARD_REG_BIT (reg_class_contents[rclass],
+		  : TEST_HARD_REG_BIT (available_regs,
 				       hard_regno + nregs_diff))))
 	{
 	  if (hard_regno_costs_check[hard_regno]
@@ -612,7 +639,9 @@ find_hard_regno_for (int regno, int *cost, int try_only_hard_regno)
 		&& ! df_regs_ever_live_p (hard_regno + j))
 	      /* It needs save restore.	 */
 	      hard_regno_costs[hard_regno]
-		+= 2 * ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb->frequency + 1;
+		+= (2
+		    * REG_FREQ_FROM_BB (ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb)
+		    + 1);
 	  priority = targetm.register_priority (hard_regno);
 	  if (best_hard_regno < 0 || hard_regno_costs[hard_regno] < best_cost
 	      || (hard_regno_costs[hard_regno] == best_cost
@@ -627,7 +656,7 @@ find_hard_regno_for (int regno, int *cost, int try_only_hard_regno)
 	      best_usage = lra_hard_reg_usage[hard_regno];
 	    }
 	}
-      if (try_only_hard_regno >= 0)
+      if (try_only_hard_regno >= 0 || (first_p && best_hard_regno >= 0))
 	break;
     }
   if (best_hard_regno >= 0)
@@ -752,7 +781,7 @@ static void
 setup_try_hard_regno_pseudos (int p, enum reg_class rclass)
 {
   int i, hard_regno;
-  enum machine_mode mode;
+  machine_mode mode;
   unsigned int spill_regno;
   bitmap_iterator bi;
 
@@ -813,13 +842,19 @@ static int *sorted_reload_pseudos;
    to be spilled), we take into account not only how REGNO will
    benefit from the spills but also how other reload pseudos not yet
    assigned to hard registers benefit from the spills too.  In very
-   rare cases, the function can fail and return -1.  */
+   rare cases, the function can fail and return -1.
+
+   If FIRST_P, return the first available hard reg ignoring other
+   criteria, e.g. allocation cost and cost of spilling non-reload
+   pseudos.  This approach results in less hard reg pool fragmentation
+   and permit to allocate hard regs to reload pseudos in complicated
+   situations where pseudo sizes are different.  */
 static int
-spill_for (int regno, bitmap spilled_pseudo_bitmap)
+spill_for (int regno, bitmap spilled_pseudo_bitmap, bool first_p)
 {
   int i, j, n, p, hard_regno, best_hard_regno, cost, best_cost, rclass_size;
   int reload_hard_regno, reload_cost;
-  enum machine_mode mode;
+  machine_mode mode;
   enum reg_class rclass;
   unsigned int spill_regno, reload_regno, uid;
   int insn_pseudos_num, best_insn_pseudos_num;
@@ -862,11 +897,13 @@ spill_for (int regno, bitmap spilled_pseudo_bitmap)
 	}
       /* Spill pseudos.	 */
       EXECUTE_IF_SET_IN_BITMAP (&spill_pseudos_bitmap, 0, spill_regno, bi)
-	if ((int) spill_regno >= lra_constraint_new_regno_start
-	    && ! bitmap_bit_p (&lra_inheritance_pseudos, spill_regno)
-	    && ! bitmap_bit_p (&lra_split_regs, spill_regno)
-	    && ! bitmap_bit_p (&lra_subreg_reload_pseudos, spill_regno)
-	    && ! bitmap_bit_p (&lra_optional_reload_pseudos, spill_regno))
+	if ((pic_offset_table_rtx != NULL
+	     && spill_regno == REGNO (pic_offset_table_rtx))
+	    || ((int) spill_regno >= lra_constraint_new_regno_start
+		&& ! bitmap_bit_p (&lra_inheritance_pseudos, spill_regno)
+		&& ! bitmap_bit_p (&lra_split_regs, spill_regno)
+		&& ! bitmap_bit_p (&lra_subreg_reload_pseudos, spill_regno)
+		&& ! bitmap_bit_p (&lra_optional_reload_pseudos, spill_regno)))
 	  goto fail;
       insn_pseudos_num = 0;
       if (lra_dump_file != NULL)
@@ -894,14 +931,16 @@ spill_for (int regno, bitmap spilled_pseudo_bitmap)
 	    }
 	}
       n = 0;
-      EXECUTE_IF_SET_IN_SPARSESET (live_range_reload_inheritance_pseudos,
-				   reload_regno)
-	if ((int) reload_regno != regno
-	    && (ira_reg_classes_intersect_p
-		[rclass][regno_allocno_class_array[reload_regno]])
-	    && live_pseudos_reg_renumber[reload_regno] < 0
-	    && find_hard_regno_for (reload_regno, &cost, -1) < 0)
-	  sorted_reload_pseudos[n++] = reload_regno;
+      if (sparseset_cardinality (live_range_reload_inheritance_pseudos)
+	  <= (unsigned)LRA_MAX_CONSIDERED_RELOAD_PSEUDOS)
+	EXECUTE_IF_SET_IN_SPARSESET (live_range_reload_inheritance_pseudos,
+				     reload_regno)
+	  if ((int) reload_regno != regno
+	      && (ira_reg_classes_intersect_p
+		  [rclass][regno_allocno_class_array[reload_regno]])
+	      && live_pseudos_reg_renumber[reload_regno] < 0
+	      && find_hard_regno_for (reload_regno, &cost, -1, first_p) < 0)
+	    sorted_reload_pseudos[n++] = reload_regno;
       EXECUTE_IF_SET_IN_BITMAP (&spill_pseudos_bitmap, 0, spill_regno, bi)
 	{
 	  update_lives (spill_regno, true);
@@ -909,7 +948,7 @@ spill_for (int regno, bitmap spilled_pseudo_bitmap)
 	    fprintf (lra_dump_file, " spill %d(freq=%d)",
 		     spill_regno, lra_reg_info[spill_regno].freq);
 	}
-      hard_regno = find_hard_regno_for (regno, &cost, -1);
+      hard_regno = find_hard_regno_for (regno, &cost, -1, first_p);
       if (hard_regno >= 0)
 	{
 	  assign_temporarily (regno, hard_regno);
@@ -921,7 +960,7 @@ spill_for (int regno, bitmap spilled_pseudo_bitmap)
 	      lra_assert (live_pseudos_reg_renumber[reload_regno] < 0);
 	      if ((reload_hard_regno
 		   = find_hard_regno_for (reload_regno,
-					  &reload_cost, -1)) >= 0)
+					  &reload_cost, -1, first_p)) >= 0)
 		{
 		  if (lra_dump_file != NULL)
 		    fprintf (lra_dump_file, " assign %d(cost=%d)",
@@ -932,15 +971,15 @@ spill_for (int regno, bitmap spilled_pseudo_bitmap)
 	    }
 	  EXECUTE_IF_SET_IN_BITMAP (&spill_pseudos_bitmap, 0, spill_regno, bi)
 	    {
-	      rtx x;
+	      rtx_insn_list *x;
 
 	      cost += lra_reg_info[spill_regno].freq;
 	      if (ira_reg_equiv[spill_regno].memory != NULL
 		  || ira_reg_equiv[spill_regno].constant != NULL)
 		for (x = ira_reg_equiv[spill_regno].init_insns;
 		     x != NULL;
-		     x = XEXP (x, 1))
-		  cost -= REG_FREQ_FROM_BB (BLOCK_FOR_INSN (XEXP (x, 0)));
+		     x = x->next ())
+		  cost -= REG_FREQ_FROM_BB (BLOCK_FOR_INSN (x->insn ()));
 	    }
 	  if (best_insn_pseudos_num > insn_pseudos_num
 	      || (best_insn_pseudos_num == insn_pseudos_num
@@ -973,6 +1012,8 @@ spill_for (int regno, bitmap spilled_pseudo_bitmap)
   /* Spill: */
   EXECUTE_IF_SET_IN_BITMAP (&best_spill_pseudos_bitmap, 0, spill_regno, bi)
     {
+      if ((int) spill_regno >= lra_constraint_new_regno_start)
+	former_reload_pseudo_spill_p = true;
       if (lra_dump_file != NULL)
 	fprintf (lra_dump_file, "      Spill %sr%d(hr=%d, freq=%d) for r%d\n",
 		 pseudo_prefix_title (spill_regno),
@@ -1021,7 +1062,7 @@ setup_live_pseudos_and_spill_after_risky_transforms (bitmap
   unsigned int k, conflict_regno;
   int val, offset;
   HARD_REG_SET conflict_set;
-  enum machine_mode mode;
+  machine_mode mode;
   lra_live_range_t r;
   bitmap_iterator bi;
   int max_regno = max_reg_num ();
@@ -1034,9 +1075,15 @@ setup_live_pseudos_and_spill_after_risky_transforms (bitmap
       return;
     }
   for (n = 0, i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
-    if (reg_renumber[i] >= 0 && lra_reg_info[i].nrefs > 0)
+    if ((pic_offset_table_rtx == NULL_RTX
+	 || i != (int) REGNO (pic_offset_table_rtx))
+	&& reg_renumber[i] >= 0 && lra_reg_info[i].nrefs > 0)
       sorted_pseudos[n++] = i;
   qsort (sorted_pseudos, n, sizeof (int), pseudo_compare_func);
+  if (pic_offset_table_rtx != NULL_RTX
+      && (regno = REGNO (pic_offset_table_rtx)) >= FIRST_PSEUDO_REGISTER
+      && reg_renumber[regno] >= 0 && lra_reg_info[regno].nrefs > 0)
+    sorted_pseudos[n++] = regno;
   for (i = n - 1; i >= 0; i--)
     {
       regno = sorted_pseudos[i];
@@ -1082,6 +1129,8 @@ setup_live_pseudos_and_spill_after_risky_transforms (bitmap
 	   j++)
 	lra_hard_reg_usage[hard_regno + j] -= lra_reg_info[regno].freq;
       reg_renumber[regno] = -1;
+      if (regno >= lra_constraint_new_regno_start)
+	former_reload_pseudo_spill_p = true;
       if (lra_dump_file != NULL)
 	fprintf (lra_dump_file, "    Spill r%d after risky transformations\n",
 		 regno);
@@ -1143,8 +1192,8 @@ improve_inheritance (bitmap changed_pseudos)
 		   regno, hard_regno, another_regno, another_hard_regno);
 	      update_lives (another_regno, true);
 	      lra_setup_reg_renumber (another_regno, -1, false);
-	      if (hard_regno
-		  == find_hard_regno_for (another_regno, &cost, hard_regno))
+	      if (hard_regno == find_hard_regno_for (another_regno, &cost,
+						     hard_regno, false))
 		assign_hard_regno (hard_regno, another_regno);
 	      else
 		assign_hard_regno (another_hard_regno, another_regno);
@@ -1161,15 +1210,50 @@ static bitmap_head all_spilled_pseudos;
 /* All pseudos whose allocation was changed.  */
 static bitmap_head changed_pseudo_bitmap;
 
+
+/* Add to LIVE_RANGE_HARD_REG_PSEUDOS all pseudos conflicting with
+   REGNO and whose hard regs can be assigned to REGNO.  */
+static void
+find_all_spills_for (int regno)
+{
+  int p;
+  lra_live_range_t r;
+  unsigned int k;
+  bitmap_iterator bi;
+  enum reg_class rclass;
+  bool *rclass_intersect_p;
+
+  rclass = regno_allocno_class_array[regno];
+  rclass_intersect_p = ira_reg_classes_intersect_p[rclass];
+  for (r = lra_reg_info[regno].live_ranges; r != NULL; r = r->next)
+    {
+      EXECUTE_IF_SET_IN_BITMAP (&live_hard_reg_pseudos[r->start], 0, k, bi)
+	if (rclass_intersect_p[regno_allocno_class_array[k]])
+	  sparseset_set_bit (live_range_hard_reg_pseudos, k);
+      for (p = r->start + 1; p <= r->finish; p++)
+	{
+	  lra_live_range_t r2;
+
+	  for (r2 = start_point_ranges[p];
+	       r2 != NULL;
+	       r2 = r2->start_next)
+	    {
+	      if (live_pseudos_reg_renumber[r2->regno] >= 0
+		  && rclass_intersect_p[regno_allocno_class_array[r2->regno]])
+		sparseset_set_bit (live_range_hard_reg_pseudos, r2->regno);
+	    }
+	}
+    }
+}
+
 /* Assign hard registers to reload pseudos and other pseudos.  */
 static void
 assign_by_spills (void)
 {
   int i, n, nfails, iter, regno, hard_regno, cost, restore_regno;
-  rtx insn;
-  basic_block bb;
+  rtx_insn *insn;
   bitmap_head changed_insns, do_not_assign_nonreload_pseudos;
-  unsigned int u;
+  unsigned int u, conflict_regno;
   bitmap_iterator bi;
   bool reload_p;
   int max_regno = max_reg_num ();
@@ -1206,10 +1290,10 @@ assign_by_spills (void)
 		     ORIGINAL_REGNO (regno_reg_rtx[regno]),
 		     lra_reg_info[regno].freq, regno_assign_info[regno].first,
 		     regno_assign_info[regno_assign_info[regno].first].freq);
-	  hard_regno = find_hard_regno_for (regno, &cost, -1);
+	  hard_regno = find_hard_regno_for (regno, &cost, -1, iter == 1);
 	  reload_p = ! bitmap_bit_p (&non_reload_pseudos, regno);
 	  if (hard_regno < 0 && reload_p)
-	    hard_regno = spill_for (regno, &all_spilled_pseudos);
+	    hard_regno = spill_for (regno, &all_spilled_pseudos, iter == 1);
 	  if (hard_regno < 0)
 	    {
 	      if (reload_p)
@@ -1232,9 +1316,9 @@ assign_by_spills (void)
 	break;
       if (iter > 0)
 	{
-	  /* We did not assign hard regs to reload pseudos after two
-	     iteration.  It means something is wrong with asm insn
-	     constraints.  Report it.  */
+	  /* We did not assign hard regs to reload pseudos after two iterations.
+	     Either it's an asm and something is wrong with the constraints, or
+	     we have run out of spill registers; error out in either case.  */
 	  bool asm_p = false;
 	  bitmap_head failed_reload_insns;
 
@@ -1245,7 +1329,7 @@ assign_by_spills (void)
 	      bitmap_ior_into (&failed_reload_insns,
 			       &lra_reg_info[regno].insn_bitmap);
 	      /* Assign an arbitrary hard register of regno class to
-		 avoid further trouble with the asm insns.  */
+		 avoid further trouble with this insn.  */
 	      bitmap_clear_bit (&all_spilled_pseudos, regno);
 	      assign_hard_regno
 		(ira_class_hard_regs[regno_allocno_class_array[regno]][0],
@@ -1277,65 +1361,52 @@ assign_by_spills (void)
 		      lra_set_insn_deleted (insn);
 		    }
 		}
+	      else if (!asm_p)
+		{
+		  error ("unable to find a register to spill");
+		  fatal_insn ("this is the insn:", insn);
+		}
 	    }
-	  lra_assert (asm_p);
 	  break;
 	}
-      /* This is a very rare event.  We can not assign a hard
-	 register to reload pseudo because the hard register was
-	 assigned to another reload pseudo on a previous
-	 assignment pass.  For x86 example, on the 1st pass we
-	 assigned CX (although another hard register could be used
-	 for this) to reload pseudo in an insn, on the 2nd pass we
-	 need CX (and only this) hard register for a new reload
-	 pseudo in the same insn.  */
+      /* This is a very rare event.  We can not assign a hard register
+	 to reload pseudo because the hard register was assigned to
+	 another reload pseudo on a previous assignment pass.  For x86
+	 example, on the 1st pass we assigned CX (although another
+	 hard register could be used for this) to reload pseudo in an
+	 insn, on the 2nd pass we need CX (and only this) hard
+	 register for a new reload pseudo in the same insn.  Another
+	 possible situation may occur in assigning to multi-regs
+	 reload pseudos when hard regs pool is too fragmented even
+	 after spilling non-reload pseudos.
+
+	 We should do something radical here to succeed.  Here we
+	 spill *all* conflicting pseudos and reassign them.  */
       if (lra_dump_file != NULL)
 	fprintf (lra_dump_file, "  2nd iter for reload pseudo assignments:\n");
+      sparseset_clear (live_range_hard_reg_pseudos);
       for (i = 0; i < nfails; i++)
 	{
 	  if (lra_dump_file != NULL)
 	    fprintf (lra_dump_file, "	 Reload r%d assignment failure\n",
 		     sorted_pseudos[i]);
-	  bitmap_ior_into (&changed_insns,
-			   &lra_reg_info[sorted_pseudos[i]].insn_bitmap);
+	  find_all_spills_for (sorted_pseudos[i]);
 	}
-
-      /* FIXME: Look up the changed insns in the cached LRA insn data using
-	 an EXECUTE_IF_SET_IN_BITMAP over changed_insns.  */
-      FOR_EACH_BB (bb)
-	FOR_BB_INSNS (bb, insn)
-	if (bitmap_bit_p (&changed_insns, INSN_UID (insn)))
-	  {
-	    lra_insn_recog_data_t data;
-	    struct lra_insn_reg *r;
-
-	    data = lra_get_insn_recog_data (insn);
-	    for (r = data->regs; r != NULL; r = r->next)
-	      {
-		regno = r->regno;
-		/* A reload pseudo did not get a hard register on the
-		   first iteration because of the conflict with
-		   another reload pseudos in the same insn.  So we
-		   consider only reload pseudos assigned to hard
-		   registers.  We shall exclude inheritance pseudos as
-		   they can occur in original insns (not reload ones).
-		   We can omit the check for split pseudos because
-		   they occur only in move insns containing non-reload
-		   pseudos.  */
-		if (regno < lra_constraint_new_regno_start
-		    || bitmap_bit_p (&lra_inheritance_pseudos, regno)
-		    || reg_renumber[regno] < 0)
-		  continue;
-		sorted_pseudos[nfails++] = regno;
-		if (lra_dump_file != NULL)
-		  fprintf (lra_dump_file,
-			   "	  Spill reload r%d(hr=%d, freq=%d)\n",
-			   regno, reg_renumber[regno],
-			   lra_reg_info[regno].freq);
-		update_lives (regno, true);
-		lra_setup_reg_renumber (regno, -1, false);
-	      }
-	  }
+      EXECUTE_IF_SET_IN_SPARSESET (live_range_hard_reg_pseudos, conflict_regno)
+	{
+	  if ((int) conflict_regno >= lra_constraint_new_regno_start)
+	    {
+	      sorted_pseudos[nfails++] = conflict_regno;
+	      former_reload_pseudo_spill_p = true;
+	    }
+	  if (lra_dump_file != NULL)
+	    fprintf (lra_dump_file, "	  Spill %s r%d(hr=%d, freq=%d)\n",
+		     pseudo_prefix_title (conflict_regno), conflict_regno,
+		     reg_renumber[conflict_regno],
+		     lra_reg_info[conflict_regno].freq);
+	  update_lives (conflict_regno, true);
+	  lra_setup_reg_renumber (conflict_regno, -1, false);
+	}
       n = nfails;
     }
   improve_inheritance (&changed_pseudo_bitmap);
@@ -1377,7 +1448,7 @@ assign_by_spills (void)
       for (i = 0; i < n; i++)
 	{
 	  regno = sorted_pseudos[i];
-	  hard_regno = find_hard_regno_for (regno, &cost, -1);
+	  hard_regno = find_hard_regno_for (regno, &cost, -1, false);
 	  if (hard_regno >= 0)
 	    {
 	      assign_hard_regno (hard_regno, regno);
@@ -1385,6 +1456,32 @@ assign_by_spills (void)
 		 iteration -- mark the pseudo for invalidation of used
 		 alternatives of insns containing the pseudo.  */
 	      bitmap_set_bit (&changed_pseudo_bitmap, regno);
+	    }
+	  else
+	    {
+	      enum reg_class rclass = lra_get_allocno_class (regno);
+	      enum reg_class spill_class;
+	      
+	      if (targetm.spill_class == NULL
+		  || lra_reg_info[regno].restore_regno < 0
+		  || ! bitmap_bit_p (&lra_inheritance_pseudos, regno)
+		  || (spill_class
+		      = ((enum reg_class)
+			 targetm.spill_class
+			 ((reg_class_t) rclass,
+			  PSEUDO_REGNO_MODE (regno)))) == NO_REGS)
+		continue;
+	      regno_allocno_class_array[regno] = spill_class;
+	      hard_regno = find_hard_regno_for (regno, &cost, -1, false);
+	      if (hard_regno < 0)
+		regno_allocno_class_array[regno] = rclass;
+	      else
+		{
+		  setup_reg_classes
+		    (regno, spill_class, spill_class, spill_class);
+		  assign_hard_regno (hard_regno, regno);
+		  bitmap_set_bit (&changed_pseudo_bitmap, regno);
+		}
 	    }
 	}
     }
@@ -1415,23 +1512,29 @@ lra_assign (void)
   int max_regno = max_reg_num ();
 
   timevar_push (TV_LRA_ASSIGN);
+  lra_assignment_iter++;
+  if (lra_dump_file != NULL)
+    fprintf (lra_dump_file, "\n********** Assignment #%d: **********\n\n",
+	     lra_assignment_iter);
   init_lives ();
   sorted_pseudos = XNEWVEC (int, max_regno);
   sorted_reload_pseudos = XNEWVEC (int, max_regno);
   regno_allocno_class_array = XNEWVEC (enum reg_class, max_regno);
   for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
     regno_allocno_class_array[i] = lra_get_allocno_class (i);
+  former_reload_pseudo_spill_p = false;
   init_regno_assign_info ();
   bitmap_initialize (&all_spilled_pseudos, &reg_obstack);
   create_live_range_start_chains ();
   setup_live_pseudos_and_spill_after_risky_transforms (&all_spilled_pseudos);
 #ifdef ENABLE_CHECKING
-  for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
-    if (lra_reg_info[i].nrefs != 0 && reg_renumber[i] >= 0
-	&& lra_reg_info[i].call_p
-	&& overlaps_hard_reg_set_p (call_used_reg_set,
-				    PSEUDO_REGNO_MODE (i), reg_renumber[i]))
-      gcc_unreachable ();
+  if (!flag_ipa_ra)
+    for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
+      if (lra_reg_info[i].nrefs != 0 && reg_renumber[i] >= 0
+	  && lra_reg_info[i].call_p
+	  && overlaps_hard_reg_set_p (call_used_reg_set,
+				      PSEUDO_REGNO_MODE (i), reg_renumber[i]))
+	gcc_unreachable ();
 #endif
   /* Setup insns to process on the next constraint pass.  */
   bitmap_initialize (&changed_pseudo_bitmap, &reg_obstack);
@@ -1467,5 +1570,11 @@ lra_assign (void)
   free (sorted_reload_pseudos);
   finish_lives ();
   timevar_pop (TV_LRA_ASSIGN);
+  if (former_reload_pseudo_spill_p)
+    lra_assignment_iter_after_spill++;
+  if (lra_assignment_iter_after_spill > LRA_MAX_ASSIGNMENT_ITERATION_NUMBER)
+    internal_error
+      ("Maximum number of LRA assignment passes is achieved (%d)\n",
+       LRA_MAX_ASSIGNMENT_ITERATION_NUMBER);
   return no_spills_p;
 }

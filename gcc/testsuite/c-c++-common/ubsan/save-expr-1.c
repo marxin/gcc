@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-fsanitize=shift -Wall -Werror -O" } */
+/* { dg-options "-fsanitize=shift -Wall -Werror -O -fno-sanitize-recover=shift" } */
 
 static int x;
 int

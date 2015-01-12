@@ -1,4 +1,4 @@
-// { dg-options -std=c++11 }
+// { dg-do compile { target { ! c++14 } } }
 
 #define assert(E) if(!(E))__builtin_abort();
 

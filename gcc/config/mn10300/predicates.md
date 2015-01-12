@@ -1,5 +1,5 @@
 ;; Predicate definitions for Matsushita MN10300.
-;; Copyright (C) 2005-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2005-2015 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -70,4 +70,4 @@
 
 (define_predicate "mn10300_store_multiple_operation"
   (and (match_code "parallel")
-       (match_test "mn10300_store_multiple_operation_p (op)")))
+       (match_test "mn10300_store_multiple_regs (op) != 0")))

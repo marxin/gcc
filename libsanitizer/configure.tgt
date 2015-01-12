@@ -26,11 +26,16 @@ case "${target}" in
 		LSAN_SUPPORTED=yes
 	fi
 	;;
+  powerpc*le-*-linux*)
+	UNSUPPORTED=1
+	;;
   powerpc*-*-linux*)
 	;;
   sparc*-*-linux*)
 	;;
   arm*-*-linux*)
+	;;
+  aarch64*-*-linux*)
 	;;
   x86_64-*-darwin[1]* | i?86-*-darwin[1]*)
 	TSAN_SUPPORTED=no

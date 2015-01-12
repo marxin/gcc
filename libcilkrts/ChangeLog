@@ -1,3 +1,104 @@
+2014-11-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR bootstrap/63784
+	* configure: Regenerated.
+
+2014-11-13  Kirill Yukhin  <kirill.yukhin@intel.com>
+
+	* configure.tgt: Use config/target-posix.
+
+2014-11-11  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR target/63610
+	* configure: Regenerate.
+
+2014-08-01  Alexander Ivchenko  <alexander.ivchenko@intel.com>
+
+	* configure.ac: Move pthread affinity test to the place where
+	'-pthread' passed to CFLAGS. Otherwise the test always fails.
+	(XCFLAGS): New variable for correctly passing
+	'-pthread'.
+	(XLDFLAGS): New variable for passing the correct pthread lib.
+	* configure: Regenerate.
+	* Makefile.am (AM_CFLAGS): Add $XCFLAGS.
+	(AM_LDFLAGS): Add $XLDFLAGS.
+	* Makefile.in: Regenerate.
+
+2014-05-21  John Marino  <gnugcc@marino.st>
+
+	* runtime/os-unix.c (__DragonFly__): New target.
+
+2014-04-11  Barry Tannenbaum  <barry.m.tannenbaum@intel.com>
+
+	PR other/60644
+	* runtime/os-unix.c: Replaced all occurrances of ANDROID with
+	__ANDROID__.
+	* runtime/bug.h: Likewise.
+	* include/cilk/metaprogramming.h: Likewise.
+	* include/cilk/reducer_min_max.h: Likewise.
+
+2014-03-26  Tobias Burnus  <burnus@net-b.de>
+
+	* libcilkrts.spec.in: New.
+	* Makefile.am: Handle libcilkrts.spec.
+	* configure.ac: Determine link options for libcilkrts.spec.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+	* aclocal.m4: Regenerate.
+
+2014-03-20  Tobias Burnus  <burnus@net-b.de>
+
+	PR other/60589
+
+	Reverted:
+	2014-03-09  Tobias Burnus  <burnus@net-b.de>
+
+	* Makefile.am: Install cilk.h.
+	* Makefile.in: Regenerate.
+	* aclocal.m4: Regenerate.
+
+2014-03-09  Tobias Burnus  <burnus@net-b.de>
+
+	* Makefile.am: Install cilk.h.
+	* Makefile.in: Regenerate.
+	* aclocal.m4: Regenerate.
+
+2014-02-18  Balaji V. Iyer  <balaji.v.iyer@intel.com>
+
+	* include/cilk/common.h (__CILKRTS_ABI_VERSION): Set the ABI version
+	to 1 instead of 0.
+	* runtime/cilk-abi-cilk-for.cpp (cilk_for_recursive): Added a fix to
+	initialize stack frame correctly.
+
+2014-02-10  Balaji V. Iyer  <balaji.v.iyer@intel.com>
+
+	PR target/59691
+	* runtime/config/x86/os-unix-sysdep.c (__builtin_cpu_supports): New
+	function.
+	(restore_x86_fp_state): Added a check if the cpu supports the
+	instruction before emitting it.
+	(sysdep_save_fp_ctrl_state): Likewise.
+
+2014-01-20  Balaji V. Iyer  <balaji.v.iyer@intel.com>
+
+	PR other/58996
+	* configure.ac: Added a check for pthread affinity support.
+	* runtime/os-unix.c: Likewise.
+	* configure: Regenerate.
+
+2014-01-09  Balaji V. Iyer  <balaji.v.iyer@intel.com>
+
+	bootstrap/59094
+	* Makefile.am (cilkincludedir): Fixed a bug to store version-specific
+	runtime libraries in the correct place.
+	* Makefile.in: Regenerate.
+
+2013-12-13  Balaji V. Iyer  <balaji.v.iyer@intel.com>
+
+	* Makefile.am (GENERAL_FLAGS): Removed undefining of Cilk keywords.
+	* Makefile.in: Reconfigure.
+	* runtime/symbol_test.c: Added a #define to clear out _Cilk_for.
+
 2013-11-25  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
 
 	* configure.ac (GCC_LIBSTDCXX_RAW_CXX_FLAGS): Remove.

@@ -1,5 +1,4 @@
-/*   Copyright (C) 2013
-    Free Software Foundation, Inc.
+/* Copyright (C) 2013-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -136,7 +135,25 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "options.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
+#include "predict.h"
+#include "tm.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -183,11 +200,10 @@ vtbl_map_node_registration_find (struct vtbl_map_node *node,
   struct vtable_registration key;
   struct vtable_registration **slot;
 
-  gcc_assert (node && node->registered.is_created ());
+  gcc_assert (node && node->registered);
 
   key.vtable_decl = vtable_decl;
-  slot = (struct vtable_registration **) node->registered.find_slot (&key,
-                                                                     NO_INSERT);
+  slot = node->registered->find_slot (&key, NO_INSERT);
 
   if (slot && (*slot))
     {
@@ -213,12 +229,11 @@ vtbl_map_node_registration_insert (struct vtbl_map_node *node,
   struct vtable_registration **slot;
   bool inserted_something = false;
 
-  if (!node || !node->registered.is_created ())
+  if (!node || !node->registered)
     return false;
 
   key.vtable_decl = vtable_decl;
-  slot = (struct vtable_registration **) node->registered.find_slot (&key,
-                                                                     INSERT);
+  slot = node->registered->find_slot (&key, INSERT);
 
   if (! *slot)
     {
@@ -308,11 +323,11 @@ vtbl_map_hasher::equal (const value_type *p1, const compare_type *p2)
    to find the nodes for various tasks (see comments in vtable-verify.h
    for more details.  */
 
-typedef hash_table <vtbl_map_hasher> vtbl_map_table_type;
+typedef hash_table<vtbl_map_hasher> vtbl_map_table_type;
 typedef vtbl_map_table_type::iterator vtbl_map_iterator_type;
 
 /* Vtable map variable nodes stored in a hash table.  */
-static vtbl_map_table_type vtbl_map_hash;
+static vtbl_map_table_type *vtbl_map_hash;
 
 /* Vtable map variable nodes stored in a vector.  */
 vec<struct vtbl_map_node *> vtbl_map_nodes_vec;
@@ -329,7 +344,7 @@ vtbl_map_get_node (tree class_type)
   tree class_name;
   unsigned int type_quals;
 
-  if (!vtbl_map_hash.is_created ())
+  if (!vtbl_map_hash)
     return NULL;
 
   gcc_assert (TREE_CODE (class_type) == RECORD_TYPE);
@@ -347,8 +362,7 @@ vtbl_map_get_node (tree class_type)
   class_name = DECL_ASSEMBLER_NAME (class_type_decl);
 
   key.class_name = class_name;
-  slot = (struct vtbl_map_node **) vtbl_map_hash.find_slot (&key,
-                                                            NO_INSERT);
+  slot = (struct vtbl_map_node **) vtbl_map_hash->find_slot (&key, NO_INSERT);
   if (!slot)
     return NULL;
   return *slot;
@@ -366,8 +380,8 @@ find_or_create_vtbl_map_node (tree base_class_type)
   tree class_type_decl;
   unsigned int type_quals;
 
-  if (!vtbl_map_hash.is_created ())
-    vtbl_map_hash.create (10);
+  if (!vtbl_map_hash)
+    vtbl_map_hash = new vtbl_map_table_type (10);
 
   /* Find the TYPE_DECL for the class.  */
   class_type_decl = TYPE_NAME (base_class_type);
@@ -378,8 +392,7 @@ find_or_create_vtbl_map_node (tree base_class_type)
 
   gcc_assert (HAS_DECL_ASSEMBLER_NAME_P (class_type_decl));
   key.class_name = DECL_ASSEMBLER_NAME (class_type_decl);
-  slot = (struct vtbl_map_node **) vtbl_map_hash.find_slot (&key,
-                                                            INSERT);
+  slot = (struct vtbl_map_node **) vtbl_map_hash->find_slot (&key, INSERT);
 
   if (*slot)
     return *slot;
@@ -397,7 +410,7 @@ find_or_create_vtbl_map_node (tree base_class_type)
   (node->class_info->parents).create (4);
   (node->class_info->children).create (4);
 
-  node->registered.create (16);
+  node->registered = new register_table_type (16);
 
   node->is_used = false;
 
@@ -513,10 +526,10 @@ var_is_used_for_virtual_call_p (tree lhs, int *mem_ref_depth)
     {
       gimple stmt2 = USE_STMT (use_p);
 
-      if (gimple_code (stmt2) == GIMPLE_CALL)
+      if (is_gimple_call (stmt2))
         {
           tree fncall = gimple_call_fn (stmt2);
-          if (TREE_CODE (fncall) == OBJ_TYPE_REF)
+          if (fncall && TREE_CODE (fncall) == OBJ_TYPE_REF)
             found_vcall = true;
 	  else
 	    return false;
@@ -527,7 +540,7 @@ var_is_used_for_virtual_call_p (tree lhs, int *mem_ref_depth)
 	                                            (gimple_phi_result (stmt2),
 	                                             mem_ref_depth);
         }
-      else if (gimple_code (stmt2) == GIMPLE_ASSIGN)
+      else if (is_gimple_assign (stmt2))
         {
 	  tree rhs = gimple_assign_rhs1 (stmt2);
 	  if (TREE_CODE (rhs) == ADDR_EXPR
@@ -586,10 +599,10 @@ verify_bb_vtables (basic_block bb)
       stmt = gsi_stmt (gsi_virtual_call);
 
       /* Count virtual calls.  */
-      if (gimple_code (stmt) == GIMPLE_CALL)
+      if (is_gimple_call (stmt))
         {
           tree fncall = gimple_call_fn (stmt);
-          if (TREE_CODE (fncall) == OBJ_TYPE_REF)
+          if (fncall && TREE_CODE (fncall) == OBJ_TYPE_REF)
             total_num_virtual_calls++;
         }
 
@@ -599,7 +612,7 @@ verify_bb_vtables (basic_block bb)
           tree vtbl_var_decl = NULL_TREE;
           struct vtbl_map_node *vtable_map_node;
           tree vtbl_decl = NULL_TREE;
-          gimple call_stmt;
+          gcall *call_stmt;
           const char *vtable_name = "<unknown>";
           tree tmp0;
           bool found;
@@ -646,9 +659,6 @@ verify_bb_vtables (basic_block bb)
 
               if (vtable_map_node && vtable_map_node->vtbl_map_decl)
                 {
-                  use_operand_p use_p;
-                  ssa_op_iter iter;
-
                   vtable_map_node->is_used = true;
                   vtbl_var_decl = vtable_map_node->vtbl_map_decl;
 
@@ -695,35 +705,27 @@ verify_bb_vtables (basic_block bb)
                   gimple_call_set_lhs (call_stmt, tmp0);
                   update_stmt (call_stmt);
 
-                  /* Find the next stmt, after the vptr assignment
-                     statememt, which should use the result of the
-                     vptr assignment statement value. */
-                  gsi_next (&gsi_vtbl_assign);
-                  gimple next_stmt = gsi_stmt (gsi_vtbl_assign);
-
-                  if (!next_stmt)
-                    return;
-
-                  /* Find any/all uses of 'lhs' in next_stmt, and
-                     replace them with 'tmp0'.  */
+                  /* Replace all uses of lhs with tmp0. */
                   found = false;
-                  FOR_EACH_PHI_OR_STMT_USE (use_p, next_stmt, iter,
-                                            SSA_OP_ALL_USES)
+                  imm_use_iterator iterator;
+                  gimple use_stmt;
+                  FOR_EACH_IMM_USE_STMT (use_stmt, iterator, lhs)
                     {
-                      tree op = USE_FROM_PTR (use_p);
-                      if (op == lhs)
-                        {
-                          SET_USE (use_p, tmp0);
-                          found = true;
-                        }
+                      use_operand_p use_p;
+                      if (use_stmt == call_stmt)
+                        continue;
+                      FOR_EACH_IMM_USE_ON_STMT (use_p, iterator)
+                        SET_USE (use_p, tmp0);
+                      update_stmt (use_stmt);
+                      found = true;
                     }
-                  update_stmt (next_stmt);
+
                   gcc_assert (found);
 
                   /* Insert the new verification call just after the
                      statement that gets the vtable pointer out of the
                      object.  */
-                  gsi_vtbl_assign = gsi_for_stmt (stmt);
+                  gcc_assert (gsi_stmt (gsi_vtbl_assign) == stmt);
                   gsi_insert_after (&gsi_vtbl_assign, call_stmt,
                                     GSI_NEW_STMT);
 
@@ -735,31 +737,6 @@ verify_bb_vtables (basic_block bb)
     }
 }
 
-/* Main function, called from pass->excute().  Loop through all the
-   basic blocks in the current function, passing them to
-   verify_bb_vtables, which searches for virtual calls, and inserts
-   calls to __VLTVerifyVtablePointer.  */
-
-unsigned int
-vtable_verify_main (void)
-{
-  unsigned int ret = 1;
-  basic_block bb;
-
-  FOR_ALL_BB (bb)
-      verify_bb_vtables (bb);
-
-  return ret;
-}
-
-/* Gate function for the pass.  */
-
-static bool
-gate_tree_vtable_verify (void)
-{
-  return (flag_vtable_verify);
-}
-
 /* Definition of this optimization pass.  */
 
 namespace {
@@ -769,8 +746,6 @@ const pass_data pass_data_vtable_verify =
   GIMPLE_PASS, /* type */
   "vtable-verify", /* name */
   OPTGROUP_NONE, /* optinfo_flags */
-  true, /* has_gate */
-  true, /* has_execute */
   TV_VTABLE_VERIFICATION, /* tv_id */
   ( PROP_cfg | PROP_ssa ), /* properties_required */
   0, /* properties_provided */
@@ -787,10 +762,26 @@ public:
   {}
 
   /* opt_pass methods: */
-  bool gate () { return gate_tree_vtable_verify (); }
-  unsigned int execute () { return vtable_verify_main (); }
+  virtual bool gate (function *) { return (flag_vtable_verify); }
+  virtual unsigned int execute (function *);
 
 }; // class pass_vtable_verify
+
+/* Loop through all the basic blocks in the current function, passing them to
+   verify_bb_vtables, which searches for virtual calls, and inserts
+   calls to __VLTVerifyVtablePointer.  */
+
+unsigned int
+pass_vtable_verify::execute (function *fun)
+{
+  unsigned int ret = 1;
+  basic_block bb;
+
+  FOR_ALL_BB_FN (bb, fun)
+      verify_bb_vtables (bb);
+
+  return ret;
+}
 
 } // anon namespace
 

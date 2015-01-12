@@ -1,5 +1,5 @@
 ;;  Machine Description for TI MSP43* processors
-;;  Copyright (C) 2013 Free Software Foundation, Inc.
+;;  Copyright (C) 2013-2015 Free Software Foundation, Inc.
 ;;  Contributed by Red Hat.
 
 ;; This file is part of GCC.
@@ -58,7 +58,7 @@
        (match_code "label_ref" "0")))
 
 
-;; These are memory references that are safe to use with the X suffix,
+;; These are memory references that are safe to use without the X suffix,
 ;; because we know/assume they need not index across the 64k boundary.
 (define_constraint "Ys"
   "Memory reference, stack only."
@@ -70,3 +70,16 @@
 		  (match_test ("IN_RANGE (INTVAL (XEXP (XEXP (op, 0), 1)), -1 << 15, (1 << 15)-1)"))))
 	(match_code "reg" "0")
 	)))
+
+(define_constraint "Yc"
+  "Memory reference, for CALL - we can't use SP."
+  (and (match_code "mem")
+       (match_code "mem" "0")
+       (not (ior
+	     (and (match_code "plus" "00")
+		  (and (match_code "reg" "000")
+		       (match_test ("REGNO (XEXP (XEXP (op, 0), 0)) != SP_REGNO"))))
+	     (and (match_code "reg" "0")
+		  (match_test ("REGNO (XEXP (XEXP (op, 0), 0)) != SP_REGNO")))
+	     ))))
+

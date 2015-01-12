@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler, for HPs running
    HPUX using the 64bit runtime model.
-   Copyright (C) 1999-2013 Free Software Foundation, Inc.
+   Copyright (C) 1999-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -336,7 +336,7 @@ do {								\
    the sections are not actually used.  However, we still must provide
    defines to select the proper code path.  */
 #undef INIT_SECTION_ASM_OP
-#define INIT_SECTION_ASM_OP
+#define INIT_SECTION_ASM_OP ""
 #undef FINI_SECTION_ASM_OP
 #define FINI_SECTION_ASM_OP
 

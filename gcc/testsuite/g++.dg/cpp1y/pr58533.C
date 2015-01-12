@@ -1,5 +1,5 @@
 // PR c++/58533
-// { dg-options "-std=gnu++1y" }
+// { dg-do compile { target c++14 } }
 
 void foo()
 {

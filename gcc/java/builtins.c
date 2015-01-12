@@ -1,5 +1,5 @@
 /* Built-in and inline functions for gcj
-   Copyright (C) 2001-2013 Free Software Foundation, Inc.
+   Copyright (C) 2001-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -30,7 +30,18 @@ The Free Software Foundation is independent of Sun Microsystems, Inc.  */
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "options.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "stor-layout.h"
 #include "stringpool.h"
 #include "ggc.h"
@@ -319,7 +330,7 @@ static tree
 compareAndSwapInt_builtin (tree method_return_type ATTRIBUTE_UNUSED,
 			   tree orig_call)
 {
-  enum machine_mode mode = TYPE_MODE (int_type_node);
+  machine_mode mode = TYPE_MODE (int_type_node);
   if (can_compare_and_swap_p (mode, flag_use_atomic_builtins))
     {
       tree addr, stmt;
@@ -340,7 +351,7 @@ static tree
 compareAndSwapLong_builtin (tree method_return_type ATTRIBUTE_UNUSED,
 			    tree orig_call)
 {
-  enum machine_mode mode = TYPE_MODE (long_type_node);
+  machine_mode mode = TYPE_MODE (long_type_node);
   /* We don't trust flag_use_atomic_builtins for multi-word compareAndSwap.
      Some machines such as ARM have atomic libfuncs but not the multi-word
      versions.  */
@@ -365,7 +376,7 @@ static tree
 compareAndSwapObject_builtin (tree method_return_type ATTRIBUTE_UNUSED, 
 			      tree orig_call)
 {
-  enum machine_mode mode = TYPE_MODE (ptr_type_node);
+  machine_mode mode = TYPE_MODE (ptr_type_node);
   if (can_compare_and_swap_p (mode, flag_use_atomic_builtins))
   {
     tree addr, stmt;
@@ -394,7 +405,8 @@ putVolatile_builtin (tree method_return_type ATTRIBUTE_UNUSED,
   
   addr = build_addr_sum (value_type, obj_arg, offset_arg);
   addr 
-    = fold_convert (build_pointer_type (build_type_variant (value_type, 0, 1)),
+    = fold_convert (build_pointer_type (build_qualified_type
+					(value_type, TYPE_QUAL_VOLATILE)),
 		    addr);
   
   stmt = build_call_expr (builtin_decl_explicit (BUILT_IN_SYNC_SYNCHRONIZE), 0);
@@ -418,8 +430,9 @@ getVolatile_builtin (tree method_return_type ATTRIBUTE_UNUSED,
 
   addr = build_addr_sum (method_return_type, obj_arg, offset_arg);
   addr 
-    = fold_convert (build_pointer_type (build_type_variant 
-					(method_return_type, 0, 1)), addr);
+    = fold_convert (build_pointer_type (build_qualified_type
+					(method_return_type,
+					 TYPE_QUAL_VOLATILE)), addr);
   
   stmt = build_call_expr (builtin_decl_explicit (BUILT_IN_SYNC_SYNCHRONIZE), 0);
   tmp = build_decl (BUILTINS_LOCATION, VAR_DECL, NULL, method_return_type);
@@ -442,7 +455,7 @@ static tree
 VMSupportsCS8_builtin (tree method_return_type, 
 		       tree orig_call ATTRIBUTE_UNUSED)
 {
-  enum machine_mode mode = TYPE_MODE (long_type_node);
+  machine_mode mode = TYPE_MODE (long_type_node);
   gcc_assert (method_return_type == boolean_type_node);
   if (can_compare_and_swap_p (mode, false))
     return boolean_true_node;

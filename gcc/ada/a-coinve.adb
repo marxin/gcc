@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2004-2013, Free Software Foundation, Inc.         --
+--          Copyright (C) 2004-2014, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -33,6 +33,8 @@ with Ada.Unchecked_Deallocation;
 with System; use type System.Address;
 
 package body Ada.Containers.Indefinite_Vectors is
+
+   pragma Annotate (CodePeer, Skip_Analysis);
 
    procedure Free is
      new Ada.Unchecked_Deallocation (Elements_Type, Elements_Access);
@@ -543,6 +545,7 @@ package body Ada.Containers.Indefinite_Vectors is
       LR := LR - 1;
 
       return Result;
+
    exception
       when others =>
          BL := BL - 1;
@@ -1280,6 +1283,7 @@ package body Ada.Containers.Indefinite_Vectors is
       when others =>
          B := B - 1;
          L := L - 1;
+
          raise;
    end Find_Index;
 
@@ -1421,6 +1425,7 @@ package body Ada.Containers.Indefinite_Vectors is
             when others =>
                B := B - 1;
                L := L - 1;
+
                raise;
          end;
       end Is_Sorted;
@@ -1599,6 +1604,7 @@ package body Ada.Containers.Indefinite_Vectors is
             when others =>
                B := B - 1;
                L := L - 1;
+
                raise;
          end;
       end Sort;

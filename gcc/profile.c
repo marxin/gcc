@@ -1,5 +1,5 @@
 /* Calculate branch probabilities, and basic block execution counts.
-   Copyright (C) 1990-2013 Free Software Foundation, Inc.
+   Copyright (C) 1990-2015 Free Software Foundation, Inc.
    Contributed by James E. Wilson, UC Berkeley/Cygnus Support;
    based on some ideas from Dain Samples of UC Berkeley.
    Further mangling by Bob Manson, Cygnus Support.
@@ -54,13 +54,27 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl.h"
 #include "flags.h"
 #include "regs.h"
+#include "symtab.h"
 #include "expr.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "vec.h"
+#include "machmode.h"
+#include "hard-reg-set.h"
+#include "input.h"
 #include "function.h"
+#include "predict.h"
+#include "dominance.h"
+#include "cfg.h"
+#include "cfganal.h"
 #include "basic-block.h"
 #include "diagnostic-core.h"
 #include "coverage.h"
 #include "value-prof.h"
+#include "symtab.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
 #include "gimple-expr.h"
@@ -70,11 +84,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "cfgloop.h"
 #include "dumpfile.h"
+#include "hash-map.h"
+#include "plugin-api.h"
+#include "ipa-ref.h"
 #include "cgraph.h"
 
 #include "profile.h"
 
-struct bb_info {
+struct bb_profile_info {
   unsigned int count_valid : 1;
 
   /* Number of successor and predecessor edges.  */
@@ -82,7 +99,7 @@ struct bb_info {
   gcov_type pred_count;
 };
 
-#define BB_INFO(b)  ((struct bb_info *) (b)->aux)
+#define BB_INFO(b)  ((struct bb_profile_info *) (b)->aux)
 
 
 /* Counter summary from the last set of coverage counts read.  */
@@ -106,6 +123,14 @@ static int total_num_times_called;
 static int total_hist_br_prob[20];
 static int total_num_branches;
 
+/* Helper function to update gcov_working_sets.  */
+
+void add_working_set (gcov_working_set_t *set) {
+  int i = 0;
+  for (; i < NUM_GCOV_WORKING_SETS; i++)
+    gcov_working_sets[i] = set[i];
+}
+
 /* Forward declarations.  */
 static void find_spanning_tree (struct edge_list *);
 
@@ -128,7 +153,7 @@ instrument_edges (struct edge_list *el)
 
       FOR_EACH_EDGE (e, ei, bb->succs)
 	{
-	  struct edge_info *inf = EDGE_INFO (e);
+	  struct edge_profile_info *inf = EDGE_INFO (e);
 
 	  if (!inf->ignore && !inf->on_tree)
 	    {
@@ -183,6 +208,7 @@ instrument_values (histogram_values values)
 	  break;
 
  	case HIST_TYPE_INDIR_CALL:
+ 	case HIST_TYPE_INDIR_CALL_TOPN:
  	  gimple_gen_ic_profiler (hist, t, 0);
   	  break;
 
@@ -237,10 +263,10 @@ get_working_sets (void)
           ws_info = &gcov_working_sets[ws_ix];
           /* Print out the percentage using int arithmatic to avoid float.  */
           fprintf (dump_file, "\t\t%u.%02u%%: num counts=%u, min counter="
-                   HOST_WIDEST_INT_PRINT_DEC "\n",
+                   "%"PRId64 "\n",
                    pct / 100, pct - (pct / 100 * 100),
                    ws_info->num_counters,
-                   (HOST_WIDEST_INT)ws_info->min_counter);
+                   (int64_t)ws_info->min_counter);
         }
     }
 }
@@ -318,7 +344,7 @@ is_edge_inconsistent (vec<edge, va_gc> *edges)
 	      if (dump_file)
 		{
 		  fprintf (dump_file,
-		  	   "Edge %i->%i is inconsistent, count"HOST_WIDEST_INT_PRINT_DEC,
+		  	   "Edge %i->%i is inconsistent, count%"PRId64,
 			   e->src->index, e->dest->index, e->count);
 		  dump_bb (dump_file, e->src, 0, TDF_DETAILS);
 		  dump_bb (dump_file, e->dest, 0, TDF_DETAILS);
@@ -354,7 +380,7 @@ is_inconsistent (void)
 {
   basic_block bb;
   bool inconsistent = false;
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     {
       inconsistent |= is_edge_inconsistent (bb->preds);
       if (!dump_file && inconsistent)
@@ -367,7 +393,7 @@ is_inconsistent (void)
 	  if (dump_file)
 	    {
 	      fprintf (dump_file, "BB %i count is negative "
-		       HOST_WIDEST_INT_PRINT_DEC,
+		       "%"PRId64,
 		       bb->index,
 		       bb->count);
 	      dump_bb (dump_file, bb, 0, TDF_DETAILS);
@@ -379,7 +405,7 @@ is_inconsistent (void)
 	  if (dump_file)
 	    {
 	      fprintf (dump_file, "BB %i count does not match sum of incoming edges "
-		       HOST_WIDEST_INT_PRINT_DEC" should be " HOST_WIDEST_INT_PRINT_DEC,
+		       "%"PRId64" should be %"PRId64,
 		       bb->index,
 		       bb->count,
 		       sum_edge_counts (bb->preds));
@@ -394,7 +420,7 @@ is_inconsistent (void)
 	  if (dump_file)
 	    {
 	      fprintf (dump_file, "BB %i count does not match sum of outgoing edges "
-		       HOST_WIDEST_INT_PRINT_DEC" should be " HOST_WIDEST_INT_PRINT_DEC,
+		       "%"PRId64" should be %"PRId64,
 		       bb->index,
 		       bb->count,
 		       sum_edge_counts (bb->succs));
@@ -471,8 +497,8 @@ read_profile_edge_counts (gcov_type *exec_counts)
 	      {
 		fprintf (dump_file, "\nRead edge from %i to %i, count:",
 			 bb->index, e->dest->index);
-		fprintf (dump_file, HOST_WIDEST_INT_PRINT_DEC,
-			 (HOST_WIDEST_INT) e->count);
+		fprintf (dump_file, "%"PRId64,
+			 (int64_t) e->count);
 	      }
 	  }
     }
@@ -542,7 +568,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
     }
 
   /* Attach extra info block to each bb.  */
-  alloc_aux_for_blocks (sizeof (struct bb_info));
+  alloc_aux_for_blocks (sizeof (struct bb_profile_info));
   FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR_FOR_FN (cfun), NULL, next_bb)
     {
       edge e;
@@ -590,7 +616,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
       changes = 0;
       FOR_BB_BETWEEN (bb, EXIT_BLOCK_PTR_FOR_FN (cfun), NULL, prev_bb)
 	{
-	  struct bb_info *bi = BB_INFO (bb);
+	  struct bb_profile_info *bi = BB_INFO (bb);
 	  if (! bi->count_valid)
 	    {
 	      if (bi->succ_count == 0)
@@ -692,7 +718,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
 
   /* If the graph has been correctly solved, every block will have a
      succ and pred count of zero.  */
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     {
       gcc_assert (!BB_INFO (bb)->succ_count && !BB_INFO (bb)->pred_count);
     }
@@ -797,7 +823,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
 	 give all abnormals frequency of 0, otherwise distribute the
 	 frequency over abnormals (this is the case of noreturn
 	 calls).  */
-      else if (profile_status == PROFILE_ABSENT)
+      else if (profile_status_for_fn (cfun) == PROFILE_ABSENT)
 	{
 	  int total = 0;
 
@@ -825,7 +851,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
 	}
     }
   counts_to_freqs ();
-  profile_status = PROFILE_READ;
+  profile_status_for_fn (cfun) = PROFILE_READ;
   compute_function_frequency ();
 
   if (dump_file)
@@ -918,9 +944,8 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
          the corresponding call graph node.  */
       if (hist->type == HIST_TYPE_TIME_PROFILE)
         {
-          node = cgraph_get_node (hist->fun->decl);
-
-          node->tp_first_run = hist->hvalue.counters[0];
+	  node = cgraph_node::get (hist->fun->decl);
+	  node->tp_first_run = hist->hvalue.counters[0];
 
           if (dump_file)
             fprintf (dump_file, "Read tp_first_run: %d\n", node->tp_first_run);
@@ -1021,7 +1046,7 @@ branch_prob (void)
      We also add fake exit edges for each call and asm statement in the
      basic, since it may not return.  */
 
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     {
       int need_exit_edge = 0, need_entry_edge = 0;
       int have_exit_edge = 0, have_entry_edge = 0;
@@ -1104,29 +1129,20 @@ branch_prob (void)
 	    {
 	      gimple_stmt_iterator gsi;
 	      gimple first;
-	      tree fndecl;
 
-	      gsi = gsi_after_labels (bb);
+	      gsi = gsi_start_nondebug_after_labels_bb (bb);
 	      gcc_checking_assert (!gsi_end_p (gsi));
 	      first = gsi_stmt (gsi);
-	      if (is_gimple_debug (first))
-		{
-		  gsi_next_nondebug (&gsi);
-		  gcc_checking_assert (!gsi_end_p (gsi));
-		  first = gsi_stmt (gsi);
-		}
 	      /* Don't split the bbs containing __builtin_setjmp_receiver
-		 or __builtin_setjmp_dispatcher calls.  These are very
+		 or ABNORMAL_DISPATCHER calls.  These are very
 		 special and don't expect anything to be inserted before
 		 them.  */
 	      if (is_gimple_call (first)
-		  && (((fndecl = gimple_call_fndecl (first)) != NULL
-		       && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
-		       && (DECL_FUNCTION_CODE (fndecl)
-			   == BUILT_IN_SETJMP_RECEIVER
-			   || (DECL_FUNCTION_CODE (fndecl)
-			       == BUILT_IN_SETJMP_DISPATCHER)))
-		      || gimple_call_flags (first) & ECF_RETURNS_TWICE))
+		  && (gimple_call_builtin_p (first, BUILT_IN_SETJMP_RECEIVER)
+		      || (gimple_call_flags (first) & ECF_RETURNS_TWICE)
+		      || (gimple_call_internal_p (first)
+			  && (gimple_call_internal_fn (first)
+			      == IFN_ABNORMAL_DISPATCHER))))
 		continue;
 
 	      if (dump_file)
@@ -1139,7 +1155,7 @@ branch_prob (void)
 
   el = create_edge_list ();
   num_edges = NUM_EDGES (el);
-  alloc_aux_for_edges (sizeof (struct edge_info));
+  alloc_aux_for_edges (sizeof (struct edge_profile_info));
 
   /* The basic blocks are expected to be numbered sequentially.  */
   compact_blocks ();
@@ -1171,7 +1187,7 @@ branch_prob (void)
   for (num_instrumented = i = 0; i < num_edges; i++)
     {
       edge e = INDEX_EDGE (el, i);
-      struct edge_info *inf = EDGE_INFO (e);
+      struct edge_profile_info *inf = EDGE_INFO (e);
 
       if (inf->ignore || inf->on_tree)
 	/*NOP*/;
@@ -1231,7 +1247,7 @@ branch_prob (void)
 
 	  FOR_EACH_EDGE (e, ei, bb->succs)
 	    {
-	      struct edge_info *i = EDGE_INFO (e);
+	      struct edge_profile_info *i = EDGE_INFO (e);
 	      if (!i->ignore)
 		{
 		  unsigned flag_bits = 0;
@@ -1260,7 +1276,7 @@ branch_prob (void)
       /* Initialize the output.  */
       output_location (NULL, 0, NULL, NULL);
 
-      FOR_EACH_BB (bb)
+      FOR_EACH_BB_FN (bb, cfun)
 	{
 	  gimple_stmt_iterator gsi;
 	  gcov_position_t offset = 0;

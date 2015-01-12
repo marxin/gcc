@@ -10,6 +10,8 @@
    avr: Variadic funcs don't pass arguments in registers, while normal funcs
         do.  */
 /* { dg-skip-if "Variadic funcs use different argument passing from normal funcs" { arm_hf_eabi || { avr-*-* } } "*" "" } */
+/* { dg-skip-if "Variadic funcs have all args on stack. Normal funcs have args in registers." { nds32*-*-* } "*" "" } */
+/* { dg-require-effective-target untyped_assembly } */
    
 
 #define INTEGER_ARG  5

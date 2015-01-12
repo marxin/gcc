@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin netbsd openbsd plan9 windows
+// +build darwin nacl netbsd openbsd plan9 solaris windows
 
 #include "runtime.h"
 
@@ -152,8 +152,12 @@ runtime_notesleep(Note *n)
 
 	m = runtime_m();
 
+  /* For gccgo it's OK to sleep in non-g0, and it happens in
+     stoptheworld because we have not implemented preemption.
+
 	if(runtime_g() != m->g0)
 		runtime_throw("notesleep not on g0");
+  */
 
 	if(m->waitsema == 0)
 		m->waitsema = runtime_semacreate();
@@ -163,7 +167,9 @@ runtime_notesleep(Note *n)
 		return;
 	}
 	// Queued.  Sleep.
+	m->blocked = true;
 	runtime_semasleep(-1);
+	m->blocked = false;
 }
 
 static bool
@@ -186,18 +192,23 @@ notetsleep(Note *n, int64 ns, int64 deadline, M *mp)
 
 	if(ns < 0) {
 		// Queued.  Sleep.
+		m->blocked = true;
 		runtime_semasleep(-1);
+		m->blocked = false;
 		return true;
 	}
 
 	deadline = runtime_nanotime() + ns;
 	for(;;) {
 		// Registered.  Sleep.
+		m->blocked = true;
 		if(runtime_semasleep(ns) >= 0) {
+			m->blocked = false;
 			// Acquired semaphore, semawakeup unregistered us.
 			// Done.
 			return true;
 		}
+		m->blocked = false;
 
 		// Interrupted or timed out.  Still registered.  Semaphore not acquired.
 		ns = deadline - runtime_nanotime();
@@ -219,8 +230,10 @@ notetsleep(Note *n, int64 ns, int64 deadline, M *mp)
 		} else if(mp == (M*)LOCKED) {
 			// Wakeup happened so semaphore is available.
 			// Grab it to avoid getting out of sync.
+			m->blocked = true;
 			if(runtime_semasleep(-1) < 0)
 				runtime_throw("runtime: unable to acquire - semaphore out of sync");
+			m->blocked = false;
 			return true;
 		} else
 			runtime_throw("runtime: unexpected waitm - semaphore out of sync");

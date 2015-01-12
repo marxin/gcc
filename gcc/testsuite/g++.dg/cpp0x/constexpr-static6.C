@@ -1,8 +1,8 @@
-// { dg-options -std=c++11 }
+// { dg-do compile { target c++11 } }
 
 struct B
 {
-  constexpr operator int() { return 4; }
+  constexpr operator int() const { return 4; }
 };
 
 template <int I>

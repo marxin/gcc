@@ -1,5 +1,5 @@
 /* Routines for performing Temporary Expression Replacement (TER) in SSA trees.
-   Copyright (C) 2003-2013 Free Software Foundation, Inc.
+   Copyright (C) 2003-2015 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod  <amacleod@redhat.com>
 
 This file is part of GCC.
@@ -23,9 +23,29 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "gimple-pretty-print.h"
 #include "bitmap.h"
+#include "predict.h"
+#include "vec.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -43,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-ter.h"
 #include "tree-outof-ssa.h"
 #include "flags.h"
+#include "gimple-walk.h"
 
 
 /* Temporary Expression Replacement (TER)
@@ -427,8 +448,8 @@ ter_is_replaceable_p (gimple stmt)
       block1 = LOCATION_BLOCK (locus1);
       locus1 = LOCATION_LOCUS (locus1);
 
-      if (gimple_code (use_stmt) == GIMPLE_PHI)
-	locus2 = gimple_phi_arg_location (use_stmt, 
+      if (gphi *phi = dyn_cast <gphi *> (use_stmt))
+	locus2 = gimple_phi_arg_location (phi,
 					  PHI_ARG_INDEX_FROM_USE (use_p));
       else
 	locus2 = gimple_location (use_stmt);
@@ -438,11 +459,6 @@ ter_is_replaceable_p (gimple stmt)
       if ((!optimize || optimize_debug)
 	  && ((locus1 != UNKNOWN_LOCATION && locus1 != locus2)
 	      || (block1 != NULL_TREE && block1 != block2)))
-	return false;
-
-      /* Without alias info we can't move around loads.  */
-      if (!optimize && gimple_assign_single_p (stmt)
-	  && !is_gimple_val (gimple_assign_rhs1 (stmt)))
 	return false;
 
       return true;
@@ -554,6 +570,30 @@ mark_replaceable (temp_expr_table_p tab, tree var, bool more_replacing)
 }
 
 
+/* Helper function for find_ssaname_in_stores.  Called via walk_tree to
+   find a SSA_NAME DATA somewhere in *TP.  */
+
+static tree
+find_ssaname (tree *tp, int *walk_subtrees, void *data)
+{
+  tree var = (tree) data;
+  if (*tp == var)
+    return var;
+  else if (IS_TYPE_OR_DECL_P (*tp))
+    *walk_subtrees = 0;
+  return NULL_TREE;
+}
+
+/* Helper function for find_replaceable_in_bb.  Return true if SSA_NAME DATA
+   is used somewhere in T, which is a store in the statement.  Called via
+   walk_stmt_load_store_addr_ops.  */
+
+static bool
+find_ssaname_in_store (gimple, tree, tree t, void *data)
+{
+  return walk_tree (&t, find_ssaname, data, NULL) != NULL_TREE;
+}
+
 /* This function processes basic block BB, and looks for variables which can
    be replaced by their expressions.  Results are stored in the table TAB.  */
 
@@ -618,7 +658,27 @@ find_replaceable_in_bb (temp_expr_table_p tab, basic_block bb)
 		      && gimple_assign_single_p (def_stmt)
 		      && stmt_may_clobber_ref_p (stmt,
 						 gimple_assign_rhs1 (def_stmt)))
-		    same_root_var = true;
+		    {
+		      /* For calls, it is not a problem if USE is among
+			 call's arguments or say OBJ_TYPE_REF argument,
+			 all those necessarily need to be evaluated before
+			 the call that may clobber the memory.  But if
+			 LHS of the call refers to USE, expansion might
+			 evaluate it after the call, prevent TER in that
+			 case.
+			 For inline asm, allow TER of loads into input
+			 arguments, but disallow TER for USEs that occur
+			 somewhere in outputs.  */
+		      if (is_gimple_call (stmt)
+			  || gimple_code (stmt) == GIMPLE_ASM)
+			{
+			  if (walk_stmt_load_store_ops (stmt, use, NULL,
+							find_ssaname_in_store))
+			    same_root_var = true;
+			}
+		      else
+			same_root_var = true;
+		    }
 		}
 
 	      /* Mark expression as replaceable unless stmt is volatile, or the
@@ -683,7 +743,7 @@ find_replaceable_exprs (var_map map)
 
   bitmap_obstack_initialize (&ter_bitmap_obstack);
   table = new_temp_expr_table (map);
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     {
       find_replaceable_in_bb (table, bb);
       gcc_checking_assert (bitmap_empty_p (table->partition_in_use));

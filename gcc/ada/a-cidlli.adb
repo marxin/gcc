@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2004-2013, Free Software Foundation, Inc.         --
+--          Copyright (C) 2004-2014, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -32,6 +32,8 @@ with Ada.Unchecked_Deallocation;
 with System; use type System.Address;
 
 package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
+
+   pragma Annotate (CodePeer, Skip_Analysis);
 
    procedure Free is
      new Ada.Unchecked_Deallocation (Element_Type, Element_Access);
@@ -609,6 +611,7 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
          when others =>
             B := B - 1;
             L := L - 1;
+
             raise;
       end;
    end Find;
@@ -746,6 +749,7 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
          when others =>
             B := B - 1;
             L := L - 1;
+
             raise;
       end Is_Sorted;
 
@@ -945,10 +949,12 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
 
             B := B - 1;
             L := L - 1;
+
          exception
             when others =>
                B := B - 1;
                L := L - 1;
+
                raise;
          end;
 
@@ -979,7 +985,8 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
       Position  : out Cursor;
       Count     : Count_Type := 1)
    is
-      New_Node : Node_Access;
+      First_Node : Node_Access;
+      New_Node   : Node_Access;
 
    begin
       if Before.Container /= null then
@@ -1022,7 +1029,8 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
          Element : Element_Access := new Element_Type'(New_Item);
 
       begin
-         New_Node := new Node_Type'(Element, null, null);
+         New_Node   := new Node_Type'(Element, null, null);
+         First_Node := New_Node;
 
       exception
          when others =>
@@ -1031,7 +1039,6 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
       end;
 
       Insert_Internal (Container, Before.Node, New_Node);
-      Position := Cursor'(Container'Unchecked_Access, New_Node);
 
       for J in 2 .. Count loop
          declare
@@ -1046,6 +1053,8 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
 
          Insert_Internal (Container, Before.Node, New_Node);
       end loop;
+
+      Position := Cursor'(Container'Unchecked_Access, First_Node);
    end Insert;
 
    procedure Insert
@@ -1753,6 +1762,7 @@ package body Ada.Containers.Indefinite_Doubly_Linked_Lists is
          when others =>
             B := B - 1;
             L := L - 1;
+
             raise;
       end;
    end Reverse_Find;

@@ -1,5 +1,5 @@
 ;; Constraint definitions for IA-32 and x86-64.
-;; Copyright (C) 2006-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2015 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -19,7 +19,7 @@
 
 ;;; Unused letters:
 ;;;           H
-;;;           h j
+;;;           h j               z
 
 ;; Integer register constraints.
 ;; It is not necessary to define 'r' here.
@@ -78,10 +78,10 @@
  "TARGET_80387 || TARGET_FLOAT_RETURNS_IN_80387 ? FP_SECOND_REG : NO_REGS"
  "Second from top of 80387 floating-point stack (@code{%st(1)}).")
 
-(define_register_constraint "k" "TARGET_AVX512F ? MASK_EVEX_REGS : NO_REGS"
+(define_register_constraint "Yk" "TARGET_AVX512F ? MASK_EVEX_REGS : NO_REGS"
 "@internal Any mask register that can be used as predicate, i.e. k1-k7.")
 
-(define_register_constraint "Yk" "TARGET_AVX512F ? MASK_REGS : NO_REGS"
+(define_register_constraint "k" "TARGET_AVX512F ? MASK_REGS : NO_REGS"
 "@internal Any mask register.")
 
 ;; Vector registers (also used for plain floating point nowadays).
@@ -91,7 +91,10 @@
 (define_register_constraint "x" "TARGET_SSE ? SSE_REGS : NO_REGS"
  "Any SSE register.")
 
-(define_register_constraint "B" "TARGET_MPX ? BND_REGS : NO_REGS"
+(define_register_constraint "v" "TARGET_SSE ? ALL_SSE_REGS : NO_REGS"
+ "Any EVEX encodable SSE register (@code{%xmm0-%xmm31}).")
+
+(define_register_constraint "w" "TARGET_MPX ? BND_REGS : NO_REGS"
  "@internal Any bound register.")
 
 ;; We use the Y prefix to denote any number of conditional register sets:
@@ -102,9 +105,9 @@
 ;;  n	MMX inter-unit moves from MMX register enabled
 ;;  a	Integer register when zero extensions with AND are disabled
 ;;  p	Integer register when TARGET_PARTIAL_REG_STALL is disabled
-;;  d	Integer register when integer DFmode moves are enabled
-;;  x	Integer register when integer XFmode moves are enabled
 ;;  f	x87 register when 80387 floating point arithmetic is enabled
+;;  r	SSE regs not requiring REX prefix when prefixes avoidance is enabled
+;;	and all SSE regs otherwise
 
 (define_register_constraint "Yz" "TARGET_SSE ? SSE_FIRST_REG : NO_REGS"
  "First SSE register (@code{%xmm0}).")
@@ -134,30 +137,32 @@
   ? NO_REGS : GENERAL_REGS"
  "@internal Any integer register when zero extensions with AND are disabled.")
 
-(define_register_constraint "Yd"
- "TARGET_INTEGER_DFMODE_MOVES && optimize_function_for_speed_p (cfun)
-  ? GENERAL_REGS : NO_REGS"
- "@internal Any integer register when integer DFmode moves are enabled.")
-
-(define_register_constraint "Yx"
- "optimize_function_for_speed_p (cfun) ? GENERAL_REGS : NO_REGS"
- "@internal Any integer register when integer XFmode moves are enabled.")
-
 (define_register_constraint "Yf"
  "(ix86_fpmath & FPMATH_387) ? FLOAT_REGS : NO_REGS"
  "@internal Any x87 register when 80387 FP arithmetic is enabled.")
 
-(define_register_constraint "v" "TARGET_SSE ? ALL_SSE_REGS : NO_REGS"
- "Any EVEX encodable SSE register (@code{%xmm0-%xmm31}).")
+(define_register_constraint "Yr"
+ "TARGET_SSE ? (X86_TUNE_AVOID_4BYTE_PREFIXES ? NO_REX_SSE_REGS : ALL_SSE_REGS) : NO_REGS"
+ "@internal Lower SSE register when avoiding REX prefix and all SSE registers otherwise.")
 
-(define_constraint "z"
-  "@internal Constant call address operand."
-  (match_operand 0 "constant_call_address_operand"))
+;; We use the B prefix to denote any number of internal operands:
+;;  s  Sibcall memory operand, not valid for TARGET_X32
+;;  w  Call memory operand, not valid for TARGET_X32
+;;  z  Constant call address operand.
 
-(define_constraint "w"
+(define_constraint "Bs"
+  "@internal Sibcall memory operand."
+  (and (not (match_test "TARGET_X32"))
+       (match_operand 0 "sibcall_memory_operand")))
+
+(define_constraint "Bw"
   "@internal Call memory operand."
   (and (not (match_test "TARGET_X32"))
        (match_operand 0 "memory_operand")))
+
+(define_constraint "Bz"
+  "@internal Constant call address operand."
+  (match_operand 0 "constant_call_address_operand"))
 
 ;; Integer constant constraints.
 (define_constraint "I"
@@ -222,6 +227,13 @@
 
 ;; We use W prefix to denote any number of
 ;; constant-or-symbol-reference constraints
+
+(define_constraint "We"
+  "32-bit signed integer constant, or a symbolic reference known
+   to fit that range (for sign-extending conversion operations that
+   require non-VOIDmode immediate operands)."
+  (and (match_operand 0 "x86_64_immediate_operand")
+       (match_test "GET_MODE (op) != VOIDmode")))
 
 (define_constraint "Wz"
   "32-bit unsigned integer constant, or a symbolic reference known

@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2013 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
    Contributed by Andy Vaught
    F2003 I/O support contributed by Jerry DeLisle
 
@@ -677,7 +677,13 @@ read_decimal (st_parameter_dt *dtp, const fnode *f, char *dest, int length)
 	
       if (c == ' ')
         {
-	  if (dtp->u.p.blank_status == BLANK_NULL) continue;
+	  if (dtp->u.p.blank_status == BLANK_NULL)
+	    {
+	      /* Skip spaces.  */
+	      for ( ; w > 0; p++, w--)
+		if (*p != ' ') break; 
+	      continue;
+	    }
 	  if (dtp->u.p.blank_status == BLANK_ZERO) c = '0';
         }
         
@@ -875,6 +881,9 @@ read_radix (st_parameter_dt *dtp, const fnode *f, char *dest, int length,
 void
 read_f (st_parameter_dt *dtp, const fnode *f, char *dest, int length)
 {
+#define READF_TMP 50
+  char tmp[READF_TMP];
+  size_t buf_size = 0;
   int w, seen_dp, exponent;
   int exponent_sign;
   const char *p;
@@ -889,6 +898,7 @@ read_f (st_parameter_dt *dtp, const fnode *f, char *dest, int length)
   exponent_sign = 1;
   exponent = 0;
   w = f->u.w;
+  buffer = tmp;
 
   /* Read in the next block.  */
   p = read_block_form (dtp, &w);
@@ -905,7 +915,10 @@ read_f (st_parameter_dt *dtp, const fnode *f, char *dest, int length)
      exponent because of an implicit decimal point or the like.  Thus allocating
      strlen ("+0.0e-1000") == 10 characters plus one for NUL more than the
      original buffer had should be enough.  */
-  buffer = gfc_alloca (w + 11);
+  buf_size = w + 11;
+  if (buf_size > READF_TMP)
+    buffer = xmalloc (buf_size);
+
   out = buffer;
 
   /* Optional sign */
@@ -978,6 +991,8 @@ read_f (st_parameter_dt *dtp, const fnode *f, char *dest, int length)
 	goto bad_float;
 
       convert_infnan (dtp, dest, buffer, length);
+      if (buf_size > READF_TMP)
+	free (buffer);
       return;
     }
 
@@ -1150,7 +1165,9 @@ done:
 	  exponent = - exponent;
 	}
 
-      assert (exponent < 10000);
+      if (exponent >= 10000)
+	goto bad_float;
+
       for (dig = 3; dig >= 0; --dig)
 	{
 	  out[dig] = (char) ('0' + exponent % 10);
@@ -1162,7 +1179,8 @@ done:
 
   /* Do the actual conversion.  */
   convert_real (dtp, dest, buffer, length);
-
+  if (buf_size > READF_TMP)
+    free (buffer);
   return;
 
   /* The value read is zero.  */
@@ -1195,6 +1213,8 @@ zero:
   return;
 
 bad_float:
+  if (buf_size > READF_TMP)
+    free (buffer);
   generate_error (&dtp->common, LIBERROR_READ_VALUE,
 		  "Bad value during floating point read");
   next_record (dtp, 1);

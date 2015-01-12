@@ -1,5 +1,5 @@
 /* Core data structures for the 'tree' type.
-   Copyright (C) 1989-2013 Free Software Foundation, Inc.
+   Copyright (C) 1989-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -20,18 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TREE_CORE_H
 #define GCC_TREE_CORE_H
 
-#include "hashtab.h"
-#include "machmode.h"
-#include "input.h"
-#include "statistics.h"
-#include "vec.h"
-#include "double-int.h"
-#include "real.h"
-#include "fixed-value.h"
-#include "alias.h"
-#include "flags.h"
-#include "symtab.h"
-
 /* This file contains all the data structures that define the 'tree' type.
    There are no accessor macros nor functions in this file. Only the
    basic data structures, extern declarations and type definitions.  */
@@ -45,7 +33,6 @@ struct fixed_value;
 struct ptr_info_def;
 struct range_info_def;
 struct die_struct;
-struct pointer_set_t;
 
 
 /*---------------------------------------------------------------------------
@@ -167,6 +154,14 @@ enum built_in_class {
 #define DEF_BUILTIN(ENUM, N, C, T, LT, B, F, NA, AT, IM, COND) ENUM,
 enum built_in_function {
 #include "builtins.def"
+
+  BEGIN_CHKP_BUILTINS,
+
+#undef DEF_BUILTIN
+#define DEF_BUILTIN(ENUM, N, C, T, LT, B, F, NA, AT, IM, COND) ENUM##_CHKP,
+#include "builtins.def"
+
+  END_CHKP_BUILTINS,
 
   /* Complex division routines in libgcc.  These are done via builtins
      because emit_library_call_value can't handle complex values.  */
@@ -334,7 +329,11 @@ enum omp_clause_code {
   OMP_CLAUSE_TASKGROUP,
 
   /* Internally used only clause, holding SIMD uid.  */
-  OMP_CLAUSE__SIMDUID_
+  OMP_CLAUSE__SIMDUID_,
+
+  /* Internally used only clause, holding _Cilk_for # of iterations
+     on OMP_PARALLEL.  */
+  OMP_CLAUSE__CILK_FOR_COUNT_
 };
 
 #undef DEFTREESTRUCT
@@ -350,7 +349,9 @@ enum omp_clause_schedule_kind {
   OMP_CLAUSE_SCHEDULE_DYNAMIC,
   OMP_CLAUSE_SCHEDULE_GUIDED,
   OMP_CLAUSE_SCHEDULE_AUTO,
-  OMP_CLAUSE_SCHEDULE_RUNTIME
+  OMP_CLAUSE_SCHEDULE_RUNTIME,
+  OMP_CLAUSE_SCHEDULE_CILKFOR,
+  OMP_CLAUSE_SCHEDULE_LAST
 };
 
 enum omp_clause_default_kind {
@@ -358,7 +359,8 @@ enum omp_clause_default_kind {
   OMP_CLAUSE_DEFAULT_SHARED,
   OMP_CLAUSE_DEFAULT_NONE,
   OMP_CLAUSE_DEFAULT_PRIVATE,
-  OMP_CLAUSE_DEFAULT_FIRSTPRIVATE
+  OMP_CLAUSE_DEFAULT_FIRSTPRIVATE,
+  OMP_CLAUSE_DEFAULT_LAST
 };
 
 /* There is a TYPE_QUAL value for each type qualifier.  They can be
@@ -407,6 +409,8 @@ enum tree_index {
   TI_UINT16_TYPE,
   TI_UINT32_TYPE,
   TI_UINT64_TYPE,
+
+  TI_VOID,
 
   TI_INTEGER_ZERO,
   TI_INTEGER_ONE,
@@ -563,8 +567,16 @@ enum integer_type_kind {
   itk_unsigned_long,
   itk_long_long,
   itk_unsigned_long_long,
-  itk_int128,
-  itk_unsigned_int128,
+
+  itk_intN_0,
+  itk_unsigned_intN_0,
+  itk_intN_1,
+  itk_unsigned_intN_1,
+  itk_intN_2,
+  itk_unsigned_intN_2,
+  itk_intN_3,
+  itk_unsigned_intN_3,
+
   itk_none
 };
 
@@ -657,9 +669,19 @@ enum tree_node_kind {
 };
 
 enum annot_expr_kind {
-  annot_expr_ivdep_kind
+  annot_expr_ivdep_kind,
+  annot_expr_no_vector_kind,
+  annot_expr_vector_kind,
+  annot_expr_kind_last
 };
 
+/* Internal functions.  */
+enum internal_fn {
+#define DEF_INTERNAL_FN(CODE, FLAGS, FNSPEC) IFN_##CODE,
+#include "internal-fn.def"
+#undef DEF_INTERNAL_FN
+  IFN_LAST
+};
 
 /*---------------------------------------------------------------------------
                                 Type definitions
@@ -667,10 +689,10 @@ enum annot_expr_kind {
 /* When processing aliases at the symbol table level, we need the
    declaration of target. For this reason we need to queue aliases and
    process them after all declarations has been produced.  */
-typedef struct GTY(()) alias_pair {
+struct GTY(()) alias_pair {
   tree decl;
   tree target;
-} alias_pair;
+};
 
 /* An initialization priority.  */
 typedef unsigned short priority_type;
@@ -680,7 +702,7 @@ typedef tree (*walk_tree_fn) (tree *, int *, void *);
 
 /* The type of a callback function that represents a custom walk_tree.  */
 typedef tree (*walk_tree_lh) (tree *, int *, tree (*) (tree *, int *, void *),
-			      void *, struct pointer_set_t*);
+			      void *, hash_set<tree> *);
 
 
 /*---------------------------------------------------------------------------
@@ -755,13 +777,46 @@ struct GTY(()) tree_base {
 	 of the field must be large enough to hold addr_space_t values.  */
       unsigned address_space : 8;
     } bits;
+
     /* The following fields are present in tree_base to save space.  The
        nodes using them do not require any of the flags above and so can
        make better use of the 4-byte sized word.  */
+
+    /* The number of HOST_WIDE_INTs in an INTEGER_CST.  */
+    struct {
+      /* The number of HOST_WIDE_INTs if the INTEGER_CST is accessed in
+	 its native precision.  */
+      unsigned char unextended;
+
+      /* The number of HOST_WIDE_INTs if the INTEGER_CST is extended to
+	 wider precisions based on its TYPE_SIGN.  */
+      unsigned char extended;
+
+      /* The number of HOST_WIDE_INTs if the INTEGER_CST is accessed in
+	 offset_int precision, with smaller integers being extended
+	 according to their TYPE_SIGN.  This is equal to one of the two
+	 fields above but is cached for speed.  */
+      unsigned char offset;
+    } int_length;
+
     /* VEC length.  This field is only used with TREE_VEC.  */
     int length;
+
     /* SSA version number.  This field is only used with SSA_NAME.  */
     unsigned int version;
+
+    /* Internal function code.  */
+    enum internal_fn ifn;
+
+    /* The following two fields are used for MEM_REF and TARGET_MEM_REF
+       expression trees and specify known data non-dependences.  For
+       two memory references in a function they are known to not
+       alias if dependence_info.clique are equal and dependence_info.base
+       are distinct.  */
+    struct {
+      unsigned short clique;
+      unsigned short base;
+    } dependence_info;
   } GTY((skip(""))) u;
 };
 
@@ -821,6 +876,9 @@ struct GTY(()) tree_base {
 
        TRANSACTION_EXPR_OUTER in
 	   TRANSACTION_EXPR
+
+       SSA_NAME_ANTI_RANGE_P in
+	   SSA_NAME
 
    public_flag:
 
@@ -903,6 +961,9 @@ struct GTY(()) tree_base {
        CALL_ALLOCA_FOR_VAR_P in
            CALL_EXPR
 
+       OMP_CLAUSE_LINEAR_VARIABLE_STRIDE in
+	   OMP_CLAUSE_LINEAR
+
    side_effects_flag:
 
        TREE_SIDE_EFFECTS in
@@ -981,6 +1042,9 @@ struct GTY(()) tree_base {
        SSA_NAME_IN_FREELIST in
           SSA_NAME
 
+       DECL_NONALIASED in
+	  VAR_DECL
+
    deprecated_flag:
 
        TREE_DEPRECATED in
@@ -1039,7 +1103,7 @@ struct GTY(()) tree_common {
 
 struct GTY(()) tree_int_cst {
   struct tree_typed typed;
-  double_int int_cst;
+  HOST_WIDE_INT val[1];
 };
 
 
@@ -1090,10 +1154,10 @@ struct GTY(()) tree_vec {
    element. INDEX can optionally design the position of VALUE: in arrays,
    it is the index where VALUE has to be placed; in structures, it is the
    FIELD_DECL of the member.  */
-typedef struct GTY(()) constructor_elt_d {
+struct GTY(()) constructor_elt {
   tree index;
   tree value;
-} constructor_elt;
+};
 
 struct GTY(()) tree_constructor {
   struct tree_typed typed;
@@ -1104,7 +1168,8 @@ enum omp_clause_depend_kind
 {
   OMP_CLAUSE_DEPEND_IN,
   OMP_CLAUSE_DEPEND_OUT,
-  OMP_CLAUSE_DEPEND_INOUT
+  OMP_CLAUSE_DEPEND_INOUT,
+  OMP_CLAUSE_DEPEND_LAST
 };
 
 enum omp_clause_map_kind
@@ -1115,8 +1180,14 @@ enum omp_clause_map_kind
   OMP_CLAUSE_MAP_TOFROM,
   /* The following kind is an internal only map kind, used for pointer based
      array sections.  OMP_CLAUSE_SIZE for these is not the pointer size,
-     which is implicitly POINTER_SIZE / BITS_PER_UNIT, but the bias.  */
-  OMP_CLAUSE_MAP_POINTER
+     which is implicitly POINTER_SIZE_UNITS, but the bias.  */
+  OMP_CLAUSE_MAP_POINTER,
+  /* Also internal, behaves like OMP_CLAUS_MAP_TO, but additionally any
+     OMP_CLAUSE_MAP_POINTER records consecutive after it which have addresses
+     falling into that range will not be ignored if OMP_CLAUSE_MAP_TO_PSET
+     wasn't mapped already.  */
+  OMP_CLAUSE_MAP_TO_PSET,
+  OMP_CLAUSE_MAP_LAST
 };
 
 enum omp_clause_proc_bind_kind
@@ -1126,7 +1197,8 @@ enum omp_clause_proc_bind_kind
   OMP_CLAUSE_PROC_BIND_TRUE = 1,
   OMP_CLAUSE_PROC_BIND_MASTER = 2,
   OMP_CLAUSE_PROC_BIND_CLOSE = 3,
-  OMP_CLAUSE_PROC_BIND_SPREAD = 4
+  OMP_CLAUSE_PROC_BIND_SPREAD = 4,
+  OMP_CLAUSE_PROC_BIND_LAST
 };
 
 struct GTY(()) tree_exp {
@@ -1139,17 +1211,17 @@ struct GTY(()) tree_exp {
 
 /* Immediate use linking structure.  This structure is used for maintaining
    a doubly linked list of uses of an SSA_NAME.  */
-typedef struct GTY(()) ssa_use_operand_d {
-  struct ssa_use_operand_d* GTY((skip(""))) prev;
-  struct ssa_use_operand_d* GTY((skip(""))) next;
+struct GTY(()) ssa_use_operand_t {
+  struct ssa_use_operand_t* GTY((skip(""))) prev;
+  struct ssa_use_operand_t* GTY((skip(""))) next;
   /* Immediate uses for a given SSA name are maintained as a cyclic
      list.  To recognize the root of this list, the location field
      needs to point to the original SSA name.  Since statements and
      SSA names are of different data types, we need this union.  See
-     the explanation in struct immediate_use_iterator_d.  */
+     the explanation in struct imm_use_iterator.  */
   union { gimple stmt; tree ssa_name; } GTY((skip(""))) loc;
   tree *GTY((skip(""))) use;
-} ssa_use_operand_t;
+};
 
 struct GTY(()) tree_ssa_name {
   struct tree_typed typed;
@@ -1170,13 +1242,13 @@ struct GTY(()) tree_ssa_name {
 		"!POINTER_TYPE_P (TREE_TYPE ((tree)&%1)) : 2"))) info;
 
   /* Immediate uses list for this SSA_NAME.  */
-  struct ssa_use_operand_d imm_uses;
+  struct ssa_use_operand_t imm_uses;
 };
 
 struct GTY(()) phi_arg_d {
   /* imm_use MUST be the first element in struct because we do some
      pointer arithmetic with it.  See phi_arg_index_from_use.  */
-  struct ssa_use_operand_d imm_use;
+  struct ssa_use_operand_t imm_use;
   tree def;
   location_t locus;
 };
@@ -1211,6 +1283,7 @@ struct GTY(()) tree_block {
   unsigned block_num : 31;
 
   location_t locus;
+  location_t end_locus;
 
   tree vars;
   vec<tree, va_gc> *nonlocalized_vars;
@@ -1256,11 +1329,11 @@ struct GTY(()) tree_type_common {
     const char * GTY ((tag ("TYPE_SYMTAB_IS_POINTER"))) pointer;
     struct die_struct * GTY ((tag ("TYPE_SYMTAB_IS_DIE"))) die;
   } GTY ((desc ("debug_hooks->tree_type_symtab_field"))) symtab;
-  tree name;
+  tree canonical;
   tree next_variant;
   tree main_variant;
   tree context;
-  tree canonical;
+  tree name;
 };
 
 struct GTY(()) tree_type_with_lang_specific {
@@ -1404,8 +1477,7 @@ struct GTY(()) tree_parm_decl {
 struct GTY(()) tree_decl_with_vis {
  struct tree_decl_with_rtl common;
  tree assembler_name;
- tree section_name;
- tree comdat_group;
+ struct symtab_node *symtab_node;
 
  /* Belong to VAR_DECL exclusively.  */
  unsigned defer_output : 1;
@@ -1416,15 +1488,12 @@ struct GTY(()) tree_decl_with_vis {
  unsigned dllimport_flag : 1;
  /* Don't belong to VAR_DECL exclusively.  */
  unsigned weak_flag : 1;
- /* When SECTION_NAME is implied by -ffunction-section.  */
- unsigned implicit_section_name_p : 1;
 
  unsigned seen_in_bind_expr : 1;
  unsigned comdat_flag : 1;
+ /* Used for FUNCTION_DECL, VAR_DECL and in C++ for TYPE_DECL.  */
  ENUM_BITFIELD(symbol_visibility) visibility : 2;
  unsigned visibility_specified : 1;
- /* Belongs to VAR_DECL exclusively.  */
- ENUM_BITFIELD(tls_model) tls_model : 3;
 
  /* Belong to FUNCTION_DECL exclusively.  */
  unsigned init_priority_p : 1;
@@ -1436,7 +1505,9 @@ struct GTY(()) tree_decl_with_vis {
  unsigned cxx_destructor : 1;
  /* Belong to FUNCTION_DECL exclusively.  */
  unsigned final : 1;
- /* 11 unused bits. */
+ /* Belong to FUNCTION_DECL exclusively.  */
+ unsigned regdecl_flag : 1;
+ /* 14 unused bits. */
 };
 
 struct GTY(()) tree_var_decl {
@@ -1445,14 +1516,8 @@ struct GTY(()) tree_var_decl {
 
 struct GTY(()) tree_decl_non_common {
   struct tree_decl_with_vis common;
-  /* C++ uses this in namespaces.  */
-  tree saved_tree;
-  /* C++ uses this in templates.  */
-  tree arguments;
   /* Almost all FE's use this.  */
   tree result;
-  /* C++ uses this in namespaces and function_decls.  */
-  tree vindex;
 };
 
 /* FUNCTION_DECL inherits from DECL_NON_COMMON because of the use of the
@@ -1465,6 +1530,8 @@ struct GTY(()) tree_function_decl {
 
   struct function *f;
 
+  /* Arguments of the function.  */
+  tree arguments;
   /* The personality function. Used for stack unwinding. */
   tree personality;
 
@@ -1472,24 +1539,28 @@ struct GTY(()) tree_function_decl {
   tree function_specific_target;	/* target options */
   tree function_specific_optimization;	/* optimization options */
 
+  /* Generic function body.  */
+  tree saved_tree;
+  /* Index within a virtual table.  */
+  tree vindex;
+
   /* In a FUNCTION_DECL for which DECL_BUILT_IN holds, this is
      DECL_FUNCTION_CODE.  Otherwise unused.
      ???  The bitfield needs to be able to hold all target function
 	  codes as well.  */
-  ENUM_BITFIELD(built_in_function) function_code : 11;
+  ENUM_BITFIELD(built_in_function) function_code : 12;
   ENUM_BITFIELD(built_in_class) built_in_class : 2;
 
   unsigned static_ctor_flag : 1;
   unsigned static_dtor_flag : 1;
-  unsigned uninlinable : 1;
 
+  unsigned uninlinable : 1;
   unsigned possibly_inlined : 1;
   unsigned novops_flag : 1;
   unsigned returns_twice_flag : 1;
   unsigned malloc_flag : 1;
   unsigned operator_new_flag : 1;
   unsigned declared_inline_flag : 1;
-  unsigned regdecl_flag : 1;
   unsigned no_inline_warning_flag : 1;
 
   unsigned no_instrument_function_entry_exit : 1;
@@ -1541,17 +1612,24 @@ struct GTY(()) tree_optimization_option {
 
   /* Target optabs for this set of optimization options.  This is of
      type `struct target_optabs *'.  */
-  unsigned char *GTY ((atomic)) optabs;
+  void *GTY ((atomic)) optabs;
 
   /* The value of this_target_optabs against which the optabs above were
      generated.  */
   struct target_optabs *GTY ((skip)) base_optabs;
 };
 
+/* Forward declaration, defined in target-globals.h.  */
+
+struct GTY(()) target_globals;
+
 /* Target options used by a function.  */
 
 struct GTY(()) tree_target_option {
   struct tree_common common;
+
+  /* Target globals for the corresponding target option.  */
+  struct target_globals *globals;
 
   /* The optimization options used by the user.  */
   struct cl_target_option opts;
@@ -1697,33 +1775,26 @@ struct GTY(()) tree_map_base {
 
 /* Map from a tree to another tree.  */
 
-struct GTY(()) tree_map {
+struct GTY((for_user)) tree_map {
   struct tree_map_base base;
   unsigned int hash;
   tree to;
 };
 
 /* Map from a decl tree to another tree.  */
-struct GTY(()) tree_decl_map {
+struct GTY((for_user)) tree_decl_map {
   struct tree_map_base base;
   tree to;
 };
 
 /* Map from a tree to an int.  */
-struct GTY(()) tree_int_map {
+struct GTY((for_user)) tree_int_map {
   struct tree_map_base base;
   unsigned int to;
 };
 
-/* Map from a tree to initialization/finalization priorities.  */
-struct GTY(()) tree_priority_map {
-  struct tree_map_base base;
-  priority_type init;
-  priority_type fini;
-};
-
 /* Map from a decl tree to a tree vector.  */
-struct GTY(()) tree_vec_map {
+struct GTY((for_user)) tree_vec_map {
   struct tree_map_base base;
   vec<tree, va_gc> *to;
 };
@@ -1810,10 +1881,6 @@ extern GTY(()) builtin_info_type builtin_info;
 
 /* If nonzero, an upper limit on alignment of structure fields, in bits,  */
 extern unsigned int maximum_field_alignment;
-
-/* Nonzero means lvalues are limited to those valid in pedantic ANSI C.
-   Zero means allow extended lvalues.  */
-extern int pedantic_lvalues;
 
 /* Points to the FUNCTION_DECL of the function whose body we are reading.  */
 extern GTY(()) tree current_function_decl;

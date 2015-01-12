@@ -1,5 +1,5 @@
 /* Loop manipulation code for GNU compiler.
-   Copyright (C) 2002-2013 Free Software Foundation, Inc.
+   Copyright (C) 2002-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -22,9 +22,23 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "rtl.h"
+#include "predict.h"
+#include "vec.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "symtab.h"
+#include "inchash.h"
+#include "machmode.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
+#include "cfganal.h"
 #include "basic-block.h"
 #include "cfgloop.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
 #include "gimple-expr.h"
@@ -204,7 +218,7 @@ fix_bb_placements (basic_block from,
       || from == base_loop->header)
     return;
 
-  in_queue = sbitmap_alloc (last_basic_block);
+  in_queue = sbitmap_alloc (last_basic_block_for_fn (cfun));
   bitmap_clear (in_queue);
   bitmap_set_bit (in_queue, from->index);
   /* Prevent us from going out of the base_loop.  */
@@ -348,7 +362,7 @@ remove_path (edge e)
 
   n_bord_bbs = 0;
   bord_bbs = XNEWVEC (basic_block, n_basic_blocks_for_fn (cfun));
-  seen = sbitmap_alloc (last_basic_block);
+  seen = sbitmap_alloc (last_basic_block_for_fn (cfun));
   bitmap_clear (seen);
 
   /* Find "border" hexes -- i.e. those with predecessor in removed path.  */
@@ -623,7 +637,7 @@ update_dominators_in_loop (struct loop *loop)
   basic_block *body;
   unsigned i;
 
-  seen = sbitmap_alloc (last_basic_block);
+  seen = sbitmap_alloc (last_basic_block_for_fn (cfun));
   bitmap_clear (seen);
   body = get_loop_body (loop);
 
@@ -690,7 +704,7 @@ create_empty_if_region_on_edge (edge entry_edge, tree condition)
 
   basic_block cond_bb, true_bb, false_bb, join_bb;
   edge e_true, e_false, exit_edge;
-  gimple cond_stmt;
+  gcond *cond_stmt;
   tree simple_cond;
   gimple_stmt_iterator gsi;
 
@@ -776,7 +790,7 @@ create_empty_loop_on_edge (edge entry_edge,
   struct loop *loop;
   gimple_stmt_iterator gsi;
   gimple_seq stmts;
-  gimple cond_expr;
+  gcond *cond_expr;
   tree exit_test;
   edge exit_e;
   int prob;
@@ -1022,6 +1036,8 @@ copy_loop_info (struct loop *loop, struct loop *target)
   target->any_estimate = loop->any_estimate;
   target->nb_iterations_estimate = loop->nb_iterations_estimate;
   target->estimate_state = loop->estimate_state;
+  target->warned_aggressive_loop_optimizations
+    |= loop->warned_aggressive_loop_optimizations;
 }
 
 /* Copies copy of LOOP as subloop of TARGET loop, placing newly

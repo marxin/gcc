@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2013 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2015 Free Software Foundation, Inc.
    Contributed by Andy Vaught and Janne Blomqvist
 
 This file is part of the GNU Fortran runtime library (libgfortran).
@@ -36,7 +36,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    record, and we have to sift backwards to find the newline before
    that or the start of the file, whichever comes first.  */
 
-static const int READ_CHUNK = 4096;
+#define READ_CHUNK 4096
 
 static void
 formatted_backspace (st_parameter_filepos *fpp, gfc_unit *u)
@@ -410,7 +410,11 @@ st_rewind (st_parameter_filepos *fpp)
 	  u->last_record = 0;
 
 	  if (sseek (u->s, 0, SEEK_SET) < 0)
-	    generate_error (&fpp->common, LIBERROR_OS, NULL);
+	    {
+	      generate_error (&fpp->common, LIBERROR_OS, NULL);
+	      library_end ();
+	      return;
+	    }
 
 	  /* Set this for compatibilty with g77 for /dev/null.  */
 	  if (ssize (u->s) == 0)

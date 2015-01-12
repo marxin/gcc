@@ -1,5 +1,5 @@
 /* Redundant Extension Elimination pass for the GNU compiler.
-   Copyright (C) 2010-2013 Free Software Foundation, Inc.
+   Copyright (C) 2010-2015 Free Software Foundation, Inc.
    Contributed by Ilya Enkovich (ilya.enkovich@intel.com)
 
    Based on the Redundant Zero-extension elimination pass contributed by
@@ -220,25 +220,44 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "tm.h"
 #include "rtl.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
 #include "tm_p.h"
 #include "flags.h"
 #include "regs.h"
 #include "hard-reg-set.h"
+#include "predict.h"
+#include "machmode.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
+#include "cfgrtl.h"
 #include "basic-block.h"
 #include "insn-config.h"
-#include "function.h"
 #include "expr.h"
 #include "insn-attr.h"
 #include "recog.h"
 #include "diagnostic-core.h"
 #include "target.h"
-#include "optabs.h"
 #include "insn-codes.h"
+#include "optabs.h"
 #include "rtlhooks-def.h"
 #include "params.h"
 #include "tree-pass.h"
 #include "df.h"
+#include "hash-map.h"
+#include "is-a.h"
+#include "plugin-api.h"
+#include "ipa-ref.h"
 #include "cgraph.h"
 
 /* This structure represents a candidate for elimination.  */
@@ -252,14 +271,58 @@ typedef struct ext_cand
   enum rtx_code code;
 
   /* The destination mode.  */
-  enum machine_mode mode;
+  machine_mode mode;
 
   /* The instruction where it lives.  */
-  rtx insn;
+  rtx_insn *insn;
 } ext_cand;
 
 
 static int max_insn_uid;
+
+/* Update or remove REG_EQUAL or REG_EQUIV notes for INSN.  */
+
+static bool
+update_reg_equal_equiv_notes (rtx_insn *insn, machine_mode new_mode,
+			      machine_mode old_mode, enum rtx_code code)
+{
+  rtx *loc = &REG_NOTES (insn);
+  while (*loc)
+    {
+      enum reg_note kind = REG_NOTE_KIND (*loc);
+      if (kind == REG_EQUAL || kind == REG_EQUIV)
+	{
+	  rtx orig_src = XEXP (*loc, 0);
+	  /* Update equivalency constants.  Recall that RTL constants are
+	     sign-extended.  */
+	  if (GET_CODE (orig_src) == CONST_INT
+	      && HOST_BITS_PER_WIDE_INT >= GET_MODE_BITSIZE (new_mode))
+	    {
+	      if (INTVAL (orig_src) >= 0 || code == SIGN_EXTEND)
+		/* Nothing needed.  */;
+	      else
+		{
+		  /* Zero-extend the negative constant by masking out the
+		     bits outside the source mode.  */
+		  rtx new_const_int
+		    = gen_int_mode (INTVAL (orig_src)
+				    & GET_MODE_MASK (old_mode),
+				    new_mode);
+		  if (!validate_change (insn, &XEXP (*loc, 0),
+					new_const_int, true))
+		    return false;
+		}
+	      loc = &XEXP (*loc, 1);
+	    }
+	  /* Drop all other notes, they assume a wrong mode.  */
+	  else if (!validate_change (insn, loc, XEXP (*loc, 1), true))
+	    return false;
+	}
+      else
+	loc = &XEXP (*loc, 1);
+    }
+  return true;
+}
 
 /* Given a insn (CURR_INSN), an extension candidate for removal (CAND)
    and a pointer to the SET rtx (ORIG_SET) that needs to be modified,
@@ -279,11 +342,34 @@ static int max_insn_uid;
    assign it to the register.  */
 
 static bool
-combine_set_extension (ext_cand *cand, rtx curr_insn, rtx *orig_set)
+combine_set_extension (ext_cand *cand, rtx_insn *curr_insn, rtx *orig_set)
 {
   rtx orig_src = SET_SRC (*orig_set);
-  rtx new_reg = gen_rtx_REG (cand->mode, REGNO (SET_DEST (*orig_set)));
+  machine_mode orig_mode = GET_MODE (SET_DEST (*orig_set));
   rtx new_set;
+  rtx cand_pat = PATTERN (cand->insn);
+
+  /* If the extension's source/destination registers are not the same
+     then we need to change the original load to reference the destination
+     of the extension.  Then we need to emit a copy from that destination
+     to the original destination of the load.  */
+  rtx new_reg;
+  bool copy_needed
+    = (REGNO (SET_DEST (cand_pat)) != REGNO (XEXP (SET_SRC (cand_pat), 0)));
+  if (copy_needed)
+    new_reg = gen_rtx_REG (cand->mode, REGNO (SET_DEST (cand_pat)));
+  else
+    new_reg = gen_rtx_REG (cand->mode, REGNO (SET_DEST (*orig_set)));
+
+#if 0
+  /* Rethinking test.  Temporarily disabled.  */
+  /* We're going to be widening the result of DEF_INSN, ensure that doing so
+     doesn't change the number of hard registers needed for the result.  */
+  if (HARD_REGNO_NREGS (REGNO (new_reg), cand->mode)
+      != HARD_REGNO_NREGS (REGNO (SET_DEST (*orig_set)),
+			   GET_MODE (SET_DEST (*orig_set))))
+	return false;
+#endif
 
   /* Merge constants by directly moving the constant into the register under
      some conditions.  Recall that RTL constants are sign-extended.  */
@@ -296,9 +382,8 @@ combine_set_extension (ext_cand *cand, rtx curr_insn, rtx *orig_set)
 	{
 	  /* Zero-extend the negative constant by masking out the bits outside
 	     the source mode.  */
-	  enum machine_mode src_mode = GET_MODE (SET_DEST (*orig_set));
 	  rtx new_const_int
-	    = gen_int_mode (INTVAL (orig_src) & GET_MODE_MASK (src_mode),
+	    = gen_int_mode (INTVAL (orig_src) & GET_MODE_MASK (orig_mode),
 			    GET_MODE (new_reg));
 	  new_set = gen_rtx_SET (VOIDmode, new_reg, new_const_int);
 	}
@@ -337,12 +422,15 @@ combine_set_extension (ext_cand *cand, rtx curr_insn, rtx *orig_set)
 
   /* This change is a part of a group of changes.  Hence,
      validate_change will not try to commit the change.  */
-  if (validate_change (curr_insn, orig_set, new_set, true))
+  if (validate_change (curr_insn, orig_set, new_set, true)
+      && update_reg_equal_equiv_notes (curr_insn, cand->mode, orig_mode,
+				       cand->code))
     {
       if (dump_file)
         {
           fprintf (dump_file,
-		   "Tentatively merged extension with definition:\n");
+		   "Tentatively merged extension with definition %s:\n",
+		   (copy_needed) ? "(copy needed)" : "");
           print_rtl_single (dump_file, curr_insn);
         }
       return true;
@@ -360,7 +448,7 @@ combine_set_extension (ext_cand *cand, rtx curr_insn, rtx *orig_set)
    DEF_INSN is the if_then_else insn.  */
 
 static bool
-transform_ifelse (ext_cand *cand, rtx def_insn)
+transform_ifelse (ext_cand *cand, rtx_insn *def_insn)
 {
   rtx set_insn = PATTERN (def_insn);
   rtx srcreg, dstreg, srcreg2;
@@ -386,7 +474,9 @@ transform_ifelse (ext_cand *cand, rtx def_insn)
   ifexpr = gen_rtx_IF_THEN_ELSE (cand->mode, cond, map_srcreg, map_srcreg2);
   new_set = gen_rtx_SET (VOIDmode, map_dstreg, ifexpr);
 
-  if (validate_change (def_insn, &PATTERN (def_insn), new_set, true))
+  if (validate_change (def_insn, &PATTERN (def_insn), new_set, true)
+      && update_reg_equal_equiv_notes (def_insn, cand->mode, GET_MODE (dstreg),
+				       cand->code))
     {
       if (dump_file)
         {
@@ -406,25 +496,22 @@ transform_ifelse (ext_cand *cand, rtx def_insn)
    of the definitions onto DEST.  */
 
 static struct df_link *
-get_defs (rtx insn, rtx reg, vec<rtx> *dest)
+get_defs (rtx_insn *insn, rtx reg, vec<rtx_insn *> *dest)
 {
-  df_ref reg_info, *uses;
+  df_ref use;
   struct df_link *ref_chain, *ref_link;
 
-  reg_info = NULL;
-
-  for (uses = DF_INSN_USES (insn); *uses; uses++)
+  FOR_EACH_INSN_USE (use, insn)
     {
-      reg_info = *uses;
-      if (GET_CODE (DF_REF_REG (reg_info)) == SUBREG)
+      if (GET_CODE (DF_REF_REG (use)) == SUBREG)
         return NULL;
-      if (REGNO (DF_REF_REG (reg_info)) == REGNO (reg))
-        break;
+      if (REGNO (DF_REF_REG (use)) == REGNO (reg))
+	break;
     }
 
-  gcc_assert (reg_info != NULL && uses != NULL);
+  gcc_assert (use != NULL);
 
-  ref_chain = DF_REF_CHAIN (reg_info);
+  ref_chain = DF_REF_CHAIN (use);
 
   for (ref_link = ref_chain; ref_link; ref_link = ref_link->next)
     {
@@ -447,7 +534,7 @@ get_defs (rtx insn, rtx reg, vec<rtx> *dest)
    and store x1 and x2 in REG_1 and REG_2.  */
 
 static bool
-is_cond_copy_insn (rtx insn, rtx *reg1, rtx *reg2)
+is_cond_copy_insn (rtx_insn *insn, rtx *reg1, rtx *reg2)
 {
   rtx expr = single_set (insn);
 
@@ -484,6 +571,8 @@ struct ATTRIBUTE_PACKED ext_modified
   /* Kind of modification of the insn.  */
   ENUM_BITFIELD(ext_modified_kind) kind : 2;
 
+  unsigned int do_not_reextend : 1;
+
   /* True if the insn is scheduled to be deleted.  */
   unsigned int deleted : 1;
 };
@@ -494,10 +583,10 @@ typedef struct ext_state
   /* In order to avoid constant alloc/free, we keep these
      4 vectors live through the entire find_and_remove_re and just
      truncate them each time.  */
-  vec<rtx> defs_list;
-  vec<rtx> copies_list;
-  vec<rtx> modified_list;
-  vec<rtx> work_list;
+  vec<rtx_insn *> defs_list;
+  vec<rtx_insn *> copies_list;
+  vec<rtx_insn *> modified_list;
+  vec<rtx_insn *> work_list;
 
   /* For instructions that have been successfully modified, this is
      the original mode from which the insn is extending and
@@ -518,7 +607,7 @@ typedef struct ext_state
    success.  */
 
 static bool
-make_defs_and_copies_lists (rtx extend_insn, const_rtx set_pat,
+make_defs_and_copies_lists (rtx_insn *extend_insn, const_rtx set_pat,
 			    ext_state *state)
 {
   rtx src_reg = XEXP (SET_SRC (set_pat), 0);
@@ -536,7 +625,7 @@ make_defs_and_copies_lists (rtx extend_insn, const_rtx set_pat,
   /* Perform transitive closure for conditional copies.  */
   while (!state->work_list.is_empty ())
     {
-      rtx def_insn = state->work_list.pop ();
+      rtx_insn *def_insn = state->work_list.pop ();
       rtx reg1, reg2;
 
       gcc_assert (INSN_UID (def_insn) < max_insn_uid);
@@ -567,27 +656,21 @@ make_defs_and_copies_lists (rtx extend_insn, const_rtx set_pat,
   return ret;
 }
 
-/* Merge the DEF_INSN with an extension.  Calls combine_set_extension
-   on the SET pattern.  */
-
-static bool
-merge_def_and_ext (ext_cand *cand, rtx def_insn, ext_state *state)
+/* If DEF_INSN has single SET expression, possibly buried inside
+   a PARALLEL, return the address of the SET expression, else
+   return NULL.  This is similar to single_set, except that
+   single_set allows multiple SETs when all but one is dead.  */
+static rtx *
+get_sub_rtx (rtx_insn *def_insn)
 {
-  enum machine_mode ext_src_mode;
-  enum rtx_code code;
-  rtx *sub_rtx;
-  rtx s_expr;
-  int i;
-
-  ext_src_mode = GET_MODE (XEXP (SET_SRC (cand->expr), 0));
-  code = GET_CODE (PATTERN (def_insn));
-  sub_rtx = NULL;
+  enum rtx_code code = GET_CODE (PATTERN (def_insn));
+  rtx *sub_rtx = NULL;
 
   if (code == PARALLEL)
     {
-      for (i = 0; i < XVECLEN (PATTERN (def_insn), 0); i++)
+      for (int i = 0; i < XVECLEN (PATTERN (def_insn), 0); i++)
         {
-          s_expr = XVECEXP (PATTERN (def_insn), 0, i);
+          rtx s_expr = XVECEXP (PATTERN (def_insn), 0, i);
           if (GET_CODE (s_expr) != SET)
             continue;
 
@@ -596,7 +679,7 @@ merge_def_and_ext (ext_cand *cand, rtx def_insn, ext_state *state)
           else
             {
               /* PARALLEL with multiple SETs.  */
-              return false;
+              return NULL;
             }
         }
     }
@@ -605,10 +688,27 @@ merge_def_and_ext (ext_cand *cand, rtx def_insn, ext_state *state)
   else
     {
       /* It is not a PARALLEL or a SET, what could it be ? */
-      return false;
+      return NULL;
     }
 
   gcc_assert (sub_rtx != NULL);
+  return sub_rtx;
+}
+
+/* Merge the DEF_INSN with an extension.  Calls combine_set_extension
+   on the SET pattern.  */
+
+static bool
+merge_def_and_ext (ext_cand *cand, rtx_insn *def_insn, ext_state *state)
+{
+  machine_mode ext_src_mode;
+  rtx *sub_rtx;
+
+  ext_src_mode = GET_MODE (XEXP (SET_SRC (cand->expr), 0));
+  sub_rtx = get_sub_rtx (def_insn);
+
+  if (sub_rtx == NULL)
+    return false;
 
   if (REG_P (SET_DEST (*sub_rtx))
       && (GET_MODE (SET_DEST (*sub_rtx)) == ext_src_mode
@@ -636,6 +736,18 @@ merge_def_and_ext (ext_cand *cand, rtx def_insn, ext_state *state)
   return false;
 }
 
+/* Given SRC, which should be one or more extensions of a REG, strip
+   away the extensions and return the REG.  */
+
+static inline rtx
+get_extended_src_reg (rtx src)
+{
+  while (GET_CODE (src) == SIGN_EXTEND || GET_CODE (src) == ZERO_EXTEND)
+    src = XEXP (src, 0);
+  gcc_assert (REG_P (src));
+  return src;
+}
+
 /* This function goes through all reaching defs of the source
    of the candidate for elimination (CAND) and tries to combine
    the extension with the definition instruction.  The changes
@@ -648,7 +760,7 @@ merge_def_and_ext (ext_cand *cand, rtx def_insn, ext_state *state)
 static bool
 combine_reaching_defs (ext_cand *cand, const_rtx set_pat, ext_state *state)
 {
-  rtx def_insn;
+  rtx_insn *def_insn;
   bool merge_successful = true;
   int i;
   int defs_ix;
@@ -662,11 +774,122 @@ combine_reaching_defs (ext_cand *cand, const_rtx set_pat, ext_state *state)
   if (!outcome)
     return false;
 
+  /* If the destination operand of the extension is a different
+     register than the source operand, then additional restrictions
+     are needed.  Note we have to handle cases where we have nested
+     extensions in the source operand.  */
+  bool copy_needed
+    = (REGNO (SET_DEST (PATTERN (cand->insn)))
+       != REGNO (get_extended_src_reg (SET_SRC (PATTERN (cand->insn)))));
+  if (copy_needed)
+    {
+      /* In theory we could handle more than one reaching def, it
+	 just makes the code to update the insn stream more complex.  */
+      if (state->defs_list.length () != 1)
+	return false;
+
+      /* We require the candidate not already be modified.  It may,
+	 for example have been changed from a (sign_extend (reg))
+	 into (zero_extend (sign_extend (reg))).
+
+	 Handling that case shouldn't be terribly difficult, but the code
+	 here and the code to emit copies would need auditing.  Until
+	 we see a need, this is the safe thing to do.  */
+      if (state->modified[INSN_UID (cand->insn)].kind != EXT_MODIFIED_NONE)
+	return false;
+
+      /* Transformation of
+	 (set (reg1) (expression))
+	 (set (reg2) (any_extend (reg1)))
+	 into
+	 (set (reg2) (any_extend (expression)))
+	 (set (reg1) (reg2))
+	 is only valid for scalar integral modes, as it relies on the low
+	 subreg of reg1 to have the value of (expression), which is not true
+	 e.g. for vector modes.  */
+      if (!SCALAR_INT_MODE_P (GET_MODE (SET_DEST (PATTERN (cand->insn)))))
+	return false;
+
+      machine_mode dst_mode = GET_MODE (SET_DEST (PATTERN (cand->insn)));
+      rtx src_reg = get_extended_src_reg (SET_SRC (PATTERN (cand->insn)));
+
+      /* Ensure the number of hard registers of the copy match.  */
+      if (HARD_REGNO_NREGS (REGNO (src_reg), dst_mode)
+	  != HARD_REGNO_NREGS (REGNO (src_reg), GET_MODE (src_reg)))
+	return false;
+
+      /* There's only one reaching def.  */
+      rtx_insn *def_insn = state->defs_list[0];
+
+      /* The defining statement must not have been modified either.  */
+      if (state->modified[INSN_UID (def_insn)].kind != EXT_MODIFIED_NONE)
+	return false;
+
+      /* The defining statement and candidate insn must be in the same block.
+	 This is merely to keep the test for safety and updating the insn
+	 stream simple.  Also ensure that within the block the candidate
+	 follows the defining insn.  */
+      basic_block bb = BLOCK_FOR_INSN (cand->insn);
+      if (bb != BLOCK_FOR_INSN (def_insn)
+	  || DF_INSN_LUID (def_insn) > DF_INSN_LUID (cand->insn))
+	return false;
+
+      /* If there is an overlap between the destination of DEF_INSN and
+	 CAND->insn, then this transformation is not safe.  Note we have
+	 to test in the widened mode.  */
+      rtx *dest_sub_rtx = get_sub_rtx (def_insn);
+      if (dest_sub_rtx == NULL
+	  || !REG_P (SET_DEST (*dest_sub_rtx)))
+	return false;
+
+      rtx tmp_reg = gen_rtx_REG (GET_MODE (SET_DEST (PATTERN (cand->insn))),
+				 REGNO (SET_DEST (*dest_sub_rtx)));
+      if (reg_overlap_mentioned_p (tmp_reg, SET_DEST (PATTERN (cand->insn))))
+	return false;
+
+      /* The destination register of the extension insn must not be
+	 used or set between the def_insn and cand->insn exclusive.  */
+      if (reg_used_between_p (SET_DEST (PATTERN (cand->insn)),
+			      def_insn, cand->insn)
+	  || reg_set_between_p (SET_DEST (PATTERN (cand->insn)),
+				def_insn, cand->insn))
+	return false;
+
+      /* We must be able to copy between the two registers.   Generate,
+	 recognize and verify constraints of the copy.  Also fail if this
+	 generated more than one insn.
+
+         This generates garbage since we throw away the insn when we're
+	 done, only to recreate it later if this test was successful. 
+
+	 Make sure to get the mode from the extension (cand->insn).  This
+	 is different than in the code to emit the copy as we have not
+	 modified the defining insn yet.  */
+      start_sequence ();
+      rtx pat = PATTERN (cand->insn);
+      rtx new_dst = gen_rtx_REG (GET_MODE (SET_DEST (pat)),
+                                 REGNO (get_extended_src_reg (SET_SRC (pat))));
+      rtx new_src = gen_rtx_REG (GET_MODE (SET_DEST (pat)),
+                                 REGNO (SET_DEST (pat)));
+      emit_move_insn (new_dst, new_src);
+
+      rtx_insn *insn = get_insns();
+      end_sequence ();
+      if (NEXT_INSN (insn))
+	return false;
+      if (recog_memoized (insn) == -1)
+	return false;
+      extract_insn (insn);
+      if (!constrain_operands (1, get_preferred_alternatives (insn, bb)))
+	return false;
+    }
+
+
   /* If cand->insn has been already modified, update cand->mode to a wider
      mode if possible, or punt.  */
   if (state->modified[INSN_UID (cand->insn)].kind != EXT_MODIFIED_NONE)
     {
-      enum machine_mode mode;
+      machine_mode mode;
       rtx set;
 
       if (state->modified[INSN_UID (cand->insn)].kind
@@ -725,11 +948,15 @@ combine_reaching_defs (ext_cand *cand, const_rtx set_pat, ext_state *state)
             fprintf (dump_file, "All merges were successful.\n");
 
 	  FOR_EACH_VEC_ELT (state->modified_list, i, def_insn)
-	    if (state->modified[INSN_UID (def_insn)].kind == EXT_MODIFIED_NONE)
-	      state->modified[INSN_UID (def_insn)].kind
-		= (cand->code == ZERO_EXTEND
-		   ? EXT_MODIFIED_ZEXT : EXT_MODIFIED_SEXT);
+	    {
+	      ext_modified *modified = &state->modified[INSN_UID (def_insn)];
+	      if (modified->kind == EXT_MODIFIED_NONE)
+		modified->kind = (cand->code == ZERO_EXTEND ? EXT_MODIFIED_ZEXT
+						            : EXT_MODIFIED_SEXT);
 
+	      if (copy_needed)
+		modified->do_not_reextend = 1;
+	    }
           return true;
         }
       else
@@ -758,12 +985,12 @@ combine_reaching_defs (ext_cand *cand, const_rtx set_pat, ext_state *state)
 /* Add an extension pattern that could be eliminated.  */
 
 static void
-add_removable_extension (const_rtx expr, rtx insn,
+add_removable_extension (const_rtx expr, rtx_insn *insn,
 			 vec<ext_cand> *insn_list,
 			 unsigned *def_map)
 {
   enum rtx_code code;
-  enum machine_mode mode;
+  machine_mode mode;
   unsigned int idx;
   rtx src, dest;
 
@@ -778,8 +1005,7 @@ add_removable_extension (const_rtx expr, rtx insn,
 
   if (REG_P (dest)
       && (code == SIGN_EXTEND || code == ZERO_EXTEND)
-      && REG_P (XEXP (src, 0))
-      && REGNO (dest) == REGNO (XEXP (src, 0)))
+      && REG_P (XEXP (src, 0)))
     {
       struct df_link *defs, *def;
       ext_cand *cand;
@@ -832,10 +1058,11 @@ find_removable_extensions (void)
 {
   vec<ext_cand> insn_list = vNULL;
   basic_block bb;
-  rtx insn, set;
+  rtx_insn *insn;
+  rtx set;
   unsigned *def_map = XCNEWVEC (unsigned, max_insn_uid);
 
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     FOR_BB_INSNS (bb, insn)
       {
 	if (!NONDEBUG_INSN_P (insn))
@@ -859,10 +1086,11 @@ static void
 find_and_remove_re (void)
 {
   ext_cand *curr_cand;
-  rtx curr_insn = NULL_RTX;
+  rtx_insn *curr_insn = NULL;
   int num_re_opportunities = 0, num_realized = 0, i;
   vec<ext_cand> reinsn_list;
-  auto_vec<rtx> reinsn_del_list;
+  auto_vec<rtx_insn *> reinsn_del_list;
+  auto_vec<rtx_insn *> reinsn_copy_list;
   ext_state state;
 
   /* Construct DU chain to get all reaching definitions of each
@@ -899,9 +1127,53 @@ find_and_remove_re (void)
           if (dump_file)
             fprintf (dump_file, "Eliminated the extension.\n");
           num_realized++;
-          reinsn_del_list.safe_push (curr_cand->insn);
+	  /* If the RHS of the current candidate is not (extend (reg)), then
+	     we do not allow the optimization of extensions where
+	     the source and destination registers do not match.  Thus
+	     checking REG_P here is correct.  */
+	  if (REG_P (XEXP (SET_SRC (PATTERN (curr_cand->insn)), 0))
+	      && (REGNO (SET_DEST (PATTERN (curr_cand->insn)))
+		  != REGNO (XEXP (SET_SRC (PATTERN (curr_cand->insn)), 0))))
+	    {
+              reinsn_copy_list.safe_push (curr_cand->insn);
+              reinsn_copy_list.safe_push (state.defs_list[0]);
+	    }
+	  reinsn_del_list.safe_push (curr_cand->insn);
 	  state.modified[INSN_UID (curr_cand->insn)].deleted = 1;
         }
+    }
+
+  /* The copy list contains pairs of insns which describe copies we
+     need to insert into the INSN stream.
+
+     The first insn in each pair is the extension insn, from which
+     we derive the source and destination of the copy.
+
+     The second insn in each pair is the memory reference where the
+     extension will ultimately happen.  We emit the new copy
+     immediately after this insn.
+
+     It may first appear that the arguments for the copy are reversed.
+     Remember that the memory reference will be changed to refer to the
+     destination of the extention.  So we're actually emitting a copy
+     from the new destination to the old destination.  */
+  for (unsigned int i = 0; i < reinsn_copy_list.length (); i += 2)
+    {
+      rtx_insn *curr_insn = reinsn_copy_list[i];
+      rtx_insn *def_insn = reinsn_copy_list[i + 1];
+
+      /* Use the mode of the destination of the defining insn
+	 for the mode of the copy.  This is necessary if the
+	 defining insn was used to eliminate a second extension
+	 that was wider than the first.  */
+      rtx sub_rtx = *get_sub_rtx (def_insn);
+      rtx pat = PATTERN (curr_insn);
+      rtx new_dst = gen_rtx_REG (GET_MODE (SET_DEST (sub_rtx)),
+				 REGNO (XEXP (SET_SRC (pat), 0)));
+      rtx new_src = gen_rtx_REG (GET_MODE (SET_DEST (sub_rtx)),
+				 REGNO (SET_DEST (pat)));
+      rtx set = gen_rtx_SET (VOIDmode, new_dst, new_src);
+      emit_insn_after (set, def_insn);
     }
 
   /* Delete all useless extensions here in one sweep.  */
@@ -931,14 +1203,6 @@ rest_of_handle_ree (void)
   return 0;
 }
 
-/* Run REE pass when flag_ree is set at optimization level > 0.  */
-
-static bool
-gate_handle_ree (void)
-{
-  return (optimize > 0 && flag_ree);
-}
-
 namespace {
 
 const pass_data pass_data_ree =
@@ -946,14 +1210,12 @@ const pass_data pass_data_ree =
   RTL_PASS, /* type */
   "ree", /* name */
   OPTGROUP_NONE, /* optinfo_flags */
-  true, /* has_gate */
-  true, /* has_execute */
   TV_REE, /* tv_id */
   0, /* properties_required */
   0, /* properties_provided */
   0, /* properties_destroyed */
   0, /* todo_flags_start */
-  ( TODO_df_finish | TODO_verify_rtl_sharing ), /* todo_flags_finish */
+  TODO_df_finish, /* todo_flags_finish */
 };
 
 class pass_ree : public rtl_opt_pass
@@ -964,8 +1226,8 @@ public:
   {}
 
   /* opt_pass methods: */
-  bool gate () { return gate_handle_ree (); }
-  unsigned int execute () { return rest_of_handle_ree (); }
+  virtual bool gate (function *) { return (optimize > 0 && flag_ree); }
+  virtual unsigned int execute (function *) { return rest_of_handle_ree (); }
 
 }; // class pass_ree
 

@@ -1,5 +1,6 @@
 // PR c++/57402
-// { dg-options "-std=c++1y -pedantic-errors" }
+// { dg-do run }
+// { dg-options "" }
 
 int i = 2;
 

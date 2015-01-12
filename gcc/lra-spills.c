@@ -1,5 +1,5 @@
 /* Change pseudos by memory.
-   Copyright (C) 2010-2013 Free Software Foundation, Inc.
+   Copyright (C) 2010-2015 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -67,8 +67,18 @@ along with GCC; see the file COPYING3.	If not see
 #include "regs.h"
 #include "hard-reg-set.h"
 #include "flags.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "vec.h"
+#include "machmode.h"
+#include "input.h"
 #include "function.h"
+#include "symtab.h"
 #include "expr.h"
+#include "predict.h"
+#include "dominance.h"
+#include "cfg.h"
+#include "cfgrtl.h"
 #include "basic-block.h"
 #include "except.h"
 #include "timevar.h"
@@ -132,7 +142,7 @@ static void
 assign_mem_slot (int i)
 {
   rtx x = NULL_RTX;
-  enum machine_mode mode = GET_MODE (regno_reg_rtx[i]);
+  machine_mode mode = GET_MODE (regno_reg_rtx[i]);
   unsigned int inherent_size = PSEUDO_REGNO_BYTES (i);
   unsigned int inherent_align = GET_MODE_ALIGNMENT (mode);
   unsigned int max_ref_width = GET_MODE_SIZE (lra_reg_info[i].biggest_mode);
@@ -163,7 +173,6 @@ assign_mem_slot (int i)
       x = assign_stack_local (mode, total_size,
 			      min_align > inherent_align
 			      || total_size > inherent_size ? -1 : 0);
-      x = lra_eliminate_regs_1 (x, GET_MODE (x), false, false, true);
       stack_slot = x;
       /* Cancel the big-endian correction done in assign_stack_local.
 	 Get the address of the beginning of the slot.	This is so we
@@ -238,7 +247,7 @@ pseudo_reg_slot_compare (const void *v1p, const void *v2p)
   slot_num2 = pseudo_slots[regno2].slot_num;
   if ((diff = slot_num1 - slot_num2) != 0)
     return (frame_pointer_needed
-	    || !FRAME_GROWS_DOWNWARD == STACK_GROWS_DOWNWARD ? diff : -diff);
+	    || (!FRAME_GROWS_DOWNWARD) == STACK_GROWS_DOWNWARD ? diff : -diff);
   total_size1 = GET_MODE_SIZE (lra_reg_info[regno1].biggest_mode);
   total_size2 = GET_MODE_SIZE (lra_reg_info[regno2].biggest_mode);
   if ((diff = total_size2 - total_size1) != 0)
@@ -255,9 +264,10 @@ assign_spill_hard_regs (int *pseudo_regnos, int n)
 {
   int i, k, p, regno, res, spill_class_size, hard_regno, nr;
   enum reg_class rclass, spill_class;
-  enum machine_mode mode;
+  machine_mode mode;
   lra_live_range_t r;
-  rtx insn, set;
+  rtx_insn *insn;
+  rtx set;
   basic_block bb;
   HARD_REG_SET conflict_hard_regs;
   bitmap_head ok_insn_bitmap;
@@ -281,7 +291,7 @@ assign_spill_hard_regs (int *pseudo_regnos, int n)
 	  add_to_hard_reg_set (&reserved_hard_regs[p],
 			       lra_reg_info[i].biggest_mode, hard_regno);
   bitmap_initialize (&ok_insn_bitmap, &reg_obstack);
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     FOR_BB_INSNS (bb, insn)
       if (DEBUG_INSN_P (insn)
 	  || ((set = single_set (insn)) != NULL_RTX
@@ -412,7 +422,7 @@ assign_stack_slot_num_and_sort_pseudos (int *pseudo_regnos, int n)
    corresponding memory or spilled hard reg.  Ignore spilled pseudos
    created from the scratches.	*/
 static void
-remove_pseudos (rtx *loc, rtx insn)
+remove_pseudos (rtx *loc, rtx_insn *insn)
 {
   int i;
   rtx hard_reg;
@@ -430,8 +440,15 @@ remove_pseudos (rtx *loc, rtx insn)
 	 into scratches back.  */
       && ! lra_former_scratch_p (i))
     {
-      hard_reg = spill_hard_reg[i];
-      *loc = copy_rtx (hard_reg != NULL_RTX ? hard_reg : pseudo_slots[i].mem);
+      if ((hard_reg = spill_hard_reg[i]) != NULL_RTX)
+	*loc = copy_rtx (hard_reg);
+      else
+	{
+	  rtx x = lra_eliminate_regs_1 (insn, pseudo_slots[i].mem,
+					GET_MODE (pseudo_slots[i].mem),
+					0, false, false, true);
+	  *loc = x != pseudo_slots[i].mem ? x : copy_rtx (x);
+	}
       return;
     }
 
@@ -457,7 +474,7 @@ static void
 spill_pseudos (void)
 {
   basic_block bb;
-  rtx insn;
+  rtx_insn *insn;
   int i;
   bitmap_head spilled_pseudos, changed_insns;
 
@@ -472,14 +489,35 @@ spill_pseudos (void)
 	  bitmap_ior_into (&changed_insns, &lra_reg_info[i].insn_bitmap);
 	}
     }
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     {
       FOR_BB_INSNS (bb, insn)
 	if (bitmap_bit_p (&changed_insns, INSN_UID (insn)))
 	  {
+	    rtx *link_loc, link;
 	    remove_pseudos (&PATTERN (insn), insn);
 	    if (CALL_P (insn))
 	      remove_pseudos (&CALL_INSN_FUNCTION_USAGE (insn), insn);
+	    for (link_loc = &REG_NOTES (insn);
+		 (link = *link_loc) != NULL_RTX;
+		 link_loc = &XEXP (link, 1))
+	      {
+		switch (REG_NOTE_KIND (link))
+		  {
+		  case REG_FRAME_RELATED_EXPR:
+		  case REG_CFA_DEF_CFA:
+		  case REG_CFA_ADJUST_CFA:
+		  case REG_CFA_OFFSET:
+		  case REG_CFA_REGISTER:
+		  case REG_CFA_EXPRESSION:
+		  case REG_CFA_RESTORE:
+		  case REG_CFA_SET_VDRAP:
+		    remove_pseudos (&XEXP (link, 0), insn);
+		    break;
+		  default:
+		    break;
+		  }
+	      }
 	    if (lra_dump_file != NULL)
 	      fprintf (lra_dump_file,
 		       "Changing spilled pseudos to memory in insn #%u\n",
@@ -652,14 +690,14 @@ lra_final_code_change (void)
 {
   int i, hard_regno;
   basic_block bb;
-  rtx insn, curr;
+  rtx_insn *insn, *curr;
   int max_regno = max_reg_num ();
 
   for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
     if (lra_reg_info[i].nrefs != 0
 	&& (hard_regno = lra_get_regno_hard_regno (i)) >= 0)
       SET_REGNO (regno_reg_rtx[i], hard_regno);
-  FOR_EACH_BB (bb)
+  FOR_EACH_BB_FN (bb, cfun)
     FOR_BB_INSNS_SAFE (bb, insn, curr)
       if (INSN_P (insn))
 	{

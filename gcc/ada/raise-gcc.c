@@ -6,7 +6,7 @@
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
- *             Copyright (C) 1992-2013, Free Software Foundation, Inc.      *
+ *             Copyright (C) 1992-2014, Free Software Foundation, Inc.      *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -84,8 +84,13 @@ extern void __gnat_unhandled_except_handler (_Unwind_Exception *);
 
 /* The known and handled exception classes.  */
 
+#ifdef __ARM_EABI_UNWINDER__
+#define CXX_EXCEPTION_CLASS "GNUCC++"
+#define GNAT_EXCEPTION_CLASS "GNU-Ada"
+#else
 #define CXX_EXCEPTION_CLASS 0x474e5543432b2b00ULL
 #define GNAT_EXCEPTION_CLASS 0x474e552d41646100ULL
+#endif
 
 /* Structure of a C++ exception, represented as a C structure...  See
    unwind-cxx.h for the full definition.  */
@@ -212,7 +217,7 @@ db_phases (int phases)
 {
   const phase_descriptor *a = phase_descriptors;
 
-  if (! (db_accepted_codes() & DB_PHASES))
+  if (! (db_accepted_codes () & DB_PHASES))
     return;
 
   db (DB_PHASES, "\n");
@@ -860,15 +865,29 @@ extern struct Exception_Data Foreign_Exception;
 extern struct Exception_Data Non_Ada_Error;
 #endif
 
+/* Return true iff the exception class of EXCEPT is EC.  */
+
+static int
+exception_class_eq (const _GNAT_Exception *except, _Unwind_Exception_Class ec)
+{
+#ifdef __ARM_EABI_UNWINDER__
+  return memcmp (except->common.exception_class, ec, 8) == 0;
+#else
+  return except->common.exception_class == ec;
+#endif
+}
+
+/* Return how CHOICE matches PROPAGATED_EXCEPTION.  */
+
 static enum action_kind
-is_handled_by (_Unwind_Ptr choice, _GNAT_Exception * propagated_exception)
+is_handled_by (_Unwind_Ptr choice, _GNAT_Exception *propagated_exception)
 {
   /* All others choice match everything.  */
   if (choice == GNAT_ALL_OTHERS)
     return handler;
 
   /* GNAT exception occurrence.  */
-  if (propagated_exception->common.exception_class == GNAT_EXCEPTION_CLASS)
+  if (exception_class_eq (propagated_exception, GNAT_EXCEPTION_CLASS))
     {
       /* Pointer to the GNAT exception data corresponding to the propagated
          occurrence.  */
@@ -913,13 +932,14 @@ is_handled_by (_Unwind_Ptr choice, _GNAT_Exception * propagated_exception)
     return handler;
 
   /* C++ exception occurrences.  */
-  if (propagated_exception->common.exception_class == CXX_EXCEPTION_CLASS
+  if (exception_class_eq (propagated_exception, CXX_EXCEPTION_CLASS)
       && Language_For (choice) == 'C')
     {
       void *choice_typeinfo = Foreign_Data_For (choice);
       void *except_typeinfo =
 	(((struct __cxa_exception *)
-	  ((_Unwind_Exception *)propagated_exception + 1)) - 1)->exceptionType;
+	  ((_Unwind_Exception *)propagated_exception + 1)) - 1)
+	->exceptionType;
 
       /* Typeinfo are directly compared, which might not be correct if they
 	 aren't merged.  ??? We should call the == operator if this module is
@@ -977,7 +997,6 @@ get_action_description_for (_Unwind_Ptr ip,
   else
     {
       const unsigned char * p = action->table_entry;
-
       _sleb128_t ar_filter, ar_disp;
 
       action->kind = nothing;
@@ -1010,7 +1029,8 @@ get_action_description_for (_Unwind_Ptr ip,
 
                   /* See if the filter we have is for an exception which
                      matches the one we are propagating.  */
-                  _Unwind_Ptr choice = get_ttype_entry_for (region, ar_filter);
+                  _Unwind_Ptr choice =
+		    get_ttype_entry_for (region, ar_filter);
 
 		  act = is_handled_by (choice, gnat_exception);
                   if (act != nothing)
@@ -1070,93 +1090,49 @@ extern void __gnat_notify_unhandled_exception (struct Exception_Occurrence *);
 /* Below is the eh personality routine per se. We currently assume that only
    GNU-Ada exceptions are met.  */
 
+/* By default, the personality routine is public.  */
+#define PERSONALITY_STORAGE
+
 #ifdef __USING_SJLJ_EXCEPTIONS__
 #define PERSONALITY_FUNCTION    __gnat_personality_sj0
 #elif defined (__SEH__)
 #define PERSONALITY_FUNCTION    __gnat_personality_imp
+/* The public personality routine for seh is __gnat_personality_seh0, defined
+   below using the SEH convention. This is a wrapper around the GNU routine,
+   which is static.  */
+#undef PERSONALITY_STORAGE
+#define PERSONALITY_STORAGE static
 #else
 #define PERSONALITY_FUNCTION    __gnat_personality_v0
 #endif
 
-/* Major tweak for ia64-vms : the CHF propagation phase calls this personality
-   routine with sigargs/mechargs arguments and has very specific expectations
-   on possible return values.
+/* Code executed to continue unwinding.  With the ARM unwinder, the
+   personality routine must unwind one frame (per EHABI 7.3 4.).  */
 
-   We handle this with a number of specific tricks:
-
-   1. We tweak the personality routine prototype to have the "version" and
-      "phases" two first arguments be void * instead of int and _Unwind_Action
-      as nominally expected in the GCC context.
-
-      This allows us to access the full range of bits passed in every case and
-      has no impact on the callers side since each argument remains assigned
-      the same single 64bit slot.
-
-   2. We retrieve the corresponding int and _Unwind_Action values within the
-      routine for regular use with truncating conversions. This is a noop when
-      called from the libgcc unwinder.
-
-   3. We assume we're called by the VMS CHF when unexpected bits are set in
-      both those values. The incoming arguments are then real sigargs and
-      mechargs pointers, which we then redirect to __gnat_handle_vms_condition
-      for proper processing.
-*/
-#if defined (VMS) && defined (__IA64)
-typedef void * version_arg_t;
-typedef void * phases_arg_t;
-#else
-typedef int version_arg_t;
-typedef _Unwind_Action phases_arg_t;
-#endif
-
-#if defined (__SEH__) && !defined (__USING_SJLJ_EXCEPTIONS__)
-static
-#endif
-_Unwind_Reason_Code
-PERSONALITY_FUNCTION (version_arg_t, phases_arg_t,
-                      _Unwind_Exception_Class, _Unwind_Exception *,
-                      _Unwind_Context *);
-
-_Unwind_Reason_Code
-PERSONALITY_FUNCTION (version_arg_t version_arg,
-                      phases_arg_t phases_arg,
-                      _Unwind_Exception_Class uw_exception_class
-		         ATTRIBUTE_UNUSED,
-                      _Unwind_Exception *uw_exception,
-                      _Unwind_Context *uw_context)
+static _Unwind_Reason_Code
+continue_unwind (struct _Unwind_Exception* ue_header ATTRIBUTE_UNUSED,
+		 struct _Unwind_Context* uw_context ATTRIBUTE_UNUSED)
 {
-  /* Fetch the version and phases args with their nominal ABI types for later
-     use. This is a noop everywhere except on ia64-vms when called from the
-     Condition Handling Facility.  */
-  int uw_version = (int) version_arg;
-  _Unwind_Action uw_phases = (_Unwind_Action) phases_arg;
+#ifdef __ARM_EABI_UNWINDER__
+  if (__gnu_unwind_frame (ue_header, uw_context) != _URC_OK)
+    return _URC_FAILURE;
+#endif
+  return _URC_CONTINUE_UNWIND;
+}
+
+/* Common code for the body of GNAT personality routine.  This code is shared
+   between all unwinders.  */
+
+static _Unwind_Reason_Code
+personality_body (_Unwind_Action uw_phases,
+		  _Unwind_Exception *uw_exception,
+		  _Unwind_Context *uw_context)
+{
   region_descriptor region;
   action_descriptor action;
   _Unwind_Ptr ip;
 
-  /* Check that we're called from the ABI context we expect, with a major
-     possible variation on VMS for IA64.  */
-  if (uw_version != 1)
-    {
-#if defined (VMS) && defined (__IA64)
-
-      /* Assume we're called with sigargs/mechargs arguments if really
-	 unexpected bits are set in our first two formals.  Redirect to the
-	 GNAT condition handling code in this case.  */
-
-      extern long __gnat_handle_vms_condition (void *, void *);
-
-      unsigned int version_unexpected_bits_mask = 0xffffff00U;
-      unsigned int phases_unexpected_bits_mask  = 0xffffff00U;
-
-      if ((unsigned int)uw_version & version_unexpected_bits_mask
-	  && (unsigned int)uw_phases & phases_unexpected_bits_mask)
-	return __gnat_handle_vms_condition (version_arg, phases_arg);
-#endif
-
-      return _URC_FATAL_PHASE1_ERROR;
-    }
-
+  /* Debug traces.  */
   db_indent (DB_INDENT_RESET);
   db_phases (uw_phases);
   db_indent (DB_INDENT_INCREASE);
@@ -1165,12 +1141,14 @@ PERSONALITY_FUNCTION (version_arg_t version_arg,
      will tell us if there is some lsda, call_site, action and/or ttype data
      for the associated ip.  */
   get_region_description_for (uw_context, &region);
-  ip = get_ip_from_context (uw_context);
-  db_region_for (&region, ip);
 
   /* No LSDA => no handlers or cleanups => we shall unwind further up.  */
   if (! region.lsda)
-    return _URC_CONTINUE_UNWIND;
+    return continue_unwind (uw_exception, uw_context);
+
+  /* Get the instruction pointer.  */
+  ip = get_ip_from_context (uw_context);
+  db_region_for (&region, ip);
 
   /* Search the call-site and action-record tables for the action associated
      with this IP.  */
@@ -1180,7 +1158,7 @@ PERSONALITY_FUNCTION (version_arg_t version_arg,
   /* Whatever the phase, if there is nothing relevant in this frame,
      unwinding should just go on.  */
   if (action.kind == nothing)
-    return _URC_CONTINUE_UNWIND;
+    return continue_unwind (uw_exception, uw_context);
 
   /* If we found something in search phase, we should return a code indicating
      what to do next depending on what we found. If we only have cleanups
@@ -1190,7 +1168,7 @@ PERSONALITY_FUNCTION (version_arg_t version_arg,
     {
       if (action.kind == cleanup)
 	{
-	  return _URC_CONTINUE_UNWIND;
+	  return continue_unwind (uw_exception, uw_context);
 	}
       else
 	{
@@ -1224,6 +1202,138 @@ PERSONALITY_FUNCTION (version_arg_t version_arg,
 
   return _URC_INSTALL_CONTEXT;
 }
+
+#ifndef __ARM_EABI_UNWINDER__
+/* Major tweak for ia64-vms : the CHF propagation phase calls this personality
+   routine with sigargs/mechargs arguments and has very specific expectations
+   on possible return values.
+
+   We handle this with a number of specific tricks:
+
+   1. We tweak the personality routine prototype to have the "version" and
+      "phases" two first arguments be void * instead of int and _Unwind_Action
+      as nominally expected in the GCC context.
+
+      This allows us to access the full range of bits passed in every case and
+      has no impact on the callers side since each argument remains assigned
+      the same single 64bit slot.
+
+   2. We retrieve the corresponding int and _Unwind_Action values within the
+      routine for regular use with truncating conversions. This is a noop when
+      called from the libgcc unwinder.
+
+   3. We assume we're called by the VMS CHF when unexpected bits are set in
+      both those values. The incoming arguments are then real sigargs and
+      mechargs pointers, which we then redirect to __gnat_handle_vms_condition
+      for proper processing.
+*/
+#if defined (VMS) && defined (__IA64)
+typedef void * version_arg_t;
+typedef void * phases_arg_t;
+#else
+typedef int version_arg_t;
+typedef _Unwind_Action phases_arg_t;
+#endif
+
+PERSONALITY_STORAGE _Unwind_Reason_Code
+PERSONALITY_FUNCTION (version_arg_t, phases_arg_t,
+                      _Unwind_Exception_Class, _Unwind_Exception *,
+                      _Unwind_Context *);
+
+PERSONALITY_STORAGE _Unwind_Reason_Code
+PERSONALITY_FUNCTION (version_arg_t version_arg,
+                      phases_arg_t phases_arg,
+                      _Unwind_Exception_Class uw_exception_class
+		         ATTRIBUTE_UNUSED,
+                      _Unwind_Exception *uw_exception,
+                      _Unwind_Context *uw_context)
+{
+  /* Fetch the version and phases args with their nominal ABI types for later
+     use. This is a noop everywhere except on ia64-vms when called from the
+     Condition Handling Facility.  */
+  int uw_version = (int) version_arg;
+  _Unwind_Action uw_phases = (_Unwind_Action) phases_arg;
+
+  /* Check that we're called from the ABI context we expect, with a major
+     possible variation on VMS for IA64.  */
+  if (uw_version != 1)
+    {
+#if defined (VMS) && defined (__IA64)
+
+      /* Assume we're called with sigargs/mechargs arguments if really
+	 unexpected bits are set in our first two formals.  Redirect to the
+	 GNAT condition handling code in this case.  */
+
+      extern long __gnat_handle_vms_condition (void *, void *);
+
+      unsigned int version_unexpected_bits_mask = 0xffffff00U;
+      unsigned int phases_unexpected_bits_mask  = 0xffffff00U;
+
+      if ((unsigned int)uw_version & version_unexpected_bits_mask
+	  && (unsigned int)uw_phases & phases_unexpected_bits_mask)
+	return __gnat_handle_vms_condition (version_arg, phases_arg);
+#endif
+
+      return _URC_FATAL_PHASE1_ERROR;
+    }
+
+  return personality_body (uw_phases, uw_exception, uw_context);
+}
+
+#else /* __ARM_EABI_UNWINDER__ */
+
+PERSONALITY_STORAGE _Unwind_Reason_Code
+PERSONALITY_FUNCTION (_Unwind_State state,
+		      struct _Unwind_Exception* ue_header,
+		      struct _Unwind_Context* uw_context);
+
+PERSONALITY_STORAGE _Unwind_Reason_Code
+PERSONALITY_FUNCTION (_Unwind_State state,
+		      struct _Unwind_Exception* uw_exception,
+		      struct _Unwind_Context* uw_context)
+{
+  _Unwind_Action uw_phases;
+
+  switch (state & _US_ACTION_MASK)
+    {
+    case _US_VIRTUAL_UNWIND_FRAME:
+      /* Phase 1.  */
+      uw_phases = _UA_SEARCH_PHASE;
+      break;
+
+    case _US_UNWIND_FRAME_STARTING:
+      /* Phase 2, to call a cleanup.  */
+      uw_phases = _UA_CLEANUP_PHASE;
+#if 0
+      /* ??? We don't use UA_HANDLER_FRAME (except to debug).  Futhermore,
+	 barrier_cache.sp isn't yet set.  */
+      if (!(state & _US_FORCE_UNWIND)
+	  && (uw_exception->barrier_cache.sp
+	      == _Unwind_GetGR (uw_context, UNWIND_STACK_REG)))
+	uw_phases |= _UA_HANDLER_FRAME;
+#endif
+      break;
+
+    case _US_UNWIND_FRAME_RESUME:
+      /* Phase 2, called at the return of a cleanup.  In the GNU
+	 implementation, there is nothing left to do, so we simply go on.  */
+      return continue_unwind (uw_exception, uw_context);
+
+    default:
+      return _URC_FAILURE;
+    }
+  uw_phases |= (state & _US_FORCE_UNWIND);
+
+  /* The dwarf unwinder assumes the context structure holds things like the
+     function and LSDA pointers.  The ARM implementation caches these in
+     the exception header (UCB).  To avoid rewriting everything we make a
+     virtual scratch register point at the UCB.  This is a GNU specific
+     requirement.  */
+  _Unwind_SetGR (uw_context, UNWIND_POINTER_REG, (_Unwind_Ptr) uw_exception);
+
+  return personality_body (uw_phases, uw_exception, uw_context);
+}
+#endif /* __ARM_EABI_UNWINDER__ */
 
 /* Callback routine called by Unwind_ForcedUnwind to execute all the cleanup
    before exiting the task.  */
@@ -1266,12 +1376,19 @@ __gnat_Unwind_RaiseException (_Unwind_Exception *e)
 }
 
 _Unwind_Reason_Code
-__gnat_Unwind_ForcedUnwind (_Unwind_Exception *e,
-			    void *handler,
-			    void *argument)
+__gnat_Unwind_ForcedUnwind (_Unwind_Exception *e ATTRIBUTE_UNUSED,
+			    void *handler ATTRIBUTE_UNUSED,
+			    void *argument ATTRIBUTE_UNUSED)
 {
 #ifdef __USING_SJLJ_EXCEPTIONS__
+
+# if defined (__APPLE__) && defined (__arm__)
+  /* There is not ForcedUnwind routine in arm-darwin system library.  */
+  return _URC_FATAL_PHASE1_ERROR;
+# else
   return _Unwind_SjLj_ForcedUnwind (e, handler, argument);
+# endif
+
 #else
   return _Unwind_ForcedUnwind (e, handler, argument);
 #endif
@@ -1319,7 +1436,7 @@ __gnat_adjust_context (unsigned char *unw, ULONG64 rsp)
 {
   unsigned int len;
 
-  /* Version = 1, no flags, no prolog.  */
+  /* Version = 1, no flags, no prologue.  */
   if (unw[0] != 1 || unw[1] != 0)
     return;
   len = unw[2];
@@ -1329,7 +1446,7 @@ __gnat_adjust_context (unsigned char *unw, ULONG64 rsp)
   unw += 4;
   while (len > 0)
     {
-      /* Offset in prolog = 0.  */
+      /* Offset in prologue = 0.  */
       if (unw[0] != 0)
 	return;
       switch (unw[1] & 0xf)

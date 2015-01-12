@@ -1,5 +1,5 @@
 /* Header file for SSA iterators.
-   Copyright (C) 2013 Free Software Foundation, Inc.
+   Copyright (C) 2013-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -23,7 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 /* Immediate use lists are used to directly access all uses for an SSA
    name and get pointers to the statement for each use.
 
-   The structure ssa_use_operand_d consists of PREV and NEXT pointers
+   The structure ssa_use_operand_t consists of PREV and NEXT pointers
    to maintain the list.  A USE pointer, which points to address where
    the use is located and a LOC pointer which can point to the
    statement where the use is located, or, in the case of the root
@@ -55,7 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 
    If iteration is halted early, the marker node must be removed from
    the list before continuing.  */
-typedef struct immediate_use_iterator_d
+struct imm_use_iterator
 {
   /* This is the current use the iterator is processing.  */
   ssa_use_operand_t *imm_use;
@@ -66,7 +66,7 @@ typedef struct immediate_use_iterator_d
   /* This is the next ssa_name to visit.  IMM_USE may get removed before
      the next one is traversed to, so it must be cached early.  */
   ssa_use_operand_t *next_imm_name;
-} imm_use_iterator;
+};
 
 
 /* Use this iterator when simply looking at stmts.  Adding, deleting or
@@ -98,7 +98,7 @@ typedef struct immediate_use_iterator_d
    get access to each occurrence of ssavar on the stmt returned by
    that iterator..  for instance:
 
-     FOR_EACH_IMM_USE_STMT (stmt, iter, var)
+     FOR_EACH_IMM_USE_STMT (stmt, iter, ssavar)
        {
          FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
 	   {
@@ -131,7 +131,7 @@ enum ssa_op_iter_type {
    optimization, this structure is scalarized, and any unused fields are
    optimized away, resulting in little overhead.  */
 
-typedef struct ssa_operand_iterator_d
+struct ssa_op_iter
 {
   enum ssa_op_iter_type iter_type;
   bool done;
@@ -140,15 +140,15 @@ typedef struct ssa_operand_iterator_d
   unsigned numops;
   use_optype_p uses;
   gimple stmt;
-} ssa_op_iter;
+};
 
+/* NOTE: Keep these in sync with doc/tree-ssa.texi.  */
 /* These flags are used to determine which operands are returned during
    execution of the loop.  */
 #define SSA_OP_USE		0x01	/* Real USE operands.  */
 #define SSA_OP_DEF		0x02	/* Real DEF operands.  */
 #define SSA_OP_VUSE		0x04	/* VUSE operands.  */
 #define SSA_OP_VDEF		0x08	/* VDEF operands.  */
-
 /* These are commonly grouped operand flags.  */
 #define SSA_OP_VIRTUAL_USES	(SSA_OP_VUSE)
 #define SSA_OP_VIRTUAL_DEFS	(SSA_OP_VDEF)
@@ -194,7 +194,9 @@ typedef struct ssa_operand_iterator_d
    a real stmt or a PHI node, looking at the USE nodes matching FLAGS.  */
 #define FOR_EACH_PHI_OR_STMT_USE(USEVAR, STMT, ITER, FLAGS)	\
   for ((USEVAR) = (gimple_code (STMT) == GIMPLE_PHI 		\
-		   ? op_iter_init_phiuse (&(ITER), STMT, FLAGS)	\
+		   ? op_iter_init_phiuse (&(ITER),              \
+					  as_a <gphi *> (STMT), \
+					  FLAGS)		\
 		   : op_iter_init_use (&(ITER), STMT, FLAGS));	\
        !op_iter_done (&(ITER));					\
        (USEVAR) = op_iter_next_use (&(ITER)))
@@ -203,7 +205,9 @@ typedef struct ssa_operand_iterator_d
    a real stmt or a PHI node, looking at the DEF nodes matching FLAGS.  */
 #define FOR_EACH_PHI_OR_STMT_DEF(DEFVAR, STMT, ITER, FLAGS)	\
   for ((DEFVAR) = (gimple_code (STMT) == GIMPLE_PHI 		\
-		   ? op_iter_init_phidef (&(ITER), STMT, FLAGS)	\
+		   ? op_iter_init_phidef (&(ITER),		\
+					  as_a <gphi *> (STMT), \
+					  FLAGS)		\
 		   : op_iter_init_def (&(ITER), STMT, FLAGS));	\
        !op_iter_done (&(ITER));					\
        (DEFVAR) = op_iter_next_def (&(ITER)))
@@ -610,7 +614,7 @@ op_iter_init (ssa_op_iter *ptr, gimple stmt, int flags)
 	    ptr->numops = 1;
 	    break;
 	  case GIMPLE_ASM:
-	    ptr->numops = gimple_asm_noutputs (stmt);
+	    ptr->numops = gimple_asm_noutputs (as_a <gasm *> (stmt));
 	    break;
 	  default:
 	    ptr->numops = 0;
@@ -749,7 +753,7 @@ num_ssa_operands (gimple stmt, int flags)
 /* If there is a single DEF in the PHI node which matches FLAG, return it.
    Otherwise return NULL_DEF_OPERAND_P.  */
 static inline tree
-single_phi_def (gimple stmt, int flags)
+single_phi_def (gphi *stmt, int flags)
 {
   tree def = PHI_RESULT (stmt);
   if ((flags & SSA_OP_DEF) && is_gimple_reg (def))
@@ -762,7 +766,7 @@ single_phi_def (gimple stmt, int flags)
 /* Initialize the iterator PTR for uses matching FLAGS in PHI.  FLAGS should
    be either SSA_OP_USES or SSA_OP_VIRTUAL_USES.  */
 static inline use_operand_p
-op_iter_init_phiuse (ssa_op_iter *ptr, gimple phi, int flags)
+op_iter_init_phiuse (ssa_op_iter *ptr, gphi *phi, int flags)
 {
   tree phi_def = gimple_phi_result (phi);
   int comp;
@@ -792,7 +796,7 @@ op_iter_init_phiuse (ssa_op_iter *ptr, gimple phi, int flags)
 /* Start an iterator for a PHI definition.  */
 
 static inline def_operand_p
-op_iter_init_phidef (ssa_op_iter *ptr, gimple phi, int flags)
+op_iter_init_phidef (ssa_op_iter *ptr, gphi *phi, int flags)
 {
   tree phi_def = PHI_RESULT (phi);
   int comp;
@@ -881,9 +885,9 @@ link_use_stmts_after (use_operand_p head, imm_use_iterator *imm)
   /* Only look at virtual or real uses, depending on the type of HEAD.  */
   flag = (is_gimple_reg (use) ? SSA_OP_USE : SSA_OP_VIRTUAL_USES);
 
-  if (gimple_code (head_stmt) == GIMPLE_PHI)
+  if (gphi *phi = dyn_cast <gphi *> (head_stmt))
     {
-      FOR_EACH_PHI_ARG (use_p, head_stmt, op_iter, flag)
+      FOR_EACH_PHI_ARG (use_p, phi, op_iter, flag)
 	if (USE_FROM_PTR (use_p) == use)
 	  last_p = move_use_after_head (use_p, head, last_p);
     }

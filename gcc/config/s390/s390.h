@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for IBM S/390
-   Copyright (C) 1999-2013 Free Software Foundation, Inc.
+   Copyright (C) 1999-2015 Free Software Foundation, Inc.
    Contributed by Hartmut Penner (hpenner@de.ibm.com) and
                   Ulrich Weigand (uweigand@de.ibm.com).
                   Andreas Krebbel (Andreas.Krebbel@de.ibm.com)
@@ -217,7 +217,7 @@ enum processor_flags
 #define STACK_BOUNDARY 64
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
-#define FUNCTION_BOUNDARY 32
+#define FUNCTION_BOUNDARY 64
 
 /* There is no point aligning anything to a rounder boundary than this.  */
 #define BIGGEST_ALIGNMENT 64
@@ -251,14 +251,6 @@ enum processor_flags
 #define FLOAT_TYPE_SIZE 32
 #define DOUBLE_TYPE_SIZE 64
 #define LONG_DOUBLE_TYPE_SIZE (TARGET_LONG_DOUBLE_128 ? 128 : 64)
-
-/* Define this to set long double type size to use in libgcc2.c, which can
-   not depend on target_flags.  */
-#ifdef __LONG_DOUBLE_128__
-#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 128
-#else
-#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 64
-#endif
 
 /* Work around target_flags dependency in ada/targtyps.c.  */
 #define WIDEST_HARDWARE_FP_SIZE 64
@@ -752,24 +744,6 @@ do {									\
 #define MOVE_MAX_PIECES (TARGET_ZARCH ? 8 : 4)
 #define MAX_MOVE_MAX 16
 
-/* Determine whether to use move_by_pieces or block move insn.  */
-#define MOVE_BY_PIECES_P(SIZE, ALIGN)		\
-  ( (SIZE) == 1 || (SIZE) == 2 || (SIZE) == 4	\
-    || (TARGET_ZARCH && (SIZE) == 8) )
-
-/* Determine whether to use clear_by_pieces or block clear insn.  */
-#define CLEAR_BY_PIECES_P(SIZE, ALIGN)		\
-  ( (SIZE) == 1 || (SIZE) == 2 || (SIZE) == 4	\
-    || (TARGET_ZARCH && (SIZE) == 8) )
-
-/* This macro is used to determine whether store_by_pieces should be
-   called to "memcpy" storage when the source is a constant string.  */
-#define STORE_BY_PIECES_P(SIZE, ALIGN) MOVE_BY_PIECES_P (SIZE, ALIGN)
-
-/* Likewise to decide whether to "memset" storage with byte values
-   other than zero.  */
-#define SET_BY_PIECES_P(SIZE, ALIGN) STORE_BY_PIECES_P (SIZE, ALIGN)
-
 /* Don't perform CSE on function addresses.  */
 #define NO_FUNCTION_CSE
 
@@ -878,6 +852,13 @@ do {									\
   fputc ('\n', (FILE));							\
 } while (0)
 
+/* Mark the return register as used by the epilogue so that we can
+   use it in unadorned (return) and (simple_return) instructions.  */
+#define EPILOGUE_USES(REGNO) ((REGNO) == RETURN_REGNUM)
+
+#undef ASM_OUTPUT_FUNCTION_LABEL
+#define ASM_OUTPUT_FUNCTION_LABEL(FILE, NAME, DECL) \
+  s390_asm_output_function_label (FILE, NAME, DECL)
 
 /* Miscellaneous parameters.  */
 
@@ -892,7 +873,7 @@ do {									\
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode ((enum machine_mode) (TARGET_64BIT ? DImode : SImode))
+#define Pmode ((machine_mode) (TARGET_64BIT ? DImode : SImode))
 
 /* This is -1 for "pointer mode" extend.  See ptr_extend in s390.md.  */
 #define POINTERS_EXTEND_UNSIGNED -1

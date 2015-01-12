@@ -20,63 +20,19 @@
 
 namespace __tsan {
 
-struct ScopedInSymbolizer {
-  ScopedInSymbolizer() {
-    ThreadState *thr = cur_thread();
-    CHECK(!thr->in_symbolizer);
-    thr->in_symbolizer = true;
-  }
-
-  ~ScopedInSymbolizer() {
-    ThreadState *thr = cur_thread();
-    CHECK(thr->in_symbolizer);
-    thr->in_symbolizer = false;
-  }
-};
-
-ReportStack *NewReportStackEntry(uptr addr) {
-  ReportStack *ent = (ReportStack*)internal_alloc(MBlockReportStack,
-                                                  sizeof(ReportStack));
-  internal_memset(ent, 0, sizeof(*ent));
-  ent->pc = addr;
-  return ent;
+void EnterSymbolizer() {
+  ThreadState *thr = cur_thread();
+  CHECK(!thr->in_symbolizer);
+  thr->in_symbolizer = true;
+  thr->ignore_interceptors++;
 }
 
-// Strip module path to make output shorter.
-static char *StripModuleName(const char *module) {
-  if (module == 0)
-    return 0;
-  const char *short_module_name = internal_strrchr(module, '/');
-  if (short_module_name)
-    short_module_name += 1;
-  else
-    short_module_name = module;
-  return internal_strdup(short_module_name);
+void ExitSymbolizer() {
+  ThreadState *thr = cur_thread();
+  CHECK(thr->in_symbolizer);
+  thr->in_symbolizer = false;
+  thr->ignore_interceptors--;
 }
-
-static ReportStack *NewReportStackEntry(const AddressInfo &info) {
-  ReportStack *ent = NewReportStackEntry(info.address);
-  ent->module = StripModuleName(info.module);
-  ent->offset = info.module_offset;
-  if (info.function)
-    ent->func = internal_strdup(info.function);
-  if (info.file)
-    ent->file = internal_strdup(info.file);
-  ent->line = info.line;
-  ent->col = info.column;
-  return ent;
-}
-
-
-  ReportStack *next;
-  char *module;
-  uptr offset;
-  uptr pc;
-  char *func;
-  char *file;
-  int line;
-  int col;
-
 
 // Denotes fake PC values that come from JIT/JAVA/etc.
 // For such PC values __tsan_symbolize_external() will be called.
@@ -105,35 +61,29 @@ ReportStack *SymbolizeCode(uptr addr) {
     static char func_buf[1024];
     static char file_buf[1024];
     int line, col;
+    ReportStack *ent = ReportStack::New(addr);
     if (!__tsan_symbolize_external(addr, func_buf, sizeof(func_buf),
                                   file_buf, sizeof(file_buf), &line, &col))
-      return NewReportStackEntry(addr);
-    ReportStack *ent = NewReportStackEntry(addr);
-    ent->module = 0;
-    ent->offset = 0;
-    ent->func = internal_strdup(func_buf);
-    ent->file = internal_strdup(file_buf);
-    ent->line = line;
-    ent->col = col;
+      return ent;
+    ent->info.function = internal_strdup(func_buf);
+    ent->info.file = internal_strdup(file_buf);
+    ent->info.line = line;
+    ent->info.column = col;
     return ent;
   }
-  if (!getSymbolizer()->IsAvailable())
-    return SymbolizeCodeAddr2Line(addr);
-  ScopedInSymbolizer in_symbolizer;
   static const uptr kMaxAddrFrames = 16;
   InternalScopedBuffer<AddressInfo> addr_frames(kMaxAddrFrames);
   for (uptr i = 0; i < kMaxAddrFrames; i++)
     new(&addr_frames[i]) AddressInfo();
-  uptr addr_frames_num =
-      getSymbolizer()->SymbolizeCode(addr, addr_frames.data(), kMaxAddrFrames);
+  uptr addr_frames_num = Symbolizer::GetOrInit()->SymbolizePC(
+      addr, addr_frames.data(), kMaxAddrFrames);
   if (addr_frames_num == 0)
-    return NewReportStackEntry(addr);
+    return ReportStack::New(addr);
   ReportStack *top = 0;
   ReportStack *bottom = 0;
   for (uptr i = 0; i < addr_frames_num; i++) {
-    ReportStack *cur_entry = NewReportStackEntry(addr_frames[i]);
-    CHECK(cur_entry);
-    addr_frames[i].Clear();
+    ReportStack *cur_entry = ReportStack::New(addr);
+    cur_entry->info = addr_frames[i];
     if (i == 0)
       top = cur_entry;
     else
@@ -144,30 +94,16 @@ ReportStack *SymbolizeCode(uptr addr) {
 }
 
 ReportLocation *SymbolizeData(uptr addr) {
-  if (!getSymbolizer()->IsAvailable())
-    return 0;
-  ScopedInSymbolizer in_symbolizer;
   DataInfo info;
-  if (!getSymbolizer()->SymbolizeData(addr, &info))
+  if (!Symbolizer::GetOrInit()->SymbolizeData(addr, &info))
     return 0;
-  ReportLocation *ent = (ReportLocation*)internal_alloc(MBlockReportStack,
-                                                        sizeof(ReportLocation));
-  internal_memset(ent, 0, sizeof(*ent));
-  ent->type = ReportLocationGlobal;
-  ent->module = StripModuleName(info.module);
-  ent->offset = info.module_offset;
-  if (info.name)
-    ent->name = internal_strdup(info.name);
-  ent->addr = info.start;
-  ent->size = info.size;
+  ReportLocation *ent = ReportLocation::New(ReportLocationGlobal);
+  ent->global = info;
   return ent;
 }
 
 void SymbolizeFlush() {
-  if (!getSymbolizer()->IsAvailable())
-    return;
-  ScopedInSymbolizer in_symbolizer;
-  getSymbolizer()->Flush();
+  Symbolizer::GetOrInit()->Flush();
 }
 
 }  // namespace __tsan

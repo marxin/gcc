@@ -1,5 +1,5 @@
 // Mixed explicit and implicit generic lambda test.
-// { dg-options "-std=c++1y" }
+// { dg-do compile { target c++14 } }
 
 int main()
 {

@@ -1,3 +1,120 @@
+2014-11-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR bootstrap/63784
+	* configure: Regenerated.
+
+2014-11-11  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR target/63610
+	* configure: Regenerate.
+
+2014-10-15  Ian Lance Taylor  <iant@google.com>
+
+	* configure.ac: If the compiler supports -Qunused-arguments, use
+	it when running the compiler on .s files.
+	* configure: Regenerated.
+
+2014-09-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* src/powerpc/linux64.S: Emit .note.GNU-stack even when
+	POWERPC64 is not defined.
+	* src/powerpc/linux64_closure.S: Likewise.  Also test _CALL_ELF == 2.
+
+2014-07-21  Uros Bizjak  <ubizjak@gmail.com>
+
+	* src/alpha/ffi.c: Do not include stdlib.h.
+	(ffi_closure_osf_inner) <default>: Use FFI_ASSERT instead of abort.
+
+2014-07-04  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/lib/libffi.exp (libffi-dg-runtest): Change interface
+	match to dg-runtest's.
+
+2014-05-20  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* testsuite/lib/libffi.exp (load_gcc_lib): Register loaded libs.
+
+2014-05-13  Bernd Edlinger  <bernd.edlinger@hotmail.de>
+
+	Fix current cygwin-64 build problems.
+	* src/java_raw_api.c: Remove if !defined(FFI_NO_RAW_API).
+	* src/x86/ffi.c: Add if defined(__CYGWIN__).
+	* src/x86/win64.S (ffi_closure_win64, ffi_call_win64): Added
+	handling for FFI_TYPE_UINT64, FFI_TYPE_POINTER and FFI_TYPE_INT.
+	Added SEH information.  Fixed formatting.
+
+2014-04-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR other/43620
+	* configure.ac (AM_INIT_AUTOMAKE): Add no-dist.
+	* Makefile.in: Regenerated.
+	* include/Makefile.in: Regenerated.
+	* man/Makefile.in: Regenerated.
+	* testsuite/Makefile.in: Regenerated.
+
+2014-03-12  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* src/aarch64/sysv.S (ffi_closure_SYSV): Use x29 as the
+	main CFA reg; update cfi_rel_offset.
+
+2014-02-17  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR libffi/60073
+	* src/sparc/v8.S: Assemble only if !SPARC64.
+	* src/sparc/v9.S: Remove obsolete comment.
+	* src/sparc/ffitarget.h (enum ffi_abi): Add FFI_COMPAT_V9.
+	(V8_ABI_P): New macro.
+	(V9_ABI_P): Likewise.
+	(FFI_EXTRA_CIF_FIELDS): Define only if SPARC64.
+	* src/sparc/ffi.c (ffi_prep_args_v8): Compile only if !SPARC64.
+	(ffi_prep_args_v9): Compile only if SPARC64.
+	(ffi_prep_cif_machdep_core): Use V9_ABI_P predicate.
+	(ffi_prep_cif_machdep): Guard access to nfixedargs field.
+	(ffi_prep_cif_machdep_var): Likewise.
+	(ffi_v9_layout_struct): Compile only if SPARC64.
+	(ffi_call): Deal with FFI_V8PLUS and FFI_COMPAT_V9 and fix warnings.
+	(ffi_prep_closure_loc): Use V9_ABI_P and V8_ABI_P predicates.
+	(ffi_closure_sparc_inner_v8): Compile only if !SPARC64.
+	(ffi_closure_sparc_inner_v9): Compile only if SPARC64.  Guard access
+	to nfixedargs field.
+
+2014-02-13  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR libffi/60073
+	* src/sparc/ffitarget.h (FFI_TARGET_SPECIFIC_VARIADIC): Define.
+	(FFI_EXTRA_CIF_FIELDS): Likewise.
+	(FFI_NATIVE_RAW_API): Move around.
+	* src/sparc/ffi.c (ffi_prep_cif_machdep_core): New function from...
+	(ffi_prep_cif_machdep): ...here.  Call ffi_prep_cif_machdep_core.
+	(ffi_prep_cif_machdep_var): New function.
+	(ffi_closure_sparc_inner_v9): Do not pass anonymous FP arguments in
+	FP registers.
+	* doc/libffi.texi (Introduction): Fix inaccuracy.
+
+2013-12-10  Alan Modra  <amodra@gmail.com>
+
+	* src/powerpc/ffitarget.h: Import from upstream.
+	* src/powerpc/ffi_powerpc.h: Likewise.
+	* src/powerpc/ffi.c: Likewise.
+	* src/powerpc/ffi_sysv.c: Likewise.
+	* src/powerpc/ffi_linux64.c: Likewise.
+	* src/powerpc/sysv.S: Likewise.
+	* src/powerpc/ppc_closure.S: Likewise.
+	* src/powerpc/linux64.S: Likewise.
+	* src/powerpc/linux64_closure.S: Likewise.
+	* src/types.c: Likewise.
+	* Makefile.am (EXTRA_DIST): Add new src/powerpc files.
+	(nodist_libffi_la_SOURCES <POWERPC, POWERPC_FREEBSD>): Likewise.
+	* configure.ac (HAVE_LONG_DOUBLE_VARIANT): Define for powerpc.
+	* include/ffi.h.in (ffi_prep_types): Declare.
+	* src/prep_cif.c (ffi_prep_cif_core): Call ffi_prep_types.
+	* configure: Regenerate.
+	* fficonfig.h.in: Regenerate.
+	* Makefile.in: Regenerate.
+	* man/Makefile.in: Regenerate.
+	* include/Makefile.in: Regenerate.
+	* testsuite/Makefile.in: Regenerate.
+
 2013-11-18  Alan Modra  <amodra@gmail.com>
 
 	* src/powerpc/ppc_closure.S: Don't bl .Luint128.
@@ -705,7 +822,7 @@
 	* src/sparc/ffi.c (ffi_prep_closure_loc): Don't ASSERT ABI test,
 	just return FFI_BAD_ABI when things are wrong.
 
-2012-02-11  Eric Botcazou  <ebotcazou@adacore.com>
+2011-02-11  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* src/sparc/v9.S (STACKFRAME): Bump to 176.
 

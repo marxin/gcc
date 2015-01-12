@@ -1,5 +1,5 @@
 /* Vectorizer Specific Loop Manipulations
-   Copyright (C) 2003-2013 Free Software Foundation, Inc.
+   Copyright (C) 2003-2015 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
    and Ira Rosen <irar@il.ibm.com>
 
@@ -24,7 +24,24 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "dumpfile.h"
 #include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
+#include "predict.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
+#include "cfganal.h"
 #include "basic-block.h"
 #include "gimple-pretty-print.h"
 #include "tree-ssa-alias.h"
@@ -85,7 +102,6 @@ rename_use_op (use_operand_p op_p)
 static void
 rename_variables_in_bb (basic_block bb)
 {
-  gimple_stmt_iterator gsi;
   gimple stmt;
   use_operand_p use_p;
   ssa_op_iter iter;
@@ -93,7 +109,8 @@ rename_variables_in_bb (basic_block bb)
   edge_iterator ei;
   struct loop *loop = bb->loop_father;
 
-  for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+  for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+       gsi_next (&gsi))
     {
       stmt = gsi_stmt (gsi);
       FOR_EACH_SSA_USE_OPERAND (use_p, stmt, iter, SSA_OP_ALL_USES)
@@ -104,8 +121,9 @@ rename_variables_in_bb (basic_block bb)
     {
       if (!flow_bb_inside_loop_p (loop, e->src))
 	continue;
-      for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-        rename_use_op (PHI_ARG_DEF_PTR_FROM_EDGE (gsi_stmt (gsi), e));
+      for (gphi_iterator gsi = gsi_start_phis (bb); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
+        rename_use_op (PHI_ARG_DEF_PTR_FROM_EDGE (gsi.phi (), e));
     }
 }
 
@@ -391,8 +409,8 @@ static void
 slpeel_update_phi_nodes_for_guard1 (edge guard_edge, struct loop *loop,
                                     bool is_new_loop, basic_block *new_exit_bb)
 {
-  gimple orig_phi, new_phi;
-  gimple update_phi, update_phi2;
+  gphi *orig_phi, *new_phi;
+  gphi *update_phi, *update_phi2;
   tree guard_arg, loop_arg;
   basic_block new_merge_bb = guard_edge->dest;
   edge e = EDGE_SUCC (new_merge_bb, 0);
@@ -400,7 +418,7 @@ slpeel_update_phi_nodes_for_guard1 (edge guard_edge, struct loop *loop,
   basic_block orig_bb = loop->header;
   edge new_exit_e;
   tree current_new_name;
-  gimple_stmt_iterator gsi_orig, gsi_update;
+  gphi_iterator gsi_orig, gsi_update;
 
   /* Create new bb between loop and new_merge_bb.  */
   *new_exit_bb = split_edge (single_exit (loop));
@@ -414,13 +432,13 @@ slpeel_update_phi_nodes_for_guard1 (edge guard_edge, struct loop *loop,
     {
       source_location loop_locus, guard_locus;
       tree new_res;
-      orig_phi = gsi_stmt (gsi_orig);
-      update_phi = gsi_stmt (gsi_update);
+      orig_phi = gsi_orig.phi ();
+      update_phi = gsi_update.phi ();
 
       /** 1. Handle new-merge-point phis  **/
 
       /* 1.1. Generate new phi node in NEW_MERGE_BB:  */
-      new_res = copy_ssa_name (PHI_RESULT (orig_phi), NULL);
+      new_res = copy_ssa_name (PHI_RESULT (orig_phi));
       new_phi = create_phi_node (new_res, new_merge_bb);
 
       /* 1.2. NEW_MERGE_BB has two incoming edges: GUARD_EDGE and the exit-edge
@@ -450,7 +468,7 @@ slpeel_update_phi_nodes_for_guard1 (edge guard_edge, struct loop *loop,
 	continue;
 
       /* 2.1. Generate new phi node in NEW_EXIT_BB:  */
-      new_res = copy_ssa_name (PHI_RESULT (orig_phi), NULL);
+      new_res = copy_ssa_name (PHI_RESULT (orig_phi));
       new_phi = create_phi_node (new_res, *new_exit_bb);
 
       /* 2.2. NEW_EXIT_BB has one incoming edge: the exit-edge of the loop.  */
@@ -483,7 +501,18 @@ slpeel_update_phi_nodes_for_guard1 (edge guard_edge, struct loop *loop,
 	  if (!current_new_name)
 	    continue;
         }
-      gcc_assert (get_current_def (current_new_name) == NULL_TREE);
+      tree new_name = get_current_def (current_new_name);
+      /* Because of peeled_chrec optimization it is possible that we have
+	 set this earlier.  Verify the PHI has the same value.  */
+      if (new_name)
+	{
+	  gimple phi = SSA_NAME_DEF_STMT (new_name);
+	  gcc_assert (gimple_code (phi) == GIMPLE_PHI
+		      && gimple_bb (phi) == *new_exit_bb
+		      && (PHI_ARG_DEF_FROM_EDGE (phi, single_exit (loop))
+			  == loop_arg));
+	  continue;
+	}
 
       set_current_def (current_new_name, PHI_RESULT (new_phi));
     }
@@ -520,8 +549,8 @@ static void
 slpeel_update_phi_nodes_for_guard2 (edge guard_edge, struct loop *loop,
                                     bool is_new_loop, basic_block *new_exit_bb)
 {
-  gimple orig_phi, new_phi;
-  gimple update_phi, update_phi2;
+  gphi *orig_phi, *new_phi;
+  gphi *update_phi, *update_phi2;
   tree guard_arg, loop_arg;
   basic_block new_merge_bb = guard_edge->dest;
   edge e = EDGE_SUCC (new_merge_bb, 0);
@@ -530,7 +559,7 @@ slpeel_update_phi_nodes_for_guard2 (edge guard_edge, struct loop *loop,
   tree orig_def, orig_def_new_name;
   tree new_name, new_name2;
   tree arg;
-  gimple_stmt_iterator gsi;
+  gphi_iterator gsi;
 
   /* Create new bb between loop and new_merge_bb.  */
   *new_exit_bb = split_edge (single_exit (loop));
@@ -540,7 +569,7 @@ slpeel_update_phi_nodes_for_guard2 (edge guard_edge, struct loop *loop,
   for (gsi = gsi_start_phis (update_bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       tree new_res;
-      update_phi = gsi_stmt (gsi);
+      update_phi = gsi.phi ();
       orig_phi = update_phi;
       orig_def = PHI_ARG_DEF_FROM_EDGE (orig_phi, e);
       /* This loop-closed-phi actually doesn't represent a use
@@ -553,7 +582,7 @@ slpeel_update_phi_nodes_for_guard2 (edge guard_edge, struct loop *loop,
       /** 1. Handle new-merge-point phis  **/
 
       /* 1.1. Generate new phi node in NEW_MERGE_BB:  */
-      new_res = copy_ssa_name (PHI_RESULT (orig_phi), NULL);
+      new_res = copy_ssa_name (PHI_RESULT (orig_phi));
       new_phi = create_phi_node (new_res, new_merge_bb);
 
       /* 1.2. NEW_MERGE_BB has two incoming edges: GUARD_EDGE and the exit-edge
@@ -595,7 +624,7 @@ slpeel_update_phi_nodes_for_guard2 (edge guard_edge, struct loop *loop,
       /** 2. Handle loop-closed-ssa-form phis  **/
 
       /* 2.1. Generate new phi node in NEW_EXIT_BB:  */
-      new_res = copy_ssa_name (PHI_RESULT (orig_phi), NULL);
+      new_res = copy_ssa_name (PHI_RESULT (orig_phi));
       new_phi = create_phi_node (new_res, *new_exit_bb);
 
       /* 2.2. NEW_EXIT_BB has one incoming edge: the exit-edge of the loop.  */
@@ -630,7 +659,7 @@ slpeel_update_phi_nodes_for_guard2 (edge guard_edge, struct loop *loop,
       arg = guard_arg;
 
       /* 3.2. Generate new phi node in GUARD_BB:  */
-      new_res = copy_ssa_name (PHI_RESULT (orig_phi), NULL);
+      new_res = copy_ssa_name (PHI_RESULT (orig_phi));
       new_phi = create_phi_node (new_res, guard_edge->src);
 
       /* 3.3. GUARD_BB has one incoming edge:  */
@@ -656,8 +685,8 @@ void
 slpeel_make_loop_iterate_ntimes (struct loop *loop, tree niters)
 {
   tree indx_before_incr, indx_after_incr;
-  gimple cond_stmt;
-  gimple orig_cond;
+  gcond *cond_stmt;
+  gcond *orig_cond;
   edge exit_edge = single_exit (loop);
   gimple_stmt_iterator loop_cond_gsi;
   gimple_stmt_iterator incr_gsi;
@@ -703,12 +732,42 @@ slpeel_make_loop_iterate_ntimes (struct loop *loop, tree niters)
   loop->nb_iterations = niters;
 }
 
+/* Helper routine of slpeel_tree_duplicate_loop_to_edge_cfg.
+   For all PHI arguments in FROM->dest and TO->dest from those
+   edges ensure that TO->dest PHI arguments have current_def
+   to that in from.  */
+
+static void
+slpeel_duplicate_current_defs_from_edges (edge from, edge to)
+{
+  gimple_stmt_iterator gsi_from, gsi_to;
+
+  for (gsi_from = gsi_start_phis (from->dest),
+       gsi_to = gsi_start_phis (to->dest);
+       !gsi_end_p (gsi_from) && !gsi_end_p (gsi_to);
+       gsi_next (&gsi_from), gsi_next (&gsi_to))
+    {
+      gimple from_phi = gsi_stmt (gsi_from);
+      gimple to_phi = gsi_stmt (gsi_to);
+      tree from_arg = PHI_ARG_DEF_FROM_EDGE (from_phi, from);
+      tree to_arg = PHI_ARG_DEF_FROM_EDGE (to_phi, to);
+      if (TREE_CODE (from_arg) == SSA_NAME
+	  && TREE_CODE (to_arg) == SSA_NAME
+	  && get_current_def (to_arg) == NULL_TREE)
+	set_current_def (to_arg, get_current_def (from_arg));
+    }
+}
+
 
 /* Given LOOP this function generates a new copy of it and puts it
-   on E which is either the entry or exit of LOOP.  */
+   on E which is either the entry or exit of LOOP.  If SCALAR_LOOP is
+   non-NULL, assume LOOP and SCALAR_LOOP are equivalent and copy the
+   basic blocks from SCALAR_LOOP instead of LOOP, but to either the
+   entry or exit of LOOP.  */
 
 struct loop *
-slpeel_tree_duplicate_loop_to_edge_cfg (struct loop *loop, edge e)
+slpeel_tree_duplicate_loop_to_edge_cfg (struct loop *loop,
+					struct loop *scalar_loop, edge e)
 {
   struct loop *new_loop;
   basic_block *new_bbs, *bbs;
@@ -722,19 +781,22 @@ slpeel_tree_duplicate_loop_to_edge_cfg (struct loop *loop, edge e)
   if (!at_exit && e != loop_preheader_edge (loop))
     return NULL;
 
-  bbs = XNEWVEC (basic_block, loop->num_nodes + 1);
-  get_loop_body_with_size (loop, bbs, loop->num_nodes);
+  if (scalar_loop == NULL)
+    scalar_loop = loop;
+
+  bbs = XNEWVEC (basic_block, scalar_loop->num_nodes + 1);
+  get_loop_body_with_size (scalar_loop, bbs, scalar_loop->num_nodes);
 
   /* Check whether duplication is possible.  */
-  if (!can_copy_bbs_p (bbs, loop->num_nodes))
+  if (!can_copy_bbs_p (bbs, scalar_loop->num_nodes))
     {
       free (bbs);
       return NULL;
     }
 
   /* Generate new loop structure.  */
-  new_loop = duplicate_loop (loop, loop_outer (loop));
-  duplicate_subloops (loop, new_loop);
+  new_loop = duplicate_loop (scalar_loop, loop_outer (scalar_loop));
+  duplicate_subloops (scalar_loop, new_loop);
 
   exit_dest = exit->dest;
   was_imm_dom = (get_immediate_dominator (CDI_DOMINATORS,
@@ -744,35 +806,80 @@ slpeel_tree_duplicate_loop_to_edge_cfg (struct loop *loop, edge e)
   /* Also copy the pre-header, this avoids jumping through hoops to
      duplicate the loop entry PHI arguments.  Create an empty
      pre-header unconditionally for this.  */
-  basic_block preheader = split_edge (loop_preheader_edge (loop));
+  basic_block preheader = split_edge (loop_preheader_edge (scalar_loop));
   edge entry_e = single_pred_edge (preheader);
-  bbs[loop->num_nodes] = preheader;
-  new_bbs = XNEWVEC (basic_block, loop->num_nodes + 1);
+  bbs[scalar_loop->num_nodes] = preheader;
+  new_bbs = XNEWVEC (basic_block, scalar_loop->num_nodes + 1);
 
-  copy_bbs (bbs, loop->num_nodes + 1, new_bbs,
+  exit = single_exit (scalar_loop);
+  copy_bbs (bbs, scalar_loop->num_nodes + 1, new_bbs,
 	    &exit, 1, &new_exit, NULL,
 	    e->src, true);
-  basic_block new_preheader = new_bbs[loop->num_nodes];
+  exit = single_exit (loop);
+  basic_block new_preheader = new_bbs[scalar_loop->num_nodes];
 
-  add_phi_args_after_copy (new_bbs, loop->num_nodes + 1, NULL);
+  add_phi_args_after_copy (new_bbs, scalar_loop->num_nodes + 1, NULL);
+
+  if (scalar_loop != loop)
+    {
+      /* If we copied from SCALAR_LOOP rather than LOOP, SSA_NAMEs from
+	 SCALAR_LOOP will have current_def set to SSA_NAMEs in the new_loop,
+	 but LOOP will not.  slpeel_update_phi_nodes_for_guard{1,2} expects
+	 the LOOP SSA_NAMEs (on the exit edge and edge from latch to
+	 header) to have current_def set, so copy them over.  */
+      slpeel_duplicate_current_defs_from_edges (single_exit (scalar_loop),
+						exit);
+      slpeel_duplicate_current_defs_from_edges (EDGE_SUCC (scalar_loop->latch,
+							   0),
+						EDGE_SUCC (loop->latch, 0));
+    }
 
   if (at_exit) /* Add the loop copy at exit.  */
     {
+      if (scalar_loop != loop)
+	{
+	  gphi_iterator gsi;
+	  new_exit = redirect_edge_and_branch (new_exit, exit_dest);
+
+	  for (gsi = gsi_start_phis (exit_dest); !gsi_end_p (gsi);
+	       gsi_next (&gsi))
+	    {
+	      gphi *phi = gsi.phi ();
+	      tree orig_arg = PHI_ARG_DEF_FROM_EDGE (phi, e);
+	      location_t orig_locus
+		= gimple_phi_arg_location_from_edge (phi, e);
+
+	      add_phi_arg (phi, orig_arg, new_exit, orig_locus);
+	    }
+	}
       redirect_edge_and_branch_force (e, new_preheader);
       flush_pending_stmts (e);
       set_immediate_dominator (CDI_DOMINATORS, new_preheader, e->src);
       if (was_imm_dom)
-	set_immediate_dominator (CDI_DOMINATORS, exit_dest, new_loop->header);
+	set_immediate_dominator (CDI_DOMINATORS, exit_dest, new_exit->src);
 
       /* And remove the non-necessary forwarder again.  Keep the other
          one so we have a proper pre-header for the loop at the exit edge.  */
-      redirect_edge_pred (single_succ_edge (preheader), single_pred (preheader));
+      redirect_edge_pred (single_succ_edge (preheader),
+			  single_pred (preheader));
       delete_basic_block (preheader);
-      set_immediate_dominator (CDI_DOMINATORS, loop->header,
-			       loop_preheader_edge (loop)->src);
+      set_immediate_dominator (CDI_DOMINATORS, scalar_loop->header,
+			       loop_preheader_edge (scalar_loop)->src);
     }
   else /* Add the copy at entry.  */
     {
+      if (scalar_loop != loop)
+	{
+	  /* Remove the non-necessary forwarder of scalar_loop again.  */
+	  redirect_edge_pred (single_succ_edge (preheader),
+			      single_pred (preheader));
+	  delete_basic_block (preheader);
+	  set_immediate_dominator (CDI_DOMINATORS, scalar_loop->header,
+				   loop_preheader_edge (scalar_loop)->src);
+	  preheader = split_edge (loop_preheader_edge (loop));
+	  entry_e = single_pred_edge (preheader);
+	}
+
       redirect_edge_and_branch_force (entry_e, new_preheader);
       flush_pending_stmts (entry_e);
       set_immediate_dominator (CDI_DOMINATORS, new_preheader, entry_e->src);
@@ -783,14 +890,38 @@ slpeel_tree_duplicate_loop_to_edge_cfg (struct loop *loop, edge e)
 
       /* And remove the non-necessary forwarder again.  Keep the other
          one so we have a proper pre-header for the loop at the exit edge.  */
-      redirect_edge_pred (single_succ_edge (new_preheader), single_pred (new_preheader));
+      redirect_edge_pred (single_succ_edge (new_preheader),
+			  single_pred (new_preheader));
       delete_basic_block (new_preheader);
       set_immediate_dominator (CDI_DOMINATORS, new_loop->header,
 			       loop_preheader_edge (new_loop)->src);
     }
 
-  for (unsigned i = 0; i < loop->num_nodes+1; i++)
+  for (unsigned i = 0; i < scalar_loop->num_nodes + 1; i++)
     rename_variables_in_bb (new_bbs[i]);
+
+  if (scalar_loop != loop)
+    {
+      /* Update new_loop->header PHIs, so that on the preheader
+	 edge they are the ones from loop rather than scalar_loop.  */
+      gphi_iterator gsi_orig, gsi_new;
+      edge orig_e = loop_preheader_edge (loop);
+      edge new_e = loop_preheader_edge (new_loop);
+
+      for (gsi_orig = gsi_start_phis (loop->header),
+	   gsi_new = gsi_start_phis (new_loop->header);
+	   !gsi_end_p (gsi_orig) && !gsi_end_p (gsi_new);
+	   gsi_next (&gsi_orig), gsi_next (&gsi_new))
+	{
+	  gphi *orig_phi = gsi_orig.phi ();
+	  gphi *new_phi = gsi_new.phi ();
+	  tree orig_arg = PHI_ARG_DEF_FROM_EDGE (orig_phi, orig_e);
+	  location_t orig_locus
+	    = gimple_phi_arg_location_from_edge (orig_phi, orig_e);
+
+	  add_phi_arg (new_phi, orig_arg, new_e, orig_locus);
+	}
+    }
 
   free (new_bbs);
   free (bbs);
@@ -816,7 +947,7 @@ slpeel_add_loop_guard (basic_block guard_bb, tree cond,
 {
   gimple_stmt_iterator gsi;
   edge new_e, enter_e;
-  gimple cond_stmt;
+  gcond *cond_stmt;
   gimple_seq gimplify_stmt_list = NULL;
 
   enter_e = EDGE_SUCC (guard_bb, 0);
@@ -861,7 +992,7 @@ slpeel_can_duplicate_loop_p (const struct loop *loop, const_edge e)
 {
   edge exit_e = single_exit (loop);
   edge entry_e = loop_preheader_edge (loop);
-  gimple orig_cond = get_loop_exit_condition (loop);
+  gcond *orig_cond = get_loop_exit_condition (loop);
   gimple_stmt_iterator loop_exit_gsi = gsi_last_bb (exit_e->src);
 
   if (loop->inner
@@ -929,9 +1060,9 @@ set_prologue_iterations (basic_block bb_before_first_loop,
   basic_block cond_bb, then_bb;
   tree var, prologue_after_cost_adjust_name;
   gimple_stmt_iterator gsi;
-  gimple newphi;
+  gphi *newphi;
   edge e_true, e_false, e_fallthru;
-  gimple cond_stmt;
+  gcond *cond_stmt;
   gimple_seq stmts = NULL;
   tree cost_pre_condition = NULL_TREE;
   tree scalar_loop_iters =
@@ -1002,6 +1133,8 @@ set_prologue_iterations (basic_block bb_before_first_loop,
 
    Input:
    - LOOP: the loop to be peeled.
+   - SCALAR_LOOP: if non-NULL, the alternate loop from which basic blocks
+	should be copied.
    - E: the exit or entry edge of LOOP.
         If it is the entry edge, we peel the first iterations of LOOP. In this
         case first-loop is LOOP, and second-loop is the newly created loop.
@@ -1043,8 +1176,8 @@ set_prologue_iterations (basic_block bb_before_first_loop,
    FORNOW the resulting code will not be in loop-closed-ssa form.
 */
 
-static struct loop*
-slpeel_tree_peel_loop_to_edge (struct loop *loop,
+static struct loop *
+slpeel_tree_peel_loop_to_edge (struct loop *loop, struct loop *scalar_loop,
 			       edge e, tree *first_niters,
 			       tree niters, bool update_first_loop_count,
 			       unsigned int th, bool check_profitability,
@@ -1058,10 +1191,9 @@ slpeel_tree_peel_loop_to_edge (struct loop *loop,
   basic_block bb_before_first_loop;
   basic_block bb_between_loops;
   basic_block new_exit_bb;
-  gimple_stmt_iterator gsi;
+  gphi_iterator gsi;
   edge exit_e = single_exit (loop);
   source_location loop_loc;
-  tree cost_pre_condition = NULL_TREE;
   /* There are many aspects to how likely the first loop is going to be executed.
      Without histogram we can't really do good job.  Simply set it to
      2/3, so the first loop is not reordered to the end of function and
@@ -1091,15 +1223,15 @@ slpeel_tree_peel_loop_to_edge (struct loop *loop,
   for (gsi = gsi_start_phis (loop->header); !gsi_end_p (gsi); gsi_next (&gsi))
     if (virtual_operand_p (gimple_phi_result (gsi_stmt (gsi))))
       {
-	gimple phi = gsi_stmt (gsi);
+	gphi *phi = gsi.phi ();
 	for (gsi = gsi_start_phis (exit_e->dest);
 	     !gsi_end_p (gsi); gsi_next (&gsi))
 	  if (virtual_operand_p (gimple_phi_result (gsi_stmt (gsi))))
 	    break;
 	if (gsi_end_p (gsi))
 	  {
-	    tree new_vop = copy_ssa_name (PHI_RESULT (phi), NULL);
-	    gimple new_phi = create_phi_node (new_vop, exit_e->dest);
+	    tree new_vop = copy_ssa_name (PHI_RESULT (phi));
+	    gphi *new_phi = create_phi_node (new_vop, exit_e->dest);
 	    tree vop = PHI_ARG_DEF_FROM_EDGE (phi, EDGE_SUCC (loop->latch, 0));
 	    imm_use_iterator imm_iter;
 	    gimple stmt;
@@ -1129,7 +1261,8 @@ slpeel_tree_peel_loop_to_edge (struct loop *loop,
         orig_exit_bb:
    */
 
-  if (!(new_loop = slpeel_tree_duplicate_loop_to_edge_cfg (loop, e)))
+  if (!(new_loop = slpeel_tree_duplicate_loop_to_edge_cfg (loop, scalar_loop,
+							   e)))
     {
       loop_loc = find_loop_location (loop);
       dump_printf_loc (MSG_MISSED_OPTIMIZATION, loop_loc,
@@ -1263,21 +1396,17 @@ slpeel_tree_peel_loop_to_edge (struct loop *loop,
   /* Epilogue peeling.  */
   if (!update_first_loop_count)
     {
+      loop_vec_info loop_vinfo = loop_vec_info_for_loop (loop);
+      tree scalar_loop_iters = LOOP_VINFO_NITERSM1 (loop_vinfo);
+      unsigned limit = LOOP_VINFO_VECT_FACTOR (loop_vinfo) - 1;
+      if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo))
+	limit = limit + 1;
+      if (check_profitability
+	  && th > limit)
+	limit = th;
       pre_condition =
-	fold_build2 (LE_EXPR, boolean_type_node, *first_niters,
-		     build_int_cst (TREE_TYPE (*first_niters), 0));
-      if (check_profitability)
-	{
-	  tree scalar_loop_iters
-	    = unshare_expr (LOOP_VINFO_NITERS_UNCHANGED
-					(loop_vec_info_for_loop (loop)));
-	  cost_pre_condition =
-	    fold_build2 (LE_EXPR, boolean_type_node, scalar_loop_iters,
-		         build_int_cst (TREE_TYPE (scalar_loop_iters), th));
-
-	  pre_condition = fold_build2 (TRUTH_OR_EXPR, boolean_type_node,
-				       cost_pre_condition, pre_condition);
-	}
+	fold_build2 (LT_EXPR, boolean_type_node, scalar_loop_iters,
+		     build_int_cst (TREE_TYPE (scalar_loop_iters), limit));
       if (cond_expr)
 	{
 	  pre_condition =
@@ -1418,7 +1547,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
   struct loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
   basic_block bb = loop->header;
   gimple phi;
-  gimple_stmt_iterator gsi;
+  gphi_iterator gsi;
 
   /* Analyze phi functions of the loop header.  */
 
@@ -1428,7 +1557,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
     {
       tree evolution_part;
 
-      phi = gsi_stmt (gsi);
+      phi = gsi.phi ();
       if (dump_enabled_p ())
 	{
           dump_printf_loc (MSG_NOTE, vect_location, "Analyze phi: ");
@@ -1527,8 +1656,8 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo, tree niters,
 {
   struct loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
   basic_block exit_bb = single_exit (loop)->dest;
-  gimple phi, phi1;
-  gimple_stmt_iterator gsi, gsi1;
+  gphi *phi, *phi1;
+  gphi_iterator gsi, gsi1;
   basic_block update_bb = update_e->dest;
 
   gcc_checking_assert (vect_can_advance_ivs_p (loop_vinfo));
@@ -1547,8 +1676,8 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo, tree niters,
       gimple_stmt_iterator last_gsi;
       stmt_vec_info stmt_info;
 
-      phi = gsi_stmt (gsi);
-      phi1 = gsi_stmt (gsi1);
+      phi = gsi.phi ();
+      phi1 = gsi1.phi ();
       if (dump_enabled_p ())
         {
           dump_printf_loc (MSG_NOTE, vect_location,
@@ -1625,6 +1754,7 @@ vect_do_peeling_for_loop_bound (loop_vec_info loop_vinfo,
 				unsigned int th, bool check_profitability)
 {
   struct loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
+  struct loop *scalar_loop = LOOP_VINFO_SCALAR_LOOP (loop_vinfo);
   struct loop *new_loop;
   edge update_e;
   basic_block preheader;
@@ -1641,11 +1771,12 @@ vect_do_peeling_for_loop_bound (loop_vec_info loop_vinfo,
 
   loop_num  = loop->num;
 
-  new_loop = slpeel_tree_peel_loop_to_edge (loop, single_exit (loop),
-                                            &ratio_mult_vf_name, ni_name, false,
-                                            th, check_profitability,
-					    cond_expr, cond_expr_stmt_list,
-					    0, LOOP_VINFO_VECT_FACTOR (loop_vinfo));
+  new_loop
+    = slpeel_tree_peel_loop_to_edge (loop, scalar_loop, single_exit (loop),
+				     &ratio_mult_vf_name, ni_name, false,
+				     th, check_profitability,
+				     cond_expr, cond_expr_stmt_list,
+				     0, LOOP_VINFO_VECT_FACTOR (loop_vinfo));
   gcc_assert (new_loop);
   gcc_assert (loop_num == loop->num);
 #ifdef ENABLE_CHECKING
@@ -1678,7 +1809,7 @@ vect_do_peeling_for_loop_bound (loop_vec_info loop_vinfo,
 	      : LOOP_VINFO_VECT_FACTOR (loop_vinfo)) - 2;
   if (check_profitability)
     max_iter = MAX (max_iter, (int) th - 1);
-  record_niter_bound (new_loop, double_int::from_shwi (max_iter), false, true);
+  record_niter_bound (new_loop, max_iter, false, true);
   dump_printf (MSG_NOTE,
                "Setting upper bound of nb iterations for epilogue "
                "loop to %d\n", max_iter);
@@ -1878,6 +2009,7 @@ vect_do_peeling_for_alignment (loop_vec_info loop_vinfo, tree ni_name,
 			       unsigned int th, bool check_profitability)
 {
   struct loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
+  struct loop *scalar_loop = LOOP_VINFO_SCALAR_LOOP (loop_vinfo);
   tree niters_of_prolog_loop;
   tree wide_prolog_niters;
   struct loop *new_loop;
@@ -1899,11 +2031,11 @@ vect_do_peeling_for_alignment (loop_vec_info loop_vinfo, tree ni_name,
 
   /* Peel the prolog loop and iterate it niters_of_prolog_loop.  */
   new_loop =
-    slpeel_tree_peel_loop_to_edge (loop, loop_preheader_edge (loop),
+    slpeel_tree_peel_loop_to_edge (loop, scalar_loop,
+				   loop_preheader_edge (loop),
 				   &niters_of_prolog_loop, ni_name, true,
 				   th, check_profitability, NULL_TREE, NULL,
-				   bound,
-				   0);
+				   bound, 0);
 
   gcc_assert (new_loop);
 #ifdef ENABLE_CHECKING
@@ -1914,7 +2046,7 @@ vect_do_peeling_for_alignment (loop_vec_info loop_vinfo, tree ni_name,
   max_iter = LOOP_VINFO_VECT_FACTOR (loop_vinfo) - 2;
   if (check_profitability)
     max_iter = MAX (max_iter, (int) th - 1);
-  record_niter_bound (new_loop, double_int::from_shwi (max_iter), false, true);
+  record_niter_bound (new_loop, max_iter, false, true);
   dump_printf (MSG_NOTE,
                "Setting upper bound of nb iterations for prologue "
                "loop to %d\n", max_iter);
@@ -1922,6 +2054,9 @@ vect_do_peeling_for_alignment (loop_vec_info loop_vinfo, tree ni_name,
   /* Update number of times loop executes.  */
   LOOP_VINFO_NITERS (loop_vinfo) = fold_build2 (MINUS_EXPR,
 		TREE_TYPE (ni_name), ni_name, niters_of_prolog_loop);
+  LOOP_VINFO_NITERSM1 (loop_vinfo) = fold_build2 (MINUS_EXPR,
+		TREE_TYPE (ni_name),
+		LOOP_VINFO_NITERSM1 (loop_vinfo), niters_of_prolog_loop);
 
   if (types_compatible_p (sizetype, TREE_TYPE (niters_of_prolog_loop)))
     wide_prolog_niters = niters_of_prolog_loop;
@@ -2028,8 +2163,7 @@ vect_create_cond_for_align_checks (loop_vec_info loop_vinfo,
 
       sprintf (tmp_name, "addr2int%d", i);
       addr_tmp_name = make_temp_ssa_name (int_ptrsize_type, NULL, tmp_name);
-      addr_stmt = gimple_build_assign_with_ops (NOP_EXPR, addr_tmp_name,
-						addr_base, NULL_TREE);
+      addr_stmt = gimple_build_assign (addr_tmp_name, NOP_EXPR, addr_base);
       gimple_seq_add_stmt (cond_expr_stmt_list, addr_stmt);
 
       /* The addresses are OR together.  */
@@ -2039,9 +2173,8 @@ vect_create_cond_for_align_checks (loop_vec_info loop_vinfo,
           /* create: or_tmp = or_tmp | addr_tmp */
           sprintf (tmp_name, "orptrs%d", i);
 	  new_or_tmp_name = make_temp_ssa_name (int_ptrsize_type, NULL, tmp_name);
-	  or_stmt = gimple_build_assign_with_ops (BIT_IOR_EXPR,
-						  new_or_tmp_name,
-						  or_tmp_name, addr_tmp_name);
+	  or_stmt = gimple_build_assign (new_or_tmp_name, BIT_IOR_EXPR,
+					 or_tmp_name, addr_tmp_name);
 	  gimple_seq_add_stmt (cond_expr_stmt_list, or_stmt);
           or_tmp_name = new_or_tmp_name;
         }
@@ -2055,8 +2188,8 @@ vect_create_cond_for_align_checks (loop_vec_info loop_vinfo,
   /* create: and_tmp = or_tmp & mask  */
   and_tmp_name = make_temp_ssa_name (int_ptrsize_type, NULL, "andmask");
 
-  and_stmt = gimple_build_assign_with_ops (BIT_AND_EXPR, and_tmp_name,
-					   or_tmp_name, mask_cst);
+  and_stmt = gimple_build_assign (and_tmp_name, BIT_AND_EXPR,
+				  or_tmp_name, mask_cst);
   gimple_seq_add_stmt (cond_expr_stmt_list, and_stmt);
 
   /* Make and_tmp the left operand of the conditional test against zero.
@@ -2134,13 +2267,24 @@ vect_create_cond_for_alias_checks (loop_vec_info loop_vinfo, tree * cond_expr)
 
       tree seg_a_min = addr_base_a;
       tree seg_a_max = fold_build_pointer_plus (addr_base_a, segment_length_a);
+      /* For negative step, we need to adjust address range by TYPE_SIZE_UNIT
+	 bytes, e.g., int a[3] -> a[1] range is [a+4, a+16) instead of
+	 [a, a+12) */
       if (tree_int_cst_compare (DR_STEP (dr_a.dr), size_zero_node) < 0)
-	seg_a_min = seg_a_max, seg_a_max = addr_base_a;
+	{
+	  tree unit_size = TYPE_SIZE_UNIT (TREE_TYPE (DR_REF (dr_a.dr)));
+	  seg_a_min = fold_build_pointer_plus (seg_a_max, unit_size);
+	  seg_a_max = fold_build_pointer_plus (addr_base_a, unit_size);
+	}
 
       tree seg_b_min = addr_base_b;
       tree seg_b_max = fold_build_pointer_plus (addr_base_b, segment_length_b);
       if (tree_int_cst_compare (DR_STEP (dr_b.dr), size_zero_node) < 0)
-	seg_b_min = seg_b_max, seg_b_max = addr_base_b;
+	{
+	  tree unit_size = TYPE_SIZE_UNIT (TREE_TYPE (DR_REF (dr_b.dr)));
+	  seg_b_min = fold_build_pointer_plus (seg_b_max, unit_size);
+	  seg_b_max = fold_build_pointer_plus (addr_base_b, unit_size);
+	}
 
       part_cond_expr =
       	fold_build2 (TRUTH_OR_EXPR, boolean_type_node,
@@ -2187,12 +2331,14 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 		      unsigned int th, bool check_profitability)
 {
   struct loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
+  struct loop *scalar_loop = LOOP_VINFO_SCALAR_LOOP (loop_vinfo);
   basic_block condition_bb;
-  gimple_stmt_iterator gsi, cond_exp_gsi;
+  gphi_iterator gsi;
+  gimple_stmt_iterator cond_exp_gsi;
   basic_block merge_bb;
   basic_block new_exit_bb;
   edge new_exit_e, e;
-  gimple orig_phi, new_phi;
+  gphi *orig_phi, *new_phi;
   tree cond_expr = NULL_TREE;
   gimple_seq cond_expr_stmt_list = NULL;
   tree arg;
@@ -2222,8 +2368,43 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
   gimple_seq_add_seq (&cond_expr_stmt_list, gimplify_stmt_list);
 
   initialize_original_copy_tables ();
-  loop_version (loop, cond_expr, &condition_bb,
-		prob, prob, REG_BR_PROB_BASE - prob, true);
+  if (scalar_loop)
+    {
+      edge scalar_e;
+      basic_block preheader, scalar_preheader;
+
+      /* We don't want to scale SCALAR_LOOP's frequencies, we need to
+	 scale LOOP's frequencies instead.  */
+      loop_version (scalar_loop, cond_expr, &condition_bb,
+		    prob, REG_BR_PROB_BASE, REG_BR_PROB_BASE - prob, true);
+      scale_loop_frequencies (loop, prob, REG_BR_PROB_BASE);
+      /* CONDITION_BB was created above SCALAR_LOOP's preheader,
+	 while we need to move it above LOOP's preheader.  */
+      e = loop_preheader_edge (loop);
+      scalar_e = loop_preheader_edge (scalar_loop);
+      gcc_assert (empty_block_p (e->src)
+		  && single_pred_p (e->src));
+      gcc_assert (empty_block_p (scalar_e->src)
+		  && single_pred_p (scalar_e->src));
+      gcc_assert (single_pred_p (condition_bb));
+      preheader = e->src;
+      scalar_preheader = scalar_e->src;
+      scalar_e = find_edge (condition_bb, scalar_preheader);
+      e = single_pred_edge (preheader);
+      redirect_edge_and_branch_force (single_pred_edge (condition_bb),
+				      scalar_preheader);
+      redirect_edge_and_branch_force (scalar_e, preheader);
+      redirect_edge_and_branch_force (e, condition_bb);
+      set_immediate_dominator (CDI_DOMINATORS, condition_bb,
+			       single_pred (condition_bb));
+      set_immediate_dominator (CDI_DOMINATORS, scalar_preheader,
+			       single_pred (scalar_preheader));
+      set_immediate_dominator (CDI_DOMINATORS, preheader,
+			       condition_bb);
+    }
+  else
+    loop_version (loop, cond_expr, &condition_bb,
+		  prob, prob, REG_BR_PROB_BASE - prob, true);
 
   if (LOCATION_LOCUS (vect_location) != UNKNOWN_LOCATION
       && dump_enabled_p ())
@@ -2246,90 +2427,28 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
      basic block (i.e. it has two predecessors). Just in order to simplify
      following transformations in the vectorizer, we fix this situation
      here by adding a new (empty) block on the exit-edge of the loop,
-     with the proper loop-exit phis to maintain loop-closed-form.  */
+     with the proper loop-exit phis to maintain loop-closed-form.
+     If loop versioning wasn't done from loop, but scalar_loop instead,
+     merge_bb will have already just a single successor.  */
 
   merge_bb = single_exit (loop)->dest;
-  gcc_assert (EDGE_COUNT (merge_bb->preds) == 2);
-  new_exit_bb = split_edge (single_exit (loop));
-  new_exit_e = single_exit (loop);
-  e = EDGE_SUCC (new_exit_bb, 0);
-
-  for (gsi = gsi_start_phis (merge_bb); !gsi_end_p (gsi); gsi_next (&gsi))
+  if (scalar_loop == NULL || EDGE_COUNT (merge_bb->preds) >= 2)
     {
-      tree new_res;
-      orig_phi = gsi_stmt (gsi);
-      new_res = copy_ssa_name (PHI_RESULT (orig_phi), NULL);
-      new_phi = create_phi_node (new_res, new_exit_bb);
-      arg = PHI_ARG_DEF_FROM_EDGE (orig_phi, e);
-      add_phi_arg (new_phi, arg, new_exit_e,
-		   gimple_phi_arg_location_from_edge (orig_phi, e));
-      adjust_phi_and_debug_stmts (orig_phi, e, PHI_RESULT (new_phi));
-    }
+      gcc_assert (EDGE_COUNT (merge_bb->preds) >= 2);
+      new_exit_bb = split_edge (single_exit (loop));
+      new_exit_e = single_exit (loop);
+      e = EDGE_SUCC (new_exit_bb, 0);
 
-
-  /* Extract load statements on memrefs with zero-stride accesses.  */
-
-  if (LOOP_REQUIRES_VERSIONING_FOR_ALIAS (loop_vinfo))
-    {
-      /* In the loop body, we iterate each statement to check if it is a load.
-	 Then we check the DR_STEP of the data reference.  If DR_STEP is zero,
-	 then we will hoist the load statement to the loop preheader.  */
-
-      basic_block *bbs = LOOP_VINFO_BBS (loop_vinfo);
-      int nbbs = loop->num_nodes;
-
-      for (int i = 0; i < nbbs; ++i)
+      for (gsi = gsi_start_phis (merge_bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
-	  for (gimple_stmt_iterator si = gsi_start_bb (bbs[i]);
-	       !gsi_end_p (si);)
-	    {
-	      gimple stmt = gsi_stmt (si);
-	      stmt_vec_info stmt_info = vinfo_for_stmt (stmt);
-	      struct data_reference *dr = STMT_VINFO_DATA_REF (stmt_info);
-
-	      if (is_gimple_assign (stmt)
-		  && (!dr
-		      || (DR_IS_READ (dr) && integer_zerop (DR_STEP (dr)))))
-		{
-		  bool hoist = true;
-		  ssa_op_iter iter;
-		  tree var;
-
-		  /* We hoist a statement if all SSA uses in it are defined
-		     outside of the loop.  */
-		  FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
-		    {
-		      gimple def = SSA_NAME_DEF_STMT (var);
-		      if (!gimple_nop_p (def)
-			  && flow_bb_inside_loop_p (loop, gimple_bb (def)))
-			{
-			  hoist = false;
-			  break;
-			}
-		    }
-
-		  if (hoist)
-		    {
-		      if (dr)
-			gimple_set_vuse (stmt, NULL);
-
-		      gsi_remove (&si, false);
-		      gsi_insert_on_edge_immediate (loop_preheader_edge (loop),
-						    stmt);
-
-		      if (dump_enabled_p ())
-			{
-			  dump_printf_loc
-			      (MSG_NOTE, vect_location,
-			       "hoisting out of the vectorized loop: ");
-			  dump_gimple_stmt (MSG_NOTE, TDF_SLIM, stmt, 0);
-			  dump_printf (MSG_NOTE, "\n");
-			}
-		      continue;
-		    }
-		}
-	      gsi_next (&si);
-	    }
+	  tree new_res;
+	  orig_phi = gsi.phi ();
+	  new_res = copy_ssa_name (PHI_RESULT (orig_phi));
+	  new_phi = create_phi_node (new_res, new_exit_bb);
+	  arg = PHI_ARG_DEF_FROM_EDGE (orig_phi, e);
+	  add_phi_arg (new_phi, arg, new_exit_e,
+		       gimple_phi_arg_location_from_edge (orig_phi, e));
+	  adjust_phi_and_debug_stmts (orig_phi, e, PHI_RESULT (new_phi));
 	}
     }
 

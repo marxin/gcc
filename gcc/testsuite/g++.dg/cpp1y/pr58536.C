@@ -1,7 +1,6 @@
-// { dg-do compile }
-// { dg-options "-std=gnu++1y" }
-
 // PR c++/58536
+// { dg-do compile { target c++14 } }
+// { dg-options "" }
 
 struct A
 {
@@ -9,4 +8,3 @@ struct A
 };
 
 A::A(auto) {}
-

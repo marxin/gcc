@@ -1,5 +1,5 @@
 ; Options of Andes NDS32 cpu for GNU compiler
-; Copyright (C) 2012-2013 Free Software Foundation, Inc.
+; Copyright (C) 2012-2015 Free Software Foundation, Inc.
 ; Contributed by Andes Technology Corporation.
 ;
 ; This file is part of GCC.
@@ -71,6 +71,7 @@ Specify the name of the target architecture.
 
 Enum
 Name(nds32_arch_type) Type(enum nds32_arch_type)
+Known arch types (for use with the -march= option):
 
 EnumValue
 Enum(nds32_arch_type) String(v2) Value(ARCH_V2)

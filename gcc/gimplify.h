@@ -1,5 +1,5 @@
 /* Header file for gimplification.
-   Copyright (C) 2013 Free Software Foundation, Inc.
+   Copyright (C) 2013-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -53,13 +53,14 @@ extern void free_gimplify_stack (void);
 extern void push_gimplify_context (bool in_ssa = false,
 				   bool rhs_cond_ok = false);
 extern void pop_gimplify_context (gimple);
-extern gimple gimple_current_bind_expr (void);
-extern vec<gimple> gimple_bind_expr_stack (void);
+extern gbind *gimple_current_bind_expr (void);
+extern vec<gbind *> gimple_bind_expr_stack (void);
 extern void gimplify_and_add (tree, gimple_seq *);
 extern tree get_formal_tmp_var (tree, gimple_seq *);
 extern tree get_initialized_tmp_var (tree, gimple_seq *, gimple_seq *);
 extern void declare_vars (tree, gimple, bool);
 extern void gimple_add_tmp_var (tree);
+extern void gimple_add_tmp_var_fn (struct function *, tree);
 extern tree unshare_expr (tree);
 extern tree unshare_expr_without_location (tree);
 extern tree voidify_wrapper_expr (tree, tree);
@@ -75,7 +76,8 @@ extern enum gimplify_status gimplify_expr (tree *, gimple_seq *, gimple_seq *,
 
 extern void gimplify_type_sizes (tree, gimple_seq *);
 extern void gimplify_one_sizepos (tree *, gimple_seq *);
-extern gimple gimplify_body (tree, bool);
+extern gbind *gimplify_body (tree, bool);
+extern enum gimplify_status gimplify_arg (tree *, gimple_seq *, location_t);
 extern void gimplify_function_tree (tree);
 extern enum gimplify_status gimplify_va_arg_expr (tree *, gimple_seq *,
 						  gimple_seq *);

@@ -1,5 +1,5 @@
 /* Definitions for describing one tree-ssa optimization pass.
-   Copyright (C) 2004-2013 Free Software Foundation, Inc.
+   Copyright (C) 2004-2015 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>
 
 This file is part of GCC.
@@ -25,6 +25,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "timevar.h"
 #include "dumpfile.h"
 
+struct function;
+
 /* Optimization pass type.  */
 enum opt_pass_type
 {
@@ -46,14 +48,6 @@ struct pass_data
 
   /* The -fopt-info optimization group flags as defined in dumpfile.h. */
   unsigned int optinfo_flags;
-
-  /* If true, this pass has its own implementation of the opt_pass::gate
-     method.  */
-  bool has_gate;
-
-  /* If true, this pass has its own implementation of the opt_pass::execute
-     method.  */
-  bool has_execute;
 
   /* The timevar id associated with this pass.  */
   /* ??? Ideally would be dynamically assigned.  */
@@ -90,29 +84,33 @@ public:
      The default implementation prints an error message and aborts.  */
   virtual opt_pass *clone ();
 
-  /* If has_gate is set, this pass and all sub-passes are executed only if
-     the function returns true.
-     The default implementation returns true.  */
-  virtual bool gate ();
+  /* This pass and all sub-passes are executed only if the function returns
+     true.  The default implementation returns true.  */
+  virtual bool gate (function *fun);
 
-  /* This is the code to run.  If has_execute is false, then there should
+  /* This is the code to run.  If this is not overridden, then there should
      be sub-passes otherwise this pass does nothing.
      The return value contains TODOs to execute in addition to those in
      TODO_flags_finish.   */
-  virtual unsigned int execute ();
+  virtual unsigned int execute (function *fun);
 
 protected:
   opt_pass (const pass_data&, gcc::context *);
 
 public:
   /* A list of sub-passes to run, dependent on gate predicate.  */
-  struct opt_pass *sub;
+  opt_pass *sub;
 
   /* Next in the list of passes to run, independent of gate predicate.  */
-  struct opt_pass *next;
+  opt_pass *next;
 
   /* Static pass number, used as a fragment of the dump file name.  */
   int static_pass_number;
+
+  /* When a given dump file is being initialized, this flag is set to
+     true if the corresponding TDF_graph dump file has also been
+     initialized.  */
+  bool graph_dump_initialized;
 
 protected:
   gcc::context *m_ctxt;
@@ -138,7 +136,7 @@ protected:
   }
 };
 
-struct varpool_node;
+class varpool_node;
 struct cgraph_node;
 struct lto_symtab_encoder_d;
 
@@ -171,7 +169,7 @@ public:
      function body via this hook.  */
   unsigned int function_transform_todo_flags_start;
   unsigned int (*function_transform) (struct cgraph_node *);
-  void (*variable_transform) (struct varpool_node *);
+  void (*variable_transform) (varpool_node *);
 
 protected:
   ipa_opt_pass_d (const pass_data& data, gcc::context *ctxt,
@@ -183,7 +181,7 @@ protected:
 		  void (*stmt_fixup) (struct cgraph_node *, gimple *),
 		  unsigned int function_transform_todo_flags_start,
 		  unsigned int (*function_transform) (struct cgraph_node *),
-		  void (*variable_transform) (struct varpool_node *))
+		  void (*variable_transform) (varpool_node *))
     : opt_pass (data, ctxt),
       generate_summary (generate_summary),
       write_summary (write_summary),
@@ -222,20 +220,18 @@ protected:
 #define PROP_gimple_lcx		(1 << 10)       /* lowered complex */
 #define PROP_loops		(1 << 11)	/* preserve loop structures */
 #define PROP_gimple_lvec	(1 << 12)       /* lowered vector */
+#define PROP_gimple_eomp	(1 << 13)       /* no OpenMP directives */
 
 #define PROP_trees \
   (PROP_gimple_any | PROP_gimple_lcf | PROP_gimple_leh | PROP_gimple_lomp)
 
 /* To-do flags.  */
 #define TODO_do_not_ggc_collect		(1 << 1)
-#define TODO_verify_ssa			(1 << 2)
-#define TODO_verify_flow		(1 << 3)
-#define TODO_verify_stmts		(1 << 4)
 #define TODO_cleanup_cfg        	(1 << 5)
+#define TODO_verify_il			(1 << 6)
 #define TODO_dump_symtab		(1 << 7)
 #define TODO_remove_functions		(1 << 8)
 #define TODO_rebuild_frequencies	(1 << 9)
-#define TODO_verify_rtl_sharing         (1 << 10)
 
 /* To-do flags for calls to update_ssa.  */
 
@@ -306,8 +302,7 @@ protected:
      | TODO_update_ssa_full_phi		\
      | TODO_update_ssa_only_virtuals)
 
-#define TODO_verify_all \
-  (TODO_verify_ssa | TODO_verify_flow | TODO_verify_stmts)
+#define TODO_verify_all TODO_verify_il
 
 
 /* Register pass info. */
@@ -321,7 +316,7 @@ enum pass_positioning_ops
 
 struct register_pass_info
 {
-  struct opt_pass *pass;            /* New pass to register.  */
+  opt_pass *pass;		    /* New pass to register.  */
   const char *reference_pass_name;  /* Name of the reference pass for hooking
                                        up the new pass.  */
   int ref_pass_instance_number;     /* Insert the pass at the specified
@@ -338,6 +333,10 @@ extern void register_pass (register_pass_info *);
 extern void register_pass (opt_pass* pass, pass_positioning_ops pos,
 			   const char* ref_pass_name, int ref_pass_inst_number);
 
+extern simple_ipa_opt_pass *make_pass_ipa_chkp_versioning (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_ipa_chkp_produce_thunks (gcc::context *ctxt);
+extern gimple_opt_pass *make_pass_chkp (gcc::context *ctxt);
+extern gimple_opt_pass *make_pass_chkp_opt (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_asan (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_asan_O0 (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tsan (gcc::context *ctxt);
@@ -355,7 +354,9 @@ extern gimple_opt_pass *make_pass_sra_early (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_early_ipa_sra (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tail_recursion (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tail_calls (gcc::context *ctxt);
+extern gimple_opt_pass *make_pass_fix_loops (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tree_loop (gcc::context *ctxt);
+extern gimple_opt_pass *make_pass_tree_no_loop (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tree_loop_init (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_lim (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tree_unswitch (gcc::context *ctxt);
@@ -384,7 +385,6 @@ extern gimple_opt_pass *make_pass_build_alias (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_build_ealias (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_dominator (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_dce (gcc::context *ctxt);
-extern gimple_opt_pass *make_pass_dce_loop (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_cd_dce (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_call_cdce (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_merge_phi (gcc::context *ctxt);
@@ -455,8 +455,11 @@ extern simple_ipa_opt_pass *make_pass_ipa_lower_emutls (gcc::context *ctxt);
 extern simple_ipa_opt_pass
 							      *make_pass_ipa_function_and_variable_visibility (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_tree_profile (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_ipa_auto_profile (gcc::context *ctxt);
 
-extern simple_ipa_opt_pass *make_pass_early_local_passes (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_build_ssa_passes (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_chkp_instrumentation_passes (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_local_optimization_passes (gcc::context *ctxt);
 
 extern ipa_opt_pass_d *make_pass_ipa_whole_program_visibility (gcc::context
 							       *ctxt);
@@ -468,13 +471,17 @@ extern simple_ipa_opt_pass *make_pass_ipa_free_lang_data (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_free_inline_summary (gcc::context
 							       *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_cp (gcc::context *ctxt);
+extern ipa_opt_pass_d *make_pass_ipa_icf (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_devirt (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_reference (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_pure_const (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_pta (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_tm (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_omp_simd_clone (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_profile (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_cdtor_merge (gcc::context *ctxt);
+extern ipa_opt_pass_d *make_pass_ipa_single_use (gcc::context *ctxt);
+extern ipa_opt_pass_d *make_pass_ipa_comdats (gcc::context *ctxt);
 
 extern gimple_opt_pass *make_pass_cleanup_cfg_post_optimizing (gcc::context
 							       *ctxt);
@@ -508,8 +515,7 @@ extern rtl_opt_pass *make_pass_outof_cfg_layout_mode (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_loop2 (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_rtl_loop_init (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_rtl_move_loop_invariants (gcc::context *ctxt);
-extern rtl_opt_pass *make_pass_rtl_unswitch (gcc::context *ctxt);
-extern rtl_opt_pass *make_pass_rtl_unroll_and_peel_loops (gcc::context *ctxt);
+extern rtl_opt_pass *make_pass_rtl_unroll_loops (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_rtl_doloop (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_rtl_loop_done (gcc::context *ctxt);
 
@@ -547,6 +553,7 @@ extern rtl_opt_pass *make_pass_branch_target_load_optimize1 (gcc::context
 extern rtl_opt_pass *make_pass_thread_prologue_and_epilogue (gcc::context
 							     *ctxt);
 extern rtl_opt_pass *make_pass_stack_adjustments (gcc::context *ctxt);
+extern rtl_opt_pass *make_pass_sched_fusion (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_peephole2 (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_if_after_reload (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_regrename (gcc::context *ctxt);
@@ -583,25 +590,25 @@ extern gimple_opt_pass *make_pass_update_address_taken (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_convert_switch (gcc::context *ctxt);
 
 /* Current optimization pass.  */
-extern struct opt_pass *current_pass;
+extern opt_pass *current_pass;
 
-extern bool execute_one_pass (struct opt_pass *);
-extern void execute_pass_list (struct opt_pass *);
-extern void execute_ipa_pass_list (struct opt_pass *);
-extern void execute_ipa_summary_passes (struct ipa_opt_pass_d *);
+extern bool execute_one_pass (opt_pass *);
+extern void execute_pass_list (function *, opt_pass *);
+extern void execute_ipa_pass_list (opt_pass *);
+extern void execute_ipa_summary_passes (ipa_opt_pass_d *);
 extern void execute_all_ipa_transforms (void);
 extern void execute_all_ipa_stmt_fixups (struct cgraph_node *, gimple *);
-extern bool pass_init_dump_file (struct opt_pass *);
-extern void pass_fini_dump_file (struct opt_pass *);
+extern bool pass_init_dump_file (opt_pass *);
+extern void pass_fini_dump_file (opt_pass *);
 
 extern const char *get_current_pass_name (void);
 extern void print_current_pass (FILE *);
 extern void debug_pass (void);
-extern void ipa_write_summaries (void);
+extern void ipa_write_summaries (bool);
 extern void ipa_write_optimization_summaries (struct lto_symtab_encoder_d *);
 extern void ipa_read_summaries (void);
 extern void ipa_read_optimization_summaries (void);
-extern void register_one_dump_file (struct opt_pass *);
+extern void register_one_dump_file (opt_pass *);
 extern bool function_called_by_processed_nodes_p (void);
 
 /* Set to true if the pass is called the first time during compilation of the
@@ -614,7 +621,7 @@ extern bool function_called_by_processed_nodes_p (void);
 extern bool first_pass_instance;
 
 /* Declare for plugins.  */
-extern void do_per_function_toporder (void (*) (void *), void *);
+extern void do_per_function_toporder (void (*) (function *, void *), void *);
 
 extern void disable_pass (const char *);
 extern void enable_pass (const char *);

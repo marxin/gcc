@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2004-2013, Free Software Foundation, Inc.         --
+--          Copyright (C) 2004-2014, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -38,6 +38,8 @@ with Ada.Containers.Prime_Numbers;  use Ada.Containers.Prime_Numbers;
 with System;  use type System.Address;
 
 package body Ada.Containers.Bounded_Hashed_Maps is
+
+   pragma Annotate (CodePeer, Skip_Analysis);
 
    -----------------------
    -- Local Subprograms --
@@ -116,6 +118,24 @@ package body Ada.Containers.Bounded_Hashed_Maps is
    begin
       return Is_Equal (Left, Right);
    end "=";
+
+   ------------
+   -- Adjust --
+   ------------
+
+   procedure Adjust (Control : in out Reference_Control_Type) is
+   begin
+      if Control.Container /= null then
+         declare
+            C : Map renames Control.Container.all;
+            B : Natural renames C.Busy;
+            L : Natural renames C.Lock;
+         begin
+            B := B + 1;
+            L := L + 1;
+         end;
+      end if;
+   end Adjust;
 
    ------------
    -- Assign --
@@ -199,8 +219,16 @@ package body Ada.Containers.Bounded_Hashed_Maps is
 
       declare
          N : Node_Type renames Container.Nodes (Position.Node);
+         B : Natural renames Position.Container.Busy;
+         L : Natural renames Position.Container.Lock;
       begin
-         return (Element => N.Element'Access);
+         return R : constant Constant_Reference_Type :=
+            (Element => N.Element'Access,
+             Control => (Controlled with Container'Unrestricted_Access))
+         do
+            B := B + 1;
+            L := L + 1;
+         end return;
       end;
    end Constant_Reference;
 
@@ -208,7 +236,8 @@ package body Ada.Containers.Bounded_Hashed_Maps is
      (Container : aliased Map;
       Key       : Key_Type) return Constant_Reference_Type
    is
-      Node : constant Count_Type := Key_Ops.Find (Container, Key);
+      Node : constant Count_Type :=
+               Key_Ops.Find (Container'Unrestricted_Access.all, Key);
 
    begin
       if Node = 0 then
@@ -216,9 +245,21 @@ package body Ada.Containers.Bounded_Hashed_Maps is
       end if;
 
       declare
+         Cur  : Cursor := Find (Container, Key);
+         pragma Unmodified (Cur);
+
          N : Node_Type renames Container.Nodes (Node);
+         B : Natural   renames Cur.Container.Busy;
+         L : Natural   renames Cur.Container.Lock;
+
       begin
-         return (Element => N.Element'Access);
+         return R : constant Constant_Reference_Type :=
+           (Element => N.Element'Access,
+            Control => (Controlled with Container'Unrestricted_Access))
+         do
+            B := B + 1;
+            L := L + 1;
+         end return;
       end;
    end Constant_Reference;
 
@@ -321,7 +362,8 @@ package body Ada.Containers.Bounded_Hashed_Maps is
    -------------
 
    function Element (Container : Map; Key : Key_Type) return Element_Type is
-      Node : constant Count_Type := Key_Ops.Find (Container, Key);
+      Node : constant Count_Type :=
+               Key_Ops.Find (Container'Unrestricted_Access.all, Key);
 
    begin
       if Node = 0 then
@@ -444,12 +486,29 @@ package body Ada.Containers.Bounded_Hashed_Maps is
       end if;
    end Finalize;
 
+   procedure Finalize (Control : in out Reference_Control_Type) is
+   begin
+      if Control.Container /= null then
+         declare
+            C : Map renames Control.Container.all;
+            B : Natural renames C.Busy;
+            L : Natural renames C.Lock;
+         begin
+            B := B - 1;
+            L := L - 1;
+         end;
+
+         Control.Container := null;
+      end if;
+   end Finalize;
+
    ----------
    -- Find --
    ----------
 
    function Find (Container : Map; Key : Key_Type) return Cursor is
-      Node : constant Count_Type := Key_Ops.Find (Container, Key);
+      Node : constant Count_Type :=
+               Key_Ops.Find (Container'Unrestricted_Access.all, Key);
    begin
       if Node = 0 then
          return No_Element;
@@ -553,15 +612,20 @@ package body Ada.Containers.Bounded_Hashed_Maps is
       -----------------
 
       procedure Assign_Key (Node : in out Node_Type) is
+         New_Item : Element_Type;
+         pragma Unmodified (New_Item);
+         --  Default-initialized element (ok to reference, see below)
+
       begin
          Node.Key := Key;
 
-         --  Note that we do not also assign the element component of the node
-         --  here, because this version of Insert does not accept an element
-         --  parameter.
+         --  There is no explicit element provided, but in an instance the
+         --  element type may be a scalar with a Default_Value aspect, or a
+         --  composite type with such a scalar component, or components with
+         --  default initialization, so insert a possibly initialized element
+         --  under the given key.
 
-         --  Node.Element := New_Item;
-         --  What is this deleted code about???
+         Node.Element := New_Item;
       end Assign_Key;
 
       --------------
@@ -968,8 +1032,17 @@ package body Ada.Containers.Bounded_Hashed_Maps is
 
       declare
          N : Node_Type renames Container.Nodes (Position.Node);
+         B : Natural renames Container.Busy;
+         L : Natural renames Container.Lock;
+
       begin
-         return (Element => N.Element'Access);
+         return R : constant Reference_Type :=
+           (Element => N.Element'Access,
+            Control => (Controlled with Container'Unrestricted_Access))
+         do
+            B := B + 1;
+            L := L + 1;
+         end return;
       end;
    end Reference;
 
@@ -986,8 +1059,17 @@ package body Ada.Containers.Bounded_Hashed_Maps is
 
       declare
          N : Node_Type renames Container.Nodes (Node);
+         B : Natural   renames Container.Busy;
+         L : Natural   renames Container.Lock;
+
       begin
-         return (Element => N.Element'Access);
+         return R : constant Reference_Type :=
+           (Element => N.Element'Access,
+            Control => (Controlled with Container'Unrestricted_Access))
+         do
+            B := B + 1;
+            L := L + 1;
+         end return;
       end;
    end Reference;
 
@@ -1160,7 +1242,8 @@ package body Ada.Containers.Bounded_Hashed_Maps is
             return False;
          end if;
 
-         X := M.Buckets (Key_Ops.Index (M, M.Nodes (Position.Node).Key));
+         X := M.Buckets (Key_Ops.Checked_Index
+                          (M, M.Nodes (Position.Node).Key));
 
          for J in 1 .. M.Length loop
             if X = Position.Node then

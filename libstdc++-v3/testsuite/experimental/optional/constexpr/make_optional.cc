@@ -1,9 +1,9 @@
-// { dg-options "-std=gnu++1y" }
+// { dg-options "-std=gnu++14" }
 // XFAIL pending resolution of PR libstdc++/58777
 // { dg-do compile { xfail *-*-* } }
 // { dg-excess-errors "" }
 
-// Copyright (C) 2013 Free Software Foundation, Inc.
+// Copyright (C) 2013-2015 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the

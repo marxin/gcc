@@ -1,5 +1,5 @@
 ;; Code and mode itertator and attribute definitions for the ARM backend
-;; Copyright (C) 2010-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2015 Free Software Foundation, Inc.
 ;; Contributed by ARM Ltd.
 ;;
 ;; This file is part of GCC.
@@ -116,6 +116,9 @@
 ;; Vector modes including 64-bit integer elements, but no floats.
 (define_mode_iterator VDQIX [V8QI V16QI V4HI V8HI V2SI V4SI DI V2DI])
 
+;; Vector modes for H, S and D types.
+(define_mode_iterator VDQHSD [V4HI V8HI V2SI V4SI V2DI])
+
 ;; Vector modes for float->int conversions.
 (define_mode_iterator VCVTF [V2SF V4SF])
 
@@ -166,6 +169,9 @@
 
 (define_mode_iterator QMUL [HQ HA])
 
+;; Modes for polynomial or float values.
+(define_mode_iterator VPF [V8QI V16QI V2SF V4SF])
+
 ;;----------------------------------------------------------------------------
 ;; Code iterators
 ;;----------------------------------------------------------------------------
@@ -191,6 +197,23 @@
 ;; Right shifts
 (define_code_iterator rshifts [ashiftrt lshiftrt])
 
+;; Iterator for integer conversions
+(define_code_iterator FIXUORS [fix unsigned_fix])
+
+;; Binary operators whose second operand can be shifted.
+(define_code_iterator shiftable_ops [plus minus ior xor and])
+
+;; plus and minus are the only shiftable_ops for which Thumb2 allows
+;; a stack pointer opoerand.  The minus operation is a candidate for an rsub
+;; and hence only plus is supported.
+(define_code_attr t2_binop0
+  [(plus "rk") (minus "r") (ior "r") (xor "r") (and "r")])
+
+;; The instruction to use when a shiftable_ops has a shift operation as
+;; its first operand.
+(define_code_attr arith_shift_insn
+  [(plus "add") (minus "rsb") (ior "orr") (xor "eor") (and "and")])
+
 ;;----------------------------------------------------------------------------
 ;; Int iterators
 ;;----------------------------------------------------------------------------
@@ -198,8 +221,112 @@
 (define_int_iterator VRINT [UNSPEC_VRINTZ UNSPEC_VRINTP UNSPEC_VRINTM
                             UNSPEC_VRINTR UNSPEC_VRINTX UNSPEC_VRINTA])
 
+(define_int_iterator VCVT [UNSPEC_VRINTP UNSPEC_VRINTM UNSPEC_VRINTA])
+
 (define_int_iterator NEON_VRINT [UNSPEC_NVRINTP UNSPEC_NVRINTZ UNSPEC_NVRINTM
                               UNSPEC_NVRINTX UNSPEC_NVRINTA UNSPEC_NVRINTN])
+
+(define_int_iterator NEON_VCVT [UNSPEC_NVRINTP UNSPEC_NVRINTM UNSPEC_NVRINTA])
+
+(define_int_iterator VADDL [UNSPEC_VADDL_S UNSPEC_VADDL_U])
+
+(define_int_iterator VADDW [UNSPEC_VADDW_S UNSPEC_VADDW_U])
+
+(define_int_iterator VHADD [UNSPEC_VRHADD_S UNSPEC_VRHADD_U
+			    UNSPEC_VHADD_S UNSPEC_VHADD_U])
+
+(define_int_iterator VQADD [UNSPEC_VQADD_S UNSPEC_VQADD_U])
+
+(define_int_iterator VADDHN [UNSPEC_VADDHN UNSPEC_VRADDHN])
+
+(define_int_iterator VMLAL [UNSPEC_VMLAL_S UNSPEC_VMLAL_U])
+
+(define_int_iterator VMLAL_LANE [UNSPEC_VMLAL_S_LANE UNSPEC_VMLAL_U_LANE])
+
+(define_int_iterator VMLSL [UNSPEC_VMLSL_S UNSPEC_VMLSL_U])
+
+(define_int_iterator VMLSL_LANE [UNSPEC_VMLSL_S_LANE UNSPEC_VMLSL_U_LANE])
+
+(define_int_iterator VQDMULH [UNSPEC_VQDMULH UNSPEC_VQRDMULH])
+
+(define_int_iterator VQDMULH_LANE [UNSPEC_VQDMULH_LANE UNSPEC_VQRDMULH_LANE])
+
+(define_int_iterator VMULL [UNSPEC_VMULL_S UNSPEC_VMULL_U UNSPEC_VMULL_P])
+
+(define_int_iterator VMULL_LANE [UNSPEC_VMULL_S_LANE UNSPEC_VMULL_U_LANE])
+
+(define_int_iterator VSUBL [UNSPEC_VSUBL_S UNSPEC_VSUBL_U])
+
+(define_int_iterator VSUBW [UNSPEC_VSUBW_S UNSPEC_VSUBW_U])
+
+(define_int_iterator VHSUB [UNSPEC_VHSUB_S UNSPEC_VHSUB_U])
+
+(define_int_iterator VQSUB [UNSPEC_VQSUB_S UNSPEC_VQSUB_U])
+
+(define_int_iterator VSUBHN [UNSPEC_VSUBHN UNSPEC_VRSUBHN])
+
+(define_int_iterator VABD [UNSPEC_VABD_S UNSPEC_VABD_U])
+
+(define_int_iterator VABDL [UNSPEC_VABDL_S UNSPEC_VABDL_U])
+
+(define_int_iterator VMAXMIN [UNSPEC_VMAX UNSPEC_VMAX_U
+			      UNSPEC_VMIN UNSPEC_VMIN_U])
+
+(define_int_iterator VMAXMINF [UNSPEC_VMAX UNSPEC_VMIN])
+
+(define_int_iterator VPADDL [UNSPEC_VPADDL_S UNSPEC_VPADDL_U])
+
+(define_int_iterator VPADAL [UNSPEC_VPADAL_S UNSPEC_VPADAL_U])
+
+(define_int_iterator VPMAXMIN [UNSPEC_VPMAX UNSPEC_VPMAX_U
+			       UNSPEC_VPMIN UNSPEC_VPMIN_U])
+
+(define_int_iterator VPMAXMINF [UNSPEC_VPMAX UNSPEC_VPMIN])
+
+(define_int_iterator VCVT_US [UNSPEC_VCVT_S UNSPEC_VCVT_U])
+
+(define_int_iterator VCVT_US_N [UNSPEC_VCVT_S_N UNSPEC_VCVT_U_N])
+
+(define_int_iterator VQMOVN [UNSPEC_VQMOVN_S UNSPEC_VQMOVN_U])
+
+(define_int_iterator VMOVL [UNSPEC_VMOVL_S UNSPEC_VMOVL_U])
+
+(define_int_iterator VSHL [UNSPEC_VSHL_S UNSPEC_VSHL_U
+			   UNSPEC_VRSHL_S UNSPEC_VRSHL_U])
+
+(define_int_iterator VQSHL [UNSPEC_VQSHL_S UNSPEC_VQSHL_U
+			    UNSPEC_VQRSHL_S UNSPEC_VQRSHL_U])
+
+(define_int_iterator VSHR_N [UNSPEC_VSHR_S_N UNSPEC_VSHR_U_N
+			     UNSPEC_VRSHR_S_N UNSPEC_VRSHR_U_N])
+
+(define_int_iterator VSHRN_N [UNSPEC_VSHRN_N UNSPEC_VRSHRN_N])
+
+(define_int_iterator VQSHRN_N [UNSPEC_VQSHRN_S_N UNSPEC_VQSHRN_U_N
+			       UNSPEC_VQRSHRN_S_N UNSPEC_VQRSHRN_U_N])
+
+(define_int_iterator VQSHRUN_N [UNSPEC_VQSHRUN_N UNSPEC_VQRSHRUN_N])
+
+(define_int_iterator VQSHL_N [UNSPEC_VQSHL_S_N UNSPEC_VQSHL_U_N])
+
+(define_int_iterator VSHLL_N [UNSPEC_VSHLL_S_N UNSPEC_VSHLL_U_N])
+
+(define_int_iterator VSRA_N [UNSPEC_VSRA_S_N UNSPEC_VSRA_U_N
+			     UNSPEC_VRSRA_S_N UNSPEC_VRSRA_U_N])
+
+(define_int_iterator CRC [UNSPEC_CRC32B UNSPEC_CRC32H UNSPEC_CRC32W
+                          UNSPEC_CRC32CB UNSPEC_CRC32CH UNSPEC_CRC32CW])
+
+(define_int_iterator CRYPTO_UNARY [UNSPEC_AESMC UNSPEC_AESIMC])
+
+(define_int_iterator CRYPTO_BINARY [UNSPEC_AESD UNSPEC_AESE
+                                    UNSPEC_SHA1SU1 UNSPEC_SHA256SU0])
+
+(define_int_iterator CRYPTO_TERNARY [UNSPEC_SHA1SU0 UNSPEC_SHA256H
+                                     UNSPEC_SHA256H2 UNSPEC_SHA256SU1])
+
+(define_int_iterator CRYPTO_SELECTING [UNSPEC_SHA1C UNSPEC_SHA1M
+                                       UNSPEC_SHA1P])
 
 ;;----------------------------------------------------------------------------
 ;; Mode attributes
@@ -466,6 +593,8 @@
                      (DI "")   (V2DI "_q")
                      (DF "")   (V2DF "_q")])
 
+(define_mode_attr pf [(V8QI "p") (V16QI "p") (V2SF "f") (V4SF "f")])
+
 ;;----------------------------------------------------------------------------
 ;; Code attributes
 ;;----------------------------------------------------------------------------
@@ -488,6 +617,13 @@
 ;; Assembler mnemonics for signedness of widening operations.
 (define_code_attr US [(sign_extend "s") (zero_extend "u")])
 
+;; Signedness suffix for float->fixed conversions.  Empty for signed
+;; conversion.
+(define_code_attr su_optab [(fix "") (unsigned_fix "u")])
+
+;; Sign prefix to use in instruction type suffixes, i.e. s32, u32.
+(define_code_attr su [(fix "s") (unsigned_fix "u")])
+
 ;; Right shifts
 (define_code_attr shift [(ashiftrt "ashr") (lshiftrt "lshr")])
 (define_code_attr shifttype [(ashiftrt "signed") (lshiftrt "unsigned")])
@@ -495,6 +631,82 @@
 ;;----------------------------------------------------------------------------
 ;; Int attributes
 ;;----------------------------------------------------------------------------
+
+;; Mapping between vector UNSPEC operations and the signed ('s'),
+;; unsigned ('u'), poly ('p') or float ('f') nature of their data type.
+(define_int_attr sup [
+  (UNSPEC_VADDL_S "s") (UNSPEC_VADDL_U "u")
+  (UNSPEC_VADDW_S "s") (UNSPEC_VADDW_U "u")
+  (UNSPEC_VRHADD_S "s") (UNSPEC_VRHADD_U "u")
+  (UNSPEC_VHADD_S "s") (UNSPEC_VHADD_U "u")
+  (UNSPEC_VQADD_S "s") (UNSPEC_VQADD_U "u")
+  (UNSPEC_VMLAL_S "s") (UNSPEC_VMLAL_U "u")
+  (UNSPEC_VMLAL_S_LANE "s") (UNSPEC_VMLAL_U_LANE "u")
+  (UNSPEC_VMLSL_S "s") (UNSPEC_VMLSL_U "u")
+  (UNSPEC_VMLSL_S_LANE "s") (UNSPEC_VMLSL_U_LANE "u")
+  (UNSPEC_VMULL_S "s") (UNSPEC_VMULL_U "u") (UNSPEC_VMULL_P "p")
+  (UNSPEC_VMULL_S_LANE "s") (UNSPEC_VMULL_U_LANE "u")
+  (UNSPEC_VSUBL_S "s") (UNSPEC_VSUBL_U "u")
+  (UNSPEC_VSUBW_S "s") (UNSPEC_VSUBW_U "u")
+  (UNSPEC_VHSUB_S "s") (UNSPEC_VHSUB_U "u")
+  (UNSPEC_VQSUB_S "s") (UNSPEC_VQSUB_U "u")
+  (UNSPEC_VABD_S "s") (UNSPEC_VABD_U "u")
+  (UNSPEC_VABDL_S "s") (UNSPEC_VABDL_U "u")
+  (UNSPEC_VMAX "s") (UNSPEC_VMAX_U "u")
+  (UNSPEC_VMIN "s") (UNSPEC_VMIN_U "u")
+  (UNSPEC_VPADDL_S "s") (UNSPEC_VPADDL_U "u")
+  (UNSPEC_VPADAL_S "s") (UNSPEC_VPADAL_U "u")
+  (UNSPEC_VPMAX "s") (UNSPEC_VPMAX_U "u")
+  (UNSPEC_VPMIN "s") (UNSPEC_VPMIN_U "u")
+  (UNSPEC_VCVT_S "s") (UNSPEC_VCVT_U "u")
+  (UNSPEC_VCVT_S_N "s") (UNSPEC_VCVT_U_N "u")
+  (UNSPEC_VQMOVN_S "s") (UNSPEC_VQMOVN_U "u")
+  (UNSPEC_VMOVL_S "s") (UNSPEC_VMOVL_U "u")
+  (UNSPEC_VSHL_S "s") (UNSPEC_VSHL_U "u")
+  (UNSPEC_VRSHL_S "s") (UNSPEC_VRSHL_U "u")
+  (UNSPEC_VQSHL_S "s") (UNSPEC_VQSHL_U "u")
+  (UNSPEC_VQRSHL_S "s") (UNSPEC_VQRSHL_U "u")
+  (UNSPEC_VSHR_S_N "s") (UNSPEC_VSHR_U_N "u")
+  (UNSPEC_VRSHR_S_N "s") (UNSPEC_VRSHR_U_N "u")
+  (UNSPEC_VQSHRN_S_N "s") (UNSPEC_VQSHRN_U_N "u")
+  (UNSPEC_VQRSHRN_S_N "s") (UNSPEC_VQRSHRN_U_N "u")
+  (UNSPEC_VQSHL_S_N "s") (UNSPEC_VQSHL_U_N "u")
+  (UNSPEC_VSHLL_S_N "s") (UNSPEC_VSHLL_U_N "u")
+  (UNSPEC_VSRA_S_N "s") (UNSPEC_VSRA_U_N "u")
+  (UNSPEC_VRSRA_S_N "s") (UNSPEC_VRSRA_U_N "u")
+
+])
+
+(define_int_attr r [
+  (UNSPEC_VRHADD_S "r") (UNSPEC_VRHADD_U "r")
+  (UNSPEC_VHADD_S "") (UNSPEC_VHADD_U "")
+  (UNSPEC_VADDHN "") (UNSPEC_VRADDHN "r")
+  (UNSPEC_VQDMULH "") (UNSPEC_VQRDMULH "r")
+  (UNSPEC_VQDMULH_LANE "") (UNSPEC_VQRDMULH_LANE "r")
+  (UNSPEC_VSUBHN "") (UNSPEC_VRSUBHN "r")
+])
+
+(define_int_attr maxmin [
+  (UNSPEC_VMAX "max") (UNSPEC_VMAX_U "max")
+  (UNSPEC_VMIN "min") (UNSPEC_VMIN_U "min")
+  (UNSPEC_VPMAX "max") (UNSPEC_VPMAX_U "max")
+  (UNSPEC_VPMIN "min") (UNSPEC_VPMIN_U "min")
+])
+
+(define_int_attr shift_op [
+  (UNSPEC_VSHL_S "shl") (UNSPEC_VSHL_U "shl")
+  (UNSPEC_VRSHL_S "rshl") (UNSPEC_VRSHL_U "rshl")
+  (UNSPEC_VQSHL_S "qshl") (UNSPEC_VQSHL_U "qshl")
+  (UNSPEC_VQRSHL_S "qrshl") (UNSPEC_VQRSHL_U "qrshl")
+  (UNSPEC_VSHR_S_N "shr") (UNSPEC_VSHR_U_N "shr")
+  (UNSPEC_VRSHR_S_N "rshr") (UNSPEC_VRSHR_U_N "rshr")
+  (UNSPEC_VSHRN_N "shrn") (UNSPEC_VRSHRN_N "rshrn")
+  (UNSPEC_VQRSHRN_S_N "qrshrn") (UNSPEC_VQRSHRN_U_N "qrshrn")
+  (UNSPEC_VQSHRN_S_N "qshrn") (UNSPEC_VQSHRN_U_N "qshrn")
+  (UNSPEC_VQSHRUN_N "qshrun") (UNSPEC_VQRSHRUN_N "qrshrun")
+  (UNSPEC_VSRA_S_N "sra") (UNSPEC_VSRA_U_N "sra")
+  (UNSPEC_VRSRA_S_N "rsra") (UNSPEC_VRSRA_U_N "rsra")
+])
 
 ;; Standard names for floating point to integral rounding instructions.
 (define_int_attr vrint_pattern [(UNSPEC_VRINTZ "btrunc") (UNSPEC_VRINTP "ceil")
@@ -511,9 +723,56 @@
                                   (UNSPEC_VRINTA "no") (UNSPEC_VRINTM "no")
                                   (UNSPEC_VRINTR "yes") (UNSPEC_VRINTX "yes")])
 
+(define_int_attr vrint_conds [(UNSPEC_VRINTZ "nocond") (UNSPEC_VRINTP "unconditional")
+                              (UNSPEC_VRINTA "unconditional") (UNSPEC_VRINTM "unconditional")
+                              (UNSPEC_VRINTR "nocond") (UNSPEC_VRINTX "nocond")])
+
 (define_int_attr nvrint_variant [(UNSPEC_NVRINTZ "z") (UNSPEC_NVRINTP "p")
                                 (UNSPEC_NVRINTA "a") (UNSPEC_NVRINTM "m")
                                 (UNSPEC_NVRINTX "x") (UNSPEC_NVRINTN "n")])
+
+(define_int_attr crc_variant [(UNSPEC_CRC32B "crc32b") (UNSPEC_CRC32H "crc32h")
+                        (UNSPEC_CRC32W "crc32w") (UNSPEC_CRC32CB "crc32cb")
+                        (UNSPEC_CRC32CH "crc32ch") (UNSPEC_CRC32CW "crc32cw")])
+
+(define_int_attr crc_mode [(UNSPEC_CRC32B "QI") (UNSPEC_CRC32H "HI")
+                        (UNSPEC_CRC32W "SI") (UNSPEC_CRC32CB "QI")
+                        (UNSPEC_CRC32CH "HI") (UNSPEC_CRC32CW "SI")])
+
+(define_int_attr crypto_pattern [(UNSPEC_SHA1H "sha1h") (UNSPEC_AESMC "aesmc")
+                          (UNSPEC_AESIMC "aesimc") (UNSPEC_AESD "aesd")
+                          (UNSPEC_AESE "aese") (UNSPEC_SHA1SU1 "sha1su1")
+                          (UNSPEC_SHA256SU0 "sha256su0") (UNSPEC_SHA1C "sha1c")
+                          (UNSPEC_SHA1M "sha1m") (UNSPEC_SHA1P "sha1p")
+                          (UNSPEC_SHA1SU0 "sha1su0") (UNSPEC_SHA256H "sha256h")
+                          (UNSPEC_SHA256H2 "sha256h2")
+                          (UNSPEC_SHA256SU1 "sha256su1")])
+
+(define_int_attr crypto_type
+ [(UNSPEC_AESE "crypto_aese") (UNSPEC_AESD "crypto_aese")
+ (UNSPEC_AESMC "crypto_aesmc") (UNSPEC_AESIMC "crypto_aesmc")
+ (UNSPEC_SHA1C "crypto_sha1_slow") (UNSPEC_SHA1P "crypto_sha1_slow")
+ (UNSPEC_SHA1M "crypto_sha1_slow") (UNSPEC_SHA1SU1 "crypto_sha1_fast")
+ (UNSPEC_SHA1SU0 "crypto_sha1_xor") (UNSPEC_SHA256H "crypto_sha256_slow")
+ (UNSPEC_SHA256H2 "crypto_sha256_slow") (UNSPEC_SHA256SU0 "crypto_sha256_fast")
+ (UNSPEC_SHA256SU1 "crypto_sha256_slow")])
+
+(define_int_attr crypto_size_sfx [(UNSPEC_SHA1H "32") (UNSPEC_AESMC "8")
+                          (UNSPEC_AESIMC "8") (UNSPEC_AESD "8")
+                          (UNSPEC_AESE "8") (UNSPEC_SHA1SU1 "32")
+                          (UNSPEC_SHA256SU0 "32") (UNSPEC_SHA1C "32")
+                          (UNSPEC_SHA1M "32") (UNSPEC_SHA1P "32")
+                          (UNSPEC_SHA1SU0 "32") (UNSPEC_SHA256H "32")
+                          (UNSPEC_SHA256H2 "32") (UNSPEC_SHA256SU1 "32")])
+
+(define_int_attr crypto_mode [(UNSPEC_SHA1H "V4SI") (UNSPEC_AESMC "V16QI")
+                          (UNSPEC_AESIMC "V16QI") (UNSPEC_AESD "V16QI")
+                          (UNSPEC_AESE "V16QI") (UNSPEC_SHA1SU1 "V4SI")
+                          (UNSPEC_SHA256SU0 "V4SI") (UNSPEC_SHA1C "V4SI")
+                          (UNSPEC_SHA1M "V4SI") (UNSPEC_SHA1P "V4SI")
+                          (UNSPEC_SHA1SU0 "V4SI") (UNSPEC_SHA256H "V4SI")
+                          (UNSPEC_SHA256H2 "V4SI") (UNSPEC_SHA256SU1 "V4SI")])
+
 ;; Both kinds of return insn.
 (define_code_iterator returns [return simple_return])
 (define_code_attr return_str [(return "") (simple_return "simple_")])

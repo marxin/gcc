@@ -1,6 +1,6 @@
 // Test for range-based for with VLAs.
-// { dg-options -std=c++1y }
-// { dg-do run }
+// { dg-do run { target c++11 } }
+// { dg-options "-Wno-vla" }
 
 #include <new>
 

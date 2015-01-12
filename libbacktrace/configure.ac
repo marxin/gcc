@@ -1,5 +1,5 @@
 # configure.ac -- Backtrace configure script.
-# Copyright (C) 2012-2013 Free Software Foundation, Inc.
+# Copyright (C) 2012-2015 Free Software Foundation, Inc.
 
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -144,7 +144,7 @@ else
   ac_save_CFFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -Werror-implicit-function-declaration"
   AC_MSG_CHECKING([for _Unwind_GetIPInfo])
-  AC_COMPILE_IFELSE(
+  AC_LINK_IFELSE(
     [AC_LANG_PROGRAM(
        [#include "unwind.h"
 	struct _Unwind_Context *context;

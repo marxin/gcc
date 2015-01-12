@@ -1,4 +1,4 @@
-@c Copyright (C) 1988-2013 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2015 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -325,6 +325,9 @@ support, improved leaf function register allocation, and his direction
 via the steering committee.
 
 @item
+Jonny Grant for improvements to @code{collect2's} @option{--help} documentation.
+
+@item
 Anthony Green for his @option{-Os} contributions, the moxie port, and
 Java front end work.
 
@@ -335,7 +338,7 @@ Stu Grossman for gdb hacking, allowing GCJ developers to debug Java code.
 Michael K. Gschwind contributed the port to the PDP-11.
 
 @item
-Richard Guenther for his ongoing middle-end contributions and bug fixes
+Richard Biener for his ongoing middle-end contributions and bug fixes
 and for release management.
 
 @item
@@ -419,6 +422,9 @@ Kamil Iskra for general m68k hacking.
 
 @item
 Lee Iverson for random fixes and MIPS testing.
+
+@item
+Balaji V. Iyer for Cilk+ development and merging.
 
 @item
 Andreas Jaeger for testing and benchmarking of GCC and various bug fixes.
@@ -1048,6 +1054,9 @@ Carlo Wood for various fixes.
 
 @item
 Tom Wood for work on the m88k port.
+
+@item
+Chung-Ju Wu for his work on the Andes NDS32 port.
 
 @item
 Canqun Yang for work on GNU Fortran.

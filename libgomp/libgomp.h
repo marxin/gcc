@@ -1,7 +1,8 @@
-/* Copyright (C) 2005-2013 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2015 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>.
 
-   This file is part of the GNU OpenMP Library (libgomp).
+   This file is part of the GNU Offloading and Multi Processing Library
+   (libgomp).
 
    Libgomp is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by
@@ -274,6 +275,7 @@ struct gomp_task_depend_entry
   struct gomp_task *task;
   bool is_in;
   bool redundant;
+  bool redundant_out;
 };
 
 struct gomp_dependers_vec
@@ -281,6 +283,17 @@ struct gomp_dependers_vec
   size_t n_elem;
   size_t allocated;
   struct gomp_task *elem[];
+};
+
+/* Used when in GOMP_taskwait or in gomp_task_maybe_wait_for_dependencies.  */
+
+struct gomp_taskwait
+{
+  bool in_taskwait;
+  bool in_depend_wait;
+  size_t n_depend;
+  struct gomp_task *last_parent_depends_on;
+  gomp_sem_t taskwait_sem;
 };
 
 /* This structure describes a "task" to be run by a thread.  */
@@ -298,17 +311,17 @@ struct gomp_task
   struct gomp_taskgroup *taskgroup;
   struct gomp_dependers_vec *dependers;
   struct htab *depend_hash;
+  struct gomp_taskwait *taskwait;
   size_t depend_count;
   size_t num_dependees;
   struct gomp_task_icv icv;
   void (*fn) (void *);
   void *fn_data;
   enum gomp_task_kind kind;
-  bool in_taskwait;
   bool in_tied_task;
   bool final_task;
   bool copy_ctors_done;
-  gomp_sem_t taskwait_sem;
+  bool parent_depends_on;
   struct gomp_task_depend_entry depend[];
 };
 
@@ -459,7 +472,7 @@ enum gomp_cancel_kind
 
 /* ... and here is that TLS data.  */
 
-#ifdef HAVE_TLS
+#if defined HAVE_TLS || defined USE_EMUTLS
 extern __thread struct gomp_thread gomp_tls_data;
 static inline struct gomp_thread *gomp_thread (void)
 {
@@ -582,7 +595,6 @@ gomp_finish_task (struct gomp_task *task)
 {
   if (__builtin_expect (task->depend_hash != NULL, 0))
     free (task->depend_hash);
-  gomp_sem_destroy (&task->taskwait_sem);
 }
 
 /* team.c */

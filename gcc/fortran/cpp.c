@@ -1,4 +1,4 @@
-/* Copyright (C) 2008-2013 Free Software Foundation, Inc.
+/* Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -20,6 +20,15 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
 #include "version.h"
 #include "flags.h"
@@ -170,8 +179,8 @@ cpp_define_builtins (cpp_reader *pfile)
   cpp_define (pfile, "__GFORTRAN__=1");
   cpp_define (pfile, "_LANGUAGE_FORTRAN=1");
 
-  if (gfc_option.gfc_flag_openmp)
-    cpp_define (pfile, "_OPENMP=201107");
+  if (flag_openmp)
+    cpp_define (pfile, "_OPENMP=201307");
 
   /* The defines below are necessary for the TARGET_* macros.
 
@@ -363,6 +372,7 @@ gfc_cpp_handle_option (size_t scode, const char *arg, int value ATTRIBUTE_UNUSED
 
     case OPT_Wdate_time:
       gfc_cpp_option.warn_date_time = value;
+      break;
 
     case OPT_A:
     case OPT_D:
@@ -449,7 +459,7 @@ gfc_cpp_post_options (void)
 	  || gfc_cpp_option.no_line_commands
 	  || gfc_cpp_option.dump_macros
 	  || gfc_cpp_option.dump_includes))
-    gfc_fatal_error("To enable preprocessing, use -cpp");
+    gfc_fatal_error ("To enable preprocessing, use %<-cpp%>");
 
   if (!gfc_cpp_enabled ())
     return;
@@ -469,7 +479,7 @@ gfc_cpp_post_options (void)
 
   cpp_option->cpp_pedantic = pedantic;
 
-  cpp_option->dollars_in_ident = gfc_option.flag_dollar_ok;
+  cpp_option->dollars_in_ident = flag_dollar_ok;
   cpp_option->discard_comments = gfc_cpp_option.discard_comments;
   cpp_option->discard_comments_in_macro_exp = gfc_cpp_option.discard_comments_in_macro_exp;
   cpp_option->print_include_names = gfc_cpp_option.print_include_names;
@@ -547,7 +557,7 @@ gfc_cpp_init_0 (void)
 
 	  print.outf = fopen (gfc_cpp_option.output_filename, "w");
 	  if (print.outf == NULL)
-	    gfc_fatal_error ("opening output file %s: %s",
+	    gfc_fatal_error ("opening output file %qs: %s",
 			     gfc_cpp_option.output_filename,
 			     xstrerror (errno));
 	}
@@ -558,7 +568,7 @@ gfc_cpp_init_0 (void)
     {
       print.outf = fopen (gfc_cpp_option.temporary_filename, "w");
       if (print.outf == NULL)
-	gfc_fatal_error ("opening output file %s: %s",
+	gfc_fatal_error ("opening output file %qs: %s",
 			 gfc_cpp_option.temporary_filename, xstrerror (errno));
     }
 
@@ -575,6 +585,7 @@ gfc_cpp_init (void)
   if (gfc_option.flag_preprocessed)
     return;
 
+  cpp_change_file (cpp_in, LC_RENAME, _("<built-in>"));
   if (!gfc_cpp_option.no_predefined)
     {
       /* Make sure all of the builtins about to be declared have
@@ -664,7 +675,7 @@ gfc_cpp_done (void)
 	      fclose (f);
 	    }
 	  else
-	    gfc_fatal_error ("opening output file %s: %s",
+	    gfc_fatal_error ("opening output file %qs: %s",
 			     gfc_cpp_option.deps_filename,
 			     xstrerror (errno));
 	}

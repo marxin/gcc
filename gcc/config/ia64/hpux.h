@@ -1,5 +1,5 @@
 /* Definitions of target machine GNU compiler.  IA-64 version.
-   Copyright (C) 1999-2013 Free Software Foundation, Inc.
+   Copyright (C) 1999-2015 Free Software Foundation, Inc.
    Contributed by Steve Ellcey <sje@cup.hp.com> and
                   Reva Cuthbertson <reva@cup.hp.com>
 
@@ -182,22 +182,12 @@ do {								\
 /* ia64 HPUX has the float and long double forms of math functions.
    We redefine this hook so the version from elfos.h header won't be used.  */
 #undef TARGET_LIBC_HAS_FUNCTION
-#define TARGET_LIBC_HAS_FUNCTION default_c99_libc_has_function
+#define TARGET_LIBC_HAS_FUNCTION default_libc_has_function
 
 #undef TARGET_INIT_LIBFUNCS
 #define TARGET_INIT_LIBFUNCS ia64_hpux_init_libfuncs
 
 #define FLOAT_LIB_COMPARE_RETURNS_BOOL(MODE, COMPARISON) ((MODE) == TFmode)
-
-/* Put all *xf routines in libgcc, regardless of long double size.  */
-#undef LIBGCC2_HAS_XF_MODE
-#define LIBGCC2_HAS_XF_MODE 1
-#define XF_SIZE 64
-
-/* Put all *tf routines in libgcc, regardless of long double size.  */
-#undef LIBGCC2_HAS_TF_MODE
-#define LIBGCC2_HAS_TF_MODE 1
-#define TF_SIZE 113
 
 /* HP-UX headers are C++-compatible.  */
 #define NO_IMPLICIT_EXTERN_C

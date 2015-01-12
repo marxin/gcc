@@ -1,6 +1,6 @@
 /* Print GENERIC declaration (functions, variables, types) trees coming from
    the C and C++ front-ends as well as macros in Ada syntax.
-   Copyright (C) 2010-2013 Free Software Foundation, Inc.
+   Copyright (C) 2010-2015 Free Software Foundation, Inc.
    Adapted from tree-pretty-print.c by Arnaud Charlet  <charlet@adacore.com>
 
 This file is part of GCC.
@@ -23,27 +23,24 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "options.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "dumpfile.h"
 #include "c-ada-spec.h"
 #include "cpplib.h"
 #include "c-pragma.h"
 #include "cpp-id-data.h"
-
-/* Adapted from hwint.h to use the Ada prefix.  */
-#if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
-# if HOST_BITS_PER_WIDE_INT == 64
-#  define ADA_HOST_WIDE_INT_PRINT_DOUBLE_HEX \
-     "16#%" HOST_LONG_FORMAT "x%016" HOST_LONG_FORMAT "x#"
-# else
-#  define ADA_HOST_WIDE_INT_PRINT_DOUBLE_HEX \
-     "16#%" HOST_LONG_FORMAT "x%08" HOST_LONG_FORMAT "x#"
-# endif
-#else
-  /* We can assume that 'long long' is at least 64 bits.  */
-# define ADA_HOST_WIDE_INT_PRINT_DOUBLE_HEX \
-    "16#%" HOST_LONG_LONG_FORMAT "x%016" HOST_LONG_LONG_FORMAT "x#"
-#endif /* HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG */
+#include "wide-int.h"
 
 /* Local functions, macros and variables.  */
 static int dump_generic_ada_node (pretty_printer *, tree, tree, int, int,
@@ -58,7 +55,7 @@ static void dump_ada_nodes (pretty_printer *, const char *);
 static void reset_ada_withs (void);
 static void dump_ada_withs (FILE *);
 static void dump_ads (const char *, void (*)(const char *),
-		      int (*)(const_tree, cpp_operation));
+		      int (*)(tree, cpp_operation));
 static char *to_ada_name (const char *, int *);
 static bool separate_class_package (tree);
 
@@ -68,7 +65,7 @@ static bool separate_class_package (tree);
 #define INDENT_INCR 3
 
 /* Global hook used to perform C++ queries on nodes.  */
-static int (*cpp_check) (const_tree, cpp_operation) = NULL;
+static int (*cpp_check) (tree, cpp_operation) = NULL;
 
 
 /* Given a cpp MACRO, compute the max length BUFFER_LEN of the macro, as well
@@ -650,8 +647,9 @@ dump_ada_nodes (pretty_printer *pp, const char *source_file)
   comments = cpp_get_comments (parse_in);
 
   /* Sort the comments table by sloc.  */
-  qsort (comments->entries, comments->count, sizeof (cpp_comment),
-	 compare_comment);
+  if (comments->count > 1)
+    qsort (comments->entries, comments->count, sizeof (cpp_comment),
+	   compare_comment);
 
   /* Interleave comments and declarations in line number order.  */
   i = j = 0;
@@ -975,7 +973,7 @@ is_tagged_type (const_tree type)
    sufficiently simple.  */
 
 static bool
-has_nontrivial_methods (const_tree type)
+has_nontrivial_methods (tree type)
 {
   tree tmp;
 
@@ -2211,19 +2209,19 @@ dump_generic_ada_node (pretty_printer *buffer, tree node, tree type, int spc,
 	pp_unsigned_wide_integer (buffer, tree_to_uhwi (node));
       else
 	{
-	  tree val = node;
-	  unsigned HOST_WIDE_INT low = TREE_INT_CST_LOW (val);
-	  HOST_WIDE_INT high = TREE_INT_CST_HIGH (val);
-
-	  if (tree_int_cst_sgn (val) < 0)
+	  wide_int val = node;
+	  int i;
+	  if (wi::neg_p (val))
 	    {
 	      pp_minus (buffer);
-	      high = ~high + !low;
-	      low = -low;
+	      val = -val;
 	    }
 	  sprintf (pp_buffer (buffer)->digit_buffer,
-		   ADA_HOST_WIDE_INT_PRINT_DOUBLE_HEX,
-		   (unsigned HOST_WIDE_INT) high, low);
+		   "16#%" HOST_WIDE_INT_PRINT "x",
+		   val.elt (val.get_len () - 1));
+	  for (i = val.get_len () - 2; i >= 0; i--)
+	    sprintf (pp_buffer (buffer)->digit_buffer,
+		     HOST_WIDE_INT_PRINT_PADDED_HEX, val.elt (i));
 	  pp_string (buffer, pp_buffer (buffer)->digit_buffer);
 	}
       break;
@@ -2521,20 +2519,34 @@ dump_nested_types (pretty_printer *buffer, tree t, tree parent, bool forward,
   TREE_VISITED (t) = 1;
 }
 
+/* Dump in BUFFER constructor spec corresponding to T.  */
+
+static void
+print_constructor (pretty_printer *buffer, tree t)
+{
+  tree decl_name = DECL_NAME (DECL_ORIGIN (t));
+
+  pp_string (buffer, "New_");
+  pp_ada_tree_identifier (buffer, decl_name, t, false);
+}
+
 /* Dump in BUFFER destructor spec corresponding to T.  */
 
 static void
 print_destructor (pretty_printer *buffer, tree t)
 {
-  const char *s = IDENTIFIER_POINTER (DECL_NAME (t));
+  tree decl_name = DECL_NAME (DECL_ORIGIN (t));
+  const char *s = IDENTIFIER_POINTER (decl_name);
 
   if (*s == '_')
-    for (s += 2; *s != ' '; s++)
-      pp_character (buffer, *s);
+    {
+      for (s += 2; *s != ' '; s++)
+	pp_character (buffer, *s);
+    }
   else
     {
       pp_string (buffer, "Delete_");
-      pp_ada_tree_identifier (buffer, DECL_NAME (t), t, false);
+      pp_ada_tree_identifier (buffer, decl_name, t, false);
     }
 }
 
@@ -2785,7 +2797,7 @@ print_ada_declaration (pretty_printer *buffer, tree t, tree type, int spc)
     }
   else if (TREE_CODE (t) == FUNCTION_DECL)
     {
-      bool is_function = true, is_abstract_class = false;
+      bool is_function, is_abstract_class = false;
       bool is_method = TREE_CODE (TREE_TYPE (t)) == METHOD_TYPE;
       tree decl_name = DECL_NAME (t);
       int prev_in_function = in_function;
@@ -2805,24 +2817,21 @@ print_ada_declaration (pretty_printer *buffer, tree t, tree type, int spc)
 	  is_copy_constructor = cpp_check (t, IS_COPY_CONSTRUCTOR);
 	}
 
-      /* Skip __comp_dtor destructor which is redundant with the '~class()'
-	 destructor.  */
-      if (is_destructor
-	  && !strncmp (IDENTIFIER_POINTER (decl_name), "__comp", 6))
-	return 0;
-
       /* Skip copy constructors: some are internal only, and those that are
 	 not cannot be called easily from Ada anyway.  */
       if (is_copy_constructor)
 	return 0;
 
-      /* If this function has an entry in the dispatch table, we cannot
-	 omit it.  */
-      if (!DECL_VINDEX (t) && *IDENTIFIER_POINTER (decl_name) == '_')
+      if (is_constructor || is_destructor)
 	{
-	  if (IDENTIFIER_POINTER (decl_name)[1] == '_')
+	  /* Only consider constructors/destructors for complete objects.  */
+	  if (strncmp (IDENTIFIER_POINTER (decl_name), "__comp", 6) != 0)
 	    return 0;
+	}
 
+      /* If this function has an entry in the vtable, we cannot omit it.  */
+      else if (!DECL_VINDEX (t) && *IDENTIFIER_POINTER (decl_name) == '_')
+	{
 	  INDENT (spc);
 	  pp_string (buffer, "--  skipped func ");
 	  pp_string (buffer, IDENTIFIER_POINTER (decl_name));
@@ -2832,19 +2841,22 @@ print_ada_declaration (pretty_printer *buffer, tree t, tree type, int spc)
       if (need_indent)
 	INDENT (spc);
 
-      if (is_constructor)
-	pp_string (buffer, "function New_");
-      else if (VOID_TYPE_P (TREE_TYPE (TREE_TYPE (t))))
+      if (VOID_TYPE_P (TREE_TYPE (TREE_TYPE (t))) && !is_constructor)
 	{
-	  is_function = false;
 	  pp_string (buffer, "procedure ");
+	  is_function = false;
 	}
       else
-	pp_string (buffer, "function ");
+	{
+	  pp_string (buffer, "function ");
+	  is_function = true;
+	}
 
       in_function = is_function;
 
-      if (is_destructor)
+      if (is_constructor)
+	print_constructor (buffer, t);
+      else if (is_destructor)
 	print_destructor (buffer, t);
       else
 	dump_ada_decl_name (buffer, t, false);
@@ -2856,16 +2868,9 @@ print_ada_declaration (pretty_printer *buffer, tree t, tree type, int spc)
       if (is_function)
 	{
 	  pp_string (buffer, " return ");
-
-	  if (is_constructor)
-	    {
-	      dump_ada_decl_name (buffer, t, false);
-	    }
-	  else
-	    {
-	      dump_generic_ada_node
-		(buffer, TREE_TYPE (TREE_TYPE (t)), type, spc, false, true);
-	    }
+	  tree ret_type
+	    = is_constructor ? DECL_CONTEXT (t) : TREE_TYPE (TREE_TYPE (t));
+	  dump_generic_ada_node (buffer, ret_type, type, spc, false, true);
 	}
 
       if (is_constructor
@@ -2877,7 +2882,7 @@ print_ada_declaration (pretty_printer *buffer, tree t, tree type, int spc)
 	  for (tmp = TYPE_METHODS (type); tmp; tmp = TREE_CHAIN (tmp))
 	    if (cpp_check (tmp, IS_ABSTRACT))
 	      {
-		is_abstract_class = 1;
+		is_abstract_class = true;
 		break;
 	      }
 	}
@@ -2896,8 +2901,8 @@ print_ada_declaration (pretty_printer *buffer, tree t, tree type, int spc)
 
       if (is_constructor)
 	{
-	  pp_string (buffer, "pragma CPP_Constructor (New_");
-	  dump_ada_decl_name (buffer, t, false);
+	  pp_string (buffer, "pragma CPP_Constructor (");
+	  print_constructor (buffer, t);
 	  pp_string (buffer, ", \"");
 	  pp_asm_name (buffer, t);
 	  pp_string (buffer, "\");");
@@ -3256,7 +3261,7 @@ print_ada_struct_decl (pretty_printer *buffer, tree node, tree type, int spc,
 static void
 dump_ads (const char *source_file,
 	  void (*collect_all_refs)(const char *),
-	  int (*check)(const_tree, cpp_operation))
+	  int (*check)(tree, cpp_operation))
 {
   char *ads_name;
   char *pkg_name;
@@ -3357,7 +3362,7 @@ collect_source_ref (const char *filename)
 
 void
 dump_ada_specs (void (*collect_all_refs)(const char *),
-		int (*check)(const_tree, cpp_operation))
+		int (*check)(tree, cpp_operation))
 {
   int i;
 

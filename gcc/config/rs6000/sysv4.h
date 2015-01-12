@@ -1,5 +1,5 @@
 /* Target definitions for GNU compiler for PowerPC running System V.4
-   Copyright (C) 1995-2013 Free Software Foundation, Inc.
+   Copyright (C) 1995-2015 Free Software Foundation, Inc.
    Contributed by Cygnus Support.
 
    This file is part of GCC.
@@ -292,7 +292,7 @@ do {									\
 /* An expression for the alignment of a structure field FIELD if the
    alignment computed in the usual way is COMPUTED.  */
 #define ADJUST_FIELD_ALIGN(FIELD, COMPUTED)				      \
-	((TARGET_ALTIVEC && TREE_CODE (TREE_TYPE (FIELD)) == VECTOR_TYPE)     \
+	(rs6000_special_adjust_field_align_p ((FIELD), (COMPUTED))	      \
 	 ? 128 : COMPUTED)
 
 #undef  BIGGEST_FIELD_ALIGNMENT
@@ -457,7 +457,7 @@ do {									\
 do {									\
   if (DEFAULT_ABI == ABI_V4)						\
     asm_fprintf (FILE,							\
-		 "\tlwz %s,12(%s)\n\taddic %s,%s,16\n",	\
+		 "\tlwz %s,12(%s)\n\taddi %s,%s,16\n",	\
 		 reg_names[REGNO], reg_names[1], reg_names[1],		\
 		 reg_names[1]);						\
 } while (0)
@@ -522,8 +522,6 @@ extern int fixuplabelno;
 #define ENDIAN_SELECT(BIG_OPT, LITTLE_OPT, DEFAULT_OPT)	\
 "%{mlittle|mlittle-endian:"	LITTLE_OPT ";"	\
   "mbig|mbig-endian:"		BIG_OPT    ";"	\
-  "mcall-aixdesc|mcall-freebsd|mcall-netbsd|"	\
-  "mcall-openbsd|mcall-linux:"	BIG_OPT    ";"	\
   "mcall-i960-old:"		LITTLE_OPT ";"	\
   ":"				DEFAULT_OPT "}"
 
@@ -536,20 +534,13 @@ extern int fixuplabelno;
 %{memb|msdata=eabi: -memb}" \
 ENDIAN_SELECT(" -mbig", " -mlittle", DEFAULT_ASM_ENDIAN)
 
-#define	CC1_ENDIAN_BIG_SPEC ""
-
-#define	CC1_ENDIAN_LITTLE_SPEC ""
-
-#define	CC1_ENDIAN_DEFAULT_SPEC "%(cc1_endian_big)"
-
 #ifndef CC1_SECURE_PLT_DEFAULT_SPEC
 #define CC1_SECURE_PLT_DEFAULT_SPEC ""
 #endif
 
-/* Pass -G xxx to the compiler and set correct endian mode.  */
+/* Pass -G xxx to the compiler.  */
+#undef CC1_SPEC
 #define	CC1_SPEC "%{G*} %(cc1_cpu)" \
-  ENDIAN_SELECT(" %(cc1_endian_big)", " %(cc1_endian_little)",	\
-		" %(cc1_endian_default)")			\
 "%{meabi: %{!mcall-*: -mcall-sysv }} \
 %{!meabi: %{!mno-eabi: \
     %{mrelocatable: -meabi } \
@@ -903,9 +894,6 @@ ncrtn.o%s"
   { "link_os_netbsd",		LINK_OS_NETBSD_SPEC },			\
   { "link_os_openbsd",		LINK_OS_OPENBSD_SPEC },			\
   { "link_os_default",		LINK_OS_DEFAULT_SPEC },			\
-  { "cc1_endian_big",		CC1_ENDIAN_BIG_SPEC },			\
-  { "cc1_endian_little",	CC1_ENDIAN_LITTLE_SPEC },		\
-  { "cc1_endian_default",	CC1_ENDIAN_DEFAULT_SPEC },		\
   { "cc1_secure_plt_default",	CC1_SECURE_PLT_DEFAULT_SPEC },		\
   { "cpp_os_ads",		CPP_OS_ADS_SPEC },			\
   { "cpp_os_yellowknife",	CPP_OS_YELLOWKNIFE_SPEC },		\
@@ -961,4 +949,3 @@ ncrtn.o%s"
 /* This target uses the sysv4.opt file.  */
 #define TARGET_USES_SYSV4_OPT 1
 
-#undef DBX_REGISTER_NUMBER

@@ -1,6 +1,6 @@
 // Algorithm implementation -*- C++ -*-
 
-// Copyright (C) 2001-2013 Free Software Foundation, Inc.
+// Copyright (C) 2001-2015 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -1512,34 +1512,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   // partition
 
   /// This is a helper function...
-  /// Requires __len != 0 and !__pred(*__first),
-  /// same as __stable_partition_adaptive.
-  template<typename _ForwardIterator, typename _Predicate, typename _Distance>
-    _ForwardIterator
-    __inplace_stable_partition(_ForwardIterator __first,
-			       _Predicate __pred, _Distance __len)
-    {
-      if (__len == 1)
-	return __first;
-      _ForwardIterator __middle = __first;
-      std::advance(__middle, __len / 2);
-      _ForwardIterator __left_split =
-	std::__inplace_stable_partition(__first, __pred, __len / 2);
-      // Advance past true-predicate values to satisfy this
-      // function's preconditions.
-      _Distance __right_len = __len - __len / 2;
-      _ForwardIterator __right_split =
-	std::__find_if_not_n(__middle, __right_len, __pred);
-      if (__right_len)
-	__right_split = std::__inplace_stable_partition(__middle,
-							__pred,
-							__right_len);
-      std::rotate(__left_split, __middle, __right_split);
-      std::advance(__left_split, std::distance(__middle, __right_split));
-      return __left_split;
-    }
-
-  /// This is a helper function...
   /// Requires __first != __last and !__pred(__first)
   /// and __len == distance(__first, __last).
   ///
@@ -1554,10 +1526,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 				_Pointer __buffer,
 				_Distance __buffer_size)
     {
+      if (__len == 1)
+	return __first;
+
       if (__len <= __buffer_size)
 	{
 	  _ForwardIterator __result1 = __first;
 	  _Pointer __result2 = __buffer;
+
 	  // The precondition guarantees that !__pred(__first), so
 	  // move that element to the buffer before starting the loop.
 	  // This ensures that we only call __pred once per element.
@@ -1575,31 +1551,33 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		*__result2 = _GLIBCXX_MOVE(*__first);
 		++__result2;
 	      }
+
 	  _GLIBCXX_MOVE3(__buffer, __result2, __result1);
 	  return __result1;
 	}
-      else
-	{
-	  _ForwardIterator __middle = __first;
-	  std::advance(__middle, __len / 2);
-	  _ForwardIterator __left_split =
-	    std::__stable_partition_adaptive(__first, __middle, __pred,
-					     __len / 2, __buffer,
-					     __buffer_size);
-	  // Advance past true-predicate values to satisfy this
-	  // function's preconditions.
-	  _Distance __right_len = __len - __len / 2;
-	  _ForwardIterator __right_split =
-	    std::__find_if_not_n(__middle, __right_len, __pred);
-	  if (__right_len)
-	    __right_split =
-	      std::__stable_partition_adaptive(__right_split, __last, __pred,
-					       __right_len,
-					       __buffer, __buffer_size);
-	  std::rotate(__left_split, __middle, __right_split);
-	  std::advance(__left_split, std::distance(__middle, __right_split));
-	  return __left_split;
-	}
+
+      _ForwardIterator __middle = __first;
+      std::advance(__middle, __len / 2);
+      _ForwardIterator __left_split =
+	std::__stable_partition_adaptive(__first, __middle, __pred,
+					 __len / 2, __buffer,
+					 __buffer_size);
+
+      // Advance past true-predicate values to satisfy this
+      // function's preconditions.
+      _Distance __right_len = __len - __len / 2;
+      _ForwardIterator __right_split =
+	std::__find_if_not_n(__middle, __right_len, __pred);
+
+      if (__right_len)
+	__right_split =
+	  std::__stable_partition_adaptive(__right_split, __last, __pred,
+					   __right_len,
+					   __buffer, __buffer_size);
+
+      std::rotate(__left_split, __middle, __right_split);
+      std::advance(__left_split, std::distance(__middle, __right_split));
+      return __left_split;
     }
 
   template<typename _ForwardIterator, typename _Predicate>
@@ -1618,16 +1596,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	_DistanceType;
 
       _Temporary_buffer<_ForwardIterator, _ValueType> __buf(__first, __last);
-      if (__buf.size() > 0)
-	return
-	  std::__stable_partition_adaptive(__first, __last, __pred,
-					   _DistanceType(__buf.requested_size()),
-					   __buf.begin(),
-					   _DistanceType(__buf.size()));
-      else
-	return
-	  std::__inplace_stable_partition(__first, __pred,
-					  _DistanceType(__buf.requested_size()));
+      return
+	std::__stable_partition_adaptive(__first, __last, __pred,
+					 _DistanceType(__buf.requested_size()),
+					 __buf.begin(),
+					 _DistanceType(__buf.size()));
     }
 
   /**
@@ -2471,6 +2444,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 				     __gnu_cxx::__ops::__val_comp_iter(__comp));
 	      __len11 = std::distance(__first, __first_cut);
 	    }
+
 	  _BidirectionalIterator __new_middle
 	    = std::__rotate_adaptive(__first_cut, __middle, __second_cut,
 				     __len1 - __len11, __len22, __buffer,
@@ -2496,12 +2470,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     {
       if (__len1 == 0 || __len2 == 0)
 	return;
+
       if (__len1 + __len2 == 2)
 	{
 	  if (__comp(__middle, __first))
 	    std::iter_swap(__first, __middle);
 	  return;
 	}
+
       _BidirectionalIterator __first_cut = __first;
       _BidirectionalIterator __second_cut = __middle;
       _Distance __len11 = 0;
@@ -2524,6 +2500,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 				 __gnu_cxx::__ops::__val_comp_iter(__comp));
 	  __len11 = std::distance(__first, __first_cut);
 	}
+
       std::rotate(__first_cut, __middle, __second_cut);
       _BidirectionalIterator __new_middle = __first_cut;
       std::advance(__new_middle, std::distance(__middle, __second_cut));
@@ -3294,6 +3271,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  __b) otherwise.
   */
   template<typename _Tp>
+    _GLIBCXX14_CONSTEXPR
     inline pair<const _Tp&, const _Tp&>
     minmax(const _Tp& __a, const _Tp& __b)
     {
@@ -3314,6 +3292,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  __b) otherwise.
   */
   template<typename _Tp, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     inline pair<const _Tp&, const _Tp&>
     minmax(const _Tp& __a, const _Tp& __b, _Compare __comp)
     {
@@ -3322,6 +3301,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _ForwardIterator, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     pair<_ForwardIterator, _ForwardIterator>
     __minmax_element(_ForwardIterator __first, _ForwardIterator __last,
 		     _Compare __comp)
@@ -3331,7 +3311,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  || ++__next == __last)
 	return std::make_pair(__first, __first);
 
-      _ForwardIterator __min, __max;
+      _ForwardIterator __min{}, __max{};
       if (__comp(__next, __first))
 	{
 	  __min = __next;
@@ -3392,6 +3372,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *           such that no other element in the range is larger.
   */
   template<typename _ForwardIterator>
+    _GLIBCXX14_CONSTEXPR
     inline pair<_ForwardIterator, _ForwardIterator>
     minmax_element(_ForwardIterator __first, _ForwardIterator __last)
     {
@@ -3418,6 +3399,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *           such that no other element in the range is larger.
   */
   template<typename _ForwardIterator, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     inline pair<_ForwardIterator, _ForwardIterator>
     minmax_element(_ForwardIterator __first, _ForwardIterator __last,
 		   _Compare __comp)
@@ -3435,26 +3417,31 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   // N2722 + DR 915.
   template<typename _Tp>
+    _GLIBCXX14_CONSTEXPR
     inline _Tp
     min(initializer_list<_Tp> __l)
     { return *std::min_element(__l.begin(), __l.end()); }
 
   template<typename _Tp, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     inline _Tp
     min(initializer_list<_Tp> __l, _Compare __comp)
     { return *std::min_element(__l.begin(), __l.end(), __comp); }
 
   template<typename _Tp>
+    _GLIBCXX14_CONSTEXPR
     inline _Tp
     max(initializer_list<_Tp> __l)
     { return *std::max_element(__l.begin(), __l.end()); }
 
   template<typename _Tp, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     inline _Tp
     max(initializer_list<_Tp> __l, _Compare __comp)
     { return *std::max_element(__l.begin(), __l.end(), __comp); }
 
   template<typename _Tp>
+    _GLIBCXX14_CONSTEXPR
     inline pair<_Tp, _Tp>
     minmax(initializer_list<_Tp> __l)
     {
@@ -3464,6 +3451,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _Tp, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     inline pair<_Tp, _Tp>
     minmax(initializer_list<_Tp> __l, _Compare __comp)
     {
@@ -4430,7 +4418,13 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
 
       if (__first != __last)
 	for (_RandomAccessIterator __i = __first + 1; __i != __last; ++__i)
-	  std::iter_swap(__i, __first + (std::rand() % ((__i - __first) + 1)));
+	  {
+	    // XXX rand() % N is not uniformly distributed
+	    _RandomAccessIterator __j = __first
+					+ std::rand() % ((__i - __first) + 1);
+	    if (__i != __j)
+	      std::iter_swap(__i, __j);
+	  }
     }
 
   /**
@@ -4464,7 +4458,11 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
       if (__first == __last)
 	return;
       for (_RandomAccessIterator __i = __first + 1; __i != __last; ++__i)
-	std::iter_swap(__i, __first + __rand((__i - __first) + 1));
+	{
+	  _RandomAccessIterator __j = __first + __rand((__i - __first) + 1);
+	  if (__i != __j)
+	    std::iter_swap(__i, __j);
+	}
     }
 
 
@@ -5394,6 +5392,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
     }
 
   template<typename _ForwardIterator, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     _ForwardIterator
     __min_element(_ForwardIterator __first, _ForwardIterator __last,
 		  _Compare __comp)
@@ -5415,6 +5414,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
    *  @return  Iterator referencing the first instance of the smallest value.
   */
   template<typename _ForwardIterator>
+    _GLIBCXX14_CONSTEXPR
     _ForwardIterator
     inline min_element(_ForwardIterator __first, _ForwardIterator __last)
     {
@@ -5438,6 +5438,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
    *  according to __comp.
   */
   template<typename _ForwardIterator, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     inline _ForwardIterator
     min_element(_ForwardIterator __first, _ForwardIterator __last,
 		_Compare __comp)
@@ -5454,6 +5455,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
     }
 
   template<typename _ForwardIterator, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     _ForwardIterator
     __max_element(_ForwardIterator __first, _ForwardIterator __last,
 		  _Compare __comp)
@@ -5474,6 +5476,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
    *  @return  Iterator referencing the first instance of the largest value.
   */
   template<typename _ForwardIterator>
+    _GLIBCXX14_CONSTEXPR
     inline _ForwardIterator
     max_element(_ForwardIterator __first, _ForwardIterator __last)
     {
@@ -5497,6 +5500,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
    *  according to __comp.
   */
   template<typename _ForwardIterator, typename _Compare>
+    _GLIBCXX14_CONSTEXPR
     inline _ForwardIterator
     max_element(_ForwardIterator __first, _ForwardIterator __last,
 		_Compare __comp)

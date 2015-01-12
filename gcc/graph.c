@@ -1,5 +1,5 @@
 /* Output routines for graphical representation.
-   Copyright (C) 1998-2013 Free Software Foundation, Inc.
+   Copyright (C) 1998-2015 Free Software Foundation, Inc.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
    Rewritten for DOT output by Steven Bosscher, 2012.
 
@@ -24,6 +24,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "diagnostic-core.h" /* for fatal_error */
 #include "sbitmap.h"
+#include "predict.h"
+#include "vec.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "tm.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
+#include "cfganal.h"
 #include "basic-block.h"
 #include "cfgloop.h"
 #include "graph.h"
@@ -157,14 +169,14 @@ draw_cfg_nodes_no_loops (pretty_printer *pp, struct function *fun)
   int i, n;
   sbitmap visited;
 
-  visited = sbitmap_alloc (last_basic_block);
+  visited = sbitmap_alloc (last_basic_block_for_fn (cfun));
   bitmap_clear (visited);
 
   n = pre_and_rev_post_order_compute_fn (fun, NULL, rpo, true);
   for (i = n_basic_blocks_for_fn (fun) - n;
        i < n_basic_blocks_for_fn (fun); i++)
     {
-      basic_block bb = BASIC_BLOCK (rpo[i]);
+      basic_block bb = BASIC_BLOCK_FOR_FN (cfun, rpo[i]);
       draw_cfg_node (pp, fun->funcdef_no, bb);
       bitmap_set_bit (visited, bb->index);
     }
@@ -255,7 +267,7 @@ draw_cfg_edges (pretty_printer *pp, struct function *fun)
 {
   basic_block bb;
   mark_dfs_back_edges ();
-  FOR_ALL_BB (bb)
+  FOR_ALL_BB_FN (bb, cfun)
     draw_cfg_node_succ_edges (pp, fun->funcdef_no, bb);
 
   /* Add an invisible edge from ENTRY to EXIT, to improve the graph layout.  */

@@ -1,5 +1,5 @@
 ;;- Machine description for HP PA-RISC architecture for GCC compiler
-;;   Copyright (C) 1992-2013 Free Software Foundation, Inc.
+;;   Copyright (C) 1992-2015 Free Software Foundation, Inc.
 ;;   Contributed by the Center for Software Science at the University
 ;;   of Utah.
 
@@ -123,7 +123,7 @@
 ;; type "binary" insns have two input operands (1,2) and one output (0)
 
 (define_attr "type"
-  "move,unary,binary,shift,nullshift,compare,load,store,uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,fpload,fpstore,fpalu,fpcc,fpmulsgl,fpmuldbl,fpdivsgl,fpdivdbl,fpsqrtsgl,fpsqrtdbl,multi,milli,sh_func_adrs,parallel_branch,fpstore_load,store_fpload"
+  "move,unary,binary,shift,nullshift,compare,load,store,uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,fpload,fpstore,fpalu,fpcc,fpmulsgl,fpmuldbl,fpdivsgl,fpdivdbl,fpsqrtsgl,fpsqrtdbl,multi,milli,sh_func_adrs,parallel_branch,fpstore_load,store_fpload,trap"
   (const_string "binary"))
 
 (define_attr "pa_combine_type"
@@ -166,7 +166,7 @@
 ;; For conditional branches. Frame related instructions are not allowed
 ;; because they confuse the unwind support.
 (define_attr "in_branch_delay" "false,true"
-  (if_then_else (and (eq_attr "type" "!uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,multi,milli,sh_func_adrs,parallel_branch")
+  (if_then_else (and (eq_attr "type" "!uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,multi,milli,sh_func_adrs,parallel_branch,trap")
 		     (eq_attr "length" "4")
 		     (not (match_test "RTX_FRAME_RELATED_P (insn)")))
 		(const_string "true")
@@ -175,25 +175,19 @@
 ;; Disallow instructions which use the FPU since they will tie up the FPU
 ;; even if the instruction is nullified.
 (define_attr "in_nullified_branch_delay" "false,true"
-  (if_then_else (and (eq_attr "type" "!uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,multi,milli,sh_func_adrs,fpcc,fpalu,fpmulsgl,fpmuldbl,fpdivsgl,fpdivdbl,fpsqrtsgl,fpsqrtdbl,parallel_branch")
+  (if_then_else (and (eq_attr "type" "!uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,multi,milli,sh_func_adrs,fpcc,fpalu,fpmulsgl,fpmuldbl,fpdivsgl,fpdivdbl,fpsqrtsgl,fpsqrtdbl,parallel_branch,trap")
 		     (eq_attr "length" "4")
 		     (not (match_test "RTX_FRAME_RELATED_P (insn)")))
 		(const_string "true")
 		(const_string "false")))
 
-;; For calls and millicode calls.  Allow unconditional branches in the
-;; delay slot.
+;; For calls and millicode calls.
 (define_attr "in_call_delay" "false,true"
-  (cond [(and (eq_attr "type" "!uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,multi,milli,sh_func_adrs,parallel_branch")
-	      (eq_attr "length" "4")
-	      (not (match_test "RTX_FRAME_RELATED_P (insn)")))
-	   (const_string "true")
-	 (eq_attr "type" "uncond_branch")
-	   (if_then_else (match_test "TARGET_JUMP_IN_DELAY")
-			 (const_string "true")
-			 (const_string "false"))]
-	(const_string "false")))
-
+  (if_then_else (and (eq_attr "type" "!uncond_branch,branch,cbranch,fbranch,call,sibcall,dyncall,multi,milli,sh_func_adrs,parallel_branch,trap")
+		     (eq_attr "length" "4")
+		     (not (match_test "RTX_FRAME_RELATED_P (insn)")))
+		(const_string "true")
+		(const_string "false")))
 
 ;; Call delay slot description.
 (define_delay (eq_attr "type" "call")
@@ -229,8 +223,7 @@
    (and (eq_attr "in_nullified_branch_delay" "true")
 	(attr_flag "backward"))])
 
-(define_delay (and (eq_attr "type" "uncond_branch")
-		   (not (match_test "pa_following_call (insn)")))
+(define_delay (eq_attr "type" "uncond_branch")
   [(eq_attr "in_branch_delay" "true") (nil) (nil)])
 
 ;; Memory. Disregarding Cache misses, the Mustang memory times are:
@@ -5331,6 +5324,15 @@
   [(set_attr "type" "binary,binary")
    (set_attr "length" "4,4")])
 
+;; Trap instructions.
+
+(define_insn "trap"
+  [(trap_if (const_int 1) (const_int 0))]
+  ""
+  "{addit|addi,tc},<> 1,%%r0,%%r0"
+  [(set_attr "type" "trap")
+   (set_attr "length" "4")])
+
 ;; Clobbering a "register_operand" instead of a match_scratch
 ;; in operand3 of millicode calls avoids spilling %r1 and
 ;; produces better code.
@@ -6884,13 +6886,7 @@
   [(set_attr "type" "uncond_branch")
    (set_attr "pa_combine_type" "uncond_branch")
    (set (attr "length")
-    (cond [(match_test "pa_jump_in_call_delay (insn)")
-	   (if_then_else (lt (abs (minus (match_dup 0)
-					 (plus (pc) (const_int 8))))
-			     (const_int MAX_12BIT_OFFSET))
-	   (const_int 4)
-	   (const_int 8))
-	   (lt (abs (minus (match_dup 0) (plus (pc) (const_int 8))))
+    (cond [(lt (abs (minus (match_dup 0) (plus (pc) (const_int 8))))
 	       (const_int MAX_17BIT_OFFSET))
 	   (const_int 4)
 	   (match_test "TARGET_PORTABLE_RUNTIME")
@@ -7087,7 +7083,17 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
   if (TARGET_PORTABLE_RUNTIME)
     op = force_reg (SImode, XEXP (operands[0], 0));
   else
-    op = XEXP (operands[0], 0);
+    {
+      op = XEXP (operands[0], 0);
+
+      /* Generate indirect long calls to non-local functions. */
+      if (!TARGET_64BIT && TARGET_LONG_CALLS && GET_CODE (op) == SYMBOL_REF)
+	{
+	  tree call_decl = SYMBOL_REF_DECL (op);
+	  if (!(call_decl && targetm.binds_local_p (call_decl)))
+	    op = force_reg (word_mode, op);
+	}
+    }
 
   if (TARGET_64BIT)
     {
@@ -7575,11 +7581,29 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
   rtx op;
   rtx dst = operands[0];
   rtx nb = operands[2];
+  bool call_powf = false;
 
   if (TARGET_PORTABLE_RUNTIME)
     op = force_reg (SImode, XEXP (operands[1], 0));
   else
-    op = XEXP (operands[1], 0);
+    {
+      op = XEXP (operands[1], 0);
+      if (GET_CODE (op) == SYMBOL_REF)
+	{
+	  /* Handle special call to buggy powf function.  */
+	  if (TARGET_HPUX && !TARGET_DISABLE_FPREGS && !TARGET_SOFT_FLOAT
+	      && !strcmp (targetm.strip_name_encoding (XSTR (op, 0)), "powf"))
+	    call_powf = true;
+
+	  /* Generate indirect long calls to non-local functions. */
+	  else if (!TARGET_64BIT && TARGET_LONG_CALLS)
+	    {
+	      tree call_decl = SYMBOL_REF_DECL (op);
+	      if (!(call_decl && targetm.binds_local_p (call_decl)))
+		op = force_reg (word_mode, op);
+	    }
+	}
+    }
 
   if (TARGET_64BIT)
     {
@@ -7639,8 +7663,7 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
       rtx r4 = gen_rtx_REG (word_mode, 4);
       if (GET_CODE (op) == SYMBOL_REF)
 	{
-	  if (TARGET_HPUX && !TARGET_DISABLE_FPREGS && !TARGET_SOFT_FLOAT
-	      && !strcmp (targetm.strip_name_encoding (XSTR (op, 0)), "powf"))
+	  if (call_powf)
 	    emit_call_insn (gen_call_val_powf_64bit (dst, op, nb, r4));
 	  else
 	    emit_call_insn (gen_call_val_symref_64bit (dst, op, nb, r4));
@@ -7659,18 +7682,14 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 	    {
 	      rtx r4 = gen_rtx_REG (word_mode, 4);
 
-	      if (TARGET_HPUX && !TARGET_DISABLE_FPREGS && !TARGET_SOFT_FLOAT
-		  && !strcmp (targetm.strip_name_encoding (XSTR (op, 0)),
-			      "powf"))
+	      if (call_powf)
 		emit_call_insn (gen_call_val_powf_pic (dst, op, nb, r4));
 	      else
 		emit_call_insn (gen_call_val_symref_pic (dst, op, nb, r4));
 	    }
 	  else
 	    {
-	      if (TARGET_HPUX && !TARGET_DISABLE_FPREGS && !TARGET_SOFT_FLOAT
-		  && !strcmp (targetm.strip_name_encoding (XSTR (op, 0)),
-			      "powf"))
+	      if (call_powf)
 		emit_call_insn (gen_call_val_powf (dst, op, nb));
 	      else
 		emit_call_insn (gen_call_val_symref (dst, op, nb));
@@ -8485,36 +8504,6 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
   [(set_attr "type" "move")
    (set_attr "length" "4")])
 
-;; These are just placeholders so we know where branch tables
-;; begin and end.
-(define_insn "begin_brtab"
-  [(const_int 1)]
-  ""
-  "*
-{
-  /* Only GAS actually supports this pseudo-op.  */
-  if (TARGET_GAS)
-    return \".begin_brtab\";
-  else
-    return \"\";
-}"
-  [(set_attr "type" "move")
-   (set_attr "length" "0")])
-
-(define_insn "end_brtab"
-  [(const_int 2)]
-  ""
-  "*
-{
-  /* Only GAS actually supports this pseudo-op.  */
-  if (TARGET_GAS)
-    return \".end_brtab\";
-  else
-    return \"\";
-}"
-  [(set_attr "type" "move")
-   (set_attr "length" "0")])
-
 ;;; EH does longjmp's from and within the data section.  Thus,
 ;;; an interspace branch is required for the longjmp implementation.
 ;;; Registers r1 and r2 are used as scratch registers for the jump
@@ -8933,14 +8922,14 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 ;; strength reduction is used.  It is actually created when the instruction
 ;; combination phase combines the special loop test.  Since this insn
 ;; is both a jump insn and has an output, it must deal with its own
-;; reloads, hence the `m' constraints.  The `!' constraints direct reload
+;; reloads, hence the `Q' constraints.  The `!' constraints direct reload
 ;; to not choose the register alternatives in the event a reload is needed.
 (define_insn "decrement_and_branch_until_zero"
   [(set (pc)
 	(if_then_else
 	  (match_operator 2 "comparison_operator"
 	   [(plus:SI
-	      (match_operand:SI 0 "reg_before_reload_operand" "+!r,!*f,*m")
+	      (match_operand:SI 0 "reg_before_reload_operand" "+!r,!*f,*Q")
 	      (match_operand:SI 1 "int5_operand" "L,L,L"))
 	    (const_int 0)])
 	  (label_ref (match_operand 3 "" ""))
@@ -9029,7 +9018,7 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 	   [(match_operand:SI 1 "register_operand" "r,r,r,r") (const_int 0)])
 	  (label_ref (match_operand 3 "" ""))
 	  (pc)))
-   (set (match_operand:SI 0 "reg_before_reload_operand" "=!r,!*f,*m,!*q")
+   (set (match_operand:SI 0 "reg_before_reload_operand" "=!r,!*f,*Q,!*q")
 	(match_dup 1))]
   ""
 "* return pa_output_movb (operands, insn, which_alternative, 0); "
@@ -9101,7 +9090,7 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 	   [(match_operand:SI 1 "register_operand" "r,r,r,r") (const_int 0)])
 	  (pc)
 	  (label_ref (match_operand 3 "" ""))))
-   (set (match_operand:SI 0 "reg_before_reload_operand" "=!r,!*f,*m,!*q")
+   (set (match_operand:SI 0 "reg_before_reload_operand" "=!r,!*f,*Q,!*q")
 	(match_dup 1))]
   ""
 "* return pa_output_movb (operands, insn, which_alternative, 1); "

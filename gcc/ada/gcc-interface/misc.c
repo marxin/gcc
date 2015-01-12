@@ -6,7 +6,7 @@
  *                                                                          *
  *                           C Implementation File                          *
  *                                                                          *
- *          Copyright (C) 1992-2013, Free Software Foundation, Inc.         *
+ *          Copyright (C) 1992-2015, Free Software Foundation, Inc.         *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -29,7 +29,17 @@
 #include "opts.h"
 #include "options.h"
 #include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "stor-layout.h"
 #include "print-tree.h"
 #include "diagnostic.h"
@@ -42,7 +52,14 @@
 #include "langhooks-def.h"
 #include "plugin.h"
 #include "real.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "vec.h"
+#include "machmode.h"
+#include "hard-reg-set.h"
+#include "input.h"
 #include "function.h"	/* For pass_by_reference.  */
+#include "dwarf2out.h"
 
 #include "ada.h"
 #include "adadecode.h"
@@ -151,6 +168,10 @@ gnat_handle_option (size_t scode, const char *arg ATTRIBUTE_UNUSED, int value,
       /* These are handled by the front-end.  */
       break;
 
+    case OPT_fshort_enums:
+      /* This is handled by the middle-end.  */
+      break;
+
     default:
       gcc_unreachable ();
     }
@@ -170,8 +191,10 @@ gnat_init_options_struct (struct gcc_options *opts)
   /* Uninitialized really means uninitialized in Ada.  */
   opts->x_flag_zero_initialized_in_bss = 0;
 
-  /* We can delete dead instructions that may throw exceptions in Ada.  */
-  opts->x_flag_delete_dead_exceptions = 1;
+  /* We don't care about errno in Ada and it causes __builtin_sqrt to
+     call the libm function rather than do it inline.  */
+  opts->x_flag_errno_math = 0;
+  opts->frontend_set_flag_errno_math = true;
 }
 
 /* Initialize for option processing.  */
@@ -224,10 +247,13 @@ gnat_init_options (unsigned int decoded_options_count,
 #undef optimize
 #undef optimize_size
 #undef flag_compare_debug
+#undef flag_short_enums
 #undef flag_stack_check
+int gnat_encodings = 0;
 int optimize;
 int optimize_size;
 int flag_compare_debug;
+int flag_short_enums;
 enum stack_check_type flag_stack_check = NO_STACK_CHECK;
 
 /* Settings adjustments after switches processing by the back-end.
@@ -257,6 +283,13 @@ gnat_post_options (const char **pfilename ATTRIBUTE_UNUSED)
   optimize_size = global_options.x_optimize_size;
   flag_compare_debug = global_options.x_flag_compare_debug;
   flag_stack_check = global_options.x_flag_stack_check;
+  flag_short_enums = global_options.x_flag_short_enums;
+
+  /* Unfortunately the post_options hook is called before the value of
+     flag_short_enums is autodetected, if need be.  Mimic the process
+     for our private flag_short_enums.  */
+  if (flag_short_enums == 2)
+    flag_short_enums = targetm.default_short_enums ();
 
   return false;
 }
@@ -270,8 +303,8 @@ internal_error_function (diagnostic_context *context,
   text_info tinfo;
   char *buffer, *p, *loc;
   String_Template temp, temp_loc;
-  Fat_Pointer fp, fp_loc;
-  expanded_location s;
+  String_Pointer sp, sp_loc;
+  expanded_location xloc;
 
   /* Warn if plugins present.  */
   warn_if_plugins ();
@@ -298,21 +331,21 @@ internal_error_function (diagnostic_context *context,
 
   temp.Low_Bound = 1;
   temp.High_Bound = p - buffer;
-  fp.Bounds = &temp;
-  fp.Array = buffer;
+  sp.Bounds = &temp;
+  sp.Array = buffer;
 
-  s = expand_location (input_location);
-  if (context->show_column && s.column != 0)
-    asprintf (&loc, "%s:%d:%d", s.file, s.line, s.column);
+  xloc = expand_location (input_location);
+  if (context->show_column && xloc.column != 0)
+    loc = xasprintf ("%s:%d:%d", xloc.file, xloc.line, xloc.column);
   else
-    asprintf (&loc, "%s:%d", s.file, s.line);
+    loc = xasprintf ("%s:%d", xloc.file, xloc.line);
   temp_loc.Low_Bound = 1;
   temp_loc.High_Bound = strlen (loc);
-  fp_loc.Bounds = &temp_loc;
-  fp_loc.Array = loc;
+  sp_loc.Bounds = &temp_loc;
+  sp_loc.Array = loc;
 
   Current_Error_Node = error_gnat_node;
-  Compiler_Abort (fp, -1, fp_loc);
+  Compiler_Abort (sp, sp_loc, true);
 }
 
 /* Perform all the initialization steps that are language-specific.  */
@@ -366,17 +399,21 @@ gnat_init_gcc_eh (void)
      right exception regions.  */
   using_eh_for_cleanups ();
 
-  /* Turn on -fexceptions and -fnon-call-exceptions.  The first one triggers
-     the generation of the necessary exception tables.  The second one is
-     useful for two reasons: 1/ we map some asynchronous signals like SEGV to
-     exceptions, so we need to ensure that the insns which can lead to such
-     signals are correctly attached to the exception region they pertain to,
-     2/ Some calls to pure subprograms are handled as libcall blocks and then
-     marked as "cannot trap" if the flag is not set (see emit_libcall_block).
-     We should not let this be since it is possible for such calls to actually
-     raise in Ada.  */
+  /* Turn on -fexceptions, -fnon-call-exceptions and -fdelete-dead-exceptions.
+     The first one triggers the generation of the necessary exception tables.
+     The second one is useful for two reasons: 1/ we map some asynchronous
+     signals like SEGV to exceptions, so we need to ensure that the insns
+     which can lead to such signals are correctly attached to the exception
+     region they pertain to, 2/ some calls to pure subprograms are handled as
+     libcall blocks and then marked as "cannot trap" if the flag is not set
+     (see emit_libcall_block).  We should not let this be since it is possible
+     for such calls to actually raise in Ada.
+     The third one is an optimization that makes it possible to delete dead
+     instructions that may throw exceptions, most notably loads and stores,
+     as permitted in Ada.  */
   flag_exceptions = 1;
   flag_non_call_exceptions = 1;
+  flag_delete_dead_exceptions = 1;
 
   init_eh ();
 }
@@ -394,10 +431,8 @@ gnat_init_gcc_fp (void)
     flag_signed_zeros = 0;
 
   /* Assume that FP operations can trap if S'Machine_Overflow is true,
-     but don't override the user if not.
-
-     ??? Alpha/VMS enables FP traps without declaring it.  */
-  if (Machine_Overflows_On_Target || TARGET_ABI_OPEN_VMS)
+     but don't override the user if not.  */
+  if (Machine_Overflows_On_Target)
     flag_trapping_math = 1;
   else if (!global_options_set.x_flag_trapping_math)
     flag_trapping_math = 0;
@@ -451,8 +486,6 @@ gnat_print_type (FILE *file, tree node, int indent)
       else if (TYPE_HAS_ACTUAL_BOUNDS_P (node))
 	print_node (file, "actual bounds", TYPE_ACTUAL_BOUNDS (node),
 		    indent + 4);
-      else if (TYPE_VAX_FLOATING_POINT_P (node))
-	;
       else
 	print_node (file, "index type", TYPE_INDEX_TYPE (node), indent + 4);
 
@@ -612,6 +645,65 @@ gnat_type_max_size (const_tree gnu_type)
   return max_unitsize;
 }
 
+/* Provide information in INFO for debug output about the TYPE array type.
+   Return whether TYPE is handled.  */
+
+static bool
+gnat_get_array_descr_info (const_tree type, struct array_descr_info *info)
+{
+  bool convention_fortran_p;
+  tree index_type;
+
+  const_tree dimen = NULL_TREE;
+  const_tree last_dimen = NULL_TREE;
+  int i;
+
+  if (TREE_CODE (type) != ARRAY_TYPE
+      || !TYPE_DOMAIN (type)
+      || !TYPE_INDEX_TYPE (TYPE_DOMAIN (type)))
+    return false;
+
+  /* Count how many dimentions this array has.  */
+  for (i = 0, dimen = type; ; ++i, dimen = TREE_TYPE (dimen))
+    if (i > 0
+	&& (TREE_CODE (dimen) != ARRAY_TYPE
+	    || !TYPE_MULTI_ARRAY_P (dimen)))
+      break;
+  info->ndimensions = i;
+  convention_fortran_p = TYPE_CONVENTION_FORTRAN_P (type);
+
+  /* TODO: For row major ordering, we probably want to emit nothing and
+     instead specify it as the default in Dw_TAG_compile_unit.  */
+  info->ordering = (convention_fortran_p
+		    ? array_descr_ordering_column_major
+		    : array_descr_ordering_row_major);
+  info->base_decl = NULL_TREE;
+  info->data_location = NULL_TREE;
+  info->allocated = NULL_TREE;
+  info->associated = NULL_TREE;
+
+  for (i = (convention_fortran_p ? info->ndimensions - 1 : 0),
+       dimen = type;
+
+       0 <= i && i < info->ndimensions;
+
+       i += (convention_fortran_p ? -1 : 1),
+       dimen = TREE_TYPE (dimen))
+    {
+      /* We are interested in the stored bounds for the debug info.  */
+      index_type = TYPE_INDEX_TYPE (TYPE_DOMAIN (dimen));
+
+      info->dimen[i].bounds_type = index_type;
+      info->dimen[i].lower_bound = TYPE_MIN_VALUE (index_type);
+      info->dimen[i].upper_bound = TYPE_MAX_VALUE (index_type);
+      last_dimen = dimen;
+    }
+
+  info->element_type = TREE_TYPE (last_dimen);
+
+  return true;
+}
+
 /* GNU_TYPE is a subtype of an integral type.  Set LOWVAL to the low bound
    and HIGHVAL to the high bound, respectively.  */
 
@@ -670,7 +762,7 @@ must_pass_by_ref (tree gnu_type)
 /* This function is called by the front-end to enumerate all the supported
    modes for the machine, as well as some predefined C types.  F is a function
    which is called back with the parameters as listed below, first a string,
-   then six ints.  The name is any arbitrary null-terminated string and has
+   then seven ints.  The name is any arbitrary null-terminated string and has
    no particular significance, except for the case of predefined C types, where
    it should be the name of the C type.  For integer types, only signed types
    should be listed, unsigned versions are assumed.  The order of types should
@@ -686,11 +778,12 @@ must_pass_by_ref (tree gnu_type)
    COMPLEX_P	nonzero is this represents a complex mode
    COUNT	count of number of items, nonzero for vector mode
    FLOAT_REP	Float_Rep_Kind for FP, otherwise undefined
-   SIZE		number of bits used to store data
+   PRECISION	number of bits used to store data
+   SIZE		number of bits occupied by the mode
    ALIGN	number of bits to which mode is aligned.  */
 
 void
-enumerate_modes (void (*f) (const char *, int, int, int, int, int, int))
+enumerate_modes (void (*f) (const char *, int, int, int, int, int, int, int))
 {
   const tree c_types[]
     = { float_type_node, double_type_node, long_double_type_node };
@@ -698,10 +791,13 @@ enumerate_modes (void (*f) (const char *, int, int, int, int, int, int))
     = { "float", "double", "long double" };
   int iloop;
 
+  /* We are going to compute it below.  */
+  fp_arith_may_widen = false;
+
   for (iloop = 0; iloop < NUM_MACHINE_MODES; iloop++)
     {
-      enum machine_mode i = (enum machine_mode) iloop;
-      enum machine_mode inner_mode = i;
+      machine_mode i = (machine_mode) iloop;
+      machine_mode inner_mode = i;
       bool float_p = false;
       bool complex_p = false;
       bool vector_p = false;
@@ -747,6 +843,15 @@ enumerate_modes (void (*f) (const char *, int, int, int, int, int, int))
 	  if (!fmt)
 	    continue;
 
+	  /* Be conservative and consider that floating-point arithmetics may
+	     use wider intermediate results as soon as there is an extended
+	     Motorola or Intel mode supported by the machine.  */
+	  if (fmt == &ieee_extended_motorola_format
+	      || fmt == &ieee_extended_intel_96_format
+	      || fmt == &ieee_extended_intel_96_round_53_format
+	      || fmt == &ieee_extended_intel_128_format)
+	    fp_arith_may_widen = true;
+
 	  if (fmt->b == 2)
 	    digs = (fmt->p - 1) * 1233 / 4096; /* scale by log (2) */
 
@@ -755,37 +860,30 @@ enumerate_modes (void (*f) (const char *, int, int, int, int, int, int))
 
 	  else
 	    gcc_unreachable();
-
-	  if (fmt == &vax_f_format
-	      || fmt == &vax_d_format
-	      || fmt == &vax_g_format)
-	    float_rep = VAX_Native;
 	}
 
       /* First register any C types for this mode that the front end
 	 may need to know about, unless the mode should be skipped.  */
-
-      if (!skip_p)
+      if (!skip_p && !vector_p)
 	for (nameloop = 0; nameloop < ARRAY_SIZE (c_types); nameloop++)
 	  {
-	    tree typ = c_types[nameloop];
-	    const char *nam = c_names[nameloop];
+	    tree type = c_types[nameloop];
+	    const char *name = c_names[nameloop];
 
-	    if (TYPE_MODE (typ) == i)
+	    if (TYPE_MODE (type) == i)
 	      {
-		f (nam, digs, complex_p,
-		   vector_p ? GET_MODE_NUNITS (i) : 0, float_rep,
-		   TYPE_PRECISION (typ), TYPE_ALIGN (typ));
+		f (name, digs, complex_p, 0, float_rep, TYPE_PRECISION (type),
+		   TREE_INT_CST_LOW (TYPE_SIZE (type)), TYPE_ALIGN (type));
 		skip_p = true;
 	      }
 	  }
 
       /* If no predefined C types were found, register the mode itself.  */
-
       if (!skip_p)
 	f (GET_MODE_NAME (i), digs, complex_p,
 	   vector_p ? GET_MODE_NUNITS (i) : 0, float_rep,
-	   GET_MODE_PRECISION (i), GET_MODE_ALIGNMENT (i));
+	   GET_MODE_PRECISION (i), GET_MODE_BITSIZE (i),
+	   GET_MODE_ALIGNMENT (i));
     }
 }
 
@@ -794,7 +892,7 @@ enumerate_modes (void (*f) (const char *, int, int, int, int, int, int))
 int
 fp_prec_to_size (int prec)
 {
-  enum machine_mode mode;
+  machine_mode mode;
 
   for (mode = GET_CLASS_NARROWEST_MODE (MODE_FLOAT); mode != VOIDmode;
        mode = GET_MODE_WIDER_MODE (mode))
@@ -809,7 +907,7 @@ fp_prec_to_size (int prec)
 int
 fp_size_to_prec (int size)
 {
-  enum machine_mode mode;
+  machine_mode mode;
 
   for (mode = GET_CLASS_NARROWEST_MODE (MODE_FLOAT); mode != VOIDmode;
        mode = GET_MODE_WIDER_MODE (mode))
@@ -896,6 +994,8 @@ gnat_init_ts (void)
 #define LANG_HOOKS_TYPE_FOR_SIZE	gnat_type_for_size
 #undef  LANG_HOOKS_TYPES_COMPATIBLE_P
 #define LANG_HOOKS_TYPES_COMPATIBLE_P	gnat_types_compatible_p
+#undef  LANG_HOOKS_GET_ARRAY_DESCR_INFO
+#define LANG_HOOKS_GET_ARRAY_DESCR_INFO	gnat_get_array_descr_info
 #undef  LANG_HOOKS_GET_SUBRANGE_BOUNDS
 #define LANG_HOOKS_GET_SUBRANGE_BOUNDS  gnat_get_subrange_bounds
 #undef  LANG_HOOKS_DESCRIPTIVE_TYPE

@@ -1,5 +1,5 @@
 /* GCC backend definitions for the Renesas RL78 processor.
-   Copyright (C) 2011-2013 Free Software Foundation, Inc.
+   Copyright (C) 2011-2015 Free Software Foundation, Inc.
    Contributed by Red Hat.
 
    This file is part of GCC.
@@ -98,9 +98,6 @@
 #define DOUBLE_TYPE_SIZE 		32 /*64*/
 #define LONG_DOUBLE_TYPE_SIZE		64 /*DOUBLE_TYPE_SIZE*/
 
-#define LIBGCC2_HAS_DF_MODE		1
-#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE   64
-
 #define DEFAULT_SIGNED_CHAR		0
 
 #define STRICT_ALIGNMENT 		1
@@ -147,7 +144,6 @@
 
 #define STORE_FLAG_VALUE		1
 #define LOAD_EXTEND_OP(MODE)		ZERO_EXTEND
-#define SHORT_IMMEDIATES_SIGN_EXTEND	0
 
 
 /* The RL78 has four register banks.  Normal operation uses RB0 as

@@ -29,7 +29,7 @@
 #include <fficonfig.h>
 #include <ffi.h>
 
-#ifdef __powerpc64__
+#ifdef POWERPC64
 	.hidden	ffi_call_LINUX64
 	.globl	ffi_call_LINUX64
 # if _CALL_ELF == 2
@@ -254,7 +254,8 @@ ffi_call_LINUX64:
 	.align 3
 .LEFDE1:
 
-# if (defined __ELF__ && defined __linux__) || _CALL_ELF == 2
+#endif
+
+#if (defined __ELF__ && defined __linux__) || _CALL_ELF == 2
 	.section	.note.GNU-stack,"",@progbits
-# endif
 #endif

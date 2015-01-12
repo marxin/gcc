@@ -12,7 +12,7 @@ target_alias=${target_alias-$host_alias}
 
 . ${srcdir}/configure.host
 
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([no-dist])
 
 # See if makeinfo has been installed and is modern enough
 # that we can use it.
@@ -65,6 +65,7 @@ dnl The -no-testsuite modules omit the test subdir.
 AM_CONDITIONAL(TESTSUBDIR, test -d $srcdir/testsuite)
 
 TARGETDIR="unknown"
+HAVE_LONG_DOUBLE_VARIANT=0
 case "$host" in
   aarch64*-*-*)
 	TARGET=AARCH64; TARGETDIR=aarch64
@@ -162,6 +163,7 @@ case "$host" in
 
   powerpc*-*-linux* | powerpc-*-sysv*)
 	TARGET=POWERPC; TARGETDIR=powerpc
+	HAVE_LONG_DOUBLE_VARIANT=1
 	;;
   powerpc-*-amigaos*)
 	TARGET=POWERPC; TARGETDIR=powerpc
@@ -177,6 +179,7 @@ case "$host" in
 	;;
   powerpc-*-freebsd* | powerpc-*-openbsd*)
 	TARGET=POWERPC_FREEBSD; TARGETDIR=powerpc
+	HAVE_LONG_DOUBLE_VARIANT=1
 	;;
   powerpc64-*-freebsd*)
 	TARGET=POWERPC; TARGETDIR=powerpc
@@ -273,18 +276,33 @@ AC_CHECK_SIZEOF(long double)
 # Also AC_SUBST this variable for ffi.h.
 if test -z "$HAVE_LONG_DOUBLE"; then
   HAVE_LONG_DOUBLE=0
-  if test $ac_cv_sizeof_double != $ac_cv_sizeof_long_double; then
-    if test $ac_cv_sizeof_long_double != 0; then
+  if test $ac_cv_sizeof_long_double != 0; then
+    if test $HAVE_LONG_DOUBLE_VARIANT != 0; then
+      AC_DEFINE(HAVE_LONG_DOUBLE_VARIANT, 1, [Define if you support more than one size of the long double type])
       HAVE_LONG_DOUBLE=1
-      AC_DEFINE(HAVE_LONG_DOUBLE, 1, [Define if you have the long double type and it is bigger than a double])
+    else
+      if test $ac_cv_sizeof_double != $ac_cv_sizeof_long_double; then
+        HAVE_LONG_DOUBLE=1
+        AC_DEFINE(HAVE_LONG_DOUBLE, 1, [Define if you have the long double type and it is bigger than a double])
+      fi
     fi
   fi
 fi
 AC_SUBST(HAVE_LONG_DOUBLE)
+AC_SUBST(HAVE_LONG_DOUBLE_VARIANT)
 
 AC_C_BIGENDIAN
 
 GCC_AS_CFI_PSEUDO_OP
+
+AC_CACHE_CHECK([if compiler supports -Qunused-arguments],
+[libffi_cv_c_unused_arguments],
+[CFLAGS_hold=$CFLAGS
+CFLAGS="$CFLAGS -Qunused-arguments"
+AC_COMPILE_IFELSE([[int i;]],
+[libffi_cv_c_unused_arguments=yes],
+[libffi_cv_c_unused_arguments=no])
+CFLAGS=$CFLAGS_hold])
 
 if test x$TARGET = xSPARC; then
     AC_CACHE_CHECK([assembler and linker support unaligned pc related relocs],
@@ -322,9 +340,14 @@ if test x$TARGET = xX86 || test x$TARGET = xX86_WIN32 || test x$TARGET = xX86_64
 	libffi_cv_as_x86_pcrel, [
 	libffi_cv_as_x86_pcrel=yes
 	echo '.text; foo: nop; .data; .long foo-.; .text' > conftest.s
+	CFLAGS_hold=$CFLAGS
+	if test "$libffi_cv_c_unused_arguments" = yes; then
+	    CFLAGS="$CFLAGS -Qunused-arguments"
+	fi
 	if $CC $CFLAGS -c conftest.s 2>&1 | $EGREP -i 'illegal|warning' > /dev/null; then
 	    libffi_cv_as_x86_pcrel=no
 	fi
+	CFLAGS=$CFLAGS_hold
 	])
     if test "x$libffi_cv_as_x86_pcrel" = xyes; then
 	AC_DEFINE(HAVE_AS_X86_PCREL, 1,
@@ -388,9 +411,14 @@ if test x$TARGET = xX86_64; then
 	libffi_cv_as_x86_64_unwind_section_type, [
 	libffi_cv_as_x86_64_unwind_section_type=yes
 	echo '.section .eh_frame,"a",@unwind' > conftest.s
+	CFLAGS_hold=$CFLAGS
+	if test "$libffi_cv_c_unused_arguments" = yes; then
+	    CFLAGS="$CFLAGS -Qunused-arguments"
+	fi
 	if $CC $CFLAGS -c conftest.s 2>&1 | grep -i warning > /dev/null; then
 	    libffi_cv_as_x86_64_unwind_section_type=no
 	fi
+	CFLAGS=$CFLAGS_hold
 	])
     if test "x$libffi_cv_as_x86_64_unwind_section_type" = xyes; then
 	AC_DEFINE(HAVE_AS_X86_64_UNWIND_SECTION_TYPE, 1,

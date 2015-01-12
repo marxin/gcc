@@ -1,6 +1,6 @@
 // -*- C++ -*- header.
 
-// Copyright (C) 2008-2013 Free Software Foundation, Inc.
+// Copyright (C) 2008-2015 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -33,7 +33,6 @@
 #pragma GCC system_header
 
 #include <bits/c++config.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <bits/atomic_lockfree_defines.h>
 
@@ -675,10 +674,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // Factored out to facilitate explicit specialization.
       constexpr ptrdiff_t
-      _M_type_size(ptrdiff_t __d) { return __d * sizeof(_PTp); }
+      _M_type_size(ptrdiff_t __d) const { return __d * sizeof(_PTp); }
 
       constexpr ptrdiff_t
-      _M_type_size(ptrdiff_t __d) volatile { return __d * sizeof(_PTp); }
+      _M_type_size(ptrdiff_t __d) const volatile { return __d * sizeof(_PTp); }
 
     public:
       __atomic_base() noexcept = default;
@@ -768,11 +767,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       bool
       is_lock_free() const noexcept
-      { return __atomic_is_lock_free(_M_type_size(1), nullptr); }
+      { return __atomic_is_lock_free(sizeof(__pointer_type), nullptr); }
 
       bool
       is_lock_free() const volatile noexcept
-      { return __atomic_is_lock_free(_M_type_size(1), nullptr); }
+      { return __atomic_is_lock_free(sizeof(__pointer_type), nullptr); }
 
       _GLIBCXX_ALWAYS_INLINE void
       store(__pointer_type __p,

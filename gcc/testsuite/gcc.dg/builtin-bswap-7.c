@@ -1,7 +1,11 @@
-/* { dg-do compile { target arm*-*-* alpha*-*-* ia64*-*-* x86_64-*-* s390x-*-* powerpc*-*-* rs6000-*-* } } */
+/* { dg-do compile { target arm*-*-* alpha*-*-* ia64*-*-* i?86-*-* x86_64-*-* s390x-*-* powerpc*-*-* rs6000-*-* } } */
 /* { dg-require-effective-target stdint_types } */
 /* { dg-require-effective-target lp64 } */
 /* { dg-options "-O -fdump-rtl-combine" } */
+
+/* The branch cost setting prevents the return value from being
+   calculated with arithmetic instead of doing a compare.  */
+/* { dg-additional-options "-mbranch-cost=0" { target s390x-*-* } } */
 
 #include <stdint.h>
 

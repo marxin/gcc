@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -704,13 +705,14 @@ func TestGobEncoderExtraIndirect(t *testing.T) {
 }
 
 // Another bug: this caused a crash with the new Go1 Time type.
-// We throw in a gob-encoding array, to test another case of isZero
-
+// We throw in a gob-encoding array, to test another case of isZero,
+// and a struct containing an nil interface, to test a third.
 type isZeroBug struct {
 	T time.Time
 	S string
 	I int
 	A isZeroBugArray
+	F isZeroBugInterface
 }
 
 type isZeroBugArray [2]uint8
@@ -730,8 +732,20 @@ func (a *isZeroBugArray) GobDecode(data []byte) error {
 	return nil
 }
 
+type isZeroBugInterface struct {
+	I interface{}
+}
+
+func (i isZeroBugInterface) GobEncode() (b []byte, e error) {
+	return []byte{}, nil
+}
+
+func (i *isZeroBugInterface) GobDecode(data []byte) error {
+	return nil
+}
+
 func TestGobEncodeIsZero(t *testing.T) {
-	x := isZeroBug{time.Now(), "hello", -55, isZeroBugArray{1, 2}}
+	x := isZeroBug{time.Now(), "hello", -55, isZeroBugArray{1, 2}, isZeroBugInterface{}}
 	b := new(bytes.Buffer)
 	enc := NewEncoder(b)
 	err := enc.Encode(x)
@@ -765,5 +779,19 @@ func TestGobEncodePtrError(t *testing.T) {
 	}
 	if err2 != nil {
 		t.Fatalf("expected nil, got %v", err2)
+	}
+}
+
+func TestNetIP(t *testing.T) {
+	// Encoding of net.IP{1,2,3,4} in Go 1.1.
+	enc := []byte{0x07, 0x0a, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04}
+
+	var ip net.IP
+	err := NewDecoder(bytes.NewReader(enc)).Decode(&ip)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if ip.String() != "1.2.3.4" {
+		t.Errorf("decoded to %v, want 1.2.3.4", ip.String())
 	}
 }

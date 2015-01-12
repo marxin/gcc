@@ -1,5 +1,5 @@
 ;; Constraint definitions for MIPS.
-;; Copyright (C) 2006-2013 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2015 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -19,7 +19,7 @@
 
 ;; Register constraints
 
-(define_register_constraint "d" "BASE_REG_CLASS"
+(define_register_constraint "d" "TARGET_MIPS16 ? M16_REGS : GR_REGS"
   "An address register.  This is equivalent to @code{r} unless
    generating MIPS16 code.")
 
@@ -92,10 +92,7 @@
 ;; but the DSP version allows any accumulator target.
 (define_register_constraint "ka" "ISA_HAS_DSP_MULT ? ACC_REGS : MD_REGS")
 
-;; The register class to use for an allocatable division result.
-;; MIPS16 uses M16_REGS because LO is fixed.
-(define_register_constraint "kl"
-  "TARGET_MIPS16 ? M16_REGS : TARGET_BIG_ENDIAN ? MD1_REG : MD0_REG"
+(define_register_constraint "kb" "M16_STORE_REGS"
   "@internal")
 
 (define_constraint "kf"
@@ -324,13 +321,13 @@
 	 (match_test "mips_address_insns (XEXP (op, 0), mode, false)"))))
 
 (define_address_constraint "ZD"
-  "When compiling microMIPS code, this constraint matches an address operand
-   that is formed from a base register and a 12-bit offset.  These operands
-   can be used for microMIPS instructions such as @code{prefetch}.  When
-   not compiling for microMIPS code, @code{ZD} is equivalent to @code{p}."
+  "An address suitable for a @code{prefetch} instruction, or for any other
+   instruction with the same addressing mode as @code{prefetch}."
    (if_then_else (match_test "TARGET_MICROMIPS")
 		 (match_test "umips_12bit_offset_address_p (op, mode)")
-		 (match_test "mips_address_insns (op, mode, false)")))
+	  (if_then_else (match_test "ISA_HAS_PREFETCH_9BIT")
+			(match_test "mips_9bit_offset_address_p (op, mode)")
+			(match_test "mips_address_insns (op, mode, false)"))))
 
 (define_memory_constraint "ZR"
  "@internal

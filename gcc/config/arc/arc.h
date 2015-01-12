@@ -1,6 +1,5 @@
 /* Definitions of target machine for GNU compiler, Synopsys DesignWare ARC cpu.
-   Copyright (C) 1994, 1995, 1997, 1998, 2007-2013
-   Free Software Foundation, Inc.
+   Copyright (C) 1994-2015 Free Software Foundation, Inc.
 
    Sources derived from work done by Sankhya Technologies (www.sankhya.com) on
    behalf of Synopsys Inc.
@@ -302,9 +301,6 @@ along with GCC; see the file COPYING3.  If not see
 /* Define this if most significant word of a multiword number is the lowest
    numbered.  */
 #define WORDS_BIG_ENDIAN (TARGET_BIG_ENDIAN)
-
-/* Number of bits in an addressable storage unit.  */
-#define BITS_PER_UNIT 8
 
 /* Width in bits of a "word", which is the contents of a machine register.
    Note that this is not necessarily the width of data type `int';
@@ -1061,7 +1057,7 @@ extern int arc_initial_elimination_offset(int from, int to);
 
 /* Given a comparison code (EQ, NE, etc.) and the first operand of a COMPARE,
    return the mode to be used for the comparison.  */
-/*extern enum machine_mode arc_select_cc_mode ();*/
+/*extern machine_mode arc_select_cc_mode ();*/
 #define SELECT_CC_MODE(OP, X, Y) \
 arc_select_cc_mode (OP, X, Y)
 
@@ -1557,12 +1553,6 @@ extern int arc_return_address_regs[4];
    in one reasonably fast instruction.  */
 #define MOVE_MAX 4
 
-/* Let the movmem expander handle small block moves.  */
-#define MOVE_BY_PIECES_P(LEN, ALIGN)  0
-#define CAN_MOVE_BY_PIECES(SIZE, ALIGN) \
-  (move_by_pieces_ninsns (SIZE, ALIGN, MOVE_MAX_PIECES + 1) \
-   < (unsigned int) MOVE_RATIO (!optimize_size))
-
 /* Undo the effects of the movmem pattern presence on STORE_BY_PIECES_P .  */
 #define MOVE_RATIO(SPEED) ((SPEED) ? 15 : 3)
 
@@ -1661,16 +1651,16 @@ extern enum arc_function_type arc_compute_function_type (struct function *);
   ((LENGTH) \
    = (GET_CODE (PATTERN (X)) == SEQUENCE \
       ? ((LENGTH) \
-	 + arc_adjust_insn_length (XVECEXP (PATTERN (X), 0, 0), \
-				   get_attr_length (XVECEXP (PATTERN (X), \
-						    0, 0)), \
-				   true) \
-	 - get_attr_length (XVECEXP (PATTERN (X), 0, 0)) \
-	 + arc_adjust_insn_length (XVECEXP (PATTERN (X), 0, 1), \
-				   get_attr_length (XVECEXP (PATTERN (X), \
-						    0, 1)), \
-				   true) \
-	 - get_attr_length (XVECEXP (PATTERN (X), 0, 1))) \
+	 + arc_adjust_insn_length ( \
+             as_a <rtx_sequence *> (PATTERN (X))->insn (0), \
+	     get_attr_length (as_a <rtx_sequence *> (PATTERN (X))->insn (0)), \
+	     true)							\
+	 - get_attr_length (as_a <rtx_sequence *> (PATTERN (X))->insn (0)) \
+	 + arc_adjust_insn_length ( \
+	     as_a <rtx_sequence *> (PATTERN (X))->insn (1), \
+	     get_attr_length (as_a <rtx_sequence *> (PATTERN (X))->insn (1)), \
+	     true)							\
+	 - get_attr_length (as_a <rtx_sequence *> (PATTERN (X))->insn (1))) \
       : arc_adjust_insn_length ((X), (LENGTH), false)))
 
 #define IS_ASM_LOGICAL_LINE_SEPARATOR(C,STR) ((C) == '`')

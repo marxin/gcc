@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-options "-fsanitize=vla-bound -w" } */
+/* { dg-options "-fsanitize=vla-bound -Wall -Wno-unused-variable -fno-sanitize-recover=vla-bound" } */
 
 int
 main (void)
@@ -10,6 +10,5 @@ main (void)
     /* Don't instrument this one.  */
     int g[t];
   };
-
   return 0;
 }

@@ -1,7 +1,7 @@
 /* This file contains routines to construct GNU OpenMP constructs,
    called from parsing in the C and C++ front ends.
 
-   Copyright (C) 2005-2013 Free Software Foundation, Inc.
+   Copyright (C) 2005-2015 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>,
 		  Diego Novillo <dnovillo@redhat.com>.
 
@@ -24,6 +24,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
 #include "c-common.h"
 #include "c-pragma.h"
@@ -136,7 +146,7 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 		     enum tree_code opcode, tree lhs, tree rhs,
 		     tree v, tree lhs1, tree rhs1, bool swapped, bool seq_cst)
 {
-  tree x, type, addr;
+  tree x, type, addr, pre = NULL_TREE;
 
   if (lhs == error_mark_node || rhs == error_mark_node
       || v == error_mark_node || lhs1 == error_mark_node
@@ -170,7 +180,7 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
     {
       /* Make sure LHS is simple enough so that goa_lhs_expr_p can recognize
 	 it even after unsharing function body.  */
-      tree var = create_tmp_var_raw (TREE_TYPE (addr), NULL);
+      tree var = create_tmp_var_raw (TREE_TYPE (addr));
       DECL_CONTEXT (var) = current_function_decl;
       addr = build4 (TARGET_EXPR, TREE_TYPE (addr), var, addr, NULL, NULL);
     }
@@ -183,7 +193,6 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
       OMP_ATOMIC_SEQ_CST (x) = seq_cst;
       return build_modify_expr (loc, v, NULL_TREE, NOP_EXPR,
 				loc, x, NULL_TREE);
-      return x;
     }
 
   /* There are lots of warnings, errors, and conversions that need to happen
@@ -194,9 +203,18 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
       rhs = build2_loc (loc, opcode, TREE_TYPE (lhs), rhs, lhs);
       opcode = NOP_EXPR;
     }
+  bool save = in_late_binary_op;
+  in_late_binary_op = true;
   x = build_modify_expr (loc, lhs, NULL_TREE, opcode, loc, rhs, NULL_TREE);
+  in_late_binary_op = save;
   if (x == error_mark_node)
     return error_mark_node;
+  if (TREE_CODE (x) == COMPOUND_EXPR)
+    {
+      pre = TREE_OPERAND (x, 0);
+      gcc_assert (TREE_CODE (pre) == SAVE_EXPR);
+      x = TREE_OPERAND (x, 1);
+    }
   gcc_assert (TREE_CODE (x) == MODIFY_EXPR);
   rhs = TREE_OPERAND (x, 1);
 
@@ -264,6 +282,8 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
       x = omit_one_operand_loc (loc, type, x, rhs1addr);
     }
 
+  if (pre)
+    x = omit_one_operand_loc (loc, type, x, pre);
   return x;
 }
 
@@ -386,7 +406,7 @@ c_finish_omp_for (location_t locus, enum tree_code code, tree declv,
   bool fail = false;
   int i;
 
-  if (code == CILK_SIMD
+  if ((code == CILK_SIMD || code == CILK_FOR)
       && !c_check_cilk_loop (locus, TREE_VEC_ELT (declv, 0)))
     fail = true;
 
@@ -505,7 +525,10 @@ c_finish_omp_for (location_t locus, enum tree_code code, tree declv,
 		  || TREE_CODE (cond) == EQ_EXPR)
 		{
 		  if (!INTEGRAL_TYPE_P (TREE_TYPE (decl)))
-		    cond_ok = false;
+		    {
+		      if (code != CILK_SIMD && code != CILK_FOR)
+			cond_ok = false;
+		    }
 		  else if (operand_equal_p (TREE_OPERAND (cond, 1),
 					    TYPE_MIN_VALUE (TREE_TYPE (decl)),
 					    0))
@@ -516,7 +539,7 @@ c_finish_omp_for (location_t locus, enum tree_code code, tree declv,
 					    0))
 		    TREE_SET_CODE (cond, TREE_CODE (cond) == NE_EXPR
 					 ? LT_EXPR : GE_EXPR);
-		  else if (code != CILK_SIMD)
+		  else if (code != CILK_SIMD && code != CILK_FOR)
 		    cond_ok = false;
 		}
 	    }
@@ -555,6 +578,12 @@ c_finish_omp_for (location_t locus, enum tree_code code, tree declv,
 	      incr = c_omp_for_incr_canonicalize_ptr (elocus, decl, incr);
 	      break;
 
+	    case COMPOUND_EXPR:
+	      if (TREE_CODE (TREE_OPERAND (incr, 0)) != SAVE_EXPR
+		  || TREE_CODE (TREE_OPERAND (incr, 1)) != MODIFY_EXPR)
+		break;
+	      incr = TREE_OPERAND (incr, 1);
+	      /* FALLTHRU */
 	    case MODIFY_EXPR:
 	      if (TREE_OPERAND (incr, 0) != decl)
 		break;
@@ -773,8 +802,13 @@ c_omp_split_clauses (location_t loc, enum tree_code code,
 	  else if ((mask & (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_NUM_TEAMS))
 		   != 0)
 	    {
-	      /* This must be #pragma omp {,target }teams distribute.  */
-	      gcc_assert (code == OMP_DISTRIBUTE);
+	      /* This must be one of
+		 #pragma omp {,target }teams distribute
+		 #pragma omp target teams
+		 #pragma omp {,target }teams distribute simd.  */
+	      gcc_assert (code == OMP_DISTRIBUTE
+			  || code == OMP_TEAMS
+			  || code == OMP_SIMD);
 	      s = C_OMP_CLAUSE_SPLIT_TEAMS;
 	    }
 	  else if ((mask & (OMP_CLAUSE_MASK_1

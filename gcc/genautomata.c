@@ -1,5 +1,5 @@
 /* Pipeline hazard description translator.
-   Copyright (C) 2000-2013 Free Software Foundation, Inc.
+   Copyright (C) 2000-2015 Free Software Foundation, Inc.
 
    Written by Vladimir Makarov <vmakarov@redhat.com>
 
@@ -1178,7 +1178,7 @@ next_sep_el (const char **pstr, int sep, int par_flag)
 	}
     }
   obstack_1grow (&irp, '\0');
-  out_str = obstack_base (&irp);
+  out_str = (char *) obstack_base (&irp);
   obstack_finish (&irp);
 
   *pstr = p;
@@ -2348,7 +2348,7 @@ add_presence_absence (unit_set_el_t dest_list,
 		for (prev_el = (presence_p
 				? (final_p
 				   ? dst->unit_decl->final_presence_list
-				   : dst->unit_decl->final_presence_list)
+				   : dst->unit_decl->presence_list)
 				: (final_p
 				   ? dst->unit_decl->final_absence_list
 				   : dst->unit_decl->absence_list));
@@ -3349,7 +3349,7 @@ uniq_sort_alt_states (alt_state_t alt_states_list)
   if (alt_states_list->next_alt_state == 0)
     return alt_states_list;
 
-  stack_vec<alt_state_t, 150> alt_states;
+  auto_vec<alt_state_t, 150> alt_states;
   for (curr_alt_state = alt_states_list;
        curr_alt_state != NULL;
        curr_alt_state = curr_alt_state->next_alt_state)
@@ -3494,7 +3494,7 @@ reserv_sets_hash_value (reserv_sets_t reservs)
     {
       reservs_num--;
       hash_value += ((*reserv_ptr >> i)
-		     | (*reserv_ptr << (sizeof (set_el_t) * CHAR_BIT - i)));
+		     | (*reserv_ptr << (((sizeof (set_el_t) * CHAR_BIT) - 1) & -i)));
       i++;
       if (i == sizeof (set_el_t) * CHAR_BIT)
 	i = 0;
@@ -5484,7 +5484,7 @@ form_ainsn_with_same_reservs (automaton_t automaton)
 {
   ainsn_t curr_ainsn;
   size_t i;
-  stack_vec<ainsn_t, 150> last_insns;
+  auto_vec<ainsn_t, 150> last_insns;
 
   for (curr_ainsn = automaton->ainsn_list;
        curr_ainsn != NULL;
@@ -5555,7 +5555,7 @@ make_automaton (automaton_t automaton)
   state_t state;
   state_t start_state;
   state_t state2;
-  stack_vec<state_t, 150> state_stack;
+  auto_vec<state_t, 150> state_stack;
   int states_n;
   reserv_sets_t reservs_matter = form_reservs_matter (automaton);
 
@@ -6178,7 +6178,7 @@ merge_states (automaton_t automaton, vec<state_t> equiv_classes)
 		    alt_states = new_alt_state;
 		  }
 	    }
-	  /* Its is important that alt states were sorted before and
+	  /* It is important that alt states were sorted before and
 	     after merging to have the same querying results.  */
 	  new_state->component_states = uniq_sort_alt_states (alt_states);
 	}
@@ -6873,7 +6873,7 @@ regexp_representation (regexp_t regexp)
 {
   form_regexp (regexp);
   obstack_1grow (&irp, '\0');
-  return obstack_base (&irp);
+  return (char *) obstack_base (&irp);
 }
 
 /* The function frees memory allocated for last formed string
@@ -8134,8 +8134,9 @@ output_internal_insn_code_evaluation (const char *insn_name,
 	       insn_code_name, COLLAPSE_NDFA_VALUE_NAME);
     }
   fprintf (output_file, "\n  else\n    {\n");
-  fprintf (output_file, "      %s = %s (%s);\n", insn_code_name,
-	   DFA_INSN_CODE_FUNC_NAME, insn_name);
+  fprintf (output_file,
+	   "      %s = %s (as_a <rtx_insn *> (%s));\n",
+	   insn_code_name, DFA_INSN_CODE_FUNC_NAME, insn_name);
   fprintf (output_file, "      if (%s > %s)\n        return %d;\n    }\n",
 	   insn_code_name, ADVANCE_CYCLE_VALUE_NAME, code);
 }
@@ -8165,7 +8166,7 @@ dfa_insn_code_enlarge (int uid)\n\
 	   DFA_INSN_CODES_LENGTH_VARIABLE_NAME,
 	   DFA_INSN_CODES_VARIABLE_NAME);
   fprintf (output_file, "\
-static inline int\n%s (rtx %s)\n\
+static inline int\n%s (rtx_insn *%s)\n\
 {\n\
   int uid = INSN_UID (%s);\n\
   int %s;\n\n",
@@ -8208,7 +8209,7 @@ output_trans_func (void)
 static void
 output_min_issue_delay_func (void)
 {
-  fprintf (output_file, "int\n%s (%s %s, rtx %s)\n",
+  fprintf (output_file, "int\n%s (%s %s, rtx_insn *%s)\n",
 	   MIN_ISSUE_DELAY_FUNC_NAME, STATE_TYPE_NAME, STATE_NAME,
 	   INSN_PARAMETER_NAME);
   fprintf (output_file, "{\n  int %s;\n", INTERNAL_INSN_CODE_NAME);
@@ -8362,8 +8363,8 @@ output_internal_insn_latency_func (void)
 
   fprintf (output_file, "static int\n%s (int %s ATTRIBUTE_UNUSED,\n\tint %s ATTRIBUTE_UNUSED,\n\trtx %s ATTRIBUTE_UNUSED,\n\trtx %s ATTRIBUTE_UNUSED)\n",
 	   INTERNAL_INSN_LATENCY_FUNC_NAME, INTERNAL_INSN_CODE_NAME,
-	   INTERNAL_INSN2_CODE_NAME, INSN_PARAMETER_NAME,
-	   INSN2_PARAMETER_NAME);
+	   INTERNAL_INSN2_CODE_NAME, "insn_or_const0",
+	   "insn2_or_const0");
   fprintf (output_file, "{\n");
 
   if (DECL_INSN_RESERV (advance_cycle_insn_decl)->insn_num == 0)
@@ -8375,6 +8376,28 @@ output_internal_insn_latency_func (void)
   fprintf (output_file, "  if (%s >= %s || %s >= %s)\n    return 0;\n",
 	   INTERNAL_INSN_CODE_NAME, ADVANCE_CYCLE_VALUE_NAME,
 	   INTERNAL_INSN2_CODE_NAME, ADVANCE_CYCLE_VALUE_NAME);
+
+  /* We've now rejected the case that
+       INTERNAL_INSN_CODE_NAME >= ADVANCE_CYCLE_VALUE_NAME
+     i.e. that
+       insn_code >= DFA__ADVANCE_CYCLE,
+     and similarly for insn2_code.  */
+  fprintf (output_file,
+	   "  /* Within output_internal_insn_code_evaluation, the generated\n"
+	   "     code sets \"code\" to NDFA__COLLAPSE for const0_rtx, and\n"
+	   "     NDFA__COLLAPSE > DFA__ADVANCE_CYCLE.  Hence we can't be\n"
+	   "     dealing with const0_rtx instances at this point.  */\n");
+  if (collapse_flag)
+    fprintf (output_file,
+	     "  gcc_assert (NDFA__COLLAPSE > DFA__ADVANCE_CYCLE);\n");
+  fprintf (output_file,
+	   ("  gcc_assert (insn_or_const0 != const0_rtx);\n"
+	    "  rtx_insn *%s ATTRIBUTE_UNUSED = safe_as_a <rtx_insn *> (insn_or_const0);\n"),
+	   INSN_PARAMETER_NAME);
+  fprintf (output_file,
+	   ("  gcc_assert (insn2_or_const0 != const0_rtx);\n"
+	    "  rtx_insn *%s ATTRIBUTE_UNUSED = safe_as_a <rtx_insn *> (insn2_or_const0);\n"),
+	   INSN2_PARAMETER_NAME);
 
   fprintf (output_file, "  switch (%s)\n    {\n", INTERNAL_INSN_CODE_NAME);
   for (i = 0; i < description->decls_num; i++)
@@ -8514,7 +8537,7 @@ output_print_reservation_func (void)
   int i, j;
 
   fprintf (output_file,
-	   "void\n%s (FILE *%s, rtx %s ATTRIBUTE_UNUSED)\n{\n",
+	   "void\n%s (FILE *%s, rtx_insn *%s ATTRIBUTE_UNUSED)\n{\n",
            PRINT_RESERVATION_FUNC_NAME, FILE_PARAMETER_NAME,
            INSN_PARAMETER_NAME);
 
@@ -8680,7 +8703,7 @@ static void
 output_insn_has_dfa_reservation_p (void)
 {
   fprintf (output_file,
-	   "bool\n%s (rtx %s ATTRIBUTE_UNUSED)\n{\n",
+	   "bool\n%s (rtx_insn *%s ATTRIBUTE_UNUSED)\n{\n",
            INSN_HAS_DFA_RESERVATION_P_FUNC_NAME,
            INSN_PARAMETER_NAME);
 
@@ -8725,7 +8748,7 @@ output_dfa_clean_insn_cache_func (void)
 	   DFA_INSN_CODES_VARIABLE_NAME, I_VARIABLE_NAME);
 
   fprintf (output_file,
-           "void\n%s (rtx %s)\n{\n  int %s;\n\n",
+           "void\n%s (rtx_insn *%s)\n{\n  int %s;\n\n",
            DFA_CLEAR_SINGLE_INSN_CACHE_FUNC_NAME, INSN_PARAMETER_NAME,
 	   I_VARIABLE_NAME);
   fprintf (output_file,
@@ -9289,7 +9312,7 @@ initiate_automaton_gen (char **argv)
   obstack_grow (&irp, STANDARD_OUTPUT_DESCRIPTION_FILE_SUFFIX,
 		strlen (STANDARD_OUTPUT_DESCRIPTION_FILE_SUFFIX) + 1);
   obstack_1grow (&irp, '\0');
-  output_description_file_name = obstack_base (&irp);
+  output_description_file_name = (char *) obstack_base (&irp);
   obstack_finish (&irp);
 }
 
@@ -9652,6 +9675,15 @@ main (int argc, char **argv)
 		"#include \"system.h\"\n"
 		"#include \"coretypes.h\"\n"
 		"#include \"tm.h\"\n"
+		"#include \"hash-set.h\"\n"
+		"#include \"machmode.h\"\n"
+		"#include \"vec.h\"\n"
+		"#include \"double-int.h\"\n"
+		"#include \"input.h\"\n"
+		"#include \"alias.h\"\n"
+		"#include \"symtab.h\"\n"
+		"#include \"wide-int.h\"\n"
+		"#include \"inchash.h\"\n"
 		"#include \"tree.h\"\n"
 		"#include \"varasm.h\"\n"
 		"#include \"stor-layout.h\"\n"

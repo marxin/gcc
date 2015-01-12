@@ -1,5 +1,5 @@
 /* Language-dependent hooks for LTO.
-   Copyright (C) 2009-2013 Free Software Foundation, Inc.
+   Copyright (C) 2009-2015 Free Software Foundation, Inc.
    Contributed by CodeSourcery, Inc.
 
 This file is part of GCC.
@@ -23,7 +23,17 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "flags.h"
 #include "tm.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "stringpool.h"
 #include "stor-layout.h"
 #include "target.h"
@@ -33,6 +43,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-tree.h"
 #include "lto.h"
 #include "tree-inline.h"
+#include "predict.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
@@ -41,6 +55,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "diagnostic-core.h"
 #include "toplev.h"
+#include "hash-map.h"
+#include "plugin-api.h"
+#include "ipa-ref.h"
+#include "cgraph.h"
 #include "lto-streamer.h"
 #include "cilk.h"
 
@@ -146,9 +164,12 @@ enum lto_builtin_type
 #define DEF_FUNCTION_TYPE_3(NAME, RETURN, ARG1, ARG2, ARG3) NAME,
 #define DEF_FUNCTION_TYPE_4(NAME, RETURN, ARG1, ARG2, ARG3, ARG4) NAME,
 #define DEF_FUNCTION_TYPE_5(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5) NAME,
-#define DEF_FUNCTION_TYPE_6(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6) NAME,
-#define DEF_FUNCTION_TYPE_7(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7) NAME,
-#define DEF_FUNCTION_TYPE_8(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8) NAME,
+#define DEF_FUNCTION_TYPE_6(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
+			    ARG6) NAME,
+#define DEF_FUNCTION_TYPE_7(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
+			    ARG6, ARG7) NAME,
+#define DEF_FUNCTION_TYPE_8(NAME, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
+			    ARG6, ARG7, ARG8) NAME,
 #define DEF_FUNCTION_TYPE_VAR_0(NAME, RETURN) NAME,
 #define DEF_FUNCTION_TYPE_VAR_1(NAME, RETURN, ARG1) NAME,
 #define DEF_FUNCTION_TYPE_VAR_2(NAME, RETURN, ARG1, ARG2) NAME,
@@ -192,6 +213,7 @@ static GTY(()) tree signed_size_type_node;
 /* Flags needed to process builtins.def.  */
 int flag_isoc94;
 int flag_isoc99;
+int flag_isoc11;
 
 /* Attribute handlers.  */
 
@@ -323,8 +345,7 @@ static bool
 get_nonnull_operand (tree arg_num_expr, unsigned HOST_WIDE_INT *valp)
 {
   /* Verify the arg number is a constant.  */
-  if (TREE_CODE (arg_num_expr) != INTEGER_CST
-      || TREE_INT_CST_HIGH (arg_num_expr) != 0)
+  if (!tree_fits_uhwi_p (arg_num_expr))
     return false;
 
   *valp = TREE_INT_CST_LOW (arg_num_expr);
@@ -521,6 +542,7 @@ def_fn_type (builtin_type def, builtin_type ret, bool var, int n, ...)
   tree *args = XALLOCAVEC (tree, n);
   va_list list;
   int i;
+  bool err = false;
 
   va_start (list, n);
   for (i = 0; i < n; ++i)
@@ -528,22 +550,22 @@ def_fn_type (builtin_type def, builtin_type ret, bool var, int n, ...)
       builtin_type a = (builtin_type) va_arg (list, int);
       t = builtin_types[a];
       if (t == error_mark_node)
-	goto egress;
+	err = true;
       args[i] = t;
     }
   va_end (list);
 
   t = builtin_types[ret];
+  if (err)
+    t = error_mark_node;
   if (t == error_mark_node)
-    goto egress;
-  if (var)
+    ;
+  else if (var)
     t = build_varargs_function_type_array (t, n, args);
   else
     t = build_function_type_array (t, n, args);
 
- egress:
   builtin_types[def] = t;
-  va_end (list);
 }
 
 /* Used to help initialize the builtin-types.def table.  When a type of
@@ -663,12 +685,15 @@ lto_define_builtins (tree va_list_ref_type_node ATTRIBUTE_UNUSED,
 #include "builtin-types.def"
 
 #undef DEF_PRIMITIVE_TYPE
+#undef DEF_FUNCTION_TYPE_0
 #undef DEF_FUNCTION_TYPE_1
 #undef DEF_FUNCTION_TYPE_2
 #undef DEF_FUNCTION_TYPE_3
 #undef DEF_FUNCTION_TYPE_4
 #undef DEF_FUNCTION_TYPE_5
 #undef DEF_FUNCTION_TYPE_6
+#undef DEF_FUNCTION_TYPE_7
+#undef DEF_FUNCTION_TYPE_8
 #undef DEF_FUNCTION_TYPE_VAR_0
 #undef DEF_FUNCTION_TYPE_VAR_1
 #undef DEF_FUNCTION_TYPE_VAR_2
@@ -747,6 +772,10 @@ lto_handle_option (size_t scode, const char *arg,
 
     case OPT_Wabi:
       warn_psabi = value;
+      break;
+
+    case OPT_fwpa:
+      flag_wpa = value ? "" : NULL;
       break;
 
     default:
@@ -836,7 +865,7 @@ lto_type_for_size (unsigned precision, int unsignedp)
    then UNSIGNEDP selects between saturating and nonsaturating types.  */
 
 static tree
-lto_type_for_mode (enum machine_mode mode, int unsigned_p)
+lto_type_for_mode (machine_mode mode, int unsigned_p)
 {
   tree t;
 
@@ -896,7 +925,7 @@ lto_type_for_mode (enum machine_mode mode, int unsigned_p)
 
   if (COMPLEX_MODE_P (mode))
     {
-      enum machine_mode inner_mode;
+      machine_mode inner_mode;
       tree inner_type;
 
       if (mode == TYPE_MODE (complex_float_type_node))
@@ -916,7 +945,7 @@ lto_type_for_mode (enum machine_mode mode, int unsigned_p)
     }
   else if (VECTOR_MODE_P (mode))
     {
-      enum machine_mode inner_mode = GET_MODE_INNER (mode);
+      machine_mode inner_mode = GET_MODE_INNER (mode);
       tree inner_type = lto_type_for_mode (inner_mode, unsigned_p);
       if (inner_type != NULL_TREE)
 	return build_vector_type_for_mode (inner_type, mode);
@@ -1075,11 +1104,14 @@ lto_getdecls (void)
 static void
 lto_write_globals (void)
 {
-  tree *vec = lto_global_var_decls->address ();
-  int len = lto_global_var_decls->length ();
-  wrapup_global_declarations (vec, len);
-  emit_debug_global_declarations (vec, len);
-  vec_free (lto_global_var_decls);
+  if (flag_wpa)
+    return;
+
+  /* Output debug info for global variables.  */  
+  varpool_node *vnode;
+  FOR_EACH_DEFINED_VARIABLE (vnode)
+    if (!decl_function_context (vnode->decl))
+      debug_hooks->global_decl (vnode->decl);
 }
 
 static tree
@@ -1136,7 +1168,26 @@ lto_build_c_type_nodes (void)
       signed_size_type_node = long_long_integer_type_node;
     }
   else
-    gcc_unreachable ();
+    {
+      int i;
+
+      signed_size_type_node = NULL_TREE;
+      for (i = 0; i < NUM_INT_N_ENTS; i++)
+	if (int_n_enabled_p[i])
+	  {
+	    char name[50];
+	    sprintf (name, "__int%d unsigned", int_n_data[i].bitsize);
+
+	    if (strcmp (name, SIZE_TYPE) == 0)
+	      {
+		intmax_type_node = int_n_trees[i].signed_type;
+		uintmax_type_node = int_n_trees[i].unsigned_type;
+		signed_size_type_node = int_n_trees[i].signed_type;
+	      }
+	  }
+      if (signed_size_type_node == NULL_TREE)
+	gcc_unreachable ();
+    }
 
   wint_type_node = unsigned_type_node;
   pid_type_node = integer_type_node;
@@ -1147,11 +1198,13 @@ lto_build_c_type_nodes (void)
 static bool
 lto_init (void)
 {
+  int i;
+
   /* We need to generate LTO if running in WPA mode.  */
-  flag_generate_lto = flag_wpa;
+  flag_generate_lto = (flag_wpa != NULL);
 
   /* Create the basic integer types.  */
-  build_common_tree_nodes (flag_signed_char, /*short_double=*/false);
+  build_common_tree_nodes (flag_signed_char, flag_short_double);
 
   /* The global tree for the main identifier is filled in by
      language-specific front-end initialization that is not run in the
@@ -1179,11 +1232,11 @@ lto_init (void)
     }
   else
     {
-      lto_define_builtins (va_list_type_node,
-			   build_reference_type (va_list_type_node));
+      lto_define_builtins (build_reference_type (va_list_type_node),
+			   va_list_type_node);
     }
-  
-  if (flag_enable_cilkplus)
+
+  if (flag_cilkplus)
     cilk_init_builtins ();
 
   targetm.init_builtins ();
@@ -1215,10 +1268,19 @@ lto_init (void)
   NAME_TYPE (long_double_type_node, "long double");
   NAME_TYPE (void_type_node, "void");
   NAME_TYPE (boolean_type_node, "bool");
+  NAME_TYPE (complex_float_type_node, "complex float");
+  NAME_TYPE (complex_double_type_node, "complex double");
+  NAME_TYPE (complex_long_double_type_node, "complex long double");
+  for (i = 0; i < NUM_INT_N_ENTS; i++)
+    if (int_n_enabled_p[i])
+      {
+	char name[50];
+	sprintf (name, "__int%d", int_n_data[i].bitsize);
+	NAME_TYPE (int_n_trees[i].signed_type, name);
+      }
 #undef NAME_TYPE
 
   /* Initialize LTO-specific data structures.  */
-  vec_alloc (lto_global_var_decls, 256);
   in_lto_p = true;
 
   return true;

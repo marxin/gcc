@@ -1,5 +1,5 @@
 /* Header file for gimple statement walk support.
-   Copyright (C) 2013 Free Software Foundation, Inc.
+   Copyright (C) 2013-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -36,7 +36,7 @@ struct walk_stmt_info
   /* Pointer map used to mark visited tree nodes when calling
      walk_tree on each operand.  If set to NULL, duplicate tree nodes
      will be visited more than once.  */
-  struct pointer_set_t *pset;
+  hash_set<tree> *pset;
 
   /* Operand returned by the callbacks.  This is set when calling
      walk_gimple_seq.  If the walk_stmt_fn or walk_tree_fn callback
@@ -89,11 +89,12 @@ extern gimple walk_gimple_seq (gimple_seq, walk_stmt_fn, walk_tree_fn,
 extern tree walk_gimple_op (gimple, walk_tree_fn, struct walk_stmt_info *);
 extern tree walk_gimple_stmt (gimple_stmt_iterator *, walk_stmt_fn,
 			      walk_tree_fn, struct walk_stmt_info *);
+typedef bool (*walk_stmt_load_store_addr_fn) (gimple, tree, tree, void *);
 extern bool walk_stmt_load_store_addr_ops (gimple, void *,
-					   bool (*)(gimple, tree, void *),
-					   bool (*)(gimple, tree, void *),
-					   bool (*)(gimple, tree, void *));
+					   walk_stmt_load_store_addr_fn,
+					   walk_stmt_load_store_addr_fn,
+					   walk_stmt_load_store_addr_fn);
 extern bool walk_stmt_load_store_ops (gimple, void *,
-				      bool (*)(gimple, tree, void *),
-				      bool (*)(gimple, tree, void *));
+				      walk_stmt_load_store_addr_fn,
+				      walk_stmt_load_store_addr_fn);
 #endif /* GCC_GIMPLE_WALK_H */

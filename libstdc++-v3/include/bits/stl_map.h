@@ -1,6 +1,6 @@
 // Map implementation -*- C++ -*-
 
-// Copyright (C) 2001-2013 Free Software Foundation, Inc.
+// Copyright (C) 2001-2015 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -154,8 +154,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       typedef typename _Rep_type::const_reverse_iterator const_reverse_iterator;
 
       // [23.3.1.1] construct/copy/destroy
-      // (get_allocator() is normally listed in this section, but seems to have
-      // been accidentally omitted in the printed standard)
+      // (get_allocator() is also listed in this section)
+
       /**
        *  @brief  Default constructor creates no elements.
        */
@@ -297,27 +297,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       }
 
 #if __cplusplus >= 201103L
-      /**
-       *  @brief  %Map move assignment operator.
-       *  @param  __x  A %map of identical element and allocator types.
-       *
-       *  The contents of @a __x are moved into this map (without copying).
-       *  @a __x is a valid, but unspecified %map.
-       */
+      /// Move assignment operator.
       map&
-      operator=(map&& __x) noexcept(_Alloc_traits::_S_nothrow_move())
-      {
-	if (!_M_t._M_move_assign(__x._M_t))
-	  {
-	    // The rvalue's allocator cannot be moved and is not equal,
-	    // so we need to individually move each element.
-	    clear();
-	    insert(std::__make_move_if_noexcept_iterator(__x.begin()),
-		   std::__make_move_if_noexcept_iterator(__x.end()));
-	    __x.clear();
-	  }
-	return *this;
-      }
+      operator=(map&&) = default;
 
       /**
        *  @brief  %Map list assignment operator.
@@ -333,8 +315,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       map&
       operator=(initializer_list<value_type> __l)
       {
-	this->clear();
-	this->insert(__l.begin(), __l.end());
+	_M_t._M_assign_unique(__l.begin(), __l.end());
 	return *this;
       }
 #endif
@@ -594,7 +575,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  cause no gains in efficiency.
        *
        *  See
-       *  http://gcc.gnu.org/onlinedocs/libstdc++/manual/bk01pt07ch17.html
+       *  https://gcc.gnu.org/onlinedocs/libstdc++/manual/associative.html#containers.associative.insert_hints
        *  for more on @a hinting.
        *
        *  Insertion requires logarithmic time (if the hint is not taken).
@@ -668,7 +649,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
        *  cause no gains in efficiency.
        *
        *  See
-       *  http://gcc.gnu.org/onlinedocs/libstdc++/manual/bk01pt07ch17.html
+       *  https://gcc.gnu.org/onlinedocs/libstdc++/manual/associative.html#containers.associative.insert_hints
        *  for more on @a hinting.
        *
        *  Insertion requires logarithmic time (if the hint is not taken).

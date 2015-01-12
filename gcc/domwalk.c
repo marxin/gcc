@@ -1,5 +1,5 @@
 /* Generic dominator tree walker
-   Copyright (C) 2003-2013 Free Software Foundation, Inc.
+   Copyright (C) 2003-2015 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
 This file is part of GCC.
@@ -22,6 +22,17 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "tm.h"
+#include "predict.h"
+#include "vec.h"
+#include "hashtab.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "hard-reg-set.h"
+#include "input.h"
+#include "function.h"
+#include "dominance.h"
+#include "cfg.h"
+#include "cfganal.h"
 #include "basic-block.h"
 #include "domwalk.h"
 #include "sbitmap.h"
@@ -159,7 +170,7 @@ dom_walker::walk (basic_block bb)
     {
       postorder = XNEWVEC (int, n_basic_blocks_for_fn (cfun));
       postorder_num = inverted_post_order_compute (postorder);
-      bb_postorder = XNEWVEC (int, last_basic_block);
+      bb_postorder = XNEWVEC (int, last_basic_block_for_fn (cfun));
       for (int i = 0; i < postorder_num; ++i)
 	bb_postorder[postorder[i]] = i;
       free (postorder);

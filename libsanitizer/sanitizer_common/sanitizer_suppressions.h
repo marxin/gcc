@@ -23,6 +23,9 @@ enum SuppressionType {
   SuppressionThread,
   SuppressionSignal,
   SuppressionLeak,
+  SuppressionLib,
+  SuppressionDeadlock,
+  SuppressionVptrCheck,
   SuppressionTypeCount
 };
 
@@ -35,13 +38,21 @@ struct Suppression {
 
 class SuppressionContext {
  public:
-  SuppressionContext() : suppressions_(1), can_parse_(true) {}
   void Parse(const char *str);
   bool Match(const char* str, SuppressionType type, Suppression **s);
-  uptr SuppressionCount();
+  uptr SuppressionCount() const;
+  const Suppression *SuppressionAt(uptr i) const;
   void GetMatched(InternalMmapVector<Suppression *> *matched);
 
+  // Create a SuppressionContext singleton if it hasn't been created earlier.
+  // Not thread safe. Must be called early during initialization (but after
+  // runtime flags are parsed).
+  static void InitIfNecessary();
+  // Returns a SuppressionContext singleton.
+  static SuppressionContext *Get();
+
  private:
+  SuppressionContext() : suppressions_(1), can_parse_(true) {}
   InternalMmapVector<Suppression> suppressions_;
   bool can_parse_;
 
@@ -50,7 +61,6 @@ class SuppressionContext {
 
 const char *SuppressionTypeString(SuppressionType t);
 
-// Exposed for testing.
 bool TemplateMatch(char *templ, const char *str);
 
 }  // namespace __sanitizer

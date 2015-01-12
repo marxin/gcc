@@ -1,6 +1,6 @@
 // class template regex -*- C++ -*-
 
-// Copyright (C) 2013 Free Software Foundation, Inc.
+// Copyright (C) 2013-2015 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -35,12 +35,13 @@ namespace __detail
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 #ifdef _GLIBCXX_DEBUG
-  std::ostream&
+  inline std::ostream&
   _State_base::_M_print(std::ostream& ostr) const
   {
     switch (_M_opcode)
     {
       case _S_opcode_alternative:
+      case _S_opcode_repeat:
 	ostr << "alt next=" << _M_next << " alt=" << _M_alt;
 	break;
       case _S_opcode_subexpr_begin:
@@ -66,17 +67,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   }
 
   // Prints graphviz dot commands for state.
-  std::ostream&
+  inline std::ostream&
   _State_base::_M_dot(std::ostream& __ostr, _StateIdT __id) const
   {
     switch (_M_opcode)
     {
       case _S_opcode_alternative:
+      case _S_opcode_repeat:
 	__ostr << __id << " [label=\"" << __id << "\\nALT\"];\n"
 	       << __id << " -> " << _M_next
-	       << " [label=\"epsilon\", tailport=\"s\"];\n"
+	       << " [label=\"next\", tailport=\"s\"];\n"
 	       << __id << " -> " << _M_alt
-	       << " [label=\"epsilon\", tailport=\"n\"];\n";
+	       << " [label=\"alt\", tailport=\"n\"];\n";
 	break;
       case _S_opcode_backref:
 	__ostr << __id << " [label=\"" << __id << "\\nBACKREF "
@@ -134,9 +136,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     _NFA<_TraitsT>::_M_dot(std::ostream& __ostr) const
     {
       __ostr << "digraph _Nfa {\n"
-	        "  rankdir=LR;\n";
+		"  rankdir=LR;\n";
       for (size_t __i = 0; __i < this->size(); ++__i)
-        (*this)[__i]._M_dot(__ostr, __i);
+	(*this)[__i]._M_dot(__ostr, __i);
       __ostr << "}\n";
       return __ostr;
     }
@@ -174,6 +176,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		 == _S_opcode_dummy)
 	    __it._M_next = (*this)[__it._M_next]._M_next;
 	  if (__it._M_opcode == _S_opcode_alternative
+	      || __it._M_opcode == _S_opcode_repeat
 	      || __it._M_opcode == _S_opcode_subexpr_lookahead)
 	    while (__it._M_alt >= 0 && (*this)[__it._M_alt]._M_opcode
 		   == _S_opcode_dummy)
@@ -194,30 +197,36 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  auto __u = __stack.top();
 	  __stack.pop();
 	  auto __dup = _M_nfa[__u];
+	  // _M_insert_state() never return -1
 	  auto __id = _M_nfa._M_insert_state(__dup);
 	  __m[__u] = __id;
+	  if (__dup._M_opcode == _S_opcode_alternative
+	      || __dup._M_opcode == _S_opcode_repeat
+	      || __dup._M_opcode == _S_opcode_subexpr_lookahead)
+	    if (__dup._M_alt != _S_invalid_state_id
+		&& __m.count(__dup._M_alt) == 0)
+	      __stack.push(__dup._M_alt);
 	  if (__u == _M_end)
 	    continue;
-	  if (__m.count(__dup._M_next) == 0)
+	  if (__dup._M_next != _S_invalid_state_id
+	      && __m.count(__dup._M_next) == 0)
 	    __stack.push(__dup._M_next);
-	  if (__dup._M_opcode == _S_opcode_alternative
-	      || __dup._M_opcode == _S_opcode_subexpr_lookahead)
-	    if (__m.count(__dup._M_alt) == 0)
-	      __stack.push(__dup._M_alt);
 	}
       for (auto __it : __m)
 	{
-	  auto& __ref = _M_nfa[__it.second];
-	  if (__ref._M_next != -1)
+	  auto __v = __it.second;
+	  auto& __ref = _M_nfa[__v];
+	  if (__ref._M_next != _S_invalid_state_id)
 	    {
-	      _GLIBCXX_DEBUG_ASSERT(__m.count(__ref._M_next));
+	      _GLIBCXX_DEBUG_ASSERT(__m.count(__ref._M_next) > 0);
 	      __ref._M_next = __m[__ref._M_next];
 	    }
 	  if (__ref._M_opcode == _S_opcode_alternative
+	      || __ref._M_opcode == _S_opcode_repeat
 	      || __ref._M_opcode == _S_opcode_subexpr_lookahead)
-	    if (__ref._M_alt != -1)
+	    if (__ref._M_alt != _S_invalid_state_id)
 	      {
-		_GLIBCXX_DEBUG_ASSERT(__m.count(__ref._M_alt));
+		_GLIBCXX_DEBUG_ASSERT(__m.count(__ref._M_alt) > 0);
 		__ref._M_alt = __m[__ref._M_alt];
 	      }
 	}

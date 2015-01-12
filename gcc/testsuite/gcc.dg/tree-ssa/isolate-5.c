@@ -1,7 +1,6 @@
-
 /* { dg-do compile } */ 
 /* { dg-options "-O2 -fdump-tree-isolate-paths -fdump-tree-optimized" } */
-
+/* { dg-skip-if "" keeps_null_pointer_checks } */
 
 struct demangle_component
 {
@@ -11,7 +10,6 @@ struct demangle_component
 
 };
 
-
 struct d_info
 {
   struct demangle_component *comps;
@@ -19,6 +17,8 @@ struct d_info
   int num_comps;
 };
 
+void foo (int);
+void bar (int);
 
 static struct demangle_component *
 d_make_empty (struct d_info *di)
@@ -30,8 +30,6 @@ d_make_empty (struct d_info *di)
   p = &di->comps[di->next_comp];
   return p;
 }
-
-
 
 struct demangle_component *
 d_type (struct d_info *di)
@@ -55,8 +53,4 @@ d_type (struct d_info *di)
 /* { dg-final { scan-tree-dump-times "\\.type" 1 "optimized"} } */
 /* { dg-final { scan-tree-dump-times "->zzz" 1 "isolate-paths"} } */
 /* { dg-final { cleanup-tree-dump "isolate-paths" } } */
-/* { dg-final { cleanup-tree-dump "optimized-paths" } } */
-
-
-
-
+/* { dg-final { cleanup-tree-dump "optimized" } } */

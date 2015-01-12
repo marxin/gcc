@@ -38,19 +38,20 @@ ACLOCAL_AMFLAGS = -I .. -I ../config
 
 # Compiler and linker flags.
 GENERAL_FLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/runtime -I$(top_srcdir)/runtime/config/$(config_dir) -DIN_CILK_RUNTIME=1
-GENERAL_FLAGS += -D_Cilk_spawn="" -D_Cilk_sync="" -D_Cilk_for=for
+# GENERAL_FLAGS += -D_Cilk_spawn="" -D_Cilk_sync="" -D_Cilk_for=for
 
 # Enable Intel Cilk Plus extension
 GENERAL_FLAGS += -fcilkplus
 
-AM_CFLAGS = $(GENERAL_FLAGS) -std=c99
+AM_CFLAGS = $(XCFLAGS) $(GENERAL_FLAGS) -std=c99
 AM_CPPFLAGS = $(GENERAL_FLAGS)
-AM_LDFLAGS = -lpthread 
+AM_LDFLAGS = $(XLDFLAGS)
 
 # May be used by toolexeclibdir.
 gcc_version := $(shell cat $(top_srcdir)/../gcc/BASE-VER)
 
 # Target list.
+nodist_toolexeclib_HEADERS = libcilkrts.spec
 toolexeclib_LTLIBRARIES = libcilkrts.la
 
 libcilkrts_la_SOURCES =            \
@@ -91,7 +92,8 @@ include include/internal/rev.mk
 
 #libcilkrts_la_LDFLAGS  = -rpath '$(libdir)'
 libcilkrts_la_LDFLAGS = -version-info 5:0:0
-libcilkrts_la_LDFLAGS += -lpthread @lt_cv_dlopen_libs@
+libcilkrts_la_LDFLAGS += @lt_cv_dlopen_libs@
+libcilkrts_la_LDFLAGS += $(AM_LDFLAGS)
 
 # If we're building on Linux, use the Linux version script
 if LINUX_LINKER_SCRIPT
@@ -108,8 +110,9 @@ endif
 libcilkrts_la_LDFLAGS += -no-undefined
 
 # C/C++ header files for Cilk.
-cilkincludedir = $(includedir)/cilk
-cilkinclude_HEADERS =              \
+# cilkincludedir = $(includedir)/cilk
+cilkincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)/include/cilk
+nodist_cilkinclude_HEADERS =       \
   include/cilk/cilk_api.h          \
   include/cilk/cilk_api_linux.h    \
   include/cilk/cilk.h              \
