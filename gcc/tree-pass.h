@@ -1,5 +1,5 @@
 /* Definitions for describing one tree-ssa optimization pass.
-   Copyright (C) 2004-2014 Free Software Foundation, Inc.
+   Copyright (C) 2004-2015 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>
 
 This file is part of GCC.
@@ -466,6 +466,7 @@ extern ipa_opt_pass_d *make_pass_ipa_whole_program_visibility (gcc::context
 extern simple_ipa_opt_pass *make_pass_ipa_increase_alignment (gcc::context
 							      *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_inline (gcc::context *ctxt);
+extern simple_ipa_opt_pass *make_pass_ipa_sem_equality (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_free_lang_data (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_ipa_free_inline_summary (gcc::context
 							       *ctxt);

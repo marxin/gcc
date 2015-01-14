@@ -1,5 +1,5 @@
 /* Default target hook functions.
-   Copyright (C) 2003-2014 Free Software Foundation, Inc.
+   Copyright (C) 2003-2015 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -52,15 +52,22 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm.h"
 #include "machmode.h"
 #include "rtl.h"
+#include "hash-set.h"
+#include "machmode.h"
+#include "vec.h"
+#include "double-int.h"
+#include "input.h"
+#include "alias.h"
+#include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
 #include "tree.h"
+#include "fold-const.h"
 #include "stor-layout.h"
 #include "varasm.h"
 #include "expr.h"
 #include "output.h"
 #include "diagnostic-core.h"
-#include "hashtab.h"
-#include "hash-set.h"
-#include "vec.h"
 #include "hard-reg-set.h"
 #include "input.h"
 #include "function.h"
@@ -1639,12 +1646,8 @@ default_get_pch_validity (size_t *sz)
 static const char *
 pch_option_mismatch (const char *option)
 {
-  char *r;
-
-  asprintf (&r, _("created and used with differing settings of '%s'"), option);
-  if (r == NULL)
-    return _("out of memory");
-  return r;
+  return xasprintf (_("created and used with differing settings of '%s'"),
+		    option);
 }
 
 /* Default version of pch_valid_p.  */
