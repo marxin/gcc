@@ -2390,3 +2390,4 @@ test
 test
 test
 Before change
+EARLY_INLINING_INSNS=14
