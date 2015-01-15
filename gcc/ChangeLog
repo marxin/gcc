@@ -2390,5 +2390,4 @@ test
 test
 test
 Before change
-EARLY_INLINING_INSNS=14
-INLINE_UNIT_GROWTH=15
+aaa
