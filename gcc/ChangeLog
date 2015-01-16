@@ -1,4 +1,338 @@
-2014-01-15  David Edelsohn  <dje.gcc@gmail.com>
+2015-01-16  Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* config/nds32/nds32-protos.h (nds32_expand_epilogue): Change
+	prototype.
+	(nds32_expand_epilogue_v3pop): Likewise.
+	* config/nds32/nds32.md (sibcall): Define this for sibling call
+	optimization.
+	(sibcall_register): Likewise.
+	(sibcall_immediate): Likewise.
+	(sibcall_value): Likewise.
+	(sibcall_value_register): Likewise.
+	(sibcall_value_immediate): Likewise.
+	(sibcall_epilogue): Likewise.
+	(epilogue): Pass false to indicate this is not a sibcall epilogue.
+	* config/nds32/nds32.c (nds32_expand_epilogue): Consider sibcall case.
+	(nds32_expand_epilogue_v3pop): Likewise.
+
+2015-01-16  Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* config/nds32/nds32-protos.h (nds32_can_use_return_insn): New.
+	* config/nds32/nds32.md (unspec_volatile_func_return): Remove.
+	(return_internal): New.
+	(return): Define this named pattern.
+	(simple_return): Define this named pattern.
+	* config/nds32/nds32.c (nds32_expand_epilogue): Emit return_internal
+	pattern instead of unspec_volatile_func_return.
+	(nds32_expand_epilogue_v3pop): Likewise.
+	(nds32_can_use_return_insn): New function.
+
+2015-01-16  Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* config/nds32/constants.md (UNSPEC_VOLATILE_POP25_RETURN): New.
+	* config/nds32/nds32.md (pop25return): New.
+	* config/nds32/nds32.c (nds32_expand_epilogue_v3pop): Emit
+	pop25return pattern.
+
+2015-01-16  Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* doc/invoke.texi (NDS32 Options): Remove -mforce-fp-as-gp,
+	-mforbid-fp-as-gp, and -mex9 options.
+
+2015-01-16  Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* doc/invoke.texi (NDS32 Options): Add -mcmodel= option and
+	remove -mgp-direct option.
+
+2015-01-15  Jan Hubicka  <hubicka@ucw.cz>
+	
+	* doc/invoke.texi (--param early-inlining-insns): Update default value.
+	* params.def (PARAM_EARLY_INLINING_INSNS): Set to 14.
+
+2015-01-15  Jan Hubicka  <hubicka@ucw.cz>
+
+	* ipa-inline.c (inline_small_functions): Work around hints
+	cache issue.
+
+2015-01-15  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR target/59710
+	* doc/invoke.texi (Option Summary): Document new Nios II
+	-mgpopt= syntax.
+	(Nios II Options): Likewise.
+	* config/nios2/nios2.opt: Add -mgpopt= option support.
+	Modify existing -mgpopt and -mno-gpopt options to be aliases.
+	* config/nios2/nios2-opts.h (enum nios2_gpopt_type): New.
+	* config/nios2/nios2.c (nios2_option_override): Adjust
+	-mgpopt defaulting.
+	(nios2_in_small_data_p): Return true for explicit small data
+	sections even with -G0.
+	(nios2_symbol_ref_in_small_data_p): Adjust to handle new -mgpopt=
+	option choices.
+
+2015-01-15  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/64612
+	* ipa-inline-transform.c (can_remove_node_now_p): Fix handling
+	of comdat locals.
+	(inline_call): Fix removal of aliases.
+
+2015-01-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* flag-types.h (enum sanitize_code): Add SANITIZE_VPTR,
+	include SANITIZE_VPTR in SANITIZE_UNDEFINED.
+	* opts.c (common_handle_option): Add -fsanitize=vptr.
+	* sanitizer.def (BUILT_IN_UBSAN_HANDLE_DYNAMIC_TYPE_CACHE_MISS,
+	BUILT_IN_UBSAN_HANDLE_DYNAMIC_TYPE_CACHE_MISS_ABORT): New.
+	* ubsan.h (enum ubsan_null_ckind): Add UBSAN_DOWNCAST_POINTER,
+	UBSAN_DOWNCAST_REFERENCE, UBSAN_UPCAST and UBSAN_CAST_TO_VBASE.
+	(ubsan_expand_vptr_ifn): New prototype.
+	* internal-fn.c (expand_ANNOTATE, expand_GOMP_SIMD_LANE,
+	expand_GOMP_SIMD_VF, expand_GOMP_SIMD_LAST_LANE, expand_UBSAN_NULL,
+	expand_UBSAN_BOUNDS, expand_UBSAN_OBJECT_SIZE, expand_ASAN_CHECK,
+	expand_LOOP_VECTORIZED): Make argument nameless, remove
+	ATTRIBUTE_UNUSED.
+	(expand_UBSAN_VPTR): New function.
+	* internal-fn.def (UBSAN_NULL, ASAN_CHECK): Use R instead of W
+	in fn spec.
+	(UBSAN_VPTR): New internal function.
+	* sanopt.c (tree_map_traits): Renamed to ...
+	(sanopt_tree_map_traits): ... this.
+	(sanopt_tree_triplet, sanopt_tree_triplet_map_traits): New classes.
+	(sanopt_ctx): Adjust asan_check_map type for tree_map_traits
+	to sanopt_tree_map_traits renaming.  Add vptr_check_map field.
+	(maybe_optimize_ubsan_vptr_ifn): New function.
+	(sanopt_optimize_walker): Handle IFN_UBSAN_VPTR.
+	(pass_sanopt::execute): Likewise.  Call sanopt_optimize even for
+	-fsanitize=vptr.
+	* tree-ssa-alias.c (call_may_clobber_ref_p_1): Handle certain
+	internal calls like pure functions for aliasing, even when they
+	have other side-effects that prevent making them ECF_PURE.
+	* ubsan.c (ubsan_vptr_type_cache_decl): New variable.
+	(ubsan_expand_vptr_ifn): New function.
+
+2015-01-15  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/64110
+	* stmt.c (parse_output_constraint): Process '^' and '$'.
+	(parse_input_constraint): Ditto.
+	* lra-constraints.c (process_alt_operands): Process the new
+	constraints.
+	* ira-costs.c (record_reg_classes): Process the new constraint
+	'^'.
+	* genoutput.c (indep_constraints): Add '^' and '$'.
+	* config/i386/sse.md (*vec_dup<mode>): Use '$' instead of '!'.
+	* doc/md.texi: Add description of the new constraints.
+
+2015-01-15  Thomas Schwinge  <thomas@codesourcery.com>
+	    Bernd Schmidt  <bernds@codesourcery.com>
+	    Cesar Philippidis  <cesar@codesourcery.com>
+	    James Norris  <jnorris@codesourcery.com>
+	    Tom de Vries  <tom@codesourcery.com>
+	    Ilmir Usmanov  <i.usmanov@samsung.com>
+	    Dmitry Bocharnikov  <dmitry.b@samsung.com>
+	    Evgeny Gavrin  <e.gavrin@samsung.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	* builtin-types.def (BT_FN_VOID_INT_INT_VAR)
+	(BT_FN_VOID_INT_PTR_SIZE_PTR_PTR_PTR_INT_INT_VAR)
+	(BT_FN_VOID_INT_OMPFN_PTR_SIZE_PTR_PTR_PTR_INT_INT_INT_INT_INT_VAR):
+	New function types.
+	* builtins.c: Include "gomp-constants.h".
+	(expand_builtin_acc_on_device): New function.
+	(expand_builtin, is_inexpensive_builtin): Handle
+	BUILT_IN_ACC_ON_DEVICE.
+	* builtins.def (DEF_GOACC_BUILTIN, DEF_GOACC_BUILTIN_COMPILER):
+	New macros.
+	* cgraph.c (cgraph_node::create): Consider flag_openacc next to
+	flag_openmp.
+	* config.gcc <nvptx-*> (tm_file): Add nvptx/offload.h.
+	<*-intelmic-* | *-intelmicemul-*> (tm_file): Add
+	i386/intelmic-offload.h.
+	* gcc.c (LINK_COMMAND_SPEC, GOMP_SELF_SPECS): For -fopenacc, link
+	to libgomp and its dependencies.
+	* config/arc/arc.h (LINK_COMMAND_SPEC): Likewise.
+	* config/darwin.h (LINK_COMMAND_SPEC_A): Likewise.
+	* config/i386/mingw32.h (GOMP_SELF_SPECS): Likewise.
+	* config/ia64/hpux.h (LIB_SPEC): Likewise.
+	* config/pa/pa-hpux11.h (LIB_SPEC): Likewise.
+	* config/pa/pa64-hpux.h (LIB_SPEC): Likewise.
+	* doc/generic.texi: Update for OpenACC changes.
+	* doc/gimple.texi: Likewise.
+	* doc/invoke.texi: Likewise.
+	* doc/sourcebuild.texi: Likewise.
+	* gimple-pretty-print.c (dump_gimple_omp_for): Handle
+	GF_OMP_FOR_KIND_OACC_LOOP.
+	(dump_gimple_omp_target): Handle GF_OMP_TARGET_KIND_OACC_KERNELS,
+	GF_OMP_TARGET_KIND_OACC_PARALLEL, GF_OMP_TARGET_KIND_OACC_DATA,
+	GF_OMP_TARGET_KIND_OACC_UPDATE,
+	GF_OMP_TARGET_KIND_OACC_ENTER_EXIT_DATA.
+	Dump more data.
+	* gimple.c: Update comments for OpenACC changes.
+	* gimple.def: Likewise.
+	* gimple.h: Likewise.
+	(enum gf_mask): Add GF_OMP_FOR_KIND_OACC_LOOP,
+	GF_OMP_TARGET_KIND_OACC_PARALLEL, GF_OMP_TARGET_KIND_OACC_KERNELS,
+	GF_OMP_TARGET_KIND_OACC_DATA, GF_OMP_TARGET_KIND_OACC_UPDATE,
+	GF_OMP_TARGET_KIND_OACC_ENTER_EXIT_DATA.
+	(gimple_omp_for_cond, gimple_omp_for_set_cond): Sort in the
+	appropriate place.
+	(is_gimple_omp_oacc, is_gimple_omp_offloaded): New functions.
+	* gimplify.c: Include "gomp-constants.h".
+	Update comments for OpenACC changes.
+	(is_gimple_stmt): Handle OACC_PARALLEL, OACC_KERNELS, OACC_DATA,
+	OACC_HOST_DATA, OACC_DECLARE, OACC_UPDATE, OACC_ENTER_DATA,
+	OACC_EXIT_DATA, OACC_CACHE, OACC_LOOP.
+	(gimplify_scan_omp_clauses, gimplify_adjust_omp_clauses): Handle
+	OMP_CLAUSE__CACHE_, OMP_CLAUSE_ASYNC, OMP_CLAUSE_WAIT,
+	OMP_CLAUSE_NUM_GANGS, OMP_CLAUSE_NUM_WORKERS,
+	OMP_CLAUSE_VECTOR_LENGTH, OMP_CLAUSE_GANG, OMP_CLAUSE_WORKER,
+	OMP_CLAUSE_VECTOR, OMP_CLAUSE_DEVICE_RESIDENT,
+	OMP_CLAUSE_USE_DEVICE, OMP_CLAUSE_INDEPENDENT, OMP_CLAUSE_AUTO,
+	OMP_CLAUSE_SEQ.
+	(gimplify_adjust_omp_clauses_1, gimplify_adjust_omp_clauses): Use
+	GOMP_MAP_* instead of OMP_CLAUSE_MAP_*.  Use
+	OMP_CLAUSE_SET_MAP_KIND.
+	(gimplify_oacc_cache): New function.
+	(gimplify_omp_for): Handle OACC_LOOP.
+	(gimplify_omp_workshare): Handle OACC_KERNELS, OACC_PARALLEL,
+	OACC_DATA.
+	(gimplify_omp_target_update): Handle OACC_ENTER_DATA,
+	OACC_EXIT_DATA, OACC_UPDATE.
+	(gimplify_expr): Handle OACC_LOOP, OACC_CACHE, OACC_HOST_DATA,
+	OACC_DECLARE, OACC_KERNELS, OACC_PARALLEL, OACC_DATA,
+	OACC_ENTER_DATA, OACC_EXIT_DATA, OACC_UPDATE.
+	(gimplify_body): Consider flag_openacc next to flag_openmp.
+	* lto-streamer-out.c: Include "gomp-constants.h".
+	* omp-builtins.def (BUILT_IN_ACC_GET_DEVICE_TYPE)
+	(BUILT_IN_GOACC_DATA_START, BUILT_IN_GOACC_DATA_END)
+	(BUILT_IN_GOACC_ENTER_EXIT_DATA, BUILT_IN_GOACC_PARALLEL)
+	(BUILT_IN_GOACC_UPDATE, BUILT_IN_GOACC_WAIT)
+	(BUILT_IN_GOACC_GET_THREAD_NUM, BUILT_IN_GOACC_GET_NUM_THREADS)
+	(BUILT_IN_ACC_ON_DEVICE): New builtins.
+	* omp-low.c: Include "gomp-constants.h".
+	Update comments for OpenACC changes.
+	(struct omp_context): Add reduction_map, gwv_below, gwv_this
+	members.
+	(extract_omp_for_data, use_pointer_for_field, install_var_field)
+	(new_omp_context, delete_omp_context, scan_sharing_clauses)
+	(create_omp_child_function, scan_omp_for, scan_omp_target)
+	(check_omp_nesting_restrictions, lower_reduction_clauses)
+	(build_omp_regions_1, diagnose_sb_0, make_gimple_omp_edges):
+	Update for OpenACC changes.
+	(scan_sharing_clauses): Handle OMP_CLAUSE_NUM_GANGS:
+	OMP_CLAUSE_NUM_WORKERS: OMP_CLAUSE_VECTOR_LENGTH,
+	OMP_CLAUSE_ASYNC, OMP_CLAUSE_WAIT, OMP_CLAUSE_GANG,
+	OMP_CLAUSE_WORKER, OMP_CLAUSE_VECTOR, OMP_CLAUSE_DEVICE_RESIDENT,
+	OMP_CLAUSE_USE_DEVICE, OMP_CLAUSE__CACHE_, OMP_CLAUSE_INDEPENDENT,
+	OMP_CLAUSE_AUTO, OMP_CLAUSE_SEQ.  Use GOMP_MAP_* instead of
+	OMP_CLAUSE_MAP_*.
+	(expand_omp_for_static_nochunk, expand_omp_for_static_chunk):
+	Handle GF_OMP_FOR_KIND_OACC_LOOP.
+	(expand_omp_target, lower_omp_target): Handle
+	GF_OMP_TARGET_KIND_OACC_PARALLEL, GF_OMP_TARGET_KIND_OACC_KERNELS,
+	GF_OMP_TARGET_KIND_OACC_UPDATE,
+	GF_OMP_TARGET_KIND_OACC_ENTER_EXIT_DATA,
+	GF_OMP_TARGET_KIND_OACC_DATA.
+	(pass_expand_omp::execute, execute_lower_omp)
+	(pass_diagnose_omp_blocks::gate): Consider flag_openacc next to
+	flag_openmp.
+	(offload_symbol_decl): New variable.
+	(oacc_get_reduction_array_id, oacc_max_threads)
+	(get_offload_symbol_decl, get_base_type, lookup_oacc_reduction)
+	(maybe_lookup_oacc_reduction, enclosing_target_ctx)
+	(oacc_loop_or_target_p, oacc_lower_reduction_var_helper)
+	(oacc_gimple_assign, oacc_initialize_reduction_data)
+	(oacc_finalize_reduction_data, oacc_process_reduction_data): New
+	functions.
+	(is_targetreg_ctx): Remove function.
+	* tree-core.h (enum omp_clause_code): Add OMP_CLAUSE__CACHE_,
+	OMP_CLAUSE_DEVICE_RESIDENT, OMP_CLAUSE_USE_DEVICE,
+	OMP_CLAUSE_GANG, OMP_CLAUSE_ASYNC, OMP_CLAUSE_WAIT,
+	OMP_CLAUSE_AUTO, OMP_CLAUSE_SEQ, OMP_CLAUSE_INDEPENDENT,
+	OMP_CLAUSE_WORKER, OMP_CLAUSE_VECTOR, OMP_CLAUSE_NUM_GANGS,
+	OMP_CLAUSE_NUM_WORKERS, OMP_CLAUSE_VECTOR_LENGTH.
+	* tree.c (omp_clause_code_name, walk_tree_1): Update accordingly.
+	* tree.h (OMP_CLAUSE_GANG_EXPR, OMP_CLAUSE_GANG_STATIC_EXPR)
+	(OMP_CLAUSE_ASYNC_EXPR, OMP_CLAUSE_WAIT_EXPR)
+	(OMP_CLAUSE_VECTOR_EXPR, OMP_CLAUSE_WORKER_EXPR)
+	(OMP_CLAUSE_NUM_GANGS_EXPR, OMP_CLAUSE_NUM_WORKERS_EXPR)
+	(OMP_CLAUSE_VECTOR_LENGTH_EXPR): New macros.
+	* tree-core.h: Update comments for OpenACC changes.
+	(enum omp_clause_map_kind): Remove.
+	(struct tree_omp_clause): Change type of map_kind member from enum
+	omp_clause_map_kind to unsigned char.
+	* tree-inline.c: Update comments for OpenACC changes.
+	* tree-nested.c: Likewise.  Include "gomp-constants.h".
+	(convert_nonlocal_reference_stmt, convert_local_reference_stmt)
+	(convert_tramp_reference_stmt, convert_gimple_call): Update for
+	OpenACC changes.  Use GOMP_MAP_* instead of OMP_CLAUSE_MAP_*.  Use
+	OMP_CLAUSE_SET_MAP_KIND.
+	* tree-pretty-print.c: Include "gomp-constants.h".
+	(dump_omp_clause): Handle OMP_CLAUSE_DEVICE_RESIDENT,
+	OMP_CLAUSE_USE_DEVICE, OMP_CLAUSE__CACHE_, OMP_CLAUSE_GANG,
+	OMP_CLAUSE_ASYNC, OMP_CLAUSE_AUTO, OMP_CLAUSE_SEQ,
+	OMP_CLAUSE_WAIT, OMP_CLAUSE_WORKER, OMP_CLAUSE_VECTOR,
+	OMP_CLAUSE_NUM_GANGS, OMP_CLAUSE_NUM_WORKERS,
+	OMP_CLAUSE_VECTOR_LENGTH, OMP_CLAUSE_INDEPENDENT.  Use GOMP_MAP_*
+	instead of OMP_CLAUSE_MAP_*.
+	(dump_generic_node): Handle OACC_PARALLEL, OACC_KERNELS,
+	OACC_DATA, OACC_HOST_DATA, OACC_DECLARE, OACC_UPDATE,
+	OACC_ENTER_DATA, OACC_EXIT_DATA, OACC_CACHE, OACC_LOOP.
+	* tree-streamer-in.c: Include "gomp-constants.h".
+	(unpack_ts_omp_clause_value_fields) Use GOMP_MAP_* instead of
+	OMP_CLAUSE_MAP_*.  Use OMP_CLAUSE_SET_MAP_KIND.
+	* tree-streamer-out.c: Include "gomp-constants.h".
+	(pack_ts_omp_clause_value_fields): Use GOMP_MAP_* instead of
+	OMP_CLAUSE_MAP_*.
+	* tree.def (OACC_PARALLEL, OACC_KERNELS, OACC_DATA)
+	(OACC_HOST_DATA, OACC_LOOP, OACC_CACHE, OACC_DECLARE)
+	(OACC_ENTER_DATA, OACC_EXIT_DATA, OACC_UPDATE): New tree codes.
+	* tree.c (omp_clause_num_ops): Update accordingly.
+	* tree.h (OMP_BODY, OMP_CLAUSES, OMP_LOOP_CHECK, OMP_CLAUSE_SIZE):
+	Likewise.
+	(OACC_PARALLEL_BODY, OACC_PARALLEL_CLAUSES, OACC_KERNELS_BODY)
+	(OACC_KERNELS_CLAUSES, OACC_DATA_BODY, OACC_DATA_CLAUSES)
+	(OACC_HOST_DATA_BODY, OACC_HOST_DATA_CLAUSES, OACC_CACHE_CLAUSES)
+	(OACC_DECLARE_CLAUSES, OACC_ENTER_DATA_CLAUSES)
+	(OACC_EXIT_DATA_CLAUSES, OACC_UPDATE_CLAUSES)
+	(OACC_KERNELS_COMBINED, OACC_PARALLEL_COMBINED): New macros.
+	* tree.h (OMP_CLAUSE_MAP_KIND): Cast it to enum gomp_map_kind.
+	(OMP_CLAUSE_SET_MAP_KIND): New macro.
+	* varpool.c (varpool_node::get_create): Consider flag_openacc next
+	to flag_openmp.
+	* config/i386/intelmic-offload.h: New file.
+	* config/nvptx/offload.h: Likewise.
+
+2015-01-15  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	* explow.h: Remove duplicate contents.
+	* dojump.h: Likewise.
+
+2015-01-15  Richard Earnshaw  <rearnsha@arm.com>
+
+	* arm.c (arm_xgene_tune): Add default initializer for instruction
+	fusion.
+
+2015-01-15  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/64068
+	PR ipa/64559
+	* ipa.c (symbol_table::remove_unreachable_nodes):
+	Do not put abstract origins into boundary.
+
+2015-01-15  Evgeny Stupachenko  <evstupac@gmail.com>
+
+	* config/i386/gnu-user.h (CRT_GET_RFIB_DATA): Remove EBX register usage.
+	* config/i386/sysv4.h (CRT_GET_RFIB_DATA): Ditto.
+
+2015-01-15  Steve Ellcey  <sellcey@mips.com>
+
+	* Makefile.in (PLUGIN_HEADERS): Add dominance.h, cfg.h, cfgrtl.h,
+	cfganal.h, cfgbuild.h, cfgcleanup.h, lcm.h, cfgloopmanip.h,
+	builtins.def, and chkp-builtins.def.
+
+2015-01-15  David Edelsohn  <dje.gcc@gmail.com>
 
 	* config/rs6000/default64.h (TARGET_DEFAULT) [LITTLE_ENDIAN]: Use
 	ISA 2.7 (POWER8).
@@ -700,7 +1034,7 @@
 	Do not save lr in case of tail call.
 	* config/arm/thumb2.md (*thumb2_pop_single): New pattern.
 
-2015-01-13  Martin Uecker <uecker@eecs.berkeley.edu>
+2015-01-14  Martin Uecker <uecker@eecs.berkeley.edu>
 
 	* tree-vrp.c (check_array_ref): Emit more warnings
 	for warn_array_bounds >= 2.
@@ -838,7 +1172,7 @@
 	(perform_symbolic_merge): This. Also fix computation of the range and
 	end of the symbolic number corresponding to the result of a bitwise OR.
 
-2014-01-13  Richard Biener  <rguenther@suse.de>
+2015-01-13  Richard Biener  <rguenther@suse.de>
 
 	PR tree-optimization/64568
 	* tree-ssa-forwprop.c (pass_forwprop::execute): Properly
