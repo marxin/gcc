@@ -1,5 +1,6 @@
 
 
+
 2015-01-15  Jan Hubicka  <hubicka@ucw.cz>
 
 	* ipa-inline.c (inline_small_functions): Work around hints
