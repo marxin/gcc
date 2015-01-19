@@ -1,4 +1,5 @@
 
+
 2015-01-19  Martin Liska  <mliska@suse.cz>
 
 	* doc/extend.texi (no_icf): Add new attribute description.
