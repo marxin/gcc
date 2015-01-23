@@ -525,12 +525,37 @@ sem_function::equals_private (sem_item *item,
   if (decl1 != decl2)
     return return_false();
 
-
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
     if (!m_checker->compare_decl (arg1, arg2))
       return return_false ();
+
+  /* Compare if this function contains any function references
+     and compare them.  */
+  cgraph_node *source_node = get_node ();
+  cgraph_node *target_node = m_compared_func->get_node ();
+  if (source_node->num_references () != target_node->num_references ())
+    return return_false_with_msg ("different number of references");
+
+  ipa_ref *r1 = NULL, *r2 = NULL;
+
+  for (unsigned i = 0; i < source_node->num_references (); i++)
+    {
+      symtab_node *ref1 = source_node->iterate_reference (i, r1)->referred;
+      symtab_node *ref2 = target_node->iterate_reference (i, r2)->referred;
+
+      bool is_cgraph1 = is_a<cgraph_node *> (ref1);
+      bool is_cgraph2 = is_a<cgraph_node *> (ref2);
+
+      if (!is_cgraph1 && !is_cgraph2)
+	continue;
+
+      if ((is_cgraph1 && is_cgraph2 && ref1 != ref2)
+	  || (!is_cgraph1 && is_cgraph2)
+	  || (is_cgraph1 && !is_cgraph2))
+	return return_false_with_msg ("different target of a reference");
+    }
 
   /* Fill-up label dictionary.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
