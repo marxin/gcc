@@ -29,7 +29,8 @@ class congruence_class
 {
 public:
   /* Congruence class constructor for a new class with _ID.  */
-  congruence_class (unsigned int _id): in_worklist (false), id(_id)
+  congruence_class (unsigned int _id): in_worklist (false), id(_id),
+    sensitive_reference (false)
   {
   }
 
@@ -54,6 +55,9 @@ public:
 
   /* Global unique class identifier.  */
   unsigned int id;
+
+  /* A function from the class contains a reference to another class.  */
+  bool sensitive_reference;
 };
 
 /* Semantic item type enum.  */
@@ -475,6 +479,10 @@ private:
 
   /* Iterative congruence reduction function.  */
   void process_cong_reduction (void);
+
+  /* Identify congruence classes which have an address taken. These
+     classes can be potentially been merged just as thunks.  */
+  void identify_address_sensitive_classes (void);
 
   /* After reduction is done, we can declare all items in a group
      to be equal. PREV_CLASS_COUNT is start number of classes

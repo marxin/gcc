@@ -38,7 +38,7 @@ int main()
   return 0;
 }
 
-/* { dg-final { scan-ipa-dump "Semantic equality hit:bar->foo" "icf"  } } */
 /* { dg-final { scan-ipa-dump "Semantic equality hit:remove->destroy" "icf"  } } */
 /* { dg-final { scan-ipa-dump "Equal symbols: 2" "icf"  } } */
+/* { dg-final { scan-ipa-dump "A function from the congruence class uses a sensitive reference." "icf"  } } */
 /* { dg-final { cleanup-ipa-dump "icf" } } */

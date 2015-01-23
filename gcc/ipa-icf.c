@@ -1751,6 +1751,7 @@ sem_item_optimizer::execute (void)
   unsigned int prev_class_count = m_classes_count;
 
   process_cong_reduction ();
+  identify_address_sensitive_classes ();
   dump_cong_classes ();
   verify_classes ();
   merge_classes (prev_class_count);
@@ -2262,6 +2263,61 @@ sem_item_optimizer::process_cong_reduction (void)
     do_congruence_step (cls);
 }
 
+
+/* Identify congruence classes which have an address taken. These
+   classes can be potentially been merged just as thunks.  */
+
+void
+sem_item_optimizer::identify_address_sensitive_classes (void)
+{
+  for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
+    for (unsigned i = 0; i < (*it)->classes.length (); i++)
+      {
+	congruence_class *cls = (*it)->classes[i];
+
+	if (cls->members.length () == 1)
+	  continue;
+
+	auto_vec <sem_item *> references;
+	sem_item *source_node = cls->members[0];
+	ipa_ref *r;
+
+	for (unsigned j = 0; j < source_node->node->num_references (); j++)
+	  {
+	    symtab_node *ref = source_node->node->iterate_reference (j, r)->referred;
+	    sem_item **symbol = m_symtab_node_map.get (ref);
+	    if (symbol)
+	      references.safe_push (*symbol);
+	  }
+
+	for (unsigned j = 1; j < cls->members.length (); j++)
+	  {
+	    source_node = cls->members[j];
+
+	    unsigned l = 0;
+	    for (unsigned k = 0; k < source_node->node->num_references (); k++)
+	      {
+		symtab_node *ref = source_node->node->iterate_reference (k, r)->referred;
+		sem_item **symbol = m_symtab_node_map.get (ref);
+		if (symbol)
+		  {
+		    if (l >= references.length () || references[l] != *symbol)
+		      {
+			cls->sensitive_reference = true;
+			break;
+		      }
+
+		    l++;
+		  }
+	      }
+
+	    if (cls->sensitive_reference)
+	      break;
+	  }
+      }
+}
+
 /* Debug function prints all informations about congruence classes.  */
 
 void
@@ -2396,6 +2452,15 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 		continue;
 	      }
 
+	    if (c->sensitive_reference)
+	      {
+		if (dump_file)
+		  fprintf (dump_file, "A function from the congruence class "
+			   "uses a sensitive reference.\n");
+
+		continue;
+	      }
+
 	    if (dump_file && (dump_flags & TDF_DETAILS))
 	      {
 		source->dump_to_file (dump_file);
@@ -2412,8 +2477,10 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 void
 congruence_class::dump (FILE *file, unsigned int indent) const
 {
-  FPRINTF_SPACES (file, indent, "class with id: %u, hash: %u, items: %u\n",
-		  id, members[0]->get_hash (), members.length ());
+  FPRINTF_SPACES (file, indent,
+		  "class with id: %u, hash: %u, items: %u %s\n",
+		  id, members[0]->get_hash (), members.length (),
+		  sensitive_reference ? "sensitive_reference" : "");
 
   FPUTS_SPACES (file, indent + 2, "");
   for (unsigned i = 0; i < members.length (); i++)
