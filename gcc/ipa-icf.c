@@ -525,37 +525,12 @@ sem_function::equals_private (sem_item *item,
   if (decl1 != decl2)
     return return_false();
 
+
   for (arg1 = DECL_ARGUMENTS (decl),
        arg2 = DECL_ARGUMENTS (m_compared_func->decl);
        arg1; arg1 = DECL_CHAIN (arg1), arg2 = DECL_CHAIN (arg2))
     if (!m_checker->compare_decl (arg1, arg2))
       return return_false ();
-
-  /* Compare if this function contains any function references
-     and compare them.  */
-  cgraph_node *source_node = get_node ();
-  cgraph_node *target_node = m_compared_func->get_node ();
-  if (source_node->num_references () != target_node->num_references ())
-    return return_false_with_msg ("different number of references");
-
-  ipa_ref *r1 = NULL, *r2 = NULL;
-
-  for (unsigned i = 0; i < source_node->num_references (); i++)
-    {
-      symtab_node *ref1 = source_node->iterate_reference (i, r1)->referred;
-      symtab_node *ref2 = target_node->iterate_reference (i, r2)->referred;
-
-      bool is_cgraph1 = is_a<cgraph_node *> (ref1);
-      bool is_cgraph2 = is_a<cgraph_node *> (ref2);
-
-      if (!is_cgraph1 && !is_cgraph2)
-	continue;
-
-      if ((is_cgraph1 && is_cgraph2 && ref1 != ref2)
-	  || (!is_cgraph1 && is_cgraph2)
-	  || (is_cgraph1 && !is_cgraph2))
-	return return_false_with_msg ("different target of a reference");
-    }
 
   /* Fill-up label dictionary.  */
   for (unsigned i = 0; i < bb_sorted.length (); ++i)
@@ -610,9 +585,10 @@ sem_function::equals_private (sem_item *item,
 }
 
 /* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
-   be applied.  */
+   be applied. If ADDRESS_IS_SENSITIVE is set to true,
+   we cannot create an alias.  */
 bool
-sem_function::merge (sem_item *alias_item)
+sem_function::merge (sem_item *alias_item, bool address_is_sensitive)
 {
   gcc_assert (alias_item->type == FUNC);
 
@@ -686,7 +662,8 @@ sem_function::merge (sem_item *alias_item)
     }
 
   if (create_alias && (DECL_COMDAT_GROUP (alias->decl)
-		       || !sem_item::target_supports_symbol_aliases_p ()))
+		       || !sem_item::target_supports_symbol_aliases_p ()
+		       || address_is_sensitive))
     {
       create_alias = false;
       create_thunk = true;
@@ -1283,7 +1260,7 @@ sem_variable::get_hash (void)
    be applied.  */
 
 bool
-sem_variable::merge (sem_item *alias_item)
+sem_variable::merge (sem_item *alias_item, bool ARG_UNUSED(address_is_sensitive))
 {
   gcc_assert (alias_item->type == VAR);
 
@@ -1754,6 +1731,7 @@ sem_item_optimizer::execute (void)
   unsigned int prev_class_count = m_classes_count;
 
   process_cong_reduction ();
+  identify_address_sensitive_classes ();
   dump_cong_classes ();
   verify_classes ();
   merge_classes (prev_class_count);
@@ -2265,6 +2243,51 @@ sem_item_optimizer::process_cong_reduction (void)
     do_congruence_step (cls);
 }
 
+
+/* Identify congruence classes which have an address taken. These
+   classes can be potentially been merged just as thunks.  */
+
+void
+sem_item_optimizer::identify_address_sensitive_classes (void)
+{
+  hash_map <congruence_class *, sem_item *> references;
+
+  for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
+       it != m_classes.end (); ++it)
+    for (unsigned i = 0; i < (*it)->classes.length (); i++)
+      {
+	bool exit_inner = false;
+	congruence_class *cls = (*it)->classes[i];
+
+	for (unsigned j = 0; j < !exit_inner && cls->members.length (); j++)
+	  {
+	    sem_item *source_node = cls->members[j];
+	    ipa_ref *r;
+	    for (unsigned k = 0; k < source_node->node->num_references (); k++)
+	      {
+		symtab_node *ref = source_node->node->iterate_reference (k, r)->referred;
+		sem_item **symbol = m_symtab_node_map.get (ref);
+		if (symbol)
+		  {
+		    /* Get reference for class the symbol belongs to.  */
+		    sem_item **target = references.get ((*symbol)->cls);
+		    if (target)
+		      {
+			if (*target != *symbol)
+			  {
+			    (*target)->cls->address_used = true;
+			    exit_inner = true;
+			    break;
+			  }
+		      }
+		    else
+		      references.put ((*symbol)->cls, *symbol);
+		  }
+	      }
+	  }
+      }
+}
+
 /* Debug function prints all informations about congruence classes.  */
 
 void
@@ -2399,13 +2422,18 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 		continue;
 	      }
 
+
+	    if (dump_file && c->address_used)
+	      fprintf (dump_file, "A function from the congruence class has "
+		       "address taken.\n");
+
 	    if (dump_file && (dump_flags & TDF_DETAILS))
 	      {
 		source->dump_to_file (dump_file);
 		alias->dump_to_file (dump_file);
 	      }
 
-	    source->merge (alias);
+	    source->merge (alias, c->address_used);
 	  }
       }
 }

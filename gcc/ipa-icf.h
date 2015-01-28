@@ -29,7 +29,8 @@ class congruence_class
 {
 public:
   /* Congruence class constructor for a new class with _ID.  */
-  congruence_class (unsigned int _id): in_worklist (false), id(_id)
+  congruence_class (unsigned int _id): in_worklist (false), id(_id),
+    address_used (false)
   {
   }
 
@@ -54,6 +55,9 @@ public:
 
   /* Global unique class identifier.  */
   unsigned int id;
+
+  /* Address of a member is taken.  */
+  bool address_used;
 };
 
 /* Semantic item type enum.  */
@@ -130,8 +134,9 @@ public:
   virtual hashval_t get_hash (void) = 0;
 
   /* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
-     be applied.  */
-  virtual bool merge (sem_item *alias_item) = 0;
+     be applied. If ADDRESS_IS_SENSITIVE is set to true,
+     we cannot create an alias.  */
+  virtual bool merge (sem_item *alias_item, bool address_is_sensitive) = 0;
 
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file) = 0;
@@ -206,7 +211,7 @@ public:
   virtual hashval_t get_hash (void);
   virtual bool equals (sem_item *item,
 		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
-  virtual bool merge (sem_item *alias_item);
+  virtual bool merge (sem_item *alias_item, bool address_is_sensitive);
 
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file)
@@ -328,7 +333,7 @@ public:
   }
 
   virtual hashval_t get_hash (void);
-  virtual bool merge (sem_item *alias_item);
+  virtual bool merge (sem_item *alias_item, bool ARG_UNUSED(address_is_sensitive));
   virtual void dump_to_file (FILE *file);
   virtual bool equals (sem_item *item,
 		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
@@ -475,6 +480,10 @@ private:
 
   /* Iterative congruence reduction function.  */
   void process_cong_reduction (void);
+
+  /* Identify congruence classes which have an address taken. These
+     classes can be potentially been merged just as thunks.  */
+  void identify_address_sensitive_classes (void);
 
   /* After reduction is done, we can declare all items in a group
      to be equal. PREV_CLASS_COUNT is start number of classes

@@ -39,5 +39,6 @@ int main()
   return 0;
 }
 
-/* { dg-final { scan-ipa-dump "different target of a reference" "icf"  } } */
+/* { dg-final { scan-ipa-dump "Equal symbols: 2" "icf"  } } */
+/* { dg-final { scan-ipa-dump "A function from the congruence class has address taken." "icf"  } } */
 /* { dg-final { cleanup-ipa-dump "icf" } } */
