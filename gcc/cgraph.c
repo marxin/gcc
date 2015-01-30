@@ -1695,10 +1695,11 @@ cgraph_node::release_body (bool keep_arguments)
   ipa_transforms_to_apply.release ();
   if (!used_as_abstract_origin && symtab->state != PARSING)
     {
-      DECL_RESULT (decl) = NULL;
-
       if (!keep_arguments)
-	DECL_ARGUMENTS (decl) = NULL;
+	{
+	  DECL_RESULT (decl) = NULL;
+	  DECL_ARGUMENTS (decl) = NULL;
+	}
     }
   /* If the node is abstract and needed, then do not clear DECL_INITIAL
      of its associated function function declaration because it's

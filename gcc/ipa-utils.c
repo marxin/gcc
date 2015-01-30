@@ -411,7 +411,7 @@ get_base_var (tree t)
 
 void
 ipa_merge_profiles (struct cgraph_node *dst,
-		    struct cgraph_node *src)
+		    struct cgraph_node *src, bool keep_arguments)
 {
   tree oldsrcdecl = src->decl;
   struct function *srccfun, *dstcfun;
@@ -652,7 +652,7 @@ ipa_merge_profiles (struct cgraph_node *dst,
 	      e->frequency = freq;
 	    }
 	}
-      src->release_body ();
+      src->release_body (keep_arguments);
       inline_update_overall_summary (dst);
     }
   /* TODO: if there is no match, we can scale up.  */

@@ -121,7 +121,7 @@ lto_cgraph_replace_node (struct cgraph_node *node,
       node->instrumented_version = NULL;
     }
 
-  ipa_merge_profiles (prevailing_node, node);
+  ipa_merge_profiles (prevailing_node, node, false);
   lto_free_function_in_decl_state_for_node (node);
 
   if (node->decl != prevailing_node->decl)
