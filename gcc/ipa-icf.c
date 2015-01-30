@@ -2443,8 +2443,10 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 void
 congruence_class::dump (FILE *file, unsigned int indent) const
 {
-  FPRINTF_SPACES (file, indent, "class with id: %u, hash: %u, items: %u\n",
-		  id, members[0]->get_hash (), members.length ());
+  FPRINTF_SPACES (file, indent,
+		  "class with id: %u, hash: %u, items: %u %s\n",
+		  id, members[0]->get_hash (), members.length (),
+		  address_used ? "address_used" : "");
 
   FPUTS_SPACES (file, indent + 2, "");
   for (unsigned i = 0; i < members.length (); i++)
