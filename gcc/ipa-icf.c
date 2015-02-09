@@ -588,7 +588,7 @@ sem_function::equals_private (sem_item *item,
    be applied. If ADDRESS_IS_SENSITIVE is set to true,
    we cannot create an alias.  */
 bool
-sem_function::merge (sem_item *alias_item, bool address_is_sensitive)
+sem_function::merge (sem_item *alias_item)
 {
   gcc_assert (alias_item->type == FUNC);
 
@@ -662,8 +662,7 @@ sem_function::merge (sem_item *alias_item, bool address_is_sensitive)
     }
 
   if (create_alias && (DECL_COMDAT_GROUP (alias->decl)
-		       || !sem_item::target_supports_symbol_aliases_p ()
-		       || address_is_sensitive))
+		       || !sem_item::target_supports_symbol_aliases_p ()))
     {
       create_alias = false;
       create_thunk = true;
@@ -1260,7 +1259,7 @@ sem_variable::get_hash (void)
    be applied.  */
 
 bool
-sem_variable::merge (sem_item *alias_item, bool ARG_UNUSED(address_is_sensitive))
+sem_variable::merge (sem_item *alias_item)
 {
   gcc_assert (alias_item->type == VAR);
 
@@ -2250,40 +2249,50 @@ sem_item_optimizer::process_cong_reduction (void)
 void
 sem_item_optimizer::identify_address_sensitive_classes (void)
 {
-  hash_map <congruence_class *, sem_item *> references;
-
   for (hash_table<congruence_class_group_hash>::iterator it = m_classes.begin ();
        it != m_classes.end (); ++it)
     for (unsigned i = 0; i < (*it)->classes.length (); i++)
       {
-	bool exit_inner = false;
 	congruence_class *cls = (*it)->classes[i];
 
-	for (unsigned j = 0; j < !exit_inner && cls->members.length (); j++)
+	if (cls->members.length () == 1)
+	  continue;
+
+	auto_vec <sem_item *> references;
+	sem_item *source_node = cls->members[0];
+	ipa_ref *r;
+
+	for (unsigned j = 0; j < source_node->node->num_references (); j++)
 	  {
-	    sem_item *source_node = cls->members[j];
-	    ipa_ref *r;
+	    symtab_node *ref = source_node->node->iterate_reference (j, r)->referred;
+	    sem_item **symbol = m_symtab_node_map.get (ref);
+	    if (symbol)
+	      references.safe_push (*symbol);
+	  }
+
+	for (unsigned j = 1; j < cls->members.length (); j++)
+	  {
+	    source_node = cls->members[j];
+
+	    unsigned l = 0;
 	    for (unsigned k = 0; k < source_node->node->num_references (); k++)
 	      {
 		symtab_node *ref = source_node->node->iterate_reference (k, r)->referred;
 		sem_item **symbol = m_symtab_node_map.get (ref);
 		if (symbol)
 		  {
-		    /* Get reference for class the symbol belongs to.  */
-		    sem_item **target = references.get ((*symbol)->cls);
-		    if (target)
+		    if (l >= references.length () || references[l] != *symbol)
 		      {
-			if (*target != *symbol)
-			  {
-			    (*target)->cls->address_used = true;
-			    exit_inner = true;
-			    break;
-			  }
+			cls->sensitive_reference = true;
+			break;
 		      }
-		    else
-		      references.put ((*symbol)->cls, *symbol);
+
+		    l++;
 		  }
 	      }
+
+	    if (cls->sensitive_reference)
+	      break;
 	  }
       }
 }
@@ -2422,10 +2431,13 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 		continue;
 	      }
 
+	    if (dump_file && c->sensitive_reference)
+	      {
+	        fprintf (dump_file, "A function from the congruence class uses "
+		         "a sensitive reference.\n");
 
-	    if (dump_file && c->address_used)
-	      fprintf (dump_file, "A function from the congruence class has "
-		       "address taken.\n");
+		continue;
+	      }
 
 	    if (dump_file && (dump_flags & TDF_DETAILS))
 	      {
@@ -2433,9 +2445,7 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 		alias->dump_to_file (dump_file);
 	      }
 
-	    // TODO: remove
-	    if (!c->address_used)
-	      source->merge (alias, c->address_used);
+	    source->merge (alias);
 	  }
       }
 }
@@ -2448,7 +2458,7 @@ congruence_class::dump (FILE *file, unsigned int indent) const
   FPRINTF_SPACES (file, indent,
 		  "class with id: %u, hash: %u, items: %u %s\n",
 		  id, members[0]->get_hash (), members.length (),
-		  address_used ? "address_used" : "");
+		  sensitive_reference ? "sensitive_reference" : "");
 
   FPUTS_SPACES (file, indent + 2, "");
   for (unsigned i = 0; i < members.length (); i++)

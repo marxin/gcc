@@ -30,7 +30,7 @@ class congruence_class
 public:
   /* Congruence class constructor for a new class with _ID.  */
   congruence_class (unsigned int _id): in_worklist (false), id(_id),
-    address_used (false)
+    sensitive_reference (false)
   {
   }
 
@@ -56,8 +56,8 @@ public:
   /* Global unique class identifier.  */
   unsigned int id;
 
-  /* Address of a member is taken.  */
-  bool address_used;
+  /* A function from the class contains a reference to another class.  */
+  bool sensitive_reference;
 };
 
 /* Semantic item type enum.  */
@@ -136,7 +136,7 @@ public:
   /* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
      be applied. If ADDRESS_IS_SENSITIVE is set to true,
      we cannot create an alias.  */
-  virtual bool merge (sem_item *alias_item, bool address_is_sensitive) = 0;
+  virtual bool merge (sem_item *alias_item) = 0;
 
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file) = 0;
@@ -211,7 +211,7 @@ public:
   virtual hashval_t get_hash (void);
   virtual bool equals (sem_item *item,
 		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
-  virtual bool merge (sem_item *alias_item, bool address_is_sensitive);
+  virtual bool merge (sem_item *alias_item);
 
   /* Dump symbol to FILE.  */
   virtual void dump_to_file (FILE *file)
@@ -333,7 +333,7 @@ public:
   }
 
   virtual hashval_t get_hash (void);
-  virtual bool merge (sem_item *alias_item, bool ARG_UNUSED(address_is_sensitive));
+  virtual bool merge (sem_item *alias_item);
   virtual void dump_to_file (FILE *file);
   virtual bool equals (sem_item *item,
 		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
