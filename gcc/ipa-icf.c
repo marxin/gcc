@@ -2433,7 +2433,9 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count)
 		alias->dump_to_file (dump_file);
 	      }
 
-	    source->merge (alias, c->address_used);
+	    // TODO: remove
+	    if (!c->address_used)
+	      source->merge (alias, c->address_used);
 	  }
       }
 }
