@@ -1651,6 +1651,7 @@ inline_small_functions (void)
   ipa_reduced_postorder (order, true, true, NULL);
   free (order);
 
+  symtab->enable_inline_cache = true;
   FOR_EACH_DEFINED_FUNCTION (node)
     if (!node->global.inlined_to)
       {
@@ -1966,6 +1967,7 @@ inline_small_functions (void)
 	}
     }
 
+  symtab->enable_inline_cache = false;
   free_growth_caches ();
   if (dump_file)
     fprintf (dump_file,

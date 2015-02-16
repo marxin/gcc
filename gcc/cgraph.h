@@ -261,16 +261,28 @@ public:
 				  void *data,
 				  bool include_overwrite);
 
+  /* Call callback on symtab node and aliases associated to this node.
+     When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
+     skipped.  */
+  template <typename Arg, bool (*callback) (symtab_node*, Arg arg)>
+  bool call_for_symbol_and_aliases (Arg data, bool include_overwrite);
+
   /* If node can not be interposable by static or dynamic linker to point to
      different definition, return this symbol. Otherwise look for alias with
      such property and if none exists, introduce new one.  */
   symtab_node *noninterposable_alias (void);
+
+  /* Worker searching noninterposable alias.  */
+  static bool noninterposable_alias (symtab_node *node, symtab_node **data);
 
   /* Return node that alias is aliasing.  */
   inline symtab_node *get_alias_target (void);
 
   /* Set section for symbol and its aliases.  */
   void set_section (const char *section);
+
+  /* Worker for set_section.  */
+  static bool set_section (symtab_node *n, const char *s);
 
   /* Set section, do not recurse into aliases.
      When one wants to change section of symbol and its aliases,
@@ -523,6 +535,11 @@ protected:
   bool call_for_symbol_and_aliases_1 (bool (*callback) (symtab_node *, void *),
 				      void *data,
 				      bool include_overwrite);
+
+  /* Worker for call_for_symbol_and_aliases.  */
+  template <typename Arg, bool (*callback) (symtab_node *, Arg)>
+  bool call_for_symbol_and_aliases_1 (Arg data, bool include_overwritable);
+
 private:
   /* Worker for set_section.  */
   static bool set_section (symtab_node *n, void *s);
@@ -1042,6 +1059,13 @@ public:
 						      void *),
 				    void *data, bool include_overwritable);
 
+  /* Call callback on function and aliases associated to the function.
+     When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
+     skipped. */
+  template <typename Arg, bool (*callback) (cgraph_node *, Arg)>
+  bool call_for_symbol_and_aliases (Arg data, bool include_overwritable);
+
+
   /* Call callback on cgraph_node, thunks and aliases associated to NODE.
      When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
      skipped.  When EXCLUDE_VIRTUAL_THUNKS is true, virtual thunks are
@@ -1049,6 +1073,15 @@ public:
   bool call_for_symbol_thunks_and_aliases (bool (*callback) (cgraph_node *node,
 							     void *data),
 					   void *data,
+					   bool include_overwritable,
+					   bool exclude_virtual_thunks = false);
+
+  /* Call callback on cgraph_node, thunks and aliases associated to NODE.
+     When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
+     skipped.  When EXCLUDE_VIRTUAL_THUNKS is true, virtual thunks are
+     skipped.  */
+  template <typename Arg, bool (*callback) (cgraph_node *, Arg)>
+  bool call_for_symbol_thunks_and_aliases (Arg data,
 					   bool include_overwritable,
 					   bool exclude_virtual_thunks = false);
 
@@ -1093,6 +1126,9 @@ public:
      the program unless we are compiling whole program or we do LTO.  In this
      case we know we win since dynamic linking will not really discard the
      linkonce section.  */
+  bool will_be_removed_from_program_if_no_direct_calls_compute_p (void);
+
+  /* Wrapper for will_be_removed_from_program_if_no_direct_calls_compute_p.  */
   bool will_be_removed_from_program_if_no_direct_calls_p (void);
 
   /* Return true when function can be removed from callgraph
@@ -1101,7 +1137,14 @@ public:
 
   /* Return true when function cgraph_node and its aliases can be removed from
      callgraph if all direct calls are eliminated.  */
+  bool can_remove_if_no_direct_calls_compute_p (void);
+
+  /* Wrapper for can_remove_if_no_direct_calls_compute_p.  */
   bool can_remove_if_no_direct_calls_p (void);
+
+  /* Worker for cgraph_can_remove_if_no_direct_calls_p.  */
+  static bool nonremovable_p (cgraph_node *node, void *);
+  static bool nonremovable_compute_p (cgraph_node *node, void *);
 
   /* Return true when callgraph node is a function with Gimple body defined
      in current unit.  Functions can also be define externally or they
@@ -1295,11 +1338,24 @@ public:
   /* True if there was multiple COMDAT bodies merged by lto-symtab.  */
   unsigned merged : 1;
 
+  /* IPA inline cached values.  */
+  unsigned inline_nonremovable_init: 1;
+  unsigned inline_can_remove_if_no_direct_calls_init: 1;
+  unsigned inline_will_be_removed_if_no_direct_calls_init: 1;
+
+  unsigned inline_nonremovable: 1;
+  unsigned inline_can_remove_if_no_direct_calls: 1;
+  unsigned inline_will_be_removed_if_no_direct_calls: 1;
+
 private:
   /* Worker for call_for_symbol_and_aliases.  */
   bool call_for_symbol_and_aliases_1 (bool (*callback) (cgraph_node *,
 						        void *),
 				      void *data, bool include_overwritable);
+
+  /* Worker for call_for_symbol_and_aliases.  */
+  template <typename Arg, bool (*callback) (cgraph_node *, Arg)>
+  bool call_for_symbol_and_aliases_1 (Arg data, bool include_overwritable);
 };
 
 /* A cgraph node set is a collection of cgraph nodes.  A cgraph node
@@ -1683,6 +1739,12 @@ public:
 				    void *data,
 				    bool include_overwritable);
 
+  /* Call calback on varpool symbol and aliases associated to varpool symbol.
+     When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
+     skipped. */
+  template <typename Arg, bool (*callback) (varpool_node *, Arg)>
+  bool call_for_symbol_and_aliases (Arg data, bool include_overwritable);
+
   /* Return true when variable should be considered externally visible.  */
   bool externally_visible_p (void);
 
@@ -1761,6 +1823,10 @@ private:
   bool call_for_symbol_and_aliases_1 (bool (*callback) (varpool_node *, void *),
 				      void *data,
 				      bool include_overwritable);
+
+  /* Worker for call_for_symbol_and_aliases.  */
+  template <typename Arg, bool (*callback) (varpool_node*, Arg arg)>
+  bool call_for_symbol_and_aliases_1 (Arg data, bool include_overwritable);
 };
 
 /* Every top level asm statement is put into a asm_node.  */
@@ -1862,7 +1928,7 @@ public:
   friend class cgraph_node;
   friend class cgraph_edge;
 
-  symbol_table (): cgraph_max_summary_uid (1)
+  symbol_table (): cgraph_max_summary_uid (1), enable_inline_cache (false)
   {
   }
 
@@ -2100,6 +2166,9 @@ public:
   hash_map<symtab_node *, symbol_priority_map> *init_priority_hash;
 
   FILE* GTY ((skip)) dump_file;
+
+  /* Inline cache flag.  */
+  bool enable_inline_cache;
 
 private:
   /* Allocate new callgraph node.  */
@@ -2987,6 +3056,21 @@ symtab_node::call_for_symbol_and_aliases (bool (*callback) (symtab_node *,
   return false;
 }
 
+template <typename Arg, bool (*callback) (symtab_node *, Arg arg)>
+inline bool
+symtab_node::call_for_symbol_and_aliases (Arg data, bool include_overwritable)
+{
+  ipa_ref *ref;
+
+  if (callback (this, data))
+    return true;
+  if (iterate_direct_aliases (0, ref))
+    return call_for_symbol_and_aliases_1 <Arg, callback>
+      (data, include_overwritable);
+  return false;
+}
+
+
 /* Call callback on function and aliases associated to the function.
    When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
    skipped.  */
@@ -3004,6 +3088,43 @@ cgraph_node::call_for_symbol_and_aliases (bool (*callback) (cgraph_node *,
   return false;
 }
 
+/* Call callback on function and aliases associated to the function.
+   When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
+   skipped.  */
+
+template <typename Arg, bool (*callback) (cgraph_node *, Arg arg)>
+inline bool
+cgraph_node::call_for_symbol_and_aliases (Arg data, bool include_overwritable)
+{
+  ipa_ref *ref;
+
+  if (callback (this, data))
+    return true;
+
+  if (iterate_direct_aliases (0, ref))
+    return call_for_symbol_and_aliases_1 <Arg, callback> (data, include_overwritable);
+
+  return false;
+}
+
+template <typename Arg, bool (*callback) (cgraph_node *, Arg arg)>
+inline bool
+cgraph_node::call_for_symbol_and_aliases_1 (Arg data, bool include_overwritable)
+{
+  ipa_ref *ref;
+  FOR_EACH_ALIAS (this, ref)
+    {
+      cgraph_node *alias = dyn_cast <cgraph_node *> (ref->referring);
+      if (include_overwritable
+	  || alias->get_availability () > AVAIL_INTERPOSABLE)
+	if (alias->call_for_symbol_and_aliases <Arg, callback> (data, include_overwritable))
+	  return true;
+    }
+
+  return false;
+}
+
+
 /* Call calback on varpool symbol and aliases associated to varpool symbol.
    When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
    skipped. */
@@ -3018,6 +3139,47 @@ varpool_node::call_for_symbol_and_aliases (bool (*callback) (varpool_node *,
     return true;
   if (has_aliases_p ())
     return call_for_symbol_and_aliases_1 (callback, data, include_overwritable);
+  return false;
+}
+
+
+/* Call calback on varpool symbol and aliases associated to varpool symbol.
+   When INCLUDE_OVERWRITABLE is false, overwritable aliases and thunks are
+   skipped. */
+
+template <typename Arg, bool (*callback) (varpool_node*, Arg arg)>
+inline bool
+varpool_node::call_for_symbol_and_aliases (Arg data, bool include_overwritable)
+{
+  ipa_ref *ref;
+
+  if (callback (this, data))
+    return true;
+  if (iterate_direct_aliases (0, ref))
+    return call_for_symbol_and_aliases_1 <Arg, callback>
+      (data, include_overwritable);
+
+  return false;
+}
+
+/* Worker for call_for_symbol_and_aliases.  */
+
+template <typename Arg, bool (*callback) (varpool_node*, Arg arg)>
+bool
+varpool_node::call_for_symbol_and_aliases_1 (Arg data,
+					     bool include_overwritable)
+{
+  ipa_ref *ref;
+
+  FOR_EACH_ALIAS (this, ref)
+    {
+      varpool_node *alias = dyn_cast <varpool_node *> (ref->referring);
+      if (include_overwritable
+	  || alias->get_availability () > AVAIL_INTERPOSABLE)
+	if (alias->call_for_symbol_and_aliases <Arg, callback>
+	  (data, include_overwritable))
+	    return true;
+    }
   return false;
 }
 
@@ -3093,6 +3255,151 @@ cgraph_local_p (cgraph_node *node)
 
   return node->local.local && node->instrumented_version->local.local;
 }
+
+inline bool
+cgraph_node::nonremovable_compute_p (cgraph_node *node, void *)
+{
+  return !node->can_remove_if_no_direct_calls_and_refs_p ();
+}
+
+inline bool
+cgraph_node::nonremovable_p (cgraph_node *node, void *)
+{
+  bool retval;
+
+  if (symtab->enable_inline_cache)
+    {
+      if (!node->inline_nonremovable_init)
+        {
+	  node->inline_nonremovable = nonremovable_compute_p (node, NULL);
+	  node->inline_nonremovable_init = true;
+	}
+
+      retval = node->inline_nonremovable;
+
+      gcc_checking_assert (retval == nonremovable_compute_p (node, NULL));
+    }
+  else
+    retval = nonremovable_compute_p (node, NULL);
+
+  return retval;
+}
+
+inline bool
+cgraph_node::can_remove_if_no_direct_calls_compute_p (void)
+{
+  if (DECL_EXTERNAL (decl))
+    return true;
+  if (address_taken)
+    return false;
+
+  return !call_for_symbol_and_aliases <void *, cgraph_node::nonremovable_compute_p>
+    (NULL, true);
+}
+
+/* Return true when function cgraph_node and its aliases can be removed from
+   callgraph if all direct calls are eliminated.  */
+
+inline bool
+cgraph_node::can_remove_if_no_direct_calls_p (void)
+{
+  bool retval;
+
+  if (symtab->enable_inline_cache)
+  {
+    if (!inline_can_remove_if_no_direct_calls_init)
+      {
+	inline_can_remove_if_no_direct_calls = can_remove_if_no_direct_calls_compute_p ();
+	inline_can_remove_if_no_direct_calls_init = true;
+      }
+
+    retval = inline_can_remove_if_no_direct_calls;
+
+    gcc_checking_assert
+      (retval == can_remove_if_no_direct_calls_compute_p ());
+  }
+  else
+    retval = can_remove_if_no_direct_calls_compute_p ();
+
+  return retval;
+}
+
+/* Return true when function cgraph_node can be expected to be removed
+   from program when direct calls in this compilation unit are removed.
+
+   As a special case COMDAT functions are
+   cgraph_can_remove_if_no_direct_calls_p while the are not
+   cgraph_only_called_directly_p (it is possible they are called from other
+   unit)
+
+   This function behaves as cgraph_only_called_directly_p because eliminating
+   all uses of COMDAT function does not make it necessarily disappear from
+   the program unless we are compiling whole program or we do LTO.  In this
+   case we know we win since dynamic linking will not really discard the
+   linkonce section.  */
+
+inline bool
+cgraph_node::will_be_removed_from_program_if_no_direct_calls_compute_p (void)
+{
+  gcc_assert (!global.inlined_to);
+
+  if (call_for_symbol_and_aliases <void *, used_from_object_file_p_worker>
+    (NULL, true))
+      return false;
+  if (!in_lto_p && !flag_whole_program)
+    return only_called_directly_p ();
+  else
+    {
+       if (DECL_EXTERNAL (decl))
+         return true;
+      return can_remove_if_no_direct_calls_p ();
+    }
+}
+
+/* Wrapper for will_be_removed_from_program_if_no_direct_calls_computed_p.  */
+
+inline bool
+cgraph_node::will_be_removed_from_program_if_no_direct_calls_p (void)
+{
+  if (symtab->enable_inline_cache)
+    {
+      if (!inline_will_be_removed_if_no_direct_calls_init)
+        {
+	  inline_will_be_removed_if_no_direct_calls
+	    = will_be_removed_from_program_if_no_direct_calls_compute_p ();
+
+	  inline_will_be_removed_if_no_direct_calls_init = true;
+        }
+
+      gcc_checking_assert (inline_will_be_removed_if_no_direct_calls ==
+	will_be_removed_from_program_if_no_direct_calls_compute_p ());
+      return inline_will_be_removed_if_no_direct_calls;
+    }
+
+  return will_be_removed_from_program_if_no_direct_calls_compute_p ();
+}
+
+/* Worker for cgraph_only_called_directly_p.  */
+
+static bool
+cgraph_not_only_called_directly_p_1 (cgraph_node *node, void *)
+{
+  return !node->only_called_directly_or_aliased_p ();
+}
+
+/* Return true when function cgraph_node and all its aliases are only called
+   directly.
+   i.e. it is not externally visible, address was not taken and
+   it is not used in any other non-standard way.  */
+
+inline bool
+cgraph_node::only_called_directly_p (void)
+{
+  gcc_assert (ultimate_alias_target () == this);
+  return !call_for_symbol_and_aliases (cgraph_not_only_called_directly_p_1,
+				       NULL, true);
+}
+
 
 /* When using fprintf (or similar), problems can arise with
    transient generated strings.  Many string-generation APIs

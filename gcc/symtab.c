@@ -1337,9 +1337,9 @@ symtab_node::set_section_for_node (const char *section)
 /* Worker for set_section.  */
 
 bool
-symtab_node::set_section (symtab_node *n, void *s)
+symtab_node::set_section (symtab_node *n, const char *s)
 {
-  n->set_section_for_node ((char *)s);
+  n->set_section_for_node (s);
   return false;
 }
 
@@ -1349,8 +1349,7 @@ void
 symtab_node::set_section (const char *section)
 {
   gcc_assert (!this->alias);
-  call_for_symbol_and_aliases
-    (symtab_node::set_section, const_cast<char *>(section), true);
+  call_for_symbol_and_aliases <const char *, symtab_node::set_section> (section, true);
 }
 
 /* Return the initialization priority.  */
@@ -1491,10 +1490,11 @@ symtab_node::resolve_alias (symtab_node *target)
     {
       error ("section of alias %q+D must match section of its target", decl);
     }
-  call_for_symbol_and_aliases (symtab_node::set_section,
-			     const_cast<char *>(target->get_section ()), true);
+  call_for_symbol_and_aliases <const char *, symtab_node::set_section>
+    (const_cast<char *>(target->get_section ()), true);
   if (target->implicit_section)
-    call_for_symbol_and_aliases (set_implicit_section, NULL, true);
+    call_for_symbol_and_aliases <void *, symtab_node::set_implicit_section>
+      (NULL, true);
 
   /* Alias targets become redundant after alias is resolved into an reference.
      We do not want to keep it around or we would have to mind updating them
@@ -1513,7 +1513,7 @@ symtab_node::resolve_alias (symtab_node *target)
 /* Worker searching noninterposable alias.  */
 
 bool
-symtab_node::noninterposable_alias (symtab_node *node, void *data)
+symtab_node::noninterposable_alias (symtab_node *node, symtab_node **data)
 {
   if (decl_binds_to_current_def_p (node->decl))
     {
@@ -1530,7 +1530,7 @@ symtab_node::noninterposable_alias (symtab_node *node, void *data)
 	  || DECL_ATTRIBUTES (node->decl) != DECL_ATTRIBUTES (fn->decl))
 	return false;
 
-      *(symtab_node **)data = node;
+      *data = node;
       return true;
     }
   return false;
@@ -1550,8 +1550,8 @@ symtab_node::noninterposable_alias (void)
      (if that is already non-overwritable).  */
   symtab_node *node = ultimate_alias_target ();
   gcc_assert (!node->alias && !node->weakref);
-  node->call_for_symbol_and_aliases (symtab_node::noninterposable_alias,
-				   (void *)&new_node, true);
+  node->call_for_symbol_and_aliases
+    <symtab_node **, symtab_node::noninterposable_alias> (&new_node, true);
   if (new_node)
     return new_node;
 #ifndef ASM_OUTPUT_DEF
@@ -1840,10 +1840,8 @@ symtab_node::equal_address_to (symtab_node *s2)
 /* Worker for call_for_symbol_and_aliases.  */
 
 bool
-symtab_node::call_for_symbol_and_aliases_1 (bool (*callback) (symtab_node *,
-							      void *),
-					    void *data,
-					    bool include_overwritable)
+symtab_node::call_for_symbol_and_aliases_1 (bool (*callback) (symtab_node *,void *),
+                                           void *data, bool include_overwritable)
 {
   ipa_ref *ref;
   FOR_EACH_ALIAS (this, ref)
@@ -1852,6 +1850,26 @@ symtab_node::call_for_symbol_and_aliases_1 (bool (*callback) (symtab_node *,
       if (include_overwritable
 	  || alias->get_availability () > AVAIL_INTERPOSABLE)
 	if (alias->call_for_symbol_and_aliases (callback, data,
+					      include_overwritable))
+	  return true;
+    }
+  return false;
+}
+
+/* Worker for call_for_symbol_and_aliases.  */
+
+template <typename Arg, bool (*callback) (symtab_node*, Arg arg)>
+bool
+symtab_node::call_for_symbol_and_aliases_1 (Arg data,
+					    bool include_overwritable)
+{
+  ipa_ref *ref;
+  FOR_EACH_ALIAS (this, ref)
+    {
+      symtab_node *alias = ref->referring;
+      if (include_overwritable
+	  || alias->get_availability () > AVAIL_INTERPOSABLE)
+	if (alias->call_for_symbol_and_aliases <Arg, callback> (data,
 					      include_overwritable))
 	  return true;
     }
