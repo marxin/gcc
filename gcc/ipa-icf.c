@@ -1184,7 +1184,10 @@ sem_variable::equals (tree t1, tree t2)
   if (tc1 != tc2)
     return false;
 
-  switch (tc1)
+ if (DECL_IN_CONSTANT_POOL (t1) || DECL_IN_CONSTANT_POOL (t2))
+   return false;
+
+ switch (tc1)
     {
     case CONSTRUCTOR:
       {
@@ -1262,15 +1265,7 @@ sem_variable::parse (varpool_node *node, bitmap_obstack *stack)
 {
   tree decl = node->decl;
 
-  bool readonly = TYPE_P (decl) ? TYPE_READONLY (decl) : TREE_READONLY (decl);
-  if (!readonly)
-    return NULL;
-
-  bool can_handle = DECL_VIRTUAL_P (decl)
-		    || flag_merge_constants >= 2
-		    || (!TREE_ADDRESSABLE (decl) && !node->externally_visible);
-
-  if (!can_handle || DECL_EXTERNAL (decl))
+  if (DECL_EXTERNAL (decl))
     return NULL;
 
   tree ctor = ctor_for_folding (decl);
@@ -1731,7 +1726,21 @@ sem_item_optimizer::filter_removed_items (void)
 	  if (!flag_ipa_icf_variables)
 	    remove_item (item);
 	  else
-	    filtered.safe_push (item);
+	    {
+	      /* Filter out non-readonly variables.  */
+	      tree decl = item->decl;
+
+	      varpool_node *vnode = dyn_cast<varpool_node *> (item->node);
+	      bool can_handle = DECL_VIRTUAL_P (decl)
+				|| flag_merge_constants >= 2
+				|| (!TREE_ADDRESSABLE (decl)
+				    && vnode->ctor_useable_for_folding_p ());
+
+	      if (can_handle)
+		filtered.safe_push (item);
+	      else
+		remove_item (item);
+	    }
         }
     }
 

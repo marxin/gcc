@@ -387,6 +387,9 @@ public:
   /* Semantic variable initialization function.  */
   inline virtual void init (void)
   {
+    if (in_lto_p)
+      get_node ()->get_constructor ();
+
     decl = get_node ()->decl;
     ctor = ctor_for_folding (decl);
   }
