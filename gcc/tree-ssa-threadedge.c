@@ -1378,7 +1378,7 @@ thread_through_normal_block (edge e,
 	  return 1;
 	}
 
-      if (!flag_expensive_optimizations
+      if (!0
 	  || optimize_function_for_size_p (cfun)
 	  || TREE_CODE (cond) != SSA_NAME
 	  || e->dest->loop_father != e->src->loop_father
