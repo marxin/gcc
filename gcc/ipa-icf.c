@@ -217,6 +217,7 @@ sem_item::dump (void)
 bool
 sem_item::target_supports_symbol_aliases_p (void)
 {
+  return false;
 #if !defined (ASM_OUTPUT_DEF) || (!defined(ASM_OUTPUT_WEAK_ALIAS) && !defined (ASM_WEAKEN_DECL))
   return false;
 #else
@@ -662,6 +663,7 @@ sem_function::merge (sem_item *alias_item)
       redirect_callers
 	= (!original_discardable
 	   && !DECL_COMDAT_GROUP (alias->decl)
+	   && !DECL_VIRTUAL_P (alias->decl)
 	   && alias->get_availability () > AVAIL_INTERPOSABLE
 	   && original->get_availability () > AVAIL_INTERPOSABLE
 	   && !alias->instrumented_version);
@@ -724,15 +726,18 @@ sem_function::merge (sem_item *alias_item)
 
       /* The alias function is removed if symbol address
          does not matter.  */
-      if (!alias_address_matters)
-	alias->remove ();
+      if (!alias->externally_visible && !alias->address_taken)
+	{
+	  alias->remove ();
 
-      if (dump_file && redirected)
-	fprintf (dump_file, "Callgraph local calls have been redirected.\n\n");
+	  if (dump_file && redirected)
+	    fprintf (dump_file, "Callgraph local calls have been redirected.\n\n");
+	  return true;
+	}
     }
-  /* If the condtion above is not met, we are lucky and can turn the
+  /* If the condition above is not met, we are lucky and can turn the
      function into real alias.  */
-  else if (create_alias)
+  if (create_alias)
     {
       alias->icf_merged = true;
       if (local_original->lto_file_data
@@ -762,7 +767,7 @@ sem_function::merge (sem_item *alias_item)
 	  if (dump_file)
 	    fprintf (dump_file, "Callgraph thunk cannot be created because of COMDAT\n");
 
-	  return 0;
+	  return false;
 	}
 
       if (DECL_STATIC_CHAIN (alias->decl))
@@ -770,7 +775,7 @@ sem_function::merge (sem_item *alias_item)
          if (dump_file)
            fprintf (dump_file, "Thunk creation is risky for static-chain functions.\n\n");
 
-         return 0;
+         return false;
         }
 
       alias->icf_merged = true;
