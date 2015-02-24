@@ -563,10 +563,10 @@ sem_function::equals_private (sem_item *item,
 	  if (e1->flags != e2->flags)
 	    return return_false_with_msg ("flags comparison returns false");
 
-	  if (!bb_dict_test (bb_dict, e1->src->index, e2->src->index))
+	  if (!bb_dict_test (&bb_dict, e1->src->index, e2->src->index))
 	    return return_false_with_msg ("edge comparison returns false");
 
-	  if (!bb_dict_test (bb_dict, e1->dest->index, e2->dest->index))
+	  if (!bb_dict_test (&bb_dict, e1->dest->index, e2->dest->index))
 	    return return_false_with_msg ("BB comparison returns false");
 
 	  if (!m_checker->compare_edge (e1, e2))
@@ -582,6 +582,16 @@ sem_function::equals_private (sem_item *item,
       return return_false_with_msg ("PHI node comparison returns false");
 
   return result;
+}
+
+/* Set LOCAL_P of NODE to true if DATA is non-NULL.
+   Helper for call_for_symbol_thunks_and_aliases.  */
+
+static bool
+set_local (cgraph_node *node, void *data)
+{
+  node->local.local = data != NULL;
+  return false;
 }
 
 /* Merges instance with an ALIAS_ITEM, where alias, thunk or redirection can
@@ -641,7 +651,9 @@ sem_function::merge (sem_item *alias_item)
      section (or we risk link failures when section is discarded).  */
   if ((original_address_matters
        && alias_address_matters)
-      || original_discardable)
+      || original_discardable
+      || DECL_COMDAT_GROUP (alias->decl)
+      || !sem_item::target_supports_symbol_aliases_p ())
     {
       create_thunk = !stdarg_p (TREE_TYPE (alias->decl));
       create_alias = false;
@@ -649,6 +661,7 @@ sem_function::merge (sem_item *alias_item)
          the extra thunk wrapper for direct calls.  */
       redirect_callers
 	= (!original_discardable
+	   && !DECL_COMDAT_GROUP (alias->decl)
 	   && alias->get_availability () > AVAIL_INTERPOSABLE
 	   && original->get_availability () > AVAIL_INTERPOSABLE
 	   && !alias->instrumented_version);
@@ -658,13 +671,6 @@ sem_function::merge (sem_item *alias_item)
       create_alias = true;
       create_thunk = false;
       redirect_callers = false;
-    }
-
-  if (create_alias && (DECL_COMDAT_GROUP (alias->decl)
-		       || !sem_item::target_supports_symbol_aliases_p ()))
-    {
-      create_alias = false;
-      create_thunk = true;
     }
 
   /* We want thunk to always jump to the local function body
@@ -711,6 +717,10 @@ sem_function::merge (sem_item *alias_item)
 	}
 
       alias->icf_merged = true;
+      if (local_original->lto_file_data
+	  && alias->lto_file_data
+	  && local_original->lto_file_data != alias->lto_file_data)
+      local_original->merged = true;
 
       /* The alias function is removed if symbol address
          does not matter.  */
@@ -725,6 +735,10 @@ sem_function::merge (sem_item *alias_item)
   else if (create_alias)
     {
       alias->icf_merged = true;
+      if (local_original->lto_file_data
+	  && alias->lto_file_data
+	  && local_original->lto_file_data != alias->lto_file_data)
+      local_original->merged = true;
 
       /* Remove the function's body.  */
       ipa_merge_profiles (original, alias);
@@ -735,10 +749,8 @@ sem_function::merge (sem_item *alias_item)
       cgraph_node::create_alias (alias_func->decl, decl);
       alias->resolve_alias (original);
 
-      /* Workaround for PR63566 that forces equal calling convention
-       to be used.  */
-      alias->local.local = false;
-      original->local.local = false;
+      original->call_for_symbol_thunks_and_aliases
+	 (set_local, (void *)(size_t) original->local_p (), true);
 
       if (dump_file)
 	fprintf (dump_file, "Callgraph alias has been created.\n\n");
@@ -762,7 +774,11 @@ sem_function::merge (sem_item *alias_item)
         }
 
       alias->icf_merged = true;
-      ipa_merge_profiles (local_original, alias);
+      if (local_original->lto_file_data
+	  && alias->lto_file_data
+	  && local_original->lto_file_data != alias->lto_file_data)
+      local_original->merged = true;
+      ipa_merge_profiles (local_original, alias, true);
       alias->create_wrapper (local_original);
 
       if (dump_file)
@@ -1033,21 +1049,21 @@ sem_function::icf_handled_component_p (tree t)
    corresponds to TARGET.  */
 
 bool
-sem_function::bb_dict_test (auto_vec<int> bb_dict, int source, int target)
+sem_function::bb_dict_test (vec<int> *bb_dict, int source, int target)
 {
   source++;
   target++;
 
-  if (bb_dict.length () <= (unsigned)source)
-    bb_dict.safe_grow_cleared (source + 1);
+  if (bb_dict->length () <= (unsigned)source)
+    bb_dict->safe_grow_cleared (source + 1);
 
-  if (bb_dict[source] == 0)
+  if ((*bb_dict)[source] == 0)
     {
-      bb_dict[source] = target;
+      (*bb_dict)[source] = target;
       return true;
     }
   else
-    return bb_dict[source] == target;
+    return (*bb_dict)[source] == target;
 }
 
 /* Iterates all tree types in T1 and T2 and returns true if all types
@@ -1550,11 +1566,13 @@ sem_item_optimizer::read_summary (void)
 void
 sem_item_optimizer::register_hooks (void)
 {
-  m_cgraph_node_hooks = symtab->add_cgraph_removal_hook
-			(&sem_item_optimizer::cgraph_removal_hook, this);
+  if (!m_cgraph_node_hooks)
+    m_cgraph_node_hooks = symtab->add_cgraph_removal_hook
+			  (&sem_item_optimizer::cgraph_removal_hook, this);
 
-  m_varpool_node_hooks = symtab->add_varpool_removal_hook
-			 (&sem_item_optimizer::varpool_removal_hook, this);
+  if (!m_varpool_node_hooks)
+    m_varpool_node_hooks = symtab->add_varpool_removal_hook
+			   (&sem_item_optimizer::varpool_removal_hook, this);
 }
 
 /* Unregister callgraph and varpool hooks.  */
@@ -1692,6 +1710,8 @@ void
 sem_item_optimizer::execute (void)
 {
   filter_removed_items ();
+  unregister_hooks ();
+
   build_hash_based_classes ();
 
   if (dump_file)
@@ -2426,6 +2446,7 @@ ipa_icf_generate_summary (void)
   if (!optimizer)
     optimizer = new sem_item_optimizer ();
 
+  optimizer->register_hooks ();
   optimizer->parse_funcs_and_vars ();
 }
 
@@ -2459,7 +2480,6 @@ ipa_icf_driver (void)
   gcc_assert (optimizer);
 
   optimizer->execute ();
-  optimizer->unregister_hooks ();
 
   delete optimizer;
   optimizer = NULL;

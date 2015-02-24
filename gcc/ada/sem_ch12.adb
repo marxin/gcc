@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2014, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2015, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -921,7 +921,7 @@ package body Sem_Ch12 is
    is
       Actuals_To_Freeze : constant Elist_Id  := New_Elmt_List;
       Assoc             : constant List_Id   := New_List;
-      Default_Actuals   : constant Elist_Id  := New_Elmt_List;
+      Default_Actuals   : constant List_Id   := New_List;
       Gen_Unit          : constant Entity_Id :=
                             Defining_Entity (Parent (F_Copy));
 
@@ -1385,16 +1385,34 @@ package body Sem_Ch12 is
             case Nkind (Formal) is
                when N_Formal_Object_Declaration =>
                   Match :=
-                    Matching_Actual (
-                      Defining_Identifier (Formal),
-                      Defining_Identifier (Analyzed_Formal));
+                    Matching_Actual
+                      (Defining_Identifier (Formal),
+                       Defining_Identifier (Analyzed_Formal));
 
                   if No (Match) and then Partial_Parameterization then
                      Process_Default (Formal);
+
                   else
                      Append_List
                        (Instantiate_Object (Formal, Match, Analyzed_Formal),
                         Assoc);
+
+                     --  For a defaulted in_parameter, create an entry in the
+                     --  the list of defaulted actuals, for GNATProve use. Do
+                     --  not included these defaults for an instance nested
+                     --  within a generic, because the defaults are also used
+                     --  in the analysis of the enclosing generic, and only
+                     --  defaulted subprograms are relevant there.
+
+                     if No (Match) and then not Inside_A_Generic then
+                        Append_To (Default_Actuals,
+                          Make_Generic_Association (Sloc (I_Node),
+                            Selector_Name                     =>
+                              New_Occurrence_Of
+                                (Defining_Identifier (Formal), Sloc (I_Node)),
+                            Explicit_Generic_Actual_Parameter =>
+                              New_Copy_Tree (Default_Expression (Formal))));
+                     end if;
                   end if;
 
                   --  If the object is a call to an expression function, this
@@ -1404,16 +1422,16 @@ package body Sem_Ch12 is
                     and then Present (Entity (Match))
                     and then Nkind
                       (Original_Node (Unit_Declaration_Node (Entity (Match))))
-                        = N_Expression_Function
+                                                     = N_Expression_Function
                   then
                      Append_Elmt (Entity (Match), Actuals_To_Freeze);
                   end if;
 
                when N_Formal_Type_Declaration =>
                   Match :=
-                    Matching_Actual (
-                      Defining_Identifier (Formal),
-                      Defining_Identifier (Analyzed_Formal));
+                    Matching_Actual
+                      (Defining_Identifier (Formal),
+                       Defining_Identifier (Analyzed_Formal));
 
                   if No (Match) then
                      if Partial_Parameterization then
@@ -1474,10 +1492,10 @@ package body Sem_Ch12 is
                   then
                      declare
                         Formal_Ent : constant Entity_Id :=
-                                        Defining_Identifier (Analyzed_Formal);
+                                       Defining_Identifier (Analyzed_Formal);
                      begin
                         if Is_Remote_Access_To_Class_Wide_Type (Entity (Match))
-                             = Is_Remote_Types (Formal_Ent)
+                                                = Is_Remote_Types (Formal_Ent)
                         then
                            --  Remoteness of formal and actual match
 
@@ -1567,12 +1585,22 @@ package body Sem_Ch12 is
                   end if;
 
                   --  If this is a nested generic, preserve default for later
-                  --  instantiations.
+                  --  instantiations. We do this as well for GNATProve use,
+                  --  so that the list of generic associations is complete.
 
                   if No (Match) and then Box_Present (Formal) then
-                     Append_Elmt
-                       (Defining_Unit_Name (Specification (Last (Assoc))),
-                        Default_Actuals);
+                     declare
+                        Subp : constant Entity_Id :=
+                          Defining_Unit_Name (Specification (Last (Assoc)));
+
+                     begin
+                        Append_To (Default_Actuals,
+                          Make_Generic_Association (Sloc (I_Node),
+                            Selector_Name                     =>
+                              New_Occurrence_Of (Subp, Sloc (I_Node)),
+                            Explicit_Generic_Actual_Parameter =>
+                              New_Occurrence_Of (Subp, Sloc (I_Node))));
+                     end;
                   end if;
 
                when N_Formal_Package_Declaration =>
@@ -1667,31 +1695,24 @@ package body Sem_Ch12 is
       --  explicit associations for them. This is required if the instance
       --  appears within a generic.
 
-      declare
-         Elmt  : Elmt_Id;
-         Subp  : Entity_Id;
-         New_D : Node_Id;
+      if not Is_Empty_List (Default_Actuals) then
+         declare
+            Default : Node_Id;
 
-      begin
-         Elmt := First_Elmt (Default_Actuals);
-         while Present (Elmt) loop
+         begin
+            Default := First (Default_Actuals);
+            while Present (Default) loop
+               Mark_Rewrite_Insertion (Default);
+               Next (Default);
+            end loop;
+
             if No (Actuals) then
-               Actuals := New_List;
-               Set_Generic_Associations (I_Node, Actuals);
+               Set_Generic_Associations (I_Node, Default_Actuals);
+            else
+               Append_List_To (Actuals, Default_Actuals);
             end if;
-
-            Subp := Node (Elmt);
-            New_D :=
-              Make_Generic_Association (Sloc (Subp),
-                Selector_Name                     =>
-                  New_Occurrence_Of (Subp, Sloc (Subp)),
-                Explicit_Generic_Actual_Parameter =>
-                  New_Occurrence_Of (Subp, Sloc (Subp)));
-            Mark_Rewrite_Insertion (New_D);
-            Append_To (Actuals, New_D);
-            Next_Elmt (Elmt);
-         end loop;
-      end;
+         end;
+      end if;
 
       --  If this is a formal package, normalize the parameter list by adding
       --  explicit box associations for the formals that are covered by an
@@ -4582,7 +4603,13 @@ package body Sem_Ch12 is
       Gen_Decl         : Node_Id;
       Pack_Id          : Entity_Id;
       Parent_Installed : Boolean := False;
-      Renaming_List    : List_Id;
+
+      Renaming_List : List_Id;
+      --  The list of declarations that link formals and actuals of the
+      --  instance. These are subtype declarations for formal types, and
+      --  renaming declarations for other formals. The subprogram declaration
+      --  for the instance is then appended to the list, and the last item on
+      --  the list is the renaming declaration for the instance.
 
       procedure Analyze_Instance_And_Renamings;
       --  The instance must be analyzed in a context that includes the mappings
@@ -4590,6 +4617,14 @@ package body Sem_Ch12 is
       --  for this purpose, and a subprogram with an internal name within the
       --  package. The subprogram instance is simply an alias for the internal
       --  subprogram, declared in the current scope.
+
+      procedure Build_Subprogram_Renaming;
+      --  If the subprogram is recursive, there are occurrences of the name of
+      --  the generic within the body, which must resolve to the current
+      --  instance. We add a renaming declaration after the declaration, which
+      --  is available in the instance body, as well as in the analysis of
+      --  aspects that appear in the generic. This renaming declaration is
+      --  inserted after the instance declaration which it renames.
 
       ------------------------------------
       -- Analyze_Instance_And_Renamings --
@@ -4744,6 +4779,52 @@ package body Sem_Ch12 is
             Set_Body_Required (Parent (N), False);
          end if;
       end Analyze_Instance_And_Renamings;
+
+      -------------------------------
+      -- Build_Subprogram_Renaming --
+      -------------------------------
+
+      procedure Build_Subprogram_Renaming is
+         Renaming_Decl : Node_Id;
+         Unit_Renaming : Node_Id;
+
+      begin
+         Unit_Renaming :=
+           Make_Subprogram_Renaming_Declaration (Loc,
+             Specification =>
+               Copy_Generic_Node
+                 (Specification (Original_Node (Gen_Decl)),
+                  Empty,
+                  Instantiating => True),
+             Name          => New_Occurrence_Of (Anon_Id, Loc));
+
+         --  The generic may be a a child unit. The renaming needs an
+         --  identifier with the proper name.
+
+         Set_Defining_Unit_Name (Specification (Unit_Renaming),
+            Make_Defining_Identifier (Loc, Chars (Gen_Unit)));
+
+         --  If there is a formal subprogram with the same name as the unit
+         --  itself, do not add this renaming declaration, to prevent
+         --  ambiguities when there is a call with that name in the body.
+         --  This is a partial and ugly fix for one ACATS test. ???
+
+         Renaming_Decl := First (Renaming_List);
+         while Present (Renaming_Decl) loop
+            if Nkind (Renaming_Decl) = N_Subprogram_Renaming_Declaration
+              and then
+                Chars (Defining_Entity (Renaming_Decl)) = Chars (Gen_Unit)
+            then
+               exit;
+            end if;
+
+            Next (Renaming_Decl);
+         end loop;
+
+         if No (Renaming_Decl) then
+            Append  (Unit_Renaming, Renaming_List);
+         end if;
+      end Build_Subprogram_Renaming;
 
       --  Local variables
 
@@ -4910,6 +4991,7 @@ package body Sem_Ch12 is
          end if;
 
          Append (Act_Decl, Renaming_List);
+         Build_Subprogram_Renaming;
          Analyze_Instance_And_Renamings;
 
          --  If the generic is marked Import (Intrinsic), then so is the
@@ -5492,6 +5574,12 @@ package body Sem_Ch12 is
                                N_Formal_Package_Declaration)
            or else Kind in N_Formal_Subprogram_Declaration
          then
+            null;
+
+         --  Ada 2012: If both formal and actual are incomplete types they
+         --  are conformant.
+
+         elsif Is_Incomplete_Type (E1) and then Is_Incomplete_Type (E2) then
             null;
 
          elsif B then
@@ -9455,8 +9543,7 @@ package body Sem_Ch12 is
 
                   if Present (Formal_Ent) then
                      Find_Matching_Actual (Formal_Node, Actual_Ent);
-                     Match_Formal_Entity
-                       (Formal_Node, Formal_Ent, Actual_Ent);
+                     Match_Formal_Entity (Formal_Node, Formal_Ent, Actual_Ent);
 
                      --  We iterate at the same time over the actuals of the
                      --  local package created for the formal, to determine
@@ -10666,14 +10753,11 @@ package body Sem_Ch12 is
                         Defining_Unit_Name (Specification (Act_Decl));
       Pack_Id       : constant Entity_Id  :=
                         Defining_Unit_Name (Parent (Act_Decl));
-      Decls         : List_Id;
       Gen_Body      : Node_Id;
       Gen_Body_Id   : Node_Id;
       Act_Body      : Node_Id;
       Pack_Body     : Node_Id;
-      Prev_Formal   : Entity_Id;
       Ret_Expr      : Node_Id;
-      Unit_Renaming : Node_Id;
 
       Parent_Installed : Boolean := False;
 
@@ -10803,47 +10887,14 @@ package body Sem_Ch12 is
             Parent_Installed := True;
          end if;
 
-         --  Inside its body, a reference to the generic unit is a reference
-         --  to the instance. The corresponding renaming is the first
-         --  declaration in the body.
+         --  Subprogram body is placed in the body of wrapper package,
+         --  whose spec contains the subprogram declaration as well as
+         --  the renaming declarations for the generic parameters.
 
-         Unit_Renaming :=
-           Make_Subprogram_Renaming_Declaration (Loc,
-             Specification =>
-               Copy_Generic_Node (
-                 Specification (Original_Node (Gen_Body)),
-                 Empty,
-                 Instantiating => True),
-             Name => New_Occurrence_Of (Anon_Id, Loc));
-
-         --  If there is a formal subprogram with the same name as the unit
-         --  itself, do not add this renaming declaration. This is a temporary
-         --  fix for one ACATS test. ???
-
-         Prev_Formal := First_Entity (Pack_Id);
-         while Present (Prev_Formal) loop
-            if Chars (Prev_Formal) = Chars (Gen_Unit)
-              and then Is_Overloadable (Prev_Formal)
-            then
-               exit;
-            end if;
-
-            Next_Entity (Prev_Formal);
-         end loop;
-
-         if Present (Prev_Formal) then
-            Decls :=  New_List (Act_Body);
-         else
-            Decls :=  New_List (Unit_Renaming, Act_Body);
-         end if;
-
-         --  The subprogram body is placed in the body of a dummy package body,
-         --  whose spec contains the subprogram declaration as well as the
-         --  renaming declarations for the generic parameters.
-
-         Pack_Body := Make_Package_Body (Loc,
-           Defining_Unit_Name => New_Copy (Pack_Id),
-           Declarations       => Decls);
+         Pack_Body :=
+           Make_Package_Body (Loc,
+             Defining_Unit_Name => New_Copy (Pack_Id),
+             Declarations       => New_List (Act_Body));
 
          Set_Corresponding_Spec (Pack_Body, Pack_Id);
 
@@ -12277,6 +12328,14 @@ package body Sem_Ch12 is
          Set_Has_Private_View (Subtype_Indication (Decl_Node));
       end if;
 
+      --  In Ada 2012 the actual may be a limited view. Indicate that
+      --  the local subtype must be treated as such.
+
+      if From_Limited_With (Act_T) then
+         Set_Ekind (Subt, E_Incomplete_Subtype);
+         Set_From_Limited_With (Subt);
+      end if;
+
       Decl_Nodes := New_List (Decl_Node);
 
       --  Flag actual derived types so their elaboration produces the
@@ -12646,14 +12705,24 @@ package body Sem_Ch12 is
                            --  Subprogram instance
 
                            else
-                              --  The instance_spec is the wrapper package,
-                              --  and the subprogram declaration is the last
-                              --  declaration in the wrapper.
+                              --  The instance_spec is in the wrapper package,
+                              --  usually followed by its local renaming
+                              --  declaration. See Build_Subprogram_Renaming
+                              --  for details.
 
-                              Info.Act_Decl :=
-                                Last
-                                  (Visible_Declarations
-                                    (Specification (Info.Act_Decl)));
+                              declare
+                                 Decl : Node_Id :=
+                                          (Last (Visible_Declarations
+                                            (Specification (Info.Act_Decl))));
+                              begin
+                                 if Nkind (Decl) =
+                                      N_Subprogram_Renaming_Declaration
+                                 then
+                                    Decl := Prev (Decl);
+                                 end if;
+
+                                 Info.Act_Decl := Decl;
+                              end;
 
                               Instantiate_Subprogram_Body
                                 (Info, Body_Optional => True);

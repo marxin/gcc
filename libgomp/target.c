@@ -38,6 +38,7 @@
 
 #ifdef PLUGIN_SUPPORT
 #include <dlfcn.h>
+#include "plugin-suffix.h"
 #endif
 
 static void gomp_target_init (void);
@@ -918,7 +919,7 @@ static bool
 gomp_load_plugin_for_device (struct gomp_device_descr *device,
 			     const char *plugin_name)
 {
-  char *err = NULL, *last_missing = NULL;
+  const char *err = NULL, *last_missing = NULL;
   int optional_present, optional_total;
 
   /* Clear any existing error.  */
@@ -946,7 +947,7 @@ gomp_load_plugin_for_device (struct gomp_device_descr *device,
 #define DLSYM_OPT(f, n)						\
   do									\
     {									\
-      char *tmp_err;							\
+      const char *tmp_err;							\
       device->f##_func = dlsym (plugin_handle, "GOMP_OFFLOAD_" #n);	\
       tmp_err = dlerror ();						\
       if (tmp_err == NULL)						\
@@ -1054,7 +1055,7 @@ static void
 gomp_target_init (void)
 {
   const char *prefix ="libgomp-plugin-";
-  const char *suffix = ".so.1";
+  const char *suffix = SONAME_SUFFIX (1);
   const char *cur, *next;
   char *plugin_name;
   int i, new_num_devices;

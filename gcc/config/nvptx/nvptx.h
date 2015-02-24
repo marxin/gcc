@@ -33,6 +33,10 @@
       builtin_define ("__nvptx__");		\
     } while (0)
 
+/* Avoid the default in ../../gcc.c, which adds "-pthread", which is not
+   supported for nvptx.  */
+#define GOMP_SELF_SPECS ""
+
 /* Storage Layout.  */
 
 #define BITS_BIG_ENDIAN 0
@@ -185,7 +189,8 @@ struct nvptx_args {
 #define DEFAULT_PCC_STRUCT_RETURN 0
 
 #define FUNCTION_PROFILER(file, labelno) \
-  fatal_error ("profiling is not yet implemented for this architecture")
+  fatal_error (input_location, \
+	       "profiling is not yet implemented for this architecture")
 
 #define TRAMPOLINE_SIZE 32
 #define TRAMPOLINE_ALIGNMENT 256

@@ -957,6 +957,8 @@ bits.  Note that this is not the biggest alignment that is supported,
 just the biggest alignment that, when violated, may cause a fault.
 @end defmac
 
+@hook TARGET_ABSOLUTE_BIGGEST_ALIGNMENT
+
 @defmac MALLOC_ABI_ALIGNMENT
 Alignment, in bits, a C conformant malloc implementation has to
 provide.  If not defined, the default value is @code{BITS_PER_WORD}.
@@ -7981,17 +7983,6 @@ to by @var{ce_info}.
 @hook TARGET_INVALID_WITHIN_DOLOOP
 
 @hook TARGET_LEGITIMATE_COMBINED_INSN
-
-@defmac MD_CAN_REDIRECT_BRANCH (@var{branch1}, @var{branch2})
-
-Take a branch insn in @var{branch1} and another in @var{branch2}.
-Return true if redirecting @var{branch1} to the destination of
-@var{branch2} is possible.
-
-On some targets, branches may have a limited range.  Optimizing the
-filling of delay slots can result in branches being redirected, and this
-may in turn cause a branch offset to overflow.
-@end defmac
 
 @hook TARGET_CAN_FOLLOW_JUMP
 

@@ -4384,12 +4384,6 @@ static void
 ix86_conditional_register_usage (void)
 {
   int i, c_mask;
-  unsigned int j;
-
-  /* The PIC register, if it exists, is fixed.  */
-  j = PIC_OFFSET_TABLE_REGNUM;
-  if (j != INVALID_REGNUM)
-    fixed_regs[j] = call_used_regs[j] = 1;
 
   /* For 32-bit targets, squash the REX registers.  */
   if (! TARGET_64BIT)
@@ -4466,6 +4460,7 @@ ix86_function_specific_save (struct cl_target_option *ptr,
 {
   ptr->arch = ix86_arch;
   ptr->schedule = ix86_schedule;
+  ptr->prefetch_sse = x86_prefetch_sse;
   ptr->tune = ix86_tune;
   ptr->branch_cost = ix86_branch_cost;
   ptr->tune_defaulted = ix86_tune_defaulted;
@@ -4523,6 +4518,7 @@ ix86_function_specific_restore (struct gcc_options *opts,
   ix86_arch = (enum processor_type) ptr->arch;
   ix86_schedule = (enum attr_cpu) ptr->schedule;
   ix86_tune = (enum processor_type) ptr->tune;
+  x86_prefetch_sse = ptr->prefetch_sse;
   opts->x_ix86_branch_cost = ptr->branch_cost;
   ix86_tune_defaulted = ptr->tune_defaulted;
   ix86_arch_specified = ptr->arch_specified;
@@ -4553,6 +4549,13 @@ ix86_function_specific_restore (struct gcc_options *opts,
   opts->x_ix86_tune_memset_strategy = ptr->x_ix86_tune_memset_strategy;
   opts->x_ix86_tune_no_default = ptr->x_ix86_tune_no_default;
   opts->x_ix86_veclibabi_type = ptr->x_ix86_veclibabi_type;
+  ix86_tune_cost = processor_target_table[ix86_tune].cost;
+  /* TODO: ix86_cost should be chosen at instruction or function granuality
+     so for cold code we use size_cost even in !optimize_size compilation.  */
+  if (opts->x_optimize_size)
+    ix86_cost = &ix86_size_cost;
+  else
+    ix86_cost = ix86_tune_cost;
 
   /* Recreate the arch feature tests if the arch changed */
   if (old_arch != ix86_arch)
@@ -5067,35 +5070,20 @@ ix86_can_inline_p (tree caller, tree callee)
 /* Remember the last target of ix86_set_current_function.  */
 static GTY(()) tree ix86_previous_fndecl;
 
-/* Set target globals to default.  */
+/* Set targets globals to the default (or current #pragma GCC target
+   if active).  Invalidate ix86_previous_fndecl cache.  */
 
-static void
-ix86_reset_to_default_globals (void)
-{
-  tree old_tree = (ix86_previous_fndecl
-		   ? DECL_FUNCTION_SPECIFIC_TARGET (ix86_previous_fndecl)
-		   : NULL_TREE);
-
-  if (old_tree)
-    {
-      tree new_tree = target_option_current_node;
-      cl_target_option_restore (&global_options,
-				TREE_TARGET_OPTION (new_tree));
-      if (TREE_TARGET_GLOBALS (new_tree))
-	restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
-      else if (new_tree == target_option_default_node)
-	restore_target_globals (&default_target_globals);
-      else
-	TREE_TARGET_GLOBALS (new_tree)
-	  = save_target_globals_default_opts ();
-    }
-}
-
-/* Invalidate ix86_previous_fndecl cache.  */
 void
 ix86_reset_previous_fndecl (void)
 {
-  ix86_reset_to_default_globals ();
+  tree new_tree = target_option_current_node;
+  cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
+  if (TREE_TARGET_GLOBALS (new_tree))
+    restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
+  else if (new_tree == target_option_default_node)
+    restore_target_globals (&default_target_globals);
+  else
+    TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
   ix86_previous_fndecl = NULL_TREE;
 }
 
@@ -5108,34 +5096,39 @@ ix86_set_current_function (tree fndecl)
   /* Only change the context if the function changes.  This hook is called
      several times in the course of compiling a function, and we don't want to
      slow things down too much or call target_reinit when it isn't safe.  */
-  if (fndecl && fndecl != ix86_previous_fndecl)
+  if (fndecl == ix86_previous_fndecl)
+    return;
+
+  tree old_tree;
+  if (ix86_previous_fndecl == NULL_TREE)
+    old_tree = target_option_current_node;
+  else if (DECL_FUNCTION_SPECIFIC_TARGET (ix86_previous_fndecl))
+    old_tree = DECL_FUNCTION_SPECIFIC_TARGET (ix86_previous_fndecl);
+  else
+    old_tree = target_option_default_node;
+
+  if (fndecl == NULL_TREE)
     {
-      tree old_tree = (ix86_previous_fndecl
-		       ? DECL_FUNCTION_SPECIFIC_TARGET (ix86_previous_fndecl)
-		       : NULL_TREE);
-
-      tree new_tree = (fndecl
-		       ? DECL_FUNCTION_SPECIFIC_TARGET (fndecl)
-		       : NULL_TREE);
-
-      if (old_tree == new_tree)
-	;
-
-      else if (new_tree && new_tree != target_option_default_node)
-	{
-	  cl_target_option_restore (&global_options,
-				    TREE_TARGET_OPTION (new_tree));
-	  if (TREE_TARGET_GLOBALS (new_tree))
-	    restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
-	  else
-	    TREE_TARGET_GLOBALS (new_tree)
-	      = save_target_globals_default_opts ();
-	}
-
-      else if (old_tree && old_tree != target_option_default_node)
-	ix86_reset_to_default_globals ();
-      ix86_previous_fndecl = fndecl;
+      if (old_tree != target_option_current_node)
+	ix86_reset_previous_fndecl ();
+      return;
     }
+
+  tree new_tree = DECL_FUNCTION_SPECIFIC_TARGET (fndecl);
+  if (new_tree == NULL_TREE)
+    new_tree = target_option_default_node;
+
+  if (old_tree != new_tree)
+    {
+      cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
+      if (TREE_TARGET_GLOBALS (new_tree))
+	restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
+      else if (new_tree == target_option_default_node)
+	restore_target_globals (&default_target_globals);
+      else
+	TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
+    }
+  ix86_previous_fndecl = fndecl;
 }
 
 
@@ -5764,49 +5757,55 @@ ix86_function_regparm (const_tree type, const_tree decl)
 
   /* Use register calling convention for local functions when possible.  */
   if (decl
-      && TREE_CODE (decl) == FUNCTION_DECL
+      && TREE_CODE (decl) == FUNCTION_DECL)
+    {
+      cgraph_node *target = cgraph_node::get (decl);
+      if (target)
+	target = target->function_symbol ();
+
       /* Caller and callee must agree on the calling convention, so
 	 checking here just optimize means that with
 	 __attribute__((optimize (...))) caller could use regparm convention
 	 and callee not, or vice versa.  Instead look at whether the callee
 	 is optimized or not.  */
-      && opt_for_fn (decl, optimize)
-      && !(profile_flag && !flag_fentry))
-    {
-      /* FIXME: remove this CONST_CAST when cgraph.[ch] is constified.  */
-      cgraph_local_info *i = cgraph_node::local_info (CONST_CAST_TREE (decl));
-      if (i && i->local && i->can_change_signature)
+      if (target && opt_for_fn (target->decl, optimize)
+	  && !(profile_flag && !flag_fentry))
 	{
-	  int local_regparm, globals = 0, regno;
+	  cgraph_local_info *i = &target->local;
+	  if (i && i->local && i->can_change_signature)
+	    {
+	      int local_regparm, globals = 0, regno;
 
-	  /* Make sure no regparm register is taken by a
-	     fixed register variable.  */
-	  for (local_regparm = 0; local_regparm < REGPARM_MAX; local_regparm++)
-	    if (fixed_regs[local_regparm])
-	      break;
+	      /* Make sure no regparm register is taken by a
+		 fixed register variable.  */
+	      for (local_regparm = 0; local_regparm < REGPARM_MAX;
+		   local_regparm++)
+		if (fixed_regs[local_regparm])
+		  break;
 
-	  /* We don't want to use regparm(3) for nested functions as
-	     these use a static chain pointer in the third argument.  */
-	  if (local_regparm == 3 && DECL_STATIC_CHAIN (decl))
-	    local_regparm = 2;
+	      /* We don't want to use regparm(3) for nested functions as
+		 these use a static chain pointer in the third argument.  */
+	      if (local_regparm == 3 && DECL_STATIC_CHAIN (target->decl))
+		local_regparm = 2;
 
-	  /* In 32-bit mode save a register for the split stack.  */
-	  if (!TARGET_64BIT && local_regparm == 3 && flag_split_stack)
-	    local_regparm = 2;
+	      /* Save a register for the split stack.  */
+	      if (local_regparm == 3 && flag_split_stack)
+		local_regparm = 2;
 
-	  /* Each fixed register usage increases register pressure,
-	     so less registers should be used for argument passing.
-	     This functionality can be overriden by an explicit
-	     regparm value.  */
-	  for (regno = AX_REG; regno <= DI_REG; regno++)
-	    if (fixed_regs[regno])
-	      globals++;
+	      /* Each fixed register usage increases register pressure,
+		 so less registers should be used for argument passing.
+		 This functionality can be overriden by an explicit
+		 regparm value.  */
+	      for (regno = AX_REG; regno <= DI_REG; regno++)
+		if (fixed_regs[regno])
+		  globals++;
 
-	  local_regparm
-	    = globals < local_regparm ? local_regparm - globals : 0;
+	      local_regparm
+		= globals < local_regparm ? local_regparm - globals : 0;
 
-	  if (local_regparm > regparm)
-	    regparm = local_regparm;
+	      if (local_regparm > regparm)
+		regparm = local_regparm;
+	    }
 	}
     }
 
@@ -5845,15 +5844,37 @@ ix86_function_sseregparm (const_tree type, const_tree decl, bool warn)
       return 2;
     }
 
+  if (!decl)
+    return 0;
+
+  cgraph_node *target = cgraph_node::get (decl);
+  if (target)
+    target = target->function_symbol ();
+
   /* For local functions, pass up to SSE_REGPARM_MAX SFmode
      (and DFmode for SSE2) arguments in SSE registers.  */
-  if (decl && TARGET_SSE_MATH && optimize
+  if (target
+      /* TARGET_SSE_MATH */
+      && (target_opts_for_fn (target->decl)->x_ix86_fpmath & FPMATH_SSE)
+      && opt_for_fn (target->decl, optimize)
       && !(profile_flag && !flag_fentry))
     {
-      /* FIXME: remove this CONST_CAST when cgraph.[ch] is constified.  */
-      cgraph_local_info *i = cgraph_node::local_info (CONST_CAST_TREE(decl));
+      cgraph_local_info *i = &target->local;
       if (i && i->local && i->can_change_signature)
-	return TARGET_SSE2 ? 2 : 1;
+	{
+	  /* Refuse to produce wrong code when local function with SSE enabled
+	     is called from SSE disabled function.
+	     We may work hard to work out these scenarios but hopefully
+	     it doesnot matter in practice.  */
+	  if (!TARGET_SSE && warn)
+	    {
+	      error ("calling %qD with SSE caling convention without "
+		     "SSE/SSE2 enabled", decl);
+	      return 0;
+	    }
+	  return TARGET_SSE2_P (target_opts_for_fn (target->decl)
+				->x_ix86_isa_flags) ? 2 : 1;
+	}
     }
 
   return 0;
@@ -6256,7 +6277,7 @@ ix86_maybe_switch_abi (void)
 
 /* Return 1 if pseudo register should be created and used to hold
    GOT address for PIC code.  */
-static bool
+bool
 ix86_use_pseudo_pic_reg (void)
 {
   if ((TARGET_64BIT
@@ -6340,20 +6361,25 @@ init_cumulative_args (CUMULATIVE_ARGS *cum,  /* Argument info to initialize */
 		      tree fndecl,
 		      int caller)
 {
-  struct cgraph_local_info *i;
+  struct cgraph_local_info *i = NULL;
+  struct cgraph_node *target = NULL;
 
   memset (cum, 0, sizeof (*cum));
 
   if (fndecl)
     {
-      i = cgraph_node::local_info (fndecl);
-      cum->call_abi = ix86_function_abi (fndecl);
+      target = cgraph_node::get (fndecl);
+      if (target)
+	{
+	  target = target->function_symbol ();
+	  i = cgraph_node::local_info (target->decl);
+	  cum->call_abi = ix86_function_abi (target->decl);
+	}
+      else
+	cum->call_abi = ix86_function_abi (fndecl);
     }
   else
-    {
-      i = NULL;
-      cum->call_abi = ix86_function_type_abi (fntype);
-    }
+    cum->call_abi = ix86_function_type_abi (fntype);
 
   cum->caller = caller;
 
@@ -6389,7 +6415,7 @@ init_cumulative_args (CUMULATIVE_ARGS *cum,  /* Argument info to initialize */
      helping K&R code.
      FIXME: once typesytem is fixed, we won't need this code anymore.  */
   if (i && i->local && i->can_change_signature)
-    fntype = TREE_TYPE (fndecl);
+    fntype = TREE_TYPE (target->decl);
   cum->stdarg = stdarg_p (fntype);
   cum->maybe_vaarg = (fntype
 		      ? (!prototype_p (fntype) || stdarg_p (fntype))
@@ -16716,7 +16742,7 @@ ix86_avx_u128_mode_after (int mode, rtx_insn *insn)
 
 /* Return the mode that an insn results in.  */
 
-int
+static int
 ix86_mode_after (int entity, int mode, rtx_insn *insn)
 {
   switch (entity)
@@ -30571,6 +30597,8 @@ static void
 ix86_add_new_builtins (HOST_WIDE_INT isa)
 {
   int i;
+  tree saved_current_target_pragma = current_target_pragma;
+  current_target_pragma = NULL_TREE;
 
   for (i = 0; i < (int)IX86_BUILTIN_MAX; i++)
     {
@@ -30597,6 +30625,8 @@ ix86_add_new_builtins (HOST_WIDE_INT isa)
 	    TREE_NOTHROW (decl) = 1;
 	}
     }
+
+  current_target_pragma = saved_current_target_pragma;
 }
 
 /* Bits for builtin_description.flag.  */
@@ -34284,11 +34314,14 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
     P_POPCNT,
     P_AVX,
     P_PROC_AVX,
+    P_BMI,
+    P_PROC_BMI,
     P_FMA4,
     P_XOP,
     P_PROC_XOP,
     P_FMA,    
     P_PROC_FMA,
+    P_BMI2,
     P_AVX2,
     P_PROC_AVX2,
     P_AVX512F,
@@ -34317,9 +34350,11 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
       {"sse4.2", P_SSE4_2},
       {"popcnt", P_POPCNT},
       {"avx", P_AVX},
+      {"bmi", P_BMI},
       {"fma4", P_FMA4},
       {"xop", P_XOP},
       {"fma", P_FMA},
+      {"bmi2", P_BMI2},
       {"avx2", P_AVX2},
       {"avx512f", P_AVX512F}
     };
@@ -34414,7 +34449,7 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 	      break;
 	    case PROCESSOR_BTVER2:
 	      arg_str = "btver2";
-	      priority = P_PROC_AVX;
+	      priority = P_PROC_BMI;
 	      break;
 	    case PROCESSOR_BDVER1:
 	      arg_str = "bdver1";
@@ -35131,7 +35166,7 @@ make_resolver_func (const tree default_decl,
 
   gimplify_function_tree (decl);
   push_cfun (DECL_STRUCT_FUNCTION (decl));
-  *empty_bb = init_lowered_empty_function (decl, false);
+  *empty_bb = init_lowered_empty_function (decl, false, 0);
 
   cgraph_node::add_new_function (decl, true);
   symtab->call_cgraph_insertion_hooks (cgraph_node::get_create (decl));
@@ -35301,6 +35336,8 @@ fold_builtin_cpu (tree fndecl, tree *args)
     F_XOP,
     F_FMA,
     F_AVX512F,
+    F_BMI,
+    F_BMI2,
     F_MAX
   };
 
@@ -35333,7 +35370,8 @@ fold_builtin_cpu (tree fndecl, tree *args)
     M_AMDFAM15H_BDVER3,
     M_AMDFAM15H_BDVER4,
     M_INTEL_COREI7_IVYBRIDGE,
-    M_INTEL_COREI7_HASWELL
+    M_INTEL_COREI7_HASWELL,
+    M_INTEL_COREI7_BROADWELL
   };
 
   static struct _arch_names_table
@@ -35354,6 +35392,7 @@ fold_builtin_cpu (tree fndecl, tree *args)
       {"sandybridge", M_INTEL_COREI7_SANDYBRIDGE},
       {"ivybridge", M_INTEL_COREI7_IVYBRIDGE},
       {"haswell", M_INTEL_COREI7_HASWELL},
+      {"broadwell", M_INTEL_COREI7_BROADWELL},
       {"bonnell", M_INTEL_BONNELL},
       {"silvermont", M_INTEL_SILVERMONT},
       {"knl", M_INTEL_KNL},
@@ -35392,7 +35431,9 @@ fold_builtin_cpu (tree fndecl, tree *args)
       {"xop",    F_XOP},
       {"fma",    F_FMA},
       {"avx2",   F_AVX2},
-      {"avx512f",F_AVX512F}
+      {"avx512f",F_AVX512F},
+      {"bmi",    F_BMI},
+      {"bmi2",   F_BMI2}
     };
 
   tree __processor_model_type = build_processor_model_struct ();
@@ -52089,6 +52130,9 @@ ix86_initialize_bounds (tree var, tree lb, tree ub, tree *stmts)
 #undef TARGET_OFFLOAD_OPTIONS
 #define TARGET_OFFLOAD_OPTIONS \
   ix86_offload_options
+
+#undef TARGET_ABSOLUTE_BIGGEST_ALIGNMENT
+#define TARGET_ABSOLUTE_BIGGEST_ALIGNMENT 512
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

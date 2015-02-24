@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2014, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2015, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -878,7 +878,14 @@ package body Sem_Ch3 is
          --  create a reference to it after the enclosing protected definition
          --  because the itype will be used in the subsequent bodies.
 
-         if Ekind (Current_Scope) = E_Protected_Type then
+         --  If the anonymous access itself is protected, a full type
+         --  declaratiton will be created for it, so that the equivalent
+         --  record type can be constructed. For further details, see
+         --  Replace_Anonymous_Access_To_Protected-Subprogram.
+
+         if Ekind (Current_Scope) = E_Protected_Type
+           and then not Protected_Present (Access_To_Subprogram_Definition (N))
+         then
             Build_Itype_Reference (Anon_Type, Parent (Current_Scope));
          end if;
 
@@ -2790,6 +2797,14 @@ package body Sem_Ch3 is
 
       else
          Generate_Definition (Def_Id);
+      end if;
+
+      --  Propagate any pending access types whose finalization masters need to
+      --  be fully initialized from the partial to the full view. Guard against
+      --  an illegal full view that remains unanalyzed.
+
+      if Is_Type (Def_Id) and then Is_Incomplete_Or_Private_Type (Prev) then
+         Set_Pending_Access_Types (Def_Id, Pending_Access_Types (Prev));
       end if;
 
       if Chars (Scope (Def_Id)) = Name_System
@@ -4970,16 +4985,17 @@ package body Sem_Ch3 is
                end if;
 
                if Has_Discriminants (T) then
-                  Set_Discriminant_Constraint (Id,
-                                           Discriminant_Constraint (T));
+                  Set_Discriminant_Constraint
+                    (Id, Discriminant_Constraint (T));
                   Set_Stored_Constraint_From_Discriminant_Constraint (Id);
                end if;
 
-            when E_Incomplete_Type =>
+            when Incomplete_Kind  =>
                if Ada_Version >= Ada_2005 then
 
                   --  In Ada 2005 an incomplete type can be explicitly tagged:
-                  --  propagate indication.
+                  --  propagate indication. Note that we also have to include
+                  --  subtypes for Ada 2012 extended use of incomplete types.
 
                   Set_Ekind              (Id, E_Incomplete_Subtype);
                   Set_Is_Tagged_Type     (Id, Is_Tagged_Type (T));
@@ -4988,6 +5004,7 @@ package body Sem_Ch3 is
                   if Is_Tagged_Type (Id) then
                      Set_No_Tagged_Streams_Pragma
                        (Id, No_Tagged_Streams_Pragma (T));
+                     Set_Direct_Primitive_Operations (Id, New_Elmt_List);
                   end if;
 
                   --  Ada 2005 (AI-412): Decorate an incomplete subtype of an
@@ -10042,46 +10059,34 @@ package body Sem_Ch3 is
                elsif Is_Concurrent_Record_Type (T)
                  and then Present (Interfaces (T))
                then
-                  --  If an inherited subprogram is implemented by a protected
-                  --  procedure or an entry, then the first parameter of the
-                  --  inherited subprogram shall be of mode OUT or IN OUT, or
-                  --  an access-to-variable parameter (RM 9.4(11.9/3))
+                  --  There is no need to check here RM 9.4(11.9/3) since we
+                  --  are processing the corresponding record type and the
+                  --  mode of the overriding subprograms was verified by
+                  --  Check_Conformance when the corresponding concurrent
+                  --  type declaration was analyzed.
 
-                  if Is_Protected_Type (Corresponding_Concurrent_Type (T))
-                    and then Ekind (First_Formal (Subp)) = E_In_Parameter
-                    and then Ekind (Subp) /= E_Function
-                    and then not Is_Predefined_Dispatching_Operation (Subp)
-                  then
-                     Error_Msg_PT (T, Subp);
+                  Error_Msg_NE
+                    ("interface subprogram & must be overridden", T, Subp);
 
-                  --  Some other kind of overriding failure
+                  --  Examine primitive operations of synchronized type to find
+                  --  homonyms that have the wrong profile.
 
-                  else
-                     Error_Msg_NE
-                       ("interface subprogram & must be overridden",
-                        T, Subp);
+                  declare
+                     Prim : Entity_Id;
 
-                     --  Examine primitive operations of synchronized type,
-                     --  to find homonyms that have the wrong profile.
+                  begin
+                     Prim := First_Entity (Corresponding_Concurrent_Type (T));
+                     while Present (Prim) loop
+                        if Chars (Prim) = Chars (Subp) then
+                           Error_Msg_NE
+                             ("profile is not type conformant with prefixed "
+                              & "view profile of inherited operation&",
+                              Prim, Subp);
+                        end if;
 
-                     declare
-                        Prim : Entity_Id;
-
-                     begin
-                        Prim :=
-                          First_Entity (Corresponding_Concurrent_Type (T));
-                        while Present (Prim) loop
-                           if Chars (Prim) = Chars (Subp) then
-                              Error_Msg_NE
-                                ("profile is not type conformant with "
-                                   & "prefixed view profile of "
-                                   & "inherited operation&", Prim, Subp);
-                           end if;
-
-                           Next_Entity (Prim);
-                        end loop;
-                     end;
-                  end if;
+                        Next_Entity (Prim);
+                     end loop;
+                  end;
                end if;
 
             else
@@ -16463,6 +16468,13 @@ package body Sem_Ch3 is
             Set_Has_Private_Declaration (Prev);
             Set_Has_Private_Declaration (Id);
 
+            --  AI12-0133: Indicate whether we have a partial view with
+            --  unknown discriminants, in which case initialization of objects
+            --  of the type do not receive an invariant check.
+
+            Set_Partial_View_Has_Unknown_Discr
+              (Prev, Has_Unknown_Discriminants (Id));
+
             --  Preserve aspect and iterator flags that may have been set on
             --  the partial view.
 
@@ -19424,15 +19436,27 @@ package body Sem_Ch3 is
 
       begin
          if Nkind (Parent (Priv_T)) = N_Private_Extension_Declaration
-           and then not Limited_Present (Parent (Priv_T))
-           and then not Synchronized_Present (Parent (Priv_T))
            and then Nkind (Orig_Decl) = N_Full_Type_Declaration
            and then Nkind
              (Type_Definition (Orig_Decl)) = N_Derived_Type_Definition
-           and then Limited_Present (Type_Definition (Orig_Decl))
          then
-            Error_Msg_N
-              ("full view of non-limited extension cannot be limited", N);
+            if not Limited_Present (Parent (Priv_T))
+              and then not Synchronized_Present (Parent (Priv_T))
+              and then Limited_Present (Type_Definition (Orig_Decl))
+            then
+               Error_Msg_N
+                ("full view of non-limited extension cannot be limited", N);
+
+            --  Conversely, if the partial view carries the limited keyword,
+            --  the full view must as well, even if it may be redundant.
+
+            elsif Limited_Present (Parent (Priv_T))
+              and then not Limited_Present (Type_Definition (Orig_Decl))
+            then
+               Error_Msg_N
+                ("full view of limited extension must be explicitly limited",
+                 N);
+            end if;
          end if;
       end;
 

@@ -1918,6 +1918,14 @@ if test -d ${srcdir}/gcc; then
     fi
   fi
 
+  # If we're building an offloading compiler, add the LTO front end.
+  if test x"$enable_as_accelerator_for" != x ; then
+    case ,${enable_languages}, in
+      *,lto,*) ;;
+      *) enable_languages="${enable_languages},lto" ;;
+    esac
+  fi
+
   missing_languages=`echo ",$enable_languages," | sed -e s/,all,/,/ -e s/,c,/,/ `
   potential_languages=,c,
 
@@ -3466,6 +3474,30 @@ AC_ARG_ENABLE(host-shared,
 		[build host code as shared libraries])],
 [host_shared=$enableval], [host_shared=no])
 AC_SUBST(host_shared)
+
+# PR jit/64780: Require the user to explicitly specify
+# --enable-host-shared if the jit is enabled, hinting
+# that they might want to do a separate configure/build of
+# the jit, to avoid users from slowing down the rest of the
+# compiler by enabling the jit.
+if test ${host_shared} = "no" ; then
+  case "${enable_languages}" in
+    *jit*)
+      AC_MSG_ERROR([
+Enabling language "jit" requires --enable-host-shared.
+
+--enable-host-shared typically slows the rest of the compiler down by
+a few %, so you must explicitly enable it.
+
+If you want to build both the jit and the regular compiler, it is often
+best to do this via two separate configure/builds, in separate
+directories, to avoid imposing the performance cost of
+--enable-host-shared on the regular compiler.])
+      ;;
+    *)
+      ;;
+  esac
+fi
 
 # Specify what files to not compare during bootstrap.
 

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2014, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2015, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -43,7 +43,6 @@ with Exp_Pakd; use Exp_Pakd;
 with Exp_Prag; use Exp_Prag;
 with Exp_Tss;  use Exp_Tss;
 with Exp_Util; use Exp_Util;
-with Fname;    use Fname;
 with Freeze;   use Freeze;
 with Inline;   use Inline;
 with Lib;      use Lib;
@@ -415,9 +414,10 @@ package body Exp_Ch6 is
                  and then No (Finalization_Master (Ptr_Typ))
                then
                   Build_Finalization_Master
-                    (Typ        => Ptr_Typ,
-                     Ins_Node   => Associated_Node_For_Itype (Ptr_Typ),
-                     Encl_Scope => Scope (Ptr_Typ));
+                    (Typ            => Ptr_Typ,
+                     For_Anonymous  => True,
+                     Context_Scope  => Scope (Ptr_Typ),
+                     Insertion_Node => Associated_Node_For_Itype (Ptr_Typ));
                end if;
 
                --  Access-to-controlled types should always have a master
@@ -964,6 +964,10 @@ package body Exp_Ch6 is
 
       Pop_Scope;
    end Detect_Infinite_Recursion;
+
+   --------------------
+   -- Expand_Actuals --
+   --------------------
 
    --------------------
    -- Expand_Actuals --
@@ -1749,9 +1753,49 @@ package body Exp_Ch6 is
             --  be handled separately because the name does not denote an
             --  overloadable entity.
 
-            declare
+            By_Ref_Predicate_Check : declare
                Aund : constant Entity_Id := Underlying_Type (E_Actual);
                Atyp : Entity_Id;
+
+               function Is_Public_Subp return Boolean;
+               --  Check whether the subprogram being called is a visible
+               --  operation of the type of the actual. Used to determine
+               --  whether an invariant check must be generated on the
+               --  caller side.
+
+               ---------------------
+               --  Is_Public_Subp --
+               ---------------------
+
+               function Is_Public_Subp return Boolean is
+                  Pack      : constant Entity_Id := Scope (Subp);
+                  Subp_Decl : Node_Id;
+
+               begin
+                  if not Is_Subprogram (Subp) then
+                     return False;
+
+                  --  The operation may be inherited, or a primitive of the
+                  --  root type.
+
+                  elsif
+                    Nkind_In (Parent (Subp), N_Private_Extension_Declaration,
+                                             N_Full_Type_Declaration)
+                  then
+                     Subp_Decl := Parent (Subp);
+
+                  else
+                     Subp_Decl := Unit_Declaration_Node (Subp);
+                  end if;
+
+                  return Ekind (Pack) = E_Package
+                    and then
+                      List_Containing (Subp_Decl) =
+                        Visible_Declarations
+                          (Specification (Unit_Declaration_Node (Pack)));
+               end Is_Public_Subp;
+
+            --  Start of processing for By_Ref_Predicate_Check
 
             begin
                if No (Aund) then
@@ -1770,7 +1814,34 @@ package body Exp_Ch6 is
                   Append_To (Post_Call,
                     Make_Predicate_Check (Atyp, Actual));
                end if;
-            end;
+
+               --  We generated caller-side invariant checks in two cases:
+
+               --  a) when calling an inherited operation, where there is an
+               --  implicit view conversion of the actual to the parent type.
+
+               --  b) When the conversion is explicit
+
+               --  We treat these cases separately because the required
+               --  conversion for a) is added later when expanding the call.
+
+               if Has_Invariants (Etype (Actual))
+                  and then
+                    Nkind (Parent (Subp)) = N_Private_Extension_Declaration
+               then
+                  if  Comes_From_Source (N) and then Is_Public_Subp then
+                     Append_To (Post_Call, Make_Invariant_Call (Actual));
+                  end if;
+
+               elsif Nkind (Actual) = N_Type_Conversion
+                 and then Has_Invariants (Etype (Expression (Actual)))
+               then
+                  if Comes_From_Source (N) and then Is_Public_Subp then
+                     Append_To (Post_Call,
+                       Make_Invariant_Call (Expression (Actual)));
+                  end if;
+               end if;
+            end By_Ref_Predicate_Check;
 
          --  Processing for IN parameters
 
@@ -3685,7 +3756,7 @@ package body Exp_Ch6 is
                else
                   --  Let the back end handle it
 
-                  Add_Inlined_Body (Subp);
+                  Add_Inlined_Body (Subp, Call_Node);
 
                   if Front_End_Inlining
                     and then Nkind (Spec) = N_Subprogram_Declaration
@@ -3707,35 +3778,17 @@ package body Exp_Ch6 is
            or else Nkind (Unit_Declaration_Node (Subp)) /=
                                                  N_Subprogram_Declaration
            or else No (Body_To_Inline (Unit_Declaration_Node (Subp)))
+           or else Nkind (Body_To_Inline (Unit_Declaration_Node (Subp))) in
+                                                                      N_Entity
          then
-            Add_Inlined_Body (Subp);
-            Register_Backend_Call (Call_Node);
-
-            --  If the call is to a function in a run-time unit that is marked
-            --  Inline_Always, we must suppress debugging information on it,
-            --  so that the code that is eventually inlined will not affect
-            --  debugging of the user program.
-
-            if Is_Predefined_File_Name
-                 (Unit_File_Name (Get_Source_Unit (Sloc (Subp))))
-              and then In_Extended_Main_Source_Unit (N)
-            then
-               --  We make an exception for calls to the Ada hierarchy if call
-               --  comes from source, because some user applications need the
-               --  debugging information for such calls.
-
-               if Comes_From_Source (Call_Node)
-                 and then Name_Buffer (1 .. 2) = "a-"
-               then
-                  null;
-               else
-                  Set_Needs_Debug_Info (Subp, False);
-               end if;
-            end if;
+            Add_Inlined_Body (Subp, Call_Node);
 
          --  Front end expansion of simple functions returning unconstrained
-         --  types (see Check_And_Split_Unconstrained_Function) and simple
-         --  renamings inlined by the front end (see Build_Renamed_Entity).
+         --  types (see Check_And_Split_Unconstrained_Function). Note that the
+         --  case of a simple renaming (Body_To_Inline in N_Entity above, see
+         --  also Build_Renamed_Body) cannot be expanded here because this may
+         --  give rise to order-of-elaboration issues for the types of the
+         --  parameters of the subprogram, if any.
 
          else
             Expand_Inlined_Call (Call_Node, Subp, Orig_Subp);
@@ -7608,6 +7661,7 @@ package body Exp_Ch6 is
 
                   if Present (Class_Pre) then
                      Merge_Preconditions (Check_Prag, Class_Pre);
+
                   else
                      Class_Pre := Check_Prag;
                   end if;
@@ -8356,33 +8410,6 @@ package body Exp_Ch6 is
 
       Add_Access_Actual_To_Build_In_Place_Call
         (Func_Call, Function_Id, Return_Obj_Actual);
-
-      --  If the build-in-place function call returns a controlled object,
-      --  the finalization master will require a reference to routine
-      --  Finalize_Address of the designated type. Setting this attribute
-      --  is done in the same manner to expansion of allocators.
-
-      if Needs_Finalization (Result_Subt) then
-
-         --  Controlled types with supressed finalization do not need to
-         --  associate the address of their Finalize_Address primitives with
-         --  a master since they do not need a master to begin with.
-
-         if Is_Library_Level_Entity (Acc_Type)
-           and then Finalize_Storage_Only (Result_Subt)
-         then
-            null;
-
-         --  Do not generate the call to Set_Finalize_Address in CodePeer mode
-         --  because Finalize_Address is never built.
-
-         elsif not CodePeer_Mode then
-            Insert_Action (Allocator,
-              Make_Set_Finalize_Address_Call (Loc,
-                Typ     => Etype (Function_Id),
-                Ptr_Typ => Acc_Type));
-         end if;
-      end if;
 
       --  Finally, replace the allocator node with a reference to the temp
 

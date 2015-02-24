@@ -975,14 +975,14 @@ want_inline_function_to_all_callers_p (struct cgraph_node *node, bool cold)
   if (node->global.inlined_to)
     return false;
   /* Does it have callers?  */
-  if (!node->call_for_symbol_thunks_and_aliases (has_caller_p, NULL, true))
+  if (!node->call_for_symbol_and_aliases (has_caller_p, NULL, true))
     return false;
   /* Inlining into all callers would increase size?  */
   if (estimate_growth (node) > 0)
     return false;
   /* All inlines must be possible.  */
-  if (node->call_for_symbol_thunks_and_aliases (check_callers, &has_hot_call,
-						true))
+  if (node->call_for_symbol_and_aliases (check_callers, &has_hot_call,
+					 true))
     return false;
   if (!cold && !has_hot_call)
     return false;
@@ -1702,6 +1702,7 @@ inline_small_functions (void)
     {
       bool update = false;
       struct cgraph_edge *next;
+      bool has_speculative = false;
 
       if (dump_file)
 	fprintf (dump_file, "Enqueueing calls in %s/%i.\n",
@@ -1719,12 +1720,17 @@ inline_small_functions (void)
 	      gcc_assert (!edge->aux);
 	      update_edge_key (&edge_heap, edge);
 	    }
-	  if (edge->speculative && !speculation_useful_p (edge, edge->aux != NULL))
+	  if (edge->speculative)
+	    has_speculative = true;
+	}
+      if (has_speculative)
+	for (edge = node->callees; edge; edge = next)
+	  if (edge->speculative && !speculation_useful_p (edge,
+							  edge->aux != NULL))
 	    {
 	      edge->resolve_speculation ();
 	      update = true;
 	    }
-	}
       if (update)
 	{
 	  struct cgraph_node *where = node->global.inlined_to
@@ -1794,7 +1800,7 @@ inline_small_functions (void)
 #endif
       if (current_badness != badness)
 	{
-	  if (edge_heap.min () && badness > edge_heap.min_key ())
+	  if (edge_heap.min () && current_badness > edge_heap.min_key ())
 	    {
 	      edge->aux = edge_heap.insert (current_badness, edge);
 	      continue;
@@ -1822,6 +1828,9 @@ inline_small_functions (void)
 		   " Estimated badness is %f, frequency %.2f.\n",
 		   edge->caller->name (), edge->caller->order,
 		   edge->call_stmt
+		   && (LOCATION_LOCUS (gimple_location ((const_gimple)
+							edge->call_stmt))
+		       > BUILTINS_LOCATION)
 		   ? gimple_filename ((const_gimple) edge->call_stmt)
 		   : "unknown",
 		   edge->call_stmt
@@ -2350,9 +2359,9 @@ ipa_inline (void)
 	  if (want_inline_function_to_all_callers_p (node, cold))
 	    {
 	      int num_calls = 0;
-	      node->call_for_symbol_thunks_and_aliases (sum_callers, &num_calls,
-						      true);
-	      while (node->call_for_symbol_thunks_and_aliases
+	      node->call_for_symbol_and_aliases (sum_callers, &num_calls,
+						 true);
+	      while (node->call_for_symbol_and_aliases
 		       (inline_to_all_callers, &num_calls, true))
 		;
 	      remove_functions = true;
@@ -2503,6 +2512,13 @@ early_inliner (function *fun)
 #endif
   node->remove_all_references ();
 
+  /* Rebuild this reference because it dosn't depend on
+     function's body and it's required to pass cgraph_node
+     verification.  */
+  if (node->instrumented_version
+      && !node->instrumentation_clone)
+    node->create_reference (node->instrumented_version, IPA_REF_CHKP, NULL);
+
   /* Even when not optimizing or not inlining inline always-inline
      functions.  */
   inlined = inline_always_inline_functions (node);
@@ -2518,7 +2534,9 @@ early_inliner (function *fun)
 	 cycles of edges to be always inlined in the callgraph.
 
 	 We might want to be smarter and just avoid this type of inlining.  */
-      || DECL_DISREGARD_INLINE_LIMITS (node->decl))
+      || (DECL_DISREGARD_INLINE_LIMITS (node->decl)
+	  && lookup_attribute ("always_inline",
+			       DECL_ATTRIBUTES (node->decl))))
     ;
   else if (lookup_attribute ("flatten",
 			     DECL_ATTRIBUTES (node->decl)) != NULL)
@@ -2533,6 +2551,18 @@ early_inliner (function *fun)
     }
   else
     {
+      /* If some always_inline functions was inlined, apply the changes.
+	 This way we will not account always inline into growth limits and
+	 moreover we will inline calls from always inlines that we skipped
+	 previously becuase of conditional above.  */
+      if (inlined)
+	{
+	  timevar_push (TV_INTEGRATION);
+	  todo |= optimize_inline_calls (current_function_decl);
+	  inline_update_overall_summary (node);
+	  inlined = false;
+	  timevar_pop (TV_INTEGRATION);
+	}
       /* We iterate incremental inlining to get trivial cases of indirect
 	 inlining.  */
       while (iterations < PARAM_VALUE (PARAM_EARLY_INLINER_MAX_ITERATIONS)

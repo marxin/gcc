@@ -3105,6 +3105,11 @@ begin_subprog_body (tree subprog_decl)
   /* This function is being defined.  */
   TREE_STATIC (subprog_decl) = 1;
 
+  /* The failure of this assertion will likely come from a wrong context for
+     the subprogram body, e.g. another procedure for a procedure declared at
+     library level.  */
+  gcc_assert (current_function_decl == decl_function_context (subprog_decl));
+
   current_function_decl = subprog_decl;
 
   /* Enter a new binding level and show that all the parameters belong to
@@ -5472,11 +5477,11 @@ install_builtin_function_types (void)
   def_fn_type (ENUM, RETURN, 1, 5, ARG1, ARG2, ARG3, ARG4, ARG5);
 #define DEF_FUNCTION_TYPE_VAR_8(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 				ARG6, ARG7, ARG8)			\
-  def_fn_type (ENUM, RETURN, 1, 5, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6,	\
+  def_fn_type (ENUM, RETURN, 1, 8, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6,	\
 	       ARG7, ARG8);
 #define DEF_FUNCTION_TYPE_VAR_12(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4, ARG5, \
 				 ARG6, ARG7, ARG8, ARG9, ARG10, ARG11, ARG12) \
-  def_fn_type (ENUM, RETURN, 1, 5, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6,	\
+  def_fn_type (ENUM, RETURN, 1, 12, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6,	\
 	       ARG7, ARG8, ARG9, ARG10, ARG11, ARG12);
 #define DEF_POINTER_TYPE(ENUM, TYPE) \
   builtin_types[(int) ENUM] = build_pointer_type (builtin_types[(int) TYPE]);
