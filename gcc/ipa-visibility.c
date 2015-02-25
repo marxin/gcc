@@ -129,27 +129,6 @@ cgraph_node::local_p (void)
 					
 }
 
-/* Return true when there is a reference to node and it is not vtable.  */
-
-bool
-symtab_node::address_taken_from_non_vtable_p (void)
-{
-  int i;
-  struct ipa_ref *ref = NULL;
-
-  for (i = 0; iterate_referring (i, ref); i++)
-    if (ref->use == IPA_REF_ADDR)
-      {
-	varpool_node *node;
-	if (is_a <cgraph_node *> (ref->referring))
-	  return true;
-	node = dyn_cast <varpool_node *> (ref->referring);
-	if (!DECL_VIRTUAL_P (node->decl))
-	  return true;
-      }
-  return false;
-}
-
 /* A helper for comdat_can_be_unshared_p.  */
 
 static bool
@@ -387,7 +366,8 @@ can_replace_by_local_alias_in_vtable (symtab_node *node)
 /* walk_tree callback that rewrites initializer references.   */
 
 static tree
-update_vtable_references (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
+update_vtable_references (tree *tp, int *walk_subtrees,
+			  void *data ATTRIBUTE_UNUSED)
 {
   if (TREE_CODE (*tp) == VAR_DECL
       || TREE_CODE (*tp) == FUNCTION_DECL)

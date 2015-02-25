@@ -337,6 +337,10 @@ public:
      return 2 otherwise.   */
   int equal_address_to (symtab_node *s2);
 
+  /* Return true if symbol's address may possibly be compared to other
+     symbol's address.  */
+  bool address_matters_p ();
+
   /* Return symbol table node associated with DECL, if any,
      and NULL otherwise.  */
   static inline symtab_node *get (const_tree decl)

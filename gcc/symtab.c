@@ -1512,6 +1512,19 @@ symtab_node::resolve_alias (symtab_node *target)
   /* If alias has address taken, so does the target.  */
   if (address_taken)
     target->ultimate_alias_target ()->address_taken = true;
+
+  /* All non-weakref aliases of THIS are now in fact aliases of TARGET.  */
+  ipa_ref *ref;
+  for (unsigned i = 0; iterate_direct_aliases (i, ref);)
+    {
+      struct symtab_node *alias_alias = ref->referring;
+      if (!alias_alias->weakref)
+	{
+	  alias_alias->remove_all_references ();
+	  alias_alias->create_reference (target, IPA_REF_ALIAS, NULL);
+	}
+      else i++;
+    }
   return true;
 }
 
@@ -1861,4 +1874,52 @@ symtab_node::call_for_symbol_and_aliases_1 (bool (*callback) (symtab_node *,
 	  return true;
     }
   return false;
+}
+
+/* Return ture if address of N is possibly compared.  */
+
+static bool
+address_matters_1 (symtab_node *n, void *)
+{
+  if (DECL_VIRTUAL_P (n->decl))
+    return false;
+  if (is_a <cgraph_node *> (n)
+      && (DECL_CXX_CONSTRUCTOR_P (n->decl)
+	  || DECL_CXX_DESTRUCTOR_P (n->decl)))
+    return false;
+  if (n->externally_visible
+      || n->symtab_node::address_taken_from_non_vtable_p ())
+    return true;
+  return false;
+}
+
+/* Return true when there is a reference to node and it is not vtable.  */
+
+bool
+symtab_node::address_taken_from_non_vtable_p (void)
+{
+  int i;
+  struct ipa_ref *ref = NULL;
+
+  for (i = 0; iterate_referring (i, ref); i++)
+    if (ref->use == IPA_REF_ADDR)
+      {
+	varpool_node *node;
+	if (is_a <cgraph_node *> (ref->referring))
+	  return true;
+	node = dyn_cast <varpool_node *> (ref->referring);
+	if (!DECL_VIRTUAL_P (node->decl))
+	  return true;
+      }
+  return false;
+}
+
+/* Return true if symbol's address may possibly be compared to other
+   symbol's address.  */
+
+bool
+symtab_node::address_matters_p ()
+{
+  gcc_assert (!alias);
+  return call_for_symbol_and_aliases (address_matters_1, NULL, true);
 }
