@@ -1413,10 +1413,6 @@ sem_variable::parse (varpool_node *node, bitmap_obstack *stack)
   if (node->alias)
     return NULL;
 
-  bool readonly = TYPE_P (decl) ? TYPE_READONLY (decl) : TREE_READONLY (decl);
-  if (!readonly)
-    return NULL;
-
   bool can_handle = DECL_VIRTUAL_P (decl)
 		    || flag_merge_constants >= 2
 		    || (!TREE_ADDRESSABLE (decl) && !node->externally_visible);
@@ -1903,7 +1899,14 @@ sem_item_optimizer::filter_removed_items (void)
 	  if (!flag_ipa_icf_variables)
 	    remove_item (item);
 	  else
-	    filtered.safe_push (item);
+	    {
+	      /* Filter out non-readonly variables.  */
+	      tree decl = item->decl;
+	      if (TYPE_P (decl) ? TYPE_READONLY (decl) : TREE_READONLY (decl))
+		filtered.safe_push (item);
+	      else
+		remove_item (item);
+	    }
         }
     }
 
