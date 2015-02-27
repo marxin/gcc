@@ -543,8 +543,8 @@ func_checker::compare_function_decl (tree t1, tree t2)
   if (t1 == t2)
     return true;
 
-  symtab_node *n1 = symtab_node::get (t1);
-  symtab_node *n2 = symtab_node::get (t2);
+  symtab_node *n1 = symtab_node::get (t1)->ultimate_alias_target ();
+  symtab_node *n2 = symtab_node::get (t2)->ultimate_alias_target ();
 
   if (m_ignored_source_nodes != NULL && m_ignored_target_nodes != NULL)
     {

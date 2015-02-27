@@ -342,6 +342,9 @@ sem_function::compare_cgraph_references (hash_map <symtab_node *, sem_item *>
     &ignored_nodes,
     symtab_node *n1, symtab_node *n2)
 {
+  n1 = n1->ultimate_alias_target ();
+  n2 = n2->ultimate_alias_target ();
+
   if (n1 == n2 || (ignored_nodes.get (n1) && ignored_nodes.get (n2)))
     return true;
 
@@ -1095,7 +1098,7 @@ sem_function::parse (cgraph_node *node, bitmap_obstack *stack)
   tree fndecl = node->decl;
   function *func = DECL_STRUCT_FUNCTION (fndecl);
 
-  /* TODO: add support for thunks and aliases.  */
+  /* TODO: add support for thunks.  */
 
   if (!func || !node->has_gimple_body_p ())
     return NULL;
@@ -1406,6 +1409,9 @@ sem_variable *
 sem_variable::parse (varpool_node *node, bitmap_obstack *stack)
 {
   tree decl = node->decl;
+
+  if (node->alias)
+    return NULL;
 
   bool readonly = TYPE_P (decl) ? TYPE_READONLY (decl) : TREE_READONLY (decl);
   if (!readonly)
@@ -2057,7 +2063,8 @@ sem_item_optimizer::build_graph (void)
 	  cgraph_edge *e = cnode->callees;
 	  while (e)
 	    {
-	      sem_item **slot = m_symtab_node_map.get (e->callee);
+	      sem_item **slot = m_symtab_node_map.get
+		(e->callee->ultimate_alias_target ());
 	      if (slot)
 		item->add_reference (*slot);
 
@@ -2068,7 +2075,8 @@ sem_item_optimizer::build_graph (void)
       ipa_ref *ref = NULL;
       for (unsigned i = 0; item->node->iterate_reference (i, ref); i++)
 	{
-	  sem_item **slot = m_symtab_node_map.get (ref->referred);
+	  sem_item **slot = m_symtab_node_map.get
+	    (ref->referred->ultimate_alias_target ());
 	  if (slot)
 	    item->add_reference (*slot);
 	}
