@@ -1677,6 +1677,10 @@ cgraph_node::expand_thunk (bool output_asm_thunks, bool force_gimple_thunk)
 	    vargs.quick_push (tmp);
 	  }
       call = gimple_build_call_vec (build_fold_addr_expr_loc (0, alias), vargs);
+
+      if (DECL_BY_REFERENCE (resdecl))
+	gimple_call_set_return_slot_opt (call, true);
+
       callees->call_stmt = call;
       gimple_call_set_from_thunk (call, true);
       gimple_call_set_with_bounds (call, instrumentation_clone);
