@@ -30592,6 +30592,8 @@ struct builtin_isa {
 
 static struct builtin_isa ix86_builtins_isa[(int) IX86_BUILTIN_MAX];
 
+/* Union of all masks that are part of builtin_isa structures.  */
+static HOST_WIDE_INT defined_isa_values = 0;
 
 /* Add an ix86 target builtin function with CODE, NAME and TYPE.  Save the MASK
    of which isa_flags to use in the ix86_builtins_isa array.  Stores the
@@ -30619,6 +30621,7 @@ def_builtin (HOST_WIDE_INT mask, const char *name,
   if (!(mask & OPTION_MASK_ISA_64BIT) || TARGET_64BIT)
     {
       ix86_builtins_isa[(int) code].isa = mask;
+      defined_isa_values |= mask;
 
       mask &= ~OPTION_MASK_ISA_64BIT;
       if (mask == 0
@@ -30670,6 +30673,20 @@ def_builtin_const (HOST_WIDE_INT mask, const char *name,
 static void
 ix86_add_new_builtins (HOST_WIDE_INT isa)
 {
+  /* Last cached isa value.  */
+  static HOST_WIDE_INT last_tested_isa_value = 0;
+
+  /* We iterate through all defined builtins just if the last tested
+     values is different from ISA and just in case there is any intersection
+     between ISA value and union of all possible configurations.
+     Last condition skips iterations if ISA is changed by the change has
+     empty intersection with defined_isa_values.  */
+  if ((isa & defined_isa_values) == 0 || isa == last_tested_isa_value
+       || ((isa ^ last_tested_isa_value) & defined_isa_values) == 0)
+    return;
+
+  last_tested_isa_value = isa;
+
   int i;
   tree saved_current_target_pragma = current_target_pragma;
   current_target_pragma = NULL_TREE;
