@@ -1670,6 +1670,10 @@ sem_variable::equals_wpa (sem_item *item,
       /* DECL_FINAL_P flag on methods referred by virtual tables is used
 	 to decide on completeness possible_polymorphic_call_targets lists
 	 and therefore it must match.  */
+      if (!is_a <cgraph_node *> (ref->referred)
+	  || !is_a <cgraph_node *> (ref2->referred))
+	continue;
+
       if ((DECL_VIRTUAL_P (decl) || DECL_VIRTUAL_P (item->decl))
 	  && (DECL_VIRTUAL_P (ref->referred->decl)
 	      || DECL_VIRTUAL_P (ref2->referred->decl))
