@@ -954,6 +954,8 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 	  /* This is only interesting for its constant offset.  */
 	  temp.off = TREE_INT_CST_LOW (TYPE_SIZE_UNIT (TREE_TYPE (ref)));
 	  break;
+	case TARGET_MEM_REF:
+	  break;
 	default:
 	  gcc_unreachable ();
 	}

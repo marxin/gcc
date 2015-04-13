@@ -529,7 +529,7 @@ insert_debug_temps_for_defs (gimple_stmt_iterator *gsi)
       if (TREE_CODE (var) != SSA_NAME)
 	continue;
 
-      insert_debug_temp_for_var_def (gsi, var);
+//      insert_debug_temp_for_var_def (gsi, var);
     }
 }
 

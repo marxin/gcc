@@ -1448,6 +1448,7 @@ OBJS = \
 	tree-ssa-operands.o \
 	tree-ssa-phiopt.o \
 	tree-ssa-phiprop.o \
+	tree-ssa-hack.o \
 	tree-ssa-pre.o \
 	tree-ssa-propagate.o \
 	tree-ssa-reassoc.o \
