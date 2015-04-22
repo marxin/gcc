@@ -107,21 +107,16 @@ void dump_hash_table_loc_statistics (void)
 {
   fprintf (stderr, "HASH_TABLE: %u\n", all_hash_tables.length ());
 
-  for (unsigned i = 0; i < all_hash_tables.length (); i++)
-    {
-      void *t = all_hash_tables[i];
-      mem_location **slot = hash_table_usage.m_reverse_location_map->get (t);
-      mem_usage_pair<mem_usage> **slot2 = hash_table_usage.m_reverse_map->get (t);
 
-      if (slot)
-	{
-          mem_location *pair = *slot;
-          fprintf (stderr, "%s:%s:%d\n", pair->get_trimmed_filename (), pair->m_function,
-		   pair->m_line);
+  mem_alloc_description<mem_usage>::mem_map_t::iterator it = hash_table_usage.m_map->begin();
 
-	  if (slot2)
-	    fprintf (stderr, "%u\n", (*slot2)->usage->m_times);
-	}
-    }
+  for (;
+       it != hash_table_usage.m_map->end (); ++it)
+       {
+	 mem_location *loc = (*it).first;
+	 mem_usage *usage = (*it).second;
+	 fprintf (stderr, "HHHH:%s:%s:%d:peak:%u:times:%u\n", loc->get_trimmed_filename (), loc->m_function,
+		  loc->m_line, usage->m_peak, usage->m_times);
+       }
 }
 

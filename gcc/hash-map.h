@@ -124,7 +124,7 @@ public:
       if (gather_mem_stats)
 	{
 	  mem_usage *usage = hash_map_usage.get_descriptor
-	    (ALONE_FINAL_PASS_MEM_STAT, this);
+	    (ALONE_FINAL_PASS_MEM_STAT);
 	  m_descriptor_id = hash_map_usage_list.length ();
 	  hash_map_usage_list.safe_push (usage);
 	}

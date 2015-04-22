@@ -91,14 +91,11 @@ public:
   typedef hash_map <mem_location *, T *, mem_alloc_hashmap_traits>
     mem_map_t;
   typedef hash_map <const void *, mem_usage_pair<T> *, default_hashmap_traits> reverse_mem_map_t;
-  typedef hash_map <const void *, mem_location *, default_hashmap_traits> reverse_location_map_t;
 
   mem_alloc_description ();
-  T *get_descriptor (const char *name, int line, const char *function,
-		     const void *ptr);
+  T *get_descriptor (const char *name, int line, const char *function);
   T *register_overhead (size_t size, const char *name, int line,
-			const char *function, void *ptr);
-  T *register_overhead2 (size_t size, const void *ptr, T *usage);
+			const char *function, const void *ptr);
   void release_overhead (void *ptr);
   void dump ();
   T get_total ();
@@ -106,17 +103,15 @@ public:
   mem_location m_location;
   mem_map_t *m_map;
   reverse_mem_map_t *m_reverse_map;
-  reverse_location_map_t *m_reverse_location_map;
 };
 
 #include "hash-map.h"
 
 template <class T>
 inline T* 
-mem_alloc_description<T>::get_descriptor (const char *filename, int line, const char *function, const void *ptr)
+mem_alloc_description<T>::get_descriptor (const char *filename, int line, const char *function)
 {  
   mem_location *l = new mem_location (filename, function, line);
-  m_reverse_location_map->put (ptr, l);
   T *usage = NULL;
 
   T **slot = m_map->get (l);
@@ -137,18 +132,10 @@ mem_alloc_description<T>::get_descriptor (const char *filename, int line, const 
 
 template <class T>
 inline T* 
-mem_alloc_description<T>::register_overhead (size_t size, const char *filename, int line, const char *function, void *ptr)
+mem_alloc_description<T>::register_overhead (size_t size, const char *filename, int line, const char *function, const void *ptr)
 {
-  T *usage = get_descriptor (filename, line, function, ptr);
-  register_overhead2 (size, ptr, usage);
+  T *usage = get_descriptor (filename, line, function);
 
-  return usage;
-}
-
-template <class T>
-inline T* 
-mem_alloc_description<T>::register_overhead2 (size_t size, const void *ptr, T *usage)
-{
   usage->m_allocated += size;  
   usage->m_times++;
 
@@ -157,10 +144,6 @@ mem_alloc_description<T>::register_overhead2 (size_t size, const void *ptr, T *u
 
   if (!m_reverse_map->get (ptr))
     m_reverse_map->put (ptr, new mem_usage_pair<T> (usage, size));
-
-  // TODO
-  if (ptr)
-    return usage;
 
   return usage;
 }
@@ -202,7 +185,6 @@ mem_alloc_description<T>::mem_alloc_description()
 {
   m_map = new mem_map_t (13, false, false);
   m_reverse_map = new reverse_mem_map_t (13, false, false);
-  m_reverse_location_map = new reverse_location_map_t (13, false, false);
 }
 
 #endif // GCC_MEM_STATS_H
