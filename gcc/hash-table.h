@@ -574,6 +574,8 @@ struct mark_empty_helper<Type *, Traits, false>
   }
 };
 
+class mem_usage;
+
 /* User-facing hash table type.
 
    The table stores elements of type Descriptor::value_type, or pointers to
@@ -615,7 +617,7 @@ class hash_table<Descriptor, Allocator, false>
   typedef typename Descriptor::compare_type compare_type;
 
 public:
-  hash_table (size_t);
+  inline hash_table (size_t CXX_MEM_STAT_INFO);
   ~hash_table ();
 
   /* Current size (in entries) of the hash table.  */
@@ -748,11 +750,225 @@ private:
   /* Current size (in entries) of the hash table, as an index into the
      table of primes.  */
   unsigned int m_size_prime_index;
+
+  /* If we should gather memory statistics for the table.  */
+  bool m_gather_mem_stats;
+
+  /* Memory usage data structure.  */
+  mem_usage *m_mem_usage;
 };
 
+/* A partial specialization used when values should be stored directly.  */
+
+template <typename Descriptor,
+	 template<typename Type> class Allocator>
+class hash_table<Descriptor, Allocator, true>
+{
+  typedef typename Descriptor::value_type value_type;
+  typedef typename Descriptor::compare_type compare_type;
+
+public:
+  explicit hash_table (size_t, bool ggc = false, bool gather_mem_stats = false
+		       CXX_MEM_STAT_INFO);
+  ~hash_table ();
+
+  /* Create a hash_table in gc memory.  */
+
+  static hash_table *
+  create_ggc (size_t n CXX_MEM_STAT_INFO)
+  {
+    hash_table *table = ggc_alloc<hash_table> ();
+    new (table) hash_table (n, true);
+    return table;
+  }
+
+  /* Current size (in entries) of the hash table.  */
+  size_t size () const { return m_size; }
+
+  /* Return the current number of elements in this hash table. */
+  size_t elements () const { return m_n_elements - m_n_deleted; }
+
+  /* Return the current number of elements in this hash table. */
+  size_t elements_with_deleted () const { return m_n_elements; }
+
+  /* This function clears all entries in the given hash table.  */
+  void empty ();
+
+  /* This function clears a specified SLOT in a hash table.  It is
+     useful when you've already done the lookup and don't want to do it
+     again. */
+
+  void clear_slot (value_type *);
+
+  /* This function searches for a hash table entry equal to the given
+     COMPARABLE element starting with the given HASH value.  It cannot
+     be used to insert or delete an element. */
+  value_type &find_with_hash (const compare_type &, hashval_t);
+
+/* Like find_slot_with_hash, but compute the hash value from the element.  */
+  value_type &find (const value_type &value)
+    {
+      return find_with_hash (value, Descriptor::hash (value));
+    }
+
+  value_type *find_slot (const value_type &value, insert_option insert)
+    {
+      return find_slot_with_hash (value, Descriptor::hash (value), insert);
+    }
+
+  /* This function searches for a hash table slot containing an entry
+     equal to the given COMPARABLE element and starting with the given
+     HASH.  To delete an entry, call this with insert=NO_INSERT, then
+     call clear_slot on the slot returned (possibly after doing some
+     checks).  To insert an entry, call this with insert=INSERT, then
+     write the value you want into the returned slot.  When inserting an
+     entry, NULL may be returned if memory allocation fails. */
+  value_type *find_slot_with_hash (const compare_type &comparable,
+				    hashval_t hash, enum insert_option insert);
+
+  /* This function deletes an element with the given COMPARABLE value
+     from hash table starting with the given HASH.  If there is no
+     matching element in the hash table, this function does nothing. */
+  void remove_elt_with_hash (const compare_type &, hashval_t);
+
+/* Like remove_elt_with_hash, but compute the hash value from the element.  */
+  void remove_elt (const value_type &value)
+    {
+      remove_elt_with_hash (value, Descriptor::hash (value));
+    }
+
+  /* This function scans over the entire hash table calling CALLBACK for
+     each live entry.  If CALLBACK returns false, the iteration stops.
+     ARGUMENT is passed as CALLBACK's second argument. */
+  template <typename Argument,
+	    int (*Callback) (value_type *slot, Argument argument)>
+  void traverse_noresize (Argument argument);
+
+  /* Like traverse_noresize, but does resize the table when it is too empty
+     to improve effectivity of subsequent calls.  */
+  template <typename Argument,
+	    int (*Callback) (value_type *slot, Argument argument)>
+  void traverse (Argument argument);
+
+  class iterator
+  {
+  public:
+    iterator () : m_slot (NULL), m_limit (NULL) {}
+
+    iterator (value_type *slot, value_type *limit) :
+      m_slot (slot), m_limit (limit) {}
+
+    inline value_type &operator * () { return *m_slot; }
+    void slide ();
+    inline iterator &operator ++ ();
+    bool operator != (const iterator &other) const
+      {
+	return m_slot != other.m_slot || m_limit != other.m_limit;
+      }
+
+  private:
+    value_type *m_slot;
+    value_type *m_limit;
+  };
+
+  iterator begin () const
+    {
+      iterator iter (m_entries, m_entries + m_size);
+      iter.slide ();
+      return iter;
+    }
+
+  iterator end () const { return iterator (); }
+
+  double collisions () const
+    {
+      return m_searches ? static_cast <double> (m_collisions) / m_searches : 0;
+    }
+
+private:
+  template<typename T> friend void gt_ggc_mx (hash_table<T> *);
+  template<typename T> friend void gt_pch_nx (hash_table<T> *);
+  template<typename T> friend void
+    hashtab_entry_note_pointers (void *, void *, gt_pointer_operator, void *);
+  template<typename T, typename U, typename V> friend void
+  gt_pch_nx (hash_map<T, U, V> *, gt_pointer_operator, void *);
+  template<typename T, typename U> friend void gt_pch_nx (hash_set<T, U> *,
+							  gt_pointer_operator,
+							  void *);
+  template<typename T> friend void gt_pch_nx (hash_table<T> *,
+					      gt_pointer_operator, void *);
+
+  value_type *alloc_entries (size_t n) const;
+  value_type *find_empty_slot_for_expand (hashval_t);
+  void expand ();
+  static bool is_deleted (value_type &v)
+    {
+      return is_deleted_helper<value_type, Descriptor>::call (v);
+    }
+  static bool is_empty (value_type &v)
+    {
+      return is_empty_helper<value_type, Descriptor>::call (v);
+    }
+
+  static void mark_deleted (value_type &v)
+    {
+      return mark_deleted_helper<value_type, Descriptor>::call (v);
+    }
+
+  static void mark_empty (value_type &v)
+    {
+      return mark_empty_helper<value_type, Descriptor>::call (v);
+    }
+
+  /* Table itself.  */
+  typename Descriptor::value_type *m_entries;
+
+  size_t m_size;
+
+  /* Current number of elements including also deleted elements.  */
+  size_t m_n_elements;
+
+  /* Current number of deleted elements in the table.  */
+  size_t m_n_deleted;
+
+  /* The following member is used for debugging. Its value is number
+     of all calls of `htab_find_slot' for the hash table. */
+  unsigned int m_searches;
+
+  /* The following member is used for debugging.  Its value is number
+     of collisions fixed for time of work with the hash table. */
+  unsigned int m_collisions;
+
+  /* Current size (in entries) of the hash table, as an index into the
+     table of primes.  */
+  unsigned int m_size_prime_index;
+
+  /* if m_entries is stored in ggc memory.  */
+  bool m_ggc;
+
+  /* If we should gather memory statistics for the table.  */
+  bool m_gather_mem_stats;
+
+  /* Memory usage data structure.  */
+  mem_usage *m_mem_usage;
+};
+
+#include "mem-stats.h"
+#include "hash-map.h"
+#include "vec.h"
+
+extern mem_alloc_description<mem_usage> hash_table_usage;
+extern vec<mem_usage *> hash_table_usage_list;
+extern vec<void *> all_hash_tables;
+
+/* Support function for statistics.  */
+extern void dump_hash_table_loc_statistics (void);
+
 template<typename Descriptor, template<typename Type> class Allocator>
-hash_table<Descriptor, Allocator, false>::hash_table (size_t size) :
-  m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0)
+hash_table<Descriptor, Allocator, false>::hash_table (size_t size
+						      MEM_STAT_DECL) :
+  m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
+  m_gather_mem_stats (true)
 {
   unsigned int size_prime_index;
 
@@ -763,6 +979,15 @@ hash_table<Descriptor, Allocator, false>::hash_table (size_t size) :
   gcc_assert (m_entries != NULL);
   m_size = size;
   m_size_prime_index = size_prime_index;
+
+  if (m_gather_mem_stats)
+    {
+      m_mem_usage = hash_table_usage.get_descriptor
+	(ALONE_FINAL_PASS_MEM_STAT, this);
+      hash_table_usage.register_overhead2 (size, this, m_mem_usage);
+      hash_table_usage_list.safe_push (m_mem_usage);
+      all_hash_tables.safe_push (this);
+    }
 }
 
 template<typename Descriptor, template<typename Type> class Allocator>
@@ -1106,198 +1331,13 @@ hash_table<Descriptor, Allocator, false>::iterator::operator ++ ()
   return *this;
 }
 
-/* A partial specialization used when values should be stored directly.  */
-
-template <typename Descriptor,
-	 template<typename Type> class Allocator>
-class hash_table<Descriptor, Allocator, true>
-{
-  typedef typename Descriptor::value_type value_type;
-  typedef typename Descriptor::compare_type compare_type;
-
-public:
-  explicit hash_table (size_t, bool ggc = false);
-  ~hash_table ();
-
-  /* Create a hash_table in gc memory.  */
-
-  static hash_table *
-  create_ggc (size_t n)
-  {
-    hash_table *table = ggc_alloc<hash_table> ();
-    new (table) hash_table (n, true);
-    return table;
-  }
-
-  /* Current size (in entries) of the hash table.  */
-  size_t size () const { return m_size; }
-
-  /* Return the current number of elements in this hash table. */
-  size_t elements () const { return m_n_elements - m_n_deleted; }
-
-  /* Return the current number of elements in this hash table. */
-  size_t elements_with_deleted () const { return m_n_elements; }
-
-  /* This function clears all entries in the given hash table.  */
-  void empty ();
-
-  /* This function clears a specified SLOT in a hash table.  It is
-     useful when you've already done the lookup and don't want to do it
-     again. */
-
-  void clear_slot (value_type *);
-
-  /* This function searches for a hash table entry equal to the given
-     COMPARABLE element starting with the given HASH value.  It cannot
-     be used to insert or delete an element. */
-  value_type &find_with_hash (const compare_type &, hashval_t);
-
-/* Like find_slot_with_hash, but compute the hash value from the element.  */
-  value_type &find (const value_type &value)
-    {
-      return find_with_hash (value, Descriptor::hash (value));
-    }
-
-  value_type *find_slot (const value_type &value, insert_option insert)
-    {
-      return find_slot_with_hash (value, Descriptor::hash (value), insert);
-    }
-
-  /* This function searches for a hash table slot containing an entry
-     equal to the given COMPARABLE element and starting with the given
-     HASH.  To delete an entry, call this with insert=NO_INSERT, then
-     call clear_slot on the slot returned (possibly after doing some
-     checks).  To insert an entry, call this with insert=INSERT, then
-     write the value you want into the returned slot.  When inserting an
-     entry, NULL may be returned if memory allocation fails. */
-  value_type *find_slot_with_hash (const compare_type &comparable,
-				    hashval_t hash, enum insert_option insert);
-
-  /* This function deletes an element with the given COMPARABLE value
-     from hash table starting with the given HASH.  If there is no
-     matching element in the hash table, this function does nothing. */
-  void remove_elt_with_hash (const compare_type &, hashval_t);
-
-/* Like remove_elt_with_hash, but compute the hash value from the element.  */
-  void remove_elt (const value_type &value)
-    {
-      remove_elt_with_hash (value, Descriptor::hash (value));
-    }
-
-  /* This function scans over the entire hash table calling CALLBACK for
-     each live entry.  If CALLBACK returns false, the iteration stops.
-     ARGUMENT is passed as CALLBACK's second argument. */
-  template <typename Argument,
-	    int (*Callback) (value_type *slot, Argument argument)>
-  void traverse_noresize (Argument argument);
-
-  /* Like traverse_noresize, but does resize the table when it is too empty
-     to improve effectivity of subsequent calls.  */
-  template <typename Argument,
-	    int (*Callback) (value_type *slot, Argument argument)>
-  void traverse (Argument argument);
-
-  class iterator
-  {
-  public:
-    iterator () : m_slot (NULL), m_limit (NULL) {}
-
-    iterator (value_type *slot, value_type *limit) :
-      m_slot (slot), m_limit (limit) {}
-
-    inline value_type &operator * () { return *m_slot; }
-    void slide ();
-    inline iterator &operator ++ ();
-    bool operator != (const iterator &other) const
-      {
-	return m_slot != other.m_slot || m_limit != other.m_limit;
-      }
-
-  private:
-    value_type *m_slot;
-    value_type *m_limit;
-  };
-
-  iterator begin () const
-    {
-      iterator iter (m_entries, m_entries + m_size);
-      iter.slide ();
-      return iter;
-    }
-
-  iterator end () const { return iterator (); }
-
-  double collisions () const
-    {
-      return m_searches ? static_cast <double> (m_collisions) / m_searches : 0;
-    }
-
-private:
-  template<typename T> friend void gt_ggc_mx (hash_table<T> *);
-  template<typename T> friend void gt_pch_nx (hash_table<T> *);
-  template<typename T> friend void
-    hashtab_entry_note_pointers (void *, void *, gt_pointer_operator, void *);
-  template<typename T, typename U, typename V> friend void
-  gt_pch_nx (hash_map<T, U, V> *, gt_pointer_operator, void *);
-  template<typename T, typename U> friend void gt_pch_nx (hash_set<T, U> *,
-							  gt_pointer_operator,
-							  void *);
-  template<typename T> friend void gt_pch_nx (hash_table<T> *,
-					      gt_pointer_operator, void *);
-
-  value_type *alloc_entries (size_t n) const;
-  value_type *find_empty_slot_for_expand (hashval_t);
-  void expand ();
-  static bool is_deleted (value_type &v)
-    {
-      return is_deleted_helper<value_type, Descriptor>::call (v);
-    }
-  static bool is_empty (value_type &v)
-    {
-      return is_empty_helper<value_type, Descriptor>::call (v);
-    }
-
-  static void mark_deleted (value_type &v)
-    {
-      return mark_deleted_helper<value_type, Descriptor>::call (v);
-    }
-
-  static void mark_empty (value_type &v)
-    {
-      return mark_empty_helper<value_type, Descriptor>::call (v);
-    }
-
-  /* Table itself.  */
-  typename Descriptor::value_type *m_entries;
-
-  size_t m_size;
-
-  /* Current number of elements including also deleted elements.  */
-  size_t m_n_elements;
-
-  /* Current number of deleted elements in the table.  */
-  size_t m_n_deleted;
-
-  /* The following member is used for debugging. Its value is number
-     of all calls of `htab_find_slot' for the hash table. */
-  unsigned int m_searches;
-
-  /* The following member is used for debugging.  Its value is number
-     of collisions fixed for time of work with the hash table. */
-  unsigned int m_collisions;
-
-  /* Current size (in entries) of the hash table, as an index into the
-     table of primes.  */
-  unsigned int m_size_prime_index;
-
-  /* if m_entries is stored in ggc memory.  */
-  bool m_ggc;
-};
 
 template<typename Descriptor, template<typename Type> class Allocator>
-hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc) :
+hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc,
+						     bool gather_mem_stats
+						     MEM_STAT_DECL) :
   m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
-  m_ggc (ggc)
+  m_ggc (ggc), m_gather_mem_stats (gather_mem_stats), m_mem_usage (NULL)
 {
   unsigned int size_prime_index;
 
@@ -1307,6 +1347,14 @@ hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc) :
   m_entries = alloc_entries (size);
   m_size = size;
   m_size_prime_index = size_prime_index;
+
+  if (m_gather_mem_stats)
+    {
+      m_mem_usage = hash_table_usage.get_descriptor
+	(ALONE_FINAL_PASS_MEM_STAT, this);
+      hash_table_usage_list.safe_push (m_mem_usage);
+      all_hash_tables.safe_push (this);
+    }
 }
 
 template<typename Descriptor, template<typename Type> class Allocator>
@@ -1334,6 +1382,9 @@ hash_table<Descriptor, Allocator, true>::alloc_entries (size_t n) const
     nentries = Allocator <value_type> ::data_alloc (n);
   else
     nentries = ::ggc_cleared_vec_alloc<value_type> (n);
+
+  if (m_mem_usage)
+    hash_table_usage.register_overhead2 (n, this, m_mem_usage); 
 
   gcc_assert (nentries != NULL);
   for (size_t i = 0; i < n; i++)

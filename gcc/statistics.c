@@ -118,7 +118,7 @@ curr_statistics_hash (void)
       nr_statistics_hashes = idx + 1;
     }
 
-  statistics_hashes[idx] = new stats_counter_table_type (15);
+  statistics_hashes[idx] = new stats_counter_table_type (15, false, false);
 
   return statistics_hashes[idx];
 }

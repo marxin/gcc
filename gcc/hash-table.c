@@ -31,7 +31,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "hash-table.h"
 
-
 /* Table of primes and multiplicative inverses.
 
    Note that these are not minimally reduced inverses.  Unlike when generating
@@ -97,5 +96,32 @@ hash_table_higher_prime_index (unsigned long n)
   gcc_assert (n <= prime_tab[low].prime);
 
   return low;
+}
+
+mem_alloc_description<mem_usage> hash_table_usage;
+vec<mem_usage *> hash_table_usage_list;
+vec<void *> all_hash_tables;
+
+/* Support function for statistics.  */
+void dump_hash_table_loc_statistics (void)
+{
+  fprintf (stderr, "HASH_TABLE: %u\n", all_hash_tables.length ());
+
+  for (unsigned i = 0; i < all_hash_tables.length (); i++)
+    {
+      void *t = all_hash_tables[i];
+      mem_location **slot = hash_table_usage.m_reverse_location_map->get (t);
+      mem_usage_pair<mem_usage> **slot2 = hash_table_usage.m_reverse_map->get (t);
+
+      if (slot)
+	{
+          mem_location *pair = *slot;
+          fprintf (stderr, "%s:%s:%d\n", pair->get_trimmed_filename (), pair->m_function,
+		   pair->m_line);
+
+	  if (slot2)
+	    fprintf (stderr, "%u\n", (*slot2)->usage->m_times);
+	}
+    }
 }
 

@@ -33,6 +33,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "vec.h"
 #include "diagnostic-core.h"
 #include "hashtab.h"
+#include "mem-stats.h"
+#include "hash-map.h"
+#include "mem-stats.h"
 
 /* vNULL is an empty type with a template cast operation that returns
    a zero-initialized vec<T, A, L> instance.  Use this when you want
@@ -56,9 +59,16 @@ struct vec_descriptor
   size_t peak;
 };
 
+struct vec_usage: public mem_usage
+{
+  size_t m_items;
+  size_t m_items_peak;
+};
 
 /* Hashtable mapping vec addresses to descriptors.  */
 static htab_t vec_desc_hash;
+
+static mem_alloc_description <vec_usage> vec_desc;
 
 /* Hashtable helpers.  */
 static hashval_t
@@ -131,9 +141,14 @@ vec_descriptor (const char *name, int line, const char *function)
 /* Account the overhead.  */
 
 void
-vec_prefix::register_overhead (size_t size, const char *name, int line,
+vec_prefix::register_overhead (size_t size, size_t elements, const char *name, int line,
 			       const char *function)
 {
+  vec_usage *usage = vec_desc.register_overhead (size, name, line, function, this);
+  usage->m_items += elements;
+  if (usage->m_items_peak < usage->m_items)
+    usage->m_items_peak = usage->m_items;
+
   struct vec_descriptor *loc = vec_descriptor (name, line, function);
   struct ptr_hash_entry *p = XNEW (struct ptr_hash_entry);
   PTR *slot;
@@ -160,6 +175,8 @@ vec_prefix::register_overhead (size_t size, const char *name, int line,
 void
 vec_prefix::release_overhead (void)
 {
+  vec_desc.release_overhead (this);
+
   PTR *slot = htab_find_slot_with_hash (ptr_hash, this,
 					htab_hash_pointer (this),
 					NO_INSERT);
@@ -232,6 +249,8 @@ add_statistics (void **slot, void *b)
 void
 dump_vec_loc_statistics (void)
 {
+  vec_desc.dump ();
+
   int nentries = 0;
   char s[4096];
   size_t allocated = 0;
@@ -240,6 +259,20 @@ dump_vec_loc_statistics (void)
 
   if (! GATHER_STATISTICS)
     return;
+
+  mem_alloc_description<vec_usage>::mem_map_t::iterator it = vec_desc.m_map->begin();
+
+  for (;
+       it != vec_desc.m_map->end (); ++it)
+       {
+	 mem_location *loc = (*it).first;
+	 mem_usage *usage = (*it).second;
+	 fprintf (stderr, "YYY:%s:%s:%d:%u:%u\n", loc->get_trimmed_filename (), loc->m_function,
+		  loc->m_line, usage->m_peak, usage->m_times);
+       }
+
+  mem_usage total = vec_desc.get_total ();
+  fprintf (stderr, "TIMES: %u, LEAK: %u\n", total.m_times, total.m_allocated);
 
   loc_array = XCNEWVEC (struct vec_descriptor *, vec_desc_hash->n_elements);
   fprintf (stderr, "Heap vectors:\n");
@@ -275,4 +308,6 @@ dump_vec_loc_statistics (void)
   fprintf (stderr, "\n%-48s %10s       %10s       %10s\n",
 	   "source location", "Leak", "Peak", "Times");
   fprintf (stderr, "-------------------------------------------------------\n");
+
+
 }

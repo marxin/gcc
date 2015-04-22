@@ -216,7 +216,7 @@ struct vec_prefix
 	     compilers that have stricter notions of PODness for types.  */
 
   /* Memory allocation support routines in vec.c.  */
-  void register_overhead (size_t, const char *, int, const char *);
+  void register_overhead (size_t, size_t, const char *, int, const char *);
   void release_overhead (void);
   static unsigned calculate_allocation (vec_prefix *, unsigned, bool);
   static unsigned calculate_allocation_1 (unsigned, unsigned);
@@ -311,7 +311,7 @@ va_heap::reserve (vec<T, va_heap, vl_embed> *&v, unsigned reserve, bool exact
   v->embedded_init (alloc, nelem);
 
   if (GATHER_STATISTICS)
-    v->m_vecpfx.register_overhead (size FINAL_PASS_MEM_STAT);
+    v->m_vecpfx.register_overhead (size, reserve FINAL_PASS_MEM_STAT);
 }
 
 

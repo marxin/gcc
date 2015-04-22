@@ -25,6 +25,17 @@ along with GCC; see the file COPYING3.  If not see
 #include "bitmap.h"
 #include "hash-table.h"
 #include "vec.h"
+#include "inchash.h"
+#include "mem-stats.h"
+#include "hash-map.h"
+
+struct bitmap_mem_usage: public mem_usage
+{
+  uint64_t nsearches;
+  uint64_t search_iter;
+};
+
+static mem_alloc_description<mem_usage> bitmap_mem_desc;
 
 /* Store information about each particular bitmap, per allocation site.  */
 struct bitmap_descriptor_d
@@ -49,6 +60,7 @@ static int next_bitmap_desc_id = 0;
 
 /* Vector mapping descriptor ids to descriptors.  */
 static vec<bitmap_descriptor> bitmap_descriptors;
+static vec<bitmap_descriptor> bitmap_mem_descriptors;
 
 /* Hashtable helpers.  */
 
