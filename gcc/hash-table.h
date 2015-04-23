@@ -617,7 +617,7 @@ class hash_table<Descriptor, Allocator, false>
   typedef typename Descriptor::compare_type compare_type;
 
 public:
-  inline hash_table (size_t CXX_MEM_STAT_INFO);
+  inline hash_table (size_t size, bool gather_mem_stats = false CXX_MEM_STAT_INFO);
   ~hash_table ();
 
   /* Current size (in entries) of the hash table.  */
@@ -630,7 +630,7 @@ public:
   size_t elements_with_deleted () const { return m_n_elements; }
 
   /* This function clears all entries in the given hash table.  */
-  void empty (ALONE_CXX_MEM_STAT_INFO);
+  void empty ();
 
   /* This function clears a specified SLOT in a hash table.  It is
      useful when you've already done the lookup and don't want to do it
@@ -649,11 +649,9 @@ public:
       return find_with_hash (value, Descriptor::hash (value));
     }
 
-  value_type **find_slot (const value_type *value, insert_option insert
-			  CXX_MEM_STAT_INFO)
+  value_type **find_slot (const value_type *value, insert_option insert)
     {
-      return find_slot_with_hash (value, Descriptor::hash (value), insert
-				  FINAL_PASS_MEM_STAT);
+      return find_slot_with_hash (value, Descriptor::hash (value), insert);
     }
 
   /* This function searches for a hash table slot containing an entry
@@ -664,18 +662,17 @@ public:
      write the value you want into the returned slot.  When inserting an
      entry, NULL may be returned if memory allocation fails. */
   value_type **find_slot_with_hash (const compare_type *comparable,
-				    hashval_t hash, enum insert_option insert
-				    CXX_MEM_STAT_INFO);
+				    hashval_t hash, enum insert_option insert);
 
   /* This function deletes an element with the given COMPARABLE value
      from hash table starting with the given HASH.  If there is no
      matching element in the hash table, this function does nothing. */
-  void remove_elt_with_hash (const compare_type *, hashval_t CXX_MEM_STAT_INFO);
+  void remove_elt_with_hash (const compare_type *, hashval_t);
 
 /* Like remove_elt_with_hash, but compute the hash value from the element.  */
-  void remove_elt (const value_type *value CXX_MEM_STAT_INFO)
+  void remove_elt (const value_type *value)
     {
-      remove_elt_with_hash (value, Descriptor::hash (value) FINAL_PASS_MEM_STAT);
+      remove_elt_with_hash (value, Descriptor::hash (value));
     }
 
   /* This function scans over the entire hash table calling CALLBACK for
@@ -689,7 +686,7 @@ public:
      to improve effectivity of subsequent calls.  */
   template <typename Argument,
 	    int (*Callback) (value_type **slot, Argument argument)>
-  void traverse (Argument argument CXX_MEM_STAT_INFO);
+  void traverse (Argument argument);
 
   class iterator
   {
@@ -729,7 +726,7 @@ public:
 private:
 
   value_type **find_empty_slot_for_expand (hashval_t);
-  void expand (ALONE_CXX_MEM_STAT_INFO);
+  void expand ();
 
   /* Table itself.  */
   typename Descriptor::value_type **m_entries;
@@ -771,8 +768,8 @@ class hash_table<Descriptor, Allocator, true>
   typedef typename Descriptor::compare_type compare_type;
 
 public:
-  explicit hash_table (size_t, bool ggc = false, bool gather_mem_stats = false
-		       CXX_MEM_STAT_INFO);
+  explicit inline hash_table (size_t, bool ggc = false, bool gather_mem_stats =
+			      false CXX_MEM_STAT_INFO);
   ~hash_table ();
 
   /* Create a hash_table in gc memory.  */
@@ -795,7 +792,7 @@ public:
   size_t elements_with_deleted () const { return m_n_elements; }
 
   /* This function clears all entries in the given hash table.  */
-  void empty (ALONE_CXX_MEM_STAT_INFO);
+  void empty ();
 
   /* This function clears a specified SLOT in a hash table.  It is
      useful when you've already done the lookup and don't want to do it
@@ -814,11 +811,9 @@ public:
       return find_with_hash (value, Descriptor::hash (value));
     }
 
-  value_type *find_slot (const value_type &value, insert_option insert
-			 CXX_MEM_STAT_INFO)
+  value_type *find_slot (const value_type &value, insert_option insert)
     {
-      return find_slot_with_hash (value, Descriptor::hash (value), insert
-				  FINAL_PASS_MEM_STAT);
+      return find_slot_with_hash (value, Descriptor::hash (value), insert);
     }
 
   /* This function searches for a hash table slot containing an entry
@@ -829,18 +824,17 @@ public:
      write the value you want into the returned slot.  When inserting an
      entry, NULL may be returned if memory allocation fails. */
   value_type *find_slot_with_hash (const compare_type &comparable,
-				    hashval_t hash, enum insert_option insert
-				    CXX_MEM_STAT_INFO);
+				    hashval_t hash, enum insert_option insert);
 
   /* This function deletes an element with the given COMPARABLE value
      from hash table starting with the given HASH.  If there is no
      matching element in the hash table, this function does nothing. */
-  void remove_elt_with_hash (const compare_type &, hashval_t CXX_MEM_STAT_INFO);
+  void remove_elt_with_hash (const compare_type &, hashval_t);
 
 /* Like remove_elt_with_hash, but compute the hash value from the element.  */
-  void remove_elt (const value_type &value CXX_MEM_STAT_INFO)
+  void remove_elt (const value_type &value)
     {
-      remove_elt_with_hash (value, Descriptor::hash (value) FINAL_PASS_MEM_STAT);
+      remove_elt_with_hash (value, Descriptor::hash (value));
     }
 
   /* This function scans over the entire hash table calling CALLBACK for
@@ -854,7 +848,7 @@ public:
      to improve effectivity of subsequent calls.  */
   template <typename Argument,
 	    int (*Callback) (value_type *slot, Argument argument)>
-  void traverse (Argument argument CXX_MEM_STAT_INFO);
+  void traverse (Argument argument);
 
   class iterator
   {
@@ -904,9 +898,9 @@ private:
   template<typename T> friend void gt_pch_nx (hash_table<T> *,
 					      gt_pointer_operator, void *);
 
-  value_type *alloc_entries (size_t n CXX_MEM_STAT_INFO) const;
+  value_type *alloc_entries (size_t n) const;
   value_type *find_empty_slot_for_expand (hashval_t);
-  void expand (ALONE_MEM_STAT_DECL);
+  void expand ();
   static bool is_deleted (value_type &v)
     {
       return is_deleted_helper<value_type, Descriptor>::call (v);
@@ -964,36 +958,34 @@ private:
 #include "vec.h"
 
 extern mem_alloc_description<mem_usage> hash_table_usage;
-extern vec<mem_usage *> hash_table_usage_list;
-extern vec<void *> all_hash_tables;
-
 /* Support function for statistics.  */
 extern void dump_hash_table_loc_statistics (void);
 
 template<typename Descriptor, template<typename Type> class Allocator>
-hash_table<Descriptor, Allocator, false>::hash_table (size_t size
+inline
+hash_table<Descriptor, Allocator, false>::hash_table (size_t size,
+						      bool gather_mem_stats
 						      MEM_STAT_DECL) :
   m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
-  m_gather_mem_stats (true)
+  m_gather_mem_stats (gather_mem_stats)
 {
   unsigned int size_prime_index;
 
   size_prime_index = hash_table_higher_prime_index (size);
   size = prime_tab[size_prime_index].prime;
-
+  
   m_entries = Allocator <value_type*> ::data_alloc (size);
-  gcc_assert (m_entries != NULL);
-  m_size = size;
-  m_size_prime_index = size_prime_index;
 
   if (m_gather_mem_stats)
     {
-      m_mem_usage = hash_table_usage.get_descriptor
-	(ALONE_FINAL_PASS_MEM_STAT);
-      hash_table_usage.register_overhead (size FINAL_PASS_MEM_STAT, this);
-      hash_table_usage_list.safe_push (m_mem_usage);
-      all_hash_tables.safe_push (this);
+      m_mem_usage = hash_table_usage.register_descriptor (this, ALONE_FINAL_PASS_MEM_STAT);
+      hash_table_usage.register_instance_overhead (sizeof (value_type *) *
+						    size, this);
     }
+
+  gcc_assert (m_entries != NULL);
+  m_size = size;
+  m_size_prime_index = size_prime_index;
 }
 
 template<typename Descriptor, template<typename Type> class Allocator>
@@ -1004,6 +996,10 @@ hash_table<Descriptor, Allocator, false>::~hash_table ()
       Descriptor::remove (m_entries[i]);
 
   Allocator <value_type *> ::data_free (m_entries);
+
+  if (m_gather_mem_stats)
+    hash_table_usage.release_overhead_for_instance (this, sizeof (value_type *)
+						    * m_size);
 }
 
 /* Similar to find_slot, but without several unwanted side effects:
@@ -1050,7 +1046,7 @@ hash_table<Descriptor, Allocator, false>
 
 template<typename Descriptor, template<typename Type> class Allocator>
 void
-hash_table<Descriptor, Allocator, false>::expand (ALONE_MEM_STAT_DECL)
+hash_table<Descriptor, Allocator, false>::expand ()
 {
   value_type **oentries = m_entries;
   unsigned int oindex = m_size_prime_index;
@@ -1074,6 +1070,10 @@ hash_table<Descriptor, Allocator, false>::expand (ALONE_MEM_STAT_DECL)
     }
 
   value_type **nentries = Allocator <value_type *> ::data_alloc (nsize);
+
+  if (m_gather_mem_stats)
+    hash_table_usage.register_instance_overhead (sizeof (value_type *) * (nsize - osize), this);
+
   gcc_assert (nentries != NULL);
   m_entries = nentries;
   m_size = nsize;
@@ -1102,7 +1102,7 @@ hash_table<Descriptor, Allocator, false>::expand (ALONE_MEM_STAT_DECL)
 
 template<typename Descriptor, template<typename Type> class Allocator>
 void
-hash_table<Descriptor, Allocator, false>::empty (ALONE_MEM_STAT_DECL)
+hash_table<Descriptor, Allocator, false>::empty ()
 {
   size_t size = m_size;
   value_type **entries = m_entries;
@@ -1120,6 +1120,11 @@ hash_table<Descriptor, Allocator, false>::empty (ALONE_MEM_STAT_DECL)
 
       Allocator <value_type *> ::data_free (m_entries);
       m_entries = Allocator <value_type *> ::data_alloc (nsize);
+
+      if (m_gather_mem_stats)
+	hash_table_usage.release_overhead_for_instance (this, sizeof
+							(value_type *) * (m_size - nsize));
+
       m_size = nsize;
       m_size_prime_index = nindex;
     }
@@ -1193,7 +1198,7 @@ template<typename Descriptor, template<typename Type> class Allocator>
 typename hash_table<Descriptor, Allocator, false>::value_type **
 hash_table<Descriptor, Allocator, false>
 ::find_slot_with_hash (const compare_type *comparable, hashval_t hash,
-		       enum insert_option insert MEM_STAT_DECL)
+		       enum insert_option insert)
 {
   if (insert == INSERT && m_size * 3 <= m_n_elements * 4)
     expand ();
@@ -1253,11 +1258,9 @@ hash_table<Descriptor, Allocator, false>
 template<typename Descriptor, template<typename Type> class Allocator>
 void
 hash_table<Descriptor, Allocator, false>
-::remove_elt_with_hash (const compare_type *comparable, hashval_t hash
-			MEM_STAT_DECL)
+::remove_elt_with_hash (const compare_type *comparable, hashval_t hash)
 {
-  value_type **slot = find_slot_with_hash (comparable, hash, NO_INSERT
-					   FINAL_PASS_MEM_STAT);
+  value_type **slot = find_slot_with_hash (comparable, hash, NO_INSERT);
   if (*slot == HTAB_EMPTY_ENTRY)
     return;
 
@@ -1303,12 +1306,11 @@ template <typename Argument,
 					       false>::value_type **slot,
 			   Argument argument)>
 void
-hash_table<Descriptor, Allocator, false>::traverse (Argument argument
-						    MEM_STAT_DECL)
+hash_table<Descriptor, Allocator, false>::traverse (Argument argument)
 {
   size_t size = m_size;
   if (elements () * 8 < size && size > 32)
-    expand (ALONE_FINAL_PASS_MEM_STAT);
+    expand ();
 
   traverse_noresize <Argument, Callback> (argument);
 }
@@ -1340,8 +1342,8 @@ hash_table<Descriptor, Allocator, false>::iterator::operator ++ ()
   return *this;
 }
 
-
 template<typename Descriptor, template<typename Type> class Allocator>
+inline
 hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc,
 						     bool gather_mem_stats
 						     MEM_STAT_DECL) :
@@ -1353,17 +1355,12 @@ hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc,
   size_prime_index = hash_table_higher_prime_index (size);
   size = prime_tab[size_prime_index].prime;
 
-  m_entries = alloc_entries (size FINAL_PASS_MEM_STAT);
+  if (m_gather_mem_stats)
+    m_mem_usage = hash_table_usage.register_descriptor (this, ALONE_FINAL_PASS_MEM_STAT);
+
+  m_entries = alloc_entries (size);
   m_size = size;
   m_size_prime_index = size_prime_index;
-
-  if (m_gather_mem_stats)
-    {
-      m_mem_usage = hash_table_usage.get_descriptor
-	(ALONE_FINAL_PASS_MEM_STAT);
-      hash_table_usage_list.safe_push (m_mem_usage);
-      all_hash_tables.safe_push (this);
-    }
 }
 
 template<typename Descriptor, template<typename Type> class Allocator>
@@ -1377,23 +1374,27 @@ hash_table<Descriptor, Allocator, true>::~hash_table ()
     Allocator <value_type> ::data_free (m_entries);
   else
     ggc_free (m_entries);
+
+  if (m_gather_mem_stats && !m_ggc)
+    hash_table_usage.release_overhead_for_instance (this, sizeof (value_type) * m_size);
 }
 
 /* This function returns an array of empty hash table elements.  */
 
 template<typename Descriptor, template<typename Type> class Allocator>
 inline typename hash_table<Descriptor, Allocator, true>::value_type *
-hash_table<Descriptor, Allocator, true>::alloc_entries (size_t n MEM_STAT_DECL) const
+hash_table<Descriptor, Allocator, true>::alloc_entries (size_t n) const
 {
   value_type *nentries;
 
   if (!m_ggc)
-    nentries = Allocator <value_type> ::data_alloc (n);
+    {
+      nentries = Allocator <value_type> ::data_alloc (n);
+      if (m_gather_mem_stats)
+	hash_table_usage.register_instance_overhead (sizeof (value_type) * n, this);
+    }
   else
     nentries = ::ggc_cleared_vec_alloc<value_type> (n);
-
-  if (m_gather_mem_stats)
-    hash_table_usage.register_overhead (n FINAL_PASS_MEM_STAT, this); 
 
   gcc_assert (nentries != NULL);
   for (size_t i = 0; i < n; i++)
@@ -1450,7 +1451,7 @@ hash_table<Descriptor, Allocator, true>
 
 	  template<typename Descriptor, template<typename Type> class Allocator>
 void
-hash_table<Descriptor, Allocator, true>::expand (ALONE_MEM_STAT_DECL)
+hash_table<Descriptor, Allocator, true>::expand ()
 {
   value_type *oentries = m_entries;
   unsigned int oindex = m_size_prime_index;
@@ -1473,7 +1474,12 @@ hash_table<Descriptor, Allocator, true>::expand (ALONE_MEM_STAT_DECL)
       nsize = osize;
     }
 
-  value_type *nentries = alloc_entries (nsize FINAL_PASS_MEM_STAT);
+  value_type *nentries = alloc_entries (nsize);
+
+  if (m_gather_mem_stats)
+    hash_table_usage.release_overhead_for_instance (this, sizeof (value_type)
+						    * osize);
+
   m_entries = nentries;
   m_size = nsize;
   m_size_prime_index = nindex;
@@ -1504,7 +1510,7 @@ hash_table<Descriptor, Allocator, true>::expand (ALONE_MEM_STAT_DECL)
 
 template<typename Descriptor, template<typename Type> class Allocator>
 void
-hash_table<Descriptor, Allocator, true>::empty (ALONE_MEM_STAT_DECL)
+hash_table<Descriptor, Allocator, true>::empty ()
 {
   size_t size = m_size;
   value_type *entries = m_entries;
@@ -1525,7 +1531,7 @@ hash_table<Descriptor, Allocator, true>::empty (ALONE_MEM_STAT_DECL)
       else
 	ggc_free (m_entries);
 
-      m_entries = alloc_entries (nsize FINAL_PASS_MEM_STAT);
+      m_entries = alloc_entries (nsize);
       m_size = nsize;
       m_size_prime_index = nindex;
     }
@@ -1597,10 +1603,10 @@ template<typename Descriptor, template<typename Type> class Allocator>
 typename hash_table<Descriptor, Allocator, true>::value_type *
 hash_table<Descriptor, Allocator, true>
 ::find_slot_with_hash (const compare_type &comparable, hashval_t hash,
-		       enum insert_option insert MEM_STAT_DECL)
+		       enum insert_option insert)
 {
   if (insert == INSERT && m_size * 3 <= m_n_elements * 4)
-    expand (ALONE_FINAL_PASS_MEM_STAT);
+    expand ();
 
   m_searches++;
 
@@ -1657,11 +1663,9 @@ hash_table<Descriptor, Allocator, true>
 template<typename Descriptor, template<typename Type> class Allocator>
 void
 hash_table<Descriptor, Allocator, true>
-::remove_elt_with_hash (const compare_type &comparable, hashval_t hash
-			MEM_STAT_DECL)
+::remove_elt_with_hash (const compare_type &comparable, hashval_t hash)
 {
-  value_type *slot = find_slot_with_hash (comparable, hash, NO_INSERT
-					  FINAL_PASS_MEM_STAT);
+  value_type *slot = find_slot_with_hash (comparable, hash, NO_INSERT);
   if (is_empty (*slot))
     return;
 
@@ -1708,12 +1712,11 @@ template <typename Argument,
 					       true>::value_type *slot,
 			   Argument argument)>
 void
-hash_table<Descriptor, Allocator, true>::traverse (Argument argument
-						   MEM_STAT_DECL)
+hash_table<Descriptor, Allocator, true>::traverse (Argument argument)
 {
   size_t size = m_size;
   if (elements () * 8 < size && size > 32)
-    expand (ALONE_FINAL_PASS_MEM_STAT);
+    expand ();
 
   traverse_noresize <Argument, Callback> (argument);
 }

@@ -118,13 +118,13 @@ class GTY((user)) hash_map
 public:
   explicit hash_map (size_t n = 13, bool ggc = false,
 		     bool gather_mem_stats = true CXX_MEM_STAT_INFO)
-    : m_table (n, ggc, gather_mem_stats FINAL_PASS_MEM_STAT),
+    : m_table (n, ggc, false FINAL_PASS_MEM_STAT),
       m_descriptor_id (-1)
     {
       if (gather_mem_stats)
 	{
-	  mem_usage *usage = hash_map_usage.get_descriptor
-	    (ALONE_FINAL_PASS_MEM_STAT);
+	  mem_usage *usage = hash_map_usage.register_descriptor
+	    (this, ALONE_FINAL_PASS_MEM_STAT);
 	  m_descriptor_id = hash_map_usage_list.length ();
 	  hash_map_usage_list.safe_push (usage);
 	}

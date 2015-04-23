@@ -937,7 +937,7 @@ ggc_record_overhead (size_t allocated, size_t overhead, void *ptr,
   p->loc = loc;
   p->size = allocated + overhead;
   if (!ptr_hash)
-    ptr_hash = new hash_table<ptr_hash_hasher> (10);
+    ptr_hash = new hash_table<ptr_hash_hasher> (10, false);
   slot = ptr_hash->find_slot_with_hash (ptr, htab_hash_pointer (ptr), INSERT);
   gcc_assert (!*slot);
   *slot = p;

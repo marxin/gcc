@@ -99,24 +99,27 @@ hash_table_higher_prime_index (unsigned long n)
 }
 
 mem_alloc_description<mem_usage> hash_table_usage;
-vec<mem_usage *> hash_table_usage_list;
-vec<void *> all_hash_tables;
 
 /* Support function for statistics.  */
 void dump_hash_table_loc_statistics (void)
 {
-  fprintf (stderr, "HASH_TABLE: %u\n", all_hash_tables.length ());
-
+  fprintf (stderr, "HASH_TABLE\n");
+  char s[4096];
 
   mem_alloc_description<mem_usage>::mem_map_t::iterator it = hash_table_usage.m_map->begin();
 
-  for (;
-       it != hash_table_usage.m_map->end (); ++it)
-       {
-	 mem_location *loc = (*it).first;
-	 mem_usage *usage = (*it).second;
-	 fprintf (stderr, "HHHH:%s:%s:%d:peak:%u:times:%u\n", loc->get_trimmed_filename (), loc->m_function,
-		  loc->m_line, usage->m_peak, usage->m_times);
-       }
+  for (; it != hash_table_usage.m_map->end (); ++it)
+    {
+      mem_location *loc = (*it).first;
+      mem_usage *usage = (*it).second;
+
+       sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
+		loc->m_line, loc->m_function);
+       
+       s[48] = '\0';
+
+       fprintf (stderr, "%-48s %10u%10u%10u\n", s, 
+       usage->m_allocated, usage->m_peak, usage->m_times);
+     }
 }
 

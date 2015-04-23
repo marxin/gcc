@@ -49,6 +49,15 @@ struct mem_usage
   size_t m_allocated;
   size_t m_times;
   size_t m_peak;
+
+  inline void register_overhead (size_t size)
+    {
+      m_allocated += size;  
+      m_times++;
+
+      if (m_peak < m_allocated)
+	m_peak = m_allocated;
+    }
 };
 
 template <class T>
@@ -93,10 +102,12 @@ public:
   typedef hash_map <const void *, mem_usage_pair<T> *, default_hashmap_traits> reverse_mem_map_t;
 
   mem_alloc_description ();
-  T *get_descriptor (const char *name, int line, const char *function);
+  T *register_descriptor (const void *ptr, const char *name, int line, const char *function);
   T *register_overhead (size_t size, const char *name, int line,
 			const char *function, const void *ptr);
+  T *register_instance_overhead (size_t size, const void *ptr);
   void release_overhead (void *ptr);
+  void release_overhead_for_instance (void *ptr, size_t size);
   void dump ();
   T get_total ();
 
@@ -109,7 +120,7 @@ public:
 
 template <class T>
 inline T* 
-mem_alloc_description<T>::get_descriptor (const char *filename, int line, const char *function)
+mem_alloc_description<T>::register_descriptor (const void *ptr, const char *filename, int line, const char *function)
 {  
   mem_location *l = new mem_location (filename, function, line);
   T *usage = NULL;
@@ -117,8 +128,7 @@ mem_alloc_description<T>::get_descriptor (const char *filename, int line, const 
   T **slot = m_map->get (l);
   if (slot)
     {
-      // TODO
-      // delete l;
+      delete l;
       usage = *slot;
     }
   else
@@ -127,6 +137,20 @@ mem_alloc_description<T>::get_descriptor (const char *filename, int line, const 
       m_map->put (l, usage);
     }
 
+  if (!m_reverse_map->get (ptr))
+    m_reverse_map->put (ptr, new mem_usage_pair<T> (usage, 0));
+
+  return usage;
+}
+
+
+template <class T>
+inline T* 
+mem_alloc_description<T>::register_instance_overhead (size_t size, const void *ptr)
+{
+  mem_usage *usage = (*m_reverse_map->get (ptr))->usage;
+  usage->register_overhead (size);
+
   return usage;
 }
 
@@ -134,16 +158,8 @@ template <class T>
 inline T* 
 mem_alloc_description<T>::register_overhead (size_t size, const char *filename, int line, const char *function, const void *ptr)
 {
-  T *usage = get_descriptor (filename, line, function);
-
-  usage->m_allocated += size;  
-  usage->m_times++;
-
-  if (usage->m_peak < usage->m_allocated)
-    usage->m_peak = usage->m_allocated;
-
-  if (!m_reverse_map->get (ptr))
-    m_reverse_map->put (ptr, new mem_usage_pair<T> (usage, size));
+  T *usage = register_descriptor (ptr, filename, line, function);
+  usage->register_overhead (size);
 
   return usage;
 }
@@ -155,6 +171,26 @@ mem_alloc_description<T>::release_overhead (void *ptr)
 //  mem_usage_pair<T> **slot = mem_ptr_map.get (ptr);
 //  mem_usage_pair<T> *usage_pair = *slot;
 //  usage_pair->usage->m_allocated -= usage_pair->allocated;
+}
+
+
+template <class T>
+inline void
+mem_alloc_description<T>::release_overhead_for_instance (void *ptr, size_t size)
+{
+  mem_usage_pair<T> **slot = m_reverse_map->get (ptr);
+  mem_usage_pair<T> *usage_pair = *slot;
+
+
+  // TODO
+  if (!(size <= usage_pair->usage->m_allocated))
+    {
+    fprintf (stderr, "XXX: fix release: %lu/%lu\n",
+	     size, usage_pair->usage->m_allocated);
+    return;
+    }
+
+  usage_pair->usage->m_allocated -= size;
 }
 
 template <class T>
