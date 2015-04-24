@@ -35,7 +35,7 @@ struct bitmap_mem_usage: public mem_usage
   uint64_t search_iter;
 };
 
-static mem_alloc_description<mem_usage> bitmap_mem_desc;
+mem_alloc_description<mem_usage> bitmap_mem_desc;
 
 /* Store information about each particular bitmap, per allocation site.  */
 struct bitmap_descriptor_d
@@ -60,7 +60,6 @@ static int next_bitmap_desc_id = 0;
 
 /* Vector mapping descriptor ids to descriptors.  */
 static vec<bitmap_descriptor> bitmap_descriptors;
-static vec<bitmap_descriptor> bitmap_mem_descriptors;
 
 /* Hashtable helpers.  */
 
@@ -128,6 +127,7 @@ get_bitmap_descriptor (const char *file, int line, const char *function)
 void
 bitmap_register (bitmap b MEM_STAT_DECL)
 {
+  bitmap_mem_desc.register_descriptor (b, BITMAP FINAL_PASS_MEM_STAT);
   bitmap_descriptor desc = get_bitmap_descriptor (ALONE_FINAL_PASS_MEM_STAT);
   desc->created++;
   b->descriptor_id = desc->id;
@@ -137,6 +137,8 @@ bitmap_register (bitmap b MEM_STAT_DECL)
 static void
 register_overhead (bitmap b, int amount)
 {
+  bitmap_mem_desc.register_instance_overhead (amount, b);
+
   bitmap_descriptor desc = bitmap_descriptors[b->descriptor_id];
   desc->current += amount;
   if (amount > 0)
@@ -2204,6 +2206,15 @@ dump_bitmap_statistics (void)
 
   if (!bitmap_desc_hash)
     return;
+
+  fprintf (stderr, "BITMAPS\n");
+  mem_alloc_description<mem_usage>::mem_list_t *list = bitmap_mem_desc.get_list (BITMAP);
+
+  for (int i = list->length () - 1; i >= 0; i--)
+    (*list)[i].second->dump ((*list)[i].first);
+
+  delete list;
+
 
   fprintf (stderr,
 	   "\n%-41s %9s %15s %15s %15s %10s %10s\n",

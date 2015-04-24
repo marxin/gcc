@@ -160,10 +160,8 @@ public:
   T *register_overhead (size_t size, mem_alloc_origin origin, const char *name, int line,
 			const char *function, const void *ptr);
   T *register_instance_overhead (size_t size, const void *ptr);
-  void release_overhead (void *ptr);
   void release_overhead_for_instance (void *ptr, size_t size);
   void dump ();
-  void verify ();
   T get_total ();
   mem_list_t *get_list (mem_alloc_origin origin);
 
@@ -196,31 +194,22 @@ mem_alloc_description<T>::register_descriptor (const void *ptr, mem_alloc_origin
   if (!m_reverse_map->get (ptr))
     m_reverse_map->put (ptr, new mem_usage_pair<T> (usage, 0));
 
-  verify ();
-
   return usage;
-}
-
-template <class T>
-inline void 
-mem_alloc_description<T>::verify ()
-{
-  for (typename mem_map_t::iterator it = m_map->begin(); it != m_map->end (); ++it)
-    {
-      // TODO
-      gcc_assert ((*it).first);
-      gcc_assert ((*it).second);
-    }
 }
 
 template <class T>
 inline T* 
 mem_alloc_description<T>::register_instance_overhead (size_t size, const void *ptr)
 {
-  T *usage = (*m_reverse_map->get (ptr))->usage;
-  usage->register_overhead (size);
+  mem_usage_pair <T> **slot = m_reverse_map->get (ptr);
+  if (!slot)
+    {
+      fprintf (stderr, "problem tu je..\n");
+      return NULL;
+    }
 
-  verify ();
+  T *usage = (*slot)->usage;
+  usage->register_overhead (size);
 
   return usage;
 }
@@ -237,30 +226,12 @@ mem_alloc_description<T>::register_overhead (size_t size, mem_alloc_origin origi
 
 template <class T>
 inline void
-mem_alloc_description<T>::release_overhead (void *ptr)
-{
-//  mem_usage_pair<T> **slot = mem_ptr_map.get (ptr);
-//  mem_usage_pair<T> *usage_pair = *slot;
-//  usage_pair->usage->m_allocated -= usage_pair->allocated;
-}
-
-
-template <class T>
-inline void
 mem_alloc_description<T>::release_overhead_for_instance (void *ptr, size_t size)
 {
   mem_usage_pair<T> **slot = m_reverse_map->get (ptr);
   mem_usage_pair<T> *usage_pair = *slot;
 
-
-  // TODO
-  if (!(size <= usage_pair->usage->m_allocated))
-    {
-      gcc_unreachable ();
-    fprintf (stderr, "XXX: fix release: %lu/%lu\n",
-	     size, usage_pair->usage->m_allocated);
-    return;
-    }
+  gcc_assert (size <= usage_pair->usage->m_allocated);
 
   usage_pair->usage->m_allocated -= size;
 }
@@ -303,8 +274,6 @@ mem_alloc_description<T>::get_list (mem_alloc_origin origin)
 {
   mem_list_t *list = new mem_list_t ();
   list->m_gather_mem_stats = false;
-
-  verify ();
 
   for (typename mem_map_t::iterator it = m_map->begin(); it != m_map->end (); ++it)
     if ((*it).first->m_origin == origin)
