@@ -4,6 +4,7 @@
 #include "hash-map-traits.h"
 #include "inchash.h"
 #include "mem-stats-traits.h"
+#include "vec.h"
 
 template<typename Key, typename Value,
 	 typename Traits = default_hashmap_traits>
@@ -25,7 +26,13 @@ struct mem_location
 
   hashval_t hash ()
   {
-    return 123;
+    inchash::hash hash;
+
+    hash.add_ptr (m_filename);
+    hash.add_ptr (m_function);
+    hash.add_int (m_line);
+
+    return hash.end ();
   }
 
   int equal (mem_location &other)
@@ -47,40 +54,63 @@ struct mem_location
 
   static const char *get_origin_name (mem_alloc_origin origin)
   {
-    switch (origin)
-      {
-      case HASH_TABLE:
-	return "hash table";
-      case HASH_MAP:
-	return "hash map";
-      case HASH_SET:
-	return "hash set";
-      case VEC:
-	return "vec";
-      case BITMAP:
-	return "bitmap";
-      default:
-	gcc_unreachable ();
-      }
+    return mem_alloc_origin_names[(unsigned) origin];
   }
 };
 
 struct mem_usage
 {
   mem_usage (): m_allocated (0), m_times (0), m_peak (0) {}
+  mem_usage (size_t allocated, size_t times, size_t peak):
+    m_allocated (allocated), m_times (times), m_peak (peak) {} 
 
   size_t m_allocated;
   size_t m_times;
   size_t m_peak;
 
   inline void register_overhead (size_t size)
-    {
-      m_allocated += size;  
-      m_times++;
+  {
+    m_allocated += size;  
+    m_times++;
 
-      if (m_peak < m_allocated)
-	m_peak = m_allocated;
-    }
+    if (m_peak < m_allocated)
+      m_peak = m_allocated;
+  }
+
+  mem_usage operator+ (const mem_usage &second)
+  {
+    return mem_usage (m_allocated + second.m_allocated,
+		      m_times + second.m_times,
+		      m_peak + second.m_peak);
+  }
+
+  inline bool operator< (const mem_usage &second) const
+  {
+    return (m_allocated == second.m_allocated ?
+	    (m_peak == second.m_peak ? m_times < second.m_times
+	     : m_peak < second.m_peak ) : m_allocated < second.m_allocated);
+  }
+
+  static int compare (const void *first, const void *second)
+  {
+    typedef std::pair<mem_location *, mem_usage *> mem_pair_t;
+
+    const mem_pair_t f = *(const mem_pair_t *)first;
+    const mem_pair_t s = *(const mem_pair_t *)second;
+
+    return (*f.second) < (*s.second);
+  }
+
+  inline void dump (mem_location *loc) const
+  {
+    char s[4096];
+    sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
+	     loc->m_line, loc->m_function);
+
+    s[48] = '\0';
+
+    fprintf (stderr, "%-48s %10li%10li%10li\n", s, (long)m_allocated, (long)m_peak, (long)m_times);
+  }
 };
 
 template <class T>
@@ -123,6 +153,7 @@ public:
   typedef hash_map <mem_location *, T *, mem_alloc_hashmap_traits>
     mem_map_t;
   typedef hash_map <const void *, mem_usage_pair<T> *, default_hashmap_traits> reverse_mem_map_t;
+  typedef vec <std::pair <mem_location *, T *> > mem_list_t;
 
   mem_alloc_description ();
   T *register_descriptor (const void *ptr, mem_alloc_origin origin, const char *name, int line, const char *function);
@@ -132,7 +163,9 @@ public:
   void release_overhead (void *ptr);
   void release_overhead_for_instance (void *ptr, size_t size);
   void dump ();
+  void verify ();
   T get_total ();
+  mem_list_t *get_list (mem_alloc_origin origin);
 
   mem_location m_location;
   mem_map_t *m_map;
@@ -163,16 +196,31 @@ mem_alloc_description<T>::register_descriptor (const void *ptr, mem_alloc_origin
   if (!m_reverse_map->get (ptr))
     m_reverse_map->put (ptr, new mem_usage_pair<T> (usage, 0));
 
+  verify ();
+
   return usage;
 }
 
+template <class T>
+inline void 
+mem_alloc_description<T>::verify ()
+{
+  for (typename mem_map_t::iterator it = m_map->begin(); it != m_map->end (); ++it)
+    {
+      // TODO
+      gcc_assert ((*it).first);
+      gcc_assert ((*it).second);
+    }
+}
 
 template <class T>
 inline T* 
 mem_alloc_description<T>::register_instance_overhead (size_t size, const void *ptr)
 {
-  mem_usage *usage = (*m_reverse_map->get (ptr))->usage;
+  T *usage = (*m_reverse_map->get (ptr))->usage;
   usage->register_overhead (size);
+
+  verify ();
 
   return usage;
 }
@@ -208,6 +256,7 @@ mem_alloc_description<T>::release_overhead_for_instance (void *ptr, size_t size)
   // TODO
   if (!(size <= usage_pair->usage->m_allocated))
     {
+      gcc_unreachable ();
     fprintf (stderr, "XXX: fix release: %lu/%lu\n",
 	     size, usage_pair->usage->m_allocated);
     return;
@@ -239,11 +288,31 @@ mem_alloc_description<T>::get_total ()
 }
 
 template <class T>
-inline 
+inline
 mem_alloc_description<T>::mem_alloc_description()
 {
   m_map = new mem_map_t (13, false, false);
   m_reverse_map = new reverse_mem_map_t (13, false, false);
+}
+
+
+template <class T>
+inline 
+vec <std::pair<mem_location *, T *> > *
+mem_alloc_description<T>::get_list (mem_alloc_origin origin)
+{
+  mem_list_t *list = new mem_list_t ();
+  list->m_gather_mem_stats = false;
+
+  verify ();
+
+  for (typename mem_map_t::iterator it = m_map->begin(); it != m_map->end (); ++it)
+    if ((*it).first->m_origin == origin)
+      list->safe_push (std::pair<mem_location*, T*> (*it));
+
+  list->qsort (T::compare);
+
+  return list;
 }
 
 #endif // GCC_MEM_STATS_H

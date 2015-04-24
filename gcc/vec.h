@@ -216,8 +216,9 @@ struct vec_prefix
 	     compilers that have stricter notions of PODness for types.  */
 
   /* Memory allocation support routines in vec.c.  */
-  void register_overhead (size_t, size_t, const char *, int, const char *);
-  void release_overhead (void);
+  void register_overhead (void *, size_t, size_t, const char *, int, const char
+			  *);
+  void release_overhead (void *, size_t);
   static unsigned calculate_allocation (vec_prefix *, unsigned, bool);
   static unsigned calculate_allocation_1 (unsigned, unsigned);
 
@@ -302,16 +303,17 @@ va_heap::reserve (vec<T, va_heap, vl_embed> *&v, unsigned reserve, bool exact
     = vec_prefix::calculate_allocation (v ? &v->m_vecpfx : 0, reserve, exact);
   gcc_checking_assert (alloc);
 
-  if (GATHER_STATISTICS && v)
-    v->m_vecpfx.release_overhead ();
+  if (GATHER_STATISTICS && v && v->m_gather_mem_stats)
+    v->m_vecpfx.release_overhead (v, v->allocated () * sizeof (T));
 
   size_t size = vec<T, va_heap, vl_embed>::embedded_size (alloc);
   unsigned nelem = v ? v->length () : 0;
   v = static_cast <vec<T, va_heap, vl_embed> *> (xrealloc (v, size));
   v->embedded_init (alloc, nelem);
 
-  if (GATHER_STATISTICS)
-    v->m_vecpfx.register_overhead (size, reserve FINAL_PASS_MEM_STAT);
+  if (GATHER_STATISTICS && v->m_gather_mem_stats)
+    v->m_vecpfx.register_overhead (v, alloc * sizeof (T), reserve
+				   FINAL_PASS_MEM_STAT);
 }
 
 
@@ -324,8 +326,8 @@ va_heap::release (vec<T, va_heap, vl_embed> *&v)
   if (v == NULL)
     return;
 
-  if (GATHER_STATISTICS)
-    v->m_vecpfx.release_overhead ();
+  if (GATHER_STATISTICS && v->m_gather_mem_stats)
+    v->m_vecpfx.release_overhead (v, sizeof (T) * v->allocated ());
   ::free (v);
   v = NULL;
 }
@@ -471,6 +473,8 @@ template<typename T, typename A>
 struct GTY((user)) vec<T, A, vl_embed>
 {
 public:
+  bool m_gather_mem_stats;
+
   unsigned allocated (void) const { return m_vecpfx.m_alloc; }
   unsigned length (void) const { return m_vecpfx.m_num; }
   bool is_empty (void) const { return m_vecpfx.m_num == 0; }
@@ -1168,6 +1172,7 @@ template<typename T>
 struct vec<T, va_heap, vl_ptr>
 {
 public:
+  bool m_gather_mem_stats;
   /* Memory allocation and deallocation for the embedded vector.
      Needed because we cannot have proper ctors/dtors defined.  */
   void create (unsigned nelems CXX_MEM_STAT_INFO);

@@ -756,11 +756,6 @@ private:
 
   /* If we should gather memory statistics for the table.  */
   bool m_gather_mem_stats;
-
-  /* Memory usage data structure.  */
-  mem_usage *m_mem_usage;
-
-  /* Memory usage origin.  */
 };
 
 /* A partial specialization used when values should be stored directly.  */
@@ -774,7 +769,7 @@ class hash_table<Descriptor, Allocator, true>
 
 public:
   explicit inline hash_table (size_t, bool ggc = false,
-			      bool gather_mem_stats = false,
+			      bool gather_mem_stats = true,
 			      mem_alloc_origin origin = HASH_TABLE
 			      CXX_MEM_STAT_INFO);
   ~hash_table ();
@@ -955,9 +950,6 @@ private:
 
   /* If we should gather memory statistics for the table.  */
   bool m_gather_mem_stats;
-
-  /* Memory usage data structure.  */
-  mem_usage *m_mem_usage;
 };
 
 #include "mem-stats.h"
@@ -987,7 +979,9 @@ hash_table<Descriptor, Allocator, false>::hash_table (size_t size,
 
   if (m_gather_mem_stats)
     {
-      m_mem_usage = hash_table_usage.register_descriptor (this, origin FINAL_PASS_MEM_STAT);
+      hash_table_usage.register_descriptor (this, origin
+					    FINAL_PASS_MEM_STAT);
+
       hash_table_usage.register_instance_overhead (sizeof (value_type *) *
 						    size, this);
     }
@@ -1358,7 +1352,7 @@ hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc,
 						     mem_alloc_origin origin 
 						     MEM_STAT_DECL) :
   m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
-  m_ggc (ggc), m_gather_mem_stats (gather_mem_stats), m_mem_usage (NULL)
+  m_ggc (ggc), m_gather_mem_stats (gather_mem_stats)
 {
   unsigned int size_prime_index;
 
@@ -1366,7 +1360,7 @@ hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc,
   size = prime_tab[size_prime_index].prime;
 
   if (m_gather_mem_stats)
-    m_mem_usage = hash_table_usage.register_descriptor (this, origin FINAL_PASS_MEM_STAT);
+    hash_table_usage.register_descriptor (this, origin FINAL_PASS_MEM_STAT);
 
   m_entries = alloc_entries (size);
   m_size = size;

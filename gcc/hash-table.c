@@ -122,13 +122,7 @@ void dump_hash_table_loc_statistics (void)
 	  if (loc->m_origin != origin)
 	    continue;
 
-	  sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
-		  loc->m_line, loc->m_function);
-
-	  s[48] = '\0';
-
-	  fprintf (stderr, "%-48s %10u%10u%10u\n", s, 
-	  usage->m_allocated, usage->m_peak, usage->m_times);
+	  usage->dump (loc);
 	 }
 
       fprintf (stderr, "\n\n");
