@@ -28,9 +28,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "mem-stats.h"
 #include "vec.h"
 
-static mem_alloc_description <mem_usage> hash_map_usage;
-static vec <mem_usage *> hash_map_usage_list;
-
 template<typename Key, typename Value,
 	 typename Traits>
 class GTY((user)) hash_map
@@ -118,17 +115,8 @@ class GTY((user)) hash_map
 public:
   explicit hash_map (size_t n = 13, bool ggc = false,
 		     bool gather_mem_stats = true CXX_MEM_STAT_INFO)
-    : m_table (n, ggc, false FINAL_PASS_MEM_STAT),
-      m_descriptor_id (-1)
-    {
-      if (gather_mem_stats)
-	{
-	  mem_usage *usage = hash_map_usage.register_descriptor
-	    (this, ALONE_FINAL_PASS_MEM_STAT);
-	  m_descriptor_id = hash_map_usage_list.length ();
-	  hash_map_usage_list.safe_push (usage);
-	}
-    }
+    : m_table (n, ggc, gather_mem_stats, HASH_MAP FINAL_PASS_MEM_STAT),
+      m_descriptor_id (-1) {}
 
   /* Create a hash_map in ggc memory.  */
   static hash_map *create_ggc (size_t size, bool gather_mem_stats = true

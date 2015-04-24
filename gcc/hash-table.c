@@ -103,23 +103,35 @@ mem_alloc_description<mem_usage> hash_table_usage;
 /* Support function for statistics.  */
 void dump_hash_table_loc_statistics (void)
 {
-  fprintf (stderr, "HASH_TABLE\n");
   char s[4096];
 
-  mem_alloc_description<mem_usage>::mem_map_t::iterator it = hash_table_usage.m_map->begin();
-
-  for (; it != hash_table_usage.m_map->end (); ++it)
+  for (unsigned i = 0; i < MEM_ALLOC_ORIGIN_LENGTH; i++)
     {
-      mem_location *loc = (*it).first;
-      mem_usage *usage = (*it).second;
+      mem_alloc_origin origin = (mem_alloc_origin) i;
 
-       sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
-		loc->m_line, loc->m_function);
-       
-       s[48] = '\0';
+      fprintf (stderr, "%s\n\n", mem_location::get_origin_name (origin));
 
-       fprintf (stderr, "%-48s %10u%10u%10u\n", s, 
-       usage->m_allocated, usage->m_peak, usage->m_times);
-     }
+      mem_alloc_description<mem_usage>::mem_map_t::iterator it
+	= hash_table_usage.m_map->begin();
+
+      for (; it != hash_table_usage.m_map->end (); ++it)
+	{
+	  mem_location *loc = (*it).first;
+	  mem_usage *usage = (*it).second;
+
+	  if (loc->m_origin != origin)
+	    continue;
+
+	  sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
+		  loc->m_line, loc->m_function);
+
+	  s[48] = '\0';
+
+	  fprintf (stderr, "%-48s %10u%10u%10u\n", s, 
+	  usage->m_allocated, usage->m_peak, usage->m_times);
+	 }
+
+      fprintf (stderr, "\n\n");
+    }
 }
 

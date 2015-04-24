@@ -199,6 +199,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ggc.h"
 #include "hashtab.h"
 #include <new>
+#include "mem-stats-traits.h"
 
 template<typename, typename, typename> class hash_map;
 template<typename, typename> class hash_set;
@@ -617,7 +618,9 @@ class hash_table<Descriptor, Allocator, false>
   typedef typename Descriptor::compare_type compare_type;
 
 public:
-  inline hash_table (size_t size, bool gather_mem_stats = false CXX_MEM_STAT_INFO);
+  inline hash_table (size_t size, bool gather_mem_stats = false,
+		     mem_alloc_origin origin = HASH_TABLE
+		     CXX_MEM_STAT_INFO);
   ~hash_table ();
 
   /* Current size (in entries) of the hash table.  */
@@ -756,6 +759,8 @@ private:
 
   /* Memory usage data structure.  */
   mem_usage *m_mem_usage;
+
+  /* Memory usage origin.  */
 };
 
 /* A partial specialization used when values should be stored directly.  */
@@ -768,8 +773,10 @@ class hash_table<Descriptor, Allocator, true>
   typedef typename Descriptor::compare_type compare_type;
 
 public:
-  explicit inline hash_table (size_t, bool ggc = false, bool gather_mem_stats =
-			      false CXX_MEM_STAT_INFO);
+  explicit inline hash_table (size_t, bool ggc = false,
+			      bool gather_mem_stats = false,
+			      mem_alloc_origin origin = HASH_TABLE
+			      CXX_MEM_STAT_INFO);
   ~hash_table ();
 
   /* Create a hash_table in gc memory.  */
@@ -778,7 +785,7 @@ public:
   create_ggc (size_t n CXX_MEM_STAT_INFO)
   {
     hash_table *table = ggc_alloc<hash_table> ();
-    new (table) hash_table (n, true, false FINAL_PASS_MEM_STAT);
+    new (table) hash_table (n, true, false, HASH_TABLE FINAL_PASS_MEM_STAT);
     return table;
   }
 
@@ -958,13 +965,15 @@ private:
 #include "vec.h"
 
 extern mem_alloc_description<mem_usage> hash_table_usage;
+
 /* Support function for statistics.  */
 extern void dump_hash_table_loc_statistics (void);
 
 template<typename Descriptor, template<typename Type> class Allocator>
 inline
 hash_table<Descriptor, Allocator, false>::hash_table (size_t size,
-						      bool gather_mem_stats
+						      bool gather_mem_stats,
+						      mem_alloc_origin origin 
 						      MEM_STAT_DECL) :
   m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
   m_gather_mem_stats (gather_mem_stats)
@@ -978,7 +987,7 @@ hash_table<Descriptor, Allocator, false>::hash_table (size_t size,
 
   if (m_gather_mem_stats)
     {
-      m_mem_usage = hash_table_usage.register_descriptor (this, ALONE_FINAL_PASS_MEM_STAT);
+      m_mem_usage = hash_table_usage.register_descriptor (this, origin FINAL_PASS_MEM_STAT);
       hash_table_usage.register_instance_overhead (sizeof (value_type *) *
 						    size, this);
     }
@@ -1345,7 +1354,8 @@ hash_table<Descriptor, Allocator, false>::iterator::operator ++ ()
 template<typename Descriptor, template<typename Type> class Allocator>
 inline
 hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc,
-						     bool gather_mem_stats
+						     bool gather_mem_stats,
+						     mem_alloc_origin origin 
 						     MEM_STAT_DECL) :
   m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
   m_ggc (ggc), m_gather_mem_stats (gather_mem_stats), m_mem_usage (NULL)
@@ -1356,7 +1366,7 @@ hash_table<Descriptor, Allocator, true>::hash_table (size_t size, bool ggc,
   size = prime_tab[size_prime_index].prime;
 
   if (m_gather_mem_stats)
-    m_mem_usage = hash_table_usage.register_descriptor (this, ALONE_FINAL_PASS_MEM_STAT);
+    m_mem_usage = hash_table_usage.register_descriptor (this, origin FINAL_PASS_MEM_STAT);
 
   m_entries = alloc_entries (size);
   m_size = size;

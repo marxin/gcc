@@ -3,6 +3,7 @@
 
 #include "hash-map-traits.h"
 #include "inchash.h"
+#include "mem-stats-traits.h"
 
 template<typename Key, typename Value,
 	 typename Traits = default_hashmap_traits>
@@ -13,11 +14,14 @@ struct mem_location
   const char *m_filename;
   const char *m_function;
   int m_line;
+  mem_alloc_origin m_origin;
 
   mem_location () {}
 
-  mem_location (const char *filename, const char *function, int line):
-    m_filename (filename), m_function (function), m_line (line) {}
+  mem_location (const char *filename, const char *function, int line,
+		mem_alloc_origin origin):
+    m_filename (filename), m_function (function), m_line (line), m_origin
+    (origin) {}
 
   hashval_t hash ()
   {
@@ -40,6 +44,25 @@ struct mem_location
 
       return s1;
     }
+
+  static const char *get_origin_name (mem_alloc_origin origin)
+  {
+    switch (origin)
+      {
+      case HASH_TABLE:
+	return "hash table";
+      case HASH_MAP:
+	return "hash map";
+      case HASH_SET:
+	return "hash set";
+      case VEC:
+	return "vec";
+      case BITMAP:
+	return "bitmap";
+      default:
+	gcc_unreachable ();
+      }
+  }
 };
 
 struct mem_usage
@@ -102,8 +125,8 @@ public:
   typedef hash_map <const void *, mem_usage_pair<T> *, default_hashmap_traits> reverse_mem_map_t;
 
   mem_alloc_description ();
-  T *register_descriptor (const void *ptr, const char *name, int line, const char *function);
-  T *register_overhead (size_t size, const char *name, int line,
+  T *register_descriptor (const void *ptr, mem_alloc_origin origin, const char *name, int line, const char *function);
+  T *register_overhead (size_t size, mem_alloc_origin origin, const char *name, int line,
 			const char *function, const void *ptr);
   T *register_instance_overhead (size_t size, const void *ptr);
   void release_overhead (void *ptr);
@@ -120,9 +143,9 @@ public:
 
 template <class T>
 inline T* 
-mem_alloc_description<T>::register_descriptor (const void *ptr, const char *filename, int line, const char *function)
+mem_alloc_description<T>::register_descriptor (const void *ptr, mem_alloc_origin origin, const char *filename, int line, const char *function)
 {  
-  mem_location *l = new mem_location (filename, function, line);
+  mem_location *l = new mem_location (filename, function, line, origin);
   T *usage = NULL;
 
   T **slot = m_map->get (l);
@@ -156,9 +179,9 @@ mem_alloc_description<T>::register_instance_overhead (size_t size, const void *p
 
 template <class T>
 inline T* 
-mem_alloc_description<T>::register_overhead (size_t size, const char *filename, int line, const char *function, const void *ptr)
+mem_alloc_description<T>::register_overhead (size_t size, mem_alloc_origin origin, const char *filename, int line, const char *function, const void *ptr)
 {
-  T *usage = register_descriptor (ptr, filename, line, function);
+  T *usage = register_descriptor (ptr, origin, filename, line, function);
   usage->register_overhead (size);
 
   return usage;

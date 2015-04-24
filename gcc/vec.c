@@ -144,7 +144,7 @@ void
 vec_prefix::register_overhead (size_t size, size_t elements, const char *name, int line,
 			       const char *function)
 {
-  vec_usage *usage = vec_desc.register_overhead (size, name, line, function, this);
+  vec_usage *usage = vec_desc.register_overhead (size, VEC, name, line, function, this);
   usage->m_items += elements;
   if (usage->m_items_peak < usage->m_items)
     usage->m_items_peak = usage->m_items;

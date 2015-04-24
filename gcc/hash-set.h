@@ -181,7 +181,7 @@ class hash_set
   };
 
 public:
-  explicit hash_set (size_t n = 13, bool ggc = false) : m_table (n, ggc, true) {}
+  explicit hash_set (size_t n = 13, bool ggc = false) : m_table (n, ggc, true, HASH_SET) {}
 
   /* Create a hash_set in gc memory with space for at least n elements.  */
 
