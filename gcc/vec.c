@@ -33,6 +33,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "vec.h"
 #include "diagnostic-core.h"
 #include "hashtab.h"
+#include "mem-stats.h"
+#include "hash-map.h"
+#include "mem-stats.h"
 
 /* vNULL is an empty type with a template cast operation that returns
    a zero-initialized vec<T, A, L> instance.  Use this when you want
@@ -56,9 +59,33 @@ struct vec_descriptor
   size_t peak;
 };
 
+struct vec_usage: public mem_usage
+{
+  size_t m_items;
+  size_t m_items_peak;
+
+  inline bool operator< (const vec_usage &second) const
+  {
+    return (m_allocated == second.m_allocated ?
+	    (m_peak == second.m_peak ? m_times < second.m_times
+	     : m_peak < second.m_peak ) : m_allocated < second.m_allocated);
+  }
+
+  static int compare (const void *first, const void *second)
+  {
+    typedef std::pair<mem_location *, vec_usage *> mem_pair_t;
+
+    const mem_pair_t f = *(const mem_pair_t *)first;
+    const mem_pair_t s = *(const mem_pair_t *)second;
+
+    return (*f.second) < (*s.second);
+  }
+};
 
 /* Hashtable mapping vec addresses to descriptors.  */
 static htab_t vec_desc_hash;
+
+static mem_alloc_description <vec_usage> vec_desc;
 
 /* Hashtable helpers.  */
 static hashval_t
@@ -131,9 +158,17 @@ vec_descriptor (const char *name, int line, const char *function)
 /* Account the overhead.  */
 
 void
-vec_prefix::register_overhead (size_t size, const char *name, int line,
+vec_prefix::register_overhead (void *ptr, size_t size, size_t elements, const char *name, int line,
 			       const char *function)
 {
+  /*
+  vec_desc.register_descriptor (ptr, VEC, name, line, function);
+  vec_usage *usage = vec_desc.register_instance_overhead (size, ptr);
+  usage->m_items += elements;
+  if (usage->m_items_peak < usage->m_items)
+    usage->m_items_peak = usage->m_items;
+  */
+
   struct vec_descriptor *loc = vec_descriptor (name, line, function);
   struct ptr_hash_entry *p = XNEW (struct ptr_hash_entry);
   PTR *slot;
@@ -158,8 +193,10 @@ vec_prefix::register_overhead (size_t size, const char *name, int line,
 /* Notice that the memory allocated for the vector has been freed.  */
 
 void
-vec_prefix::release_overhead (void)
+vec_prefix::release_overhead (void *ptr, size_t size)
 {
+  // vec_desc.release_overhead_for_instance (ptr, size);
+
   PTR *slot = htab_find_slot_with_hash (ptr_hash, this,
 					htab_hash_pointer (this),
 					NO_INSERT);
@@ -232,6 +269,8 @@ add_statistics (void **slot, void *b)
 void
 dump_vec_loc_statistics (void)
 {
+  vec_desc.dump ();
+
   int nentries = 0;
   char s[4096];
   size_t allocated = 0;
@@ -240,6 +279,18 @@ dump_vec_loc_statistics (void)
 
   if (! GATHER_STATISTICS)
     return;
+
+  unsigned length;
+  mem_alloc_description<vec_usage>::mem_list_t *list = vec_desc.get_list (VEC,
+									  &length);
+
+  for (int i = length - 1; i >= 0; i--)
+    list[i].second->dump (list[i].first);
+
+  delete list;
+
+  mem_usage total = vec_desc.get_total ();
+  fprintf (stderr, "TIMES: %u, LEAK: %u\n", total.m_times, total.m_allocated);
 
   loc_array = XCNEWVEC (struct vec_descriptor *, vec_desc_hash->n_elements);
   fprintf (stderr, "Heap vectors:\n");
@@ -275,4 +326,6 @@ dump_vec_loc_statistics (void)
   fprintf (stderr, "\n%-48s %10s       %10s       %10s\n",
 	   "source location", "Leak", "Peak", "Times");
   fprintf (stderr, "-------------------------------------------------------\n");
+
+
 }

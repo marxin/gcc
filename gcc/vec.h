@@ -216,8 +216,8 @@ struct vec_prefix
 	     compilers that have stricter notions of PODness for types.  */
 
   /* Memory allocation support routines in vec.c.  */
-  void register_overhead (size_t, const char *, int, const char *);
-  void release_overhead (void);
+  void register_overhead (void *, size_t, size_t, const char *, int, const char *);
+  void release_overhead (void *, size_t);
   static unsigned calculate_allocation (vec_prefix *, unsigned, bool);
   static unsigned calculate_allocation_1 (unsigned, unsigned);
 
@@ -303,7 +303,7 @@ va_heap::reserve (vec<T, va_heap, vl_embed> *&v, unsigned reserve, bool exact
   gcc_checking_assert (alloc);
 
   if (GATHER_STATISTICS && v)
-    v->m_vecpfx.release_overhead ();
+    v->m_vecpfx.release_overhead (v, sizeof (T) * v->length ());
 
   size_t size = vec<T, va_heap, vl_embed>::embedded_size (alloc);
   unsigned nelem = v ? v->length () : 0;
@@ -311,7 +311,7 @@ va_heap::reserve (vec<T, va_heap, vl_embed> *&v, unsigned reserve, bool exact
   v->embedded_init (alloc, nelem);
 
   if (GATHER_STATISTICS)
-    v->m_vecpfx.register_overhead (size FINAL_PASS_MEM_STAT);
+    v->m_vecpfx.register_overhead (v, alloc, nelem FINAL_PASS_MEM_STAT);
 }
 
 
@@ -325,7 +325,7 @@ va_heap::release (vec<T, va_heap, vl_embed> *&v)
     return;
 
   if (GATHER_STATISTICS)
-    v->m_vecpfx.release_overhead ();
+    v->m_vecpfx.release_overhead (v, sizeof (T) * v->length ());
   ::free (v);
   v = NULL;
 }

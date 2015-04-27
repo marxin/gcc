@@ -130,6 +130,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "hashtab.h"
 #include "statistics.h"
 #include "obstack.h"
+#include "mem-stats.h"
+
+extern mem_alloc_description<mem_usage> bitmap_mem_desc;
 
 /* Fundamental storage type for bitmap.  */
 
