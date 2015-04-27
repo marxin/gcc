@@ -2151,8 +2151,6 @@ build_type_inheritance_graph (void)
   if (in_lto_p)
     odr_vtable_hash = new odr_vtable_hash_type (23);
 
-  new odr_vtable_hash_type (11111);
-
   /* We reconstruct the graph starting of types of all methods seen in the
      the unit.  */
   FOR_EACH_SYMBOL (n)

@@ -156,6 +156,7 @@ public:
   typedef std::pair <mem_location *, T *> mem_list_t;
 
   mem_alloc_description ();
+  bool contains_descriptor_for_instance (const void *ptr);
   T *register_descriptor (const void *ptr, mem_alloc_origin origin, const char *name, int line, const char *function);
   T *register_overhead (size_t size, mem_alloc_origin origin, const char *name, int line,
 			const char *function, const void *ptr);
@@ -171,6 +172,14 @@ public:
 };
 
 #include "hash-map.h"
+
+
+template <class T>
+inline bool 
+mem_alloc_description<T>::contains_descriptor_for_instance (const void *ptr)
+{
+  return m_reverse_map->get (ptr);
+}
 
 template <class T>
 inline T* 

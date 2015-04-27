@@ -158,18 +158,16 @@ vec_descriptor (const char *name, int line, const char *function)
 /* Account the overhead.  */
 
 void
-vec_prefix::register_overhead (void *ptr, size_t size, size_t elements, const char *name, int line,
-			       const char *function)
+vec_prefix::register_overhead (void *ptr, size_t size, size_t elements
+			       MEM_STAT_DECL)
 {
-  /*
-  vec_desc.register_descriptor (ptr, VEC, name, line, function);
+  vec_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
   vec_usage *usage = vec_desc.register_instance_overhead (size, ptr);
   usage->m_items += elements;
   if (usage->m_items_peak < usage->m_items)
     usage->m_items_peak = usage->m_items;
-  */
 
-  struct vec_descriptor *loc = vec_descriptor (name, line, function);
+  struct vec_descriptor *loc = vec_descriptor (ALONE_FINAL_PASS_MEM_STAT);
   struct ptr_hash_entry *p = XNEW (struct ptr_hash_entry);
   PTR *slot;
 
@@ -193,9 +191,11 @@ vec_prefix::register_overhead (void *ptr, size_t size, size_t elements, const ch
 /* Notice that the memory allocated for the vector has been freed.  */
 
 void
-vec_prefix::release_overhead (void *ptr, size_t size)
+vec_prefix::release_overhead (void *ptr, size_t size MEM_STAT_DECL)
 {
-  // vec_desc.release_overhead_for_instance (ptr, size);
+  if (!vec_desc.contains_descriptor_for_instance (ptr))
+    vec_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
+  vec_desc.release_overhead_for_instance (ptr, size);
 
   PTR *slot = htab_find_slot_with_hash (ptr_hash, this,
 					htab_hash_pointer (this),
@@ -279,6 +279,8 @@ dump_vec_loc_statistics (void)
 
   if (! GATHER_STATISTICS)
     return;
+
+  fprintf (stderr, "VECTORS\n");
 
   unsigned length;
   mem_alloc_description<vec_usage>::mem_list_t *list = vec_desc.get_list (VEC,

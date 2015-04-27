@@ -217,7 +217,7 @@ struct vec_prefix
 
   /* Memory allocation support routines in vec.c.  */
   void register_overhead (void *, size_t, size_t, const char *, int, const char *);
-  void release_overhead (void *, size_t);
+  void release_overhead (void *, size_t CXX_MEM_STAT_INFO);
   static unsigned calculate_allocation (vec_prefix *, unsigned, bool);
   static unsigned calculate_allocation_1 (unsigned, unsigned);
 
@@ -303,7 +303,7 @@ va_heap::reserve (vec<T, va_heap, vl_embed> *&v, unsigned reserve, bool exact
   gcc_checking_assert (alloc);
 
   if (GATHER_STATISTICS && v)
-    v->m_vecpfx.release_overhead (v, sizeof (T) * v->length ());
+    v->m_vecpfx.release_overhead (v, v->allocated ());
 
   size_t size = vec<T, va_heap, vl_embed>::embedded_size (alloc);
   unsigned nelem = v ? v->length () : 0;
@@ -325,7 +325,7 @@ va_heap::release (vec<T, va_heap, vl_embed> *&v)
     return;
 
   if (GATHER_STATISTICS)
-    v->m_vecpfx.release_overhead (v, sizeof (T) * v->length ());
+    v->m_vecpfx.release_overhead (v, v->allocated ());
   ::free (v);
   v = NULL;
 }

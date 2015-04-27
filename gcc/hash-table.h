@@ -594,10 +594,10 @@ public:
   /* Create a hash_table in gc memory.  */
 
   static hash_table *
-  create_ggc (size_t n)
+  create_ggc (size_t n CXX_MEM_STAT_INFO)
   {
     hash_table *table = ggc_alloc<hash_table> ();
-    new (table) hash_table (n, true, true, HASH_TABLE);
+    new (table) hash_table (n, true, true, HASH_TABLE FINAL_PASS_MEM_STAT);
     return table;
   }
 
@@ -811,7 +811,7 @@ hash_table<Descriptor, Allocator>::~hash_table ()
   else
     ggc_free (m_entries);
 
-  if (m_gather_mem_stats && !m_ggc)
+  if (m_gather_mem_stats)
     hash_table_usage.release_overhead_for_instance (this, sizeof (value_type) * m_size);
 }
 

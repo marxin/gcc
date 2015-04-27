@@ -103,9 +103,7 @@ mem_alloc_description<mem_usage> hash_table_usage;
 /* Support function for statistics.  */
 void dump_hash_table_loc_statistics (void)
 {
-  char s[4096];
-
-  for (unsigned i = 0; i < MEM_ALLOC_ORIGIN_LENGTH; i++)
+  for (unsigned i = HASH_TABLE; i <= HASH_SET; i++)
     {
       mem_alloc_origin origin = (mem_alloc_origin) i;
       fprintf (stderr, "%s\n\n", mem_location::get_origin_name (origin));
