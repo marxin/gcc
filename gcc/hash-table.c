@@ -106,17 +106,7 @@ void dump_hash_table_loc_statistics (void)
   for (unsigned i = HASH_TABLE; i <= HASH_SET; i++)
     {
       mem_alloc_origin origin = (mem_alloc_origin) i;
-      fprintf (stderr, "%s\n\n", mem_location::get_origin_name (origin));
-
-      unsigned length;
-      mem_alloc_description<mem_usage>::mem_list_t *list = hash_table_usage.get_list (origin, &length);
-
-      for (int i = length - 1; i >= 0; i--)
-	list[i].second->dump (list[i].first);
-
-      delete list;
-
-      fprintf (stderr, "\n\n");
+      hash_table_usage.dump (origin);
     }
 }
 

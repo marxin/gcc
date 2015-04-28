@@ -127,7 +127,6 @@ get_bitmap_descriptor (const char *file, int line, const char *function)
 void
 bitmap_register (bitmap b MEM_STAT_DECL)
 {
-  bitmap_mem_desc.register_descriptor (b, BITMAP FINAL_PASS_MEM_STAT);
   bitmap_descriptor desc = get_bitmap_descriptor (ALONE_FINAL_PASS_MEM_STAT);
   desc->created++;
   b->descriptor_id = desc->id;
@@ -387,7 +386,10 @@ bitmap_obstack_alloc_stat (bitmap_obstack *bit_obstack MEM_STAT_DECL)
   if (map)
     bit_obstack->heads = (struct bitmap_head *) map->first;
   else
-    map = XOBNEW (&bit_obstack->obstack, bitmap_head);
+    {
+      map = XOBNEW (&bit_obstack->obstack, bitmap_head);
+      new (map) bitmap_head ();
+    }
   bitmap_initialize_stat (map, bit_obstack PASS_MEM_STAT);
 
   if (GATHER_STATISTICS)
@@ -404,6 +406,7 @@ bitmap_gc_alloc_stat (ALONE_MEM_STAT_DECL)
   bitmap map;
 
   map = ggc_alloc<bitmap_head> ();
+  new (map) bitmap_head ();
   bitmap_initialize_stat (map, NULL PASS_MEM_STAT);
 
   if (GATHER_STATISTICS)
@@ -2207,14 +2210,7 @@ dump_bitmap_statistics (void)
   if (!bitmap_desc_hash)
     return;
 
-  fprintf (stderr, "BITMAPS\n");
-  unsigned length;
-  mem_alloc_description<mem_usage>::mem_list_t *list = bitmap_mem_desc.get_list (BITMAP, &length);
-
-  for (int i = length - 1; i >= 0; i--)
-    list[i].second->dump (list[i].first);
-
-  delete list;
+  bitmap_mem_desc.dump (BITMAP);
 
 
   fprintf (stderr,

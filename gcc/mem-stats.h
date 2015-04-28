@@ -77,6 +77,13 @@ struct mem_usage
       m_peak = m_allocated;
   }
 
+  inline void release_overhead (size_t size)
+  {
+    gcc_assert (size <= m_allocated);
+
+    m_allocated += size;
+  }
+
   mem_usage operator+ (const mem_usage &second)
   {
     return mem_usage (m_allocated + second.m_allocated,
@@ -90,6 +97,11 @@ struct mem_usage
 	    (m_peak == second.m_peak ? m_times < second.m_times
 	     : m_peak < second.m_peak ) : m_allocated < second.m_allocated);
   }
+  
+  static unsigned get_print_width ()
+  {
+    return 90;
+  }
 
   static int compare (const void *first, const void *second)
   {
@@ -101,7 +113,7 @@ struct mem_usage
     return (*f.second) < (*s.second);
   }
 
-  inline void dump (mem_location *loc) const
+  inline void dump (mem_location *loc, mem_usage &total) const
   {
     char s[4096];
     sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
@@ -109,7 +121,30 @@ struct mem_usage
 
     s[48] = '\0';
 
-    fprintf (stderr, "%-48s %10li%10li%10li\n", s, (long)m_allocated, (long)m_peak, (long)m_times);
+    fprintf (stderr, "%-48s %10li:%4.1f%%%10li%10li:%4.1f%%\n", s,
+	     (long)m_allocated, m_allocated * 100.0 / total.m_allocated,
+	     (long)m_peak, (long)m_times,
+	     m_times * 100.0 / total.m_times);
+  }
+
+  inline void dump_footer ()
+  {
+    print_dashes (get_print_width ());
+    fprintf (stderr, "%s%54li%16li\n", "Total", (long)m_allocated,
+	     (long)m_times);
+    print_dashes (get_print_width ());
+  }
+
+  static inline void print_dashes (unsigned count)
+  {
+    fprintf (stderr, "%s\n", std::string (count, '-').c_str ()); 
+  }
+
+  static inline void dump_header (const char *name) 
+  {
+    fprintf (stderr, "%-48s %11s%15s%10s\n", name, "Leak", "Peak",
+	     "Times");
+    print_dashes (get_print_width ());
   }
 };
 
@@ -157,14 +192,16 @@ public:
 
   mem_alloc_description ();
   bool contains_descriptor_for_instance (const void *ptr);
+  T *get_descriptor_for_instance (const void *ptr);
   T *register_descriptor (const void *ptr, mem_alloc_origin origin, const char *name, int line, const char *function);
   T *register_overhead (size_t size, mem_alloc_origin origin, const char *name, int line,
 			const char *function, const void *ptr);
   T *register_instance_overhead (size_t size, const void *ptr);
   void release_overhead_for_instance (void *ptr, size_t size);
-  void dump ();
   T get_total ();
   mem_list_t *get_list (mem_alloc_origin origin, unsigned *length);
+  T get_sum (mem_alloc_origin origin);
+  void dump (mem_alloc_origin origin);
 
   mem_location m_location;
   mem_map_t *m_map;
@@ -179,6 +216,13 @@ inline bool
 mem_alloc_description<T>::contains_descriptor_for_instance (const void *ptr)
 {
   return m_reverse_map->get (ptr);
+}
+
+template <class T>
+inline T* 
+mem_alloc_description<T>::get_descriptor_for_instance (const void *ptr)
+{
+  return (*m_reverse_map->get (ptr))->usage;
 }
 
 template <class T>
@@ -214,6 +258,7 @@ mem_alloc_description<T>::register_instance_overhead (size_t size, const void *p
   if (!slot)
     {
       fprintf (stderr, "problem tu je..\n");
+      gcc_unreachable ();
       return NULL;
     }
 
@@ -242,36 +287,15 @@ mem_alloc_description<T>::release_overhead_for_instance (void *ptr, size_t size)
   if (!slot)
     {
       fprintf (stderr, "tady je taky problem\n");
+      gcc_unreachable ();
       return;
     }
 
   mem_usage_pair<T> *usage_pair = *slot;
-  
-  gcc_assert (size <= usage_pair->usage->m_allocated);
+
+  usage_pair->usage->release_overhead (size);
 
   usage_pair->usage->m_allocated -= size;
-}
-
-template <class T>
-inline void
-mem_alloc_description<T>::dump ()
-{
-  fprintf (stderr, "XXX\n");
-}
-
-template <class T>
-inline T 
-mem_alloc_description<T>::get_total ()
-{
-  T u;
-
-  for (typename mem_map_t::iterator it = m_map->begin(); it != m_map->end (); ++it)
-    {
-      u.m_times += (*it).second->m_times;
-      u.m_allocated += (*it).second->m_allocated;
-    }
-
-  return u;
 }
 
 template <class T>
@@ -302,6 +326,39 @@ mem_alloc_description<T>::get_list (mem_alloc_origin origin, unsigned *length)
   *length = i;
 
   return list;
+}
+
+template <class T>
+inline T
+mem_alloc_description<T>::get_sum (mem_alloc_origin origin)
+{
+  unsigned length;
+  mem_list_t *list = get_list (origin, &length);
+  T sum;
+
+  for (unsigned i = 0; i < length; i++)
+    sum = sum + *list[i].second;
+
+  return sum;
+}
+
+template <class T>
+inline void
+mem_alloc_description<T>::dump (mem_alloc_origin origin)
+{
+  unsigned length;
+  mem_list_t *list = get_list (origin, &length);
+  T total = get_sum (origin);
+
+  T::dump_header (mem_location::get_origin_name (origin));
+  for (int i = length - 1; i >= 0; i--)
+    list[i].second->dump (list[i].first, total);
+  
+  total.dump_footer ();
+
+  delete list;
+
+  fprintf (stderr, "\n\n");
 }
 
 #endif // GCC_MEM_STATS_H

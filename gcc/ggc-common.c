@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "plugin.h"
 #include "vec.h"
 #include "timevar.h"
+#include "mem-stats.h"
 
 /* When set, ggc_collect will do collection.  */
 bool ggc_force_collect;
@@ -843,6 +844,90 @@ struct ggc_loc_descriptor
   size_t collected;
 };
 
+struct ggc_usage: public mem_usage
+{
+  ggc_usage (): m_freed (0), m_collected (0), m_overhead (0) {}
+  ggc_usage (size_t allocated, size_t times, size_t peak,
+	     size_t freed, size_t collected, size_t overhead)
+    : mem_usage (allocated, times, peak),
+    m_freed (freed), m_collected (collected), m_overhead (overhead) {}
+
+
+  size_t m_freed;
+  size_t m_collected;
+  size_t m_overhead;
+
+  inline bool operator< (const ggc_usage &second) const
+  {
+    return (get_balance () == second.get_balance () ?
+	    (m_peak == second.m_peak ? m_times < second.m_times
+	     : m_peak < second.m_peak ) : get_balance () < second.get_balance ());
+  }
+
+  inline void release_overhead (size_t size)
+  {
+    m_freed += size;
+  }
+
+  ggc_usage operator+ (const ggc_usage &second)
+  {
+    return ggc_usage (m_allocated + second.m_allocated,
+		      m_times + second.m_times,
+		      m_peak + second.m_peak,
+		      m_freed + second.m_freed,
+		      m_collected + second.m_collected,
+		      m_overhead + second.m_overhead);
+  }
+
+  inline void dump (mem_location *loc, ggc_usage &total) const
+  {
+    char s[4096];
+    sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
+	     loc->m_line, loc->m_function);
+
+    s[48] = '\0';
+
+    long balance = get_balance ();
+
+    fprintf (stderr,
+	     "%-48s %10li:%4.1f%%%10li:%4.1f%%"
+	     "%10li:%4.1f%%%10li:%4.1f%%%10li\n",
+	     s, (long)m_collected, m_collected * 100.0 / total.m_collected,
+	     (long)m_freed, m_freed * 100.0 / total.m_freed,
+	     (long)balance, balance * 100.0 / total.get_balance (),
+	     (long)m_overhead, m_overhead * 100.0 / total.m_overhead,
+	     (long)m_times);
+  }
+
+  inline long get_balance () const
+  {
+    return m_allocated + m_peak - m_freed - m_collected;
+  }
+
+  static unsigned get_print_width ()
+  {
+    return 123;
+  }
+
+  static int compare (const void *first, const void *second)
+  {
+    typedef std::pair<mem_location *, ggc_usage *> mem_pair_t;
+
+    const mem_pair_t f = *(const mem_pair_t *)first;
+    const mem_pair_t s = *(const mem_pair_t *)second;
+
+    return (*f.second) < (*s.second);
+  }
+
+  static inline void dump_header (const char *name) 
+  {
+    fprintf (stderr, "%-48s %10s%16s%16s%16s%16s\n", name, "Garbage", "Freed",
+	     "Leak", "Overhead", "Times");
+    print_dashes (get_print_width ());
+  }
+
+};
+
 /* Hash table helper.  */
 
 struct ggc_loc_desc_hasher : typed_noop_remove <ggc_loc_descriptor>
@@ -870,6 +955,8 @@ ggc_loc_desc_hasher::equal (const ggc_loc_descriptor *d,
 
 /* Hashtable used for statistics.  */
 static hash_table<ggc_loc_desc_hasher> *loc_hash;
+
+static mem_alloc_description<ggc_usage> ggc_mem_desc;
 
 struct ggc_ptr_hash_entry
 {
@@ -931,6 +1018,12 @@ void
 ggc_record_overhead (size_t allocated, size_t overhead, void *ptr,
 		     const char *name, int line, const char *function)
 {
+  ggc_usage *usage = ggc_mem_desc.register_descriptor (ptr, GGC, name, line, function);
+
+  usage->m_allocated += allocated;
+  usage->m_overhead += overhead;
+  usage->m_times++;
+
   struct ggc_loc_descriptor *loc = make_loc_descriptor (name, line, function);
   struct ggc_ptr_hash_entry *p = XNEW (struct ggc_ptr_hash_entry);
   ggc_ptr_hash_entry **slot;
@@ -958,6 +1051,10 @@ ggc_prune_ptr (ggc_ptr_hash_entry **slot, void *b ATTRIBUTE_UNUSED)
   if (!ggc_marked_p (p->ptr))
     {
       p->loc->collected += p->size;
+
+      ggc_usage *usage = ggc_mem_desc.get_descriptor_for_instance (p->ptr);
+      usage->m_collected += p->size;
+
       ptr_hash->clear_slot (slot);
       free (p);
     }
@@ -986,6 +1083,10 @@ ggc_free_overhead (void *ptr)
       return;
   p = (struct ggc_ptr_hash_entry *) *slot;
   p->loc->freed += p->size;
+
+  // TODO
+  ggc_mem_desc.release_overhead_for_instance (ptr, p->size);
+
   ptr_hash->clear_slot (slot);
   free (p);
 }
@@ -1048,6 +1149,8 @@ dump_ggc_loc_statistics (bool final)
 
   ggc_force_collect = true;
   ggc_collect ();
+
+  ggc_mem_desc.dump (GGC);
 
   loc_array = XCNEWVEC (struct ggc_loc_descriptor *,
 			loc_hash->elements_with_deleted ());

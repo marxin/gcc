@@ -8,10 +8,11 @@ enum mem_alloc_origin
   HASH_SET,
   VEC,
   BITMAP,
+  GGC,
   MEM_ALLOC_ORIGIN_LENGTH
 };
 
-static const char * mem_alloc_origin_names[] = { "HASH TABLE", "HASH MAP", "HASH SET",
-  "VEC", "BITMAP" };
+static const char * mem_alloc_origin_names[] = { "Hash tables", "Hash maps", "Hash sets",
+  "Heap vectors", "Bitmaps", "GGC memory" };
 
 #endif // GCC_MEM_STATS_TRAITS_H

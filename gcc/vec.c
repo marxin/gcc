@@ -61,6 +61,12 @@ struct vec_descriptor
 
 struct vec_usage: public mem_usage
 {
+  vec_usage (): m_items (0), m_items_peak (0) {}
+  vec_usage (size_t allocated, size_t times, size_t peak,
+	     size_t items, size_t items_peak)
+    : mem_usage (allocated, times, peak),
+    m_items (items), m_items_peak (items_peak) {}
+
   size_t m_items;
   size_t m_items_peak;
 
@@ -69,6 +75,49 @@ struct vec_usage: public mem_usage
     return (m_allocated == second.m_allocated ?
 	    (m_peak == second.m_peak ? m_times < second.m_times
 	     : m_peak < second.m_peak ) : m_allocated < second.m_allocated);
+  }
+
+  vec_usage operator+ (const vec_usage &second)
+  {
+    return vec_usage (m_allocated + second.m_allocated,
+		      m_times + second.m_times,
+		      m_peak + second.m_peak,
+		      m_items + second.m_items,
+		      m_items_peak + second.m_items_peak);
+  }
+
+  inline void dump (mem_location *loc, mem_usage &total) const
+  {
+    char s[4096];
+    sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
+	     loc->m_line, loc->m_function);
+
+    s[48] = '\0';
+
+    fprintf (stderr, "%-48s %10li:%4.1f%%%10li%10li:%4.1f%%%11li%11li\n", s,
+	     (long)m_allocated, m_allocated * 100.0 / total.m_allocated,
+	     (long)m_peak, (long)m_times, m_times * 100.0 / total.m_times,
+	     (long)m_items, (long)m_items_peak);
+  }
+
+  inline void dump_footer ()
+  {
+    print_dashes (get_print_width ());
+    fprintf (stderr, "%s%54li%25li%16li\n", "Total", (long)m_allocated,
+	     (long)m_times, (long)m_items);
+    print_dashes (get_print_width ());
+  }
+
+  static unsigned get_print_width ()
+  {
+    return 113;
+  }
+
+  static inline void dump_header (const char *name) 
+  {
+    fprintf (stderr, "%-48s %11s%15s%10s%17s%11s\n", name, "Leak", "Peak",
+	     "Times", "Leak items", "Peak items");
+    print_dashes (get_print_width ());
   }
 
   static int compare (const void *first, const void *second)
@@ -269,8 +318,6 @@ add_statistics (void **slot, void *b)
 void
 dump_vec_loc_statistics (void)
 {
-  vec_desc.dump ();
-
   int nentries = 0;
   char s[4096];
   size_t allocated = 0;
@@ -280,19 +327,7 @@ dump_vec_loc_statistics (void)
   if (! GATHER_STATISTICS)
     return;
 
-  fprintf (stderr, "VECTORS\n");
-
-  unsigned length;
-  mem_alloc_description<vec_usage>::mem_list_t *list = vec_desc.get_list (VEC,
-									  &length);
-
-  for (int i = length - 1; i >= 0; i--)
-    list[i].second->dump (list[i].first);
-
-  delete list;
-
-  mem_usage total = vec_desc.get_total ();
-  fprintf (stderr, "TIMES: %u, LEAK: %u\n", total.m_times, total.m_allocated);
+  vec_desc.dump (VEC);
 
   loc_array = XCNEWVEC (struct vec_descriptor *, vec_desc_hash->n_elements);
   fprintf (stderr, "Heap vectors:\n");
