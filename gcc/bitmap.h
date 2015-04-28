@@ -181,11 +181,6 @@ struct GTY((chain_next ("%h.next"), chain_prev ("%h.prev"))) bitmap_element {
    already pointed to by the chain started by first, so GTY((skip)) it.  */
 
 struct GTY(()) bitmap_head {
-  bitmap_head (ALONE_CXX_MEM_STAT_INFO)
-  {
-    bitmap_mem_desc.register_descriptor (this, BITMAP FINAL_PASS_MEM_STAT);
-  }
-
   unsigned int indx;			/* Index of last element looked at.  */
   unsigned int descriptor_id;		/* Unique identifier for the allocation
 					   site of this bitmap, for detailed
@@ -194,6 +189,11 @@ struct GTY(()) bitmap_head {
   bitmap_element * GTY((skip(""))) current; /* Last element looked at.  */
   bitmap_obstack *obstack;		/* Obstack to allocate elements from.
 					   If NULL, then use GGC allocation.  */
+
+  bitmap_head (ALONE_CXX_MEM_STAT_INFO)
+  {
+    bitmap_mem_desc.register_descriptor (this, BITMAP FINAL_PASS_MEM_STAT);
+  }
 };
 
 /* Global data */
@@ -285,11 +285,7 @@ bitmap_initialize_stat (bitmap head, bitmap_obstack *obstack MEM_STAT_DECL)
   head->first = head->current = NULL;
   head->obstack = obstack;
   if (GATHER_STATISTICS)
-    {
-      bitmap_register (head PASS_MEM_STAT);
-      if (!bitmap_mem_desc.contains_descriptor_for_instance (head))
-	bitmap_mem_desc.register_descriptor (head, BITMAP FINAL_PASS_MEM_STAT);
-    }
+    bitmap_register (head PASS_MEM_STAT);
 }
 #define bitmap_initialize(h,o) bitmap_initialize_stat (h,o MEM_STAT_INFO)
 

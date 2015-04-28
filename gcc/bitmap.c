@@ -136,7 +136,8 @@ bitmap_register (bitmap b MEM_STAT_DECL)
 static void
 register_overhead (bitmap b, int amount)
 {
-  bitmap_mem_desc.register_instance_overhead (amount, b);
+  if (bitmap_mem_desc.contains_descriptor_for_instance (b))
+    bitmap_mem_desc.register_instance_overhead (amount, b);
 
   bitmap_descriptor desc = bitmap_descriptors[b->descriptor_id];
   desc->current += amount;
