@@ -1179,9 +1179,9 @@ finish_allocnos (void)
   ira_free (ira_regno_allocno_map);
   ira_object_id_map_vec.release ();
   allocno_vec.release ();
-  free_alloc_pool (allocno_pool);
-  free_alloc_pool (object_pool);
-  free_alloc_pool (live_range_pool);
+  delete allocno_pool;
+  delete object_pool;
+  delete live_range_pool;
 }
 
 
@@ -1370,7 +1370,7 @@ finish_prefs (void)
   FOR_EACH_PREF (pref, pi)
     finish_pref (pref);
   pref_vec.release ();
-  free_alloc_pool (pref_pool);
+  delete pref_pool;
 }
 
 
@@ -1642,7 +1642,7 @@ finish_copies (void)
   FOR_EACH_COPY (cp, ci)
     finish_copy (cp);
   copy_vec.release ();
-  free_alloc_pool (copy_pool);
+  delete copy_pool;
 }
 
 
