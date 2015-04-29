@@ -260,7 +260,12 @@ static unsigned int cfa_base_preserved_regno = INVALID_REGNUM;
    May or may not contain the useless values - the list is compacted
    each time memory is invalidated.  */
 static cselib_val *first_containing_mem = &dummy_val;
-static alloc_pool elt_loc_list_pool, elt_list_pool, cselib_val_pool, value_pool;
+
+static pool_allocator<elt_list> elt_list_pool ("elt_list", 10);
+static pool_allocator<elt_loc_list> elt_loc_list_pool ("elt_loc_list", 10);
+static pool_allocator<cselib_val> cselib_val_pool ("cselib_val_list", 10);
+static pool_allocator<rtx_def> value_pool ("value", 100, RTX_CODE_SIZE (VALUE),
+					   true);
 
 /* If nonnull, cselib will call this function before freeing useless
    VALUEs.  A VALUE is deemed useless if its "locs" field is null.  */
@@ -289,7 +294,7 @@ static inline struct elt_list *
 new_elt_list (struct elt_list *next, cselib_val *elt)
 {
   struct elt_list *el;
-  el = (struct elt_list *) pool_alloc (elt_list_pool);
+  el = elt_list_pool.allocate ();
   el->next = next;
   el->elt = elt;
   return el;
@@ -373,14 +378,14 @@ new_elt_loc_list (cselib_val *val, rtx loc)
 	}
 
       /* Chain LOC back to VAL.  */
-      el = (struct elt_loc_list *) pool_alloc (elt_loc_list_pool);
+      el = elt_loc_list_pool.allocate ();
       el->loc = val->val_rtx;
       el->setting_insn = cselib_current_insn;
       el->next = NULL;
       CSELIB_VAL_PTR (loc)->locs = el;
     }
 
-  el = (struct elt_loc_list *) pool_alloc (elt_loc_list_pool);
+  el = elt_loc_list_pool.allocate ();
   el->loc = loc;
   el->setting_insn = cselib_current_insn;
   el->next = next;
@@ -420,7 +425,7 @@ unchain_one_elt_list (struct elt_list **pl)
   struct elt_list *l = *pl;
 
   *pl = l->next;
-  pool_free (elt_list_pool, l);
+  elt_list_pool.remove (l);
 }
 
 /* Likewise for elt_loc_lists.  */
@@ -431,7 +436,7 @@ unchain_one_elt_loc_list (struct elt_loc_list **pl)
   struct elt_loc_list *l = *pl;
 
   *pl = l->next;
-  pool_free (elt_loc_list_pool, l);
+  elt_loc_list_pool.remove (l);
 }
 
 /* Likewise for cselib_vals.  This also frees the addr_list associated with
@@ -443,7 +448,7 @@ unchain_one_value (cselib_val *v)
   while (v->addr_list)
     unchain_one_elt_list (&v->addr_list);
 
-  pool_free (cselib_val_pool, v);
+  cselib_val_pool.remove (v);
 }
 
 /* Remove all entries from the hash table.  Also used during
@@ -1303,7 +1308,7 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
 static inline cselib_val *
 new_cselib_val (unsigned int hash, machine_mode mode, rtx x)
 {
-  cselib_val *e = (cselib_val *) pool_alloc (cselib_val_pool);
+  cselib_val *e = cselib_val_pool.allocate ();
 
   gcc_assert (hash);
   gcc_assert (next_uid);
@@ -1315,7 +1320,7 @@ new_cselib_val (unsigned int hash, machine_mode mode, rtx x)
      precisely when we can have VALUE RTXen (when cselib is active)
      so we don't need to put them in garbage collected memory.
      ??? Why should a VALUE be an RTX in the first place?  */
-  e->val_rtx = (rtx) pool_alloc (value_pool);
+  e->val_rtx = value_pool.allocate ();
   memset (e->val_rtx, 0, RTX_HDR_SIZE);
   PUT_CODE (e->val_rtx, VALUE);
   PUT_MODE (e->val_rtx, mode);
@@ -2727,13 +2732,6 @@ cselib_process_insn (rtx_insn *insn)
 void
 cselib_init (int record_what)
 {
-  elt_list_pool = create_alloc_pool ("elt_list",
-				     sizeof (struct elt_list), 10);
-  elt_loc_list_pool = create_alloc_pool ("elt_loc_list",
-				         sizeof (struct elt_loc_list), 10);
-  cselib_val_pool = create_alloc_pool ("cselib_val_list",
-				       sizeof (cselib_val), 10);
-  value_pool = create_alloc_pool ("value", RTX_CODE_SIZE (VALUE), 100);
   cselib_record_memory = record_what & CSELIB_RECORD_MEMORY;
   cselib_preserve_constants = record_what & CSELIB_PRESERVE_CONSTANTS;
   cselib_any_perm_equivs = false;
@@ -2775,10 +2773,10 @@ cselib_finish (void)
   cselib_any_perm_equivs = false;
   cfa_base_preserved_val = NULL;
   cfa_base_preserved_regno = INVALID_REGNUM;
-  free_alloc_pool (elt_list_pool);
-  free_alloc_pool (elt_loc_list_pool);
-  free_alloc_pool (cselib_val_pool);
-  free_alloc_pool (value_pool);
+  elt_list_pool.release ();
+  elt_loc_list_pool.release ();
+  cselib_val_pool.release ();
+  value_pool.release ();
   cselib_clear_table ();
   delete cselib_hash_table;
   cselib_hash_table = NULL;
