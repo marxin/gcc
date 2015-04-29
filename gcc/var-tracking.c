@@ -598,22 +598,28 @@ typedef struct variable_tracking_info_def
 } *variable_tracking_info;
 
 /* Alloc pool for struct attrs_def.  */
-static alloc_pool attrs_pool;
+static pool_allocator<attrs_def> attrs_pool ("attrs_def pool", 1024);
 
 /* Alloc pool for struct variable_def with MAX_VAR_PARTS entries.  */
-static alloc_pool var_pool;
+
+static pool_allocator<variable_def> var_pool
+  ("variable_def pool", 64,
+   (MAX_VAR_PARTS - 1) * sizeof (((variable)NULL)->var_part[0]));
 
 /* Alloc pool for struct variable_def with a single var_part entry.  */
-static alloc_pool valvar_pool;
+static pool_allocator<variable_def> valvar_pool
+  ("small variable_def pool", 256);
 
 /* Alloc pool for struct location_chain_def.  */
-static alloc_pool loc_chain_pool;
+static pool_allocator<location_chain_def> loc_chain_pool
+  ("location_chain_def pool", 1024);
 
 /* Alloc pool for struct shared_hash_def.  */
-static alloc_pool shared_hash_pool;
+static pool_allocator<shared_hash_def> shared_hash_pool
+  ("shared_hash_def pool", 256);
 
 /* Alloc pool for struct loc_exp_dep_s for NOT_ONEPART variables.  */
-static alloc_pool loc_exp_dep_pool;
+static pool_allocator<loc_exp_dep> loc_exp_dep_pool ("loc_exp_dep pool", 64);
 
 /* Changed variables, notes will be emitted for them.  */
 static variable_table_type *changed_variables;
@@ -1376,7 +1382,7 @@ dv_onepart_p (decl_or_value dv)
 }
 
 /* Return the variable pool to be used for a dv of type ONEPART.  */
-static inline alloc_pool
+static inline pool_allocator <variable_def> &
 onepart_pool (onepart_enum_t onepart)
 {
   return onepart ? valvar_pool : var_pool;
@@ -1459,7 +1465,7 @@ variable_htab_free (void *elem)
       for (node = var->var_part[i].loc_chain; node; node = next)
 	{
 	  next = node->next;
-	  pool_free (loc_chain_pool, node);
+	  loc_chain_pool.remove (node);
 	}
       var->var_part[i].loc_chain = NULL;
     }
@@ -1474,7 +1480,7 @@ variable_htab_free (void *elem)
       if (var->onepart == ONEPART_DEXPR)
 	set_dv_changed (var->dv, true);
     }
-  pool_free (onepart_pool (var->onepart), var);
+  onepart_pool (var->onepart).remove (var);
 }
 
 /* Initialize the set (array) SET of attrs to empty lists.  */
@@ -1498,7 +1504,7 @@ attrs_list_clear (attrs *listp)
   for (list = *listp; list; list = next)
     {
       next = list->next;
-      pool_free (attrs_pool, list);
+      attrs_pool.remove (list);
     }
   *listp = NULL;
 }
@@ -1522,7 +1528,7 @@ attrs_list_insert (attrs *listp, decl_or_value dv,
 {
   attrs list;
 
-  list = (attrs) pool_alloc (attrs_pool);
+  list = attrs_pool.allocate ();
   list->loc = loc;
   list->dv = dv;
   list->offset = offset;
@@ -1540,7 +1546,7 @@ attrs_list_copy (attrs *dstp, attrs src)
   attrs_list_clear (dstp);
   for (; src; src = src->next)
     {
-      n = (attrs) pool_alloc (attrs_pool);
+      n = attrs_pool.allocate ();
       n->loc = src->loc;
       n->dv = src->dv;
       n->offset = src->offset;
@@ -1614,7 +1620,7 @@ shared_var_p (variable var, shared_hash vars)
 static shared_hash
 shared_hash_unshare (shared_hash vars)
 {
-  shared_hash new_vars = (shared_hash) pool_alloc (shared_hash_pool);
+  shared_hash new_vars = shared_hash_pool.allocate ();
   gcc_assert (vars->refcount > 1);
   new_vars->refcount = 1;
   new_vars->htab = new variable_table_type (vars->htab->elements () + 3);
@@ -1642,7 +1648,7 @@ shared_hash_destroy (shared_hash vars)
   if (--vars->refcount == 0)
     {
       delete vars->htab;
-      pool_free (shared_hash_pool, vars);
+      shared_hash_pool.remove (vars);
     }
 }
 
@@ -1740,7 +1746,7 @@ unshare_variable (dataflow_set *set, variable_def **slot, variable var,
   variable new_var;
   int i;
 
-  new_var = (variable) pool_alloc (onepart_pool (var->onepart));
+  new_var = onepart_pool (var->onepart).allocate ();
   new_var->dv = var->dv;
   new_var->refcount = 1;
   var->refcount--;
@@ -1773,7 +1779,7 @@ unshare_variable (dataflow_set *set, variable_def **slot, variable var,
 	{
 	  location_chain new_lc;
 
-	  new_lc = (location_chain) pool_alloc (loc_chain_pool);
+	  new_lc = loc_chain_pool.allocate ();
 	  new_lc->next = NULL;
 	  if (node->init > initialized)
 	    new_lc->init = node->init;
@@ -1938,7 +1944,7 @@ var_reg_delete_and_set (dataflow_set *set, rtx loc, bool modify,
       if (dv_as_opaque (node->dv) != decl || node->offset != offset)
 	{
 	  delete_variable_part (set, node->loc, node->dv, node->offset);
-	  pool_free (attrs_pool, node);
+	  attrs_pool.remove (node);
 	  *nextp = next;
 	}
       else
@@ -1979,7 +1985,7 @@ var_reg_delete (dataflow_set *set, rtx loc, bool clobber)
       if (clobber || !dv_onepart_p (node->dv))
 	{
 	  delete_variable_part (set, node->loc, node->dv, node->offset);
-	  pool_free (attrs_pool, node);
+	  attrs_pool.remove (node);
 	  *nextp = next;
 	}
       else
@@ -1999,7 +2005,7 @@ var_regno_delete (dataflow_set *set, int regno)
     {
       next = node->next;
       delete_variable_part (set, node->loc, node->dv, node->offset);
-      pool_free (attrs_pool, node);
+      attrs_pool.remove (node);
     }
   *reg = NULL;
 }
@@ -2306,7 +2312,7 @@ drop_overlapping_mem_locs (variable_def **slot, overlapping_mems *coms)
 	      if (VAR_LOC_1PAUX (var))
 		VAR_LOC_FROM (var) = NULL;
 	    }
-	  pool_free (loc_chain_pool, loc);
+	  loc_chain_pool.remove (loc);
 	}
 
       if (!var->var_part[0].loc_chain)
@@ -2809,7 +2815,7 @@ variable_union (variable src, dataflow_set *set)
 		  goto restart_onepart_unshared;
 		}
 
-	      *nodep = nnode = (location_chain) pool_alloc (loc_chain_pool);
+	      *nodep = nnode = loc_chain_pool.allocate ();
 	      nnode->loc = snode->loc;
 	      nnode->init = snode->init;
 	      if (!snode->set_src || MEM_P (snode->set_src))
@@ -2929,7 +2935,7 @@ variable_union (variable src, dataflow_set *set)
 		    location_chain new_node;
 
 		    /* Copy the location from SRC.  */
-		    new_node = (location_chain) pool_alloc (loc_chain_pool);
+		    new_node = loc_chain_pool.allocate ();
 		    new_node->loc = node->loc;
 		    new_node->init = node->init;
 		    if (!node->set_src || MEM_P (node->set_src))
@@ -2984,7 +2990,7 @@ variable_union (variable src, dataflow_set *set)
 		      location_chain new_node;
 
 		      /* Copy the location from SRC.  */
-		      new_node = (location_chain) pool_alloc (loc_chain_pool);
+		      new_node = loc_chain_pool.allocate ();
 		      new_node->loc = node->loc;
 		      new_node->init = node->init;
 		      if (!node->set_src || MEM_P (node->set_src))
@@ -3080,7 +3086,7 @@ variable_union (variable src, dataflow_set *set)
 	    {
 	      location_chain new_lc;
 
-	      new_lc = (location_chain) pool_alloc (loc_chain_pool);
+	      new_lc = loc_chain_pool.allocate ();
 	      new_lc->next = NULL;
 	      new_lc->init = node->init;
 	      if (!node->set_src || MEM_P (node->set_src))
@@ -3298,7 +3304,7 @@ insert_into_intersection (location_chain *nodep, rtx loc,
     else if (r > 0)
       break;
 
-  node = (location_chain) pool_alloc (loc_chain_pool);
+  node = loc_chain_pool.allocate ();
 
   node->loc = loc;
   node->set_src = NULL;
@@ -3819,7 +3825,7 @@ canonicalize_values_star (variable_def **slot, dataflow_set *set)
 		    if (dv_as_opaque (list->dv) == dv_as_opaque (cdv))
 		      {
 			*listp = list->next;
-			pool_free (attrs_pool, list);
+			attrs_pool.remove (list);
 			list = *listp;
 			break;
 		      }
@@ -3837,7 +3843,7 @@ canonicalize_values_star (variable_def **slot, dataflow_set *set)
 		    if (dv_as_opaque (list->dv) == dv_as_opaque (dv))
 		      {
 			*listp = list->next;
-			pool_free (attrs_pool, list);
+			attrs_pool.remove (list);
 			list = *listp;
 			break;
 		      }
@@ -4018,7 +4024,7 @@ variable_merge_over_cur (variable s1var, struct dfset_merge *dsm)
 	{
 	  if (node)
 	    {
-	      dvar = (variable) pool_alloc (onepart_pool (onepart));
+	      dvar = onepart_pool (onepart).allocate ();
 	      dvar->dv = dv;
 	      dvar->refcount = 1;
 	      dvar->n_var_parts = 1;
@@ -4154,8 +4160,7 @@ variable_merge_over_cur (variable s1var, struct dfset_merge *dsm)
 							  INSERT);
 		  if (!*slot)
 		    {
-		      variable var = (variable) pool_alloc (onepart_pool
-							    (ONEPART_VALUE));
+		      variable var = onepart_pool (ONEPART_VALUE).allocate ();
 		      var->dv = dv;
 		      var->refcount = 1;
 		      var->n_var_parts = 1;
@@ -4242,7 +4247,7 @@ dataflow_set_merge (dataflow_set *dst, dataflow_set *src2)
   dataflow_set_init (dst);
   dst->stack_adjust = cur.stack_adjust;
   shared_hash_destroy (dst->vars);
-  dst->vars = (shared_hash) pool_alloc (shared_hash_pool);
+  dst->vars = shared_hash_pool.allocate ();
   dst->vars->refcount = 1;
   dst->vars->htab = new variable_table_type (MAX (src1_elems, src2_elems));
 
@@ -4368,7 +4373,7 @@ remove_duplicate_values (variable var)
 	    {
 	      /* Remove duplicate value node.  */
 	      *nodep = node->next;
-	      pool_free (loc_chain_pool, node);
+	      loc_chain_pool.remove (node);
 	      continue;
 	    }
 	  else
@@ -4521,7 +4526,7 @@ variable_post_merge_new_vals (variable_def **slot, dfset_post_merge *dfpm)
 		 to be added when we bring perm in.  */
 	      att = *curp;
 	      *curp = att->next;
-	      pool_free (attrs_pool, att);
+	      attrs_pool.remove (att);
 	    }
 	}
 
@@ -4781,7 +4786,7 @@ dataflow_set_preserve_mem_locs (variable_def **slot, dataflow_set *set)
 		}
 	    }
 	  *locp = loc->next;
-	  pool_free (loc_chain_pool, loc);
+	  loc_chain_pool.remove (loc);
 	}
 
       if (!var->var_part[0].loc_chain)
@@ -4853,7 +4858,7 @@ dataflow_set_remove_mem_locs (variable_def **slot, dataflow_set *set)
 	      if (VAR_LOC_1PAUX (var))
 		VAR_LOC_FROM (var) = NULL;
 	    }
-	  pool_free (loc_chain_pool, loc);
+	  loc_chain_pool.remove (loc);
 	}
 
       if (!var->var_part[0].loc_chain)
@@ -7333,7 +7338,7 @@ variable_from_dropped (decl_or_value dv, enum insert_option insert)
 
   gcc_checking_assert (onepart == ONEPART_VALUE || onepart == ONEPART_DEXPR);
 
-  empty_var = (variable) pool_alloc (onepart_pool (onepart));
+  empty_var = onepart_pool (onepart).allocate ();
   empty_var->dv = dv;
   empty_var->refcount = 1;
   empty_var->n_var_parts = 0;
@@ -7437,7 +7442,7 @@ variable_was_changed (variable var, dataflow_set *set)
 
 	  if (!empty_var)
 	    {
-	      empty_var = (variable) pool_alloc (onepart_pool (onepart));
+	      empty_var = onepart_pool (onepart).allocate ();
 	      empty_var->dv = var->dv;
 	      empty_var->refcount = 1;
 	      empty_var->n_var_parts = 0;
@@ -7561,7 +7566,7 @@ set_slot_part (dataflow_set *set, rtx loc, variable_def **slot,
   if (!var)
     {
       /* Create new variable information.  */
-      var = (variable) pool_alloc (onepart_pool (onepart));
+      var = onepart_pool (onepart).allocate ();
       var->dv = dv;
       var->refcount = 1;
       var->n_var_parts = 1;
@@ -7756,7 +7761,7 @@ set_slot_part (dataflow_set *set, rtx loc, variable_def **slot,
 		set_src = node->set_src;
 	      if (var->var_part[pos].cur_loc == node->loc)
 		var->var_part[pos].cur_loc = NULL;
-	      pool_free (loc_chain_pool, node);
+	      loc_chain_pool.remove (node);
 	      *nextp = next;
 	      break;
 	    }
@@ -7768,7 +7773,7 @@ set_slot_part (dataflow_set *set, rtx loc, variable_def **slot,
     }
 
   /* Add the location to the beginning.  */
-  node = (location_chain) pool_alloc (loc_chain_pool);
+  node = loc_chain_pool.allocate ();
   node->loc = loc;
   node->init = initialized;
   node->set_src = set_src;
@@ -7850,7 +7855,7 @@ clobber_slot_part (dataflow_set *set, rtx loc, variable_def **slot,
 		      if (dv_as_opaque (anode->dv) == dv_as_opaque (var->dv)
 			  && anode->offset == offset)
 			{
-			  pool_free (attrs_pool, anode);
+			  attrs_pool.remove (anode);
 			  *anextp = anext;
 			}
 		      else
@@ -7950,7 +7955,7 @@ delete_slot_part (dataflow_set *set, rtx loc, variable_def **slot,
 		  if (pos == 0 && var->onepart && VAR_LOC_1PAUX (var))
 		    VAR_LOC_FROM (var) = NULL;
 		}
-	      pool_free (loc_chain_pool, node);
+	      loc_chain_pool.remove (node);
 	      *nextp = next;
 	      break;
 	    }
@@ -8111,7 +8116,7 @@ loc_exp_insert_dep (variable var, rtx x, variable_table_type *vars)
     return;
 
   if (var->onepart == NOT_ONEPART)
-    led = (loc_exp_dep *) pool_alloc (loc_exp_dep_pool);
+    led = loc_exp_dep_pool.allocate ();
   else
     {
       loc_exp_dep empty;
@@ -8919,7 +8924,7 @@ notify_dependents_of_changed_value (rtx val, variable_table_type *htab,
 	  break;
 
 	case NOT_ONEPART:
-	  pool_free (loc_exp_dep_pool, led);
+	  loc_exp_dep_pool.remove (led);
 	  ivar = htab->find_with_hash (ldv, dv_htab_hash (ldv));
 	  if (ivar)
 	    {
@@ -9041,7 +9046,7 @@ emit_notes_for_differences_1 (variable_def **slot, variable_table_type *new_vars
 
       if (!empty_var)
 	{
-	  empty_var = (variable) pool_alloc (onepart_pool (old_var->onepart));
+	  empty_var = onepart_pool (old_var->onepart).allocate ();
 	  empty_var->dv = old_var->dv;
 	  empty_var->refcount = 0;
 	  empty_var->n_var_parts = 0;
@@ -9482,8 +9487,6 @@ vt_emit_notes (void)
   if (MAY_HAVE_DEBUG_INSNS)
     {
       dropped_values = new variable_table_type (cselib_get_next_uid () * 2);
-      loc_exp_dep_pool = create_alloc_pool ("loc_exp_dep pool",
-					    sizeof (loc_exp_dep), 64);
     }
 
   dataflow_set_init (&cur);
@@ -9902,18 +9905,7 @@ vt_initialize (void)
 
   alloc_aux_for_blocks (sizeof (struct variable_tracking_info_def));
 
-  attrs_pool = create_alloc_pool ("attrs_def pool",
-				  sizeof (struct attrs_def), 1024);
-  var_pool = create_alloc_pool ("variable_def pool",
-				sizeof (struct variable_def)
-				+ (MAX_VAR_PARTS - 1)
-				* sizeof (((variable)NULL)->var_part[0]), 64);
-  loc_chain_pool = create_alloc_pool ("location_chain_def pool",
-				      sizeof (struct location_chain_def),
-				      1024);
-  shared_hash_pool = create_alloc_pool ("shared_hash_def pool",
-					sizeof (struct shared_hash_def), 256);
-  empty_shared_hash = (shared_hash) pool_alloc (shared_hash_pool);
+  empty_shared_hash = shared_hash_pool.allocate ();
   empty_shared_hash->refcount = 1;
   empty_shared_hash->htab = new variable_table_type (1);
   changed_variables = new variable_table_type (10);
@@ -9932,15 +9924,12 @@ vt_initialize (void)
     {
       cselib_init (CSELIB_RECORD_MEMORY | CSELIB_PRESERVE_CONSTANTS);
       scratch_regs = BITMAP_ALLOC (NULL);
-      valvar_pool = create_alloc_pool ("small variable_def pool",
-				       sizeof (struct variable_def), 256);
       preserved_values.create (256);
       global_get_addr_cache = new hash_map<rtx, rtx>;
     }
   else
     {
       scratch_regs = NULL;
-      valvar_pool = NULL;
       global_get_addr_cache = NULL;
     }
 
@@ -10274,20 +10263,18 @@ vt_finalize (void)
   empty_shared_hash->htab = NULL;
   delete changed_variables;
   changed_variables = NULL;
-  free_alloc_pool (attrs_pool);
-  free_alloc_pool (var_pool);
-  free_alloc_pool (loc_chain_pool);
-  free_alloc_pool (shared_hash_pool);
+  attrs_pool.release ();
+  var_pool.release ();
+  loc_chain_pool.release ();
+  shared_hash_pool.release ();
 
   if (MAY_HAVE_DEBUG_INSNS)
     {
       if (global_get_addr_cache)
 	delete global_get_addr_cache;
       global_get_addr_cache = NULL;
-      if (loc_exp_dep_pool)
-	free_alloc_pool (loc_exp_dep_pool);
-      loc_exp_dep_pool = NULL;
-      free_alloc_pool (valvar_pool);
+      loc_exp_dep_pool.release ();
+      valvar_pool.release ();
       preserved_values.release ();
       cselib_finish ();
       BITMAP_FREE (scratch_regs);
