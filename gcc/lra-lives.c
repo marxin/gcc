@@ -121,14 +121,7 @@ static sparseset unused_set, dead_set;
 static bitmap_head temp_bitmap;
 
 /* Pool for pseudo live ranges.	 */
-static alloc_pool live_range_pool;
-
-/* Free live range LR.	*/
-static void
-free_live_range (lra_live_range_t lr)
-{
-  pool_free (live_range_pool, lr);
-}
+pool_allocator <lra_live_range> lra_live_range::pool ("live ranges", 100);
 
 /* Free live range list LR.  */
 static void
@@ -139,7 +132,7 @@ free_live_range_list (lra_live_range_t lr)
   while (lr != NULL)
     {
       next = lr->next;
-      free_live_range (lr);
+      delete lr;
       lr = next;
     }
 }
@@ -148,9 +141,7 @@ free_live_range_list (lra_live_range_t lr)
 static lra_live_range_t
 create_live_range (int regno, int start, int finish, lra_live_range_t next)
 {
-  lra_live_range_t p;
-
-  p = (lra_live_range_t) pool_alloc (live_range_pool);
+  lra_live_range_t p = new lra_live_range; 
   p->regno = regno;
   p->start = start;
   p->finish = finish;
@@ -162,9 +153,7 @@ create_live_range (int regno, int start, int finish, lra_live_range_t next)
 static lra_live_range_t
 copy_live_range (lra_live_range_t r)
 {
-  lra_live_range_t p;
-
-  p = (lra_live_range_t) pool_alloc (live_range_pool);
+  lra_live_range_t p = new lra_live_range;
   *p = *r;
   return p;
 }
@@ -212,7 +201,7 @@ lra_merge_live_ranges (lra_live_range_t r1, lra_live_range_t r2)
 	  r1->start = r2->start;
 	  temp = r2;
 	  r2 = r2->next;
-	  pool_free (live_range_pool, temp);
+	  delete temp; 
 	}
       else
 	{
@@ -1112,7 +1101,7 @@ remove_some_program_points_and_update_live_ranges (void)
 		}
 	      prev_r->start = r->start;
 	      prev_r->next = next_r;
-	      free_live_range (r);
+	      delete r;
 	    }
 	}
     }
@@ -1383,8 +1372,6 @@ lra_clear_live_ranges (void)
 void
 lra_live_ranges_init (void)
 {
-  live_range_pool = create_alloc_pool ("live ranges",
-				       sizeof (struct lra_live_range), 100);
   bitmap_initialize (&temp_bitmap, &reg_obstack);
   initiate_live_solver ();
 }
@@ -1395,5 +1382,5 @@ lra_live_ranges_finish (void)
 {
   finish_live_solver ();
   bitmap_clear (&temp_bitmap);
-  free_alloc_pool (live_range_pool);
+  lra_live_range::pool.release ();
 }
