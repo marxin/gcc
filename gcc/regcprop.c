@@ -85,7 +85,9 @@ struct value_data
   unsigned int n_debug_insn_changes;
 };
 
-static alloc_pool debug_insn_changes_pool;
+static pool_allocator<queued_debug_insn_change> debug_insn_changes_pool
+  ("debug insn changes pool", 256);
+
 static bool skip_debug_insn_p;
 
 static void kill_value_one_regno (unsigned, struct value_data *);
@@ -124,7 +126,7 @@ free_debug_insn_changes (struct value_data *vd, unsigned int regno)
     {
       next = cur->next;
       --vd->n_debug_insn_changes;
-      pool_free (debug_insn_changes_pool, cur);
+      debug_insn_changes_pool.remove (cur);
     }
   vd->e[regno].debug_insn_changes = NULL;
 }
@@ -500,8 +502,7 @@ replace_oldest_value_reg (rtx *loc, enum reg_class cl, rtx_insn *insn,
 	    fprintf (dump_file, "debug_insn %u: queued replacing reg %u with %u\n",
 		     INSN_UID (insn), REGNO (*loc), REGNO (new_rtx));
 
-	  change = (struct queued_debug_insn_change *)
-		   pool_alloc (debug_insn_changes_pool);
+	  change = debug_insn_changes_pool.allocate ();
 	  change->next = vd->e[REGNO (new_rtx)].debug_insn_changes;
 	  change->insn = insn;
 	  change->loc = loc;
@@ -1251,9 +1252,6 @@ pass_cprop_hardreg::execute (function *fun)
   bitmap_clear (visited);
 
   if (MAY_HAVE_DEBUG_INSNS)
-    debug_insn_changes_pool
-      = create_alloc_pool ("debug insn changes pool",
-			   sizeof (struct queued_debug_insn_change), 256);
 
   FOR_EACH_BB_FN (bb, fun)
     {
@@ -1314,7 +1312,7 @@ pass_cprop_hardreg::execute (function *fun)
 		}
 	  }
 
-      free_alloc_pool (debug_insn_changes_pool);
+      debug_insn_changes_pool.release ();
     }
 
   sbitmap_free (visited);
