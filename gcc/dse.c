@@ -329,8 +329,11 @@ lowpart_bitmask (int n)
 }
 
 typedef struct store_info *store_info_t;
-static alloc_pool cse_store_info_pool;
-static alloc_pool rtx_store_info_pool;
+static pool_allocator<store_info> cse_store_info_pool ("cse_store_info_pool",
+						       100);
+
+static pool_allocator<store_info> rtx_store_info_pool ("rtx_store_info_pool",
+						       100);
 
 /* This structure holds information about a load.  These are only
    built for rtx bases.  */
@@ -354,8 +357,7 @@ struct read_info
   struct read_info *next;
 };
 typedef struct read_info *read_info_t;
-static alloc_pool read_info_pool;
-
+static pool_allocator<read_info> read_info_pool ("read_info_pool", 100);
 
 /* One of these records is created for each insn.  */
 
@@ -444,7 +446,7 @@ struct insn_info
 };
 
 typedef struct insn_info *insn_info_t;
-static alloc_pool insn_info_pool;
+static pool_allocator<insn_info> insn_info_pool ("insn_info_pool", 100);
 
 /* The linked list of stores that are under consideration in this
    basic block.  */
@@ -510,7 +512,7 @@ struct dse_bb_info
 };
 
 typedef struct dse_bb_info *bb_info_t;
-static alloc_pool bb_info_pool;
+static pool_allocator<dse_bb_info> bb_info_pool ("bb_info_pool", 100);
 
 /* Table to hold all bb_infos.  */
 static bb_info_t *bb_table;
@@ -581,7 +583,8 @@ struct group_info
 };
 typedef struct group_info *group_info_t;
 typedef const struct group_info *const_group_info_t;
-static alloc_pool rtx_group_info_pool;
+static pool_allocator<group_info> rtx_group_info_pool
+  ("rtx_group_info_pool", 100);
 
 /* Index into the rtx_group_vec.  */
 static int rtx_group_next_id;
@@ -605,7 +608,8 @@ struct deferred_change
 };
 
 typedef struct deferred_change *deferred_change_t;
-static alloc_pool deferred_change_pool;
+static pool_allocator<deferred_change> deferred_change_pool
+  ("deferred_change_pool", 10);
 
 static deferred_change_t deferred_change_list = NULL;
 
@@ -712,8 +716,7 @@ get_group_info (rtx base)
     {
       if (!clear_alias_group)
 	{
-	  clear_alias_group = gi =
-	    (group_info_t) pool_alloc (rtx_group_info_pool);
+	  clear_alias_group = gi = rtx_group_info_pool.allocate ();
 	  memset (gi, 0, sizeof (struct group_info));
 	  gi->id = rtx_group_next_id++;
 	  gi->store1_n = BITMAP_ALLOC (&dse_bitmap_obstack);
@@ -735,7 +738,7 @@ get_group_info (rtx base)
 
   if (gi == NULL)
     {
-      *slot = gi = (group_info_t) pool_alloc (rtx_group_info_pool);
+      *slot = gi = rtx_group_info_pool.allocate ();
       gi->rtx_base = base;
       gi->id = rtx_group_next_id++;
       gi->base_mem = gen_rtx_MEM (BLKmode, base);
@@ -776,24 +779,6 @@ dse_step0 (void)
   scratch = BITMAP_ALLOC (&reg_obstack);
   kill_on_calls = BITMAP_ALLOC (&dse_bitmap_obstack);
 
-  rtx_store_info_pool
-    = create_alloc_pool ("rtx_store_info_pool",
-			 sizeof (struct store_info), 100);
-  read_info_pool
-    = create_alloc_pool ("read_info_pool",
-			 sizeof (struct read_info), 100);
-  insn_info_pool
-    = create_alloc_pool ("insn_info_pool",
-			 sizeof (struct insn_info), 100);
-  bb_info_pool
-    = create_alloc_pool ("bb_info_pool",
-			 sizeof (struct dse_bb_info), 100);
-  rtx_group_info_pool
-    = create_alloc_pool ("rtx_group_info_pool",
-			 sizeof (struct group_info), 100);
-  deferred_change_pool
-    = create_alloc_pool ("deferred_change_pool",
-			 sizeof (struct deferred_change), 10);
 
   rtx_group_table = new hash_table<invariant_group_base_hasher> (11);
 
@@ -829,9 +814,9 @@ free_store_info (insn_info_t insn_info)
       if (store_info->is_large)
 	BITMAP_FREE (store_info->positions_needed.large.bmap);
       if (store_info->cse_base)
-	pool_free (cse_store_info_pool, store_info);
+	cse_store_info_pool.remove (store_info);
       else
-	pool_free (rtx_store_info_pool, store_info);
+	rtx_store_info_pool.remove (store_info);
       store_info = next;
     }
 
@@ -991,7 +976,7 @@ delete_dead_store_insn (insn_info_t insn_info)
   while (read_info)
     {
       read_info_t next = read_info->next;
-      pool_free (read_info_pool, read_info);
+      read_info_pool.remove (read_info);
       read_info = next;
     }
   insn_info->read_rec = NULL;
@@ -1115,7 +1100,7 @@ free_read_records (bb_info_t bb_info)
       read_info_t next = (*ptr)->next;
       if ((*ptr)->alias_set == 0)
         {
-          pool_free (read_info_pool, *ptr);
+          read_info_pool.remove (*ptr);
           *ptr = next;
         }
       else
@@ -1490,7 +1475,7 @@ record_store (rtx body, bb_info_t bb_info)
       if (clear_alias_group->offset_map_size_p < spill_alias_set)
 	clear_alias_group->offset_map_size_p = spill_alias_set;
 
-      store_info = (store_info_t) pool_alloc (rtx_store_info_pool);
+      store_info = rtx_store_info_pool.allocate ();
 
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, " processing spill store %d(%s)\n",
@@ -1505,7 +1490,7 @@ record_store (rtx body, bb_info_t bb_info)
 	= rtx_group_vec[group_id];
       tree expr = MEM_EXPR (mem);
 
-      store_info = (store_info_t) pool_alloc (rtx_store_info_pool);
+      store_info = rtx_store_info_pool.allocate ();
       set_usage_bits (group, offset, width, expr);
 
       if (dump_file && (dump_flags & TDF_DETAILS))
@@ -1518,7 +1503,7 @@ record_store (rtx body, bb_info_t bb_info)
 	insn_info->stack_pointer_based = true;
       insn_info->contains_cselib_groups = true;
 
-      store_info = (store_info_t) pool_alloc (cse_store_info_pool);
+      store_info = cse_store_info_pool.allocate ();
       group_id = -1;
 
       if (dump_file && (dump_flags & TDF_DETAILS))
@@ -2066,8 +2051,7 @@ replace_read (store_info_t store_info, insn_info_t store_insn,
 
   if (validate_change (read_insn->insn, loc, read_reg, 0))
     {
-      deferred_change_t deferred_change =
-	(deferred_change_t) pool_alloc (deferred_change_pool);
+      deferred_change_t deferred_change = deferred_change_pool.allocate ();
 
       /* Insert this right before the store insn where it will be safe
 	 from later insns that might change it before the read.  */
@@ -2105,7 +2089,7 @@ replace_read (store_info_t store_info, insn_info_t store_insn,
       /* Get rid of the read_info, from the point of view of the
 	 rest of dse, play like this read never happened.  */
       read_insn->read_rec = read_info->next;
-      pool_free (read_info_pool, read_info);
+      read_info_pool.remove (read_info);
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, " -- replaced the loaded MEM with ");
@@ -2171,7 +2155,7 @@ check_mem_read_rtx (rtx *loc, bb_info_t bb_info)
   else
     width = GET_MODE_SIZE (GET_MODE (mem));
 
-  read_info = (read_info_t) pool_alloc (read_info_pool);
+  read_info = read_info_pool.allocate ();
   read_info->group_id = group_id;
   read_info->mem = mem;
   read_info->alias_set = spill_alias_set;
@@ -2487,7 +2471,7 @@ static void
 scan_insn (bb_info_t bb_info, rtx_insn *insn)
 {
   rtx body;
-  insn_info_t insn_info = (insn_info_t) pool_alloc (insn_info_pool);
+  insn_info_t insn_info = insn_info_pool.allocate ();
   int mems_found = 0;
   memset (insn_info, 0, sizeof (struct insn_info));
 
@@ -2746,7 +2730,7 @@ dse_step1 (void)
   FOR_ALL_BB_FN (bb, cfun)
     {
       insn_info_t ptr;
-      bb_info_t bb_info = (bb_info_t) pool_alloc (bb_info_pool);
+      bb_info_t bb_info = bb_info_pool.allocate ();
 
       memset (bb_info, 0, sizeof (struct dse_bb_info));
       bitmap_set_bit (all_blocks, bb->index);
@@ -2762,9 +2746,6 @@ dse_step1 (void)
 	{
 	  rtx_insn *insn;
 
-	  cse_store_info_pool
-	    = create_alloc_pool ("cse_store_info_pool",
-				 sizeof (struct store_info), 100);
 	  active_local_stores = NULL;
 	  active_local_stores_len = 0;
 	  cselib_clear_table ();
@@ -2826,7 +2807,7 @@ dse_step1 (void)
 	      /* There is no reason to validate this change.  That was
 		 done earlier.  */
 	      *deferred_change_list->loc = deferred_change_list->reg;
-	      pool_free (deferred_change_pool, deferred_change_list);
+	      deferred_change_pool.remove (deferred_change_list);
 	      deferred_change_list = next;
 	    }
 
@@ -2872,7 +2853,7 @@ dse_step1 (void)
 	      ptr = ptr->prev_insn;
 	    }
 
-	  free_alloc_pool (cse_store_info_pool);
+	  cse_store_info_pool.release ();
 	}
       bb_info->regs_live = NULL;
     }
@@ -3710,12 +3691,12 @@ dse_step7 (void)
   BITMAP_FREE (all_blocks);
   BITMAP_FREE (scratch);
 
-  free_alloc_pool (rtx_store_info_pool);
-  free_alloc_pool (read_info_pool);
-  free_alloc_pool (insn_info_pool);
-  free_alloc_pool (bb_info_pool);
-  free_alloc_pool (rtx_group_info_pool);
-  free_alloc_pool (deferred_change_pool);
+  rtx_store_info_pool.release ();
+  read_info_pool.release ();
+  insn_info_pool.release ();
+  bb_info_pool.release ();
+  rtx_group_info_pool.release ();
+  deferred_change_pool.release ();
 }
 
 
