@@ -27,67 +27,10 @@ along with GCC; see the file COPYING3.  If not see
 
 #define align_eight(x) (((x+7) >> 3) << 3)
 
-/* The internal allocation object.  */
-typedef struct allocation_object_def
-{
-#ifdef ENABLE_CHECKING
-  /* The ID of alloc pool which the object was allocated from.  */
-  ALLOC_POOL_ID_TYPE id;
-#endif
-
-  union
-    {
-      /* The data of the object.  */
-      char data[1];
-
-      /* Because we want any type of data to be well aligned after the ID,
-	 the following elements are here.  They are never accessed so
-	 the allocated object may be even smaller than this structure.
-	 We do not care about alignment for floating-point types.  */
-      char *align_p;
-      int64_t align_i;
-    } u;
-} allocation_object;
-
-/* Convert a pointer to allocation_object from a pointer to user data.  */
-#define ALLOCATION_OBJECT_PTR_FROM_USER_PTR(X)				\
-   ((allocation_object *) (((char *) (X))				\
-			   - offsetof (allocation_object, u.data)))
-
-/* Convert a pointer to user data from a pointer to allocation_object.  */
-#define USER_PTR_FROM_ALLOCATION_OBJECT_PTR(X)				\
-   ((void *) (((allocation_object *) (X))->u.data))
-
-#ifdef ENABLE_CHECKING
-/* Last used ID.  */
-static ALLOC_POOL_ID_TYPE last_id;
-#endif
-
-/* Store information about each particular alloc_pool.  Note that this
-   will underestimate the amount the amount of storage used by a small amount:
-   1) The overhead in a pool is not accounted for.
-   2) The unallocated elements in a block are not accounted for.  Note
-   that this can at worst case be one element smaller that the block
-   size for that pool.  */
-struct alloc_pool_descriptor
-{
-  /* Number of pools allocated.  */
-  unsigned long created;
-  /* Gross allocated storage.  */
-  unsigned long allocated;
-  /* Amount of currently active storage. */
-  unsigned long current;
-  /* Peak amount of storage used.  */
-  unsigned long peak;
-  /* Size of element in the pool.  */
-  int elt_size;
-};
-
 /* Hashtable mapping alloc_pool names to descriptors.  */
-static hash_map<const char *, alloc_pool_descriptor> *alloc_pool_hash;
+hash_map<const char *, alloc_pool_descriptor> *alloc_pool_hash;
 
-/* For given name, return descriptor, create new if needed.  */
-static struct alloc_pool_descriptor *
+struct alloc_pool_descriptor *
 allocate_pool_descriptor (const char *name)
 {
   if (!alloc_pool_hash)
@@ -95,6 +38,7 @@ allocate_pool_descriptor (const char *name)
 
   return &alloc_pool_hash->get_or_insert (name);
 }
+
 
 /* Create a pool of things of size SIZE, with NUM in each block we
    allocate.  */
@@ -140,7 +84,7 @@ create_alloc_pool (const char *name, size_t size, size_t num)
   /* List header size should be a multiple of 8.  */
   header_size = align_eight (sizeof (struct alloc_pool_list_def));
 
-  pool->block_size = (size * num) + header_size;
+  pool->m_block_size = (size * num) + header_size;
   pool->returned_free_list = NULL;
   pool->virgin_free_list = NULL;
   pool->virgin_elts_remaining = 0;
@@ -249,7 +193,7 @@ pool_alloc (alloc_pool pool)
 	  alloc_pool_list block_header;
 
 	  /* Make the block.  */
-	  block = XNEWVEC (char, pool->block_size);
+	  block = XNEWVEC (char, pool->m_block_size);
 	  block_header = (alloc_pool_list) block;
 	  block += align_eight (sizeof (struct alloc_pool_list_def));
 
