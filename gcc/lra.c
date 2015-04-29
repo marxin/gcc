@@ -549,15 +549,7 @@ lra_update_dups (lra_insn_recog_data_t id, signed char *nops)
    insns.  */
 
 /* Pools for insn reg info.  */
-static alloc_pool insn_reg_pool;
-
-/* Initiate pool for insn reg info.  */
-static void
-init_insn_regs (void)
-{
-  insn_reg_pool
-    = create_alloc_pool ("insn regs", sizeof (struct lra_insn_reg), 100);
-}
+static pool_allocator<lra_insn_reg> insn_reg_pool ("insn regs", 100);
 
 /* Create LRA insn related info about a reference to REGNO in INSN with
    TYPE (in/out/inout), biggest reference mode MODE, flag that it is
@@ -571,7 +563,7 @@ new_insn_reg (rtx_insn *insn, int regno, enum op_type type,
 {
   struct lra_insn_reg *ir;
 
-  ir = (struct lra_insn_reg *) pool_alloc (insn_reg_pool);
+  ir = insn_reg_pool.allocate ();
   ir->type = type;
   ir->biggest_mode = mode;
   if (GET_MODE_SIZE (mode) > GET_MODE_SIZE (lra_reg_info[regno].biggest_mode)
@@ -584,13 +576,6 @@ new_insn_reg (rtx_insn *insn, int regno, enum op_type type,
   return ir;
 }
 
-/* Free insn reg info IR.  */
-static void
-free_insn_reg (struct lra_insn_reg *ir)
-{
-  pool_free (insn_reg_pool, ir);
-}
-
 /* Free insn reg info list IR.	*/
 static void
 free_insn_regs (struct lra_insn_reg *ir)
@@ -600,7 +585,7 @@ free_insn_regs (struct lra_insn_reg *ir)
   for (; ir != NULL; ir = next_ir)
     {
       next_ir = ir->next;
-      free_insn_reg (ir);
+      insn_reg_pool.remove (ir);
     }
 }
 
@@ -608,7 +593,7 @@ free_insn_regs (struct lra_insn_reg *ir)
 static void
 finish_insn_regs (void)
 {
-  free_alloc_pool (insn_reg_pool);
+  insn_reg_pool.release ();
 }
 
 
@@ -736,7 +721,6 @@ init_insn_recog_data (void)
 {
   lra_insn_recog_data_len = 0;
   lra_insn_recog_data = NULL;
-  init_insn_regs ();
 }
 
 /* Expand, if necessary, LRA data about insns.	*/
@@ -1312,7 +1296,7 @@ get_new_reg_value (void)
 }
 
 /* Pools for copies.  */
-static alloc_pool copy_pool;
+static pool_allocator<lra_copy> copy_pool ("lra copies", 100);
 
 /* Vec referring to pseudo copies.  */
 static vec<lra_copy_t> copy_vec;
@@ -1352,8 +1336,6 @@ init_reg_info (void)
   lra_reg_info = XNEWVEC (struct lra_reg, reg_info_size);
   for (i = 0; i < reg_info_size; i++)
     initialize_lra_reg_info_element (i);
-  copy_pool
-    = create_alloc_pool ("lra copies", sizeof (struct lra_copy), 100);
   copy_vec.create (100);
 }
 
@@ -1368,7 +1350,7 @@ finish_reg_info (void)
     bitmap_clear (&lra_reg_info[i].insn_bitmap);
   free (lra_reg_info);
   reg_info_size = 0;
-  free_alloc_pool (copy_pool);
+  copy_pool.release ();
   copy_vec.release ();
 }
 
@@ -1396,7 +1378,7 @@ lra_free_copies (void)
     {
       cp = copy_vec.pop ();
       lra_reg_info[cp->regno1].copies = lra_reg_info[cp->regno2].copies = NULL;
-      pool_free (copy_pool, cp);
+      copy_pool.remove (cp);
     }
 }
 
@@ -1418,7 +1400,7 @@ lra_create_copy (int regno1, int regno2, int freq)
       regno2 = regno1;
       regno1 = temp;
     }
-  cp = (lra_copy_t) pool_alloc (copy_pool);
+  cp = copy_pool.allocate ();
   copy_vec.safe_push (cp);
   cp->regno1_dest_p = regno1_dest_p;
   cp->freq = freq;
@@ -1587,7 +1569,7 @@ invalidate_insn_data_regno_info (lra_insn_recog_data_t data, rtx_insn *insn,
     {
       i = ir->regno;
       next_ir = ir->next;
-      free_insn_reg (ir);
+      insn_reg_pool.remove (ir);
       bitmap_clear_bit (&lra_reg_info[i].insn_bitmap, uid);
       if (i >= FIRST_PSEUDO_REGISTER && ! debug_p)
 	{
