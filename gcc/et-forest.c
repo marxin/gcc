@@ -61,8 +61,8 @@ struct et_occ
 				   depth.  */
 };
 
-static alloc_pool et_nodes;
-static alloc_pool et_occurrences;
+static pool_allocator <et_node> et_nodes ("et_nodes pool", 300);
+static pool_allocator <et_occ> et_occurrences ("et_occ pool", 300);
 
 /* Changes depth of OCC to D.  */
 
@@ -451,9 +451,7 @@ et_new_occ (struct et_node *node)
 {
   struct et_occ *nw;
 
-  if (!et_occurrences)
-    et_occurrences = create_alloc_pool ("et_occ pool", sizeof (struct et_occ), 300);
-  nw = (struct et_occ *) pool_alloc (et_occurrences);
+  nw = et_occurrences.allocate ();
 
   nw->of = node;
   nw->parent = NULL;
@@ -474,9 +472,7 @@ et_new_tree (void *data)
 {
   struct et_node *nw;
 
-  if (!et_nodes)
-    et_nodes = create_alloc_pool ("et_node pool", sizeof (struct et_node), 300);
-  nw = (struct et_node *) pool_alloc (et_nodes);
+  nw = et_nodes.allocate ();
 
   nw->data = data;
   nw->father = NULL;
@@ -501,8 +497,8 @@ et_free_tree (struct et_node *t)
   if (t->father)
     et_split (t);
 
-  pool_free (et_occurrences, t->rightmost_occ);
-  pool_free (et_nodes, t);
+  et_occurrences.remove (t->rightmost_occ);
+  et_nodes.remove (t);
 }
 
 /* Releases et tree T without maintaining other nodes.  */
@@ -510,10 +506,10 @@ et_free_tree (struct et_node *t)
 void
 et_free_tree_force (struct et_node *t)
 {
-  pool_free (et_occurrences, t->rightmost_occ);
+  et_occurrences.remove (t->rightmost_occ);
   if (t->parent_occ)
-    pool_free (et_occurrences, t->parent_occ);
-  pool_free (et_nodes, t);
+    et_occurrences.remove (t->parent_occ);
+  et_nodes.remove (t);
 }
 
 /* Release the alloc pools, if they are empty.  */
@@ -521,8 +517,8 @@ et_free_tree_force (struct et_node *t)
 void
 et_free_pools (void)
 {
-  free_alloc_pool_if_empty (&et_occurrences);
-  free_alloc_pool_if_empty (&et_nodes);
+  et_occurrences.release_if_empty ();
+  et_nodes.release_if_empty ();
 }
 
 /* Sets father of et tree T to FATHER.  */
@@ -614,7 +610,7 @@ et_split (struct et_node *t)
   rmost->depth = 0;
   rmost->min = 0;
 
-  pool_free (et_occurrences, p_occ);
+  et_occurrences.remove (p_occ);
 
   /* Update the tree.  */
   if (father->son == t)
