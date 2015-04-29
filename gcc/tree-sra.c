@@ -306,7 +306,7 @@ typedef struct access *access_p;
 
 
 /* Alloc pool for allocating access structures.  */
-static alloc_pool access_pool;
+static pool_allocator<struct access> access_pool ("SRA accesses", 16);
 
 /* A structure linking lhs and rhs accesses from an aggregate assignment.  They
    are used to propagate subaccesses from rhs to lhs as long as they don't
@@ -318,7 +318,7 @@ struct assign_link
 };
 
 /* Alloc pool for allocating assign link structures.  */
-static alloc_pool link_pool;
+static pool_allocator<assign_link> link_pool ("SRA links", 16);
 
 /* Base (tree) -> Vector (vec<access_p> *) map.  */
 static hash_map<tree, auto_vec<access_p> > *base_access_vec;
@@ -690,8 +690,6 @@ sra_initialize (void)
   should_scalarize_away_bitmap = BITMAP_ALLOC (NULL);
   cannot_scalarize_away_bitmap = BITMAP_ALLOC (NULL);
   gcc_obstack_init (&name_obstack);
-  access_pool = create_alloc_pool ("SRA accesses", sizeof (struct access), 16);
-  link_pool = create_alloc_pool ("SRA links", sizeof (struct assign_link), 16);
   base_access_vec = new hash_map<tree, auto_vec<access_p> >;
   memset (&sra_stats, 0, sizeof (sra_stats));
   encountered_apply_args = false;
@@ -709,8 +707,8 @@ sra_deinitialize (void)
   candidates = NULL;
   BITMAP_FREE (should_scalarize_away_bitmap);
   BITMAP_FREE (cannot_scalarize_away_bitmap);
-  free_alloc_pool (access_pool);
-  free_alloc_pool (link_pool);
+  access_pool.release ();
+  link_pool.release ();
   obstack_free (&name_obstack, NULL);
 
   delete base_access_vec;
@@ -864,7 +862,7 @@ create_access_1 (tree base, HOST_WIDE_INT offset, HOST_WIDE_INT size)
 {
   struct access *access;
 
-  access = (struct access *) pool_alloc (access_pool);
+  access = access_pool.allocate ();
   memset (access, 0, sizeof (struct access));
   access->base = base;
   access->offset = offset;
@@ -1239,7 +1237,7 @@ build_accesses_from_assign (gimple stmt)
     {
       struct assign_link *link;
 
-      link = (struct assign_link *) pool_alloc (link_pool);
+      link = link_pool.allocate ();
       memset (link, 0, sizeof (struct assign_link));
 
       link->lacc = lacc;
@@ -2399,7 +2397,7 @@ create_artificial_child_access (struct access *parent, struct access *model,
 
   gcc_assert (!model->grp_unscalarizable_region);
 
-  access = (struct access *) pool_alloc (access_pool);
+  access = access_pool.allocate ();
   memset (access, 0, sizeof (struct access));
   if (!build_user_friendly_ref_for_offset (&expr, TREE_TYPE (expr), new_offset,
 					   model->type))
