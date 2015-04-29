@@ -956,7 +956,8 @@ static void check_format_arg (void *, tree, unsigned HOST_WIDE_INT);
 static void check_format_info_main (format_check_results *,
 				    function_format_info *,
 				    const char *, int, tree,
-                                    unsigned HOST_WIDE_INT, alloc_pool);
+                                    unsigned HOST_WIDE_INT,
+				    pool_allocator<format_wanted_type> &);
 
 static void init_dollar_format_checking (int, tree);
 static int maybe_read_dollar_number (const char **, int,
@@ -1441,7 +1442,6 @@ check_format_arg (void *ctx, tree format_tree,
   const char *format_chars;
   tree array_size = 0;
   tree array_init;
-  alloc_pool fwt_pool;
 
   if (TREE_CODE (format_tree) == VAR_DECL)
     {
@@ -1617,11 +1617,9 @@ check_format_arg (void *ctx, tree format_tree,
      will decrement it if it finds there are extra arguments, but this way
      need not adjust it for every return.  */
   res->number_other++;
-  fwt_pool = create_alloc_pool ("format_wanted_type pool",
-                                sizeof (format_wanted_type), 10);
+  pool_allocator <format_wanted_type> fwt_pool ("format_wanted_type pool", 10);
   check_format_info_main (res, info, format_chars, format_length,
                           params, arg_num, fwt_pool);
-  free_alloc_pool (fwt_pool);
 }
 
 
@@ -1636,7 +1634,8 @@ static void
 check_format_info_main (format_check_results *res,
 			function_format_info *info, const char *format_chars,
 			int format_length, tree params,
-                        unsigned HOST_WIDE_INT arg_num, alloc_pool fwt_pool)
+                        unsigned HOST_WIDE_INT arg_num,
+			pool_allocator<format_wanted_type> &fwt_pool)
 {
   const char *orig_format_chars = format_chars;
   tree first_fillin_param = params;
@@ -2313,8 +2312,7 @@ check_format_info_main (format_check_results *res,
 	      fci = fci->chain;
 	      if (fci)
 		{
-                  wanted_type_ptr = (format_wanted_type *)
-                      pool_alloc (fwt_pool);
+                  wanted_type_ptr = fwt_pool.allocate ();
 		  arg_num++;
 		  wanted_type = *fci->types[length_chars_val].type;
 		  wanted_type_name = fci->types[length_chars_val].name;
