@@ -374,21 +374,8 @@ struct asan_mem_ref
   HOST_WIDE_INT access_size;
 };
 
-static alloc_pool asan_mem_ref_alloc_pool;
-
-/* This creates the alloc pool used to store the instances of
-   asan_mem_ref that are stored in the hash table asan_mem_ref_ht.  */
-
-static alloc_pool
-asan_mem_ref_get_alloc_pool ()
-{
-  if (asan_mem_ref_alloc_pool == NULL)
-    asan_mem_ref_alloc_pool = create_alloc_pool ("asan_mem_ref",
-						 sizeof (asan_mem_ref),
-						 10);
-  return asan_mem_ref_alloc_pool;
-    
-}
+static pool_allocator<asan_mem_ref> asan_mem_ref_alloc_pool ("asan_mem_ref",
+							     10);
 
 /* Initializes an instance of asan_mem_ref.  */
 
@@ -408,8 +395,7 @@ asan_mem_ref_init (asan_mem_ref *ref, tree start, HOST_WIDE_INT access_size)
 static asan_mem_ref*
 asan_mem_ref_new (tree start, HOST_WIDE_INT access_size)
 {
-  asan_mem_ref *ref =
-    (asan_mem_ref *) pool_alloc (asan_mem_ref_get_alloc_pool ());
+  asan_mem_ref *ref = asan_mem_ref_alloc_pool.allocate ();
 
   asan_mem_ref_init (ref, start, access_size);
   return ref;
@@ -501,11 +487,7 @@ free_mem_ref_resources ()
   delete asan_mem_ref_ht;
   asan_mem_ref_ht = NULL;
 
-  if (asan_mem_ref_alloc_pool)
-    {
-      free_alloc_pool (asan_mem_ref_alloc_pool);
-      asan_mem_ref_alloc_pool = NULL;
-    }
+  asan_mem_ref_alloc_pool.release ();
 }
 
 /* Return true iff the memory reference REF has been instrumented.  */
