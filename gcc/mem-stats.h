@@ -81,7 +81,7 @@ struct mem_usage
   {
     gcc_assert (size <= m_allocated);
 
-    m_allocated += size;
+    m_allocated -= size;
   }
 
   mem_usage operator+ (const mem_usage &second)
@@ -130,7 +130,7 @@ struct mem_usage
   inline void dump_footer ()
   {
     print_dashes (get_print_width ());
-    fprintf (stderr, "%s%54li%16li\n", "Total", (long)m_allocated,
+    fprintf (stderr, "%s%54li%25li\n", "Total", (long)m_allocated,
 	     (long)m_times);
     print_dashes (get_print_width ());
   }
@@ -257,7 +257,6 @@ mem_alloc_description<T>::register_instance_overhead (size_t size, const void *p
   mem_usage_pair <T> **slot = m_reverse_map->get (ptr);
   if (!slot)
     {
-      fprintf (stderr, "problem tu je..\n");
       gcc_unreachable ();
       return NULL;
     }
@@ -286,7 +285,6 @@ mem_alloc_description<T>::release_overhead_for_instance (void *ptr, size_t size)
 
   if (!slot)
     {
-      fprintf (stderr, "tady je taky problem\n");
       gcc_unreachable ();
       return;
     }
@@ -294,8 +292,6 @@ mem_alloc_description<T>::release_overhead_for_instance (void *ptr, size_t size)
   mem_usage_pair<T> *usage_pair = *slot;
 
   usage_pair->usage->release_overhead (size);
-
-  usage_pair->usage->m_allocated -= size;
 }
 
 template <class T>
