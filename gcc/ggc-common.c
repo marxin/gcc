@@ -1036,16 +1036,16 @@ make_loc_descriptor (const char *name, int line, const char *function)
 
 /* Record ALLOCATED and OVERHEAD bytes to descriptor NAME:LINE (FUNCTION).  */
 void
-ggc_record_overhead (size_t allocated, size_t overhead, void *ptr,
-		     const char *name, int line, const char *function)
+ggc_record_overhead (size_t allocated, size_t overhead, void *ptr MEM_STAT_DECL) 
 {
-  ggc_usage *usage = ggc_mem_desc.register_descriptor (ptr, GGC, name, line, function);
+  ggc_usage *usage = ggc_mem_desc.register_descriptor (ptr, GGC, false
+						       FINAL_PASS_MEM_STAT);
 
   usage->m_allocated += allocated;
   usage->m_overhead += overhead;
   usage->m_times++;
 
-  struct ggc_loc_descriptor *loc = make_loc_descriptor (name, line, function);
+  struct ggc_loc_descriptor *loc = make_loc_descriptor (ALONE_FINAL_PASS_MEM_STAT);
   struct ggc_ptr_hash_entry *p = XNEW (struct ggc_ptr_hash_entry);
   ggc_ptr_hash_entry **slot;
 

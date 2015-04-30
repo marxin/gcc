@@ -127,7 +127,7 @@ get_bitmap_descriptor (const char *file, int line, const char *function)
 void
 bitmap_register (bitmap b MEM_STAT_DECL)
 {
-  bitmap_mem_usage.register_descriptor (b, BITMAP FINAL_PASS_MEM_STAT);
+  bitmap_mem_usage.register_descriptor (b, BITMAP, false FINAL_PASS_MEM_STAT);
   bitmap_descriptor desc = get_bitmap_descriptor (ALONE_FINAL_PASS_MEM_STAT);
   desc->created++;
   b->descriptor_id = desc->id;

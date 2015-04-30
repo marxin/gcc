@@ -210,7 +210,7 @@ void
 vec_prefix::register_overhead (void *ptr, size_t size, size_t elements
 			       MEM_STAT_DECL)
 {
-  vec_mem_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
+  vec_mem_desc.register_descriptor (ptr, VEC, false FINAL_PASS_MEM_STAT);
   vec_usage *usage = vec_mem_desc.register_instance_overhead (size, ptr);
   usage->m_items += elements;
   if (usage->m_items_peak < usage->m_items)
@@ -243,7 +243,7 @@ void
 vec_prefix::release_overhead (void *ptr, size_t size MEM_STAT_DECL)
 {
   if (!vec_mem_desc.contains_descriptor_for_instance (ptr))
-    vec_mem_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
+    vec_mem_desc.register_descriptor (ptr, VEC, false FINAL_PASS_MEM_STAT);
   vec_mem_desc.release_overhead_for_instance (ptr, size);
 
   PTR *slot = htab_find_slot_with_hash (ptr_hash, this,

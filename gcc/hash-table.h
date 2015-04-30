@@ -792,7 +792,7 @@ hash_table<Descriptor, Allocator>::hash_table (size_t size, bool ggc, bool
   size = prime_tab[size_prime_index].prime;
 
   if (m_gather_mem_stats)
-    hash_table_usage.register_descriptor (this, origin FINAL_PASS_MEM_STAT);
+    hash_table_usage.register_descriptor (this, origin, ggc FINAL_PASS_MEM_STAT);
 
   m_entries = alloc_entries (size PASS_MEM_STAT);
   m_size = size;

@@ -16,13 +16,14 @@ struct mem_location
   const char *m_function;
   int m_line;
   mem_alloc_origin m_origin;
+  bool m_ggc;
 
   mem_location () {}
 
   mem_location (const char *filename, const char *function, int line,
-		mem_alloc_origin origin):
+		mem_alloc_origin origin, bool ggc):
     m_filename (filename), m_function (function), m_line (line), m_origin
-    (origin) {}
+    (origin), m_ggc (ggc) {}
 
   hashval_t hash ()
   {
@@ -100,7 +101,7 @@ struct mem_usage
   
   static unsigned get_print_width ()
   {
-    return 90;
+    return 100;
   }
 
   static int compare (const void *first, const void *second)
@@ -121,10 +122,10 @@ struct mem_usage
 
     s[48] = '\0';
 
-    fprintf (stderr, "%-48s %10li:%4.1f%%%10li%10li:%4.1f%%\n", s,
+    fprintf (stderr, "%-48s %10li:%4.1f%%%10li%10li:%4.1f%%%10s\n", s,
 	     (long)m_allocated, m_allocated * 100.0 / total.m_allocated,
 	     (long)m_peak, (long)m_times,
-	     m_times * 100.0 / total.m_times);
+	     m_times * 100.0 / total.m_times, loc->m_ggc ? "ggc" : "heap");
   }
 
   inline void dump_footer ()
@@ -142,8 +143,8 @@ struct mem_usage
 
   static inline void dump_header (const char *name) 
   {
-    fprintf (stderr, "%-48s %11s%15s%10s\n", name, "Leak", "Peak",
-	     "Times");
+    fprintf (stderr, "%-48s %11s%15s%16s%10s\n", name, "Leak", "Peak",
+	     "Times", "Type");
     print_dashes (get_print_width ());
   }
 };
@@ -193,7 +194,9 @@ public:
   mem_alloc_description ();
   bool contains_descriptor_for_instance (const void *ptr);
   T *get_descriptor_for_instance (const void *ptr);
-  T *register_descriptor (const void *ptr, mem_alloc_origin origin, const char *name, int line, const char *function);
+  T *register_descriptor (const void *ptr, mem_alloc_origin origin,
+			  bool ggc, const char *name, int line,
+			  const char *function);
   T *register_overhead (size_t size, mem_alloc_origin origin, const char *name, int line,
 			const char *function, const void *ptr);
   T *register_instance_overhead (size_t size, const void *ptr);
@@ -227,9 +230,14 @@ mem_alloc_description<T>::get_descriptor_for_instance (const void *ptr)
 
 template <class T>
 inline T* 
-mem_alloc_description<T>::register_descriptor (const void *ptr, mem_alloc_origin origin, const char *filename, int line, const char *function)
+mem_alloc_description<T>::register_descriptor (const void *ptr,
+					       mem_alloc_origin origin,
+					       bool ggc,
+					       const char *filename,
+					       int line,
+					       const char *function)
 {  
-  mem_location *l = new mem_location (filename, function, line, origin);
+  mem_location *l = new mem_location (filename, function, line, origin, ggc);
   T *usage = NULL;
 
   T **slot = m_map->get (l);
