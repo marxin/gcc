@@ -132,7 +132,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "obstack.h"
 #include "mem-stats.h"
 
-extern mem_alloc_description<mem_usage> bitmap_mem_desc;
+extern mem_alloc_description<mem_usage> bitmap_mem_usage;
 
 /* Fundamental storage type for bitmap.  */
 
@@ -190,10 +190,12 @@ struct GTY(()) bitmap_head {
   bitmap_obstack *obstack;		/* Obstack to allocate elements from.
 					   If NULL, then use GGC allocation.  */
 
+  /*
   bitmap_head (ALONE_CXX_MEM_STAT_INFO)
   {
-    bitmap_mem_desc.register_descriptor (this, BITMAP FINAL_PASS_MEM_STAT);
+    bitmap_mem_usage.register_descriptor (this, BITMAP FINAL_PASS_MEM_STAT);
   }
+  */
 };
 
 /* Global data */

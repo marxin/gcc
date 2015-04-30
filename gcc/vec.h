@@ -205,7 +205,10 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Support function for statistics.  */
 extern void dump_vec_loc_statistics (void);
+extern void dump_vec_loc_statistics_new (void);
 
+/* Hashtable mapping vec addresses to descriptors.  */
+extern htab_t vec_mem_usage_hash;
 
 /* Control data for vectors.  This contains the number of allocated
    and used slots inside a vector.  */

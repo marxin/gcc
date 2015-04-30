@@ -49,7 +49,7 @@ vnull vNULL;
 
 
 /* Store information about each particular vector.  */
-struct vec_descriptor
+struct vec_mem_descriptor
 {
   const char *function;
   const char *file;
@@ -132,23 +132,23 @@ struct vec_usage: public mem_usage
 };
 
 /* Hashtable mapping vec addresses to descriptors.  */
-static htab_t vec_desc_hash;
+htab_t vec_mem_desc_hash;
 
-static mem_alloc_description <vec_usage> vec_desc;
+static mem_alloc_description <vec_usage> vec_mem_desc;
 
 /* Hashtable helpers.  */
 static hashval_t
 hash_descriptor (const void *p)
 {
-  const struct vec_descriptor *const d =
-    (const struct vec_descriptor *) p;
+  const struct vec_mem_descriptor *const d =
+    (const struct vec_mem_descriptor *) p;
   return htab_hash_pointer (d->file) + d->line;
 }
 static int
 eq_descriptor (const void *p1, const void *p2)
 {
-  const struct vec_descriptor *const d = (const struct vec_descriptor *) p1;
-  const struct vec_descriptor *const l = (const struct vec_descriptor *) p2;
+  const struct vec_mem_descriptor *const d = (const struct vec_mem_descriptor *) p1;
+  const struct vec_mem_descriptor *const l = (const struct vec_mem_descriptor *) p2;
   return d->file == l->file && d->function == l->function && d->line == l->line;
 }
 
@@ -157,7 +157,7 @@ static htab_t ptr_hash;
 struct ptr_hash_entry
 {
   void *ptr;
-  struct vec_descriptor *loc;
+  struct vec_mem_descriptor *loc;
   size_t allocated;
 };
 
@@ -179,23 +179,23 @@ eq_ptr (const void *p1, const void *p2)
 }
 
 /* Return descriptor for given call site, create new one if needed.  */
-static struct vec_descriptor *
-vec_descriptor (const char *name, int line, const char *function)
+static struct vec_mem_descriptor *
+vec_mem_descriptor (const char *name, int line, const char *function)
 {
-  struct vec_descriptor loc;
-  struct vec_descriptor **slot;
+  struct vec_mem_descriptor loc;
+  struct vec_mem_descriptor **slot;
 
   loc.file = name;
   loc.line = line;
   loc.function = function;
-  if (!vec_desc_hash)
-    vec_desc_hash = htab_create (10, hash_descriptor, eq_descriptor, NULL);
+  if (!vec_mem_desc_hash)
+    vec_mem_desc_hash = htab_create (10, hash_descriptor, eq_descriptor, NULL);
 
-  slot = (struct vec_descriptor **) htab_find_slot (vec_desc_hash, &loc,
+  slot = (struct vec_mem_descriptor **) htab_find_slot (vec_mem_desc_hash, &loc,
 						    INSERT);
   if (*slot)
     return *slot;
-  *slot = XCNEW (struct vec_descriptor);
+  *slot = XCNEW (struct vec_mem_descriptor);
   (*slot)->file = name;
   (*slot)->line = line;
   (*slot)->function = function;
@@ -210,13 +210,13 @@ void
 vec_prefix::register_overhead (void *ptr, size_t size, size_t elements
 			       MEM_STAT_DECL)
 {
-  vec_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
-  vec_usage *usage = vec_desc.register_instance_overhead (size, ptr);
+  vec_mem_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
+  vec_usage *usage = vec_mem_desc.register_instance_overhead (size, ptr);
   usage->m_items += elements;
   if (usage->m_items_peak < usage->m_items)
     usage->m_items_peak = usage->m_items;
 
-  struct vec_descriptor *loc = vec_descriptor (ALONE_FINAL_PASS_MEM_STAT);
+  struct vec_mem_descriptor *loc = vec_mem_descriptor (ALONE_FINAL_PASS_MEM_STAT);
   struct ptr_hash_entry *p = XNEW (struct ptr_hash_entry);
   PTR *slot;
 
@@ -242,9 +242,9 @@ vec_prefix::register_overhead (void *ptr, size_t size, size_t elements
 void
 vec_prefix::release_overhead (void *ptr, size_t size MEM_STAT_DECL)
 {
-  if (!vec_desc.contains_descriptor_for_instance (ptr))
-    vec_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
-  vec_desc.release_overhead_for_instance (ptr, size);
+  if (!vec_mem_desc.contains_descriptor_for_instance (ptr))
+    vec_mem_desc.register_descriptor (ptr, VEC FINAL_PASS_MEM_STAT);
+  vec_mem_desc.release_overhead_for_instance (ptr, size);
 
   PTR *slot = htab_find_slot_with_hash (ptr_hash, this,
 					htab_hash_pointer (this),
@@ -287,10 +287,10 @@ vec_prefix::calculate_allocation_1 (unsigned alloc, unsigned desired)
 static int
 cmp_statistic (const void *loc1, const void *loc2)
 {
-  const struct vec_descriptor *const l1 =
-    *(const struct vec_descriptor *const *) loc1;
-  const struct vec_descriptor *const l2 =
-    *(const struct vec_descriptor *const *) loc2;
+  const struct vec_mem_descriptor *const l1 =
+    *(const struct vec_mem_descriptor *const *) loc1;
+  const struct vec_mem_descriptor *const l2 =
+    *(const struct vec_mem_descriptor *const *) loc2;
   long diff;
   diff = l1->allocated - l2->allocated;
   if (!diff)
@@ -303,12 +303,12 @@ cmp_statistic (const void *loc1, const void *loc2)
 
 /* Collect array of the descriptors from hashtable.  */
 
-static struct vec_descriptor **loc_array;
+static struct vec_mem_descriptor **loc_array;
 static int
 add_statistics (void **slot, void *b)
 {
   int *n = (int *)b;
-  loc_array[*n] = (struct vec_descriptor *) *slot;
+  loc_array[*n] = (struct vec_mem_descriptor *) *slot;
   (*n)++;
   return 1;
 }
@@ -327,24 +327,22 @@ dump_vec_loc_statistics (void)
   if (! GATHER_STATISTICS)
     return;
 
-  vec_desc.dump (VEC);
-
-  loc_array = XCNEWVEC (struct vec_descriptor *, vec_desc_hash->n_elements);
+  loc_array = XCNEWVEC (struct vec_mem_descriptor *, vec_mem_desc_hash->n_elements);
   fprintf (stderr, "Heap vectors:\n");
   fprintf (stderr, "\n%-48s %10s       %10s       %10s\n",
 	   "source location", "Leak", "Peak", "Times");
   fprintf (stderr, "-------------------------------------------------------\n");
-  htab_traverse (vec_desc_hash, add_statistics, &nentries);
+  htab_traverse (vec_mem_desc_hash, add_statistics, &nentries);
   qsort (loc_array, nentries, sizeof (*loc_array), cmp_statistic);
   for (i = 0; i < nentries; i++)
     {
-      struct vec_descriptor *d = loc_array[i];
+      struct vec_mem_descriptor *d = loc_array[i];
       allocated += d->allocated;
       times += d->times;
     }
   for (i = 0; i < nentries; i++)
     {
-      struct vec_descriptor *d = loc_array[i];
+      struct vec_mem_descriptor *d = loc_array[i];
       const char *s1 = d->file;
       const char *s2;
       while ((s2 = strstr (s1, "gcc/")))
@@ -365,4 +363,10 @@ dump_vec_loc_statistics (void)
   fprintf (stderr, "-------------------------------------------------------\n");
 
 
+}
+
+void
+dump_vec_loc_statistics_new (void)
+{
+  vec_mem_desc.dump (VEC);
 }

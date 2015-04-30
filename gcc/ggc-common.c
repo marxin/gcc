@@ -879,34 +879,45 @@ struct ggc_usage: public mem_usage
 		      m_overhead + second.m_overhead);
   }
 
-  inline void dump (mem_location *loc, ggc_usage &total) const
+  inline void dump_line (const char *prefix, ggc_usage &total) const
   {
-    char s[4096];
-    sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
-	     loc->m_line, loc->m_function);
-
-    s[48] = '\0';
-
     long balance = get_balance ();
-
     fprintf (stderr,
-	     "%-48s %10li:%4.1f%%%10li:%4.1f%%"
-	     "%10li:%4.1f%%%10li:%4.1f%%%10li\n",
-	     s, (long)m_collected, m_collected * 100.0 / total.m_collected,
+	     "%-48s %10li:%5.1f%%%10li:%5.1f%%"
+	     "%10li:%5.1f%%%10li:%5.1f%%%10li\n",
+	     prefix, (long)m_collected, m_collected * 100.0 / total.m_collected,
 	     (long)m_freed, m_freed * 100.0 / total.m_freed,
 	     (long)balance, balance * 100.0 / total.get_balance (),
 	     (long)m_overhead, m_overhead * 100.0 / total.m_overhead,
 	     (long)m_times);
   }
 
+  inline void dump (mem_location *loc, ggc_usage &total) const
+  {
+    char s[4096];
+    sprintf (s, "%s:%i (%s)", loc->get_trimmed_filename (),
+	     loc->m_line, loc->m_function);
+    s[48] = '\0';
+
+    dump_line (s, total);
+  }
+
+  inline void dump_footer ()
+  {
+    print_dashes (get_print_width ());
+    dump_line ("Total", *this);
+    print_dashes (get_print_width ());
+  }
+
+
   inline long get_balance () const
   {
-    return m_allocated + m_peak - m_freed - m_collected;
+    return m_allocated + m_overhead- m_collected - m_freed;
   }
 
   static unsigned get_print_width ()
   {
-    return 123;
+    return 127;
   }
 
   static int compare (const void *first, const void *second)
@@ -958,11 +969,21 @@ static hash_table<ggc_loc_desc_hasher> *loc_hash;
 
 static mem_alloc_description<ggc_usage> ggc_mem_desc;
 
+void
+dump_ggc_loc_statistics_new (void)
+{
+  ggc_force_collect = true;
+  ggc_collect ();
+  ggc_mem_desc.dump (GGC);
+}
+
+
 struct ggc_ptr_hash_entry
 {
   void *ptr;
   struct ggc_loc_descriptor *loc;
   size_t size;
+  ggc_usage *usage;
 };
 
 /* Helper for ptr_hash table.  */
@@ -1030,6 +1051,7 @@ ggc_record_overhead (size_t allocated, size_t overhead, void *ptr,
 
   p->ptr = ptr;
   p->loc = loc;
+  p->usage = usage;
   p->size = allocated + overhead;
   if (!ptr_hash)
     ptr_hash = new hash_table<ptr_hash_hasher> (10, false);
@@ -1051,9 +1073,7 @@ ggc_prune_ptr (ggc_ptr_hash_entry **slot, void *b ATTRIBUTE_UNUSED)
   if (!ggc_marked_p (p->ptr))
     {
       p->loc->collected += p->size;
-
-      ggc_usage *usage = ggc_mem_desc.get_descriptor_for_instance (p->ptr);
-      usage->m_collected += p->size;
+      p->usage->m_collected += p->size;
 
       ptr_hash->clear_slot (slot);
       free (p);
@@ -1083,9 +1103,7 @@ ggc_free_overhead (void *ptr)
       return;
   p = (struct ggc_ptr_hash_entry *) *slot;
   p->loc->freed += p->size;
-
-  // TODO
-  ggc_mem_desc.release_overhead_for_instance (ptr, p->size);
+  p->usage->release_overhead (p->size);
 
   ptr_hash->clear_slot (slot);
   free (p);
@@ -1149,8 +1167,6 @@ dump_ggc_loc_statistics (bool final)
 
   ggc_force_collect = true;
   ggc_collect ();
-
-  ggc_mem_desc.dump (GGC);
 
   loc_array = XCNEWVEC (struct ggc_loc_descriptor *,
 			loc_hash->elements_with_deleted ());

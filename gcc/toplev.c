@@ -1958,10 +1958,17 @@ dump_memory_report (bool final)
   dump_alloc_pool_statistics ();
   dump_bitmap_statistics ();
   dump_vec_loc_statistics ();
-  dump_hash_table_loc_statistics ();
   dump_ggc_loc_statistics (final);  
   dump_alias_stats (stderr);
   dump_pta_stats (stderr);
+}
+
+void dump_new_memory_report (bool final)
+{
+  dump_hash_table_loc_statistics ();
+  bitmap_mem_usage.dump (BITMAP);
+  dump_vec_loc_statistics_new (); 
+  dump_ggc_loc_statistics_new ();
 }
 
 /* Clean up: close opened files, etc.  */
@@ -2002,7 +2009,11 @@ finalize (bool no_backend)
     }
 
   if (mem_report)
-    dump_memory_report (true);
+    {
+      dump_memory_report (true);
+      fprintf (stderr, "New memory report\n");
+      dump_new_memory_report (true);
+    }
 
   if (profile_report)
     dump_profile_report ();

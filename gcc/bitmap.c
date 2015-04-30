@@ -35,7 +35,7 @@ struct bitmap_mem_usage: public mem_usage
   uint64_t search_iter;
 };
 
-mem_alloc_description<mem_usage> bitmap_mem_desc;
+mem_alloc_description<mem_usage> bitmap_mem_usage;
 
 /* Store information about each particular bitmap, per allocation site.  */
 struct bitmap_descriptor_d
@@ -127,6 +127,7 @@ get_bitmap_descriptor (const char *file, int line, const char *function)
 void
 bitmap_register (bitmap b MEM_STAT_DECL)
 {
+  bitmap_mem_usage.register_descriptor (b, BITMAP FINAL_PASS_MEM_STAT);
   bitmap_descriptor desc = get_bitmap_descriptor (ALONE_FINAL_PASS_MEM_STAT);
   desc->created++;
   b->descriptor_id = desc->id;
@@ -136,8 +137,8 @@ bitmap_register (bitmap b MEM_STAT_DECL)
 static void
 register_overhead (bitmap b, int amount)
 {
-  if (bitmap_mem_desc.contains_descriptor_for_instance (b))
-    bitmap_mem_desc.register_instance_overhead (amount, b);
+  if (bitmap_mem_usage.contains_descriptor_for_instance (b))
+    bitmap_mem_usage.register_instance_overhead (amount, b);
 
   bitmap_descriptor desc = bitmap_descriptors[b->descriptor_id];
   desc->current += amount;
@@ -2169,6 +2170,7 @@ struct bitmap_output_info
 {
   uint64_t size;
   uint64_t count;
+  uint64_t leak;
 };
 
 /* Called via hash_table::traverse.  Output bitmap descriptor pointed out by
@@ -2195,6 +2197,7 @@ print_statistics (bitmap_descriptor_d **slot, bitmap_output_info *i)
 	       d->nsearches, d->search_iter);
       i->size += d->allocated;
       i->count += d->created;
+      i->leak += d->current;
     }
   return 1;
 }
@@ -2211,9 +2214,6 @@ dump_bitmap_statistics (void)
   if (!bitmap_desc_hash)
     return;
 
-  bitmap_mem_desc.dump (BITMAP);
-
-
   fprintf (stderr,
 	   "\n%-41s %9s %15s %15s %15s %10s %10s\n",
 	   "Bitmap", "Overall",
@@ -2222,11 +2222,12 @@ dump_bitmap_statistics (void)
   fprintf (stderr, "---------------------------------------------------------------------------------\n");
   info.count = 0;
   info.size = 0;
+  info.leak = 0;
   bitmap_desc_hash->traverse <bitmap_output_info *, print_statistics> (&info);
   fprintf (stderr, "---------------------------------------------------------------------------------\n");
   fprintf (stderr,
 	   "%-41s %9"PRId64" %15"PRId64"\n",
-	   "Total", info.count, info.size);
+	   "Total", info.count, info.leak);
   fprintf (stderr, "---------------------------------------------------------------------------------\n");
 }
 
