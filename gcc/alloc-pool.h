@@ -53,17 +53,12 @@ typedef struct alloc_pool_def
   size_t elts_free;
   size_t blocks_allocated;
   alloc_pool_list block_list;
-  size_t block_size;
+  size_t m_block_size;
   size_t elt_size;
 }
  *alloc_pool;
 
 extern alloc_pool create_alloc_pool (const char *, size_t, size_t);
-extern void free_alloc_pool (alloc_pool);
-extern void empty_alloc_pool (alloc_pool);
-extern void free_alloc_pool_if_empty (alloc_pool *);
-extern void *pool_alloc (alloc_pool) ATTRIBUTE_MALLOC;
-extern void pool_free (alloc_pool, void *);
 extern void dump_alloc_pool_statistics (void);
 
 /* Type based memory pool allocator.  */
@@ -72,33 +67,18 @@ template <typename T>
 class pool_allocator
 {
 public:
-  /* Default constructor for pool allocator called NAME. Each block
-     has NUM elements. The allocator support EXTRA_SIZE and can
-     potentially IGNORE_TYPE_SIZE.  */
   pool_allocator (const char *name, size_t num, size_t extra_size = 0,
 		  bool ignore_type_size = false);
-
-  /* Default destuctor.  */
   ~pool_allocator ();
-
-  /* Release internal data structures.  */
   void release ();
-
-  /* Release internal data structures if the pool has not allocated
-     an object.  */
   void release_if_empty ();
-
-  /* Allocate a new object.  */
   T *allocate () ATTRIBUTE_MALLOC;
-
-  /* Release OBJECT that must come from the pool.  */
   void remove (T *object);
 
-  /* Align X to 8.  */
   size_t align_eight (size_t x)
-  {
-    return (((x+7) >> 3) << 3);
-  }
+    {
+      return (((x+7) >> 3) << 3);
+    }
 
 private:
   const char *m_name;
@@ -124,6 +104,7 @@ private:
   size_t m_block_size;
   size_t m_elt_size;
   bool m_call_ctor;
+
 };
 
 /* The internal allocation object.  */
