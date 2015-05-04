@@ -236,7 +236,7 @@ template <class T>
 inline T* 
 mem_alloc_description<T>::get_descriptor_for_instance (const void *ptr)
 {
-  return (*m_reverse_map->get (ptr))->usage;
+  return m_reverse_map->get (ptr) ? (*m_reverse_map->get (ptr))->usage : NULL;
 }
 
 template <class T>
@@ -327,8 +327,11 @@ inline void
 mem_alloc_description<T>::release_overhead_for_object (void *ptr)
 {
   std::pair <T *, size_t> *entry = m_reverse_object_map->get (ptr);
-  entry->first->release_overhead (entry->second);
-  m_reverse_object_map->remove (ptr);
+  if (entry)
+    {
+      entry->first->release_overhead (entry->second);
+      m_reverse_object_map->remove (ptr);
+    }
 }
 
 template <class T>

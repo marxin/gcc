@@ -496,11 +496,11 @@ bitmap_find_bit (bitmap head, unsigned int bit)
       && head->first->next == NULL)
     return NULL;
 
-  bitmap_usage *usage = bitmap_mem_desc.get_descriptor_for_instance (head);
+   bitmap_usage *usage = bitmap_mem_desc.get_descriptor_for_instance (head);
 
   /* This bitmap has more than one element, and we're going to look
      through the elements list.  Count that as a search.  */
-  if (GATHER_STATISTICS)
+  if (GATHER_STATISTICS && usage)
     usage->m_nsearches++;
 
   if (head->indx < indx)
@@ -510,7 +510,7 @@ bitmap_find_bit (bitmap head, unsigned int bit)
 	 element->next != 0 && element->indx < indx;
 	 element = element->next)
       {
-	if (GATHER_STATISTICS)
+	if (GATHER_STATISTICS && usage)
 	  usage->m_search_iter++;
       }
 
@@ -521,7 +521,7 @@ bitmap_find_bit (bitmap head, unsigned int bit)
 	 element->prev != 0 && element->indx > indx;
 	 element = element->prev)
       {
-	if (GATHER_STATISTICS)
+	if (GATHER_STATISTICS && usage)
 	  usage->m_search_iter++;
       }
 
@@ -531,7 +531,7 @@ bitmap_find_bit (bitmap head, unsigned int bit)
     for (element = head->first;
 	 element->next != 0 && element->indx < indx;
 	 element = element->next)
-      if (GATHER_STATISTICS)
+      if (GATHER_STATISTICS && usage)
 	{
 	  usage->m_search_iter++;
 	}
