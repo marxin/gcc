@@ -1956,7 +1956,7 @@ dump_memory_report (bool final)
   dump_gimple_statistics ();
   dump_rtx_statistics ();
   dump_alloc_pool_statistics ();
-  bitmap_mem_usage.dump (BITMAP);
+  dump_bitmap_statistics ();
   dump_hash_table_loc_statistics ();
   dump_vec_loc_statistics ();
   dump_ggc_loc_statistics (final);  

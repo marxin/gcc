@@ -943,7 +943,6 @@ struct ggc_usage: public mem_usage
 	     "Leak", "Overhead", "Times");
     print_dashes (get_print_width ());
   }
-
 };
 
 static mem_alloc_description<ggc_usage> ggc_mem_desc;
