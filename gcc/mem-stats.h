@@ -197,6 +197,7 @@ public:
   typedef std::pair <mem_location *, T *> mem_list_t;
 
   mem_alloc_description ();
+  ~mem_alloc_description ();
   bool contains_descriptor_for_instance (const void *ptr);
   T *get_descriptor_for_instance (const void *ptr);
   T *register_descriptor (const void *ptr, mem_alloc_origin origin,
@@ -206,6 +207,8 @@ public:
 			const char *function, const void *ptr);
   T *register_instance_overhead (size_t size, const void *ptr);
   void release_overhead_for_instance (void *ptr, size_t size);
+  void release_overhead_for_object (void *ptr);
+  void register_object_overhead (T *usage, size_t size, const void *ptr);
   T get_total ();
   mem_list_t *get_list (mem_alloc_origin origin, unsigned *length,
 			int (*cmp) (const void *first, const void *second) = NULL);
@@ -216,6 +219,7 @@ public:
   mem_location m_location;
   mem_map_t *m_map;
   reverse_mem_map_t *m_reverse_map;
+  hash_map <const void *, std::pair<T *, size_t> > *m_reverse_object_map;
 };
 
 #include "hash-map.h"
@@ -283,6 +287,14 @@ mem_alloc_description<T>::register_instance_overhead (size_t size, const void *p
 }
 
 template <class T>
+void
+mem_alloc_description<T>::register_object_overhead (T *usage, size_t size, const void *ptr)
+{
+  gcc_assert (m_reverse_object_map->get (ptr) == NULL);
+  m_reverse_object_map->put (ptr, std::pair<T *, size_t> (usage, size));
+}
+
+template <class T>
 inline T* 
 mem_alloc_description<T>::register_overhead (size_t size, mem_alloc_origin origin, const char *filename, int line, const char *function, const void *ptr)
 {
@@ -309,14 +321,33 @@ mem_alloc_description<T>::release_overhead_for_instance (void *ptr, size_t size)
   usage_pair->usage->release_overhead (size);
 }
 
+
+template <class T>
+inline void
+mem_alloc_description<T>::release_overhead_for_object (void *ptr)
+{
+  std::pair <T *, size_t> *entry = m_reverse_object_map->get (ptr);
+  entry->first->release_overhead (entry->second);
+  m_reverse_object_map->remove (ptr);
+}
+
 template <class T>
 inline
 mem_alloc_description<T>::mem_alloc_description()
 {
   m_map = new mem_map_t (13, false, false);
   m_reverse_map = new reverse_mem_map_t (13, false, false);
+  m_reverse_object_map = new hash_map<const void *, std::pair<T *, size_t> > (13, false, false);
 }
 
+template <class T>
+inline
+mem_alloc_description<T>::~mem_alloc_description()
+{
+  delete m_map;
+  delete m_reverse_map;
+  delete m_reverse_object_map;
+}
 
 template <class T>
 inline 

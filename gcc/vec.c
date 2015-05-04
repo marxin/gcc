@@ -281,18 +281,6 @@ vec_prefix::calculate_allocation_1 (unsigned alloc, unsigned desired)
   return alloc;
 }
 
-/* Collect array of the descriptors from hashtable.  */
-
-static struct vec_mem_descriptor **loc_array;
-static int
-add_statistics (void **slot, void *b)
-{
-  int *n = (int *)b;
-  loc_array[*n] = (struct vec_mem_descriptor *) *slot;
-  (*n)++;
-  return 1;
-}
-
 /* Dump per-site memory statistics.  */
 
 void

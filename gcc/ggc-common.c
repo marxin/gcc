@@ -831,19 +831,6 @@ init_ggc_heuristics (void)
 #endif
 }
 
-/* Datastructure used to store per-call-site statistics.  */
-struct ggc_loc_descriptor
-{
-  const char *file;
-  int line;
-  const char *function;
-  int times;
-  size_t allocated;
-  size_t overhead;
-  size_t freed;
-  size_t collected;
-};
-
 struct ggc_usage: public mem_usage
 {
   ggc_usage (): m_freed (0), m_collected (0), m_overhead (0) {}
@@ -862,6 +849,13 @@ struct ggc_usage: public mem_usage
     return (get_balance () == second.get_balance () ?
 	    (m_peak == second.m_peak ? m_times < second.m_times
 	     : m_peak < second.m_peak ) : get_balance () < second.get_balance ());
+  }
+
+  inline void register_overhead (size_t allocated, size_t overhead)
+  {
+    m_allocated += allocated;
+    m_overhead += overhead;
+    m_times++;
   }
 
   inline void release_overhead (size_t size)
@@ -913,7 +907,7 @@ struct ggc_usage: public mem_usage
 
   inline long get_balance () const
   {
-    return m_allocated + m_overhead- m_collected - m_freed;
+    return m_allocated + m_overhead - m_collected - m_freed;
   }
 
   static unsigned get_print_width ()
@@ -952,34 +946,6 @@ struct ggc_usage: public mem_usage
 
 };
 
-/* Hash table helper.  */
-
-struct ggc_loc_desc_hasher : typed_noop_remove <ggc_loc_descriptor>
-{
-  typedef ggc_loc_descriptor *value_type;
-  typedef ggc_loc_descriptor *compare_type;
-  static inline hashval_t hash (const ggc_loc_descriptor *);
-  static inline bool equal (const ggc_loc_descriptor *,
-			    const ggc_loc_descriptor *);
-};
-
-inline hashval_t
-ggc_loc_desc_hasher::hash (const ggc_loc_descriptor *d)
-{
-  return htab_hash_pointer (d->function) | d->line;
-}
-
-inline bool
-ggc_loc_desc_hasher::equal (const ggc_loc_descriptor *d,
-			    const ggc_loc_descriptor *d2)
-{
-  return (d->file == d2->file && d->line == d2->line
-	  && d->function == d2->function);
-}
-
-/* Hashtable used for statistics.  */
-static hash_table<ggc_loc_desc_hasher> *loc_hash;
-
 static mem_alloc_description<ggc_usage> ggc_mem_desc;
 
 /* Dump per-site memory statistics.  */
@@ -994,63 +960,8 @@ dump_ggc_loc_statistics (bool final)
   ggc_collect ();
 
   ggc_mem_desc.dump (GGC, final ? ggc_usage::compare_final : NULL);
-}
 
-
-struct ggc_ptr_hash_entry
-{
-  void *ptr;
-  struct ggc_loc_descriptor *loc;
-  size_t size;
-  ggc_usage *usage;
-};
-
-/* Helper for ptr_hash table.  */
-
-struct ptr_hash_hasher : typed_noop_remove <ggc_ptr_hash_entry>
-{
-  typedef ggc_ptr_hash_entry *value_type;
-  typedef void *compare_type;
-  static inline hashval_t hash (const ggc_ptr_hash_entry *);
-  static inline bool equal (const ggc_ptr_hash_entry *, const void *);
-};
-
-inline hashval_t
-ptr_hash_hasher::hash (const ggc_ptr_hash_entry *d)
-{
-  return htab_hash_pointer (d->ptr);
-}
-
-inline bool
-ptr_hash_hasher::equal (const ggc_ptr_hash_entry *p, const void *p2)
-{
-  return (p->ptr == p2);
-}
-
-/* Hashtable converting address of allocated field to loc descriptor.  */
-static hash_table<ptr_hash_hasher> *ptr_hash;
-
-/* Return descriptor for given call site, create new one if needed.  */
-static struct ggc_loc_descriptor *
-make_loc_descriptor (const char *name, int line, const char *function)
-{
-  struct ggc_loc_descriptor loc;
-  struct ggc_loc_descriptor **slot;
-
-  loc.file = name;
-  loc.line = line;
-  loc.function = function;
-  if (!loc_hash)
-    loc_hash = new hash_table<ggc_loc_desc_hasher> (10);
-
-  slot = loc_hash->find_slot (&loc, INSERT);
-  if (*slot)
-    return *slot;
-  *slot = XCNEW (struct ggc_loc_descriptor);
-  (*slot)->file = name;
-  (*slot)->line = line;
-  (*slot)->function = function;
-  return *slot;
+  ggc_force_collect = false;
 }
 
 /* Record ALLOCATED and OVERHEAD bytes to descriptor NAME:LINE (FUNCTION).  */
@@ -1060,44 +971,15 @@ ggc_record_overhead (size_t allocated, size_t overhead, void *ptr MEM_STAT_DECL)
   ggc_usage *usage = ggc_mem_desc.register_descriptor (ptr, GGC, false
 						       FINAL_PASS_MEM_STAT);
 
-  usage->m_allocated += allocated;
-  usage->m_overhead += overhead;
-  usage->m_times++;
-
-  struct ggc_loc_descriptor *loc = make_loc_descriptor (ALONE_FINAL_PASS_MEM_STAT);
-  struct ggc_ptr_hash_entry *p = XNEW (struct ggc_ptr_hash_entry);
-  ggc_ptr_hash_entry **slot;
-
-  p->ptr = ptr;
-  p->loc = loc;
-  p->usage = usage;
-  p->size = allocated + overhead;
-  if (!ptr_hash)
-    ptr_hash = new hash_table<ptr_hash_hasher> (10, false);
-  slot = ptr_hash->find_slot_with_hash (ptr, htab_hash_pointer (ptr), INSERT);
-  gcc_assert (!*slot);
-  *slot = p;
-
-  loc->times++;
-  loc->allocated+=allocated;
-  loc->overhead+=overhead;
+  ggc_mem_desc.register_object_overhead (usage, allocated + overhead, ptr);
+  usage->register_overhead (allocated, overhead);
 }
 
-/* Helper function for prune_overhead_list.  See if SLOT is still marked and
-   remove it from hashtable if it is not.  */
-int
-ggc_prune_ptr (ggc_ptr_hash_entry **slot, void *b ATTRIBUTE_UNUSED)
+/* Notice that the pointer has been freed.  */
+void
+ggc_free_overhead (void *ptr)
 {
-  struct ggc_ptr_hash_entry *p = *slot;
-  if (!ggc_marked_p (p->ptr))
-    {
-      p->loc->collected += p->size;
-      p->usage->m_collected += p->size;
-
-      ptr_hash->clear_slot (slot);
-      free (p);
-    }
-  return 1;
+  ggc_mem_desc.release_overhead_for_object (ptr);
 }
 
 /* After live values has been marked, walk all recorded pointers and see if
@@ -1105,25 +987,14 @@ ggc_prune_ptr (ggc_ptr_hash_entry **slot, void *b ATTRIBUTE_UNUSED)
 void
 ggc_prune_overhead_list (void)
 {
-  ptr_hash->traverse <void *, ggc_prune_ptr> (NULL);
-}
+  typedef hash_map<const void *, std::pair<ggc_usage *, size_t > > map_t;
 
-/* Notice that the pointer has been freed.  */
-void
-ggc_free_overhead (void *ptr)
-{
-  ggc_ptr_hash_entry **slot
-    = ptr_hash->find_slot_with_hash (ptr, htab_hash_pointer (ptr), NO_INSERT);
-  struct ggc_ptr_hash_entry *p;
-  /* The pointer might be not found if a PCH read happened between allocation
-     and ggc_free () call.  FIXME: account memory properly in the presence of
-     PCH. */
-  if (!slot)
-      return;
-  p = (struct ggc_ptr_hash_entry *) *slot;
-  p->loc->freed += p->size;
-  p->usage->release_overhead (p->size);
+  map_t::iterator it = ggc_mem_desc.m_reverse_object_map->begin();
 
-  ptr_hash->clear_slot (slot);
-  free (p);
+  for (; it != ggc_mem_desc.m_reverse_object_map->end (); ++it)
+    if (!ggc_marked_p ((*it).first))
+      (*it).second.first->m_collected += (*it).second.second;
+
+  delete ggc_mem_desc.m_reverse_object_map;
+  ggc_mem_desc.m_reverse_object_map = new map_t (13, false, false);
 }
