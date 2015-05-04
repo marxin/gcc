@@ -157,8 +157,6 @@ extern void ggc_free (void *);
 
 extern void dump_ggc_loc_statistics (bool);
 
-extern void dump_ggc_loc_statistics_new (void);
-
 /* Reallocator.  */
 #define GGC_RESIZEVEC(T, P, N) \
     ((T *) ggc_realloc ((P), (N) * sizeof (T) MEM_STAT_INFO))

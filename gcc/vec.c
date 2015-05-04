@@ -103,7 +103,7 @@ struct vec_usage: public mem_usage
   inline void dump_footer ()
   {
     print_dashes (get_print_width ());
-    fprintf (stderr, "%s%54li%25li%16li\n", "Total", (long)m_allocated,
+    fprintf (stderr, "%s%55li%25li%17li\n", "Total", (long)m_allocated,
 	     (long)m_times, (long)m_items);
     print_dashes (get_print_width ());
   }
@@ -281,26 +281,6 @@ vec_prefix::calculate_allocation_1 (unsigned alloc, unsigned desired)
   return alloc;
 }
 
-
-/* Helper for qsort; sort descriptors by amount of memory consumed.  */
-
-static int
-cmp_statistic (const void *loc1, const void *loc2)
-{
-  const struct vec_mem_descriptor *const l1 =
-    *(const struct vec_mem_descriptor *const *) loc1;
-  const struct vec_mem_descriptor *const l2 =
-    *(const struct vec_mem_descriptor *const *) loc2;
-  long diff;
-  diff = l1->allocated - l2->allocated;
-  if (!diff)
-    diff = l1->peak - l2->peak;
-  if (!diff)
-    diff = l1->times - l2->times;
-  return diff > 0 ? 1 : diff < 0 ? -1 : 0;
-}
-
-
 /* Collect array of the descriptors from hashtable.  */
 
 static struct vec_mem_descriptor **loc_array;
@@ -317,56 +297,6 @@ add_statistics (void **slot, void *b)
 
 void
 dump_vec_loc_statistics (void)
-{
-  int nentries = 0;
-  char s[4096];
-  size_t allocated = 0;
-  size_t times = 0;
-  int i;
-
-  if (! GATHER_STATISTICS)
-    return;
-
-  loc_array = XCNEWVEC (struct vec_mem_descriptor *, vec_mem_desc_hash->n_elements);
-  fprintf (stderr, "Heap vectors:\n");
-  fprintf (stderr, "\n%-48s %10s       %10s       %10s\n",
-	   "source location", "Leak", "Peak", "Times");
-  fprintf (stderr, "-------------------------------------------------------\n");
-  htab_traverse (vec_mem_desc_hash, add_statistics, &nentries);
-  qsort (loc_array, nentries, sizeof (*loc_array), cmp_statistic);
-  for (i = 0; i < nentries; i++)
-    {
-      struct vec_mem_descriptor *d = loc_array[i];
-      allocated += d->allocated;
-      times += d->times;
-    }
-  for (i = 0; i < nentries; i++)
-    {
-      struct vec_mem_descriptor *d = loc_array[i];
-      const char *s1 = d->file;
-      const char *s2;
-      while ((s2 = strstr (s1, "gcc/")))
-	s1 = s2 + 4;
-      sprintf (s, "%s:%i (%s)", s1, d->line, d->function);
-      s[48] = 0;
-      fprintf (stderr, "%-48s %10li:%4.1f%% %10li      %10li:%4.1f%% \n", s,
-	       (long)d->allocated,
-	       (d->allocated) * 100.0 / allocated,
-	       (long)d->peak,
-	       (long)d->times,
-	       (d->times) * 100.0 / times);
-    }
-  fprintf (stderr, "%-48s %10ld                        %10ld\n",
-	   "Total", (long)allocated, (long)times);
-  fprintf (stderr, "\n%-48s %10s       %10s       %10s\n",
-	   "source location", "Leak", "Peak", "Times");
-  fprintf (stderr, "-------------------------------------------------------\n");
-
-
-}
-
-void
-dump_vec_loc_statistics_new (void)
 {
   vec_mem_desc.dump (VEC);
 }

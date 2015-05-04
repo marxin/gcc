@@ -122,18 +122,23 @@ struct mem_usage
 
     s[48] = '\0';
 
-    fprintf (stderr, "%-48s %10li:%4.1f%%%10li%10li:%4.1f%%%10s\n", s,
-	     (long)m_allocated, m_allocated * 100.0 / total.m_allocated,
+    fprintf (stderr, "%-48s %10li:%5.1f%%%10li%10li:%5.1f%%%10s\n", s,
+	     (long)m_allocated, get_percent (m_allocated, total.m_allocated),
 	     (long)m_peak, (long)m_times,
-	     m_times * 100.0 / total.m_times, loc->m_ggc ? "ggc" : "heap");
+	     get_percent (m_times, total.m_times), loc->m_ggc ? "ggc" : "heap");
   }
 
   inline void dump_footer ()
   {
     print_dashes (get_print_width ());
-    fprintf (stderr, "%s%54li%25li\n", "Total", (long)m_allocated,
+    fprintf (stderr, "%s%54li%27li\n", "Total", (long)m_allocated,
 	     (long)m_times);
     print_dashes (get_print_width ());
+  }
+
+  static inline float get_percent (size_t nominator, size_t denominator)
+  {
+    return denominator == 0 ? 0.0f : nominator * 100.0 / denominator;
   }
 
   static inline void print_dashes (unsigned count)
@@ -143,7 +148,7 @@ struct mem_usage
 
   static inline void dump_header (const char *name) 
   {
-    fprintf (stderr, "%-48s %11s%15s%16s%10s\n", name, "Leak", "Peak",
+    fprintf (stderr, "%-48s %11s%16s%10s%17s\n", name, "Leak", "Peak",
 	     "Times", "Type");
     print_dashes (get_print_width ());
   }
@@ -202,9 +207,11 @@ public:
   T *register_instance_overhead (size_t size, const void *ptr);
   void release_overhead_for_instance (void *ptr, size_t size);
   T get_total ();
-  mem_list_t *get_list (mem_alloc_origin origin, unsigned *length);
+  mem_list_t *get_list (mem_alloc_origin origin, unsigned *length,
+			int (*cmp) (const void *first, const void *second) = NULL);
   T get_sum (mem_alloc_origin origin);
-  void dump (mem_alloc_origin origin);
+  void dump (mem_alloc_origin origin,
+	     int (*cmp) (const void *first, const void *second) = NULL);
 
   mem_location m_location;
   mem_map_t *m_map;
@@ -314,7 +321,8 @@ mem_alloc_description<T>::mem_alloc_description()
 template <class T>
 inline 
 typename mem_alloc_description<T>::mem_list_t *
-mem_alloc_description<T>::get_list (mem_alloc_origin origin, unsigned *length)
+mem_alloc_description<T>::get_list (mem_alloc_origin origin, unsigned *length,
+			int (*cmp) (const void *first, const void *second))
 {
   /* vec data structure is not used because all vectors generate memory
      allocation info a it would create a cycle.  */
@@ -326,7 +334,7 @@ mem_alloc_description<T>::get_list (mem_alloc_origin origin, unsigned *length)
     if ((*it).first->m_origin == origin)
       list[i++] = std::pair<mem_location*, T*> (*it);
 
-  qsort (list, i, element_size, T::compare);
+  qsort (list, i, element_size, cmp == NULL ? T::compare : cmp);
   *length = i;
 
   return list;
@@ -348,10 +356,13 @@ mem_alloc_description<T>::get_sum (mem_alloc_origin origin)
 
 template <class T>
 inline void
-mem_alloc_description<T>::dump (mem_alloc_origin origin)
+mem_alloc_description<T>::dump (mem_alloc_origin origin, int (*cmp) (const void *first, const void *second))
 {
   unsigned length;
-  mem_list_t *list = get_list (origin, &length);
+
+  fprintf (stderr, "\n");
+
+  mem_list_t *list = get_list (origin, &length, cmp);
   T total = get_sum (origin);
 
   T::dump_header (mem_location::get_origin_name (origin));
@@ -362,7 +373,7 @@ mem_alloc_description<T>::dump (mem_alloc_origin origin)
 
   delete list;
 
-  fprintf (stderr, "\n\n");
+  fprintf (stderr, "\n");
 }
 
 #endif // GCC_MEM_STATS_H

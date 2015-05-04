@@ -885,10 +885,11 @@ struct ggc_usage: public mem_usage
     fprintf (stderr,
 	     "%-48s %10li:%5.1f%%%10li:%5.1f%%"
 	     "%10li:%5.1f%%%10li:%5.1f%%%10li\n",
-	     prefix, (long)m_collected, m_collected * 100.0 / total.m_collected,
-	     (long)m_freed, m_freed * 100.0 / total.m_freed,
-	     (long)balance, balance * 100.0 / total.get_balance (),
-	     (long)m_overhead, m_overhead * 100.0 / total.m_overhead,
+	     prefix, (long)m_collected,
+	     get_percent (m_collected, total.m_collected),
+	     (long)m_freed, get_percent (m_freed, total.m_freed),
+	     (long)balance, get_percent(balance, total.get_balance ()),
+	     (long)m_overhead, get_percent (m_overhead, total.m_overhead),
 	     (long)m_times);
   }
 
@@ -920,19 +921,31 @@ struct ggc_usage: public mem_usage
     return 127;
   }
 
+  typedef std::pair<mem_location *, ggc_usage *> mem_pair_t;
+
   static int compare (const void *first, const void *second)
   {
-    typedef std::pair<mem_location *, ggc_usage *> mem_pair_t;
-
     const mem_pair_t f = *(const mem_pair_t *)first;
     const mem_pair_t s = *(const mem_pair_t *)second;
 
     return (*f.second) < (*s.second);
   }
 
+  static int compare_final (const void *first, const void *second)
+  {  typedef std::pair<mem_location *, ggc_usage *> mem_pair_t;
+
+    const ggc_usage *f = ((const mem_pair_t *)first)->second;
+    const ggc_usage *s = ((const mem_pair_t *)second)->second;
+
+    size_t a = f->m_allocated + f->m_overhead - f->m_freed;
+    size_t b = s->m_allocated + s->m_overhead - s->m_freed;
+
+    return a < b;
+  }
+
   static inline void dump_header (const char *name) 
   {
-    fprintf (stderr, "%-48s %10s%16s%16s%16s%16s\n", name, "Garbage", "Freed",
+    fprintf (stderr, "%-48s %11s%17s%17s%16s%17s\n", name, "Garbage", "Freed",
 	     "Leak", "Overhead", "Times");
     print_dashes (get_print_width ());
   }
@@ -969,12 +982,18 @@ static hash_table<ggc_loc_desc_hasher> *loc_hash;
 
 static mem_alloc_description<ggc_usage> ggc_mem_desc;
 
+/* Dump per-site memory statistics.  */
+
 void
-dump_ggc_loc_statistics_new (void)
+dump_ggc_loc_statistics (bool final)
 {
+  if (! GATHER_STATISTICS)
+    return;
+
   ggc_force_collect = true;
   ggc_collect ();
-  ggc_mem_desc.dump (GGC);
+
+  ggc_mem_desc.dump (GGC, final ? ggc_usage::compare_final : NULL);
 }
 
 
@@ -1107,115 +1126,4 @@ ggc_free_overhead (void *ptr)
 
   ptr_hash->clear_slot (slot);
   free (p);
-}
-
-/* Helper for qsort; sort descriptors by amount of memory consumed.  */
-static int
-final_cmp_statistic (const void *loc1, const void *loc2)
-{
-  const struct ggc_loc_descriptor *const l1 =
-    *(const struct ggc_loc_descriptor *const *) loc1;
-  const struct ggc_loc_descriptor *const l2 =
-    *(const struct ggc_loc_descriptor *const *) loc2;
-  long diff;
-  diff = ((long)(l1->allocated + l1->overhead - l1->freed) -
-	  (l2->allocated + l2->overhead - l2->freed));
-  return diff > 0 ? 1 : diff < 0 ? -1 : 0;
-}
-
-/* Helper for qsort; sort descriptors by amount of memory consumed.  */
-static int
-cmp_statistic (const void *loc1, const void *loc2)
-{
-  const struct ggc_loc_descriptor *const l1 =
-    *(const struct ggc_loc_descriptor *const *) loc1;
-  const struct ggc_loc_descriptor *const l2 =
-    *(const struct ggc_loc_descriptor *const *) loc2;
-  long diff;
-
-  diff = ((long)(l1->allocated + l1->overhead - l1->freed - l1->collected) -
-	  (l2->allocated + l2->overhead - l2->freed - l2->collected));
-  if (diff)
-    return diff > 0 ? 1 : diff < 0 ? -1 : 0;
-  diff =  ((long)(l1->allocated + l1->overhead - l1->freed) -
-	   (l2->allocated + l2->overhead - l2->freed));
-  return diff > 0 ? 1 : diff < 0 ? -1 : 0;
-}
-
-/* Collect array of the descriptors from hashtable.  */
-static struct ggc_loc_descriptor **loc_array;
-int
-ggc_add_statistics (ggc_loc_descriptor **slot, int *n)
-{
-  loc_array[*n] = *slot;
-  (*n)++;
-  return 1;
-}
-
-/* Dump per-site memory statistics.  */
-
-void
-dump_ggc_loc_statistics (bool final)
-{
-  int nentries = 0;
-  char s[4096];
-  size_t collected = 0, freed = 0, allocated = 0, overhead = 0, times = 0;
-  int i;
-
-  if (! GATHER_STATISTICS)
-    return;
-
-  ggc_force_collect = true;
-  ggc_collect ();
-
-  loc_array = XCNEWVEC (struct ggc_loc_descriptor *,
-			loc_hash->elements_with_deleted ());
-  fprintf (stderr, "-------------------------------------------------------\n");
-  fprintf (stderr, "\n%-48s %10s       %10s       %10s       %10s       %10s\n",
-	   "source location", "Garbage", "Freed", "Leak", "Overhead", "Times");
-  fprintf (stderr, "-------------------------------------------------------\n");
-  loc_hash->traverse <int *, ggc_add_statistics> (&nentries);
-  qsort (loc_array, nentries, sizeof (*loc_array),
-	 final ? final_cmp_statistic : cmp_statistic);
-  for (i = 0; i < nentries; i++)
-    {
-      struct ggc_loc_descriptor *d = loc_array[i];
-      allocated += d->allocated;
-      times += d->times;
-      freed += d->freed;
-      collected += d->collected;
-      overhead += d->overhead;
-    }
-  for (i = 0; i < nentries; i++)
-    {
-      struct ggc_loc_descriptor *d = loc_array[i];
-      if (d->allocated)
-	{
-	  const char *s1 = d->file;
-	  const char *s2;
-	  while ((s2 = strstr (s1, "gcc/")))
-	    s1 = s2 + 4;
-	  sprintf (s, "%s:%i (%s)", s1, d->line, d->function);
-	  s[48] = 0;
-	  fprintf (stderr, "%-48s %10li:%4.1f%% %10li:%4.1f%% %10li:%4.1f%% %10li:%4.1f%% %10li\n", s,
-		   (long)d->collected,
-		   (d->collected) * 100.0 / collected,
-		   (long)d->freed,
-		   (d->freed) * 100.0 / freed,
-		   (long)(d->allocated + d->overhead - d->freed - d->collected),
-		   (d->allocated + d->overhead - d->freed - d->collected) * 100.0
-		   / (allocated + overhead - freed - collected),
-		   (long)d->overhead,
-		   d->overhead * 100.0 / overhead,
-		   (long)d->times);
-	}
-    }
-  fprintf (stderr, "%-48s %10ld       %10ld       %10ld       %10ld       %10ld\n",
-	   "Total", (long)collected, (long)freed,
-	   (long)(allocated + overhead - freed - collected), (long)overhead,
-	   (long)times);
-  fprintf (stderr, "%-48s %10s       %10s       %10s       %10s       %10s\n",
-	   "source location", "Garbage", "Freed", "Leak", "Overhead", "Times");
-  fprintf (stderr, "-------------------------------------------------------\n");
-  ggc_force_collect = false;
 }
