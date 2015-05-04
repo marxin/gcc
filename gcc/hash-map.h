@@ -114,15 +114,14 @@ class GTY((user)) hash_map
 public:
   explicit hash_map (size_t n = 13, bool ggc = false,
 		     bool gather_mem_stats = true CXX_MEM_STAT_INFO)
-    : m_table (n, ggc, gather_mem_stats, HASH_MAP FINAL_PASS_MEM_STAT),
-      m_descriptor_id (-1) {}
+    : m_table (n, ggc, gather_mem_stats, HASH_MAP PASS_MEM_STAT) {}
 
   /* Create a hash_map in ggc memory.  */
   static hash_map *create_ggc (size_t size, bool gather_mem_stats = true
 			       CXX_MEM_STAT_INFO)
     {
       hash_map *map = ggc_alloc<hash_map> ();
-      new (map) hash_map (size, true, gather_mem_stats FINAL_PASS_MEM_STAT);
+      new (map) hash_map (size, true, gather_mem_stats PASS_MEM_STAT);
       return map;
     }
 
@@ -235,8 +234,6 @@ private:
       template<typename T, typename U, typename V> friend void gt_pch_nx (hash_map<T, U, V> *, gt_pointer_operator, void *);
 
   hash_table<hash_entry> m_table;
-
-  int m_descriptor_id;
 };
 
 /* ggc marking routines.  */

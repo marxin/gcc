@@ -597,7 +597,7 @@ public:
   create_ggc (size_t n CXX_MEM_STAT_INFO)
   {
     hash_table *table = ggc_alloc<hash_table> ();
-    new (table) hash_table (n, true, true, HASH_TABLE FINAL_PASS_MEM_STAT);
+    new (table) hash_table (n, true, true, HASH_TABLE PASS_MEM_STAT);
     return table;
   }
 
