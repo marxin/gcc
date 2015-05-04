@@ -48,17 +48,6 @@ along with GCC; see the file COPYING3.  If not see
 vnull vNULL;
 
 
-/* Store information about each particular vector.  */
-struct vec_mem_descriptor
-{
-  const char *function;
-  const char *file;
-  int line;
-  size_t allocated;
-  size_t times;
-  size_t peak;
-};
-
 struct vec_usage: public mem_usage
 {
   vec_usage (): m_items (0), m_items_peak (0) {}
@@ -131,78 +120,7 @@ struct vec_usage: public mem_usage
   }
 };
 
-/* Hashtable mapping vec addresses to descriptors.  */
-htab_t vec_mem_desc_hash;
-
 static mem_alloc_description <vec_usage> vec_mem_desc;
-
-/* Hashtable helpers.  */
-static hashval_t
-hash_descriptor (const void *p)
-{
-  const struct vec_mem_descriptor *const d =
-    (const struct vec_mem_descriptor *) p;
-  return htab_hash_pointer (d->file) + d->line;
-}
-static int
-eq_descriptor (const void *p1, const void *p2)
-{
-  const struct vec_mem_descriptor *const d = (const struct vec_mem_descriptor *) p1;
-  const struct vec_mem_descriptor *const l = (const struct vec_mem_descriptor *) p2;
-  return d->file == l->file && d->function == l->function && d->line == l->line;
-}
-
-/* Hashtable converting address of allocated field to loc descriptor.  */
-static htab_t ptr_hash;
-struct ptr_hash_entry
-{
-  void *ptr;
-  struct vec_mem_descriptor *loc;
-  size_t allocated;
-};
-
-/* Hash table helpers functions.  */
-static hashval_t
-hash_ptr (const void *p)
-{
-  const struct ptr_hash_entry *const d = (const struct ptr_hash_entry *) p;
-
-  return htab_hash_pointer (d->ptr);
-}
-
-static int
-eq_ptr (const void *p1, const void *p2)
-{
-  const struct ptr_hash_entry *const p = (const struct ptr_hash_entry *) p1;
-
-  return (p->ptr == p2);
-}
-
-/* Return descriptor for given call site, create new one if needed.  */
-static struct vec_mem_descriptor *
-vec_mem_descriptor (const char *name, int line, const char *function)
-{
-  struct vec_mem_descriptor loc;
-  struct vec_mem_descriptor **slot;
-
-  loc.file = name;
-  loc.line = line;
-  loc.function = function;
-  if (!vec_mem_desc_hash)
-    vec_mem_desc_hash = htab_create (10, hash_descriptor, eq_descriptor, NULL);
-
-  slot = (struct vec_mem_descriptor **) htab_find_slot (vec_mem_desc_hash, &loc,
-						    INSERT);
-  if (*slot)
-    return *slot;
-  *slot = XCNEW (struct vec_mem_descriptor);
-  (*slot)->file = name;
-  (*slot)->line = line;
-  (*slot)->function = function;
-  (*slot)->allocated = 0;
-  (*slot)->peak = 0;
-  return *slot;
-}
 
 /* Account the overhead.  */
 
@@ -215,27 +133,7 @@ vec_prefix::register_overhead (void *ptr, size_t size, size_t elements
   usage->m_items += elements;
   if (usage->m_items_peak < usage->m_items)
     usage->m_items_peak = usage->m_items;
-
-  struct vec_mem_descriptor *loc = vec_mem_descriptor (ALONE_FINAL_PASS_MEM_STAT);
-  struct ptr_hash_entry *p = XNEW (struct ptr_hash_entry);
-  PTR *slot;
-
-  p->ptr = this;
-  p->loc = loc;
-  p->allocated = size;
-  if (!ptr_hash)
-    ptr_hash = htab_create (10, hash_ptr, eq_ptr, NULL);
-  slot = htab_find_slot_with_hash (ptr_hash, this, htab_hash_pointer (this),
-				   INSERT);
-  gcc_assert (!*slot);
-  *slot = p;
-
-  loc->allocated += size;
-  if (loc->peak < loc->allocated)
-    loc->peak += loc->allocated;
-  loc->times++;
 }
-
 
 /* Notice that the memory allocated for the vector has been freed.  */
 
@@ -245,14 +143,6 @@ vec_prefix::release_overhead (void *ptr, size_t size MEM_STAT_DECL)
   if (!vec_mem_desc.contains_descriptor_for_instance (ptr))
     vec_mem_desc.register_descriptor (ptr, VEC, false FINAL_PASS_MEM_STAT);
   vec_mem_desc.release_overhead_for_instance (ptr, size);
-
-  PTR *slot = htab_find_slot_with_hash (ptr_hash, this,
-					htab_hash_pointer (this),
-					NO_INSERT);
-  struct ptr_hash_entry *p = (struct ptr_hash_entry *) *slot;
-  p->loc->allocated -= p->allocated;
-  htab_clear_slot (ptr_hash, slot);
-  ::free (p);
 }
 
 
