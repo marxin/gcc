@@ -1515,6 +1515,7 @@ write_insn_preds_c (void)
 #include \"rtl.h\"\n\
 #include \"hash-set.h\"\n\
 #include \"machmode.h\"\n\
+#include \"hash-map.h\"\n\
 #include \"vec.h\"\n\
 #include \"double-int.h\"\n\
 #include \"input.h\"\n\
