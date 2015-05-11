@@ -364,6 +364,9 @@ private:
   bool equals_private (sem_item *item,
 		       hash_map <symtab_node *, sem_item *> &ignored_nodes);
 
+  /* Return true if DECL_ARGUMENT types are valid to be merged.  */
+  bool compatible_parm_types_p ();
+
   /* Returns true if tree T can be compared as a handled component.  */
   static bool icf_handled_component_p (tree t);
 
