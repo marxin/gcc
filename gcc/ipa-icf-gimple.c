@@ -351,7 +351,7 @@ func_checker::compare_memory_operand (tree t1, tree t2)
 	return return_false_with_msg ("different dependence info");
     }
 
-  return compare_operand (t1, t2);
+  return compare_operand (t1, t2, true);
 }
 
 /* Function compare for equality given trees T1 and T2 which
@@ -417,7 +417,7 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
    is returned.  */
 
 bool
-func_checker::compare_operand (tree t1, tree t2)
+func_checker::compare_operand (tree t1, tree t2, bool memory_operand)
 {
   tree x1, x2, y1, y2, z1, z2;
   bool ret;
@@ -430,8 +430,8 @@ func_checker::compare_operand (tree t1, tree t2)
   tree tt1 = TREE_TYPE (t1);
   tree tt2 = TREE_TYPE (t2);
 
-  if (!func_checker::compatible_types_p (tt1, tt2))
-    return false;
+  if (!memory_operand && !func_checker::compatible_types_p (tt1, tt2))
+    return return_false ();
 
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return return_false ();
@@ -448,7 +448,7 @@ func_checker::compare_operand (tree t1, tree t2)
 
 	for (unsigned i = 0; i < length1; i++)
 	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
-				CONSTRUCTOR_ELT (t2, i)->value))
+				CONSTRUCTOR_ELT (t2, i)->value), memory_operand)
 	    return return_false();
 
 	return true;
@@ -462,15 +462,15 @@ func_checker::compare_operand (tree t1, tree t2)
       y2 = TREE_OPERAND (t2, 1);
 
       if (!compare_operand (array_ref_low_bound (t1),
-			    array_ref_low_bound (t2)))
-	return return_false_with_msg ("");
+			    array_ref_low_bound (t2), memory_operand))
+	return return_false_with_msg ("array lower bound");
       if (!compare_operand (array_ref_element_size (t1),
-			    array_ref_element_size (t2)))
-	return return_false_with_msg ("");
+			    array_ref_element_size (t2), memory_operand))
+	return return_false_with_msg ("array element size");
 
-      if (!compare_operand (x1, x2))
+      if (!compare_operand (x1, x2, memory_operand))
 	return return_false_with_msg ("");
-      return compare_operand (y1, y2);
+      return compare_operand (y1, y2, memory_operand);
     case MEM_REF:
       {
 	x1 = TREE_OPERAND (t1, 0);
@@ -489,7 +489,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2)))
 	  return return_false ();
 
-	if (!compare_operand (x1, x2))
+	if (!compare_operand (x1, x2, memory_operand))
 	  return return_false_with_msg ("");
 
 	/* Type of the offset on MEM_REF does not matter.  */
@@ -502,10 +502,13 @@ func_checker::compare_operand (tree t1, tree t2)
 	y1 = TREE_OPERAND (t1, 1);
 	y2 = TREE_OPERAND (t2, 1);
 
-	ret = compare_operand (x1, x2)
-	      && compare_cst_or_decl (y1, y2);
+	if (!memory_operand && !compare_operand (x1, x2, memory_operand))
+	  return return_false ();
 
-	return return_with_debug (ret);
+	if (!compare_cst_or_decl (y1, y2))
+	  return return_false ();
+
+	return true;
       }
     /* Virtual table call.  */
     case OBJ_TYPE_REF:
@@ -522,7 +525,7 @@ func_checker::compare_operand (tree t1, tree t2)
 				     obj_type_ref_class (t2)))
 	      return return_false_with_msg ("OBJ_TYPE_REF OTR type mismatch");
 	    if (!compare_operand (OBJ_TYPE_REF_OBJECT (t1),
-				  OBJ_TYPE_REF_OBJECT (t2)))
+				  OBJ_TYPE_REF_OBJECT (t2)), memory_operand)
 	      return return_false_with_msg ("OBJ_TYPE_REF object mismatch");
 	  }
 
@@ -535,7 +538,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	x1 = TREE_OPERAND (t1, 0);
 	x2 = TREE_OPERAND (t2, 0);
 
-	ret = compare_operand (x1, x2);
+	ret = compare_operand (x1, x2, memory_operand);
 	return return_with_debug (ret);
       }
     case BIT_FIELD_REF:
@@ -547,7 +550,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	z1 = TREE_OPERAND (t1, 2);
 	z2 = TREE_OPERAND (t2, 2);
 
-	ret = compare_operand (x1, x2)
+	ret = compare_operand (x1, x2, memory_operand)
 	      && compare_cst_or_decl (y1, y2)
 	      && compare_cst_or_decl (z1, z2);
 

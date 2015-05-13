@@ -213,7 +213,7 @@ public:
   /* Function responsible for comparison of various operands T1 and T2.
      If these components, from functions FUNC1 and FUNC2, are equal, true
      is returned.  */
-  bool compare_operand (tree t1, tree t2);
+  bool compare_operand (tree t1, tree t2, bool memory_operand = false);
 
   /* Compares two tree list operands T1 and T2 and returns true if these
      two trees are semantically equivalent.  */
