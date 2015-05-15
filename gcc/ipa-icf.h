@@ -382,6 +382,11 @@ private:
   /* Processes function equality comparison.  */
   bool equals_private (sem_item *item);
 
+  /* Perform additional check needed to match types function parameters that are
+  used.  Unlike for normal parameters it matters if type is TYPE_RESTRICT and we
+  make an assumption that REFERENCE_TYPE parameters are always non-NULL.  */
+  bool compatible_parm_types_p (tree parm1, tree parm2, unsigned index);
+
   /* Returns true if tree T can be compared as a handled component.  */
   static bool icf_handled_component_p (tree t);
 
