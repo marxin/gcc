@@ -21,7 +21,8 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_CSELIB_H
 
 /* Describe a value.  */
-struct cselib_val {
+struct cselib_val
+{
   /* The hash value.  */
   unsigned int hash;
 
@@ -40,6 +41,31 @@ struct cselib_val {
   struct elt_list *addr_list;
 
   struct cselib_val *next_containing_mem;
+
+  /* Pool allocation new operator.  */
+  inline void *operator new (size_t)
+  {
+    if (pool == NULL)
+      pool = new pool_allocator <cselib_val> ("cselib_val_list", 10);
+
+    return pool->allocate ();
+  }
+
+  /* Delete operator utilizing pool allocation.  */
+  inline void operator delete (void *ptr)
+  {
+    pool->remove ((cselib_val *) ptr);
+  }
+
+  /* Release memory allocator.  */
+  static inline void release_pool ()
+  {
+    if (pool != NULL)
+      pool->release ();
+  }
+
+  /* Memory allocation pool.  */
+  static pool_allocator<cselib_val> *pool;
 };
 
 /* A list of rtl expressions that hold the same value.  */
@@ -50,6 +76,31 @@ struct elt_loc_list {
   rtx loc;
   /* The insn that made the equivalence.  */
   rtx_insn *setting_insn;
+
+  /* Pool allocation new operator.  */
+  inline void *operator new (size_t)
+  {
+    if (pool == NULL)
+      pool = new pool_allocator <elt_loc_list> ("elt_loc_list", 10);
+
+    return pool->allocate ();
+  }
+
+  /* Delete operator utilizing pool allocation.  */
+  inline void operator delete (void *ptr)
+  {
+    pool->remove ((elt_loc_list *) ptr);
+  }
+
+  /* Release memory allocator.  */
+  static inline void release_pool ()
+  {
+    if (pool != NULL)
+      pool->release ();
+  }
+
+  /* Memory allocation pool.  */
+  static pool_allocator<elt_loc_list> *pool;
 };
 
 /* Describe a single set that is part of an insn.  */
