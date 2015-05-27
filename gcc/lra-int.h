@@ -54,6 +54,24 @@ struct lra_live_range
   lra_live_range_t next;
   /* Pointer to structures with the same start.	 */
   lra_live_range_t start_next;
+
+  /* Pool allocation new operator.  */
+  inline void *operator new (size_t)
+  {
+    if (pool == NULL)
+      pool = new pool_allocator <lra_live_range> ("live ranges", 100);
+
+    return pool->allocate ();
+  }
+
+  /* Delete operator utilizing pool allocation.  */
+  inline void operator delete (void *ptr)
+  {
+    pool->remove ((lra_live_range *) ptr);
+  }
+
+  /* Memory allocation pool.  */
+  static pool_allocator<lra_live_range> *pool;
 };
 
 typedef struct lra_copy *lra_copy_t;
