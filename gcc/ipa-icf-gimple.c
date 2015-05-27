@@ -263,7 +263,7 @@ func_checker::compatible_polymorphic_types_p (tree t1, tree t2,
 
 /* Return true if types are compatible from perspective of ICF.  */
 bool
-func_checker::compatible_types_p (tree t1, tree t2)
+func_checker::compatible_types_p (tree t1, tree t2, bool ignore_type)
 {
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return return_false_with_msg ("different tree types");
@@ -271,7 +271,7 @@ func_checker::compatible_types_p (tree t1, tree t2)
   if (TYPE_RESTRICT (t1) != TYPE_RESTRICT (t2))
     return return_false_with_msg ("restrict flags are different");
 
-  if (!types_compatible_p (t1, t2))
+  if (!ignore_type && !types_compatible_p (t1, t2))
     return return_false_with_msg ("types are not compatible");
 
   if (get_alias_set (t1) != get_alias_set (t2))
@@ -370,9 +370,13 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
     case STRING_CST:
     case REAL_CST:
       {
-	ret = compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2))
-	      && operand_equal_p (t1, t2, OEP_ONLY_CONST);
-	return return_with_debug (ret);
+	ret = compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2));
+	if (!ret)
+	  return return_false_with_msg ("contant types are different");
+
+	ret = operand_equal_p (t1, t2, OEP_ONLY_CONST);
+	if (!ret)
+	  return return_false_with_msg ("contant values are different");
       }
     case FUNCTION_DECL:
       /* All function decls are in the symbol table and known to match
@@ -417,7 +421,7 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
    is returned.  */
 
 bool
-func_checker::compare_operand (tree t1, tree t2)
+func_checker::compare_operand (tree t1, tree t2, bool ignore_type)
 {
   tree x1, x2, y1, y2, z1, z2;
   bool ret;
@@ -430,11 +434,27 @@ func_checker::compare_operand (tree t1, tree t2)
   tree tt1 = TREE_TYPE (t1);
   tree tt2 = TREE_TYPE (t2);
 
-  if (!func_checker::compatible_types_p (tt1, tt2))
+  if (!ignore_type && !func_checker::compatible_types_p (tt1, tt2))
     return false;
 
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return return_false ();
+
+  HOST_WIDE_INT offset1, offset2;
+
+  tree a1 = get_addr_base_and_unit_offset (t1, &offset1);
+  tree a2 = get_addr_base_and_unit_offset (t2, &offset2);
+
+  if (a1 && a2)
+    {
+      if (offset1 != offset2)
+	return return_false_with_msg ("different memory access offset");
+
+      tree_code c = TREE_CODE (a1);
+
+      if (a1 != t1 && a2 != t2)
+	return compare_operand (a1, a2, c == MEM_REF || c == ADDR_EXPR);
+    }
 
   switch (TREE_CODE (t1))
     {
@@ -486,14 +506,20 @@ func_checker::compare_operand (tree t1, tree t2)
 	we seek for equivalency classes, so simply require inclussion in
 	both directions.  */
 
-	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2)))
+	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2),
+					       true))
 	  return return_false ();
 
-	if (!compare_operand (x1, x2))
+	if (!compare_operand (x1, x2, true))
 	  return return_false_with_msg ("");
 
 	/* Type of the offset on MEM_REF does not matter.  */
-	return wi::to_offset  (y1) == wi::to_offset  (y2);
+	bool r = wi::to_offset (y1) == wi::to_offset (y2);
+
+	if (!r)
+	  return return_false ();
+
+	return true;
       }
     case COMPONENT_REF:
       {
@@ -535,7 +561,8 @@ func_checker::compare_operand (tree t1, tree t2)
 	x1 = TREE_OPERAND (t1, 0);
 	x2 = TREE_OPERAND (t2, 0);
 
-	ret = compare_operand (x1, x2);
+	ret = compare_operand (x1, x2, true);
+	compare_operand (x1, x2, true);
 	return return_with_debug (ret);
       }
     case BIT_FIELD_REF:

@@ -213,7 +213,7 @@ public:
   /* Function responsible for comparison of various operands T1 and T2.
      If these components, from functions FUNC1 and FUNC2, are equal, true
      is returned.  */
-  bool compare_operand (tree t1, tree t2);
+  bool compare_operand (tree t1, tree t2, bool ignore_type = false);
 
   /* Compares two tree list operands T1 and T2 and returns true if these
      two trees are semantically equivalent.  */
@@ -235,7 +235,7 @@ public:
   /* Return true if types are compatible from perspective of ICF.
      FIRST_ARGUMENT indicates if the comparison is called for
      first parameter of a function.  */
-  static bool compatible_types_p (tree t1, tree t2);
+  static bool compatible_types_p (tree t1, tree t2, bool ignore_type = false);
 
 
 private:
