@@ -70,6 +70,13 @@ struct lra_live_range
     pool->remove ((lra_live_range *) ptr);
   }
 
+  /* Release memory allocator.  */
+  static inline void release_pool ()
+  {
+    if (pool != NULL)
+      pool->release ();
+  }
+
   /* Memory allocation pool.  */
   static pool_allocator<lra_live_range> *pool;
 };
@@ -87,6 +94,31 @@ struct lra_copy
   int regno1, regno2;
   /* Next copy with correspondingly REGNO1 and REGNO2.	*/
   lra_copy_t regno1_next, regno2_next;
+
+  /* Pool allocation new operator.  */
+  inline void *operator new (size_t)
+  {
+    if (pool == NULL)
+      pool = new pool_allocator <lra_copy> ("insn copies", 100);
+
+    return pool->allocate ();
+  }
+
+  /* Delete operator utilizing pool allocation.  */
+  inline void operator delete (void *ptr)
+  {
+    pool->remove ((lra_copy *) ptr);
+  }
+
+  /* Release memory allocator.  */
+  static inline void release_pool ()
+  {
+    if (pool != NULL)
+      pool->release ();
+  }
+
+  /* Memory allocation pool.  */
+  static pool_allocator<lra_copy> *pool;
 };
 
 /* Common info about a register (pseudo or hard register).  */
@@ -194,6 +226,31 @@ struct lra_insn_reg
   int regno;
   /* Next reg info of the same insn.  */
   struct lra_insn_reg *next;
+
+  /* Pool allocation new operator.  */
+  inline void *operator new (size_t)
+  {
+    if (pool == NULL)
+      pool = new pool_allocator <lra_insn_reg> ("lra regs", 100);
+
+    return pool->allocate ();
+  }
+
+  /* Delete operator utilizing pool allocation.  */
+  inline void operator delete (void *ptr)
+  {
+    pool->remove ((lra_insn_reg *) ptr);
+  }
+
+  /* Release memory allocator.  */
+  static inline void release_pool ()
+  {
+    if (pool != NULL)
+      pool->release ();
+  }
+
+  /* Memory allocation pool.  */
+  static pool_allocator<lra_insn_reg> *pool;
 };
 
 /* Static part (common info for insns with the same ICODE) of LRA
