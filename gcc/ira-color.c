@@ -1166,15 +1166,14 @@ setup_profitable_hard_regs (void)
    allocnos.  */
 
 /* Pool for update cost records.  */
-static alloc_pool update_cost_record_pool;
+static pool_allocator <update_cost_record> *update_cost_record_pool = NULL;
 
 /* Initiate update cost records.  */
 static void
 init_update_cost_records (void)
 {
-  update_cost_record_pool
-    = create_alloc_pool ("update cost records",
-			 sizeof (struct update_cost_record), 100);
+  update_cost_record_pool = new pool_allocator <update_cost_record>
+    ("update cost records", 100);
 }
 
 /* Return new update cost record with given params.  */
@@ -1184,7 +1183,7 @@ get_update_cost_record (int hard_regno, int divisor,
 {
   struct update_cost_record *record;
 
-  record = (struct update_cost_record *) pool_alloc (update_cost_record_pool);
+  record = update_cost_record_pool->allocate ();
   record->hard_regno = hard_regno;
   record->divisor = divisor;
   record->next = next;
@@ -1200,7 +1199,7 @@ free_update_cost_record_list (struct update_cost_record *list)
   while (list != NULL)
     {
       next = list->next;
-      pool_free (update_cost_record_pool, list);
+      update_cost_record_pool->remove (list);
       list = next;
     }
 }
@@ -1209,7 +1208,8 @@ free_update_cost_record_list (struct update_cost_record *list)
 static void
 finish_update_cost_records (void)
 {
-  free_alloc_pool (update_cost_record_pool);
+  delete update_cost_record_pool;
+  update_cost_record_pool = NULL;
 }
 
 /* Array whose element value is TRUE if the corresponding hard
