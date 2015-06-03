@@ -4121,7 +4121,7 @@ cp_make_fname_decl (location_t loc, tree id, int type_dep)
       pushdecl_top_level_and_finish (decl, init);
     }
 
-  return decl;
+  return decay_conversion (DECL_INITIAL (decl), tf_warning_or_error);
 }
 
 static tree
