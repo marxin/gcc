@@ -356,6 +356,15 @@ public:
   /* Return true if parameter I may be used.  */
   bool param_used_p (unsigned int i);
 
+  /* Set a new function checker.  */
+  void set_checker (ipa_icf_gimple::func_checker *checker)
+  {
+    if (m_checker)
+      delete m_checker;
+
+    m_checker = checker;
+  }
+
 private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
   hashval_t get_bb_hash (const ipa_icf_gimple::sem_bb *basic_block);

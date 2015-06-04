@@ -49,6 +49,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "expr.h"
 #include "gimple-iterator.h"
 #include "gimple-ssa.h"
+#include "tree-phinodes.h"
+#include "ssa-iterators.h"
 #include "tree-cfg.h"
 #include "stringpool.h"
 #include "tree-dfa.h"
@@ -80,14 +82,14 @@ namespace ipa_icf_gimple {
 
 func_checker::func_checker (tree source_func_decl, tree target_func_decl,
 			    bool compare_polymorphic,
-			    bool ignore_labels,
+			    bool tail_merge_mode,
 			    hash_set<symtab_node *> *ignored_source_nodes,
 			    hash_set<symtab_node *> *ignored_target_nodes)
   : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
     m_ignored_source_nodes (ignored_source_nodes),
     m_ignored_target_nodes (ignored_target_nodes),
     m_compare_polymorphic (compare_polymorphic),
-    m_ignore_labels (ignore_labels)
+    m_tail_merge_mode (tail_merge_mode)
 {
   function *source_func = DECL_STRUCT_FUNCTION (source_func_decl);
   function *target_func = DECL_STRUCT_FUNCTION (target_func_decl);
@@ -116,13 +118,17 @@ func_checker::~func_checker ()
 /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
 
 bool
-func_checker::compare_ssa_name (tree t1, tree t2)
+func_checker::compare_ssa_name (tree t1, tree t2, bool strict)
 {
   gcc_assert (TREE_CODE (t1) == SSA_NAME);
   gcc_assert (TREE_CODE (t2) == SSA_NAME);
 
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
+
+  if (strict && m_tail_merge_mode)
+    return t1 == t2 ||
+      (m_source_ssa_names[i1] != -1 && m_source_ssa_names[i1] == (int) i2);
 
   if (m_source_ssa_names[i1] == -1)
     m_source_ssa_names[i1] = i2;
@@ -270,7 +276,7 @@ func_checker::compatible_types_p (tree t1, tree t2)
 /* Function compare for equality given memory operands T1 and T2.  */
 
 bool
-func_checker::compare_memory_operand (tree t1, tree t2)
+func_checker::compare_memory_operand (tree t1, tree t2, bool strict)
 {
   if (!t1 && !t2)
     return true;
@@ -338,7 +344,7 @@ func_checker::compare_memory_operand (tree t1, tree t2)
 	return return_false_with_msg ("different dependence info");
     }
 
-  return compare_operand (t1, t2);
+  return compare_operand (t1, t2, strict);
 }
 
 /* Function compare for equality given trees T1 and T2 which
@@ -404,7 +410,7 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
    is returned.  */
 
 bool
-func_checker::compare_operand (tree t1, tree t2)
+func_checker::compare_operand (tree t1, tree t2, bool strict)
 {
   tree x1, x2, y1, y2, z1, z2;
   bool ret;
@@ -497,7 +503,8 @@ func_checker::compare_operand (tree t1, tree t2)
     /* Virtual table call.  */
     case OBJ_TYPE_REF:
       {
-	if (!compare_ssa_name (OBJ_TYPE_REF_EXPR (t1), OBJ_TYPE_REF_EXPR (t2)))
+	if (!compare_ssa_name (OBJ_TYPE_REF_EXPR (t1), OBJ_TYPE_REF_EXPR (t2),
+			       strict))
 	  return return_false ();
 	if (opt_for_fn (m_source_func_decl, flag_devirtualize)
 	    && virtual_method_call_p (t1))
@@ -541,7 +548,7 @@ func_checker::compare_operand (tree t1, tree t2)
 	return return_with_debug (ret);
       }
     case SSA_NAME:
-	return compare_ssa_name (t1, t2);
+	return compare_ssa_name (t1, t2, strict);
     case INTEGER_CST:
     case COMPLEX_CST:
     case VECTOR_CST:
@@ -637,6 +644,61 @@ func_checker::parse_labels (sem_bb *bb)
     }
 }
 
+static bool
+stmt_local_def (gimple stmt)
+{
+  basic_block bb, def_bb;
+  imm_use_iterator iter;
+  use_operand_p use_p;
+  tree val;
+  def_operand_p def_p;
+
+  if (gimple_has_side_effects (stmt)
+      || stmt_could_throw_p (stmt)
+      || gimple_vdef (stmt) != NULL_TREE)
+    return false;
+
+  def_p = SINGLE_SSA_DEF_OPERAND (stmt, SSA_OP_DEF);
+  if (def_p == NULL)
+    return false;
+
+  val = DEF_FROM_PTR (def_p);
+  if (val == NULL_TREE || TREE_CODE (val) != SSA_NAME)
+    return false;
+
+  def_bb = gimple_bb (stmt);
+
+  FOR_EACH_IMM_USE_FAST (use_p, iter, val)
+    {
+      if (is_gimple_debug (USE_STMT (use_p)))
+	continue;
+      bb = gimple_bb (USE_STMT (use_p));
+      if (bb == def_bb)
+	continue;
+
+      if (gimple_code (USE_STMT (use_p)) == GIMPLE_PHI
+	  && EDGE_PRED (bb, PHI_ARG_INDEX_FROM_USE (use_p))->src == def_bb)
+	continue;
+
+      return false;
+    }
+
+  return true;
+}
+
+
+/* Advance the iterator to the next non-local gimple statement.  */
+
+static inline void
+gsi_next_nonlocal (gimple_stmt_iterator *i)
+{
+  while (!gsi_end_p (*i) && stmt_local_def (gsi_stmt (*i)))
+    {
+      gsi_next (i);
+    }
+}
+
+
 /* Basic block equivalence comparison function that returns true if
    basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.
 
@@ -645,7 +707,7 @@ func_checker::parse_labels (sem_bb *bb)
    is utilized by every statement-by-statement comparison function.  */
 
 bool
-func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
+func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2, bool skip_local_defs)
 {
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
@@ -653,13 +715,22 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
   gsi1 = gsi_start_bb_nondebug (bb1->bb);
   gsi2 = gsi_start_bb_nondebug (bb2->bb);
 
-  while (!gsi_end_p (gsi1))
+  while (true)
     {
-      if (gsi_end_p (gsi2))
-	return return_false ();
+      if (skip_local_defs)
+	{
+	  gsi_next_nonlocal (&gsi1);
+	  gsi_next_nonlocal (&gsi2);
+	}
+
+      if (gsi_end_p (gsi1) || gsi_end_p (gsi2))
+	break;
 
       s1 = gsi_stmt (gsi1);
       s2 = gsi_stmt (gsi2);
+
+//      fprintf (stderr, "comparing\n");
+//      debug_gimple_stmt (s1);
 
       int eh1 = lookup_stmt_eh_lp_fn
 		(DECL_STRUCT_FUNCTION (m_source_func_decl), s1);
@@ -734,7 +805,7 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
       gsi_next_nondebug (&gsi2);
     }
 
-  if (!gsi_end_p (gsi2))
+  if (!gsi_end_p (gsi1) || !gsi_end_p (gsi2))
     return return_false ();
 
   return true;
@@ -800,7 +871,7 @@ func_checker::compare_gimple_call (gcall *s1, gcall *s2)
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
 
-  return compare_memory_operand (t1, t2);
+  return compare_memory_operand (t1, t2, false);
 }
 
 
@@ -831,7 +902,7 @@ func_checker::compare_gimple_assign (gimple s1, gimple s2)
       arg1 = gimple_op (s1, i);
       arg2 = gimple_op (s2, i);
 
-      if (!compare_memory_operand (arg1, arg2))
+      if (!compare_memory_operand (arg1, arg2, i != 0))
 	return return_false_with_msg ("memory operands are different");
     }
 
@@ -880,7 +951,7 @@ func_checker::compare_tree_ssa_label (tree t1, tree t2)
 bool
 func_checker::compare_gimple_label (const glabel *g1, const glabel *g2)
 {
-  if (m_ignore_labels)
+  if (m_tail_merge_mode)
     return true;
 
   tree t1 = gimple_label_label (g1);

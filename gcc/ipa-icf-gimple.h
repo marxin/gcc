@@ -138,7 +138,7 @@ public:
      of declarations that can be skipped.  */
   func_checker (tree source_func_decl, tree target_func_decl,
 		bool compare_polymorphic,
-		bool ignore_labels = false,
+		bool tail_merge_mode = false,
 		hash_set<symtab_node *> *ignored_source_nodes = NULL,
 		hash_set<symtab_node *> *ignored_target_nodes = NULL);
 
@@ -151,10 +151,10 @@ public:
 
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 correspond.  */
-  bool compare_bb (sem_bb *bb1, sem_bb *bb2);
+  bool compare_bb (sem_bb *bb1, sem_bb *bb2, bool skip_local_defs = false);
 
   /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
-  bool compare_ssa_name (tree t1, tree t2);
+  bool compare_ssa_name (tree t1, tree t2, bool strict = true);
 
   /* Verification function for edges E1 and E2.  */
   bool compare_edge (edge e1, edge e2);
@@ -204,7 +204,7 @@ public:
   bool compare_tree_ssa_label (tree t1, tree t2);
 
   /* Function compare for equality given memory operands T1 and T2.  */
-  bool compare_memory_operand (tree t1, tree t2);
+  bool compare_memory_operand (tree t1, tree t2, bool strict = true);
 
   /* Function compare for equality given trees T1 and T2 which
      can be either a constant or a declaration type.  */
@@ -213,7 +213,7 @@ public:
   /* Function responsible for comparison of various operands T1 and T2.
      If these components, from functions FUNC1 and FUNC2, are equal, true
      is returned.  */
-  bool compare_operand (tree t1, tree t2);
+  bool compare_operand (tree t1, tree t2, bool strict = false);
 
   /* Compares two tree list operands T1 and T2 and returns true if these
      two trees are semantically equivalent.  */
@@ -271,8 +271,8 @@ private:
   /* Flag if polymorphic comparison should be executed.  */
   bool m_compare_polymorphic;
 
-  /* Flag if ignore labels in comparison.  */
-  bool m_ignore_labels;
+  /* Flag which changes behavior for tree-ssa-tail-merge pass.  */
+  bool m_tail_merge_mode;
 };
 
 } // ipa_icf_gimple namespace
