@@ -932,7 +932,9 @@ compute_ltrans_boundary (lto_symtab_encoder_t in_encoder)
 	{
 	  varpool_node *origin_node
 	    = varpool_node::get (DECL_ABSTRACT_ORIGIN (vnode->decl));
-	  lto_set_symtab_encoder_in_partition (encoder, origin_node);
+
+	  if (origin_node)
+	    lto_set_symtab_encoder_in_partition (encoder, origin_node);
 	}
     }
   /* Pickle in also the initializer of all referenced readonly variables
