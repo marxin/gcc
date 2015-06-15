@@ -388,6 +388,9 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
       }
     case LABEL_DECL:
       {
+	if (m_tail_merge_mode)
+	  return t1 == t2;
+
 	int *bb1 = m_label_bb_map.get (t1);
 	int *bb2 = m_label_bb_map.get (t2);
 

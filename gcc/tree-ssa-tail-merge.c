@@ -192,10 +192,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm.h"
 #include "alias.h"
 #include "symtab.h"
+#include "wide-int.h"
+#include "inchash.h"
+#include "real.h"
 #include "tree.h"
 #include "fold-const.h"
 #include "stor-layout.h"
 #include "trans-mem.h"
+#include "inchash.h"
 #include "tm_p.h"
 #include "predict.h"
 #include "hard-reg-set.h"
@@ -206,6 +210,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgcleanup.h"
 #include "basic-block.h"
 #include "flags.h"
+#include "hash-table.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
 #include "tree-eh.h"
@@ -1276,7 +1281,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
   sem_bb sem_bb1 = sem_bb (bb1, 0, 0); // TODO
   sem_bb sem_bb2 = sem_bb (bb2, 0, 0); // TODO
 
-  func_checker *checker = new func_checker (f.decl, f.decl, true);
+  func_checker *checker = new func_checker (f.decl, f.decl, true, true);
   f.set_checker (checker);
   bool r = checker->compare_bb (&sem_bb1, &sem_bb2, true);
 
