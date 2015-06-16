@@ -1256,7 +1256,9 @@ check_edges_correspondence (basic_block bb1, basic_block bb2)
     {
       ei_cond (ei2, &e2);
 
-      if (e1->dest->index != e2->dest->index || (e1->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)) != (e2->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)))
+      if (e1->dest->index != e2->dest->index ||
+	  (e1->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE))
+	  != (e2->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)))
 	return false;
 
       ei_next (&ei2);
@@ -1283,7 +1285,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
 
   func_checker *checker = new func_checker (f.decl, f.decl, true, true);
   f.set_checker (checker);
-  bool r = checker->compare_bb (&sem_bb1, &sem_bb2, true);
+  bool r = checker->compare_bb_tail_merge (&sem_bb1, &sem_bb2);
 
   gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
   gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
@@ -1330,7 +1332,7 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
      which potentially means the semantics of one of the blocks will be changed.
      TODO: make this check more precise.  */
   if (vuse_escaped && vuse1 != vuse2)
-    goto diff;
+    return;
 
   if (dump_file)
     fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
@@ -1343,6 +1345,11 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
 diff:
   if (!check_edges_correspondence (bb1, bb2))
     return;
+
+  /*
+  if (dump_file)
+    dump_function_to_file (f.decl, dump_file, 0);
+  */
 
   if (r)
     {

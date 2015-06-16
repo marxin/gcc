@@ -1009,7 +1009,7 @@ sem_function::equals_private (sem_item *item)
 
   /* Basic block PHI nodes comparison.  */
   for (unsigned i = 0; i < bb_sorted.length (); i++)
-    if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb))
+    if (!m_checker->compare_phi_node (bb_sorted[i], m_compared_func->bb_sorted[i]))
       return return_false_with_msg ("PHI node comparison returns false");
 
   return result;
@@ -1783,6 +1783,36 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
     }
 
   return true;
+
+/* Parses function arguments and result type.  */
+
+void
+sem_function::parse_tree_args (void)
+{
+  tree result;
+
+  if (arg_types.exists ())
+    arg_types.release ();
+
+  arg_types.create (4);
+  tree fnargs = DECL_ARGUMENTS (decl);
+
+  for (tree parm = fnargs; parm; parm = DECL_CHAIN (parm))
+    arg_types.safe_push (DECL_ARG_TYPE (parm));
+
+  /* Function result type.  */
+  result = DECL_RESULT (decl);
+  result_type = result ? TREE_TYPE (result) : NULL;
+
+  /* During WPA, we can get arguments by following method.  */
+  if (!fnargs)
+    {
+      tree type = TYPE_ARG_TYPES (TREE_TYPE (decl));
+      for (tree parm = type; parm; parm = TREE_CHAIN (parm))
+	arg_types.safe_push (TYPE_CANONICAL (TREE_VALUE (parm)));
+
+      result_type = TREE_TYPE (TREE_TYPE (decl));
+    }
 }
 
 /* Returns true if tree T can be compared as a handled component.  */

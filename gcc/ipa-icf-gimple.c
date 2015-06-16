@@ -27,6 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "options.h"
 #include "tree.h"
 #include "fold-const.h"
+#include "trans-mem.h"
 #include "predict.h"
 #include "tm.h"
 #include "hard-reg-set.h"
@@ -701,6 +702,84 @@ gsi_next_nonlocal (gimple_stmt_iterator *i)
     }
 }
 
+/* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
+   return true if phi nodes are semantically equivalent in these blocks .  */
+
+bool
+func_checker::compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2)
+{
+  gphi_iterator si1, si2;
+  gphi *phi1, *phi2;
+  unsigned size1, size2, i;
+  tree t1, t2;
+  edge e1, e2;
+
+  basic_block bb1 = sem_bb1->bb;
+  basic_block bb2 = sem_bb2->bb;
+
+  gcc_assert (bb1 != NULL);
+  gcc_assert (bb2 != NULL);
+
+  si2 = gsi_start_phis (bb2);
+  for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1);
+       gsi_next (&si1))
+    {
+      gsi_next_nonvirtual_phi (&si1);
+      gsi_next_nonvirtual_phi (&si2);
+
+      if (gsi_end_p (si1) && gsi_end_p (si2))
+	break;
+
+      if (gsi_end_p (si1) || gsi_end_p (si2))
+	return return_false();
+
+      phi1 = si1.phi ();
+      phi2 = si2.phi ();
+
+      tree phi_result1 = gimple_phi_result (phi1);
+      tree phi_result2 = gimple_phi_result (phi2);
+
+      if (!compare_operand (phi_result1, phi_result2))
+	return return_false_with_msg ("PHI results are different");
+
+      size1 = gimple_phi_num_args (phi1);
+      size2 = gimple_phi_num_args (phi2);
+
+      if (size1 != size2)
+	return return_false ();
+
+      for (i = 0; i < size1; ++i)
+	{
+	  t1 = gimple_phi_arg (phi1, i)->def;
+	  t2 = gimple_phi_arg (phi2, i)->def;
+
+	  if (!compare_operand (t1, t2))
+	    return return_false ();
+
+	  e1 = gimple_phi_arg_edge (phi1, i);
+	  e2 = gimple_phi_arg_edge (phi2, i);
+
+	  if (!compare_edge (e1, e2))
+	    return return_false ();
+	}
+
+      gsi_next (&si2);
+    }
+
+  return true;
+}
+
+bool
+func_checker::compare_bb_tail_merge (sem_bb *bb1, sem_bb *bb2)
+{
+  if (!compare_bb (bb1, bb2))
+    return return_false_with_msg ("BB are different");
+
+  if (!compare_phi_node (bb1, bb2))
+    return return_false_with_msg ("PHI nodes are different");
+
+  return true;
+}
 
 /* Basic block equivalence comparison function that returns true if
    basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.
@@ -710,7 +789,7 @@ gsi_next_nonlocal (gimple_stmt_iterator *i)
    is utilized by every statement-by-statement comparison function.  */
 
 bool
-func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2, bool skip_local_defs)
+func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
 {
   gimple_stmt_iterator gsi1, gsi2;
   gimple s1, s2;
@@ -720,7 +799,7 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2, bool skip_local_defs)
 
   while (true)
     {
-      if (skip_local_defs)
+      if (m_tail_merge_mode)
 	{
 	  gsi_next_nonlocal (&gsi1);
 	  gsi_next_nonlocal (&gsi2);
@@ -732,8 +811,12 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2, bool skip_local_defs)
       s1 = gsi_stmt (gsi1);
       s2 = gsi_stmt (gsi2);
 
-//      fprintf (stderr, "comparing\n");
-//      debug_gimple_stmt (s1);
+      /* What could be better than to this this here is to blacklist the bb
+	 containing the stmt, when encountering the stmt f.i. in
+	 same_succ_hash.  */
+      if (is_tm_ending (s1)
+	  || is_tm_ending (s2))
+	return return_false_with_msg ("TM endings are different");
 
       int eh1 = lookup_stmt_eh_lp_fn
 		(DECL_STRUCT_FUNCTION (m_source_func_decl), s1);

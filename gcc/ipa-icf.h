@@ -369,11 +369,6 @@ private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
   hashval_t get_bb_hash (const ipa_icf_gimple::sem_bb *basic_block);
 
-  /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
-     true value is returned if phi nodes are semantically
-     equivalent in these blocks .  */
-  bool compare_phi_node (basic_block bb1, basic_block bb2);
-
   /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
      corresponds to TARGET.  */
   bool bb_dict_test (vec<int> *bb_dict, int source, int target);

@@ -149,9 +149,16 @@ public:
      mapping between basic blocks and labels.  */
   void parse_labels (sem_bb *bb);
 
+  /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
+     true value is returned if phi nodes are semantically
+     equivalent in these blocks .  */
+  bool compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2);
+
+  bool compare_bb_tail_merge (sem_bb *bb1, sem_bb *bb2);
+
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 correspond.  */
-  bool compare_bb (sem_bb *bb1, sem_bb *bb2, bool skip_local_defs = false);
+  bool compare_bb (sem_bb *bb1, sem_bb *bb2);
 
   /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
   bool compare_ssa_name (tree t1, tree t2, bool strict = true);
