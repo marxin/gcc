@@ -127,9 +127,12 @@ func_checker::compare_ssa_name (tree t1, tree t2, bool strict)
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
 
+  // TODO: fixme
+  /*
   if (strict && m_tail_merge_mode)
     return t1 == t2 ||
       (m_source_ssa_names[i1] != -1 && m_source_ssa_names[i1] == (int) i2);
+  */
 
   if (m_source_ssa_names[i1] == -1)
     m_source_ssa_names[i1] = i2;
@@ -649,7 +652,25 @@ func_checker::parse_labels (sem_bb *bb)
 }
 
 static bool
-stmt_local_def (gimple stmt)
+is_ssa_name_in_set (tree ssa_name, hash_set <tree> *ssa_names_set)
+{
+  if (ssa_name == NULL || TREE_CODE (ssa_name) != SSA_NAME)
+    return false;
+
+  return ssa_names_set->contains (ssa_name);
+}
+
+void
+static add_ssa_name_to_set (tree ssa_name, hash_set <tree> *ssa_names_set)
+{
+  if (ssa_name == NULL || TREE_CODE (ssa_name) != SSA_NAME)
+    return;
+
+  ssa_names_set->add (ssa_name);
+}
+
+static bool
+stmt_local_def (gimple stmt, hash_set <tree> *ssa_names_set)
 {
   basic_block bb, def_bb;
   imm_use_iterator iter;
@@ -657,9 +678,10 @@ stmt_local_def (gimple stmt)
   tree val;
   def_operand_p def_p;
 
-  if (gimple_has_side_effects (stmt)
-      || stmt_could_throw_p (stmt)
-      || gimple_vdef (stmt) != NULL_TREE)
+  if (gimple_vdef (stmt) != NULL_TREE
+      || gimple_has_side_effects (stmt)
+      || gimple_could_trap_p_1 (stmt, false, false)
+      || gimple_vuse (stmt) != NULL_TREE)
     return false;
 
   def_p = SINGLE_SSA_DEF_OPERAND (stmt, SSA_OP_DEF);
@@ -687,6 +709,10 @@ stmt_local_def (gimple stmt)
       return false;
     }
 
+  for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
+    if (is_ssa_name_in_set (gimple_op (stmt, i), ssa_names_set))
+      return false;
+
   return true;
 }
 
@@ -694,9 +720,10 @@ stmt_local_def (gimple stmt)
 /* Advance the iterator to the next non-local gimple statement.  */
 
 static inline void
-gsi_next_nonlocal (gimple_stmt_iterator *i)
+gsi_next_nonlocal (gimple_stmt_iterator *i, hash_set <tree> *ssa_names_set)
 {
-  while (!gsi_end_p (*i) && stmt_local_def (gsi_stmt (*i)))
+  while (!gsi_end_p (*i) &&
+	 (is_gimple_debug (gsi_stmt (*i)) || stmt_local_def (gsi_stmt (*i), ssa_names_set)))
     {
       gsi_next (i);
     }
@@ -769,6 +796,64 @@ func_checker::compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2)
   return true;
 }
 
+static
+void
+build_use_set (basic_block bb, hash_set <tree> *ssa_names_set)  
+{
+  gimple_stmt_iterator gsi = gsi_last_nondebug_bb (bb);
+
+  while (!gsi_end_p (gsi))
+    {
+      gimple stmt = gsi_stmt (gsi);
+
+      switch (gimple_code (stmt))
+	{
+	  case GIMPLE_ASSIGN:
+	    {
+	      tree lhs = gimple_assign_lhs (stmt);
+	      if (is_ssa_name_in_set (lhs, ssa_names_set))
+		{
+		  add_ssa_name_to_set (gimple_assign_rhs1 (stmt), ssa_names_set);
+		  add_ssa_name_to_set (gimple_assign_rhs2 (stmt), ssa_names_set);
+		  add_ssa_name_to_set (gimple_assign_rhs3 (stmt), ssa_names_set);
+		}
+	      break;
+	    }
+	  case GIMPLE_COND:
+	    {
+	      add_ssa_name_to_set (gimple_cond_lhs (stmt), ssa_names_set);
+	      add_ssa_name_to_set (gimple_cond_rhs (stmt), ssa_names_set);
+
+	      break;
+	    }
+	  case GIMPLE_SWITCH:
+	    {
+	      add_ssa_name_to_set (gimple_switch_index (as_a <gswitch *> (stmt)), ssa_names_set);
+
+	      break;
+	    }
+	  case GIMPLE_CALL:
+	    {
+	      if (is_ssa_name_in_set (gimple_call_lhs (stmt), ssa_names_set))
+		for (unsigned i = 0; i < gimple_call_num_args (stmt); i++)
+		  add_ssa_name_to_set (gimple_call_arg (stmt, i),
+				       ssa_names_set);
+
+	      break;
+	    }
+	  case GIMPLE_RETURN:
+	    {
+	      add_ssa_name_to_set (gimple_return_retval (as_a <greturn *>(stmt)), ssa_names_set);
+	      break;
+	    }
+	  default:
+	    break;
+	}
+
+      gsi_prev_nondebug (&gsi);
+    }
+}
+
 bool
 func_checker::compare_bb_tail_merge (sem_bb *bb1, sem_bb *bb2)
 {
@@ -797,12 +882,17 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
   gsi1 = gsi_start_bb_nondebug (bb1->bb);
   gsi2 = gsi_start_bb_nondebug (bb2->bb);
 
+  hash_set <tree> ssa_names_set1 (13);
+  hash_set <tree> ssa_names_set2 (13);
+  build_use_set (bb1->bb, &ssa_names_set1);
+  build_use_set (bb2->bb, &ssa_names_set2);
+
   while (true)
     {
       if (m_tail_merge_mode)
 	{
-	  gsi_next_nonlocal (&gsi1);
-	  gsi_next_nonlocal (&gsi2);
+	  gsi_next_nonlocal (&gsi1, &ssa_names_set1);
+	  gsi_next_nonlocal (&gsi2, &ssa_names_set2);
 	}
 
       if (gsi_end_p (gsi1) || gsi_end_p (gsi2))
@@ -823,7 +913,8 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
       int eh2 = lookup_stmt_eh_lp_fn
 		(DECL_STRUCT_FUNCTION (m_target_func_decl), s2);
 
-      if (eh1 != eh2)
+      // TODO: fixme
+      if (eh1 != eh2 && !m_tail_merge_mode)
 	return return_false_with_msg ("EH regions are different");
 
       if (gimple_code (s1) != gimple_code (s2))

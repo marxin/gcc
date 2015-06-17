@@ -1324,6 +1324,13 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
 	  fprintf (dump_file, "===BB2===\n");
 	  dump_bb (dump_file, bb2, 0, TDF_DETAILS);
 	  fprintf (dump_file, "===END===\n");
+
+  func_checker *checker = new func_checker (f.decl, f.decl, true, true);
+  f.set_checker (checker);
+  checker->compare_bb_tail_merge (&sem_bb1, &sem_bb2);
+
+
+	  gcc_unreachable ();
 	}
     }
 
