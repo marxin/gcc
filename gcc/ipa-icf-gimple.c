@@ -806,7 +806,7 @@ build_use_set (basic_block bb, hash_set <tree> *ssa_names_set)
   while (!gsi_end_p (gsi))
     {
       gimple stmt = gsi_stmt (gsi);
-      if (stmt_local_def (stmt, NULL))
+      if (!stmt_local_def (stmt, NULL))
 	for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
 	  add_ssa_name_to_set (gimple_op (stmt, i), ssa_names_set);
 
