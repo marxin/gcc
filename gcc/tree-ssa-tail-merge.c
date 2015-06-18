@@ -1354,10 +1354,8 @@ diff:
   if (!check_edges_correspondence (bb1, bb2))
     return;
 
-  /*
   if (dump_file)
     dump_function_to_file (f.decl, dump_file, 0);
-  */
 
   if (r)
     {

@@ -127,12 +127,9 @@ func_checker::compare_ssa_name (tree t1, tree t2, bool strict)
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
 
-  // TODO: fixme
-  /*
   if (strict && m_tail_merge_mode)
     return t1 == t2 ||
       (m_source_ssa_names[i1] != -1 && m_source_ssa_names[i1] == (int) i2);
-  */
 
   if (m_source_ssa_names[i1] == -1)
     m_source_ssa_names[i1] = i2;
@@ -377,7 +374,12 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
 	 before we start comparing bodies.  */
       return m_tail_merge_mode ? t1 == t2 : true;
     case VAR_DECL:
-      return return_with_debug (compare_variable_decl (t1, t2));
+      {
+	  if (m_tail_merge_mode)
+	    return t1 == t2;
+
+	  return return_with_debug (compare_variable_decl (t1, t2));
+	}
     case FIELD_DECL:
       {
 	tree offset1 = DECL_FIELD_OFFSET (t1);
@@ -405,6 +407,9 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
     case RESULT_DECL:
     case CONST_DECL:
       {
+	if (m_tail_merge_mode)
+	  return t1 == t2;
+
 	ret = compare_decl (t1, t2);
 	return return_with_debug (ret);
       }
