@@ -234,6 +234,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "ipa-icf-gimple.h"
 #include "ipa-icf.h"
+#include "dbgcnt.h"
 
 using namespace ipa_icf;
 using namespace ipa_icf_gimple;
@@ -1370,7 +1371,13 @@ diff:
 	  fprintf (dump_file, "===END===\n");
 	}
 
-      set_cluster (bb1, bb2);
+
+  func_checker *checker = new func_checker (f.decl, f.decl, true, true);
+  f.set_checker (checker);
+  checker->compare_bb_tail_merge (&sem_bb1, &sem_bb2);
+
+      if (dbg_cnt (tail_merge))
+	set_cluster (bb1, bb2);
     }
 }
 

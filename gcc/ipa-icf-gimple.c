@@ -372,9 +372,10 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
 	return return_with_debug (ret);
       }
     case FUNCTION_DECL:
-      /* All function decls are in the symbol table and known to match
+      /* If we are called within an invocation of IPA ICF,
+	 all function decls are in the symbol table and known to match
 	 before we start comparing bodies.  */
-      return true;
+      return m_tail_merge_mode ? t1 == t2 : true;
     case VAR_DECL:
       return return_with_debug (compare_variable_decl (t1, t2));
     case FIELD_DECL:
@@ -710,7 +711,7 @@ stmt_local_def (gimple stmt, hash_set <tree> *ssa_names_set)
     }
 
   for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
-    if (is_ssa_name_in_set (gimple_op (stmt, i), ssa_names_set))
+    if (ssa_names_set && is_ssa_name_in_set (gimple_op (stmt, i), ssa_names_set))
       return false;
 
   return true;
@@ -796,11 +797,24 @@ func_checker::compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2)
   return true;
 }
 
-static
-void
+static void
 build_use_set (basic_block bb, hash_set <tree> *ssa_names_set)  
 {
-  gimple_stmt_iterator gsi = gsi_last_nondebug_bb (bb);
+  /* Build default set of important SSA names.  */
+  gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
+
+  while (!gsi_end_p (gsi))
+    {
+      gimple stmt = gsi_stmt (gsi);
+      if (stmt_local_def (stmt, NULL))
+	for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
+	  add_ssa_name_to_set (gimple_op (stmt, i), ssa_names_set);
+
+      gsi_next_nondebug (&gsi);
+    }
+
+  /* Process reverse run.  */
+  gsi = gsi_last_nondebug_bb (bb);
 
   while (!gsi_end_p (gsi))
     {
@@ -914,7 +928,7 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
 		(DECL_STRUCT_FUNCTION (m_target_func_decl), s2);
 
       // TODO: fixme
-      if (eh1 != eh2 && !m_tail_merge_mode)
+      if (eh1 != eh2)
 	return return_false_with_msg ("EH regions are different");
 
       if (gimple_code (s1) != gimple_code (s2))
