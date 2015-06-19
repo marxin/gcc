@@ -1147,9 +1147,6 @@ func_checker::compare_tree_ssa_label (tree t1, tree t2)
 bool
 func_checker::compare_gimple_label (const glabel *g1, const glabel *g2)
 {
-  if (m_tail_merge_mode)
-    return true;
-
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
 
