@@ -128,10 +128,6 @@ struct function_linkage_pair
   unsigned int offset;
 };
 
-/* Vector of function calls where we need to resolve function offsets.  */
-
-static auto_vec <function_linkage_pair> function_call_linkage;
-
 /* Add a new chunk, allocate data for it and initialize it.  */
 
 void
@@ -511,7 +507,6 @@ emit_directive_variable (struct hsa_symbol *symbol)
   dirvar.type = htole16 (symbol->type);
   dirvar.segment = symbol->segment;
   dirvar.align = get_alignment (dirvar.type);
-  gcc_assert (symbol->linkage);
   dirvar.linkage = symbol->linkage;
   dirvar.dim.lo = (uint32_t) symbol->dim;
   dirvar.dim.hi = (uint32_t) ((unsigned long long) symbol->dim >> 32);
@@ -522,11 +517,11 @@ emit_directive_variable (struct hsa_symbol *symbol)
   return symbol->directive_offset;
 }
 
-/* Emit directives describing the function, for example its input and output
-   arguments, local variables etc.  */
+/* Emit directives describing either a function declaration or
+   definition.  */
 
 static BrigDirectiveExecutable *
-emit_function_directives (void)
+emit_function_directives (hsa_function_representation &f)
 {
   struct BrigDirectiveExecutable fndir;
   unsigned name_offset, inarg_off, scoped_off, next_toplev_off;
@@ -534,38 +529,43 @@ emit_function_directives (void)
   BrigDirectiveExecutable *ptr_to_fndir;
   hsa_symbol *sym;
 
-  name_offset = brig_emit_string (hsa_cfun->name, '&');
+  name_offset = brig_emit_string (f.name, '&');
   inarg_off = brig_code.total_size + sizeof(fndir)
-    + (hsa_cfun->output_arg ? sizeof (struct BrigDirectiveVariable) : 0);
+    + (f.output_arg ? sizeof (struct BrigDirectiveVariable) : 0);
   scoped_off = inarg_off
-    + hsa_cfun->input_args_count * sizeof (struct BrigDirectiveVariable);
-  for (hash_table <hsa_noop_symbol_hasher>::iterator iter
-	 = hsa_cfun->local_symbols->begin ();
-       iter != hsa_cfun->local_symbols->end ();
-       ++iter)
-    if (TREE_CODE ((*iter)->decl) == VAR_DECL)
-      count++;
-  count += hsa_cfun->spill_symbols.length ();
+    + f.input_args_count * sizeof (struct BrigDirectiveVariable);
+
+  if (!f.declaration_p)
+    {
+      for (hash_table <hsa_noop_symbol_hasher>::iterator iter
+	     = f.local_symbols->begin ();
+	   iter != f.local_symbols->end ();
+	   ++iter)
+	if (TREE_CODE ((*iter)->decl) == VAR_DECL)
+	  count++;
+      count += f.spill_symbols.length ();
+    }
 
   next_toplev_off = scoped_off + count * sizeof (struct BrigDirectiveVariable);
 
   memset (&fndir, 0, sizeof (fndir));
   fndir.base.byteCount = htole16 (sizeof (fndir));
-  fndir.base.kind = htole16 (hsa_cfun->kern_p ? BRIG_KIND_DIRECTIVE_KERNEL
+  fndir.base.kind = htole16 (f.kern_p ? BRIG_KIND_DIRECTIVE_KERNEL
 			     : BRIG_KIND_DIRECTIVE_FUNCTION);
   fndir.name = htole32 (name_offset);
-  fndir.inArgCount = htole16 (hsa_cfun->input_args_count);
-  fndir.outArgCount = htole16 (hsa_cfun->output_arg ? 1 : 0);
+  fndir.inArgCount = htole16 (f.input_args_count);
+  fndir.outArgCount = htole16 (f.output_arg ? 1 : 0);
   fndir.firstInArg = htole32 (inarg_off);
   fndir.firstCodeBlockEntry = htole32 (scoped_off);
   fndir.nextModuleEntry = htole32 (next_toplev_off);
-  fndir.linkage = BRIG_LINKAGE_PROGRAM;
-  fndir.modifier.allBits |= BRIG_EXECUTABLE_DEFINITION;
+  fndir.linkage = f.kern_p || TREE_PUBLIC (f.decl) ? BRIG_LINKAGE_PROGRAM :
+    BRIG_LINKAGE_MODULE;
+
+  if (!f.declaration_p)
+    fndir.modifier.allBits |= BRIG_EXECUTABLE_DEFINITION;
   memset (&fndir.reserved, 0, sizeof (fndir.reserved));
 
-  if (!function_offsets)
-    function_offsets = new hash_map<tree, BrigCodeOffset32_t> ();
-  function_offsets->put (cfun->decl, brig_code.total_size);
+  function_offsets->put (f.decl, brig_code.total_size);
 
   brig_code.add (&fndir, sizeof (fndir));
   /* XXX terrible hack: we need to set instCount after we emit all
@@ -579,23 +579,27 @@ emit_function_directives (void)
                                     + brig_code.cur_chunk->size
                                     - sizeof (fndir));
 
-  if (hsa_cfun->output_arg)
-    emit_directive_variable(hsa_cfun->output_arg);
-  for (int i = 0; i < hsa_cfun->input_args_count; i++)
-    emit_directive_variable(&hsa_cfun->input_args[i]);
-  for (hash_table <hsa_noop_symbol_hasher>::iterator iter
-	 = hsa_cfun->local_symbols->begin ();
-       iter != hsa_cfun->local_symbols->end ();
-       ++iter)
+  if (f.output_arg)
+    emit_directive_variable (f.output_arg);
+  for (unsigned i = 0; i < f.input_args_count; i++)
+    emit_directive_variable (&f.input_args[i]);
+
+  if (!f.declaration_p)
     {
-      if (TREE_CODE ((*iter)->decl) == VAR_DECL)
-	brig_insn_count++;
-      emit_directive_variable(*iter);
-    }
-  for (int i = 0; hsa_cfun->spill_symbols.iterate (i, &sym); i++)
-    {
-      emit_directive_variable (sym);
-      brig_insn_count++;
+      for (hash_table <hsa_noop_symbol_hasher>::iterator iter
+	     = f.local_symbols->begin ();
+	   iter != f.local_symbols->end ();
+	   ++iter)
+	{
+	  if (TREE_CODE ((*iter)->decl) == VAR_DECL)
+	    brig_insn_count++;
+	  emit_directive_variable (*iter);
+	}
+      for (int i = 0; f.spill_symbols.iterate (i, &sym); i++)
+	{
+	  emit_directive_variable (sym);
+	  brig_insn_count++;
+	}
     }
 
   return ptr_to_fndir;
@@ -1003,6 +1007,20 @@ emit_queued_operands (void)
     }
 }
 
+/* Emit directives describing the function that is used for
+a function declaration.  */
+static void
+emit_function_declaration (tree decl)
+{
+  hsa_function_representation *f = generate_function_declaration (decl);
+
+  emit_function_directives (*f);
+  emit_queued_operands ();
+
+  f->release ();
+  delete f;
+}
+
 /* Emit an HSA memory instruction and all necessary directives, schedule
    necessary operands for writing .  */
 
@@ -1343,12 +1361,11 @@ emit_call_insn (hsa_insn_basic *insn)
   operand_offsets[0] = htole32 (enqueue_op (call->result_code_list));
 
   /* Operand 1: func */
-  /* XXX: we have to save offset to operand section and
-     called function offset is filled up after all functions are visited. */
+  BrigCodeOffset32_t *func_offset = function_offsets->get
+    (call->called_function);
+  gcc_assert (func_offset != NULL);
+  call->func.directive_offset = *func_offset;
   unsigned int offset = enqueue_op (&call->func);
-
-  function_call_linkage.safe_push
-    (function_linkage_pair (call->called_function, offset));
 
   operand_offsets[1] = htole32 (offset);
   /* Operand 2: in-args.  */
@@ -1589,7 +1606,21 @@ hsa_brig_emit_function (void)
   memset (&op_queue, 0, sizeof (op_queue));
   op_queue.projected_size = brig_operand.total_size;
 
-  ptr_to_fndir = emit_function_directives ();
+  if (!function_offsets)
+    function_offsets = new hash_map<tree, BrigCodeOffset32_t> ();
+
+  for (unsigned i = 0; i < hsa_cfun.called_functions.length (); i++)
+    {
+      tree called = hsa_cfun.called_functions[i];
+
+      if (function_offsets->get (called) == NULL)
+	{
+	  emit_function_declaration (called);
+	  gcc_assert (function_offsets->get (called) != NULL);
+	}
+    }
+
+  ptr_to_fndir = emit_function_directives (hsa_cfun);
   for (insn = hsa_bb_for_bb (ENTRY_BLOCK_PTR_FOR_FN (cfun))->first_insn;
        insn;
        insn = insn->next)
@@ -1802,30 +1833,6 @@ hsa_output_brig (void)
 
   if (!brig_initialized)
     return;
-
-  for (unsigned i = 0; i < function_call_linkage.length (); i++)
-    {
-      function_linkage_pair p = function_call_linkage[i];
-
-      if (!function_offsets)
-	{
-	  sorry ("Missing offset to a HSA function in call instruction");
-	  return;
-	}
-      BrigCodeOffset32_t *func_offset = function_offsets->get (p.function_decl);
-      if (*func_offset)
-        {
-	  BrigOperandCodeRef *code_ref = (BrigOperandCodeRef *)
-	    (brig_operand.get_ptr_by_offset (p.offset));
-	  gcc_assert (code_ref->base.kind == BRIG_KIND_OPERAND_CODE_REF);
-	  code_ref->ref = htole32 (*func_offset);
-	}
-      else
-	{
-	  sorry ("Missing offset to a HSA function in call instruction");
-	  return;
-	}
-    }
 
   saved_section = in_section;
 

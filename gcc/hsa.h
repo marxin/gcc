@@ -714,7 +714,7 @@ public:
   /* Input arguments of the function.  */
   /* FIXME: Normally we'd use a vector, however our C++ vectors seem to have
      problems with derived classes, so for now we'll use a simple array.  */
-  int input_args_count;
+  unsigned input_args_count;
 
   /* Number of allocated register structures.  */
   int reg_count;
@@ -726,6 +726,9 @@ public:
   hash_table <hsa_noop_symbol_hasher> *local_symbols;
   /* Vector of pointers to spill symbols.  */
   vec <struct hsa_symbol *> spill_symbols;
+
+  /* Vector of called function declarations.  */
+  vec <tree> called_functions;
 
   /* Instructions to be executed before the first BB from gimple.  It's label
    is zero and must not be referenced, of course there are no PHIs.  */
@@ -739,7 +742,29 @@ public:
 
   /* True if the function is kernel function.  */
   bool kern_p;
+
+  /* True if the function representation is a declaration.  */
+  bool declaration_p;
+
+  /* Function declaration tree.  */
+  tree decl;
 };
+
+/* Release internal data structures.  */
+
+inline void
+hsa_function_representation::release ()
+{
+  delete local_symbols;
+  free (input_args);
+  free (output_arg);
+
+  spill_symbols.release ();
+  called_functions.release ();
+
+  if (!kern_p)
+    free (name);
+}
 
 /* in hsa.c */
 extern struct hsa_function_representation *hsa_cfun;
@@ -758,6 +783,7 @@ tree hsa_get_decl_kernel_mapping_decl (unsigned i);
 char *hsa_get_decl_kernel_mapping_name (unsigned i);
 void hsa_free_decl_kernel_mapping (void);
 void hsa_sanitize_name (char *p);
+const char *get_declaration_name (tree decl);
 
 /* In hsa-gen.c.  */
 void hsa_build_append_simple_mov (hsa_op_reg *, hsa_op_base *, hsa_bb *);
@@ -765,6 +791,7 @@ hsa_symbol *hsa_get_spill_symbol (BrigType16_t);
 hsa_op_reg *hsa_spill_in (hsa_insn_basic *, hsa_op_reg *, hsa_op_reg **);
 hsa_op_reg *hsa_spill_out (hsa_insn_basic *, hsa_op_reg *, hsa_op_reg **);
 hsa_bb *hsa_init_new_bb (basic_block);
+hsa_function_representation *generate_function_declaration (tree decl);
 
 /* In hsa-regalloc.c.  */
 void hsa_regalloc (void);

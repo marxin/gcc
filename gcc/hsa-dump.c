@@ -869,17 +869,18 @@ dump_hsa_insn (FILE *f, hsa_insn_basic *insn, int indent)
   else if (is_a <hsa_insn_call *> (insn))
     {
       hsa_insn_call *call = as_a <hsa_insn_call *> (insn);
-      const char *name = xstrdup (IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (call->called_function)));
+      const char *name = get_declaration_name (call->called_function);
 
       fprintf (f, "call &%s", name);
 
       if (call->result_symbol)
-	fprintf (f, "(%%%s) ", call->result_symbol->name);
+	fprintf (f, "(%%res) ");
 
       fprintf (f, "(");
       for (unsigned i = 0; i < call->args_symbols.length (); i++)
         {
-	  fprintf (f, "%%%s", call->args_symbols[i]->name);
+	  fprintf (f, "%%__arg_%u", i);
+
 	  if (i != call->args_symbols.length () - 1)
 	    fprintf (f, ", ");
 	}
