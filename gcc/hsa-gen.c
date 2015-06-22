@@ -199,14 +199,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_bb;
 
   delete hsa_allocp_symbols;
-  delete hsa_cfun.local_symbols;
-  free (hsa_cfun.input_args);
-  free (hsa_cfun.output_arg);
-  /* Kernel names are deallocated at the end of BRIG output when deallocating
-     hsa_decl_kernel_mapping.  */
-  if (!hsa_cfun.kern_p)
-    free (hsa_cfun.name);
-  hsa_cfun.spill_symbols.release();
+  hsa_cfun.release ();
 }
 
 /* Return the type which holds addresses in the given SEGMENT.  */
@@ -510,10 +503,7 @@ get_symbol_for_decl (tree decl)
     }
 
   fillup_sym_for_decl (decl, sym);
-  if (!DECL_NAME (decl))
-    sorry ("Support for HSA does not implement anonymous declarations");
-  else
-    sym->name = IDENTIFIER_POINTER (DECL_NAME (decl));
+  sym->name = get_declaration_name (decl);
   *slot = sym;
   return sym;
 }
@@ -830,7 +820,7 @@ hsa_append_insn_after (hsa_insn_basic *new_insn, hsa_insn_basic *old_insn)
    SSA names to HSA registers.  Append an new conversion statements to HBB.  */
 
 static hsa_op_reg *
-hsa_reg_for_gimple_ssa_reqtype (tree ssa, vec <hsa_op_reg_p> ssa_map,
+hsa_reg_for_gimple_ssa_reqtype (tree ssa, vec <hsa_op_reg_p> &ssa_map,
 				hsa_bb *hbb, BrigType16_t reqtype)
 {
   hsa_op_reg *reg = hsa_reg_for_gimple_ssa (ssa, ssa_map);
@@ -957,7 +947,7 @@ add_addr_regs_if_needed (hsa_op_reg *r1, hsa_op_reg *r2, hsa_bb *hbb)
 static void
 process_mem_base (tree base, hsa_symbol **symbol, BrigType16_t *addrtype,
 		  hsa_op_reg **reg, offset_int *offset, hsa_bb *hbb,
-		  vec <hsa_op_reg_p> ssa_map)
+		  vec <hsa_op_reg_p> &ssa_map)
 {
   if (TREE_CODE (base) == SSA_NAME)
     {
@@ -985,7 +975,7 @@ process_mem_base (tree base, hsa_symbol **symbol, BrigType16_t *addrtype,
    pseudo-registers.  */
 
 static hsa_op_address *
-gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> ssa_map)
+gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> &ssa_map)
 {
   hsa_symbol *symbol = NULL;
   hsa_op_reg *reg = NULL;
@@ -1747,6 +1737,7 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
   hsa_insn_call *call_insn = hsa_alloc_call_insn ();
   call_insn->opcode = BRIG_OPCODE_CALL;
   call_insn->called_function = gimple_call_fndecl (stmt);
+  hsa_cfun.called_functions.safe_push (call_insn->called_function);
   call_insn->func.kind = BRIG_KIND_OPERAND_CODE_REF;
 
   hsa_insn_call_block *call_block_insn = hsa_alloc_call_block_insn ();
@@ -1856,8 +1847,7 @@ gen_hsa_insns_for_known_library_call (gimple stmt, hsa_bb *hbb,
 				      vec <hsa_op_reg_p> ssa_map)
 {
   tree decl = gimple_call_fndecl (stmt);
-  gcc_checking_assert (DECL_NAME (decl));
-  const char *name = IDENTIFIER_POINTER (DECL_NAME (decl));
+  const char *name = get_declaration_name (decl);
 
   if (!strcmp (name, "omp_is_initial_device")
       || strcmp (name, "omp_is_initial_device"))
@@ -2189,46 +2179,97 @@ gen_body_from_gimple (vec <hsa_op_reg_p> ssa_map)
     }
 }
 
+static unsigned
+get_function_arg_count (tree decl)
+{
+  unsigned count = 0;
+
+  for (tree parm = TYPE_ARG_TYPES (TREE_TYPE (decl)); parm;
+       parm = TREE_CHAIN (parm))
+    count++;
+
+  /* Return type is the last element of tree list.  */
+  return count - 1;
+}
+
+static void
+gen_function_decl_parameters (hsa_function_representation &f,
+			      tree decl)
+{
+  tree parm;
+  unsigned i;
+
+  f.input_args_count = get_function_arg_count (decl);
+  f.input_args = XCNEWVEC (hsa_symbol, f.input_args_count);
+  for (parm = TYPE_ARG_TYPES (TREE_TYPE (decl)), i = 0;
+       parm;
+       parm = TREE_CHAIN (parm), i++)
+    {
+      /* Result type if last in the tree list.  */
+      if (i == f.input_args_count)
+	break;
+
+      tree v = TREE_VALUE (parm);
+      f.input_args[i].type = hsa_type_for_tree_type (v, &f.input_args[i].dim);
+      f.input_args[i].segment = BRIG_SEGMENT_ARG;
+      f.input_args[i].linkage = BRIG_LINKAGE_NONE;
+      f.input_args[i].name_number = i;
+    }
+
+  tree result_type = TREE_TYPE (TREE_TYPE (decl));
+  if (!VOID_TYPE_P (result_type))
+    {
+      f.output_arg = XCNEW (hsa_symbol);
+      f.output_arg->type = hsa_type_for_tree_type (result_type,
+						   &f.output_arg->dim);
+      f.output_arg->segment = BRIG_SEGMENT_ARG;
+      f.output_arg->linkage = BRIG_LINKAGE_NONE;
+      f.output_arg->name = "res";
+    }
+}
+
 /* Generate the vector of parameters of the HSA representation of the current
    function.  This also includes the output parameter representing the
    result.  */
 
 static void
-gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
+gen_function_def_parameters (hsa_function_representation &f,
+			     vec <hsa_op_reg_p> *ssa_map)
 {
   tree parm;
-  int i, count = 0;
-
-  ENTRY_BLOCK_PTR_FOR_FN (cfun)->aux = &hsa_cfun.prologue;
-  hsa_cfun.prologue.bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
+  int i;
+  int count = 0;
 
   for (parm = DECL_ARGUMENTS (cfun->decl); parm; parm = DECL_CHAIN (parm))
     count++;
 
-  hsa_cfun.input_args_count = count;
-  hsa_cfun.input_args = XCNEWVEC (hsa_symbol, count);
+  ENTRY_BLOCK_PTR_FOR_FN (cfun)->aux = &f.prologue;
+  f.prologue.bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
+
+  f.input_args_count = count;
+  f.input_args = XCNEWVEC (hsa_symbol, f.input_args_count);
   for (parm = DECL_ARGUMENTS (cfun->decl), i = 0;
        parm;
        parm = DECL_CHAIN (parm), i++)
     {
       struct hsa_symbol **slot;
 
-      fillup_sym_for_decl (parm, &hsa_cfun.input_args[i]);
-      hsa_cfun.input_args[i].segment = hsa_cfun.kern_p ? BRIG_SEGMENT_KERNARG :
+      fillup_sym_for_decl (parm, &f.input_args[i]);
+      f.input_args[i].segment = f.kern_p ? BRIG_SEGMENT_KERNARG :
 				       BRIG_SEGMENT_ARG;
 
-      hsa_cfun.input_args[i].linkage = BRIG_LINKAGE_FUNCTION;
+      f.input_args[i].linkage = BRIG_LINKAGE_FUNCTION;
       if (!DECL_NAME (parm))
 	{
 	  /* FIXME: Just generate some UID.  */
 	  sorry ("Support for HSA does not implement anonymous C++ parameters");
 	  return;
 	}
-      hsa_cfun.input_args[i].name = IDENTIFIER_POINTER (DECL_NAME (parm));
-      slot = hsa_cfun.local_symbols->find_slot (&hsa_cfun.input_args[i],
+      f.input_args[i].name = IDENTIFIER_POINTER (DECL_NAME (parm));
+      slot = f.local_symbols->find_slot (&f.input_args[i],
 						INSERT);
       gcc_assert (!*slot);
-      *slot = &hsa_cfun.input_args[i];
+      *slot = &f.input_args[i];
 
       if (is_gimple_reg (parm))
 	{
@@ -2237,9 +2278,9 @@ gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
 	    {
 	      hsa_op_address *addr;
 	      hsa_insn_mem *mem = hsa_alloc_mem_insn ();
-	      hsa_op_reg *dest = hsa_reg_for_gimple_ssa (ddef, ssa_map);
+	      hsa_op_reg *dest = hsa_reg_for_gimple_ssa (ddef, *ssa_map);
 
-	      addr = gen_hsa_addr (parm, &hsa_cfun.prologue, ssa_map);
+	      addr = gen_hsa_addr (parm, &f.prologue, *ssa_map);
 	      mem->opcode = BRIG_OPCODE_LD;
 	      mem->type = mem_type_for_type (hsa_type_for_scalar_tree_type
 					     (TREE_TYPE (ddef), false));
@@ -2247,7 +2288,7 @@ gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
 	      mem->operands[1] = addr;
 	      set_reg_def (dest, mem);
 	      gcc_assert (!addr->reg);
-	      hsa_append_insn (&hsa_cfun.prologue, mem);
+	      hsa_append_insn (&f.prologue, mem);
 	    }
 	}
     }
@@ -2256,15 +2297,32 @@ gen_function_parameters (vec <hsa_op_reg_p> ssa_map)
     {
       struct hsa_symbol **slot;
 
-      hsa_cfun.output_arg = XCNEW (hsa_symbol);
-      fillup_sym_for_decl (DECL_RESULT (cfun->decl), hsa_cfun.output_arg);
-      hsa_cfun.output_arg->segment = BRIG_SEGMENT_ARG;
-      hsa_cfun.output_arg->linkage = BRIG_LINKAGE_FUNCTION;
-      hsa_cfun.output_arg->name = "res";
-      slot = hsa_cfun.local_symbols->find_slot (hsa_cfun.output_arg, INSERT);
+      f.output_arg = XCNEW (hsa_symbol);
+      fillup_sym_for_decl (DECL_RESULT (cfun->decl), f.output_arg);
+      f.output_arg->segment = BRIG_SEGMENT_ARG;
+      f.output_arg->linkage = BRIG_LINKAGE_FUNCTION;
+      f.output_arg->name = "res";
+      slot = f.local_symbols->find_slot (f.output_arg, INSERT);
       gcc_assert (!*slot);
-      *slot = hsa_cfun.output_arg;
+      *slot = f.output_arg;
     }
+}
+
+/* Generate function representation that corresponds to
+   a function declaration.  */
+
+hsa_function_representation *
+generate_function_declaration (tree decl)
+{
+  hsa_function_representation *fun = XCNEW (hsa_function_representation);
+
+  fun->declaration_p = true;
+  fun->decl = decl;
+  fun->name = xstrdup (get_declaration_name (decl));
+
+  gen_function_decl_parameters (*fun, decl);
+
+  return fun;
 }
 
 /* Generate HSAIL representation of the current function and write into a
@@ -2278,17 +2336,17 @@ generate_hsa (bool kernel)
   vec <hsa_op_reg_p> ssa_map = vNULL;
 
   hsa_init_data_for_cfun ();
+  hsa_cfun.decl = cfun->decl;
   hsa_cfun.kern_p = kernel;
 
   ssa_map.safe_grow_cleared (SSANAMES (cfun)->length ());
-  hsa_cfun.name
-    = xstrdup (IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (current_function_decl)));
+  hsa_cfun.name = xstrdup (get_declaration_name (current_function_decl));
   hsa_sanitize_name (hsa_cfun.name);
 
   if (hsa_cfun.kern_p)
     hsa_add_kern_decl_mapping (current_function_decl, hsa_cfun.name);
 
-  gen_function_parameters (ssa_map);
+  gen_function_def_parameters (hsa_cfun, &ssa_map);
   if (seen_error ())
     goto fail;
   gen_body_from_gimple (ssa_map);

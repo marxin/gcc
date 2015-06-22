@@ -303,8 +303,6 @@ hsa_get_decl_kernel_mapping_name (unsigned i)
 void
 hsa_free_decl_kernel_mapping (void)
 {
-  for (unsigned i = 0; i < hsa_decl_kernel_mapping->length (); ++i)
-    free ((*hsa_decl_kernel_mapping)[i].name);
   ggc_free (hsa_decl_kernel_mapping);
 }
 
@@ -316,6 +314,19 @@ hsa_sanitize_name (char *p)
   for (; *p; p++)
     if (*p == '.')
       *p = '_';
+}
+
+/* Return declaration name if exists.  */
+
+const char *
+get_declaration_name (tree decl)
+{
+  if (!DECL_NAME (decl))
+    sorry ("Support for HSA does not implement anonymous declarations");
+  else
+    return IDENTIFIER_POINTER (DECL_NAME (decl));
+
+  return NULL;
 }
 
 #include "gt-hsa.h"
