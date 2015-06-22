@@ -412,8 +412,8 @@ pool_allocator<T>::allocate ()
 #endif
   VALGRIND_DISCARD (VALGRIND_MAKE_MEM_UNDEFINED (header, size));
 
-  /* Call default constructor.  */
-  return (T *)(header);
+  T *ptr = (T *)header;
+  return m_ignore_type_size ? ptr : ::new (ptr) T;
 }
 
 /* Puts PTR back on POOL's free list.  */
