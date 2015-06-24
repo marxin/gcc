@@ -50,17 +50,17 @@ struct lra_live_range
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) lra_live_range ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((lra_live_range *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<lra_live_range> pool;
+  static pool_allocator pool;
 };
 
 typedef struct lra_copy *lra_copy_t;
@@ -80,18 +80,17 @@ struct lra_copy
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) lra_copy ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((lra_copy *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<lra_copy> pool;
-
+  static pool_allocator pool;
 };
 
 /* Common info about a register (pseudo or hard register).  */
@@ -203,17 +202,17 @@ struct lra_insn_reg
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) lra_insn_reg ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((lra_insn_reg *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<lra_insn_reg> pool;
+  static pool_allocator pool;
 };
 
 /* Static part (common info for insns with the same ICODE) of LRA

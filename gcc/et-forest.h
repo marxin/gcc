@@ -70,17 +70,17 @@ struct et_node
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) et_node ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((et_node *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<et_node> pool;
+  static pool_allocator pool;
 };
 
 struct et_node *et_new_tree (void *data);

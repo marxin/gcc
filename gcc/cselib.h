@@ -45,17 +45,17 @@ struct cselib_val
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) cselib_val ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((cselib_val *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<cselib_val> pool;
+  static pool_allocator pool;
 };
 
 /* A list of rtl expressions that hold the same value.  */
@@ -70,17 +70,17 @@ struct elt_loc_list {
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) elt_loc_list ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((elt_loc_list *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<elt_loc_list> pool;
+  static pool_allocator pool;
 };
 
 /* Describe a single set that is part of an insn.  */

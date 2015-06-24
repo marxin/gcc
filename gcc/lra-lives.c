@@ -106,7 +106,8 @@ static sparseset unused_set, dead_set;
 static bitmap_head temp_bitmap;
 
 /* Pool for pseudo live ranges.	 */
-pool_allocator <lra_live_range> lra_live_range::pool ("live ranges", 100);
+pool_allocator lra_live_range::pool ("live ranges", 100,
+				     sizeof (lra_live_range));
 
 /* Free live range list LR.  */
 static void

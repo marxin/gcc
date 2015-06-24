@@ -351,20 +351,20 @@ struct asan_mem_ref
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) asan_mem_ref ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((asan_mem_ref *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<asan_mem_ref> pool;
+  static pool_allocator pool;
 };
 
-pool_allocator<asan_mem_ref> asan_mem_ref::pool ("asan_mem_ref", 10);
+pool_allocator asan_mem_ref::pool ("asan_mem_ref", 10, sizeof (asan_mem_ref));
 
 /* Initializes an instance of asan_mem_ref.  */
 

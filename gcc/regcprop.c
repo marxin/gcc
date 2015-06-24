@@ -66,7 +66,7 @@ struct queued_debug_insn_change
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<queued_debug_insn_change> pool;
+  static object_allocator<queued_debug_insn_change> pool;
 };
 
 /* For each register, we have a list of registers that contain the same
@@ -90,7 +90,7 @@ struct value_data
   unsigned int n_debug_insn_changes;
 };
 
-pool_allocator<queued_debug_insn_change> queued_debug_insn_change::pool
+object_allocator<queued_debug_insn_change> queued_debug_insn_change::pool
   ("debug insn changes pool", 256);
 
 static bool skip_debug_insn_p;

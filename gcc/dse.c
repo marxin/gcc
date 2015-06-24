@@ -307,10 +307,10 @@ lowpart_bitmask (int n)
 }
 
 typedef struct store_info *store_info_t;
-static pool_allocator<store_info> cse_store_info_pool ("cse_store_info_pool",
+static object_allocator<store_info> cse_store_info_pool ("cse_store_info_pool",
 						       100);
 
-static pool_allocator<store_info> rtx_store_info_pool ("rtx_store_info_pool",
+static object_allocator<store_info> rtx_store_info_pool ("rtx_store_info_pool",
 						       100);
 
 /* This structure holds information about a load.  These are only
@@ -337,21 +337,22 @@ struct read_info_type
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) read_info_type ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((read_info_type *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<read_info_type> pool;
+  static pool_allocator pool;
 };
 typedef struct read_info_type *read_info_t;
 
-pool_allocator<read_info_type> read_info_type::pool ("read_info_pool", 100);
+pool_allocator read_info_type::pool ("read_info_pool", 100,
+				     sizeof (read_info_type));
 
 /* One of these records is created for each insn.  */
 
@@ -441,21 +442,22 @@ struct insn_info_type
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) insn_info_type ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((insn_info_type *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<insn_info_type> pool;
+  static pool_allocator pool;
 };
 typedef struct insn_info_type *insn_info_t;
 
-pool_allocator<insn_info_type> insn_info_type::pool ("insn_info_pool", 100);
+pool_allocator insn_info_type::pool ("insn_info_pool", 100,
+				     sizeof (insn_info_type));
 
 /* The linked list of stores that are under consideration in this
    basic block.  */
@@ -521,21 +523,22 @@ struct dse_bb_info_type
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) dse_bb_info_type ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((dse_bb_info_type *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<dse_bb_info_type> pool;
+  static pool_allocator pool;
 };
 
 typedef struct dse_bb_info_type *bb_info_t;
-pool_allocator<dse_bb_info_type> dse_bb_info_type::pool ("bb_info_pool", 100);
+pool_allocator dse_bb_info_type::pool ("bb_info_pool", 100,
+				       sizeof (dse_bb_info_type));
 
 /* Table to hold all bb_infos.  */
 static bb_info_t *bb_table;
@@ -607,22 +610,23 @@ struct group_info
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) group_info ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((group_info *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<group_info> pool;
+  static pool_allocator pool;
 };
 typedef struct group_info *group_info_t;
 typedef const struct group_info *const_group_info_t;
 
-pool_allocator<group_info> group_info::pool ("rtx_group_info_pool", 100);
+pool_allocator group_info::pool ("rtx_group_info_pool", 100,
+				 sizeof (group_info));
 
 /* Index into the rtx_group_vec.  */
 static int rtx_group_next_id;
@@ -647,23 +651,23 @@ struct deferred_change
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) deferred_change ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((deferred_change *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<deferred_change> pool;
+  static pool_allocator pool;
 };
 
 typedef struct deferred_change *deferred_change_t;
 
-pool_allocator<deferred_change> deferred_change::pool
-  ("deferred_change_pool", 10);
+pool_allocator deferred_change::pool
+  ("deferred_change_pool", 10, sizeof (deferred_change));
 
 static deferred_change_t deferred_change_list = NULL;
 

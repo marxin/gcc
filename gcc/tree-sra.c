@@ -274,24 +274,24 @@ struct access
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) access ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((access *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<access> pool;
+  static pool_allocator pool;
 };
 
 typedef struct access *access_p;
 
 
 /* Alloc pool for allocating access structures.  */
-pool_allocator<struct access> access::pool ("SRA accesses", 16);
+pool_allocator access::pool ("SRA accesses", 16, sizeof (access));
 
 /* A structure linking lhs and rhs accesses from an aggregate assignment.  They
    are used to propagate subaccesses from rhs to lhs as long as they don't
@@ -304,21 +304,21 @@ struct assign_link
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) assign_link ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((assign_link *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<assign_link> pool;
+  static pool_allocator pool;
 };
 
 /* Alloc pool for allocating assign link structures.  */
-pool_allocator<assign_link> assign_link::pool ("SRA links", 16);
+pool_allocator assign_link::pool ("SRA links", 16, sizeof (assign_link));
 
 /* Base (tree) -> Vector (vec<access_p> *) map.  */
 static hash_map<tree, auto_vec<access_p> > *base_access_vec;

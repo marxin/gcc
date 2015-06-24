@@ -56,22 +56,21 @@ struct et_occ
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) et_occ ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((et_occ *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<et_occ> pool;
-
+  static pool_allocator pool;
 };
 
-pool_allocator<et_node> et_node::pool ("et_nodes pool", 300);
-pool_allocator<et_occ> et_occ::pool ("et_occ pool", 300);
+pool_allocator et_node::pool ("et_nodes pool", 300, sizeof (et_node));
+pool_allocator et_occ::pool ("et_occ pool", 300, sizeof (et_occ));
 
 /* Changes depth of OCC to D.  */
 

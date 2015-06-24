@@ -532,7 +532,7 @@ lra_update_dups (lra_insn_recog_data_t id, signed char *nops)
    insns.  */
 
 /* Pools for insn reg info.  */
-pool_allocator<lra_insn_reg> lra_insn_reg::pool ("insn regs", 100);
+pool_allocator lra_insn_reg::pool ("insn regs", 100, sizeof (lra_insn_reg));
 
 /* Create LRA insn related info about a reference to REGNO in INSN with
    TYPE (in/out/inout), biggest reference mode MODE, flag that it is
@@ -1276,7 +1276,7 @@ get_new_reg_value (void)
 }
 
 /* Pools for copies.  */
-pool_allocator<lra_copy> lra_copy::pool ("lra copies", 100);
+pool_allocator lra_copy::pool ("lra copies", 100, sizeof (lra_copy));
 
 /* Vec referring to pseudo copies.  */
 static vec<lra_copy_t> copy_vec;

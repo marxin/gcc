@@ -49,17 +49,17 @@ struct elt_list
   /* Pool allocation new operator.  */
   inline void *operator new (size_t)
   {
-    return pool.allocate ();
+    return ::new (pool.allocate ()) elt_list ();
   }
 
   /* Delete operator utilizing pool allocation.  */
   inline void operator delete (void *ptr)
   {
-    pool.remove ((elt_list *) ptr);
+    pool.remove (ptr);
   }
 
   /* Memory allocation pool.  */
-  static pool_allocator<elt_list> pool;
+  static pool_allocator pool;
 };
 
 static bool cselib_record_memory;
@@ -261,12 +261,11 @@ static unsigned int cfa_base_preserved_regno = INVALID_REGNUM;
    each time memory is invalidated.  */
 static cselib_val *first_containing_mem = &dummy_val;
 
-pool_allocator<elt_list> elt_list::pool ("elt_list", 10);
-pool_allocator<elt_loc_list> elt_loc_list::pool ("elt_loc_list", 10);
-pool_allocator<cselib_val> cselib_val::pool ("cselib_val_list", 10);
+pool_allocator elt_list::pool ("elt_list", 10, sizeof (elt_list));
+pool_allocator elt_loc_list::pool ("elt_loc_list", 10, sizeof (elt_loc_list));
+pool_allocator cselib_val::pool ("cselib_val_list", 10, sizeof (cselib_val));
 
-static pool_allocator<rtx_def> value_pool ("value", 100, RTX_CODE_SIZE (VALUE),
-					   true);
+static pool_allocator value_pool ("value", 100, RTX_CODE_SIZE (VALUE));
 
 /* If nonnull, cselib will call this function before freeing useless
    VALUEs.  A VALUE is deemed useless if its "locs" field is null.  */
@@ -1323,7 +1322,7 @@ new_cselib_val (unsigned int hash, machine_mode mode, rtx x)
      precisely when we can have VALUE RTXen (when cselib is active)
      so we don't need to put them in garbage collected memory.
      ??? Why should a VALUE be an RTX in the first place?  */
-  e->val_rtx = value_pool.allocate ();
+  e->val_rtx = (rtx_def*) value_pool.allocate ();
   memset (e->val_rtx, 0, RTX_HDR_SIZE);
   PUT_CODE (e->val_rtx, VALUE);
   PUT_MODE (e->val_rtx, mode);
