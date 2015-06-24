@@ -805,6 +805,9 @@ func_checker::compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2)
 static void
 build_use_set (basic_block bb, hash_set <tree> *ssa_names_set)  
 {
+  tree var;
+  ssa_op_iter iter;
+
   /* Build default set of important SSA names.  */
   gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
 
@@ -832,37 +835,19 @@ build_use_set (basic_block bb, hash_set <tree> *ssa_names_set)
 	      tree lhs = gimple_assign_lhs (stmt);
 	      if (is_ssa_name_in_set (lhs, ssa_names_set))
 		{
-		  add_ssa_name_to_set (gimple_assign_rhs1 (stmt), ssa_names_set);
-		  add_ssa_name_to_set (gimple_assign_rhs2 (stmt), ssa_names_set);
-		  add_ssa_name_to_set (gimple_assign_rhs3 (stmt), ssa_names_set);
+		  FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
+		    add_ssa_name_to_set (var, ssa_names_set);
 		}
 	      break;
 	    }
 	  case GIMPLE_COND:
-	    {
-	      add_ssa_name_to_set (gimple_cond_lhs (stmt), ssa_names_set);
-	      add_ssa_name_to_set (gimple_cond_rhs (stmt), ssa_names_set);
-
-	      break;
-	    }
 	  case GIMPLE_SWITCH:
-	    {
-	      add_ssa_name_to_set (gimple_switch_index (as_a <gswitch *> (stmt)), ssa_names_set);
-
-	      break;
-	    }
 	  case GIMPLE_CALL:
-	    {
-	      if (is_ssa_name_in_set (gimple_call_lhs (stmt), ssa_names_set))
-		for (unsigned i = 0; i < gimple_call_num_args (stmt); i++)
-		  add_ssa_name_to_set (gimple_call_arg (stmt, i),
-				       ssa_names_set);
-
-	      break;
-	    }
 	  case GIMPLE_RETURN:
 	    {
-	      add_ssa_name_to_set (gimple_return_retval (as_a <greturn *>(stmt)), ssa_names_set);
+	      FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
+		add_ssa_name_to_set (var, ssa_names_set);
+
 	      break;
 	    }
 	  default:
