@@ -4651,25 +4651,9 @@ typedef struct label_ref_list_d
 {
   rtx_code_label *label;
   struct label_ref_list_d *next;
-
-  /* Pool allocation new operator.  */
-  inline void *operator new (size_t)
-  {
-    return pool.allocate ();
-  }
-
-  /* Delete operator utilizing pool allocation.  */
-  inline void operator delete (void *ptr)
-  {
-    pool.remove ((label_ref_list_d *) ptr);
-  }
-
-  /* Memory allocation pool.  */
-  static pool_allocator<label_ref_list_d> pool;
-
 } *label_ref_list_t;
 
-pool_allocator<label_ref_list_d> label_ref_list_d::pool
+static object_allocator<label_ref_list_d> label_ref_list_d_pool
   ("label references list", 30);
 
 /* The SH cannot load a large constant into a register, constants have to
@@ -4791,7 +4775,7 @@ add_constant (rtx x, machine_mode mode, rtx last_value)
 		}
 	      if (lab && pool_window_label)
 		{
-		  newref = new label_ref_list_d;
+		  newref = label_ref_list_d_pool.allocate ();
 		  newref->label = pool_window_label;
 		  ref = pool_vector[pool_window_last].wend;
 		  newref->next = ref;
@@ -4820,7 +4804,7 @@ add_constant (rtx x, machine_mode mode, rtx last_value)
   pool_vector[pool_size].part_of_sequence_p = (lab == 0);
   if (lab && pool_window_label)
     {
-      newref = new label_ref_list_d;
+      newref = label_ref_list_d_pool.allocate ();
       newref->label = pool_window_label;
       ref = pool_vector[pool_window_last].wend;
       newref->next = ref;
@@ -6566,7 +6550,7 @@ sh_reorg (void)
 	  insn = barrier;
 	}
     }
-  label_ref_list_d::pool.release ();
+  label_ref_list_d_pool.release ();
   for (insn = first; insn; insn = NEXT_INSN (insn))
     PUT_MODE (insn, VOIDmode);
 
