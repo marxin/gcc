@@ -303,7 +303,8 @@ hsa_get_decl_kernel_mapping_name (unsigned i)
 void
 hsa_free_decl_kernel_mapping (void)
 {
-  ggc_free (hsa_decl_kernel_mapping);
+  if (hsa_decl_kernel_mapping)
+    ggc_free (hsa_decl_kernel_mapping);
 }
 
 /* Modify the name P in-place so that it is a valid HSA identifier.  */
