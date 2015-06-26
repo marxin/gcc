@@ -87,7 +87,7 @@ static pool_allocator<hsa_insn_seg> *hsa_allocp_inst_seg;
 static pool_allocator<hsa_insn_cmp> *hsa_allocp_inst_cmp;
 static pool_allocator<hsa_insn_br> *hsa_allocp_inst_br;
 static pool_allocator<hsa_insn_call> *hsa_allocp_inst_call;
-static pool_allocator<hsa_insn_call_block> *hsa_allocp_inst_call_block;
+static pool_allocator<hsa_insn_arg_block> *hsa_allocp_inst_arg_block;
 static pool_allocator<hsa_bb> *hsa_allocp_bb;
 static pool_allocator<hsa_symbol> *hsa_allocp_symbols;
 
@@ -95,7 +95,7 @@ static pool_allocator<hsa_symbol> *hsa_allocp_symbols;
    a destruction.  */
 static vec <hsa_op_code_list *> hsa_list_operand_code_list;
 static vec <hsa_op_reg *> hsa_list_operand_reg;
-static vec <hsa_insn_call_block *> hsa_list_insn_call_block;
+static vec <hsa_insn_arg_block *> hsa_list_insn_arg_block;
 static vec <hsa_insn_call *> hsa_list_insn_call;
 
 /* Allocate HSA structures that we need only while generating with this.  */
@@ -133,8 +133,8 @@ hsa_init_data_for_cfun ()
     = new pool_allocator<hsa_insn_br> ("HSA branching instructions", 16);
   hsa_allocp_inst_call
     = new pool_allocator<hsa_insn_call> ("HSA call instructions", 16);
-  hsa_allocp_inst_call_block
-    = new pool_allocator<hsa_insn_call_block> ("HSA call block instructions",
+  hsa_allocp_inst_arg_block
+    = new pool_allocator<hsa_insn_arg_block> ("HSA arg block instructions",
 					       16);
   hsa_allocp_bb = new pool_allocator<hsa_bb> ("HSA basic blocks", 8);
 
@@ -171,15 +171,12 @@ hsa_deinit_data_for_cfun (void)
   for (unsigned int i = 0; i < hsa_list_operand_reg.length (); i++)
     hsa_list_operand_reg[i]->~hsa_op_reg ();
 
-  for (unsigned int i = 0; i < hsa_list_insn_call_block.length (); i++)
-    hsa_list_insn_call_block[i]->~hsa_insn_call_block ();
-
   for (unsigned int i = 0; i < hsa_list_insn_call.length (); i++)
     hsa_list_insn_call[i]->~hsa_insn_call ();
 
   hsa_list_operand_code_list.release ();
   hsa_list_operand_reg.release ();
-  hsa_list_insn_call_block.release ();
+  hsa_list_insn_arg_block.release ();
   hsa_list_insn_call.release ();
 
   delete hsa_allocp_operand_address;
@@ -195,7 +192,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_inst_cmp;
   delete hsa_allocp_inst_br;
   delete hsa_allocp_inst_call;
-  delete hsa_allocp_inst_call_block;
+  delete hsa_allocp_inst_arg_block;
   delete hsa_allocp_bb;
 
   delete hsa_allocp_symbols;
@@ -749,17 +746,17 @@ hsa_alloc_call_insn (void)
 
 /* Allocate, clear and return an argument block instruction structure.  */
 
-static hsa_insn_call_block *
-hsa_alloc_call_block_insn (void)
+static hsa_insn_arg_block *
+hsa_alloc_arg_block_insn (void)
 {
-  hsa_insn_call_block *call_block;
+  hsa_insn_arg_block *arg_block;
 
-  call_block = hsa_allocp_inst_call_block->allocate ();
-  hsa_list_insn_call_block.safe_push (call_block);
-  memset (call_block, 0, sizeof (hsa_insn_call_block));
+  arg_block = hsa_allocp_inst_arg_block->allocate ();
+  hsa_list_insn_arg_block.safe_push (arg_block);
+  memset (arg_block, 0, sizeof (hsa_insn_arg_block));
 
-  call_block->opcode = HSA_OPCODE_CALL_BLOCK;
-  return call_block;
+  arg_block->opcode = HSA_OPCODE_ARG_BLOCK;
+  return arg_block;
 }
 
 /* Append HSA instruction INSN to basic block HBB.  */
@@ -1740,7 +1737,11 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
   hsa_cfun.called_functions.safe_push (call_insn->called_function);
   call_insn->func.kind = BRIG_KIND_OPERAND_CODE_REF;
 
-  hsa_insn_call_block *call_block_insn = hsa_alloc_call_block_insn ();
+  /* Argument block start.  */
+  hsa_insn_arg_block *arg_start = hsa_alloc_arg_block_insn ();
+  arg_start->kind =  BRIG_KIND_DIRECTIVE_ARG_BLOCK_START;
+  arg_start->call_insn = call_insn;
+  hsa_append_insn (hbb, arg_start);
 
   /* Preparation of arguments that will be passed to function.  */
   const unsigned args = gimple_call_num_args (stmt);
@@ -1759,13 +1760,14 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
       mem->operands[0] = src;
       mem->operands[1] = addr;
 
-      call_block_insn->input_args.safe_push (addr->symbol);
-      call_block_insn->input_arg_insns.safe_push (mem);
+      call_insn->input_args.safe_push (addr->symbol);
+      hsa_append_insn (hbb, mem);
 
       call_insn->args_symbols.safe_push (addr->symbol);
     }
 
   call_insn->args_code_list = hsa_alloc_code_list_op (args);
+  hsa_append_insn (hbb, call_insn);
 
   tree result_type = TREE_TYPE (TREE_TYPE (gimple_call_fndecl (stmt)));
 
@@ -1789,22 +1791,21 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
 	  result_insn->operands[1] = addr;
 	  set_reg_def (dst, result_insn);
 
-	  call_block_insn->output_arg_insn = result_insn;
+	  hsa_append_insn (hbb, result_insn);
 	}
 
-      call_block_insn->output_arg = addr->symbol;
+      call_insn->output_arg = addr->symbol;
       call_insn->result_symbol = addr->symbol;
       call_insn->result_code_list = hsa_alloc_code_list_op (1);
     }
   else
     call_insn->result_code_list = hsa_alloc_code_list_op (0);
 
-  call_block_insn->call_insn = call_insn;
-
-  if (result_insn)
-    call_block_insn->output_arg_insn = result_insn;
-
-  hsa_append_insn (hbb, call_block_insn);
+  /* Argument block end.  */
+  hsa_insn_arg_block *arg_end = hsa_alloc_arg_block_insn ();
+  arg_end->kind =  BRIG_KIND_DIRECTIVE_ARG_BLOCK_END;
+  arg_end->call_insn = call_insn;
+  hsa_append_insn (hbb, arg_end);
 }
 
 /* Generate HSA instructions for a return value instruction.

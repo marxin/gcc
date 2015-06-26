@@ -1320,29 +1320,6 @@ emit_cvt_insn (hsa_insn_basic *insn)
   brig_insn_count++;
 }
 
-/* Emit arg block to code segment.  */
-
-static void
-emit_arg_block (bool is_start)
-{
-  if (is_start)
-    {
-      struct BrigDirectiveArgBlockStart repr;
-      repr.base.byteCount = htole16 (sizeof (repr));
-      repr.base.kind = htole16 (BRIG_KIND_DIRECTIVE_ARG_BLOCK_START);
-      brig_code.add (&repr, sizeof (repr));
-      brig_insn_count++;
-    }
-  else
-    {
-      struct BrigDirectiveArgBlockEnd repr;
-      repr.base.byteCount = htole16 (sizeof (repr));
-      repr.base.kind = htole16 (BRIG_KIND_DIRECTIVE_ARG_BLOCK_END);
-      brig_code.add (&repr, sizeof (repr));
-      brig_insn_count++;
-    }
-}
-
 /* Emit call instruction INSN, where this instruction must be closed
    within a call block instruction.  */
 
@@ -1352,6 +1329,7 @@ emit_call_insn (hsa_insn_basic *insn)
   hsa_insn_call *call = dyn_cast <hsa_insn_call *> (insn);
   struct BrigInstBr repr;
   uint32_t byteCount;
+
 
   BrigOperandOffset32_t operand_offsets[3];
 
@@ -1386,40 +1364,49 @@ emit_call_insn (hsa_insn_basic *insn)
   brig_insn_count++;
 }
 
-/* Emit call block instruction. This super instruction encapsulate all
-   instructions needed for argument load/store and corresponding
-   instruction.  */
+/* Emit argument block directive.  */
 
 static void
-emit_call_block_insn (hsa_insn_call_block *insn)
+emit_arg_block_insn (hsa_insn_arg_block *insn)
 {
-  /* Argument scope start.  */
-  emit_arg_block (true);
-
-  for (unsigned i = 0; i < insn->input_args.length (); i++)
+  switch (insn->kind)
     {
-      insn->call_insn->args_code_list->offsets[i] = htole32
-	(emit_directive_variable (insn->input_args[i]));
-      brig_insn_count++;
+    case BRIG_KIND_DIRECTIVE_ARG_BLOCK_START:
+      {
+	struct BrigDirectiveArgBlockStart repr;
+	repr.base.byteCount = htole16 (sizeof (repr));
+	repr.base.kind = htole16 (insn->kind);
+	brig_code.add (&repr, sizeof (repr));
+
+	for (unsigned i = 0; i < insn->call_insn->input_args.length (); i++)
+	  {
+	    insn->call_insn->args_code_list->offsets[i] = htole32
+	      (emit_directive_variable (insn->call_insn->input_args[i]));
+	    brig_insn_count++;
+	  }
+
+	if (insn->call_insn->result_symbol)
+	  {
+	    insn->call_insn->result_code_list->offsets[0] = htole32
+	      (emit_directive_variable (insn->call_insn->output_arg));
+	    brig_insn_count++;
+	  }
+
+	break;
+      }
+    case BRIG_KIND_DIRECTIVE_ARG_BLOCK_END:
+      {
+	struct BrigDirectiveArgBlockEnd repr;
+	repr.base.byteCount = htole16 (sizeof (repr));
+	repr.base.kind = htole16 (insn->kind);
+	brig_code.add (&repr, sizeof (repr));
+	break;
+      }
+    default:
+      gcc_unreachable ();
     }
 
-  if (insn->call_insn->result_symbol)
-    {
-      insn->call_insn->result_code_list->offsets[0] = htole32
-	(emit_directive_variable (insn->output_arg));
-      brig_insn_count++;
-    }
-
-  for (unsigned i = 0; i < insn->input_arg_insns.length (); i++)
-    emit_memory_insn (insn->input_arg_insns[i]);
-
-  emit_call_insn (insn->call_insn);
-
-  if (insn->output_arg_insn)
-    emit_memory_insn (insn->output_arg_insn);
-
-  /* Argument scope end.  */
-  emit_arg_block (false);
+  brig_insn_count++;
 }
 
 /* Emit a basic HSA instruction and all necessary directives, schedule
@@ -1534,9 +1521,9 @@ emit_insn (hsa_insn_basic *insn)
       emit_branch_insn (br);
       return;
     }
-  if (hsa_insn_call_block *call_block = dyn_cast <hsa_insn_call_block *> (insn))
+  if (hsa_insn_arg_block *arg_block = dyn_cast <hsa_insn_arg_block *> (insn))
     {
-      emit_call_block_insn (call_block);
+      emit_arg_block_insn (arg_block);
       return;
     }
   if (hsa_insn_call *call = dyn_cast <hsa_insn_call *> (insn))

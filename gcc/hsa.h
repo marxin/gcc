@@ -251,7 +251,7 @@ struct hsa_insn_basic
 };
 
 #define HSA_OPCODE_PHI -1
-#define HSA_OPCODE_CALL_BLOCK -2
+#define HSA_OPCODE_ARG_BLOCK -2
 
 /* Structure representing a PHI node of the SSA form of HSA virtual
    registers.  */
@@ -420,6 +420,15 @@ struct hsa_insn_call: hsa_insn_basic
   /* Called function */
   tree called_function;
 
+  /* Input formal arguments.  */
+  auto_vec <hsa_symbol *> input_args;
+
+  /* Input arguments store instructions.  */
+  auto_vec <hsa_insn_mem *> input_arg_insns;
+
+  /* Output argument, can be NULL for void functions.  */
+  hsa_symbol *output_arg;
+
   /* Called function code reference.  */
   struct hsa_op_code_ref func;
 
@@ -446,43 +455,30 @@ is_a_helper <hsa_insn_call *>::test (hsa_insn_basic *p)
   return (p->opcode == BRIG_OPCODE_CALL);
 }
 
-/* HSA call instruction block encapsulates definition of arguments,
-   result type, corresponding loads and a possible store.
-   Moreover, it contains a single call instruction.
-   Emission of the instruction will produce multiple
-   HSAIL instructions.  */
+/* HSA argument block is used as a placeholder, where ArgBlock
+   is expected in HSAIL.  */
 
-struct hsa_insn_call_block: hsa_insn_basic
+struct hsa_insn_arg_block : hsa_insn_basic
 {
   /* Destructor.  */
-  ~hsa_insn_call_block ()
+  ~hsa_insn_arg_block ()
   {
   }
 
-  /* Input formal arguments.  */
-  auto_vec <hsa_symbol *> input_args;
-
-  /* Input arguments store instructions.  */
-  auto_vec <hsa_insn_mem *> input_arg_insns;
-
-  /* Output argument, can be NULL for void functions.  */
-  hsa_symbol *output_arg;
-
-  /* Output argument load instruction.  */
-  hsa_insn_mem *output_arg_insn;
-
-  /* Call instruction.  */
+  /* Call insn.  */
   hsa_insn_call *call_insn;
+
+  BrigKind kind;
 };
 
-/* Report whether or not P is a call block instruction.  */
+/* Report whether or not P is an argument block instruction.  */
 
 template <>
 template <>
 inline bool
-is_a_helper <hsa_insn_call_block *>::test (hsa_insn_basic *p)
+is_a_helper <hsa_insn_arg_block *>::test (hsa_insn_basic *p)
 {
-  return (p->opcode == HSA_OPCODE_CALL_BLOCK);
+  return (p->opcode == HSA_OPCODE_ARG_BLOCK);
 }
 
 /* Basic block of HSA instructions.  */
