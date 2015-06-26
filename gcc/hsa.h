@@ -277,7 +277,7 @@ is_a_helper <hsa_op_code_list *>::test (hsa_op_base *p)
    represent it nevertheless.  */
 
 #define HSA_OPCODE_PHI (-1)
-#define HSA_OPCODE_CALL_BLOCK (-2)
+#define HSA_OPCODE_ARG_BLOCK (-2)
 
 /* The number of operand pointers we can directly in an instruction.  */
 #define HSA_BRIG_INT_STORAGE_OPERANDS 5
@@ -531,6 +531,15 @@ public:
   /* Called function */
   tree called_function;
 
+  /* Input formal arguments.  */
+  auto_vec <hsa_symbol *> input_args;
+
+  /* Input arguments store instructions.  */
+  auto_vec <hsa_insn_mem *> input_arg_insns;
+
+  /* Output argument, can be NULL for void functions.  */
+  hsa_symbol *output_arg;
+
   /* Called function code reference.  */
   hsa_op_code_ref func;
 
@@ -569,23 +578,14 @@ is_a_helper <hsa_insn_call *>::test (hsa_insn_basic *p)
    Emission of the instruction will produce multiple
    HSAIL instructions.  */
 
-class hsa_insn_call_block : public hsa_insn_basic
+class hsa_insn_arg_block : public hsa_insn_basic
 {
 public:
-  hsa_insn_call_block ();
+  hsa_insn_arg_block (BrigKind brig_kind, hsa_insn_call * call);
   void *operator new (size_t);
 
-  /* Input formal arguments.  */
-  auto_vec <hsa_symbol *> input_args;
-
-  /* Input arguments store instructions.  */
-  auto_vec <hsa_insn_mem *> input_arg_insns;
-
-  /* Output argument, can be NULL for void functions.  */
-  hsa_symbol *output_arg;
-
-  /* Output argument load instruction.  */
-  hsa_insn_mem *output_arg_insn;
+  /* Kind of argument block.  */
+  BrigKind kind;
 
   /* Call instruction.  */
   hsa_insn_call *call_insn;
@@ -600,9 +600,9 @@ private:
 template <>
 template <>
 inline bool
-is_a_helper <hsa_insn_call_block *>::test (hsa_insn_basic *p)
+is_a_helper <hsa_insn_arg_block *>::test (hsa_insn_basic *p)
 {
-  return (p->opcode == HSA_OPCODE_CALL_BLOCK);
+  return (p->opcode == HSA_OPCODE_ARG_BLOCK);
 }
 
 /* Basic block of HSA instructions.  */
@@ -749,22 +749,6 @@ public:
   /* Function declaration tree.  */
   tree decl;
 };
-
-/* Release internal data structures.  */
-
-inline void
-hsa_function_representation::release ()
-{
-  delete local_symbols;
-  free (input_args);
-  free (output_arg);
-
-  spill_symbols.release ();
-  called_functions.release ();
-
-  if (!kern_p)
-    free (name);
-}
 
 /* in hsa.c */
 extern struct hsa_function_representation *hsa_cfun;

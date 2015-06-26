@@ -86,7 +86,7 @@ static pool_allocator<hsa_insn_seg> *hsa_allocp_inst_seg;
 static pool_allocator<hsa_insn_cmp> *hsa_allocp_inst_cmp;
 static pool_allocator<hsa_insn_br> *hsa_allocp_inst_br;
 static pool_allocator<hsa_insn_call> *hsa_allocp_inst_call;
-static pool_allocator<hsa_insn_call_block> *hsa_allocp_inst_call_block;
+static pool_allocator<hsa_insn_arg_block> *hsa_allocp_inst_arg_block;
 static pool_allocator<hsa_bb> *hsa_allocp_bb;
 static pool_allocator<hsa_symbol> *hsa_allocp_symbols;
 
@@ -94,7 +94,7 @@ static pool_allocator<hsa_symbol> *hsa_allocp_symbols;
    a destruction.  */
 static vec <hsa_op_code_list *> hsa_list_operand_code_list;
 static vec <hsa_op_reg *> hsa_list_operand_reg;
-static vec <hsa_insn_call_block *> hsa_list_insn_call_block;
+static vec <hsa_insn_arg_block *> hsa_list_insn_arg_block;
 static vec <hsa_insn_call *> hsa_list_insn_call;
 
 /* Constructor of class representing global HSA function/kernel information and
@@ -166,8 +166,8 @@ hsa_init_data_for_cfun ()
     = new pool_allocator<hsa_insn_br> ("HSA branching instructions", 16);
   hsa_allocp_inst_call
     = new pool_allocator<hsa_insn_call> ("HSA call instructions", 16);
-  hsa_allocp_inst_call_block
-    = new pool_allocator<hsa_insn_call_block> ("HSA call block instructions",
+  hsa_allocp_inst_arg_block
+    = new pool_allocator<hsa_insn_arg_block> ("HSA arg block instructions",
 					       16);
   hsa_allocp_bb = new pool_allocator<hsa_bb> ("HSA basic blocks", 8);
 
@@ -198,15 +198,12 @@ hsa_deinit_data_for_cfun (void)
   for (unsigned int i = 0; i < hsa_list_operand_reg.length (); i++)
     hsa_list_operand_reg[i]->~hsa_op_reg ();
 
-  for (unsigned int i = 0; i < hsa_list_insn_call_block.length (); i++)
-    hsa_list_insn_call_block[i]->~hsa_insn_call_block ();
-
   for (unsigned int i = 0; i < hsa_list_insn_call.length (); i++)
     hsa_list_insn_call[i]->~hsa_insn_call ();
 
   hsa_list_operand_code_list.release ();
   hsa_list_operand_reg.release ();
-  hsa_list_insn_call_block.release ();
+  hsa_list_insn_arg_block.release ();
   hsa_list_insn_call.release ();
 
   delete hsa_allocp_operand_address;
@@ -221,7 +218,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_inst_cmp;
   delete hsa_allocp_inst_br;
   delete hsa_allocp_inst_call;
-  delete hsa_allocp_inst_call_block;
+  delete hsa_allocp_inst_arg_block;
   delete hsa_allocp_bb;
   delete hsa_allocp_symbols;
   delete hsa_cfun;
@@ -675,7 +672,7 @@ hsa_op_code_list::operator new (size_t)
 /* Lookup or create a HSA pseudo register for a given gimple SSA name.  */
 
 static hsa_op_reg *
-hsa_reg_for_gimple_ssa (tree ssa, vec <hsa_op_reg_p> ssa_map)
+hsa_reg_for_gimple_ssa (tree ssa, vec <hsa_op_reg_p> &ssa_map)
 {
   hsa_op_reg *hreg;
 
@@ -895,19 +892,21 @@ hsa_insn_call::operator new (size_t)
   return hsa_allocp_inst_call->allocate ();
 }
 
-/* Constructor of class representing the block required to invoke a call in
-   HSAIL.  */
-hsa_insn_call_block::hsa_insn_call_block ()
-  : hsa_insn_basic (0, HSA_OPCODE_CALL_BLOCK)
+/* Constructor of class representing the argument block required to invoke
+   a call in HSAIL.  */
+hsa_insn_arg_block::hsa_insn_arg_block (BrigKind brig_kind,
+					hsa_insn_call * call)
+  : hsa_insn_basic (0, HSA_OPCODE_ARG_BLOCK), kind (brig_kind),
+  call_insn (call)
 {
-  hsa_list_insn_call_block.safe_push (this);
+  hsa_list_insn_arg_block.safe_push (this);
 }
 
-/* New operator for classes representing HSAIL call blocks.  */
+/* New operator for classes representing HSAIL argument blocks.  */
 void *
-hsa_insn_call_block::operator new (size_t)
+hsa_insn_arg_block::operator new (size_t)
 {
-  return hsa_allocp_inst_call_block->allocate ();
+  return hsa_allocp_inst_arg_block->allocate ();
 }
 
 /* Append HSA instruction INSN to basic block HBB.  */
@@ -1861,8 +1860,12 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
 			       vec <hsa_op_reg_p> ssa_map)
 {
   hsa_insn_call *call_insn = new hsa_insn_call (gimple_call_fndecl (stmt));
-  hsa_cfun.called_functions.safe_push (call_insn->called_function);
-  hsa_insn_call_block *call_block_insn = new hsa_insn_call_block ();
+  hsa_cfun->called_functions.safe_push (call_insn->called_function);
+
+  /* Argument block start.  */
+  hsa_insn_arg_block *arg_start = new hsa_insn_arg_block
+    (BRIG_KIND_DIRECTIVE_ARG_BLOCK_START, call_insn);
+  hsa_append_insn (hbb, arg_start);
 
   /* Preparation of arguments that will be passed to function.  */
   const unsigned args = gimple_call_num_args (stmt);
@@ -1879,13 +1882,14 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
       mem->operands[0] = src;
       mem->operands[1] = addr;
 
-      call_block_insn->input_args.safe_push (addr->symbol);
-      call_block_insn->input_arg_insns.safe_push (mem);
+      call_insn->input_args.safe_push (addr->symbol);
+      hsa_append_insn (hbb, mem);
 
       call_insn->args_symbols.safe_push (addr->symbol);
     }
 
   call_insn->args_code_list = new hsa_op_code_list (args);
+  hsa_append_insn (hbb, call_insn);
 
   tree result_type = TREE_TYPE (TREE_TYPE (gimple_call_fndecl (stmt)));
 
@@ -1908,22 +1912,20 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
 	  result_insn->operands[1] = addr;
 	  set_reg_def (dst, result_insn);
 
-	  call_block_insn->output_arg_insn = result_insn;
+	  hsa_append_insn (hbb, result_insn);
 	}
 
-      call_block_insn->output_arg = addr->symbol;
+      call_insn->output_arg = addr->symbol;
       call_insn->result_symbol = addr->symbol;
       call_insn->result_code_list = new hsa_op_code_list (1);
     }
   else
     call_insn->result_code_list = new hsa_op_code_list (0);
 
-  call_block_insn->call_insn = call_insn;
-
-  if (result_insn)
-    call_block_insn->output_arg_insn = result_insn;
-
-  hsa_append_insn (hbb, call_block_insn);
+  /* Argument block start.  */
+  hsa_insn_arg_block *arg_end = new hsa_insn_arg_block
+    (BRIG_KIND_DIRECTIVE_ARG_BLOCK_END, call_insn);
+  hsa_append_insn (hbb, arg_end);
 }
 
 /* Generate HSA instructions for a return value instruction.
@@ -2366,8 +2368,8 @@ gen_function_decl_parameters (hsa_function_representation &f,
    result.  */
 
 static void
-gen_function_def_parameters (hsa_function_representation &f,
-			     vec <hsa_op_reg_p> *ssa_map)
+gen_function_def_parameters (hsa_function_representation *f,
+			     vec <hsa_op_reg_p> &ssa_map)
 {
   tree parm;
   int i, count = 0;
@@ -2375,33 +2377,33 @@ gen_function_def_parameters (hsa_function_representation &f,
   for (parm = DECL_ARGUMENTS (cfun->decl); parm; parm = DECL_CHAIN (parm))
     count++;
 
-  ENTRY_BLOCK_PTR_FOR_FN (cfun)->aux = &f.prologue;
-  f.prologue.bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
+  ENTRY_BLOCK_PTR_FOR_FN (cfun)->aux = &f->prologue;
+  f->prologue.bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
 
-  f.input_args_count = count;
-  f.input_args = XCNEWVEC (hsa_symbol, f.input_args_count);
+  f->input_args_count = count;
+  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count);
   for (parm = DECL_ARGUMENTS (cfun->decl), i = 0;
        parm;
        parm = DECL_CHAIN (parm), i++)
     {
       struct hsa_symbol **slot;
 
-      fillup_sym_for_decl (parm, &f.input_args[i]);
-      f.input_args[i].segment = f.kern_p ? BRIG_SEGMENT_KERNARG :
+      fillup_sym_for_decl (parm, &f->input_args[i]);
+      f->input_args[i].segment = f->kern_p ? BRIG_SEGMENT_KERNARG :
 				       BRIG_SEGMENT_ARG;
 
-      f.input_args[i].linkage = BRIG_LINKAGE_FUNCTION;
+      f->input_args[i].linkage = BRIG_LINKAGE_FUNCTION;
       if (!DECL_NAME (parm))
 	{
 	  /* FIXME: Just generate some UID.  */
 	  sorry ("Support for HSA does not implement anonymous C++ parameters");
 	  return;
 	}
-      f.input_args[i].name = IDENTIFIER_POINTER (DECL_NAME (parm));
-      slot = f.local_symbols->find_slot (&f.input_args[i],
+      f->input_args[i].name = IDENTIFIER_POINTER (DECL_NAME (parm));
+      slot = f->local_symbols->find_slot (&f->input_args[i],
 						INSERT);
       gcc_assert (!*slot);
-      *slot = &f.input_args[i];
+      *slot = &f->input_args[i];
 
       if (is_gimple_reg (parm))
 	{
@@ -2419,7 +2421,7 @@ gen_function_def_parameters (hsa_function_representation &f,
 	      mem->operands[1] = addr;
 	      set_reg_def (dest, mem);
 	      gcc_assert (!addr->reg);
-	      hsa_append_insn (&f.prologue, mem);
+	      hsa_append_insn (&f->prologue, mem);
 	    }
 	}
     }
@@ -2428,14 +2430,14 @@ gen_function_def_parameters (hsa_function_representation &f,
     {
       struct hsa_symbol **slot;
 
-      f.output_arg = XCNEW (hsa_symbol);
-      fillup_sym_for_decl (DECL_RESULT (cfun->decl), f.output_arg);
-      f.output_arg->segment = BRIG_SEGMENT_ARG;
-      f.output_arg->linkage = BRIG_LINKAGE_FUNCTION;
-      f.output_arg->name = "res";
-      slot = f.local_symbols->find_slot (f.output_arg, INSERT);
+      f->output_arg = XCNEW (hsa_symbol);
+      fillup_sym_for_decl (DECL_RESULT (cfun->decl), f->output_arg);
+      f->output_arg->segment = BRIG_SEGMENT_ARG;
+      f->output_arg->linkage = BRIG_LINKAGE_FUNCTION;
+      f->output_arg->name = "res";
+      slot = f->local_symbols->find_slot (f->output_arg, INSERT);
       gcc_assert (!*slot);
-      *slot = f.output_arg;
+      *slot = f->output_arg;
     }
 }
 
@@ -2478,7 +2480,7 @@ generate_hsa (bool kernel)
   if (hsa_cfun->kern_p)
     hsa_add_kern_decl_mapping (current_function_decl, hsa_cfun->name);
 
-  gen_function_def_parameters (hsa_cfun, &ssa_map);
+  gen_function_def_parameters (hsa_cfun, ssa_map);
   if (seen_error ())
     goto fail;
   gen_body_from_gimple (ssa_map);
