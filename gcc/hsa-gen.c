@@ -117,6 +117,8 @@ hsa_function_representation::hsa_function_representation ()
   hbb_count = 1;        /* 0 is for prologue.  */
   in_ssa = true;	/* We start in SSA.  */
   kern_p = false;
+  declaration_p = false;
+  called_functions  = vec<tree> ();
 }
 
 /* Destructor of class holding function/kernel-wide informaton and state.  */

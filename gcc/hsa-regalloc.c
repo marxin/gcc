@@ -310,7 +310,7 @@ hsa_num_def_ops (hsa_insn_basic *insn)
       case BRIG_OPCODE_CALL:
       case BRIG_OPCODE_SCALL:
       case BRIG_OPCODE_ICALL:
-	return 1; /* ??? */
+	return 0;
 
       case BRIG_OPCODE_RET:
 	return 0;
@@ -340,6 +340,9 @@ hsa_num_def_ops (hsa_insn_basic *insn)
       case BRIG_OPCODE_GROUPBASEPTR:
       case BRIG_OPCODE_KERNARGBASEPTR:
 	return 1; /* ??? */
+
+      case HSA_OPCODE_ARG_BLOCK:
+	return 0;
     }
 }
 
@@ -593,9 +596,10 @@ linear_scan_regalloc (struct reg_class_desc *classes)
 	  for (insn = hbb->last_insn; insn; insn = insn->prev)
 	    {
 	      unsigned opi;
-	      int ndefs = hsa_num_def_ops (insn);
+	      unsigned ndefs = hsa_num_def_ops (insn);
 	      for (opi = 0; opi < ndefs && insn->operands[opi]; opi++)
 		{
+		  gcc_checking_assert (insn->operands[opi]);
 		  hsa_op_reg **regaddr = insn_reg_addr (insn, opi);
 		  if (regaddr)
 		    bitmap_clear_bit (work, (*regaddr)->order);
@@ -640,7 +644,7 @@ linear_scan_regalloc (struct reg_class_desc *classes)
       for (insn = hbb->last_insn; insn; insn = insn->prev)
 	{
 	  unsigned opi;
-	  int ndefs = hsa_num_def_ops (insn);
+	  unsigned ndefs = hsa_num_def_ops (insn);
 	  for (opi = 0; opi < insn->operands.length (); opi++)
 	    {
 	      gcc_checking_assert (insn->operands[opi]);
@@ -666,6 +670,7 @@ linear_scan_regalloc (struct reg_class_desc *classes)
       ind2reg[i]->lr_begin = 0;
 
   /* Sort all intervals by increasing start point.  */
+  gcc_assert (ind2reg.length () == (size_t) hsa_cfun->reg_count);
   ind2reg.qsort (cmp_begin);
   for (i = 0; i < 4; i++)
     active[i].reserve_exact (hsa_cfun->reg_count);
