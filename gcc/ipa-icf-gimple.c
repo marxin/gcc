@@ -495,7 +495,7 @@ func_checker::compare_operand (tree t1, tree t2, bool strict)
 	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2)))
 	  return return_false ();
 
-	if (!compare_operand (x1, x2))
+	if (!compare_operand (x1, x2, strict))
 	  return return_false_with_msg ("");
 
 	/* Type of the offset on MEM_REF does not matter.  */
