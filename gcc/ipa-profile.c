@@ -355,7 +355,7 @@ ipa_propagate_frequency_1 (struct cgraph_node *node, void *data)
 	    fprintf (dump_file, "  Called by %s that is executed once\n",
 		     edge->caller->name ());
 	  d->maybe_unlikely_executed = false;
-	  if (inline_edge_summary (edge)->loop_depth)
+	  if (get_inline_edge_summary (edge)->loop_depth)
 	    {
 	      d->maybe_executed_once = false;
 	      if (dump_file && (dump_flags & TDF_DETAILS))
