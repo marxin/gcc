@@ -635,7 +635,7 @@ ipa_profile (void)
 				 "Not speculating: target is overwritable "
 				 "and can be discarded.\n");
 		    }
-		  else if (ipa_node_params_sum && ipa_edge_args_vector
+		  else if (ipa_node_params_sum && ipa_edge_args_sum
 			   && !IPA_NODE_REF (n2)->descriptors.is_empty ()
 			   && ipa_get_param_count (IPA_NODE_REF (n2))
 			      != ipa_get_cs_argument_count (IPA_EDGE_REF (e))

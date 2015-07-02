@@ -1593,6 +1593,8 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"),
   int frequency;
   /* Unique id of the edge.  */
   int uid;
+  /* Not recycled unique id of the node.  */
+  int summary_uid;
   /* Whether this edge was made direct by indirect inlining.  */
   unsigned int indirect_inlining_edge : 1;
   /* Whether this edge describes an indirect call with an undetermined
@@ -1874,7 +1876,7 @@ public:
   friend class cgraph_node;
   friend class cgraph_edge;
 
-  symbol_table (): cgraph_max_summary_uid (1)
+  symbol_table (): cgraph_max_summary_uid (1), edge_max_summary_uid (1)
   {
   }
 
@@ -2078,6 +2080,7 @@ public:
 
   int edges_count;
   int edges_max_uid;
+  int edge_max_summary_uid;
 
   symtab_node* GTY(()) nodes;
   asm_node* GTY(()) asmnodes;
