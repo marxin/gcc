@@ -75,6 +75,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "intl.h"
 #include "opts.h"
 #include "varasm.h"
+#include "symbol-summary.h"
 
 /* Lattice values for const and pure functions.  Everything starts out
    being const, then may drop to pure and then neither depending on
@@ -92,6 +93,15 @@ const char *pure_const_names[3] = {"const", "pure", "neither"};
    decl.  */
 struct funct_state_d
 {
+  funct_state_d (): pure_const_state (IPA_NEITHER),
+    state_previously_known (IPA_NEITHER), looping_previously_known (true),
+    looping (true), can_throw (true), can_free (true) {}
+
+  funct_state_d (const funct_state_d &s): pure_const_state (s.pure_const_state),
+    state_previously_known (s.state_previously_known),
+    looping_previously_known (s.looping_previously_known),
+    looping (s.looping), can_throw (s.can_throw), can_free (s.can_free) {}
+
   /* See above.  */
   enum pure_const_state_e pure_const_state;
   /* What user set here; we can be always sure about this.  */
@@ -113,20 +123,25 @@ struct funct_state_d
   bool can_free;
 };
 
-/* State used when we know nothing about function.  */
-static struct funct_state_d varying_state
-   = { IPA_NEITHER, IPA_NEITHER, true, true, true, true };
-
-
 typedef struct funct_state_d * funct_state;
 
 /* The storage of the funct_state is abstracted because there is the
    possibility that it may be desirable to move this to the cgraph
    local info.  */
 
-/* Array, indexed by cgraph node uid, of function states.  */
+class funct_state_summary_t: public function_summary <funct_state_d *>
+{
+public:
+  funct_state_summary_t (symbol_table *symtab):
+    function_summary <funct_state_d *> (symtab) {}
 
-static vec<funct_state> funct_state_vec;
+  virtual void insert (cgraph_node *, funct_state_d *state);
+  virtual void duplicate (cgraph_node *src_node, cgraph_node *dst_node,
+			  funct_state_d *src_data,
+			  funct_state_d *dst_data);
+};
+
+static funct_state_summary_t *funct_state_summaries = NULL;
 
 static bool gate_pure_const (void);
 
@@ -158,12 +173,6 @@ public:
 
 private:
   bool init_p;
-
-  /* Holders of ipa cgraph hooks: */
-  struct cgraph_node_hook_list *function_insertion_hook_holder;
-  struct cgraph_2node_hook_list *node_duplication_hook_holder;
-  struct cgraph_node_hook_list *node_removal_hook_holder;
-
 }; // class pass_ipa_pure_const
 
 } // anon namespace
@@ -243,41 +252,6 @@ warn_function_noreturn (tree decl)
     warned_about 
       = suggest_attribute (OPT_Wsuggest_attribute_noreturn, decl,
 			   true, warned_about, "noreturn");
-}
-
-/* Return true if we have a function state for NODE.  */
-
-static inline bool
-has_function_state (struct cgraph_node *node)
-{
-  if (!funct_state_vec.exists ()
-      || funct_state_vec.length () <= (unsigned int)node->uid)
-    return false;
-  return funct_state_vec[node->uid] != NULL;
-}
-
-/* Return the function state from NODE.  */
-
-static inline funct_state
-get_function_state (struct cgraph_node *node)
-{
-  if (!funct_state_vec.exists ()
-      || funct_state_vec.length () <= (unsigned int)node->uid
-      || !funct_state_vec[node->uid])
-    /* We might want to put correct previously_known state into varying.  */
-    return &varying_state;
- return funct_state_vec[node->uid];
-}
-
-/* Set the function state S for NODE.  */
-
-static inline void
-set_function_state (struct cgraph_node *node, funct_state s)
-{
-  if (!funct_state_vec.exists ()
-      || funct_state_vec.length () <= (unsigned int)node->uid)
-     funct_state_vec.safe_grow_cleared (node->uid + 1);
-  funct_state_vec[node->uid] = s;
 }
 
 /* Check to see if the use (or definition when CHECKING_WRITE is true)
@@ -911,9 +885,8 @@ end:
   return l;
 }
 
-/* Called when new function is inserted to callgraph late.  */
-static void
-add_new_function (struct cgraph_node *node, void *data ATTRIBUTE_UNUSED)
+void
+funct_state_summary_t::insert (cgraph_node *node, funct_state_d *state)
 {
  if (node->get_availability () < AVAIL_INTERPOSABLE)
    return;
@@ -923,36 +896,17 @@ add_new_function (struct cgraph_node *node, void *data ATTRIBUTE_UNUSED)
      operations.  */
   if (node->get_availability () > AVAIL_INTERPOSABLE
       && opt_for_fn (node->decl, flag_ipa_pure_const))
-    set_function_state (node, analyze_function (node, true));
+    new (state) funct_state_d (*analyze_function (node, true));
 }
 
 /* Called when new clone is inserted to callgraph late.  */
 
-static void
-duplicate_node_data (struct cgraph_node *src, struct cgraph_node *dst,
-	 	     void *data ATTRIBUTE_UNUSED)
+void
+funct_state_summary_t::duplicate (cgraph_node *src_node, cgraph_node *dst_node,
+				  funct_state_d *src_data,
+				  funct_state_d *dst_data)
 {
-  if (has_function_state (src))
-    {
-      funct_state l = XNEW (struct funct_state_d);
-      gcc_assert (!has_function_state (dst));
-      memcpy (l, get_function_state (src), sizeof (*l));
-      set_function_state (dst, l);
-    }
-}
-
-/* Called when new clone is inserted to callgraph late.  */
-
-static void
-remove_node_data (struct cgraph_node *node, void *data ATTRIBUTE_UNUSED)
-{
-  if (has_function_state (node))
-    {
-      funct_state l = get_function_state (node);
-      if (l != &varying_state)
-        free (l);
-      set_function_state (node, NULL);
-    }
+  new (dst_data) funct_state_d (*src_data);
 }
 
 
@@ -965,12 +919,7 @@ register_hooks (void)
 
   init_p = true;
 
-  node_removal_hook_holder =
-      symtab->add_cgraph_removal_hook (&remove_node_data, NULL);
-  node_duplication_hook_holder =
-      symtab->add_cgraph_duplication_hook (&duplicate_node_data, NULL);
-  function_insertion_hook_holder =
-      symtab->add_cgraph_insertion_hook (&add_new_function, NULL);
+  funct_state_summaries = new funct_state_summary_t (symtab);
 }
 
 
@@ -994,7 +943,7 @@ pure_const_generate_summary (void)
   FOR_EACH_DEFINED_FUNCTION (node)
     if (node->get_availability () >= AVAIL_INTERPOSABLE
         && opt_for_fn (node->decl, flag_ipa_pure_const))
-      set_function_state (node, analyze_function (node, true));
+      new (funct_state_summaries->get (node)) funct_state_d (*analyze_function (node, true));
 }
 
 
@@ -1016,7 +965,7 @@ pure_const_write_summary (void)
        lsei_next_function_in_partition (&lsei))
     {
       node = lsei_cgraph_node (lsei);
-      if (node->definition && has_function_state (node))
+      if (node->definition)
 	count++;
     }
 
@@ -1027,14 +976,13 @@ pure_const_write_summary (void)
        lsei_next_function_in_partition (&lsei))
     {
       node = lsei_cgraph_node (lsei);
-      if (node->definition && has_function_state (node))
+      if (node->definition)
 	{
 	  struct bitpack_d bp;
-	  funct_state fs;
 	  int node_ref;
 	  lto_symtab_encoder_t encoder;
 
-	  fs = get_function_state (node);
+	  funct_state_d *fs = funct_state_summaries->get (node);
 
 	  encoder = ob->decl_state->symtab_node_encoder;
 	  node_ref = lto_symtab_encoder_encode (encoder, node);
@@ -1090,13 +1038,12 @@ pure_const_read_summary (void)
 	      funct_state fs;
 	      lto_symtab_encoder_t encoder;
 
-	      fs = XCNEW (struct funct_state_d);
 	      index = streamer_read_uhwi (ib);
 	      encoder = file_data->symtab_node_encoder;
 	      node = dyn_cast<cgraph_node *> (lto_symtab_encoder_deref (encoder,
 									index));
-	      set_function_state (node, fs);
 
+	      fs = funct_state_summaries->get (node);
 	      /* Note that the flags must be read in the opposite
 		 order in which they were written (the bitflags were
 		 pushed into FLAGS).  */
@@ -1224,7 +1171,7 @@ propagate_pure_const (void)
 	  int i;
 	  struct ipa_ref *ref = NULL;
 
-	  funct_state w_l = get_function_state (w);
+	  funct_state w_l = funct_state_summaries->get (w);
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    fprintf (dump_file, "  Visiting %s/%i state:%s looping %i\n",
 		     w->name (),
@@ -1280,7 +1227,7 @@ propagate_pure_const (void)
 		}
 	      if (avail > AVAIL_INTERPOSABLE)
 		{
-		  funct_state y_l = get_function_state (y);
+		  funct_state_d *y_l = funct_state_summaries->get (y);
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    {
 		      fprintf (dump_file,
@@ -1397,7 +1344,7 @@ propagate_pure_const (void)
       while (w && !can_free)
 	{
 	  struct cgraph_edge *e;
-	  funct_state w_l = get_function_state (w);
+	  funct_state_d *w_l = funct_state_summaries->get (w);
 
 	  if (w_l->can_free
 	      || w->get_availability () == AVAIL_INTERPOSABLE
@@ -1411,7 +1358,7 @@ propagate_pure_const (void)
 				function_or_virtual_thunk_symbol (&avail);
 
 	      if (avail > AVAIL_INTERPOSABLE)
-		can_free = get_function_state (y)->can_free;
+		can_free = funct_state_summaries->get (y)->can_free;
 	      else
 		can_free = true;
 	    }
@@ -1424,7 +1371,7 @@ propagate_pure_const (void)
       w = node;
       while (w)
 	{
-	  funct_state w_l = get_function_state (w);
+	  funct_state_d *w_l = funct_state_summaries->get (w);
 	  enum pure_const_state_e this_state = pure_const_state;
 	  bool this_looping = looping;
 
@@ -1534,7 +1481,7 @@ propagate_nothrow (void)
       while (w && !can_throw)
 	{
 	  struct cgraph_edge *e, *ie;
-	  funct_state w_l = get_function_state (w);
+	  funct_state_d *w_l = funct_state_summaries->get (w);
 
 	  if (w_l->can_throw
 	      || w->get_availability () == AVAIL_INTERPOSABLE)
@@ -1548,7 +1495,7 @@ propagate_nothrow (void)
 
 	      if (avail > AVAIL_INTERPOSABLE)
 		{
-		  funct_state y_l = get_function_state (y);
+		  funct_state_d *y_l = funct_state_summaries->get (y);
 
 		  if (y_l->can_throw && !TREE_NOTHROW (w->decl)
 		      && e->can_throw_external)
@@ -1569,7 +1516,7 @@ propagate_nothrow (void)
       w = node;
       while (w)
 	{
-	  funct_state w_l = get_function_state (w);
+	  funct_state_d *w_l = funct_state_summaries->get (w);
 	  if (!can_throw && !TREE_NOTHROW (w->decl))
 	    {
 	      /* Inline clones share declaration with their offline copies;
@@ -1605,20 +1552,12 @@ execute (function *)
   struct cgraph_node *node;
   bool remove_p;
 
-  symtab->remove_cgraph_insertion_hook (function_insertion_hook_holder);
-  symtab->remove_cgraph_duplication_hook (node_duplication_hook_holder);
-  symtab->remove_cgraph_removal_hook (node_removal_hook_holder);
-
   /* Nothrow makes more function to not lead to return and improve
      later analysis.  */
   propagate_nothrow ();
   remove_p = propagate_pure_const ();
 
-  /* Cleanup. */
-  FOR_EACH_FUNCTION (node)
-    if (has_function_state (node))
-      free (get_function_state (node));
-  funct_state_vec.release ();
+  delete funct_state_summaries;
   return remove_p ? TODO_remove_functions : 0;
 }
 
@@ -1639,12 +1578,7 @@ pass_ipa_pure_const::pass_ipa_pure_const(gcc::context *ctxt)
 		     0, /* function_transform_todo_flags_start */
 		     NULL, /* function_transform */
 		     NULL), /* variable_transform */
-  init_p(false),
-  function_insertion_hook_holder(NULL),
-  node_duplication_hook_holder(NULL),
-  node_removal_hook_holder(NULL)
-{
-}
+  init_p(false) {}
 
 ipa_opt_pass_d *
 make_pass_ipa_pure_const (gcc::context *ctxt)
