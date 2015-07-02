@@ -108,7 +108,7 @@ public:
   /* Allocates new data that are stored within map.  */
   T* allocate_new ()
   {
-    return m_ggc ? new (ggc_alloc <T> ()) T() : new T () ;
+    return m_ggc ? new (ggc_alloc <T> ()) T () : new T () ;
   }
 
   /* Release an item that is stored within map.  */
@@ -234,7 +234,7 @@ private:
 
 template <typename T>
 void
-gt_ggc_mx(function_summary<T *>* const &summary)
+gt_ggc_mx (function_summary<T *>* const &summary)
 {
   gcc_checking_assert (summary->m_ggc);
   gt_ggc_mx (&summary->m_map);
@@ -242,7 +242,7 @@ gt_ggc_mx(function_summary<T *>* const &summary)
 
 template <typename T>
 void
-gt_pch_nx(function_summary<T *>* const &summary)
+gt_pch_nx (function_summary<T *>* const &summary)
 {
   gcc_checking_assert (summary->m_ggc);
   gt_pch_nx (&summary->m_map);
@@ -250,11 +250,211 @@ gt_pch_nx(function_summary<T *>* const &summary)
 
 template <typename T>
 void
-gt_pch_nx(function_summary<T *>* const& summary, gt_pointer_operator op,
+gt_pch_nx (function_summary<T *>* const& summary, gt_pointer_operator op,
 	  void *cookie)
 {
   gcc_checking_assert (summary->m_ggc);
   gt_pch_nx (&summary->m_map, op, cookie);
 }
+
+/* We want to pass just pointer types as argument for edge_summary
+   template class.  */
+
+template <class T>
+class edge_summary
+{
+private:
+  edge_summary ();
+};
+
+template <class T>
+class GTY((user)) edge_summary <T *>
+{
+public:
+  /* Default construction takes SYMTAB as an argument.  */
+  edge_summary (symbol_table *symtab, bool ggc = false): m_ggc (ggc),
+    m_map (13, ggc), m_symtab (symtab)
+  {
+#ifdef ENABLE_CHECKING
+    cgraph_node *node;
+
+    FOR_EACH_FUNCTION (node)
+    {
+      gcc_checking_assert (node->summary_uid > 0);
+    }
+#endif
+
+    m_symtab_removal_hook =
+      symtab->add_edge_removal_hook
+      (edge_summary::symtab_removal, this);
+    m_symtab_duplication_hook =
+      symtab->add_edge_duplication_hook
+      (edge_summary::symtab_duplication, this);
+  }
+
+  /* Destructor.  */
+  virtual ~edge_summary ()
+  {
+    release ();
+  }
+
+  /* Destruction method that can be called for GGT purpose.  */
+  void release ()
+  {
+    if (m_symtab_removal_hook)
+      m_symtab->remove_edge_removal_hook (m_symtab_removal_hook);
+
+    if (m_symtab_duplication_hook)
+      m_symtab->remove_edge_duplication_hook (m_symtab_duplication_hook);
+
+    m_symtab_removal_hook = NULL;
+    m_symtab_duplication_hook = NULL;
+
+    /* Release all summaries.  */
+    typedef typename hash_map <map_hash, T *>::iterator map_iterator;
+    for (map_iterator it = m_map.begin (); it != m_map.end (); ++it)
+      release ((*it).second);
+  }
+
+  /* Traverses all summarys with a function F called with
+     ARG as argument.  */
+  template<typename Arg, bool (*f)(const T &, Arg)>
+  void traverse (Arg a) const
+  {
+    m_map.traverse <f> (a);
+  }
+
+  /* Initializer is called after we allocate a new node.  */
+  virtual void initialize (cgraph_edge *, T *) {}
+
+  /* Basic implementation of removal operation.  */
+  virtual void remove (cgraph_edge *, T *) {}
+
+  /* Basic implementation of duplication operation.  */
+  virtual void duplicate (cgraph_edge *, cgraph_edge *, T *, T *) {}
+
+  /* Allocates new data that are stored within map.  */
+  T* allocate_new (cgraph_edge *edge)
+  {
+    T *v = m_ggc ? new (ggc_alloc <T> ()) T () : new T () ;
+    initialize (edge, v);
+
+    return v;
+  }
+
+  /* Release an item that is stored within map.  */
+  void release (T *item)
+  {
+    if (m_ggc)
+      {
+	item->~T ();
+	ggc_free (item);
+      }
+    else
+      delete item;
+  }
+
+  /* Getter for summary edge node pointer.  */
+  T* get (cgraph_edge *edge)
+  {
+    bool existed;
+    T **v = &m_map.get_or_insert (edge->summary_uid, &existed);
+    if (!existed)
+      *v = allocate_new (edge);
+
+    return *v;
+  }
+
+  /* Return number of elements handled by data structure.  */
+  size_t elements ()
+  {
+    return m_map.elements ();
+  }
+
+  /* Symbol removal hook that is registered to symbol table.  */
+  static void symtab_removal (cgraph_edge *node, void *data)
+  {
+    gcc_checking_assert (node->summary_uid);
+    edge_summary *summary = (edge_summary <T *> *) (data);
+
+    int summary_uid = node->summary_uid;
+    T **v = summary->m_map.get (summary_uid);
+
+    if (v)
+      {
+	summary->remove (node, *v);
+
+	if (!summary->m_ggc)
+	  delete (*v);
+
+	summary->m_map.remove (summary_uid);
+      }
+  }
+
+  /* Symbol duplication hook that is registered to symbol table.  */
+  static void symtab_duplication (cgraph_edge *edge, cgraph_edge *edge2,
+				  void *data)
+  {
+    edge_summary *summary = (edge_summary <T *> *) (data);
+    T *s = summary->get (edge);
+
+    gcc_checking_assert (s);
+    gcc_checking_assert (edge2->summary_uid > 0);
+
+    /* This load is necessary, because we insert a new value!  */
+    T *duplicate = summary->allocate_new (edge2);
+    summary->m_map.put (edge2->summary_uid, duplicate);
+    summary->duplicate (edge, edge2, s, duplicate);
+  }
+
+protected:
+  /* Indication if we use ggc summary.  */
+  bool m_ggc;
+
+private:
+  typedef int_hash <int, 0, -1> map_hash;
+
+  /* Main summary store, where summary ID is used as key.  */
+  hash_map <map_hash, T *> m_map;
+  /* Internal summary insertion hook pointer.  */
+  cgraph_edge_hook_list *m_symtab_insertion_hook;
+  /* Internal summary removal hook pointer.  */
+  cgraph_edge_hook_list *m_symtab_removal_hook;
+  /* Internal summary duplication hook pointer.  */
+  cgraph_2edge_hook_list *m_symtab_duplication_hook;
+  /* Symbol table the summary is registered to.  */
+  symbol_table *m_symtab;
+
+  template <typename U> friend void gt_ggc_mx (edge_summary <U *> * const &);
+  template <typename U> friend void gt_pch_nx (edge_summary <U *> * const &);
+  template <typename U> friend void gt_pch_nx (edge_summary <U *> * const &,
+      gt_pointer_operator, void *);
+};
+
+template <typename T>
+void
+gt_ggc_mx (edge_summary<T *>* const &summary)
+{
+  gcc_checking_assert (summary->m_ggc);
+  gt_ggc_mx (&summary->m_map);
+}
+
+template <typename T>
+void
+gt_pch_nx (edge_summary<T *>* const &summary)
+{
+  gcc_checking_assert (summary->m_ggc);
+  gt_pch_nx (&summary->m_map);
+}
+
+template <typename T>
+void
+gt_pch_nx (edge_summary<T *>* const& summary, gt_pointer_operator op,
+	  void *cookie)
+{
+  gcc_checking_assert (summary->m_ggc);
+  gt_pch_nx (&summary->m_map, op, cookie);
+}
+
 
 #endif  /* GCC_SYMBOL_SUMMARY_H  */
