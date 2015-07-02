@@ -2592,7 +2592,7 @@ ipa_make_edge_direct_to_target (struct cgraph_edge *ie, tree target,
 				bool speculative)
 {
   struct cgraph_node *callee;
-  struct inline_edge_summary *es = inline_edge_summary (ie);
+  struct inline_edge_summary *es = get_inline_edge_summary (ie);
   bool unreachable = false;
 
   if (TREE_CODE (target) == ADDR_EXPR)
@@ -2741,7 +2741,7 @@ ipa_make_edge_direct_to_target (struct cgraph_edge *ie, tree target,
 	 for direct call (adjusted by inline_edge_duplication_hook).  */
       if (ie == orig)
 	{
-	  es = inline_edge_summary (ie);
+	  es = get_inline_edge_summary (ie);
 	  es->call_stmt_size -= (eni_size_weights.indirect_call_cost
 				 - eni_size_weights.call_cost);
 	  es->call_stmt_time -= (eni_time_weights.indirect_call_cost
@@ -3350,9 +3350,6 @@ ipa_propagate_indirect_call_infos (struct cgraph_edge *cs,
 void
 ipa_free_all_edge_args (void)
 {
-  int i;
-  struct ipa_edge_args *args;
-
   if (!ipa_edge_args_sum)
     return;
 

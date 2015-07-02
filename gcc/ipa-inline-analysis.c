@@ -141,17 +141,10 @@ enum predicate_conditions
    of executions even when they are not compile time constants.  */
 #define CHANGED IDENTIFIER_NODE
 
-/* Holders of ipa cgraph hooks: */
-static struct cgraph_2edge_hook_list *edge_duplication_hook_holder;
-static struct cgraph_edge_hook_list *edge_removal_hook_holder;
-static void inline_edge_removal_hook (struct cgraph_edge *, void *);
-static void inline_edge_duplication_hook (struct cgraph_edge *,
-					  struct cgraph_edge *, void *);
-
 /* VECtor holding inline summaries.  
    In GGC memory because conditions might point to constant trees.  */
 function_summary <inline_summary *> *inline_summaries;
-vec<inline_edge_summary_t> inline_edge_summary_vec;
+inline_edge_summary_t *inline_edge_summaries;
 
 /* Cached node/edge growths.  */
 vec<edge_growth_cache_entry> edge_growth_cache;
@@ -762,7 +755,7 @@ redirect_to_unreachable (struct cgraph_edge *e)
     e->make_direct (target);
   else
     e->redirect_callee (target);
-  struct inline_edge_summary *es = inline_edge_summary (e);
+  struct inline_edge_summary *es = get_inline_edge_summary (e);
   e->inline_failed = CIF_UNREACHABLE;
   e->frequency = 0;
   e->count = 0;
@@ -787,7 +780,7 @@ edge_set_predicate (struct cgraph_edge *e, struct predicate *predicate)
       && (!e->speculative || e->callee))
     e = redirect_to_unreachable (e);
 
-  struct inline_edge_summary *es = inline_edge_summary (e);
+  struct inline_edge_summary *es = get_inline_edge_summary (e);
   if (predicate && !true_predicate_p (predicate))
     {
       if (!es->predicate)
@@ -936,7 +929,7 @@ evaluate_properties_for_edge (struct cgraph_edge *e, bool inline_p,
     {
       struct ipa_node_params *parms_info;
       struct ipa_edge_args *args = IPA_EDGE_REF (e);
-      struct inline_edge_summary *es = inline_edge_summary (e);
+      struct inline_edge_summary *es = get_inline_edge_summary (e);
       int i, count = ipa_get_cs_argument_count (args);
 
       if (e->caller->global.inlined_to)
@@ -1019,18 +1012,11 @@ evaluate_properties_for_edge (struct cgraph_edge *e, bool inline_p,
 static void
 inline_summary_alloc (void)
 {
-  if (!edge_removal_hook_holder)
-    edge_removal_hook_holder =
-      symtab->add_edge_removal_hook (&inline_edge_removal_hook, NULL);
-  if (!edge_duplication_hook_holder)
-    edge_duplication_hook_holder =
-      symtab->add_edge_duplication_hook (&inline_edge_duplication_hook, NULL);
+  if (!inline_edge_summaries)
+    inline_edge_summaries = new inline_edge_summary_t (symtab);
 
   if (!inline_summaries)
     inline_summaries = (inline_summary_t*) inline_summary_t::create_ggc (symtab);
-
-  if (inline_edge_summary_vec.length () <= (unsigned) symtab->edges_max_uid)
-    inline_edge_summary_vec.safe_grow_cleared (symtab->edges_max_uid + 1);
 }
 
 /* We are called multiple time for given function; clear
@@ -1039,9 +1025,9 @@ inline_summary_alloc (void)
 static void
 reset_inline_edge_summary (struct cgraph_edge *e)
 {
-  if (e->uid < (int) inline_edge_summary_vec.length ())
+  if (inline_edge_summaries)
     {
-      struct inline_edge_summary *es = inline_edge_summary (e);
+      struct inline_edge_summary *es = get_inline_edge_summary (e);
 
       es->call_stmt_size = es->call_stmt_time = 0;
       if (es->predicate)
@@ -1221,7 +1207,7 @@ inline_summary_t::duplicate (cgraph_node *src,
       for (edge = dst->callees; edge; edge = next)
 	{
 	  struct predicate new_predicate;
-	  struct inline_edge_summary *es = inline_edge_summary (edge);
+	  struct inline_edge_summary *es = get_inline_edge_summary (edge);
 	  next = edge->next_callee;
 
 	  if (!edge->inline_failed)
@@ -1242,7 +1228,7 @@ inline_summary_t::duplicate (cgraph_node *src,
       for (edge = dst->indirect_calls; edge; edge = next)
 	{
 	  struct predicate new_predicate;
-	  struct inline_edge_summary *es = inline_edge_summary (edge);
+	  struct inline_edge_summary *es = get_inline_edge_summary (edge);
 	  next = edge->next_callee;
 
 	  gcc_checking_assert (edge->inline_failed);
@@ -1298,16 +1284,11 @@ inline_summary_t::duplicate (cgraph_node *src,
 
 /* Hook that is called by cgraph.c when a node is duplicated.  */
 
-static void
-inline_edge_duplication_hook (struct cgraph_edge *src,
-			      struct cgraph_edge *dst,
-			      ATTRIBUTE_UNUSED void *data)
+void
+inline_edge_summary_t::duplicate (cgraph_edge *src, cgraph_edge *dst,
+				  inline_edge_summary *srcinfo,
+				  inline_edge_summary *info)
 {
-  struct inline_edge_summary *info;
-  struct inline_edge_summary *srcinfo;
-  inline_summary_alloc ();
-  info = inline_edge_summary (dst);
-  srcinfo = inline_edge_summary (src);
   memcpy (info, srcinfo, sizeof (struct inline_edge_summary));
   info->predicate = NULL;
   edge_set_predicate (dst, srcinfo->predicate);
@@ -1324,9 +1305,9 @@ inline_edge_duplication_hook (struct cgraph_edge *src,
 
 /* Keep edge cache consistent across edge removal.  */
 
-static void
-inline_edge_removal_hook (struct cgraph_edge *edge,
-			  void *data ATTRIBUTE_UNUSED)
+void
+inline_edge_summary_t::remove (cgraph_edge *edge,
+			       inline_edge_summary *)
 {
   if (edge_growth_cache.exists ())
     reset_edge_growth_cache (edge);
@@ -1363,7 +1344,7 @@ dump_inline_edge_summary (FILE *f, int indent, struct cgraph_node *node,
   struct cgraph_edge *edge;
   for (edge = node->callees; edge; edge = edge->next_callee)
     {
-      struct inline_edge_summary *es = inline_edge_summary (edge);
+      struct inline_edge_summary *es = get_inline_edge_summary (edge);
       struct cgraph_node *callee = edge->callee->ultimate_alias_target ();
       int i;
 
@@ -1410,7 +1391,7 @@ dump_inline_edge_summary (FILE *f, int indent, struct cgraph_node *node,
     }
   for (edge = node->indirect_calls; edge; edge = edge->next_callee)
     {
-      struct inline_edge_summary *es = inline_edge_summary (edge);
+      struct inline_edge_summary *es = get_inline_edge_summary (edge);
       fprintf (f, "%*sindirect call loop depth:%2i freq:%4i size:%2i"
 	       " time: %2i",
 	       indent, "",
@@ -2656,7 +2637,7 @@ estimate_function_body_sizes (struct cgraph_node *node, bool early)
 	      && !gimple_call_internal_p (stmt))
 	    {
 	      struct cgraph_edge *edge = node->get_edge (stmt);
-	      struct inline_edge_summary *es = inline_edge_summary (edge);
+	      struct inline_edge_summary *es = get_inline_edge_summary (edge);
 
 	      /* Special case: results of BUILT_IN_CONSTANT_P will be always
 	         resolved as constant.  We however don't want to optimize
@@ -2898,7 +2879,7 @@ compute_inline_parameters (struct cgraph_node *node, bool early)
      statement size.  */
   if (node->thunk.thunk_p)
     {
-      struct inline_edge_summary *es = inline_edge_summary (node->callees);
+      struct inline_edge_summary *es = get_inline_edge_summary (node->callees);
       struct predicate t = true_predicate ();
 
       info->inlinable = 0;
@@ -3080,7 +3061,7 @@ estimate_edge_size_and_time (struct cgraph_edge *e, int *size, int *min_size,
 			     vec<ipa_agg_jump_function_p> known_aggs,
 			     inline_hints *hints)
 {
-  struct inline_edge_summary *es = inline_edge_summary (e);
+  struct inline_edge_summary *es = get_inline_edge_summary (e);
   int call_size = es->call_stmt_size;
   int call_time = es->call_stmt_time;
   int cur_size;
@@ -3117,7 +3098,7 @@ estimate_calls_size_and_time (struct cgraph_node *node, int *size,
   struct cgraph_edge *e;
   for (e = node->callees; e; e = e->next_callee)
     {
-      struct inline_edge_summary *es = inline_edge_summary (e);
+      struct inline_edge_summary *es = get_inline_edge_summary (e);
 
       /* Do not care about zero sized builtins.  */
       if (e->inline_failed && !es->call_stmt_size)
@@ -3148,7 +3129,7 @@ estimate_calls_size_and_time (struct cgraph_node *node, int *size,
     }
   for (e = node->indirect_calls; e; e = e->next_callee)
     {
-      struct inline_edge_summary *es = inline_edge_summary (e);
+      struct inline_edge_summary *es = get_inline_edge_summary (e);
       if (!es->predicate
 	  || evaluate_predicate (es->predicate, possible_truths))
 	estimate_edge_size_and_time (e, size,
@@ -3413,10 +3394,10 @@ inline_update_callee_summaries (struct cgraph_node *node, int depth)
     {
       if (!e->inline_failed)
 	inline_update_callee_summaries (e->callee, depth);
-      inline_edge_summary (e)->loop_depth += depth;
+      get_inline_edge_summary (e)->loop_depth += depth;
     }
   for (e = node->indirect_calls; e; e = e->next_callee)
-    inline_edge_summary (e)->loop_depth += depth;
+    get_inline_edge_summary (e)->loop_depth += depth;
 }
 
 /* Update change_prob of EDGE after INLINED_EDGE has been inlined.
@@ -3433,9 +3414,9 @@ remap_edge_change_prob (struct cgraph_edge *inlined_edge,
     {
       int i;
       struct ipa_edge_args *args = IPA_EDGE_REF (edge);
-      struct inline_edge_summary *es = inline_edge_summary (edge);
+      struct inline_edge_summary *es = get_inline_edge_summary (edge);
       struct inline_edge_summary *inlined_es
-	= inline_edge_summary (inlined_edge);
+	= get_inline_edge_summary (inlined_edge);
 
       for (i = 0; i < ipa_get_cs_argument_count (args); i++)
 	{
@@ -3478,7 +3459,7 @@ remap_edge_summaries (struct cgraph_edge *inlined_edge,
   struct cgraph_edge *e, *next;
   for (e = node->callees; e; e = next)
     {
-      struct inline_edge_summary *es = inline_edge_summary (e);
+      struct inline_edge_summary *es = get_inline_edge_summary (e);
       struct predicate p;
       next = e->next_callee;
 
@@ -3503,7 +3484,7 @@ remap_edge_summaries (struct cgraph_edge *inlined_edge,
     }
   for (e = node->indirect_calls; e; e = next)
     {
-      struct inline_edge_summary *es = inline_edge_summary (e);
+      struct inline_edge_summary *es = get_inline_edge_summary (e);
       struct predicate p;
       next = e->next_callee;
 
@@ -3564,7 +3545,7 @@ inline_merge_summary (struct cgraph_edge *edge)
   int i;
   struct predicate toplev_predicate;
   struct predicate true_p = true_predicate ();
-  struct inline_edge_summary *es = inline_edge_summary (edge);
+  struct inline_edge_summary *es = get_inline_edge_summary (edge);
 
   if (es->predicate)
     toplev_predicate = *es->predicate;
@@ -3650,7 +3631,7 @@ inline_merge_summary (struct cgraph_edge *edge)
 			operand_map, offset_map, clause, &toplev_predicate);
 
   inline_update_callee_summaries (edge->callee,
-				  inline_edge_summary (edge)->loop_depth);
+				  get_inline_edge_summary (edge)->loop_depth);
 
   /* We do not maintain predicates of inlined edges, free it.  */
   edge_set_predicate (edge, &true_p);
@@ -3726,7 +3707,7 @@ do_estimate_edge_time (struct cgraph_edge *edge)
   vec<tree> known_vals;
   vec<ipa_polymorphic_call_context> known_contexts;
   vec<ipa_agg_jump_function_p> known_aggs;
-  struct inline_edge_summary *es = inline_edge_summary (edge);
+  struct inline_edge_summary *es = get_inline_edge_summary (edge);
   int min_size;
 
   callee = edge->callee->ultimate_alias_target ();
@@ -3855,7 +3836,7 @@ int
 estimate_time_after_inlining (struct cgraph_node *node,
 			      struct cgraph_edge *edge)
 {
-  struct inline_edge_summary *es = inline_edge_summary (edge);
+  struct inline_edge_summary *es = get_inline_edge_summary (edge);
   if (!es->predicate || !false_predicate_p (es->predicate))
     {
       gcov_type time =
@@ -3877,7 +3858,7 @@ int
 estimate_size_after_inlining (struct cgraph_node *node,
 			      struct cgraph_edge *edge)
 {
-  struct inline_edge_summary *es = inline_edge_summary (edge);
+  struct inline_edge_summary *es = get_inline_edge_summary (edge);
   if (!es->predicate || !false_predicate_p (es->predicate))
     {
       int size = inline_summaries->get (node)->size + estimate_edge_growth (edge);
@@ -4154,7 +4135,7 @@ read_predicate (struct lto_input_block *ib)
 static void
 read_inline_edge_summary (struct lto_input_block *ib, struct cgraph_edge *e)
 {
-  struct inline_edge_summary *es = inline_edge_summary (e);
+  struct inline_edge_summary *es = get_inline_edge_summary (e);
   struct predicate p;
   int length, i;
 
@@ -4327,7 +4308,7 @@ write_predicate (struct output_block *ob, struct predicate *p)
 static void
 write_inline_edge_summary (struct output_block *ob, struct cgraph_edge *e)
 {
-  struct inline_edge_summary *es = inline_edge_summary (e);
+  struct inline_edge_summary *es = get_inline_edge_summary (e);
   int i;
 
   streamer_write_uhwi (ob, es->call_stmt_size);
@@ -4430,19 +4411,14 @@ void
 inline_free_summary (void)
 {
   struct cgraph_node *node;
-  if (edge_removal_hook_holder)
-    symtab->remove_edge_removal_hook (edge_removal_hook_holder);
-  edge_removal_hook_holder = NULL;
-  if (edge_duplication_hook_holder)
-    symtab->remove_edge_duplication_hook (edge_duplication_hook_holder);
-  edge_duplication_hook_holder = NULL;
-  if (!inline_edge_summary_vec.exists ())
+  if (inline_edge_summaries == NULL)
     return;
   FOR_EACH_DEFINED_FUNCTION (node)
     if (!node->alias)
       reset_inline_summary (node, inline_summaries->get (node));
+  inline_edge_summaries->release ();
+  inline_edge_summaries = NULL;
   inline_summaries->release ();
   inline_summaries = NULL;
-  inline_edge_summary_vec.release ();
   edge_predicate_pool.release ();
 }
