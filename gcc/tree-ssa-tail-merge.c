@@ -1093,144 +1093,6 @@ set_cluster (basic_block bb1, basic_block bb2)
     gcc_unreachable ();
 }
 
-/* Return true if gimple operands T1 and T2 have the same value.  */
-
-static bool
-gimple_operand_equal_value_p (tree t1, tree t2)
-{
-  if (t1 == t2)
-    return true;
-
-  if (t1 == NULL_TREE
-      || t2 == NULL_TREE)
-    return false;
-
-  if (operand_equal_p (t1, t2, 0))
-    return true;
-
-  return gvn_uses_equal (t1, t2);
-}
-
-/* Return true if gimple statements S1 and S2 are equal.  Gimple_bb (s1) and
-   gimple_bb (s2) are members of SAME_SUCC.  */
-
-static bool
-gimple_equal_p (same_succ same_succ, gimple s1, gimple s2)
-{
-  unsigned int i;
-  tree lhs1, lhs2;
-  basic_block bb1 = gimple_bb (s1), bb2 = gimple_bb (s2);
-  tree t1, t2;
-  bool inv_cond;
-  enum tree_code code1, code2;
-
-  if (gimple_code (s1) != gimple_code (s2))
-    return false;
-
-  switch (gimple_code (s1))
-    {
-    case GIMPLE_CALL:
-      if (!gimple_call_same_target_p (s1, s2))
-	return false;
-
-      t1 = gimple_call_chain (s1);
-      t2 = gimple_call_chain (s2);
-      if (!gimple_operand_equal_value_p (t1, t2))
-	return false;
-
-      if (gimple_call_num_args (s1) != gimple_call_num_args (s2))
-	return false;
-
-      for (i = 0; i < gimple_call_num_args (s1); ++i)
-	{
-	  t1 = gimple_call_arg (s1, i);
-	  t2 = gimple_call_arg (s2, i);
-	  if (!gimple_operand_equal_value_p (t1, t2))
-	    return false;
-	}
-
-      lhs1 = gimple_get_lhs (s1);
-      lhs2 = gimple_get_lhs (s2);
-      if (lhs1 == NULL_TREE && lhs2 == NULL_TREE)
-	return true;
-      if (lhs1 == NULL_TREE || lhs2 == NULL_TREE)
-	return false;
-      if (TREE_CODE (lhs1) == SSA_NAME && TREE_CODE (lhs2) == SSA_NAME)
-	return vn_valueize (lhs1) == vn_valueize (lhs2);
-      return operand_equal_p (lhs1, lhs2, 0);
-
-    case GIMPLE_ASSIGN:
-      lhs1 = gimple_get_lhs (s1);
-      lhs2 = gimple_get_lhs (s2);
-      if (TREE_CODE (lhs1) != SSA_NAME
-	  && TREE_CODE (lhs2) != SSA_NAME)
-	return (operand_equal_p (lhs1, lhs2, 0)
-		&& gimple_operand_equal_value_p (gimple_assign_rhs1 (s1),
-						 gimple_assign_rhs1 (s2)));
-      else if (TREE_CODE (lhs1) == SSA_NAME
-	       && TREE_CODE (lhs2) == SSA_NAME)
-	return operand_equal_p (gimple_assign_rhs1 (s1),
-				gimple_assign_rhs1 (s2), 0);
-      return false;
-
-    case GIMPLE_COND:
-      t1 = gimple_cond_lhs (s1);
-      t2 = gimple_cond_lhs (s2);
-      if (!gimple_operand_equal_value_p (t1, t2))
-	return false;
-
-      t1 = gimple_cond_rhs (s1);
-      t2 = gimple_cond_rhs (s2);
-      if (!gimple_operand_equal_value_p (t1, t2))
-	return false;
-
-      code1 = gimple_expr_code (s1);
-      code2 = gimple_expr_code (s2);
-      inv_cond = (bitmap_bit_p (same_succ->inverse, bb1->index)
-		  != bitmap_bit_p (same_succ->inverse, bb2->index));
-      if (inv_cond)
-	{
-	  bool honor_nans = HONOR_NANS (t1);
-	  code2 = invert_tree_comparison (code2, honor_nans);
-	}
-      return code1 == code2;
-
-    default:
-      return false;
-    }
-}
-
-/* Let GSI skip backwards over local defs.  Return the earliest vuse in VUSE.
-   Return true in VUSE_ESCAPED if the vuse influenced a SSA_OP_DEF of one of the
-   processed statements.  */
-
-static void
-gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
-				  bool *vuse_escaped)
-{
-  gimple stmt;
-  tree lvuse;
-
-  while (true)
-    {
-      if (gsi_end_p (*gsi))
-	return;
-      stmt = gsi_stmt (*gsi);
-
-      lvuse = gimple_vuse (stmt);
-      if (lvuse != NULL_TREE)
-	{
-	  *vuse = lvuse;
-	  if (!ZERO_SSA_OPERANDS (stmt, SSA_OP_DEF))
-	    *vuse_escaped = true;
-	}
-
-      if (!stmt_local_def (stmt))
-	return;
-      gsi_prev_nondebug (gsi);
-    }
-}
-
 static bool
 check_edges_correspondence (basic_block bb1, basic_block bb2)
 {
@@ -1258,14 +1120,9 @@ check_edges_correspondence (basic_block bb1, basic_block bb2)
    clusters them.  */
 
 static void
-find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
+find_duplicate (basic_block bb1, basic_block bb2,
 		sem_function &f)
 {
-  gimple_stmt_iterator gsi1 = gsi_last_nondebug_bb (bb1);
-  gimple_stmt_iterator gsi2 = gsi_last_nondebug_bb (bb2);
-  tree vuse1 = NULL_TREE, vuse2 = NULL_TREE;
-  bool vuse_escaped = false;
-
   sem_bb sem_bb1 = sem_bb (bb1);
   sem_bb sem_bb2 = sem_bb (bb2);
 
@@ -1273,63 +1130,15 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
   f.set_checker (checker);
   bool icf_result = checker->compare_bb_tail_merge (&sem_bb1, &sem_bb2);
 
-  gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
-  gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
-
-  while (!gsi_end_p (gsi1) && !gsi_end_p (gsi2))
-    {
-      gimple stmt1 = gsi_stmt (gsi1);
-      gimple stmt2 = gsi_stmt (gsi2);
-
-      /* What could be better than to this this here is to blacklist the bb
-	 containing the stmt, when encountering the stmt f.i. in
-	 same_succ_hash.  */
-      if (is_tm_ending (stmt1)
-	  || is_tm_ending (stmt2))
-	goto diff;
-
-      if (!gimple_equal_p (same_succ, stmt1, stmt2))
-	goto diff;
-
-      gsi_prev_nondebug (&gsi1);
-      gsi_prev_nondebug (&gsi2);
-      gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
-      gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
-    }
-
-  if (!(gsi_end_p (gsi1) && gsi_end_p (gsi2)))
+  if (!icf_result || !check_edges_correspondence (bb1, bb2))
     return;
 
-  /* If the incoming vuses are not the same, and the vuse escaped into an
-     SSA_OP_DEF, then merging the 2 blocks will change the value of the def,
-     which potentially means the semantics of one of the blocks will be changed.
-     TODO: make this check more precise.  */
-  if (vuse_escaped && vuse1 != vuse2)
-    return;
-
-  if (!icf_result && dump_file)
-    fprintf (dump_file,
-	     "missed merge optimization: <bb %d> duplicate of <bb %d>\n",
+  if (dump_file)
+    fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
 	     bb1->index, bb2->index);
 
   if (dbg_cnt (tail_merge))
     set_cluster (bb1, bb2);
-
-  return;
-
-diff:
-  if (!check_edges_correspondence (bb1, bb2))
-    return;
-
-  if (icf_result)
-    {
-      if (dump_file)
-	fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
-		 bb1->index, bb2->index);
-
-      if (dbg_cnt (tail_merge))
-	set_cluster (bb1, bb2);
-    }
 }
 
 /* Returns whether for all phis in DEST the phi alternatives for E1 and
@@ -1493,7 +1302,7 @@ find_clusters_1 (same_succ same_succ, sem_function &f)
 	  if (!(same_phi_alternatives (same_succ, bb1, bb2)))
 	    continue;
 
-	  find_duplicate (same_succ, bb1, bb2, f);
+	  find_duplicate (bb1, bb2, f);
 	}
     }
 }
