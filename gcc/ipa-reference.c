@@ -57,12 +57,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "flags.h"
 #include "diagnostic.h"
 #include "data-streamer.h"
-
-static void remove_node_data (struct cgraph_node *node,
-			      void *data ATTRIBUTE_UNUSED);
-static void duplicate_node_data (struct cgraph_node *src,
-				 struct cgraph_node *dst,
-				 void *data ATTRIBUTE_UNUSED);
+#include "symbol-summary.h"
 
 /* The static variables defined within the compilation unit that are
    loaded or stored directly by function that owns this structure.  */
@@ -92,9 +87,10 @@ struct ipa_reference_optimization_summary_d
   bitmap statics_not_written;
 };
 
-typedef struct ipa_reference_local_vars_info_d *ipa_reference_local_vars_info_t;
-typedef struct ipa_reference_global_vars_info_d *ipa_reference_global_vars_info_t;
-typedef struct ipa_reference_optimization_summary_d *ipa_reference_optimization_summary_t;
+typedef ipa_reference_local_vars_info_d *ipa_reference_local_vars_info_t;
+typedef ipa_reference_global_vars_info_d *ipa_reference_global_vars_info_t;
+typedef ipa_reference_optimization_summary_d *
+  ipa_reference_optimization_summary_t;
 
 struct ipa_reference_vars_info_d
 {
@@ -122,57 +118,55 @@ static bitmap_obstack local_info_obstack;
 /* Obstack holding global analysis live forever.  */
 static bitmap_obstack optimization_summary_obstack;
 
-/* Holders of ipa cgraph hooks: */
-static struct cgraph_2node_hook_list *node_duplication_hook_holder;
-static struct cgraph_node_hook_list *node_removal_hook_holder;
+class ipa_ref_var_info_summary_t: public function_summary
+			  <ipa_reference_vars_info_d *>
+{
+public:
+  ipa_ref_var_info_summary_t (symbol_table *symtab):
+    function_summary <ipa_reference_vars_info_d *> (symtab) {}
+};
 
-/* Vector where the reference var infos are actually stored. 
-   Indexed by UID of call graph nodes.  */
-static vec<ipa_reference_vars_info_t> ipa_reference_vars_vector;
+static ipa_ref_var_info_summary_t *ipa_ref_var_info_summaries = NULL;
 
-/* TODO: find a place where we should release the vector.  */
-static vec<ipa_reference_optimization_summary_t> ipa_reference_opt_sum_vector;
+class ipa_ref_opt_summary_t: public function_summary
+			     <ipa_reference_optimization_summary_d *>
+{
+public:
+  ipa_ref_opt_summary_t (symbol_table *symtab):
+    function_summary <ipa_reference_optimization_summary_d *> (symtab) {}
+
+
+  virtual void remove (cgraph_node *src_node,
+		       ipa_reference_optimization_summary_d *data);
+  virtual void duplicate (cgraph_node *src_node, cgraph_node *dst_node,
+			  ipa_reference_optimization_summary_d *src_data,
+			  ipa_reference_optimization_summary_d *dst_data);
+};
+
+static ipa_ref_opt_summary_t *ipa_ref_opt_sum_summaries = NULL;
 
 /* Return the ipa_reference_vars structure starting from the cgraph NODE.  */
 static inline ipa_reference_vars_info_t
 get_reference_vars_info (struct cgraph_node *node)
 {
-  if (!ipa_reference_vars_vector.exists ()
-      || ipa_reference_vars_vector.length () <= (unsigned int) node->uid)
+  if (ipa_ref_var_info_summaries == NULL)
     return NULL;
-  return ipa_reference_vars_vector[node->uid];
+
+  ipa_reference_vars_info_t v = ipa_ref_var_info_summaries->get (node);
+  return v == NULL ? NULL : v;
 }
 
 /* Return the ipa_reference_vars structure starting from the cgraph NODE.  */
 static inline ipa_reference_optimization_summary_t
 get_reference_optimization_summary (struct cgraph_node *node)
 {
-  if (!ipa_reference_opt_sum_vector.exists ()
-      || (ipa_reference_opt_sum_vector.length () <= (unsigned int) node->uid))
+  if (ipa_ref_opt_sum_summaries == NULL)
     return NULL;
-  return ipa_reference_opt_sum_vector[node->uid];
-}
 
-/* Return the ipa_reference_vars structure starting from the cgraph NODE.  */
-static inline void
-set_reference_vars_info (struct cgraph_node *node,
-			 ipa_reference_vars_info_t info)
-{
-  if (!ipa_reference_vars_vector.exists ()
-      || ipa_reference_vars_vector.length () <= (unsigned int) node->uid)
-    ipa_reference_vars_vector.safe_grow_cleared (node->uid + 1);
-  ipa_reference_vars_vector[node->uid] = info;
-}
+  ipa_reference_optimization_summary_t v = ipa_ref_opt_sum_summaries->get
+    (node);
 
-/* Return the ipa_reference_vars structure starting from the cgraph NODE.  */
-static inline void
-set_reference_optimization_summary (struct cgraph_node *node,
-				    ipa_reference_optimization_summary_t info)
-{
-  if (!ipa_reference_opt_sum_vector.exists ()
-      || (ipa_reference_opt_sum_vector.length () <= (unsigned int) node->uid))
-    ipa_reference_opt_sum_vector.safe_grow_cleared (node->uid + 1);
-  ipa_reference_opt_sum_vector[node->uid] = info;
+  return v == NULL ? NULL : v;
 }
 
 /* Return a bitmap indexed by DECL_UID for the static variables that
@@ -242,8 +236,8 @@ is_proper_for_analysis (tree t)
   if (TREE_ADDRESSABLE (t))
     return false;
 
-  /* TODO: We could track public variables that are not addressable, but currently
-     frontends don't give us those.  */
+  /* TODO: We could track public variables that are not addressable,
+     but currently frontends don't give us those.  */
   if (TREE_PUBLIC (t))
     return false;
 
@@ -411,10 +405,14 @@ ipa_init (void)
   all_module_statics = BITMAP_ALLOC (&optimization_summary_obstack);
   ignore_module_statics = BITMAP_ALLOC (&optimization_summary_obstack);
 
-  node_removal_hook_holder =
-      symtab->add_cgraph_removal_hook (&remove_node_data, NULL);
-  node_duplication_hook_holder =
-      symtab->add_cgraph_duplication_hook (&duplicate_node_data, NULL);
+  if (ipa_ref_var_info_summaries == NULL)
+    ipa_ref_var_info_summaries = new ipa_ref_var_info_summary_t (symtab);
+
+  if (ipa_ref_opt_sum_summaries != NULL)
+    {
+      delete ipa_ref_opt_sum_summaries;
+      ipa_ref_opt_sum_summaries = NULL;
+    }
 }
 
 
@@ -423,11 +421,8 @@ ipa_init (void)
 static ipa_reference_local_vars_info_t
 init_function_info (struct cgraph_node *fn)
 {
-  ipa_reference_vars_info_t info
-    = XCNEW (struct ipa_reference_vars_info_d);
-
-  /* Add the info to the tree's annotation.  */
-  set_reference_vars_info (fn, info);
+  ipa_reference_vars_info_t info =
+    ipa_ref_var_info_summaries->get_or_insert (fn);
 
   info->local.statics_read = BITMAP_ALLOC (&local_info_obstack);
   info->local.statics_written = BITMAP_ALLOC (&local_info_obstack);
@@ -490,18 +485,12 @@ analyze_function (struct cgraph_node *fn)
 
 /* Called when new clone is inserted to callgraph late.  */
 
-static void
-duplicate_node_data (struct cgraph_node *src, struct cgraph_node *dst,
-	 	     void *data ATTRIBUTE_UNUSED)
+void
+ipa_ref_opt_summary_t::duplicate (cgraph_node *, cgraph_node *,
+				  ipa_reference_optimization_summary_d *ginfo,
+				  ipa_reference_optimization_summary_d
+				  *dst_ginfo)
 {
-  ipa_reference_optimization_summary_t ginfo;
-  ipa_reference_optimization_summary_t dst_ginfo;
-
-  ginfo = get_reference_optimization_summary (src);
-  if (!ginfo)
-    return;
-  dst_ginfo = XCNEW (struct ipa_reference_optimization_summary_d);
-  set_reference_optimization_summary (dst, dst_ginfo);
   dst_ginfo->statics_not_read =
     copy_static_var_set (ginfo->statics_not_read);
   dst_ginfo->statics_not_written =
@@ -510,23 +499,17 @@ duplicate_node_data (struct cgraph_node *src, struct cgraph_node *dst,
 
 /* Called when node is removed.  */
 
-static void
-remove_node_data (struct cgraph_node *node, void *data ATTRIBUTE_UNUSED)
+void
+ipa_ref_opt_summary_t::remove (cgraph_node *,
+			       ipa_reference_optimization_summary_d *ginfo)
 {
-  ipa_reference_optimization_summary_t ginfo;
-  ginfo = get_reference_optimization_summary (node);
-  if (ginfo)
-    {
-      if (ginfo->statics_not_read
-	  && ginfo->statics_not_read != all_module_statics)
-	BITMAP_FREE (ginfo->statics_not_read);
+  if (ginfo->statics_not_read
+      && ginfo->statics_not_read != all_module_statics)
+    BITMAP_FREE (ginfo->statics_not_read);
 
-      if (ginfo->statics_not_written
-	  && ginfo->statics_not_written != all_module_statics)
-	BITMAP_FREE (ginfo->statics_not_written);
-      free (ginfo);
-      set_reference_optimization_summary (node, NULL);
-    }
+  if (ginfo->statics_not_written
+      && ginfo->statics_not_written != all_module_statics)
+    BITMAP_FREE (ginfo->statics_not_written);
 }
 
 /* Analyze each function in the cgraph to see which global or statics
@@ -653,7 +636,8 @@ get_read_write_all_from_node (struct cgraph_node *node,
       struct cgraph_node *callee = e->callee->function_symbol (&avail);
       gcc_checking_assert (callee);
       if (avail <= AVAIL_INTERPOSABLE
-          || (callee->analyzed && !opt_for_fn (callee->decl, flag_ipa_reference)))
+	  || (callee->analyzed && !opt_for_fn (callee->decl,
+					       flag_ipa_reference)))
 	read_write_all_from_decl (callee, read_all, write_all);
     }
 
@@ -836,12 +820,14 @@ propagate (void)
 	}
     }
 
+  if (ipa_ref_opt_sum_summaries == NULL)
+    ipa_ref_opt_sum_summaries = new ipa_ref_opt_summary_t (symtab);
+
   /* Cleanup. */
   FOR_EACH_DEFINED_FUNCTION (node)
     {
       ipa_reference_vars_info_t node_info;
       ipa_reference_global_vars_info_t node_g;
-      ipa_reference_optimization_summary_t opt;
 
       node_info = get_reference_vars_info (node);
       if (!node->alias && opt_for_fn (node->decl, flag_ipa_reference)
@@ -850,8 +836,8 @@ propagate (void)
 	{
 	  node_g = &node_info->global;
 
-	  opt = XCNEW (struct ipa_reference_optimization_summary_d);
-	  set_reference_optimization_summary (node, opt);
+	  ipa_reference_optimization_summary_d *opt =
+	    ipa_ref_opt_sum_summaries->get_or_insert (node);
 
 	  /* Create the complimentary sets.  */
 
@@ -879,14 +865,20 @@ propagate (void)
 				  node_g->statics_written);
 	    }
 	}
-      free (node_info);
    }
 
   ipa_free_postorder_info ();
   free (order);
 
   bitmap_obstack_release (&local_info_obstack);
-  ipa_reference_vars_vector.release ();
+
+  if (ipa_ref_var_info_summaries == NULL)
+    {
+      delete ipa_ref_var_info_summaries;
+      ipa_ref_var_info_summaries = NULL;
+    }
+
+  ipa_ref_var_info_summaries = NULL;
   if (dump_file)
     splay_tree_delete (reference_vars_to_consider);
   reference_vars_to_consider = NULL;
@@ -906,8 +898,9 @@ write_node_summary_p (struct cgraph_node *node,
   if (!node->definition || node->global.inlined_to)
     return false;
   info = get_reference_optimization_summary (node);
-  if (!info || (bitmap_empty_p (info->statics_not_read)
-		&& bitmap_empty_p (info->statics_not_written)))
+  if (!info
+      || (bitmap_empty_p (info->statics_not_read)
+	  && bitmap_empty_p (info->statics_not_written)))
     return false;
 
   /* See if we want to encode it.
@@ -957,7 +950,8 @@ stream_out_bitmap (struct lto_simple_output_block *ob,
     return;
   EXECUTE_IF_AND_IN_BITMAP (bits, ltrans_statics, 0, index, bi)
     {
-      tree decl = (tree)splay_tree_lookup (reference_vars_to_consider, index)->value;
+      tree decl = (tree)splay_tree_lookup (reference_vars_to_consider,
+					   index)->value;
       lto_output_var_decl_index (ob->decl_state, ob->main_stream, decl);
     }
 }
@@ -1046,10 +1040,9 @@ ipa_reference_read_optimization_summary (void)
   unsigned int j = 0;
   bitmap_obstack_initialize (&optimization_summary_obstack);
 
-  node_removal_hook_holder =
-      symtab->add_cgraph_removal_hook (&remove_node_data, NULL);
-  node_duplication_hook_holder =
-      symtab->add_cgraph_duplication_hook (&duplicate_node_data, NULL);
+  if (ipa_ref_opt_sum_summaries == NULL)
+    ipa_ref_opt_sum_summaries = new ipa_ref_opt_summary_t (symtab);
+
   all_module_statics = BITMAP_ALLOC (&optimization_summary_obstack);
 
   while ((file_data = file_data_vec[j++]))
@@ -1084,7 +1077,6 @@ ipa_reference_read_optimization_summary (void)
 	    {
 	      unsigned int j, index;
 	      struct cgraph_node *node;
-	      ipa_reference_optimization_summary_t info;
 	      int v_count;
 	      lto_symtab_encoder_t encoder;
 
@@ -1092,10 +1084,14 @@ ipa_reference_read_optimization_summary (void)
 	      encoder = file_data->symtab_node_encoder;
 	      node = dyn_cast<cgraph_node *> (lto_symtab_encoder_deref
 		(encoder, index));
-	      info = XCNEW (struct ipa_reference_optimization_summary_d);
-	      set_reference_optimization_summary (node, info);
-	      info->statics_not_read = BITMAP_ALLOC (&optimization_summary_obstack);
-	      info->statics_not_written = BITMAP_ALLOC (&optimization_summary_obstack);
+
+	      ipa_reference_optimization_summary_d *info =
+		ipa_ref_opt_sum_summaries->get_or_insert (node);
+
+	      info->statics_not_read = BITMAP_ALLOC
+		(&optimization_summary_obstack);
+	      info->statics_not_written = BITMAP_ALLOC
+		(&optimization_summary_obstack);
 	      if (dump_file)
 		fprintf (dump_file,
 			 "\nFunction name:%s/%i:\n  static not read:",
@@ -1137,7 +1133,8 @@ ipa_reference_read_optimization_summary (void)
 		    unsigned int var_index = streamer_read_uhwi (ib);
 		    tree v_decl = lto_file_decl_data_get_var_decl (file_data,
 								   var_index);
-		    bitmap_set_bit (info->statics_not_written, DECL_UID (v_decl));
+		    bitmap_set_bit (info->statics_not_written,
+				    DECL_UID (v_decl));
 		    if (dump_file)
 		      fprintf (dump_file, " %s", fndecl_name (v_decl));
 		  }
@@ -1150,9 +1147,9 @@ ipa_reference_read_optimization_summary (void)
 					  ib, data, len);
 	}
       else
-	/* Fatal error here.  We do not want to support compiling ltrans units with
-	   different version of compiler or different flags than the WPA unit, so
-	   this should never happen.  */
+	/* Fatal error here.  We do not want to support compiling ltrans units
+	   with different version of compiler or different flags than
+	   the WPA unit, so this should never happen.  */
 	fatal_error (input_location,
 		     "ipa reference summary is missing in ltrans unit");
     }
@@ -1221,16 +1218,5 @@ ipa_reference_c_finalize (void)
     {
       bitmap_obstack_release (&optimization_summary_obstack);
       ipa_init_p = false;
-    }
-
-  if (node_removal_hook_holder)
-    {
-      symtab->remove_cgraph_removal_hook (node_removal_hook_holder);
-      node_removal_hook_holder = NULL;
-    }
-  if (node_duplication_hook_holder)
-    {
-      symtab->remove_cgraph_duplication_hook (node_duplication_hook_holder);
-      node_duplication_hook_holder = NULL;
     }
 }
