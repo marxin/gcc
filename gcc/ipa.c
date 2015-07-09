@@ -683,7 +683,7 @@ symbol_table::remove_unreachable_nodes (FILE *file)
 #endif
 
   /* If we removed something, perhaps profile could be improved.  */
-  if (changed && optimize && inline_edge_summary_vec.exists ())
+  if (changed && optimize && inline_edge_summaries)
     FOR_EACH_DEFINED_FUNCTION (node)
       ipa_propagate_frequency (node);
 
