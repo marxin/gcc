@@ -112,7 +112,8 @@ namespace ipa_icf_gimple {
 class sem_bb
 {
 public:
-  sem_bb (basic_block bb_, unsigned nondbg_stmt_count_, unsigned edge_count_):
+  sem_bb (basic_block bb_, unsigned nondbg_stmt_count_ = 0,
+	  unsigned edge_count_ = 0):
     bb (bb_), nondbg_stmt_count (nondbg_stmt_count_), edge_count (edge_count_) {}
 
   /* Basic block the structure belongs to.  */
@@ -124,6 +125,9 @@ public:
   /* Number of edges connected to the block.  */
   unsigned edge_count;
 };
+
+/* Forward declaration.  */
+class ssa_names_set;
 
 /* A class aggregating all connections and semantic equivalents
    for a given pair of semantic function candidates.  */
@@ -138,7 +142,7 @@ public:
      of declarations that can be skipped.  */
   func_checker (tree source_func_decl, tree target_func_decl,
 		bool compare_polymorphic,
-		bool ignore_labels = false,
+		bool tail_merge_mode = false,
 		hash_set<symtab_node *> *ignored_source_nodes = NULL,
 		hash_set<symtab_node *> *ignored_target_nodes = NULL);
 
@@ -149,12 +153,20 @@ public:
      mapping between basic blocks and labels.  */
   void parse_labels (sem_bb *bb);
 
+  /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
+     true value is returned if phi nodes are semantically
+     equivalent in these blocks.  */
+  bool compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2);
+
+  /* Run tail-merge comparison for basic blocks BB1 and BB2.  */
+  bool compare_bb_tail_merge (sem_bb *bb1, sem_bb *bb2);
+
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 correspond.  */
   bool compare_bb (sem_bb *bb1, sem_bb *bb2);
 
   /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
-  bool compare_ssa_name (tree t1, tree t2);
+  bool compare_ssa_name (tree t1, tree t2, bool strict = true);
 
   /* Verification function for edges E1 and E2.  */
   bool compare_edge (edge e1, edge e2);
@@ -204,7 +216,7 @@ public:
   bool compare_tree_ssa_label (tree t1, tree t2);
 
   /* Function compare for equality given memory operands T1 and T2.  */
-  bool compare_memory_operand (tree t1, tree t2);
+  bool compare_memory_operand (tree t1, tree t2, bool strict = true);
 
   /* Function compare for equality given trees T1 and T2 which
      can be either a constant or a declaration type.  */
@@ -213,7 +225,7 @@ public:
   /* Function responsible for comparison of various operands T1 and T2.
      If these components, from functions FUNC1 and FUNC2, are equal, true
      is returned.  */
-  bool compare_operand (tree t1, tree t2);
+  bool compare_operand (tree t1, tree t2, bool strict = false);
 
   /* Compares two tree list operands T1 and T2 and returns true if these
      two trees are semantically equivalent.  */
@@ -237,6 +249,13 @@ public:
      first parameter of a function.  */
   static bool compatible_types_p (tree t1, tree t2);
 
+  /* Return true if gimple STMT is just a local difinition in a
+     basic block.  Used SSA names are contained in SSA_NAMES_SET.  */
+  static bool stmt_local_def (gimple stmt, ssa_names_set *ssa_names_set);
+
+  /* Advance the iterator to the next non-local gimple statement.  */
+  static void gsi_next_nonlocal (gimple_stmt_iterator *i,
+			  ssa_names_set *ssa_names_set);
 
 private:
   /* Vector mapping source SSA names to target ones.  */
@@ -271,8 +290,53 @@ private:
   /* Flag if polymorphic comparison should be executed.  */
   bool m_compare_polymorphic;
 
-  /* Flag if ignore labels in comparison.  */
-  bool m_ignore_labels;
+  /* Flag which changes behavior for tree-ssa-tail-merge pass.  */
+  bool m_tail_merge_mode;
 };
+
+/* SSA NAMES set.  */
+class ssa_names_set
+{
+public:
+  /* Return true if SSA_NAME is in the set.  */
+  bool contains (tree ssa_name);
+
+  /* Add a new SSA_NAME to the set.  */
+  void add (tree ssa_name);
+
+  /* Build the set for given basic block BB.  */
+  void build (basic_block bb);
+
+private:
+  hash_set <tree> m_set;
+};
+
+inline void
+func_checker::gsi_next_nonlocal (gimple_stmt_iterator *i,
+				 ssa_names_set *ssa_names_set)
+{
+  while (!gsi_end_p (*i) &&
+	 (is_gimple_debug (gsi_stmt (*i))
+	  || func_checker::stmt_local_def (gsi_stmt (*i), ssa_names_set)))
+    gsi_next (i);
+}
+
+inline bool
+ssa_names_set::contains (tree ssa_name)
+{
+  if (ssa_name == NULL || TREE_CODE (ssa_name) != SSA_NAME)
+    return false;
+
+  return m_set.contains (ssa_name);
+}
+
+inline void
+ssa_names_set::add (tree ssa_name)
+{
+  if (ssa_name == NULL || TREE_CODE (ssa_name) != SSA_NAME)
+    return;
+
+  m_set.add (ssa_name);
+}
 
 } // ipa_icf_gimple namespace

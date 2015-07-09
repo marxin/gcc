@@ -187,6 +187,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "config.h"
 #include "system.h"
+#include <list>
 #include "coretypes.h"
 #include "backend.h"
 #include "tree.h"
@@ -197,6 +198,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "fold-const.h"
 #include "stor-layout.h"
 #include "trans-mem.h"
+#include "inchash.h"
 #include "tm_p.h"
 #include "cfganal.h"
 #include "cfgcleanup.h"
@@ -213,6 +215,15 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "tree-pass.h"
 #include "trans-mem.h"
+#include "ipa-ref.h"
+#include "lto-streamer.h"
+#include "cgraph.h"
+#include "ipa-icf-gimple.h"
+#include "ipa-icf.h"
+#include "dbgcnt.h"
+
+using namespace ipa_icf;
+using namespace ipa_icf_gimple;
 
 /* Describes a group of bbs with the same successors.  The successor bbs are
    cached in succs, and the successor edge flags are cached in succ_flags.
@@ -1220,16 +1231,47 @@ gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
     }
 }
 
+static bool
+check_edges_correspondence (basic_block bb1, basic_block bb2)
+{
+  edge e1, e2;
+  edge_iterator ei2 = ei_start (bb2->succs);
+
+  for (edge_iterator ei1 = ei_start (bb1->succs); ei_cond (ei1, &e1);
+       ei_next (&ei1))
+    {
+      ei_cond (ei2, &e2);
+
+      if (e1->dest->index != e2->dest->index ||
+	  (e1->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE))
+	  != (e2->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)))
+	return false;
+
+      ei_next (&ei2);
+    }
+
+  return true;
+}
+
+
 /* Determines whether BB1 and BB2 (members of same_succ) are duplicates.  If so,
    clusters them.  */
 
 static void
-find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2)
+find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2,
+		sem_function &f)
 {
   gimple_stmt_iterator gsi1 = gsi_last_nondebug_bb (bb1);
   gimple_stmt_iterator gsi2 = gsi_last_nondebug_bb (bb2);
   tree vuse1 = NULL_TREE, vuse2 = NULL_TREE;
   bool vuse_escaped = false;
+
+  sem_bb sem_bb1 = sem_bb (bb1);
+  sem_bb sem_bb2 = sem_bb (bb2);
+
+  func_checker *checker = new func_checker (f.decl, f.decl, true, true);
+  f.set_checker (checker);
+  bool icf_result = checker->compare_bb_tail_merge (&sem_bb1, &sem_bb2);
 
   gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
   gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
@@ -1244,10 +1286,10 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2)
 	 same_succ_hash.  */
       if (is_tm_ending (stmt1)
 	  || is_tm_ending (stmt2))
-	return;
+	goto diff;
 
       if (!gimple_equal_p (same_succ, stmt1, stmt2))
-	return;
+	goto diff;
 
       gsi_prev_nondebug (&gsi1);
       gsi_prev_nondebug (&gsi2);
@@ -1265,11 +1307,29 @@ find_duplicate (same_succ same_succ, basic_block bb1, basic_block bb2)
   if (vuse_escaped && vuse1 != vuse2)
     return;
 
-  if (dump_file)
-    fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
+  if (!icf_result && dump_file)
+    fprintf (dump_file,
+	     "missed merge optimization: <bb %d> duplicate of <bb %d>\n",
 	     bb1->index, bb2->index);
 
-  set_cluster (bb1, bb2);
+  if (dbg_cnt (tail_merge))
+    set_cluster (bb1, bb2);
+
+  return;
+
+diff:
+  if (!check_edges_correspondence (bb1, bb2))
+    return;
+
+  if (icf_result)
+    {
+      if (dump_file)
+	fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
+		 bb1->index, bb2->index);
+
+      if (dbg_cnt (tail_merge))
+	set_cluster (bb1, bb2);
+    }
 }
 
 /* Returns whether for all phis in DEST the phi alternatives for E1 and
@@ -1391,7 +1451,7 @@ deps_ok_for_redirect (basic_block bb1, basic_block bb2)
 /* Within SAME_SUCC->bbs, find clusters of bbs which can be merged.  */
 
 static void
-find_clusters_1 (same_succ same_succ)
+find_clusters_1 (same_succ same_succ, sem_function &f)
 {
   basic_block bb1, bb2;
   unsigned int i, j;
@@ -1433,7 +1493,7 @@ find_clusters_1 (same_succ same_succ)
 	  if (!(same_phi_alternatives (same_succ, bb1, bb2)))
 	    continue;
 
-	  find_duplicate (same_succ, bb1, bb2);
+	  find_duplicate (same_succ, bb1, bb2, f);
 	}
     }
 }
@@ -1441,7 +1501,7 @@ find_clusters_1 (same_succ same_succ)
 /* Find clusters of bbs which can be merged.  */
 
 static void
-find_clusters (void)
+find_clusters (sem_function &f)
 {
   same_succ same;
 
@@ -1454,7 +1514,7 @@ find_clusters (void)
 	  fprintf (dump_file, "processing worklist entry\n");
 	  same_succ_print (dump_file, same);
 	}
-      find_clusters_1 (same);
+      find_clusters_1 (same, f);
     }
 }
 
@@ -1659,6 +1719,10 @@ tail_merge_optimize (unsigned int todo)
     }
   init_worklist ();
 
+  bitmap_obstack b;
+  bitmap_obstack_initialize (&b);
+  cgraph_node *node = cgraph_node::get (cfun->decl);
+
   while (!worklist.is_empty ())
     {
       if (!loop_entered)
@@ -1674,7 +1738,8 @@ tail_merge_optimize (unsigned int todo)
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "worklist iteration #%d\n", iteration_nr);
 
-      find_clusters ();
+      sem_function f (node, 0, &b);
+      find_clusters (f);
       gcc_assert (worklist.is_empty ());
       if (all_clusters.is_empty ())
 	break;
