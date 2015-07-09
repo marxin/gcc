@@ -66,21 +66,6 @@ struct et_node
 
   struct et_occ *rightmost_occ;	/* The rightmost occurrence.  */
   struct et_occ *parent_occ;	/* The occurrence of the parent node.  */
-
-  /* Pool allocation new operator.  */
-  inline void *operator new (size_t)
-  {
-    return ::new (pool.allocate ()) et_node ();
-  }
-
-  /* Delete operator utilizing pool allocation.  */
-  inline void operator delete (void *ptr)
-  {
-    pool.remove (ptr);
-  }
-
-  /* Memory allocation pool.  */
-  static pool_allocator pool;
 };
 
 struct et_node *et_new_tree (void *data);

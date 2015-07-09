@@ -105,21 +105,6 @@ struct update_cost_record
   int divisor;
   /* Next record for given allocno.  */
   struct update_cost_record *next;
-
-  /* Pool allocation new operator.  */
-  inline void *operator new (size_t)
-  {
-    return ::new (pool.allocate ()) update_cost_record ();
-  }
-
-  /* Delete operator utilizing pool allocation.  */
-  inline void operator delete (void *ptr)
-  {
-    pool.remove (ptr);
-  }
-
-  /* Memory allocation pool.  */
-  static pool_allocator pool;
 };
 
 /* To decrease footprint of ira_allocno structure we store all data

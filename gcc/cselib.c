@@ -45,21 +45,6 @@ struct elt_list
 {
   struct elt_list *next;
   cselib_val *elt;
-
-  /* Pool allocation new operator.  */
-  inline void *operator new (size_t)
-  {
-    return ::new (pool.allocate ()) elt_list ();
-  }
-
-  /* Delete operator utilizing pool allocation.  */
-  inline void operator delete (void *ptr)
-  {
-    pool.remove (ptr);
-  }
-
-  /* Memory allocation pool.  */
-  static pool_allocator pool;
 };
 
 static bool cselib_record_memory;
@@ -261,9 +246,9 @@ static unsigned int cfa_base_preserved_regno = INVALID_REGNUM;
    each time memory is invalidated.  */
 static cselib_val *first_containing_mem = &dummy_val;
 
-pool_allocator elt_list::pool ("elt_list", 10, sizeof (elt_list));
-pool_allocator elt_loc_list::pool ("elt_loc_list", 10, sizeof (elt_loc_list));
-pool_allocator cselib_val::pool ("cselib_val_list", 10, sizeof (cselib_val));
+static object_allocator<elt_list> elt_list_pool ("elt_list", 10);
+static object_allocator<elt_loc_list> elt_loc_list_pool ("elt_loc_list", 10);
+static object_allocator<cselib_val> cselib_val_pool ("cselib_val_list", 10);
 
 static pool_allocator value_pool ("value", 100, RTX_CODE_SIZE (VALUE));
 
@@ -293,7 +278,7 @@ void (*cselib_record_sets_hook) (rtx_insn *insn, struct cselib_set *sets,
 static inline struct elt_list *
 new_elt_list (struct elt_list *next, cselib_val *elt)
 {
-  elt_list *el = new elt_list ();
+  elt_list *el = elt_list_pool.allocate ();
   el->next = next;
   el->elt = elt;
   return el;
@@ -377,14 +362,14 @@ new_elt_loc_list (cselib_val *val, rtx loc)
 	}
 
       /* Chain LOC back to VAL.  */
-      el = new elt_loc_list;
+      el = elt_loc_list_pool.allocate ();
       el->loc = val->val_rtx;
       el->setting_insn = cselib_current_insn;
       el->next = NULL;
       CSELIB_VAL_PTR (loc)->locs = el;
     }
 
-  el = new elt_loc_list;
+  el = elt_loc_list_pool.allocate ();
   el->loc = loc;
   el->setting_insn = cselib_current_insn;
   el->next = next;
@@ -424,7 +409,7 @@ unchain_one_elt_list (struct elt_list **pl)
   struct elt_list *l = *pl;
 
   *pl = l->next;
-  delete l;
+  elt_list_pool.remove (l);
 }
 
 /* Likewise for elt_loc_lists.  */
@@ -435,7 +420,7 @@ unchain_one_elt_loc_list (struct elt_loc_list **pl)
   struct elt_loc_list *l = *pl;
 
   *pl = l->next;
-  delete l;
+  elt_loc_list_pool.remove (l);
 }
 
 /* Likewise for cselib_vals.  This also frees the addr_list associated with
@@ -447,7 +432,7 @@ unchain_one_value (cselib_val *v)
   while (v->addr_list)
     unchain_one_elt_list (&v->addr_list);
 
-  delete v;
+  cselib_val_pool.remove (v);
 }
 
 /* Remove all entries from the hash table.  Also used during
@@ -1310,7 +1295,7 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
 static inline cselib_val *
 new_cselib_val (unsigned int hash, machine_mode mode, rtx x)
 {
-  cselib_val *e = new cselib_val;
+  cselib_val *e = cselib_val_pool.allocate ();
 
   gcc_assert (hash);
   gcc_assert (next_uid);
@@ -2774,9 +2759,9 @@ cselib_finish (void)
   cselib_any_perm_equivs = false;
   cfa_base_preserved_val = NULL;
   cfa_base_preserved_regno = INVALID_REGNUM;
-  elt_list::pool.release ();
-  elt_loc_list::pool.release ();
-  cselib_val::pool.release ();
+  elt_list_pool.release ();
+  elt_loc_list_pool.release ();
+  cselib_val_pool.release ();
   value_pool.release ();
   cselib_clear_table ();
   delete cselib_hash_table;

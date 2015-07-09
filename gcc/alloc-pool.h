@@ -442,6 +442,9 @@ public:
   inline void
   remove (T *object)
   {
+    /* Call destructor.  */
+    object->~T ();
+
     m_allocator.remove (object);
   }
 
@@ -469,6 +472,12 @@ struct alloc_pool_descriptor
   int elt_size;
 };
 
+template <typename T>
+inline void *
+operator new (size_t, object_allocator<T> &a)
+{
+  return a.allocate ();
+}
 
 /* Hashtable mapping alloc_pool names to descriptors.  */
 extern hash_map<const char *, alloc_pool_descriptor> *alloc_pool_hash;
