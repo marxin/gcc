@@ -1,6 +1,7 @@
 /* Tail merging for gimple.
    Copyright (C) 2011-2016 Free Software Foundation, Inc.
    Contributed by Tom de Vries (tom@codesourcery.com)
+   and Martin Liska (mliska@suse.cz)
 
 This file is part of GCC.
 
@@ -124,35 +125,10 @@ along with GCC; see the file COPYING3.  If not see
      are redirected to enter the other block.  Note that this operation might
      involve introducing phi operations.
 
-   For efficient implementation, we would like to value numbers the blocks, and
-   have a comparison operator that tells us whether the blocks are equal.
-   Besides being runtime efficient, block value numbering should also abstract
-   from irrelevant differences in order of operations, much like normal value
-   numbering abstracts from irrelevant order of operations.
-
-   For the first situation (same_operations, same predecessors), normal value
-   numbering fits well.  We can calculate a block value number based on the
-   value numbers of the defs and vdefs.
-
-   For the second situation (same operations, same successors), this approach
-   doesn't work so well.  We can illustrate this using the example.  The calls
-   to free use different vdefs: MEMD.3923_16 and MEMD.3923_14, and these will
-   remain different in value numbering, since they represent different memory
-   states.  So the resulting vdefs of the frees will be different in value
-   numbering, so the block value numbers will be different.
-
-   The reason why we call the blocks equal is not because they define the same
-   values, but because uses in the blocks use (possibly different) defs in the
-   same way.  To be able to detect this efficiently, we need to do some kind of
-   reverse value numbering, meaning number the uses rather than the defs, and
-   calculate a block value number based on the value number of the uses.
-   Ideally, a block comparison operator will also indicate which phis are needed
-   to merge the blocks.
-
-   For the moment, we don't do block value numbering, but we do insn-by-insn
-   matching, using scc value numbers to match operations with results, and
-   structural comparison otherwise, while ignoring vop mismatches.
-
+   Basic blocks are compared insn-by-insn by ICF infrastructure which was
+   originally used for IPA-ICF.  Even though the pass is function base,
+   BB equality is subset of comparisons that are performed and can be reused
+   for this pass.
 
    IMPLEMENTATION
 
@@ -202,8 +178,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "tree-into-ssa.h"
 #include "params.h"
-#include "tree-ssa-sccvn.h"
+#include "gimple-pretty-print.h"
+#include "tree-dump.h"
 #include "cfgloop.h"
+#include "tree-pass.h"
+#include "trans-mem.h"
+#include "ipa-ref.h"
+#include "lto-streamer.h"
+#include "cgraph.h"
+#include <list>
+#include "except.h"
+#include "ipa-icf-gimple.h"
+#include "ipa-icf.h"
+#include "dbgcnt.h"
+
+using namespace icf;
 
 /* Describes a group of bbs with the same successors.  The successor bbs are
    cached in succs, and the successor edge flags are cached in succ_flags.
@@ -346,24 +335,29 @@ gsi_advance_fw_nondebug_nonlocal (gimple_stmt_iterator *gsi)
     }
 }
 
-/* VAL1 and VAL2 are either:
-   - uses in BB1 and BB2, or
-   - phi alternatives for BB1 and BB2.
-   Return true if the uses have the same gvn value.  */
+/* Return true if either VAL1 and VAL2 are constant values and are equal,
+   or if both values are SSA names.  In this case we conditionally return true
+   and ICF machinery will verify that these SSA names are really equivalent
+   in basic blocks we compare.  */
 
 static bool
-gvn_uses_equal (tree val1, tree val2)
+equal_ssa_uses (tree val1, tree val2,
+		auto_vec<std::pair<tree, tree> > *ssa_phi_pairs)
 {
   gcc_checking_assert (val1 != NULL_TREE && val2 != NULL_TREE);
 
   if (val1 == val2)
     return true;
 
-  if (vn_valueize (val1) != vn_valueize (val2))
+  if (CONSTANT_CLASS_P (val1) && CONSTANT_CLASS_P (val2))
+    return operand_equal_p (val1, val2, OEP_ONLY_CONST);
+  else if (TREE_CODE (val1) == SSA_NAME && TREE_CODE (val2) == SSA_NAME)
+    {
+      ssa_phi_pairs->safe_push (std::make_pair (val1, val2));
+      return true;
+    }
+  else
     return false;
-
-  return ((TREE_CODE (val1) == SSA_NAME || CONSTANT_CLASS_P (val1))
-	  && (TREE_CODE (val2) == SSA_NAME || CONSTANT_CLASS_P (val2)));
 }
 
 /* Prints E to FILE.  */
@@ -440,7 +434,6 @@ same_succ_hash (const same_succ *e)
   basic_block bb = BASIC_BLOCK_FOR_FN (cfun, first);
   int size = 0;
   gimple *stmt;
-  tree arg;
   unsigned int s;
   bitmap_iterator bs;
 
@@ -465,12 +458,6 @@ same_succ_hash (const same_succ *e)
 	  inchash::add_expr (gimple_call_fn (stmt), hstate);
 	  if (gimple_call_chain (stmt))
 	    inchash::add_expr (gimple_call_chain (stmt), hstate);
-	}
-      for (i = 0; i < gimple_call_num_args (stmt); i++)
-	{
-	  arg = gimple_call_arg (stmt, i);
-	  arg = vn_valueize (arg);
-	  inchash::add_expr (arg, hstate);
 	}
     }
 
@@ -804,6 +791,10 @@ static void
 same_succ_flush_bb (basic_block bb)
 {
   same_succ *same = BB_SAME_SUCC (bb);
+
+  if (same == NULL)
+    return;
+
   BB_SAME_SUCC (bb) = NULL;
   if (bitmap_single_bit_set_p (same->bbs))
     same_succ_htab->remove_elt_with_hash (same, same->hashval);
@@ -1069,201 +1060,94 @@ set_cluster (basic_block bb1, basic_block bb2)
     gcc_unreachable ();
 }
 
-/* Return true if gimple operands T1 and T2 have the same value.  */
+/* Make sure that all edges coming from basic block BB1 and BB2 have
+   the same destination index, and make sure that true/false edge values
+   are equal.  */
 
 static bool
-gimple_operand_equal_value_p (tree t1, tree t2)
+check_edges_correspondence (basic_block bb1, basic_block bb2)
 {
-  if (t1 == t2)
-    return true;
+  edge e1, e2;
+  edge_iterator ei2 = ei_start (bb2->succs);
 
-  if (t1 == NULL_TREE
-      || t2 == NULL_TREE)
-    return false;
-
-  if (operand_equal_p (t1, t2, OEP_MATCH_SIDE_EFFECTS))
-    return true;
-
-  return gvn_uses_equal (t1, t2);
-}
-
-/* Return true if gimple statements S1 and S2 are equal.  Gimple_bb (s1) and
-   gimple_bb (s2) are members of SAME_SUCC.  */
-
-static bool
-gimple_equal_p (same_succ *same_succ, gimple *s1, gimple *s2)
-{
-  unsigned int i;
-  tree lhs1, lhs2;
-  basic_block bb1 = gimple_bb (s1), bb2 = gimple_bb (s2);
-  tree t1, t2;
-  bool inv_cond;
-  enum tree_code code1, code2;
-
-  if (gimple_code (s1) != gimple_code (s2))
-    return false;
-
-  switch (gimple_code (s1))
+  for (edge_iterator ei1 = ei_start (bb1->succs); ei_cond (ei1, &e1);
+       ei_next (&ei1))
     {
-    case GIMPLE_CALL:
-      if (!gimple_call_same_target_p (s1, s2))
+      ei_cond (ei2, &e2);
+
+      if (e1->dest->index != e2->dest->index
+	  || (e1->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE))
+	    != (e2->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)))
 	return false;
 
-      t1 = gimple_call_chain (s1);
-      t2 = gimple_call_chain (s2);
-      if (!gimple_operand_equal_value_p (t1, t2))
-	return false;
-
-      if (gimple_call_num_args (s1) != gimple_call_num_args (s2))
-	return false;
-
-      for (i = 0; i < gimple_call_num_args (s1); ++i)
-	{
-	  t1 = gimple_call_arg (s1, i);
-	  t2 = gimple_call_arg (s2, i);
-	  if (!gimple_operand_equal_value_p (t1, t2))
-	    return false;
-	}
-
-      lhs1 = gimple_get_lhs (s1);
-      lhs2 = gimple_get_lhs (s2);
-      if (lhs1 == NULL_TREE && lhs2 == NULL_TREE)
-	return true;
-      if (lhs1 == NULL_TREE || lhs2 == NULL_TREE)
-	return false;
-      if (TREE_CODE (lhs1) == SSA_NAME && TREE_CODE (lhs2) == SSA_NAME)
-	return vn_valueize (lhs1) == vn_valueize (lhs2);
-      return operand_equal_p (lhs1, lhs2, 0);
-
-    case GIMPLE_ASSIGN:
-      lhs1 = gimple_get_lhs (s1);
-      lhs2 = gimple_get_lhs (s2);
-      if (TREE_CODE (lhs1) != SSA_NAME
-	  && TREE_CODE (lhs2) != SSA_NAME)
-	return (operand_equal_p (lhs1, lhs2, 0)
-		&& gimple_operand_equal_value_p (gimple_assign_rhs1 (s1),
-						 gimple_assign_rhs1 (s2)));
-      else if (TREE_CODE (lhs1) == SSA_NAME
-	       && TREE_CODE (lhs2) == SSA_NAME)
-	return operand_equal_p (gimple_assign_rhs1 (s1),
-				gimple_assign_rhs1 (s2), 0);
-      return false;
-
-    case GIMPLE_COND:
-      t1 = gimple_cond_lhs (s1);
-      t2 = gimple_cond_lhs (s2);
-      if (!gimple_operand_equal_value_p (t1, t2))
-	return false;
-
-      t1 = gimple_cond_rhs (s1);
-      t2 = gimple_cond_rhs (s2);
-      if (!gimple_operand_equal_value_p (t1, t2))
-	return false;
-
-      code1 = gimple_expr_code (s1);
-      code2 = gimple_expr_code (s2);
-      inv_cond = (bitmap_bit_p (same_succ->inverse, bb1->index)
-		  != bitmap_bit_p (same_succ->inverse, bb2->index));
-      if (inv_cond)
-	{
-	  bool honor_nans = HONOR_NANS (t1);
-	  code2 = invert_tree_comparison (code2, honor_nans);
-	}
-      return code1 == code2;
-
-    default:
-      return false;
+      ei_next (&ei2);
     }
-}
 
-/* Let GSI skip backwards over local defs.  Return the earliest vuse in VUSE.
-   Return true in VUSE_ESCAPED if the vuse influenced a SSA_OP_DEF of one of the
-   processed statements.  */
-
-static void
-gsi_advance_bw_nondebug_nonlocal (gimple_stmt_iterator *gsi, tree *vuse,
-				  bool *vuse_escaped)
-{
-  gimple *stmt;
-  tree lvuse;
-
-  while (true)
-    {
-      if (gsi_end_p (*gsi))
-	return;
-      stmt = gsi_stmt (*gsi);
-
-      lvuse = gimple_vuse (stmt);
-      if (lvuse != NULL_TREE)
-	{
-	  *vuse = lvuse;
-	  if (!ZERO_SSA_OPERANDS (stmt, SSA_OP_DEF))
-	    *vuse_escaped = true;
-	}
-
-      if (!stmt_local_def (stmt))
-	return;
-      gsi_prev_nondebug (gsi);
-    }
+  return true;
 }
 
 /* Determines whether BB1 and BB2 (members of same_succ) are duplicates.  If so,
    clusters them.  */
 
 static void
-find_duplicate (same_succ *same_succ, basic_block bb1, basic_block bb2)
+find_duplicate (basic_block bb1, basic_block bb2, sem_function &f,
+		auto_vec<std::pair<tree, tree> > &ssa_phi_pairs)
 {
-  gimple_stmt_iterator gsi1 = gsi_last_nondebug_bb (bb1);
-  gimple_stmt_iterator gsi2 = gsi_last_nondebug_bb (bb2);
-  tree vuse1 = NULL_TREE, vuse2 = NULL_TREE;
-  bool vuse_escaped = false;
+  sem_bb sem_bb1 = sem_bb (bb1);
+  sem_bb sem_bb2 = sem_bb (bb2);
 
-  gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
-  gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
+  func_checker *checker = new func_checker (f.decl, f.decl, true, true);
+  f.set_checker (checker);
+  bool icf_result = checker->compare_bb_tail_merge (&sem_bb1, &sem_bb2);
 
-  while (!gsi_end_p (gsi1) && !gsi_end_p (gsi2))
+  if (!icf_result || !check_edges_correspondence (bb1, bb2))
+    return;
+
+  for (unsigned i = 0; i < ssa_phi_pairs.length (); i++)
     {
-      gimple *stmt1 = gsi_stmt (gsi1);
-      gimple *stmt2 = gsi_stmt (gsi2);
+      std::pair<tree, tree> v = ssa_phi_pairs[i];
 
-      /* What could be better than this here is to blacklist the bb
-	 containing the stmt, when encountering the stmt f.i. in
-	 same_succ_hash.  */
-      if (is_tm_ending (stmt1)
-	  || is_tm_ending (stmt2))
+      /* If one of definitions does not belong the function we consider
+	 for equation, SSA names must be a same pointer.  */
+      gimple *def1 = SSA_NAME_DEF_STMT (v.first);
+      gimple *def2 = SSA_NAME_DEF_STMT (v.second);
+
+      basic_block bbdef1 = gimple_bb (def1);
+      basic_block bbdef2 = gimple_bb (def2);
+
+      if (bb1 != bbdef1 || bb2 != bbdef2)
+	if (v.first != v.second)
+	  return;
+
+      if (!checker->compare_ssa_name (v.first, v.second))
 	return;
-
-      if (!gimple_equal_p (same_succ, stmt1, stmt2))
-	return;
-
-      gsi_prev_nondebug (&gsi1);
-      gsi_prev_nondebug (&gsi2);
-      gsi_advance_bw_nondebug_nonlocal (&gsi1, &vuse1, &vuse_escaped);
-      gsi_advance_bw_nondebug_nonlocal (&gsi2, &vuse2, &vuse_escaped);
     }
 
-  if (!(gsi_end_p (gsi1) && gsi_end_p (gsi2)))
-    return;
-
-  /* If the incoming vuses are not the same, and the vuse escaped into an
-     SSA_OP_DEF, then merging the 2 blocks will change the value of the def,
-     which potentially means the semantics of one of the blocks will be changed.
-     TODO: make this check more precise.  */
-  if (vuse_escaped && vuse1 != vuse2)
-    return;
-
   if (dump_file)
+    {
     fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
 	     bb1->index, bb2->index);
 
-  set_cluster (bb1, bb2);
+    }
+
+  if (dbg_cnt (tail_merge))
+    {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  dump_bb (dump_file, bb1, 0, TDF_DETAILS);
+	  dump_bb (dump_file, bb2, 0, TDF_DETAILS);
+	}
+
+      set_cluster (bb1, bb2);
+    }
 }
 
 /* Returns whether for all phis in DEST the phi alternatives for E1 and
    E2 are equal.  */
 
 static bool
-same_phi_alternatives_1 (basic_block dest, edge e1, edge e2)
+same_phi_alternatives_1 (basic_block dest, edge e1, edge e2,
+			 auto_vec<std::pair<tree, tree> > *ssa_phi_pairs)
 {
   int n1 = e1->dest_idx, n2 = e2->dest_idx;
   gphi_iterator gsi;
@@ -1280,7 +1164,8 @@ same_phi_alternatives_1 (basic_block dest, edge e1, edge e2)
 
       if (operand_equal_for_phi_arg_p (val1, val2))
 	continue;
-      if (gvn_uses_equal (val1, val2))
+
+      if (equal_ssa_uses (val1, val2, ssa_phi_pairs))
 	continue;
 
       return false;
@@ -1293,7 +1178,8 @@ same_phi_alternatives_1 (basic_block dest, edge e1, edge e2)
    phi alternatives for BB1 and BB2 are equal.  */
 
 static bool
-same_phi_alternatives (same_succ *same_succ, basic_block bb1, basic_block bb2)
+same_phi_alternatives (same_succ *same_succ, basic_block bb1, basic_block bb2,
+		       auto_vec<std::pair<tree, tree> > *ssa_phi_pairs)
 {
   unsigned int s;
   bitmap_iterator bs;
@@ -1311,7 +1197,7 @@ same_phi_alternatives (same_succ *same_succ, basic_block bb1, basic_block bb2)
 
       /* For all phis in bb, the phi alternatives for e1 and e2 need to have
 	 the same value.  */
-      if (!same_phi_alternatives_1 (succ, e1, e2))
+      if (!same_phi_alternatives_1 (succ, e1, e2, ssa_phi_pairs))
 	return false;
     }
 
@@ -1378,7 +1264,7 @@ deps_ok_for_redirect (basic_block bb1, basic_block bb2)
 /* Within SAME_SUCC->bbs, find clusters of bbs which can be merged.  */
 
 static void
-find_clusters_1 (same_succ *same_succ)
+find_clusters_1 (same_succ *same_succ, sem_function &f)
 {
   basic_block bb1, bb2;
   unsigned int i, j;
@@ -1417,10 +1303,12 @@ find_clusters_1 (same_succ *same_succ)
 	  if (!deps_ok_for_redirect (bb1, bb2))
 	    continue;
 
-	  if (!(same_phi_alternatives (same_succ, bb1, bb2)))
+	  auto_vec<std::pair<tree, tree> > ssa_phi_pairs;
+
+	  if (!(same_phi_alternatives (same_succ, bb1, bb2, &ssa_phi_pairs)))
 	    continue;
 
-	  find_duplicate (same_succ, bb1, bb2);
+	  find_duplicate (bb1, bb2, f, ssa_phi_pairs);
 	}
     }
 }
@@ -1428,7 +1316,7 @@ find_clusters_1 (same_succ *same_succ)
 /* Find clusters of bbs which can be merged.  */
 
 static void
-find_clusters (void)
+find_clusters (sem_function &f)
 {
   same_succ *same;
 
@@ -1441,7 +1329,7 @@ find_clusters (void)
 	  fprintf (dump_file, "processing worklist entry\n");
 	  same_succ_print (dump_file, same);
 	}
-      find_clusters_1 (same);
+      find_clusters_1 (same, f);
     }
 }
 
@@ -1627,9 +1515,10 @@ update_debug_stmts (void)
 
 /* Runs tail merge optimization.  */
 
-unsigned int
-tail_merge_optimize (unsigned int todo)
+static unsigned int
+tail_merge_optimize ()
 {
+  unsigned todo = 0;
   int nr_bbs_removed_total = 0;
   int nr_bbs_removed;
   bool loop_entered = false;
@@ -1650,6 +1539,10 @@ tail_merge_optimize (unsigned int todo)
     }
   init_worklist ();
 
+  bitmap_obstack b;
+  bitmap_obstack_initialize (&b);
+  cgraph_node *node = cgraph_node::get (cfun->decl);
+
   while (!worklist.is_empty ())
     {
       if (!loop_entered)
@@ -1665,7 +1558,8 @@ tail_merge_optimize (unsigned int todo)
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "worklist iteration #%d\n", iteration_nr);
 
-      find_clusters ();
+      sem_function f (node, 0, &b);
+      find_clusters (f);
       gcc_assert (worklist.is_empty ());
       if (all_clusters.is_empty ())
 	break;
@@ -1715,4 +1609,46 @@ tail_merge_optimize (unsigned int todo)
   timevar_pop (TV_TREE_TAIL_MERGE);
 
   return todo;
+}
+
+namespace {
+
+const pass_data pass_data_tail_merge =
+{
+  GIMPLE_PASS, /* type */
+  "tail-merge", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_TREE_TAIL_MERGE, /* tv_id */
+  ( PROP_cfg | PROP_ssa ), /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  TODO_update_ssa_only_virtuals, /* todo_flags_finish */
+};
+
+class pass_tail_merge : public gimple_opt_pass
+{
+public:
+  pass_tail_merge (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_tail_merge, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  virtual bool gate (function *) { return flag_tree_tail_merge != 0; }
+  virtual unsigned int execute (function *);
+
+}; // class pass_tail_merge
+
+} // anon namespace
+
+unsigned int
+pass_tail_merge::execute (function *)
+{
+  return tail_merge_optimize ();
+}
+
+gimple_opt_pass *
+make_pass_tail_merge (gcc::context *ctxt)
+{
+  return new pass_tail_merge (ctxt);
 }

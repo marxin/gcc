@@ -38,10 +38,11 @@ along with GCC; see the file COPYING3.  If not see
 #include <list>
 #include "tree-eh.h"
 #include "builtins.h"
+#include "trans-mem.h"
 
 #include "ipa-icf-gimple.h"
 
-namespace ipa_icf_gimple {
+namespace icf {
 
 /* Initialize internal structures for a given SOURCE_FUNC_DECL and
    TARGET_FUNC_DECL. Strict polymorphic comparison is processed if
@@ -52,14 +53,14 @@ namespace ipa_icf_gimple {
 
 func_checker::func_checker (tree source_func_decl, tree target_func_decl,
 			    bool compare_polymorphic,
-			    bool ignore_labels,
+			    bool tail_merge_mode,
 			    hash_set<symtab_node *> *ignored_source_nodes,
 			    hash_set<symtab_node *> *ignored_target_nodes)
   : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
     m_ignored_source_nodes (ignored_source_nodes),
     m_ignored_target_nodes (ignored_target_nodes),
     m_compare_polymorphic (compare_polymorphic),
-    m_ignore_labels (ignore_labels)
+    m_tail_merge_mode (tail_merge_mode)
 {
   function *source_func = DECL_STRUCT_FUNCTION (source_func_decl);
   function *target_func = DECL_STRUCT_FUNCTION (target_func_decl);
@@ -85,7 +86,8 @@ func_checker::~func_checker ()
   m_target_ssa_names.release();
 }
 
-/* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
+/* Verifies that trees T1 and T2 are equivalent from
+   identical code perspective.  */
 
 bool
 func_checker::compare_ssa_name (tree t1, tree t2)
@@ -95,6 +97,10 @@ func_checker::compare_ssa_name (tree t1, tree t2)
 
   unsigned i1 = SSA_NAME_VERSION (t1);
   unsigned i2 = SSA_NAME_VERSION (t2);
+
+  if (m_comparing_sensitive_rhs && m_tail_merge_mode)
+    return t1 == t2 ||
+      (m_source_ssa_names[i1] != -1 && m_source_ssa_names[i1] == (int) i2);
 
   if (m_source_ssa_names[i1] == -1)
     m_source_ssa_names[i1] = i2;
@@ -220,7 +226,10 @@ func_checker::compatible_polymorphic_types_p (tree t1, tree t2,
   return true;
 }
 
-/* Return true if types are compatible from perspective of ICF.  */
+/* Return true if types are compatible from identical code perspective.
+   FIRST_ARGUMENT indicates if the comparison is called for
+   first parameter of a function.  */
+
 bool
 func_checker::compatible_types_p (tree t1, tree t2)
 {
@@ -247,7 +256,8 @@ func_checker::compatible_types_p (tree t1, tree t2)
   return true;
 }
 
-/* Function compare for equality given memory operands T1 and T2.  */
+/* Function compare for equality given memory operands T1 and T2.
+   If STRICT flag is true, versions must match strictly.  */
 
 bool
 func_checker::compare_memory_operand (tree t1, tree t2)
@@ -342,11 +352,18 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
 	return return_with_debug (ret);
       }
     case FUNCTION_DECL:
-      /* All function decls are in the symbol table and known to match
+      /* If we are called within an invocation of IPA ICF,
+	 all function decls are in the symbol table and known to match
 	 before we start comparing bodies.  */
-      return true;
+      return m_tail_merge_mode ? t1 == t2 : true;
     case VAR_DECL:
-      return return_with_debug (compare_variable_decl (t1, t2));
+      {
+	  /* Be strict in case of tail-merge optimization.  */
+	  if (m_tail_merge_mode)
+	    return t1 == t2;
+
+	  return return_with_debug (compare_variable_decl (t1, t2));
+	}
     case FIELD_DECL:
       {
 	tree offset1 = DECL_FIELD_OFFSET (t1);
@@ -362,6 +379,10 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
       }
     case LABEL_DECL:
       {
+	/* Be strict in case of tail-merge optimization.  */
+	if (m_tail_merge_mode)
+	  return t1 == t2;
+
 	int *bb1 = m_label_bb_map.get (t1);
 	int *bb2 = m_label_bb_map.get (t2);
 
@@ -371,6 +392,9 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
     case RESULT_DECL:
     case CONST_DECL:
       {
+	if (m_tail_merge_mode)
+	  return t1 == t2;
+
 	ret = compare_decl (t1, t2);
 	return return_with_debug (ret);
       }
@@ -595,6 +619,21 @@ func_checker::compare_variable_decl (tree t1, tree t2)
   return return_with_debug (ret);
 }
 
+/* Reset checker preferences.  */
+
+void
+func_checker::reset_preferences ()
+{
+  m_comparing_sensitive_rhs = false;
+}
+
+/* Set flag that we compare sensitive RHS of a gimple statement.  */
+
+void
+func_checker::set_comparing_sensitive_rhs ()
+{
+  m_comparing_sensitive_rhs = true;
+}
 
 /* Function visits all gimple labels and creates corresponding
    mapping between basic blocks and labels.  */
@@ -617,6 +656,138 @@ func_checker::parse_labels (sem_bb *bb)
     }
 }
 
+/* Return true if gimple STMT is just a local definition in a
+   basic block.  Local definition in this context means that a product
+   of the statement (transitively) does not escape the basic block.
+   Used SSA names are contained in SSA_NAMES_SET.  */
+
+bool
+func_checker::stmt_local_def (gimple *stmt, ssa_names_set *ssa_names_set)
+{
+  basic_block bb, def_bb;
+  imm_use_iterator iter;
+  use_operand_p use_p;
+  tree val;
+  def_operand_p def_p;
+
+  if (gimple_vdef (stmt) != NULL_TREE
+      || gimple_has_side_effects (stmt)
+      || gimple_could_trap_p_1 (stmt, false, false)
+      || gimple_vuse (stmt) != NULL_TREE)
+    return false;
+
+  def_p = SINGLE_SSA_DEF_OPERAND (stmt, SSA_OP_DEF);
+  if (def_p == NULL)
+    return false;
+
+  val = DEF_FROM_PTR (def_p);
+  if (val == NULL_TREE || TREE_CODE (val) != SSA_NAME)
+    return false;
+
+  def_bb = gimple_bb (stmt);
+
+  FOR_EACH_IMM_USE_FAST (use_p, iter, val)
+    {
+      gimple *use_stmt = USE_STMT (use_p);
+      if (is_gimple_debug (use_stmt))
+	continue;
+      bb = gimple_bb (use_stmt);
+      if (bb == def_bb)
+	continue;
+
+      if (gimple_code (use_stmt) != GIMPLE_PHI)
+	continue;
+
+      return false;
+    }
+
+  for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
+    if (ssa_names_set && ssa_names_set->contains (gimple_op (stmt, i)))
+      return false;
+
+  return true;
+}
+
+/* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
+   return true if phi nodes are semantically equivalent in these blocks.  */
+
+bool
+func_checker::compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2)
+{
+  gphi_iterator si1, si2;
+  gphi *phi1, *phi2;
+  unsigned size1, size2, i;
+  tree t1, t2;
+  edge e1, e2;
+
+  basic_block bb1 = sem_bb1->bb;
+  basic_block bb2 = sem_bb2->bb;
+
+  gcc_assert (bb1 != NULL);
+  gcc_assert (bb2 != NULL);
+
+  si2 = gsi_start_phis (bb2);
+  for (si1 = gsi_start_phis (bb1); !gsi_end_p (si1);
+       gsi_next (&si1))
+    {
+      gsi_next_nonvirtual_phi (&si1);
+      gsi_next_nonvirtual_phi (&si2);
+
+      if (gsi_end_p (si1) && gsi_end_p (si2))
+	break;
+
+      if (gsi_end_p (si1) || gsi_end_p (si2))
+	return return_false ();
+
+      phi1 = si1.phi ();
+      phi2 = si2.phi ();
+
+      tree phi_result1 = gimple_phi_result (phi1);
+      tree phi_result2 = gimple_phi_result (phi2);
+
+      if (!compare_operand (phi_result1, phi_result2))
+	return return_false_with_msg ("PHI results are different");
+
+      size1 = gimple_phi_num_args (phi1);
+      size2 = gimple_phi_num_args (phi2);
+
+      if (size1 != size2)
+	return return_false ();
+
+      for (i = 0; i < size1; ++i)
+	{
+	  t1 = gimple_phi_arg (phi1, i)->def;
+	  t2 = gimple_phi_arg (phi2, i)->def;
+
+	  if (!compare_operand (t1, t2))
+	    return return_false ();
+
+	  e1 = gimple_phi_arg_edge (phi1, i);
+	  e2 = gimple_phi_arg_edge (phi2, i);
+
+	  if (!compare_edge (e1, e2))
+	    return return_false ();
+	}
+
+      gsi_next (&si2);
+    }
+
+  return true;
+}
+
+
+bool
+func_checker::compare_bb_tail_merge (sem_bb *bb1, sem_bb *bb2)
+{
+  if (!compare_bb (bb1, bb2))
+    return return_false_with_msg ("BB are different");
+
+  if (!compare_phi_node (bb1, bb2))
+    return return_false_with_msg ("PHI nodes are different");
+
+  return true;
+}
+
 /* Basic block equivalence comparison function that returns true if
    basic blocks BB1 and BB2 (from functions FUNC1 and FUNC2) correspond.
 
@@ -633,24 +804,46 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
   gsi1 = gsi_start_bb_nondebug (bb1->bb);
   gsi2 = gsi_start_bb_nondebug (bb2->bb);
 
-  while (!gsi_end_p (gsi1))
+  ssa_names_set ssa_names_set1;
+  ssa_names_set ssa_names_set2;
+
+  ssa_names_set1.build (bb1->bb);
+  ssa_names_set2.build (bb2->bb);
+
+  while (true)
     {
-      if (gsi_end_p (gsi2))
-	return return_false ();
+      if (m_tail_merge_mode)
+	{
+	  gsi_next_nonlocal (&gsi1, &ssa_names_set1);
+	  gsi_next_nonlocal (&gsi2, &ssa_names_set2);
+	}
+
+      if (gsi_end_p (gsi1) || gsi_end_p (gsi2))
+	break;
 
       s1 = gsi_stmt (gsi1);
       s2 = gsi_stmt (gsi2);
+
+      /* What could be better than to this this here is to blacklist the bb
+	 containing the stmt, when encountering the stmt f.i. in
+	 same_succ_hash.  */
+      if (is_tm_ending (s1)
+	  || is_tm_ending (s2))
+	return return_false_with_msg ("TM endings are different");
 
       int eh1 = lookup_stmt_eh_lp_fn
 		(DECL_STRUCT_FUNCTION (m_source_func_decl), s1);
       int eh2 = lookup_stmt_eh_lp_fn
 		(DECL_STRUCT_FUNCTION (m_target_func_decl), s2);
 
-      if (eh1 != eh2)
+      if (eh1 != eh2 && !m_tail_merge_mode)
 	return return_false_with_msg ("EH regions are different");
 
       if (gimple_code (s1) != gimple_code (s2))
 	return return_false_with_msg ("gimple codes are different");
+
+      /* Reset inner state of the checker.  */
+      reset_preferences ();
 
       switch (gimple_code (s1))
 	{
@@ -714,7 +907,7 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
       gsi_next_nondebug (&gsi2);
     }
 
-  if (!gsi_end_p (gsi2))
+  if (!gsi_end_p (gsi1) || !gsi_end_p (gsi2))
     return return_false ();
 
   return true;
@@ -767,6 +960,8 @@ func_checker::compare_gimple_call (gcall *s1, gcall *s2)
     return return_false_with_msg ("static call chains are different");
 
   /* Checking of argument.  */
+  set_comparing_sensitive_rhs ();
+
   for (i = 0; i < gimple_call_num_args (s1); ++i)
     {
       t1 = gimple_call_arg (s1, i);
@@ -776,9 +971,28 @@ func_checker::compare_gimple_call (gcall *s1, gcall *s2)
 	return return_false_with_msg ("memory operands are different");
     }
 
+  /* Reset preferences after we compare all arguments.  */
+  reset_preferences ();
+
   /* Return value checking.  */
   t1 = gimple_get_lhs (s1);
   t2 = gimple_get_lhs (s2);
+
+  /* In case of tail merge mode, ignore all UBSAN_* internal functions.  */
+  if (gimple_call_internal_p (s1))
+    switch (gimple_call_internal_fn (s1))
+      {
+	case IFN_UBSAN_NULL:
+	case IFN_UBSAN_BOUNDS:
+	case IFN_UBSAN_VPTR:
+	case IFN_UBSAN_CHECK_ADD:
+	case IFN_UBSAN_CHECK_SUB:
+	case IFN_UBSAN_CHECK_MUL:
+	case IFN_UBSAN_OBJECT_SIZE:
+	  return false;
+	default:
+	  break;
+      }
 
   return compare_memory_operand (t1, t2);
 }
@@ -810,6 +1024,10 @@ func_checker::compare_gimple_assign (gimple *s1, gimple *s2)
     {
       arg1 = gimple_op (s1, i);
       arg2 = gimple_op (s2, i);
+
+      /* Set indication that we're going to compare RHS of a gimple assign.  */
+      if (i != 0)
+	set_comparing_sensitive_rhs ();
 
       if (!compare_memory_operand (arg1, arg2))
 	return return_false_with_msg ("memory operands are different");
@@ -860,9 +1078,6 @@ func_checker::compare_tree_ssa_label (tree t1, tree t2)
 bool
 func_checker::compare_gimple_label (const glabel *g1, const glabel *g2)
 {
-  if (m_ignore_labels)
-    return true;
-
   tree t1 = gimple_label_label (g1);
   tree t2 = gimple_label_label (g2);
 
@@ -1031,4 +1246,67 @@ func_checker::compare_gimple_asm (const gasm *g1, const gasm *g2)
   return true;
 }
 
-} // ipa_icf_gimple namespace
+void
+ssa_names_set::build (basic_block bb)
+{
+  tree var;
+  ssa_op_iter iter;
+
+  /* Build default set of important SSA names.  */
+  gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
+
+  /* In the first phase, we iterate all non-local statements and
+     we extract all SSA names that are used in these statements.  */
+  while (!gsi_end_p (gsi))
+    {
+      gimple *stmt = gsi_stmt (gsi);
+      if (!func_checker::stmt_local_def (stmt, NULL))
+	for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
+	  add (gimple_op (stmt, i));
+
+      gsi_next_nondebug (&gsi);
+    }
+
+  gsi = gsi_last_nondebug_bb (bb);
+
+  /* In the second phase, we process reverse run through all statements
+     and we add all SSA names whose values is based on a SSA name already
+     belonging to set.  The set was created in previous step and
+     is incrementally expanded.  At the end of this phase, we will have
+     all SSA names that not used just locally.  */
+  while (!gsi_end_p (gsi))
+    {
+      gimple *stmt = gsi_stmt (gsi);
+
+      switch (gimple_code (stmt))
+	{
+	  case GIMPLE_ASSIGN:
+	    {
+	      tree lhs = gimple_assign_lhs (stmt);
+	      if (contains (lhs))
+		{
+		  FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
+		    add (var);
+		}
+	      break;
+	    }
+	  case GIMPLE_COND:
+	  case GIMPLE_SWITCH:
+	  case GIMPLE_CALL:
+	  case GIMPLE_RETURN:
+	  case GIMPLE_ASM:
+	    {
+	      FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
+		add (var);
+
+	      break;
+	    }
+	  default:
+	    break;
+	}
+
+      gsi_prev_nondebug (&gsi);
+    }
+}
+
+} // icf namespace

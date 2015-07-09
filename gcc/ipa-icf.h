@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-namespace ipa_icf {
+namespace icf {
 class sem_item;
 
 /* Congruence class encompasses a collection of either functions or
@@ -353,19 +353,23 @@ public:
   unsigned ssa_names_size;
 
   /* Array of structures for all basic blocks.  */
-  vec <ipa_icf_gimple::sem_bb *> bb_sorted;
+  vec <sem_bb *> bb_sorted;
 
   /* Return true if parameter I may be used.  */
   bool param_used_p (unsigned int i);
 
+  /* Set a new function checker.  */
+  void set_checker (func_checker *checker)
+  {
+    if (m_checker)
+      delete m_checker;
+
+    m_checker = checker;
+  }
+
 private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
-  hashval_t get_bb_hash (const ipa_icf_gimple::sem_bb *basic_block);
-
-  /* For given basic blocks BB1 and BB2 (from functions FUNC1 and FUNC),
-     true value is returned if phi nodes are semantically
-     equivalent in these blocks .  */
-  bool compare_phi_node (basic_block bb1, basic_block bb2);
+  hashval_t get_bb_hash (const sem_bb *basic_block);
 
   /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
      corresponds to TARGET.  */
@@ -382,7 +386,7 @@ private:
   static bool icf_handled_component_p (tree t);
 
   /* Function checker stores binding between functions.   */
-  ipa_icf_gimple::func_checker *m_checker;
+  func_checker *m_checker;
 
   /* COMPARED_FUNC is a function that we compare to.  */
   sem_function *m_compared_func;
@@ -633,4 +637,4 @@ private:
   bitmap_obstack m_bmstack;
 }; // class sem_item_optimizer
 
-} // ipa_icf namespace
+} // icf namespace

@@ -4828,15 +4828,6 @@ pass_pre::execute (function *fun)
   todo |= fini_eliminate ();
   loop_optimizer_finalize ();
 
-  /* TODO: tail_merge_optimize may merge all predecessors of a block, in which
-     case we can merge the block with the remaining predecessor of the block.
-     It should either:
-     - call merge_blocks after each tail merge iteration
-     - call merge_blocks after all tail merge iterations
-     - mark TODO_cleanup_cfg when necessary
-     - share the cfg cleanup with fini_pre.  */
-  todo |= tail_merge_optimize (todo);
-
   free_scc_vn ();
 
   /* Tail merging invalidates the virtual SSA web, together with

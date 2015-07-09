@@ -406,7 +406,7 @@ extern gimple_opt_pass *make_pass_merge_phi (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_split_crit_edges (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_laddress (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_pre (gcc::context *ctxt);
-extern unsigned int tail_merge_optimize (unsigned int);
+extern gimple_opt_pass *make_pass_tail_merge (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_profile (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_strip_predict_hints (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_lower_complex_O0 (gcc::context *ctxt);
