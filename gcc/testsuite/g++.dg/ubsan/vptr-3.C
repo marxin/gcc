@@ -1,5 +1,5 @@
 // { dg-do run { target { ilp32 || lp64 } } }
-// { dg-options "-fsanitize=vptr" }
+// { dg-options "-fsanitize=vptr -fno-tree-tail-merge" }
 
 struct S
 {
