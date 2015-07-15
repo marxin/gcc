@@ -443,7 +443,6 @@ same_succ_hash (const_same_succ e)
   basic_block bb = BASIC_BLOCK_FOR_FN (cfun, first);
   int size = 0;
   gimple stmt;
-  tree arg;
   unsigned int s;
   bitmap_iterator bs;
 
@@ -1097,8 +1096,7 @@ check_edges_correspondence (basic_block bb1, basic_block bb2)
    clusters them.  */
 
 static void
-find_duplicate (basic_block bb1, basic_block bb2,
-		sem_function &f)
+find_duplicate (basic_block bb1, basic_block bb2, sem_function &f)
 {
   sem_bb sem_bb1 = sem_bb (bb1);
   sem_bb sem_bb2 = sem_bb (bb2);
