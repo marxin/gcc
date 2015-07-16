@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -ftree-tail-merge -fdump-tree-pre" } */
+/* { dg-options "-O2 -ftree-tail-merge -fdump-tree-tail-merge" } */
 
 extern void foo (char*, int);
 extern void mysprintf (char *, char *);
@@ -31,5 +31,5 @@ hprofStartupp (char *outputFileName, char *ctx)
   return ctx;
 }
 
-/* { dg-final { scan-tree-dump-times "myfree \\(" 1 "pre"} } */
-/* { dg-final { scan-tree-dump-not "Invalid sum" "pre"} } */
+/* { dg-final { scan-tree-dump-times "myfree \\(" 1 "tail-merge"} } */
+/* { dg-final { scan-tree-dump-not "Invalid sum" "tail-merge"} } */

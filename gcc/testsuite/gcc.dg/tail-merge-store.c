@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -ftree-tail-merge -fdump-tree-pre" } */
+/* { dg-options "-O2 -ftree-tail-merge -fdump-tree-tail-merge" } */
 
 int z;
 int x;
@@ -17,5 +17,5 @@ f (int c, int d)
     }
 }
 
-/* { dg-final { scan-tree-dump-times "duplicate of" 1 "pre"} } */
-/* { dg-final { scan-tree-dump-times "z = 5" 1 "pre"} } */
+/* { dg-final { scan-tree-dump-times "duplicate of" 1 "tail-merge"} } */
+/* { dg-final { scan-tree-dump-times "z = 5" 1 "tail-merge"} } */

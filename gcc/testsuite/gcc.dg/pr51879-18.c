@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -ftree-tail-merge -fdump-tree-pre -fno-tree-copy-prop -fno-tree-dominator-opts -fno-tree-copyrename" } */
+/* { dg-options "-O2 -ftree-tail-merge -fdump-tree-tail-merge -fno-tree-copy-prop -fno-tree-dominator-opts -fno-tree-copyrename" } */
 
 extern int foo (void);
 
@@ -13,4 +13,4 @@ void bar (int c, int *p)
     *q = foo ();
 }
 
-/* { dg-final { scan-tree-dump-times "foo \\(" 1 "pre"} } */
+/* { dg-final { scan-tree-dump-times "foo \\(" 1 "tail-merge"} } */
