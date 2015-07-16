@@ -1065,6 +1065,7 @@ set_cluster (basic_block bb1, basic_block bb2)
     gcc_unreachable ();
 }
 
+
 static bool
 check_edges_correspondence (basic_block bb1, basic_block bb2)
 {
@@ -1086,7 +1087,6 @@ check_edges_correspondence (basic_block bb1, basic_block bb2)
 
   return true;
 }
-
 
 /* Determines whether BB1 and BB2 (members of same_succ) are duplicates.  If so,
    clusters them.  */
@@ -1117,12 +1117,14 @@ find_duplicate (basic_block bb1, basic_block bb2, sem_function &f,
     fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
 	     bb1->index, bb2->index);
 
-//    dump_bb (dump_file, bb1, 0, TDF_DETAILS);
-//    dump_bb (dump_file, bb2, 0, TDF_DETAILS);
     }
 
   if (dbg_cnt (tail_merge))
+    {
+//    dump_bb (dump_file, bb1, 0, TDF_DETAILS);
+//    dump_bb (dump_file, bb2, 0, TDF_DETAILS);
     set_cluster (bb1, bb2);
+    }
 }
 
 /* Returns whether for all phis in DEST the phi alternatives for E1 and

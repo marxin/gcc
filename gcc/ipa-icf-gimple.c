@@ -502,7 +502,7 @@ func_checker::compare_operand (tree t1, tree t2, bool strict)
 	y1 = TREE_OPERAND (t1, 1);
 	y2 = TREE_OPERAND (t2, 1);
 
-	ret = compare_operand (x1, x2)
+	ret = compare_operand (x1, x2, strict)
 	      && compare_cst_or_decl (y1, y2);
 
 	return return_with_debug (ret);
