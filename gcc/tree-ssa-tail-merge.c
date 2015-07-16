@@ -346,15 +346,23 @@ gsi_advance_fw_nondebug_nonlocal (gimple_stmt_iterator *gsi)
 }
 
 static bool
-equal_ssa_uses (tree val1, tree val2)
+equal_ssa_uses (tree val1, tree val2,
+		auto_vec<std::pair<tree, tree> > *ssa_phi_pairs)
 {
   gcc_checking_assert (val1 != NULL_TREE && val2 != NULL_TREE);
 
   if (val1 == val2)
     return true;
 
-  return ((TREE_CODE (val1) == SSA_NAME || CONSTANT_CLASS_P (val1))
-	  && (TREE_CODE (val2) == SSA_NAME || CONSTANT_CLASS_P (val2)));
+  if (CONSTANT_CLASS_P (val1) && CONSTANT_CLASS_P (val2))
+    return operand_equal_p (val1, val2, OEP_ONLY_CONST);
+  else if (TREE_CODE (val1) == SSA_NAME && TREE_CODE (val2) == SSA_NAME)
+    {
+      ssa_phi_pairs->safe_push (std::make_pair (val1, val2));
+      return true;
+    }
+  else
+    return false;
 }
 
 /* Prints E to FILE.  */
@@ -1084,7 +1092,8 @@ check_edges_correspondence (basic_block bb1, basic_block bb2)
    clusters them.  */
 
 static void
-find_duplicate (basic_block bb1, basic_block bb2, sem_function &f)
+find_duplicate (basic_block bb1, basic_block bb2, sem_function &f,
+		auto_vec<std::pair<tree, tree> > &ssa_phi_pairs)
 {
   sem_bb sem_bb1 = sem_bb (bb1);
   sem_bb sem_bb2 = sem_bb (bb2);
@@ -1096,9 +1105,21 @@ find_duplicate (basic_block bb1, basic_block bb2, sem_function &f)
   if (!icf_result || !check_edges_correspondence (bb1, bb2))
     return;
 
+  for (unsigned i = 0; i < ssa_phi_pairs.length (); i++)
+    {
+      std::pair<tree, tree> v = ssa_phi_pairs[i];
+      if (!checker->compare_ssa_name (v.first, v.second, true))
+	return;
+    }
+
   if (dump_file)
+    {
     fprintf (dump_file, "find_duplicates: <bb %d> duplicate of <bb %d>\n",
 	     bb1->index, bb2->index);
+
+//    dump_bb (dump_file, bb1, 0, TDF_DETAILS);
+//    dump_bb (dump_file, bb2, 0, TDF_DETAILS);
+    }
 
   if (dbg_cnt (tail_merge))
     set_cluster (bb1, bb2);
@@ -1108,7 +1129,8 @@ find_duplicate (basic_block bb1, basic_block bb2, sem_function &f)
    E2 are equal.  */
 
 static bool
-same_phi_alternatives_1 (basic_block dest, edge e1, edge e2)
+same_phi_alternatives_1 (basic_block dest, edge e1, edge e2,
+			 auto_vec<std::pair<tree, tree> > *ssa_phi_pairs)
 {
   int n1 = e1->dest_idx, n2 = e2->dest_idx;
   gphi_iterator gsi;
@@ -1126,7 +1148,7 @@ same_phi_alternatives_1 (basic_block dest, edge e1, edge e2)
       if (operand_equal_for_phi_arg_p (val1, val2))
 	continue;
 
-      if (equal_ssa_uses (val1, val2))
+      if (equal_ssa_uses (val1, val2, ssa_phi_pairs))
 	continue;
 
       return false;
@@ -1139,7 +1161,8 @@ same_phi_alternatives_1 (basic_block dest, edge e1, edge e2)
    phi alternatives for BB1 and BB2 are equal.  */
 
 static bool
-same_phi_alternatives (same_succ same_succ, basic_block bb1, basic_block bb2)
+same_phi_alternatives (same_succ same_succ, basic_block bb1, basic_block bb2,
+		       auto_vec<std::pair<tree, tree> > *ssa_phi_pairs)
 {
   unsigned int s;
   bitmap_iterator bs;
@@ -1157,7 +1180,7 @@ same_phi_alternatives (same_succ same_succ, basic_block bb1, basic_block bb2)
 
       /* For all phis in bb, the phi alternatives for e1 and e2 need to have
 	 the same value.  */
-      if (!same_phi_alternatives_1 (succ, e1, e2))
+      if (!same_phi_alternatives_1 (succ, e1, e2, ssa_phi_pairs))
 	return false;
     }
 
@@ -1263,10 +1286,12 @@ find_clusters_1 (same_succ same_succ, sem_function &f)
 	  if (!deps_ok_for_redirect (bb1, bb2))
 	    continue;
 
-	  if (!(same_phi_alternatives (same_succ, bb1, bb2)))
+	  auto_vec<std::pair<tree, tree> > ssa_phi_pairs;
+
+	  if (!(same_phi_alternatives (same_succ, bb1, bb2, &ssa_phi_pairs)))
 	    continue;
 
-	  find_duplicate (bb1, bb2, f);
+	  find_duplicate (bb1, bb2, f, ssa_phi_pairs);
 	}
     }
 }
