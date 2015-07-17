@@ -448,7 +448,7 @@ func_checker::compare_operand (tree t1, tree t2, bool strict)
 
 	for (unsigned i = 0; i < length1; i++)
 	  if (!compare_operand (CONSTRUCTOR_ELT (t1, i)->value,
-				CONSTRUCTOR_ELT (t2, i)->value))
+				CONSTRUCTOR_ELT (t2, i)->value), strict)
 	    return return_false();
 
 	return true;
@@ -523,7 +523,7 @@ func_checker::compare_operand (tree t1, tree t2, bool strict)
 				     obj_type_ref_class (t2)))
 	      return return_false_with_msg ("OBJ_TYPE_REF OTR type mismatch");
 	    if (!compare_operand (OBJ_TYPE_REF_OBJECT (t1),
-				  OBJ_TYPE_REF_OBJECT (t2)))
+				  OBJ_TYPE_REF_OBJECT (t2), strict))
 	      return return_false_with_msg ("OBJ_TYPE_REF object mismatch");
 	  }
 
@@ -536,7 +536,7 @@ func_checker::compare_operand (tree t1, tree t2, bool strict)
 	x1 = TREE_OPERAND (t1, 0);
 	x2 = TREE_OPERAND (t2, 0);
 
-	ret = compare_operand (x1, x2);
+	ret = compare_operand (x1, x2, strict);
 	return return_with_debug (ret);
       }
     case BIT_FIELD_REF:
@@ -548,7 +548,7 @@ func_checker::compare_operand (tree t1, tree t2, bool strict)
 	z1 = TREE_OPERAND (t1, 2);
 	z2 = TREE_OPERAND (t2, 2);
 
-	ret = compare_operand (x1, x2)
+	ret = compare_operand (x1, x2, strict)
 	      && compare_cst_or_decl (y1, y2)
 	      && compare_cst_or_decl (z1, z2);
 
