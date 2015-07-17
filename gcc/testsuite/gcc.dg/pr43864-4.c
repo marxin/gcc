@@ -14,8 +14,8 @@ int f(int c, int b, int d)
     }
   else
     {
-      r2 = d - b;
       e = d + b;
+      r2 = d - b;
       r = e;
     }
 
