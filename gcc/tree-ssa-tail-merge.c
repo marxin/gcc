@@ -1108,6 +1108,19 @@ find_duplicate (basic_block bb1, basic_block bb2, sem_function &f,
   for (unsigned i = 0; i < ssa_phi_pairs.length (); i++)
     {
       std::pair<tree, tree> v = ssa_phi_pairs[i];
+
+      /* If one of definitions does not belong the function we consider
+         for equation, SSA names must be a same pointer.  */
+      gimple def1 = SSA_NAME_DEF_STMT (v.first);
+      gimple def2 = SSA_NAME_DEF_STMT (v.second);
+
+      basic_block bbdef1 = gimple_bb (def1);
+      basic_block bbdef2 = gimple_bb (def2);
+
+      if (bb1 != bbdef1 || bb2 != bbdef2)
+	if (v.first != v.second)
+	  return;
+
       if (!checker->compare_ssa_name (v.first, v.second, false))
 	return;
     }
