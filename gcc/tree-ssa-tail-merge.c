@@ -1108,7 +1108,7 @@ find_duplicate (basic_block bb1, basic_block bb2, sem_function &f,
   for (unsigned i = 0; i < ssa_phi_pairs.length (); i++)
     {
       std::pair<tree, tree> v = ssa_phi_pairs[i];
-      if (!checker->compare_ssa_name (v.first, v.second, true))
+      if (!checker->compare_ssa_name (v.first, v.second, false))
 	return;
     }
 
