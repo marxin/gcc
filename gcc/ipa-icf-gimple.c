@@ -683,14 +683,14 @@ func_checker::stmt_local_def (gimple stmt, ssa_names_set *ssa_names_set)
 
   FOR_EACH_IMM_USE_FAST (use_p, iter, val)
     {
-      if (is_gimple_debug (USE_STMT (use_p)))
+      gimple use_stmt = USE_STMT (use_p);
+      if (is_gimple_debug (use_stmt))
 	continue;
-      bb = gimple_bb (USE_STMT (use_p));
+      bb = gimple_bb (use_stmt);
       if (bb == def_bb)
 	continue;
 
-      if (gimple_code (USE_STMT (use_p)) == GIMPLE_PHI
-	  && EDGE_PRED (bb, PHI_ARG_INDEX_FROM_USE (use_p))->src == def_bb)
+      if (gimple_code (use_stmt) != GIMPLE_PHI)
 	continue;
 
       return false;
