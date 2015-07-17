@@ -468,9 +468,9 @@ func_checker::compare_operand (tree t1, tree t2, bool strict)
 			    array_ref_element_size (t2)))
 	return return_false_with_msg ("");
 
-      if (!compare_operand (x1, x2))
+      if (!compare_operand (x1, x2, strict))
 	return return_false_with_msg ("");
-      return compare_operand (y1, y2);
+      return compare_operand (y1, y2, strict);
     case MEM_REF:
       {
 	x1 = TREE_OPERAND (t1, 0);
