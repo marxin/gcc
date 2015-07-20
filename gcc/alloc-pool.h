@@ -439,6 +439,15 @@ public:
     return ::new (m_allocator.allocate ()) T ();
   }
 
+  /* Allocate a memory that is equal to sizeof (T) and return
+     just void*, where no default constructor is called.  */
+
+  inline void *
+  vallocate () ATTRIBUTE_MALLOC
+  {
+    return m_allocator.allocate ();
+  }
+
   inline void
   remove (T *object)
   {
@@ -472,13 +481,24 @@ struct alloc_pool_descriptor
   int elt_size;
 };
 
-/* Helper for classes that do not provide default ctor.  */
+/* Helper for classes that do not provide default ctor.  This overwritten
+   operator new is used for memory allocation.  */
 
 template <typename T>
 inline void *
 operator new (size_t, object_allocator<T> &a)
 {
-  return a.allocate ();
+  return a.vallocate ();
+}
+
+/* Helper for classes that do not provide default ctor.  This overwritten
+   operator new is used for memory allocation.  */
+
+template <typename T>
+inline void *
+operator new (size_t, object_allocator<T> *a)
+{
+  return a->vallocate ();
 }
 
 /* Hashtable mapping alloc_pool names to descriptors.  */
