@@ -1923,9 +1923,18 @@ gen_hsa_insns_for_known_library_call (gimple stmt, hsa_bb *hbb,
   return false;
 }
 
+/* Generate HSA instructions for the given kernel call statement STMT.
+   Instructions will be appended to HBB.  */
+
+static void
+gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb)
+{
+}
+
+
 /* Generate HSA instructions for the given call statement STMT.  Instructions
    will be appended to HBB.  SSA_MAP maps gimple SSA names to HSA pseudo
-   registers. */
+   registers.  */
 
 static void
 gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
@@ -1947,7 +1956,8 @@ gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
       return;
     }
 
-  switch (DECL_FUNCTION_CODE (gimple_call_fndecl (stmt)))
+  tree fndecl = gimple_call_fndecl (stmt);
+  switch (DECL_FUNCTION_CODE (fndecl))
     {
     case BUILT_IN_OMP_GET_THREAD_NUM:
       opcode = BRIG_OPCODE_WORKITEMABSID;
@@ -2067,7 +2077,20 @@ specialop:
 	hsa_append_insn (hbb, atominsn);
 	break;
       }
+    case BUILT_IN_GOMP_PARALLEL:
+      {
+	gcc_checking_assert (gimple_call_num_args (stmt) == 4);
+	tree called = gimple_call_arg (stmt, 0);
+	gcc_checking_assert (TREE_CODE (called) == ADDR_EXPR);
+	called = TREE_OPERAND (called, 0);
+	gcc_checking_assert (TREE_CODE (called) == FUNCTION_DECL);
 
+	const char *name = get_declaration_name (called);
+	hsa_add_kernel_dependency (hsa_cfun->decl, hsa_brig_function_name (name));
+	gen_hsa_insns_for_kernel_call (called, hbb);
+
+	break;
+      }
     default:
       sorry ("Support for HSA does not implement calls to builtin %D",
 	     gimple_call_fndecl (stmt));

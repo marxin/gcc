@@ -1675,6 +1675,7 @@ hsa_output_kernel_mapping (tree brig_decl)
     }
   len++;
 
+  /* Kernel mapping is a list of string names terminated by '\0'.  */
   char *buf = XNEWVEC (char, len);
   char *p = buf;
   for (unsigned i = 0; i < map_count; ++i)
@@ -1695,6 +1696,72 @@ hsa_output_kernel_mapping (tree brig_decl)
 					     build_index_type (size_int (len)));
   free (buf);
 
+  /* Kernel dependencies is a list of lists, where for a given kernel A all
+     direct kernel dispatches to A1, A2, .., An are organized are joined by '.'
+     character and each entry in the list is separated by '\0'.  */
+
+  len = 0;
+  for (unsigned i = 0; i < map_count; ++i)
+    {
+      tree caller = hsa_get_decl_kernel_mapping_decl (i);
+
+      hash_set<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
+      if (slot)
+	{
+	  hash_set<char *> *s = *slot;
+	  for (hash_set <char *>::iterator it = s->begin ();
+	       it != s->end (); ++it)
+	    len += strlen (*it);
+
+	  /* Add N-1 dot characters.  */
+	  len += 2 * (s->elements () - 1);
+	}
+
+      /* Zero termination character.  */
+      ++len;
+    }
+
+  buf = XNEWVEC (char, len);
+  p = buf;
+  for (unsigned i = 0; i < map_count; ++i)
+    {
+      tree caller = hsa_get_decl_kernel_mapping_decl (i);
+
+      hash_set<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
+      if (slot)
+	{
+	  hash_set<char *> *s = *slot;
+	  unsigned j = 0;
+	  for (hash_set <char *>::iterator it = s->begin ();
+	       it != s->end (); ++it)
+	    {
+	      unsigned ll = strlen (*it);
+	      gcc_assert (ll > 0);
+	      memcpy (p, *it, ll);
+	      p += ll;
+	      *p = '\0';
+	      p++;
+
+	      /* If it is not a last elements, append '.' string.  */
+	      if (j != s->elements () - 1)
+		{
+		  *p++ = '.';
+		  *p++ = '\0';
+		}
+
+	      j++;
+	    }
+	}
+
+      /* Zero termination character.  */
+      *p++ = '\0';
+    }
+
+  tree kern_dependencies = build_string (len, buf);
+  TREE_TYPE (kern_dependencies) = build_array_type
+    (char_type_node, build_index_type (size_int (len)));
+  free (buf);
+
   tree hsa_image_desc_type = make_node (RECORD_TYPE);
   tree id_f1 = build_decl (BUILTINS_LOCATION, FIELD_DECL,
 			   get_identifier ("brig_module"), ptr_type_node);
@@ -1702,7 +1769,11 @@ hsa_output_kernel_mapping (tree brig_decl)
   tree id_f2 = build_decl (BUILTINS_LOCATION, FIELD_DECL,
 			   get_identifier ("kern_names"), ptr_type_node);
   DECL_CHAIN (id_f2) = id_f1;
-  finish_builtin_struct (hsa_image_desc_type, "__hsa_image_desc", id_f2,
+  tree id_f3 = build_decl (BUILTINS_LOCATION, FIELD_DECL,
+			   get_identifier ("kern_dependencies"),
+			   ptr_type_node);
+  DECL_CHAIN (id_f3) = id_f2;
+  finish_builtin_struct (hsa_image_desc_type, "__hsa_image_desc", id_f3,
 			 NULL_TREE);
 
   vec<constructor_elt, va_gc> *img_desc_vec = NULL;
@@ -1712,6 +1783,12 @@ hsa_output_kernel_mapping (tree brig_decl)
 			  build1 (ADDR_EXPR,
 				  build_pointer_type (TREE_TYPE (kern_names)),
 				  kern_names));
+  CONSTRUCTOR_APPEND_ELT (img_desc_vec, NULL_TREE,
+			  build1 (ADDR_EXPR,
+				  build_pointer_type (TREE_TYPE
+						      (kern_dependencies)),
+				  kern_dependencies));
+
 
   tree img_desc_ctor = build_constructor (hsa_image_desc_type, img_desc_vec);
 
