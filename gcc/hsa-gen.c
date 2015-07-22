@@ -92,6 +92,7 @@ static object_allocator<hsa_insn_br> *hsa_allocp_inst_br;
 static object_allocator<hsa_insn_call> *hsa_allocp_inst_call;
 static object_allocator<hsa_insn_arg_block> *hsa_allocp_inst_arg_block;
 static object_allocator<hsa_insn_comment> *hsa_allocp_inst_comment;
+static object_allocator<hsa_insn_queue> *hsa_allocp_inst_queue;
 static object_allocator<hsa_bb> *hsa_allocp_bb;
 static object_allocator<hsa_symbol> *hsa_allocp_symbols;
 
@@ -244,6 +245,9 @@ hsa_init_data_for_cfun ()
   hsa_allocp_inst_comment
     = new object_allocator<hsa_insn_comment> ("HSA comment instructions",
 						16);
+  hsa_allocp_inst_queue
+    = new object_allocator<hsa_insn_queue> ("HSA queue instructions",
+						16);
   hsa_allocp_bb = new object_allocator<hsa_bb> ("HSA basic blocks", 8);
 
   sym_init_len = (vec_safe_length (cfun->local_decls) / 2) + 1;
@@ -299,6 +303,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_inst_call;
   delete hsa_allocp_inst_arg_block;
   delete hsa_allocp_inst_comment;
+  delete hsa_allocp_inst_queue;
   delete hsa_allocp_bb;
   delete hsa_allocp_symbols;
   delete hsa_cfun;
@@ -914,9 +919,22 @@ hsa_insn_arg_block::hsa_insn_arg_block (BrigKind brig_kind,
 
 /* Constructor of class representing the comment in HSAIL.  */
 hsa_insn_comment::hsa_insn_comment (const char *s)
-  : hsa_insn_basic (0, BRIG_KIND_DIRECTIVE_COMMENT), comment (s)
+  : hsa_insn_basic (0, BRIG_KIND_DIRECTIVE_COMMENT)
+{
+  unsigned l = strlen (s);
+
+  /* Append '// ' to the string.  */
+  char *buf = XNEWVEC (char, l + 4);
+  sprintf (buf, "// %s", s);
+  comment = buf;
+}
+
+/* Constructor of class representing the queue instruction in HSAIL.  */
+hsa_insn_queue::hsa_insn_queue (int nops, BrigOpcode opcode)
+  : hsa_insn_basic (nops, opcode, BRIG_TYPE_U64)
 {
 }
+
 
 /* Insert HSA instruction NEW_INSN immediately before an existing instruction
    OLD_INSN.  */
@@ -2012,7 +2030,6 @@ gen_hsa_insns_for_known_library_call (gimple stmt, hsa_bb *hbb,
 static void
 gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index)
 {
-  return;
   hsa_op_reg *shadow_reg = hsa_cfun->get_shadow_reg ();
 
   /* Load an address of the command queue to a register.  */
@@ -2034,10 +2051,10 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index)
   /* Load an address of prepared memory for a kernel arguments.  */
   unsigned byte_offset = sizeof (void *) * index;
 
-  // TODO: release the memory
   char *buf = XCNEWVEC (char, 128);
   sprintf (buf, "kernel call index: %u", index);
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment) hsa_insn_comment (buf));
+  free (buf);
 
   hsa_op_reg *kernarg_reg_base = new (hsa_allocp_operand_reg)
     hsa_op_reg (BRIG_TYPE_U64);
@@ -2194,12 +2211,17 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index)
 
   hsa_op_immed *c = new (hsa_allocp_operand_immed) hsa_op_immed
     (1, BRIG_TYPE_U64);
-  hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
-    hsa_insn_basic (3, BRIG_OPCODE_ADDQUEUEWRITEINDEX, BRIG_TYPE_U64,
-		    queue_index_reg, queue_reg, c);
+  hsa_insn_queue *queue = new (hsa_allocp_inst_queue)
+    hsa_insn_queue (3, BRIG_OPCODE_ADDQUEUEWRITEINDEX);
 
-  set_reg_def (queue_index_reg, insn);
-  hsa_append_insn (hbb, insn);
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, queue_reg, 0);
+  queue->operands[0] = queue_index_reg;
+  queue->operands[1] = addr;
+  queue->operands[2] = c;
+
+  set_reg_def (queue_index_reg, queue);
+  hsa_append_insn (hbb, queue);
 
   /* Get packet base address.  */
   size_t addr_offset = offsetof (hsa_queue_s, base_address);
@@ -2209,7 +2231,7 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index)
 
   c = new (hsa_allocp_operand_immed)
     hsa_op_immed (addr_offset, BRIG_TYPE_U64);
-  insn = new (hsa_allocp_inst_basic)
+  hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
     hsa_insn_basic (3, BRIG_OPCODE_ADD, BRIG_TYPE_U64, queue_addr_reg,
 		    queue_reg, c);
 

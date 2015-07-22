@@ -395,7 +395,7 @@ void
 hsa_sanitize_name (char *p)
 {
   for (; *p; p++)
-    if (*p == '.')
+    if (*p == '.' || *p == '-')
       *p = '_';
 }
 

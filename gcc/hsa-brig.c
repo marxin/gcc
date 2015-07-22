@@ -312,7 +312,6 @@ static hash_table<brig_string_slot_hasher> *brig_string_htab;
 static unsigned
 brig_emit_string (const char *str, char prefix = 0)
 {
-  fprintf (stderr, "emit string: %s\n", str);
   unsigned slen = strlen (str);
   unsigned offset, len = slen + (prefix ? 1 : 0);
   uint32_t hdr_len = htole32 (len);
@@ -402,6 +401,7 @@ brig_init (void)
       char* extension = strchr (modname, '.');
       if (extension)
 	*extension = '\0';
+      hsa_sanitize_name (modname);
       moddir.name = brig_emit_string (modname);
       free (modname);
     }
@@ -1420,6 +1420,39 @@ emit_comment_insn (hsa_insn_comment *insn)
   brig_code.add (&repr, sizeof (repr));
 }
 
+/* Emit queue instruction.  */
+
+static void
+emit_queue_insn (hsa_insn_queue *insn)
+{
+  BrigInstQueue repr;
+  auto_vec<BrigOperandOffset32_t, HSA_BRIG_INT_STORAGE_OPERANDS> operand_offsets;
+  uint32_t byteCount, operand_count = insn->operands.length ();
+
+  repr.base.base.byteCount = htole16 (sizeof (BrigInstQueue));
+  repr.base.base.kind = htole16 (BRIG_KIND_INST_QUEUE);
+  repr.base.opcode = htole16 (insn->opcode);
+  repr.base.type = htole16 (insn->type);
+  repr.segment = BRIG_SEGMENT_GLOBAL;
+  repr.memoryOrder = BRIG_MEMORY_ORDER_SC_RELEASE;
+
+  operand_offsets.safe_grow_cleared (operand_count);
+  for (unsigned i = 0; i < operand_count; i++)
+    {
+      gcc_checking_assert (insn->operands[i]);
+      operand_offsets[i] = htole32 (enqueue_op (insn->operands[i]));
+    }
+
+  byteCount = htole32 (4 * operand_count) ;
+  repr.base.operands = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
+  brig_data.add (operand_offsets.address (),
+		 operand_count * sizeof (BrigOperandOffset32_t));
+  brig_data.round_size_up (4);
+  brig_code.add (&repr, sizeof (repr));
+
+  brig_insn_count++;
+}
+
 /* Emit a basic HSA instruction and all necessary directives, schedule
    necessary operands for writing.  */
 
@@ -1543,6 +1576,11 @@ emit_insn (hsa_insn_basic *insn)
   if (hsa_insn_comment *comment = dyn_cast <hsa_insn_comment *> (insn))
     {
       emit_comment_insn (comment);
+      return;
+    }
+  if (hsa_insn_queue *queue = dyn_cast <hsa_insn_queue *> (insn))
+    {
+      emit_queue_insn (queue);
       return;
     }
   emit_basic_insn (insn);

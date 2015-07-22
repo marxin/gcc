@@ -604,10 +604,14 @@ is_a_helper <hsa_insn_arg_block *>::test (hsa_insn_basic *p)
 }
 
 /* HSA comment instruction.  */
+
 class hsa_insn_comment: public hsa_insn_basic
 {
 public:
   hsa_insn_comment (const char *s);
+
+  /* Destructor.  */
+  ~hsa_insn_comment ();
 
   const char *comment;
 };
@@ -622,6 +626,26 @@ is_a_helper <hsa_insn_comment *>::test (hsa_insn_basic *p)
   return (p->opcode == BRIG_KIND_DIRECTIVE_COMMENT);
 }
 
+/* HSA queue instruction.  */
+
+class hsa_insn_queue: public hsa_insn_basic
+{
+public:
+  hsa_insn_queue (int nops, BrigOpcode opcode);
+
+  /* Destructor.  */
+  ~hsa_insn_queue ();
+};
+
+/* Report whether or not P is a call block instruction.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_insn_queue *>::test (hsa_insn_basic *p)
+{
+  return (p->opcode == BRIG_OPCODE_ADDQUEUEWRITEINDEX);
+}
 
 /* Basic block of HSA instructions.  */
 
