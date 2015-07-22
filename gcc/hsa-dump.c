@@ -891,7 +891,7 @@ dump_hsa_insn (FILE *f, hsa_insn_basic *insn, int *indent)
     }
   else if (is_a <hsa_insn_comment *> (insn))
     {
-      fprintf (f, "// %s\n", as_a <hsa_insn_comment *> (insn)->comment);
+      fprintf (f, "%s\n", as_a <hsa_insn_comment *> (insn)->comment);
     }
   else
     {

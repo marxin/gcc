@@ -2249,6 +2249,67 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index)
 
   set_reg_def (queue_packet_reg, insn);
   hsa_append_insn (hbb, insn);
+
+  /* Write to packet->header.  */
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("set packet->header = 5122"));
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, queue_packet_reg, offsetof
+			(hsa_kernel_dispatch_packet_s, header));
+  c = new (hsa_allocp_operand_immed) hsa_op_immed (5122, BRIG_TYPE_U16);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem
+    (BRIG_OPCODE_ST, BRIG_TYPE_U16, c, addr);
+  hsa_append_insn (hbb, mem);
+
+  /* Write to packet->setup.  */
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("set packet->setup =| 1"));
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, queue_packet_reg, offsetof
+			(hsa_kernel_dispatch_packet_s, setup));
+  hsa_op_reg *packet_setup_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U16);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem
+    (BRIG_OPCODE_LD, BRIG_TYPE_U16, packet_setup_reg, addr);
+  hsa_append_insn (hbb, mem);
+  set_reg_def (packet_setup_reg, mem);
+
+  hsa_op_reg *packet_setup_u32 = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U32);
+
+  hsa_insn_basic *cvtinsn = new (hsa_allocp_inst_basic)
+    hsa_insn_basic (2, BRIG_OPCODE_CVT, BRIG_TYPE_U32, packet_setup_u32,
+		    packet_setup_reg);
+  hsa_append_insn (hbb, cvtinsn);
+  set_reg_def (packet_setup_u32, cvtinsn);
+
+  hsa_op_reg *packet_setup_u32_2 = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U32);
+  c = new (hsa_allocp_operand_immed) hsa_op_immed (1, BRIG_TYPE_U32);
+  insn = new (hsa_allocp_inst_basic)
+    hsa_insn_basic (3, BRIG_OPCODE_OR, BRIG_TYPE_U32, packet_setup_u32_2,
+		    packet_setup_u32, c);
+
+  hsa_append_insn (hbb, insn);
+  set_reg_def (packet_setup_u32_2, insn);
+
+  hsa_op_reg *packet_setup_reg_2 = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U16);
+
+  cvtinsn = new (hsa_allocp_inst_basic)
+    hsa_insn_basic (2, BRIG_OPCODE_CVT, BRIG_TYPE_U16, packet_setup_reg_2,
+		    packet_setup_u32_2);
+  hsa_append_insn (hbb, cvtinsn);
+  set_reg_def (packet_setup_reg_2, cvtinsn);
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, queue_packet_reg, offsetof
+			(hsa_kernel_dispatch_packet_s, setup));
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem
+    (BRIG_OPCODE_ST, BRIG_TYPE_U16, packet_setup_reg_2, addr);
+  hsa_append_insn (hbb, mem);
 }
 
 
