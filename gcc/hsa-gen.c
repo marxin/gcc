@@ -72,6 +72,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "print-tree.h"
 #include "hsa.h"
 
+// TODO: hack
+#include "../libgomp/hsa.h"
+#include "../libgomp/hsa-traits.h"
+
 /* Alloc pools for allocating basic hsa structures such as operands,
    instructions and other basic entities.s */
 static object_allocator<hsa_op_address> *hsa_allocp_operand_address;
@@ -87,6 +91,7 @@ static object_allocator<hsa_insn_cmp> *hsa_allocp_inst_cmp;
 static object_allocator<hsa_insn_br> *hsa_allocp_inst_br;
 static object_allocator<hsa_insn_call> *hsa_allocp_inst_call;
 static object_allocator<hsa_insn_arg_block> *hsa_allocp_inst_arg_block;
+static object_allocator<hsa_insn_comment> *hsa_allocp_inst_comment;
 static object_allocator<hsa_bb> *hsa_allocp_bb;
 static object_allocator<hsa_symbol> *hsa_allocp_symbols;
 
@@ -94,6 +99,40 @@ static object_allocator<hsa_symbol> *hsa_allocp_symbols;
    a destruction.  */
 static vec <hsa_op_code_list *> hsa_list_operand_code_list;
 static vec <hsa_op_reg *> hsa_list_operand_reg;
+
+/* Set the defining instruction of REG to be INSN.  When checking, make sure it
+   was not set before.  */
+
+static inline void
+set_reg_def (hsa_op_reg *reg, hsa_insn_basic *insn)
+{
+  if (hsa_cfun->in_ssa)
+    {
+      gcc_checking_assert (!reg->def_insn);
+      reg->def_insn = insn;
+    }
+  else
+    reg->def_insn = NULL;
+}
+
+/* Append HSA instruction INSN to basic block HBB.  */
+
+static void
+hsa_append_insn (hsa_bb *hbb, hsa_insn_basic *insn)
+{
+  /* Make sure we did not forget to set the kind.  */
+  gcc_assert (insn->opcode != 0);
+  gcc_assert (!insn->bb);
+
+  insn->bb = hbb->bb;
+  insn->prev = hbb->last_insn;
+  insn->next = NULL;
+  if (hbb->last_insn)
+    hbb->last_insn->next = insn;
+  hbb->last_insn = insn;
+  if (!hbb->first_insn)
+    hbb->first_insn = insn;
+}
 
 /* Constructor of class representing global HSA function/kernel information and
    state.  */
@@ -117,6 +156,7 @@ hsa_function_representation::hsa_function_representation ()
   kern_p = false;
   declaration_p = false;
   called_functions = vNULL;
+  shadow_reg = NULL;
 }
 
 /* Destructor of class holding function/kernel-wide informaton and state.  */
@@ -132,6 +172,37 @@ hsa_function_representation::~hsa_function_representation ()
     free (name);
   spill_symbols.release ();
   called_functions.release ();
+}
+
+hsa_op_reg *
+hsa_function_representation::get_shadow_reg ()
+{
+  gcc_assert (kern_p);
+
+  if (shadow_reg)
+    return shadow_reg;
+
+  /* Append the shadow argument.  */
+  hsa_symbol *shadow = &input_args[input_args_count++];
+  shadow->type = BRIG_TYPE_U64;
+  shadow->segment = BRIG_SEGMENT_KERNARG;
+  shadow->linkage = BRIG_LINKAGE_FUNCTION;
+  shadow->name = "hsa_runtime_shadow";
+
+  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
+    hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
+
+  hsa_op_reg *r = new (hsa_allocp_operand_reg) hsa_op_reg (BRIG_TYPE_U64);
+  hsa_cfun->shadow_reg = r;
+
+  mem->operands[0] = r;
+  mem->operands[1] = new (hsa_allocp_operand_address)
+    hsa_op_address (shadow, NULL, 0);
+  set_reg_def (r, mem);
+  hsa_append_insn (&prologue, mem);
+  shadow_reg = r;
+
+  return r;
 }
 
 /* Allocate HSA structures that we need only while generating with this.  */
@@ -169,6 +240,9 @@ hsa_init_data_for_cfun ()
     = new object_allocator<hsa_insn_call> ("HSA call instructions", 16);
   hsa_allocp_inst_arg_block
     = new object_allocator<hsa_insn_arg_block> ("HSA arg block instructions",
+						16);
+  hsa_allocp_inst_comment
+    = new object_allocator<hsa_insn_comment> ("HSA comment instructions",
 						16);
   hsa_allocp_bb = new object_allocator<hsa_bb> ("HSA basic blocks", 8);
 
@@ -224,6 +298,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_inst_br;
   delete hsa_allocp_inst_call;
   delete hsa_allocp_inst_arg_block;
+  delete hsa_allocp_inst_comment;
   delete hsa_allocp_bb;
   delete hsa_allocp_symbols;
   delete hsa_cfun;
@@ -579,7 +654,20 @@ hsa_op_immed::hsa_op_immed (tree tree_val)
   gcc_checking_assert (is_gimple_min_invariant (tree_val)
 		       && !POINTER_TYPE_P (TREE_TYPE (tree_val)));
   value = tree_val;
+  int_value = 0;
 }
+
+/* Constructor of class representing HSA immediate values.
+   VAL is the the immediate integer value.  */
+
+hsa_op_immed::hsa_op_immed (HOST_WIDE_INT val, BrigType16_t type)
+  : hsa_op_with_type (BRIG_KIND_OPERAND_CONSTANT_BYTES,
+		      type)
+{
+  value = NULL;
+  int_value = val;
+}
+
 
 /* Constructor of class representing HSA rgisters and pseudo-registers.  T is
    the BRIG type fo the new register.  */
@@ -665,21 +753,6 @@ hsa_reg_for_gimple_ssa (tree ssa, vec <hsa_op_reg_p> *ssa_map)
   return hreg;
 }
 
-/* Set the defining instruction of REG to be INSN.  When checking, make sure it
-   was not set before.  */
-
-static inline void
-set_reg_def (hsa_op_reg *reg, hsa_insn_basic *insn)
-{
-  if (hsa_cfun->in_ssa)
-    {
-      gcc_checking_assert (!reg->def_insn);
-      reg->def_insn = insn;
-    }
-  else
-    reg->def_insn = NULL;
-}
-
 /* Constructor of the class which is the bases of all instructions and directly
    represents the most basic ones.  NOPS is the number of operands that the
    operand vector will contain (and which will be cleared).  OP is the opcode
@@ -703,7 +776,9 @@ hsa_insn_basic::hsa_insn_basic (unsigned nops, int opc)
    operand vector will contain (and which will be cleared).  OPC is the opcode
    of the instruction, T is the type of the instruction.  */
 
-hsa_insn_basic::hsa_insn_basic (unsigned nops, int opc, BrigType16_t t)
+hsa_insn_basic::hsa_insn_basic (unsigned nops, int opc, BrigType16_t t,
+				hsa_op_base *arg0, hsa_op_base *arg1,
+				hsa_op_base *arg2)
 {
   opcode = opc;
   type = t;
@@ -714,6 +789,24 @@ hsa_insn_basic::hsa_insn_basic (unsigned nops, int opc, BrigType16_t t)
 
   if (nops > 0)
     operands.safe_grow_cleared (nops);
+
+  if (arg0 != NULL)
+    {
+      gcc_checking_assert (nops >= 1);
+      operands[0] = arg0;
+    }
+
+  if (arg1 != NULL)
+    {
+      gcc_checking_assert (nops >= 2);
+      operands[1] = arg1;
+    }
+
+  if (arg2 != NULL)
+    {
+      gcc_checking_assert (nops >= 3);
+      operands[2] = arg2;
+    }
 }
 
 /* Constructor of an instruction representing a PHI node.  NOPS is the number
@@ -748,13 +841,16 @@ hsa_insn_cmp::hsa_insn_cmp (BrigCompareOperation8_t cmp, BrigType16_t t)
 /* Constructor of classes representing memory accesses.  OPC is the opcode (must
    be BRIG_OPCODE_ST or BRIG_OPCODE_LD) and T is the type.  */
 
-hsa_insn_mem::hsa_insn_mem (int opc, BrigType16_t t)
+hsa_insn_mem::hsa_insn_mem (int opc, BrigType16_t t,
+			    hsa_op_base *arg0, hsa_op_base *arg1)
   : hsa_insn_basic (2, opc, t)
 {
   gcc_checking_assert (opc == BRIG_OPCODE_LD || opc == BRIG_OPCODE_ST);
   equiv_class = 0;
   memoryorder = BRIG_MEMORY_ORDER_NONE;
   memoryscope = BRIG_MEMORY_SCOPE_NONE;
+  operands[0] = arg0;
+  operands[1] = arg1;
 }
 
 /* Constructor for descendants allowing different opcodes and number of
@@ -816,23 +912,10 @@ hsa_insn_arg_block::hsa_insn_arg_block (BrigKind brig_kind,
 {
 }
 
-/* Append HSA instruction INSN to basic block HBB.  */
-
-static void
-hsa_append_insn (hsa_bb *hbb, hsa_insn_basic *insn)
+/* Constructor of class representing the comment in HSAIL.  */
+hsa_insn_comment::hsa_insn_comment (const char *s)
+  : hsa_insn_basic (0, BRIG_KIND_DIRECTIVE_COMMENT), comment (s)
 {
-  /* Make sure we did not forget to set the kind.  */
-  gcc_assert (insn->opcode != 0);
-  gcc_assert (!insn->bb);
-
-  insn->bb = hbb->bb;
-  insn->prev = hbb->last_insn;
-  insn->next = NULL;
-  if (hbb->last_insn)
-    hbb->last_insn->next = insn;
-  hbb->last_insn = insn;
-  if (!hbb->first_insn)
-    hbb->first_insn = insn;
 }
 
 /* Insert HSA instruction NEW_INSN immediately before an existing instruction
@@ -1927,8 +2010,223 @@ gen_hsa_insns_for_known_library_call (gimple stmt, hsa_bb *hbb,
    Instructions will be appended to HBB.  */
 
 static void
-gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb)
+gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index)
 {
+  return;
+  hsa_op_reg *shadow_reg = hsa_cfun->get_shadow_reg ();
+
+  /* Load an address of the command queue to a register.  */
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("load base address of command queue"));
+
+  hsa_op_reg *queue_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
+    hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
+
+  mem->operands[0] = queue_reg;
+  mem->operands[1] = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg, offsetof (hsa_kernel_runtime, queue));
+  set_reg_def (queue_reg, mem);
+  hsa_append_insn (hbb, mem);
+
+  /* Load an address of prepared memory for a kernel arguments.  */
+  unsigned byte_offset = sizeof (void *) * index;
+
+  // TODO: release the memory
+  char *buf = XCNEWVEC (char, 128);
+  sprintf (buf, "kernel call index: %u", index);
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment) hsa_insn_comment (buf));
+
+  hsa_op_reg *kernarg_reg_base = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get base of array with "
+				     "kernarg addresses"));
+
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
+  mem->operands[0] = kernarg_reg_base;
+  mem->operands[1] = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg,
+			offsetof (hsa_kernel_runtime, kernarg_addresses));
+  set_reg_def (kernarg_reg_base, mem);
+  hsa_append_insn (hbb, mem);
+
+  hsa_op_reg *kernarg_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get a kernarg address by "
+				     "kernel call index"));
+
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
+  mem->operands[0] = kernarg_reg;
+  mem->operands[1] = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, kernarg_reg_base, byte_offset);
+  set_reg_def (kernarg_reg, mem);
+  hsa_append_insn (hbb, mem);
+
+  /* Load an kernel object we want to call.  */
+  hsa_op_reg *object_reg_base = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get base of array with kernel objects"));
+
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
+  mem->operands[0] = object_reg_base;
+  mem->operands[1] = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg,
+			offsetof (hsa_kernel_runtime, objects));
+  set_reg_def (object_reg_base, mem);
+  hsa_append_insn (hbb, mem);
+
+  hsa_op_reg *object_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get a kernel object by "
+				     "kernel call index"));
+
+  hsa_op_address *addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, object_reg_base, byte_offset);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						object_reg, addr);
+  set_reg_def (object_reg, mem);
+  hsa_append_insn (hbb, mem);
+
+  /* Get signal prepared for the kernel dispatch.  */
+  hsa_op_reg *signal_reg_base = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get base of array with "
+				     "command queue signals"));
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg,
+			offsetof (hsa_kernel_runtime, signals));
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						object_reg_base, addr);
+  set_reg_def (signal_reg_base, mem);
+  hsa_append_insn (hbb, mem);
+
+  hsa_op_reg *signal_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get a signal by "
+				     "kernel call index"));
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, signal_reg_base, byte_offset);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						signal_reg, addr);
+  set_reg_def (signal_reg, mem);
+  hsa_append_insn (hbb, mem);
+
+  /* Get private segment size.  */
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get base of array with "
+				     "private segment sizes"));
+
+  hsa_op_reg *private_seg_reg_base = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg,
+			offsetof (hsa_kernel_runtime, private_segments_size));
+
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						object_reg_base, addr);
+  hsa_append_insn (hbb, mem);
+
+  hsa_op_reg *private_seg_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get a kernel private segment size by "
+				     "kernel call index"));
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, private_seg_reg_base, sizeof(uint32_t) * index);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						private_seg_reg, addr);
+  set_reg_def (private_seg_reg, mem);
+  hsa_append_insn (hbb, mem);
+
+  /* Get group segment size.  */
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get base of array with "
+				     "group segment sizes"));
+
+  hsa_op_reg *group_seg_reg_base = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg,
+			offsetof (hsa_kernel_runtime, group_segments_size));
+
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						object_reg_base, addr);
+  hsa_append_insn (hbb, mem);
+
+  hsa_op_reg *group_seg_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get a kernel group segment size by "
+				     "kernel call index"));
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, group_seg_reg_base, sizeof(uint32_t) * index);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						group_seg_reg, addr);
+  set_reg_def (group_seg_reg, mem);
+  hsa_append_insn (hbb, mem);
+
+  /* Get a write index to the command queue.  */
+  hsa_op_reg *queue_index_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  hsa_op_immed *c = new (hsa_allocp_operand_immed) hsa_op_immed
+    (1, BRIG_TYPE_U64);
+  hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
+    hsa_insn_basic (3, BRIG_OPCODE_ADDQUEUEWRITEINDEX, BRIG_TYPE_U64,
+		    queue_index_reg, queue_reg, c);
+
+  set_reg_def (queue_index_reg, insn);
+  hsa_append_insn (hbb, insn);
+
+  /* Get packet base address.  */
+  size_t addr_offset = offsetof (hsa_queue_s, base_address);
+
+  hsa_op_reg *queue_addr_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+
+  c = new (hsa_allocp_operand_immed)
+    hsa_op_immed (addr_offset, BRIG_TYPE_U64);
+  insn = new (hsa_allocp_inst_basic)
+    hsa_insn_basic (3, BRIG_OPCODE_ADD, BRIG_TYPE_U64, queue_addr_reg,
+		    queue_reg, c);
+
+  set_reg_def (queue_addr_reg, insn);
+  hsa_append_insn (hbb, insn);
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get base address of prepared packet"));
+
+  hsa_op_reg *queue_packet_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+  insn = new (hsa_allocp_inst_basic)
+    hsa_insn_basic (3, BRIG_OPCODE_ADD, BRIG_TYPE_U64, queue_packet_reg,
+		    queue_addr_reg, queue_index_reg);
+
+  set_reg_def (queue_packet_reg, insn);
+  hsa_append_insn (hbb, insn);
 }
 
 
@@ -2086,8 +2384,8 @@ specialop:
 	gcc_checking_assert (TREE_CODE (called) == FUNCTION_DECL);
 
 	const char *name = get_declaration_name (called);
-	hsa_add_kernel_dependency (hsa_cfun->decl, hsa_brig_function_name (name));
-	gen_hsa_insns_for_kernel_call (called, hbb);
+	unsigned index = hsa_add_kernel_dependency (hsa_cfun->decl, hsa_brig_function_name (name));
+	gen_hsa_insns_for_kernel_call (called, hbb, index);
 
 	break;
       }
@@ -2344,7 +2642,10 @@ gen_function_def_parameters (hsa_function_representation *f,
   f->prologue.bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
 
   f->input_args_count = count;
-  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count);
+
+  /* Allocate one more argument which can be potentially used for a kernel
+     dispatching.  */
+  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 1);
   for (parm = DECL_ARGUMENTS (cfun->decl), i = 0;
        parm;
        parm = DECL_CHAIN (parm), i++)

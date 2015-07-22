@@ -110,9 +110,16 @@ class hsa_op_immed : public hsa_op_with_type
 {
 public:
   hsa_op_immed (tree tree_val);
+  hsa_op_immed (HOST_WIDE_INT val, BrigType16_t type);
 
   /* Value as represented by middle end.  */
   tree value;
+
+  /* Const value as HOST_WIDE_INT.  */
+  HOST_WIDE_INT int_value;
+
+  /* Type of constant.  */
+  BrigType16_t int_type;
 
 private:
   /* Make the default constructor inaccessible.  */
@@ -286,7 +293,10 @@ class hsa_insn_basic
 {
 public:
   hsa_insn_basic (unsigned nops, int opc);
-  hsa_insn_basic (unsigned nops, int opc, BrigType16_t t);
+  hsa_insn_basic (unsigned nops, int opc, BrigType16_t t,
+		  hsa_op_base *arg0 = NULL,
+		  hsa_op_base *arg1 = NULL,
+		  hsa_op_base *arg2 = NULL);
 
   /* The previous and next instruction in the basic block.  */
   hsa_insn_basic *prev, *next;
@@ -412,7 +422,9 @@ is_a_helper <hsa_insn_cmp *>::test (hsa_insn_basic *p)
 class hsa_insn_mem : public hsa_insn_basic
 {
 public:
-  hsa_insn_mem (int opc, BrigType16_t t);
+  hsa_insn_mem (int opc, BrigType16_t t,
+		hsa_op_base *arg0 = NULL,
+		hsa_op_base *arg1 = NULL);
 
   /* The segment is of the memory access is either the segment of the symbol in
      the address operand or flat address is there is no symbol there.  */
@@ -591,6 +603,26 @@ is_a_helper <hsa_insn_arg_block *>::test (hsa_insn_basic *p)
   return (p->opcode == HSA_OPCODE_ARG_BLOCK);
 }
 
+/* HSA comment instruction.  */
+class hsa_insn_comment: public hsa_insn_basic
+{
+public:
+  hsa_insn_comment (const char *s);
+
+  const char *comment;
+};
+
+/* Report whether or not P is a call block instruction.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_insn_comment *>::test (hsa_insn_basic *p)
+{
+  return (p->opcode == BRIG_KIND_DIRECTIVE_COMMENT);
+}
+
+
 /* Basic block of HSA instructions.  */
 
 class hsa_bb
@@ -689,6 +721,9 @@ public:
   hsa_function_representation ();
   ~hsa_function_representation ();
 
+  /* Builds a shodow register that is utilized to a kernel dispatch.  */
+  hsa_op_reg *get_shadow_reg ();
+
   /* Name of the function.  */
   char *name;
 
@@ -729,12 +764,16 @@ public:
 
   /* Function declaration tree.  */
   tree decl;
+
+  /* Runtime shadow register.  */
+  hsa_op_reg *shadow_reg;
 };
 
 /* in hsa.c */
 extern struct hsa_function_representation *hsa_cfun;
 extern hash_table <hsa_free_symbol_hasher> *hsa_global_variable_symbols;
 extern hash_map <tree, hash_set <char *> *> *hsa_decl_kernel_dependencies;
+extern unsigned hsa_kernel_calls_counter;
 void hsa_init_compilation_unit_data (void);
 void hsa_deinit_compilation_unit_data (void);
 bool hsa_machine_large_p (void);
@@ -749,7 +788,7 @@ unsigned hsa_get_number_decl_kernel_mappings (void);
 tree hsa_get_decl_kernel_mapping_decl (unsigned i);
 char *hsa_get_decl_kernel_mapping_name (unsigned i);
 void hsa_free_decl_kernel_mapping (void);
-void hsa_add_kernel_dependency (tree caller, char *called_function);
+unsigned hsa_add_kernel_dependency (tree caller, char *called_function);
 void hsa_sanitize_name (char *p);
 char *hsa_brig_function_name (const char *p);
 const char *get_declaration_name (tree decl);

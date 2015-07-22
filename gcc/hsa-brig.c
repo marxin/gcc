@@ -312,6 +312,7 @@ static hash_table<brig_string_slot_hasher> *brig_string_htab;
 static unsigned
 brig_emit_string (const char *str, char prefix = 0)
 {
+  fprintf (stderr, "emit string: %s\n", str);
   unsigned slen = strlen (str);
   unsigned offset, len = slen + (prefix ? 1 : 0);
   uint32_t hdr_len = htole32 (len);
@@ -868,21 +869,26 @@ emit_immediate_operand (hsa_op_immed *imm)
   out.bytes = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
   brig_operand.add (&out, sizeof(out));
 
-  if (TREE_CODE (imm->value) == VECTOR_CST)
-    {
-      int i, num = VECTOR_CST_NELTS (imm->value);
-      for (i = 0; i < num; i++)
-	{
-	  unsigned actual;
-	  actual = emit_immediate_scalar_to_data_section
-	    (VECTOR_CST_ELT (imm->value, i), 0);
-	  total_len -= actual;
-	}
-      /* Vectors should have the exact size.  */
-      gcc_assert (total_len == 0);
-    }
+  if (imm->value == NULL)
+    brig_data.add (&imm->int_value, 8);
   else
-    emit_immediate_scalar_to_data_section (imm->value, total_len);
+    {
+      if (TREE_CODE (imm->value) == VECTOR_CST)
+	{
+	  int i, num = VECTOR_CST_NELTS (imm->value);
+	  for (i = 0; i < num; i++)
+	    {
+	      unsigned actual;
+	      actual = emit_immediate_scalar_to_data_section
+		(VECTOR_CST_ELT (imm->value, i), 0);
+	      total_len -= actual;
+	    }
+	  /* Vectors should have the exact size.  */
+	  gcc_assert (total_len == 0);
+	}
+      else
+	emit_immediate_scalar_to_data_section (imm->value, total_len);
+    }
 
   brig_data.round_size_up (4);
 }
@@ -1402,6 +1408,18 @@ emit_arg_block_insn (hsa_insn_arg_block *insn)
   brig_insn_count++;
 }
 
+/* Emit comment directive.  */
+
+static void
+emit_comment_insn (hsa_insn_comment *insn)
+{
+  struct BrigDirectiveComment repr;
+  repr.base.byteCount = htole16 (sizeof (repr));    
+  repr.base.kind = htole16 (insn->opcode);
+  repr.name = brig_emit_string (insn->comment);
+  brig_code.add (&repr, sizeof (repr));
+}
+
 /* Emit a basic HSA instruction and all necessary directives, schedule
    necessary operands for writing.  */
 
@@ -1520,6 +1538,11 @@ emit_insn (hsa_insn_basic *insn)
   if (hsa_insn_call *call = dyn_cast <hsa_insn_call *> (insn))
     {
       emit_call_insn (call);
+      return;
+    }
+  if (hsa_insn_comment *comment = dyn_cast <hsa_insn_comment *> (insn))
+    {
+      emit_comment_insn (comment);
       return;
     }
   emit_basic_insn (insn);

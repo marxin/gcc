@@ -649,7 +649,10 @@ dump_hsa_reg (FILE *f, hsa_op_reg *reg, bool dump_type = false)
 static void
 dump_hsa_immed (FILE *f, hsa_op_immed *imm)
 {
-  print_generic_expr (f, imm->value, 0);
+  if (imm->value)
+    print_generic_expr (f, imm->value, 0);
+  else
+    fprintf (f, "%u", imm->int_value);
   fprintf (f, " (%s)", hsa_type_name (imm->type));
 }
 
@@ -886,6 +889,10 @@ dump_hsa_insn (FILE *f, hsa_insn_basic *insn, int *indent)
 	}
       fprintf (f, ")\n");
     }
+  else if (is_a <hsa_insn_comment *> (insn))
+    {
+      fprintf (f, "// %s\n", as_a <hsa_insn_comment *> (insn)->comment);
+    }
   else
     {
       bool first = true;
@@ -991,7 +998,8 @@ dump_hsa_cfun (FILE *f)
 DEBUG_FUNCTION void
 debug_hsa_insn (hsa_insn_basic *insn)
 {
-  dump_hsa_insn (stderr, insn, 0);
+  int indentation = 0;
+  dump_hsa_insn (stderr, insn, &indentation);
 }
 
 /* Dump textual representation of HSA IL in HBB to stderr.  */

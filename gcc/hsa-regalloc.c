@@ -345,6 +345,9 @@ hsa_num_def_ops (hsa_insn_basic *insn)
 
       case HSA_OPCODE_ARG_BLOCK:
 	return 0;
+
+      case BRIG_KIND_DIRECTIVE_COMMENT:
+	return 0;
     }
 }
 

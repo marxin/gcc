@@ -66,6 +66,7 @@ struct brig_image_desc
 {
   hsa_ext_module_t brig_module;
   const char *names;
+  const char *kernel_dependencies;
 };
 
 struct agent_info;
@@ -94,6 +95,8 @@ struct kernel_info
   uint32_t group_segment_size;
   /* Required size of private segment.  */
   uint32_t private_segment_size;
+  /* Hash set of all kernel dependencies.  */
+  const char **dependencies;
 };
 
 /* Information about a particular brig module, its image and kernels.  */
@@ -451,6 +454,8 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
 
   p = image_desc->names;
   kernel = &module->kernels[0];
+
+  /* Parse all kernels.  */
   while (*p)
     {
       pair->start = (uintptr_t) kernel;
@@ -466,6 +471,64 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
       while (*p);
       p++;
     }
+
+  /* Load length of kernel dependencies.  */
+  unsigned *dep_count = GOMP_PLUGIN_malloc_cleared (sizeof (unsigned) *
+						    kernel_count);
+  unsigned i = 0;
+  do
+    {
+      while (*p != 0)
+	{
+	  if (*p == '.')
+	    p += 2;
+	  else
+	    {
+	      dep_count[i]++;
+
+	      do
+		p++;
+	      while (*p);
+	    }
+	}
+
+      i++;
+      p++;
+    }
+  while (i != kernel_count - 1);
+
+  /* Allocate memory for kernel dependencies.  */
+  for (unsigned i = 0; i < kernel_count; i++)
+    module->kernels[i].dependencies = GOMP_PLUGIN_malloc (sizeof (char *) *
+							  dep_count[i]);
+
+  /* Parse all kernel dependencies.  */
+  p = image_desc->kernel_dependencies;
+  i = 0;
+
+  do
+    {
+      int j = 0;
+      while (*p != 0)
+	{
+	  if (*p == '.')
+	    p += 2;
+	  else
+	    {
+	      module->kernels[i].dependencies[j++] = p;
+
+	      do
+		p++;
+	      while (*p);
+	    }
+	}
+
+      i++;
+      p++;
+    }
+  while (i != kernel_count - 1);
+
+  free (dep_count);
 
   add_module_to_agent (agent, module);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))
