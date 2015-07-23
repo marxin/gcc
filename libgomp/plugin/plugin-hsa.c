@@ -741,8 +741,6 @@ init_kernel (struct kernel_info *kernel)
 	  shadow->signals[i] = sync_signal;
 	  shadow->private_segments_size[i] = dependency->private_segment_size;
 	  shadow->group_segments_size[i] = dependency->private_segment_size;
-
-	  fprintf (stderr, "%s\n", dependency->name);
 	}
     }
 
