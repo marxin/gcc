@@ -310,7 +310,7 @@ static hash_table<brig_string_slot_hasher> *brig_string_htab;
    offset in it.  If PREFIX is non-zero, output it just before STR too.  */
 
 static unsigned
-brig_emit_string (const char *str, char prefix = 0)
+brig_emit_string (const char *str, char prefix = 0, bool sanitize = true)
 {
   unsigned slen = strlen (str);
   unsigned offset, len = slen + (prefix ? 1 : 0);
@@ -321,7 +321,9 @@ brig_emit_string (const char *str, char prefix = 0)
 
   /* XXX Sanitize the names without all the strdup.  */
   str2 = xstrdup (str);
-  hsa_sanitize_name (str2);
+
+  if (sanitize)
+    hsa_sanitize_name (str2);
   s_slot.s = str2;
   s_slot.len = slen;
   s_slot.prefix = prefix;
@@ -1466,7 +1468,7 @@ emit_comment_insn (hsa_insn_comment *insn)
   struct BrigDirectiveComment repr;
   repr.base.byteCount = htole16 (sizeof (repr));    
   repr.base.kind = htole16 (insn->opcode);
-  repr.name = brig_emit_string (insn->comment);
+  repr.name = brig_emit_string (insn->comment, '\0', false);
   brig_code.add (&repr, sizeof (repr));
 }
 
