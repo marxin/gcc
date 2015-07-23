@@ -1071,6 +1071,47 @@ emit_memory_insn (hsa_insn_mem *mem)
   brig_insn_count++;
 }
 
+/* Emit an HSA signal memory instruction and all necessary directives, schedule
+   necessary operands for writing .  */
+
+static void
+emit_signal_insn (hsa_insn_signal *mem)
+{
+  struct BrigInstSignal repr;
+  BrigOperandOffset32_t *operand_offsets = XCNEWVEC (BrigOperandOffset32_t,
+						     mem->operands.length ());
+  uint32_t byteCount;
+
+  /* This is necessary because of the erroneous typedef of
+     BrigMemoryModifier8_t which introduces padding which may then contain
+     random stuff (which we do not want so that we can test things don't
+     change).  */
+  memset (&repr, 0, sizeof (repr));
+  repr.base.base.byteCount = htole16 (sizeof (repr));
+  repr.base.base.kind = htole16 (BRIG_KIND_INST_SIGNAL);
+  repr.base.opcode = htole16 (mem->opcode);
+  repr.base.type = htole16 (mem->type);
+
+  for (unsigned i = 0; i < mem->operands.length (); i++)
+    operand_offsets[i] = htole32 (enqueue_op (mem->operands[i]));
+
+  /* We have N operands so use 4 * N for the byteCount */
+  byteCount = htole32 (4 * mem->operands.length ());
+
+  repr.base.operands = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
+  brig_data.add (operand_offsets, sizeof (BrigOperandOffset32_t) *
+		 mem->operands.length ());
+  brig_data.round_size_up (4);
+  free (operand_offsets);
+
+  repr.memoryOrder = mem->memoryorder;
+  repr.signalOperation = mem->atomicop;
+  repr.signalType = BRIG_TYPE_SIG64;
+
+  brig_code.add (&repr, sizeof (repr));
+  brig_insn_count++;
+}
+
 /* Emit an HSA atomic memory instruction and all necessary directives, schedule
    necessary operands for writing .  */
 
@@ -1078,10 +1119,16 @@ static void
 emit_atomic_insn (hsa_insn_atomic *mem)
 {
   struct BrigInstAtomic repr;
-  BrigOperandOffset32_t operand_offsets[4];
+  BrigOperandOffset32_t *operand_offsets = XCNEWVEC (BrigOperandOffset32_t,
+						     mem->operands.length ());
   uint32_t byteCount;
 
-  hsa_op_address *addr = as_a <hsa_op_address *> (mem->operands[1]);
+  /* Either operand[0] or operand[1] must be an address operand.  */
+  hsa_op_address *addr = NULL;
+  if (is_a <hsa_op_address *> (mem->operands[0]))
+    addr = as_a <hsa_op_address *> (mem->operands[0]);
+  else
+    addr = as_a <hsa_op_address *> (mem->operands[1]);
 
   /* This is necessary because of the erroneous typedef of
      BrigMemoryModifier8_t which introduces padding which may then contain
@@ -1093,17 +1140,17 @@ emit_atomic_insn (hsa_insn_atomic *mem)
   repr.base.opcode = htole16 (mem->opcode);
   repr.base.type = htole16 (mem->type);
 
-  operand_offsets[0] = htole32 (enqueue_op (mem->operands[0]));
-  operand_offsets[1] = htole32 (enqueue_op (mem->operands[1]));
-  operand_offsets[2] = htole32 (enqueue_op (mem->operands[2]));
-  operand_offsets[3] = htole32 (enqueue_op (mem->operands[3]));
+  for (unsigned i = 0; i < mem->operands.length (); i++)
+    operand_offsets[i] = htole32 (enqueue_op (mem->operands[i]));
 
-  /* We have 4 operands so use 4 * 4 for the byteCount */
-  byteCount = htole32 (4 * 4);
+  /* We have N operands so use 4 * N for the byteCount */
+  byteCount = htole32 (4 * mem->operands.length ());
 
   repr.base.operands = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
-  brig_data.add (&operand_offsets, sizeof (operand_offsets));
+  brig_data.add (operand_offsets, sizeof (BrigOperandOffset32_t) *
+		 mem->operands.length ());
   brig_data.round_size_up (4);
+  free (operand_offsets);
 
   if (addr->symbol)
     repr.segment = addr->symbol->segment;
@@ -1117,6 +1164,7 @@ emit_atomic_insn (hsa_insn_atomic *mem)
   brig_insn_count++;
 }
 
+
 /* Emit an HSA LDA instruction and all necessary directives, schedule
    necessary operands for writing .  */
 
@@ -1124,7 +1172,8 @@ static void
 emit_addr_insn (hsa_insn_basic *insn)
 {
   struct BrigInstAddr repr;
-  BrigOperandOffset32_t operand_offsets[2];
+  BrigOperandOffset32_t *operand_offsets = XCNEWVEC (BrigOperandOffset32_t,
+						     insn->operands.length ());
   uint32_t byteCount;
 
   hsa_op_address *addr = as_a <hsa_op_address *> (insn->operands[1]);
@@ -1134,15 +1183,16 @@ emit_addr_insn (hsa_insn_basic *insn)
   repr.base.opcode = htole16 (insn->opcode);
   repr.base.type = htole16 (insn->type);
 
-  operand_offsets[0] = htole32 (enqueue_op (insn->operands[0]));
-  operand_offsets[1] = htole32 (enqueue_op (insn->operands[1]));
+  for (unsigned i = 0; i < insn->operands.length (); i++)
+    operand_offsets[i] = htole32 (enqueue_op (insn->operands[i]));
 
-  /* We have two operands so use 4 * 2 for the byteCount */
-  byteCount = htole32 (4 * 2);
+  /* We have N operands so use 4 * N for the byteCount */
+  byteCount = htole32 (4 * insn->operands.length ());
 
   repr.base.operands = htole32 (brig_data.add (&byteCount, sizeof (byteCount)));
-  brig_data.add (&operand_offsets, sizeof (operand_offsets));
+  brig_data.add (operand_offsets, sizeof (operand_offsets));
   brig_data.round_size_up (4);
+  free (operand_offsets);
 
   if (addr->symbol)
     repr.segment = addr->symbol->segment;
@@ -1533,6 +1583,11 @@ static void
 emit_insn (hsa_insn_basic *insn)
 {
   gcc_assert (!is_a <hsa_insn_phi *> (insn));
+  if (hsa_insn_signal *signal = dyn_cast <hsa_insn_signal *> (insn))
+    {
+      emit_signal_insn (signal);
+      return;
+    }
   if (hsa_insn_atomic *atom = dyn_cast <hsa_insn_atomic *> (insn))
     {
       emit_atomic_insn (atom);

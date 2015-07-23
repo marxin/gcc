@@ -466,7 +466,7 @@ is_a_helper <hsa_insn_mem *>::test (hsa_insn_basic *p)
 class hsa_insn_atomic : public hsa_insn_mem
 {
 public:
-  hsa_insn_atomic (int opc, enum BrigAtomicOperation aop, BrigType16_t t);
+  hsa_insn_atomic (int nops, int opc, enum BrigAtomicOperation aop, BrigType16_t t);
 
   /* The operation itself.  */
   enum BrigAtomicOperation atomicop;
@@ -478,7 +478,7 @@ private:
   void operator delete (void *) {}
 };
 
-/* Report whether or not P is a memory instruction.  */
+/* Report whether or not P is an atomic instruction.  */
 
 template <>
 template <>
@@ -487,6 +487,30 @@ is_a_helper <hsa_insn_atomic *>::test (hsa_insn_basic *p)
 {
   return (p->opcode == BRIG_OPCODE_ATOMIC
 	  || p->opcode == BRIG_OPCODE_ATOMICNORET);
+}
+
+/* HSA instruction for signal operations.  */
+
+class hsa_insn_signal : public hsa_insn_atomic
+{
+public:
+  hsa_insn_signal (int nops, int opc, enum BrigAtomicOperation sop, BrigType16_t t);
+
+private:
+  /* All objects are deallocated by destroying their pool, so make delete
+     inaccessible too.  */
+  void operator delete (void *) {}
+};
+
+/* Report whether or not P is a signal instruction.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_insn_signal *>::test (hsa_insn_basic *p)
+{
+  return (p->opcode == BRIG_OPCODE_SIGNAL
+	  || p->opcode == BRIG_OPCODE_SIGNALNORET);
 }
 
 /* HSA instruction to convert between flat addressing and segments.  */
