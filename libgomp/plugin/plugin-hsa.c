@@ -489,6 +489,7 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
     }
 
   /* Load length of kernel dependencies.  */
+  p = image_desc->kernel_dependencies;
   unsigned i = 0;
   do
     {
