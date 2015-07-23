@@ -177,7 +177,7 @@ get_kernel_index_in_modules (struct module_info *module,
 			     const char *kernel_name)
 {
   for (unsigned i = 0; i < module->kernel_count; i++)
-    if (strstr (module->kernels[i].name, kernel_name) == 0)
+    if (strcmp (module->kernels[i].name, kernel_name) == 0)
       return i;
 
   return -1;
@@ -717,29 +717,27 @@ init_kernel (struct kernel_info *kernel)
   if (debug)
     {
       fprintf (stderr, "Kernel has following dependencies:\n");
-      const char **dependencies = kernel->dependencies;
-      while (*dependencies)
+      for (unsigned i = 0; i < kernel->dependencies_count; i++)
 	{
-	  int i = get_kernel_index_in_modules (agent->first_module,
-					       *dependencies);
-	  struct kernel_info *kernel = &module->kernels[i];
+	  int index = get_kernel_index_in_modules (agent->first_module,
+						   kernel->dependencies[i]);
+	  struct kernel_info *kernel = &module->kernels[index];
 	  init_single_kernel (kernel);
 
-	  shadow->kernarg_addresses[i] = GOMP_PLUGIN_malloc
+	  shadow->kernarg_addresses[index] = GOMP_PLUGIN_malloc
 	    (kernel->kernarg_segment_size);
-	  shadow->objects[i] = kernel->object;
+	  shadow->objects[index] = kernel->object;
 
 	  hsa_signal_t sync_signal;
 	  hsa_status_t status = hsa_signal_create (1, 0, NULL, &sync_signal);
 	  if (status != HSA_STATUS_SUCCESS)
 	    hsa_fatal ("Error creating the HSA sync signal", status);
 
-	  shadow->signals[i] = sync_signal;
-	  shadow->private_segments_size[i] = kernel->private_segment_size;
-	  shadow->group_segments_size[i] = kernel->private_segment_size;
+	  shadow->signals[index] = sync_signal;
+	  shadow->private_segments_size[index] = kernel->private_segment_size;
+	  shadow->group_segments_size[index] = kernel->private_segment_size;
 
-	  fprintf (stderr, "%s\n", *dependencies);
-	  dependencies++;
+	  fprintf (stderr, "%s\n", kernel->dependencies[i]);
 	}
     }
 
