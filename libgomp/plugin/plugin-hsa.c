@@ -696,7 +696,7 @@ init_single_kernel (struct kernel_info *kernel)
    The function assumes the program has been created, finalized and frozen by
    create_and_finalize_hsa_program.  */
 
-static void
+static struct hsa_kernel_runtime *
 init_kernel (struct kernel_info *kernel)
 {
   if (pthread_mutex_lock (&kernel->init_mutex))
@@ -706,8 +706,10 @@ init_kernel (struct kernel_info *kernel)
       if (pthread_mutex_unlock (&kernel->init_mutex))
 	GOMP_PLUGIN_fatal ("Could not unlock an HSA kernel initialization "
 			   "mutex");
-      return;
+      return NULL;
     }
+
+  init_single_kernel (kernel);
 
   // TODO: add global numbering of kernel calls!!!!
   struct agent_info *agent = kernel->agent;
@@ -745,6 +747,8 @@ init_kernel (struct kernel_info *kernel)
   if (pthread_mutex_unlock (&kernel->init_mutex))
     GOMP_PLUGIN_fatal ("Could not unlock an HSA kernel initialization "
 		       "mutex");
+
+  return shadow;
 }
 
 /* Part of the libgomp plugin interface.  Run a kernel on a device N and pass
@@ -760,13 +764,19 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
     GOMP_PLUGIN_fatal ("Unable to read-lock an HSA agent rwlock");
 
   create_and_finalize_hsa_program (agent);
-  init_kernel (kernel);
+  struct hsa_kernel_runtime *shadow = init_kernel (kernel);
 
   hsa_status_t status;
   void *kernarg_addr;
+
+  /* Increment segment size if we append a shadow HSA runtime argument.  */
+  unsigned shadow_space = kernel->dependencies_count > 0
+    ? sizeof (struct hsa_kernel_runtime) : 0;
+
   /* Allocate the kernel argument buffer from the correct region.  */
   status = hsa_memory_allocate (agent->kernarg_region,
-				kernel->kernarg_segment_size, &kernarg_addr);
+				kernel->kernarg_segment_size + shadow_space,
+				&kernarg_addr);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not allocate memory for HSA kernel arguments", status);
   hsa_signal_t sync_signal;
@@ -801,6 +811,11 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   packet->kernarg_address = kernarg_addr;
   packet->completion_signal = sync_signal;
   memcpy (kernarg_addr, &vars, sizeof(vars));
+
+  /* Append shadow pointer to kernel arguments.  */
+  if (kernel->dependencies_count > 0)
+    memcpy (kernarg_addr + sizeof (vars), &shadow,
+	    sizeof (struct hsa_kernel_runtime *));
 
   uint16_t header;
   header = HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE;
