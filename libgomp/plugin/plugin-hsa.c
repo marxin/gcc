@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include "libgomp-plugin.h"
 #include "hsa.h"
+#include "hsa-traits.h"
 #include "hsa_ext_finalize.h"
 
 /* Part of the libgomp plugin interface.  Return the name of the accelerator,
@@ -95,8 +96,10 @@ struct kernel_info
   uint32_t group_segment_size;
   /* Required size of private segment.  */
   uint32_t private_segment_size;
-  /* Hash set of all kernel dependencies.  */
+  /* List of all kernel dependencies.  */
   const char **dependencies;
+  /* Number of dependencies.  */
+  unsigned dependencies_count;
 };
 
 /* Information about a particular brig module, its image and kernels.  */
@@ -110,6 +113,8 @@ struct module_info
 
   /* Number of kernels in this module.  */
   int kernel_count;
+  /* Number of kernel from kernel dispatches.  */
+  unsigned kernel_dispatch_count;
   /* An array of kernel_info structures describing each kernel in this
      module.  */
   struct kernel_info kernels[];
@@ -166,6 +171,17 @@ struct hsa_context_info
 /* Information about the whole HSA environment and all of its agents.  */
 
 static struct hsa_context_info hsa_context;
+
+static int
+get_kernel_index_in_modules (struct module_info *module,
+			     const char *kernel_name)
+{
+  for (unsigned i = 0; i < module->kernel_count; i++)
+    if (strstr (module->kernels[i].name, kernel_name) == 0)
+      return i;
+
+  return -1;
+}
 
 /* Return true if the agent is a GPU and acceptable of concurrent submissions
    from different threads.  */
@@ -473,8 +489,6 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
     }
 
   /* Load length of kernel dependencies.  */
-  unsigned *dep_count = GOMP_PLUGIN_malloc_cleared (sizeof (unsigned) *
-						    kernel_count);
   unsigned i = 0;
   do
     {
@@ -484,7 +498,8 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
 	    p += 2;
 	  else
 	    {
-	      dep_count[i]++;
+	      module->kernels[i].dependencies_count++;
+	      module->kernel_dispatch_count++;
 
 	      do
 		p++;
@@ -499,8 +514,8 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
 
   /* Allocate memory for kernel dependencies.  */
   for (unsigned i = 0; i < kernel_count; i++)
-    module->kernels[i].dependencies = GOMP_PLUGIN_malloc (sizeof (char *) *
-							  dep_count[i]);
+    module->kernels[i].dependencies = GOMP_PLUGIN_malloc
+      (sizeof (char *) * module->kernels[i].dependencies_count);
 
   /* Parse all kernel dependencies.  */
   p = image_desc->kernel_dependencies;
@@ -527,8 +542,6 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
       p++;
     }
   while (i != kernel_count - 1);
-
-  free (dep_count);
 
   add_module_to_agent (agent, module);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))
@@ -608,23 +621,34 @@ create_and_finalize_hsa_program (struct agent_info *agent)
     GOMP_PLUGIN_fatal ("Could not unlock an HSA agent program mutex");
 }
 
-/* Do all the work that is necessary before running KERNEL for the first time.
-   The function assumes the program has been created, finalized and frozen by
-   create_and_finalize_hsa_program.  */
+static struct hsa_kernel_runtime *
+create_shadow_kernel_template (struct agent_info *agent)
+{
+  struct hsa_kernel_runtime *shadow = GOMP_PLUGIN_malloc_cleared
+    (sizeof (struct hsa_kernel_runtime));
+
+  shadow->queue = agent->command_q;
+
+  // TODO: assume that there's just a single module associated with the agent
+  struct module_info *module = agent->first_module;
+  unsigned dispatch_count = module->kernel_dispatch_count;
+
+  shadow->kernarg_addresses = GOMP_PLUGIN_malloc
+    (sizeof (void *) * dispatch_count);
+  shadow->objects = GOMP_PLUGIN_malloc (sizeof (void *) * dispatch_count);
+  shadow->signals = GOMP_PLUGIN_malloc
+    (sizeof (hsa_signal_t) * dispatch_count);
+  shadow->private_segments_size = GOMP_PLUGIN_malloc
+    (sizeof (uint32_t) * dispatch_count);
+  shadow->group_segments_size = GOMP_PLUGIN_malloc
+    (sizeof (uint32_t) * dispatch_count);
+
+  return shadow;
+}
 
 static void
-init_kernel (struct kernel_info *kernel)
+init_single_kernel (struct kernel_info *kernel)
 {
-  if (pthread_mutex_lock (&kernel->init_mutex))
-    GOMP_PLUGIN_fatal ("Could not lock an HSA kernel initialization mutex");
-  if (kernel->initialized)
-    {
-      if (pthread_mutex_unlock (&kernel->init_mutex))
-	GOMP_PLUGIN_fatal ("Could not unlock an HSA kernel initialization "
-			   "mutex");
-      return;
-    }
-
   hsa_status_t status;
   struct agent_info *agent = kernel->agent;
   hsa_executable_symbol_t kernel_symbol;
@@ -665,6 +689,60 @@ init_kernel (struct kernel_info *kernel)
       fprintf (stderr, "  kernarg_segment_size: %u\n",
 	       (unsigned) kernel->kernarg_segment_size);
     }
+
+}
+
+/* Do all the work that is necessary before running KERNEL for the first time.
+   The function assumes the program has been created, finalized and frozen by
+   create_and_finalize_hsa_program.  */
+
+static void
+init_kernel (struct kernel_info *kernel)
+{
+  if (pthread_mutex_lock (&kernel->init_mutex))
+    GOMP_PLUGIN_fatal ("Could not lock an HSA kernel initialization mutex");
+  if (kernel->initialized)
+    {
+      if (pthread_mutex_unlock (&kernel->init_mutex))
+	GOMP_PLUGIN_fatal ("Could not unlock an HSA kernel initialization "
+			   "mutex");
+      return;
+    }
+
+  // TODO: add global numbering of kernel calls!!!!
+  struct agent_info *agent = kernel->agent;
+  struct module_info *module = agent->first_module;
+  struct hsa_kernel_runtime *shadow = create_shadow_kernel_template (agent);
+
+  if (debug)
+    {
+      fprintf (stderr, "Kernel has following dependencies:\n");
+      const char **dependencies = kernel->dependencies;
+      while (*dependencies)
+	{
+	  int i = get_kernel_index_in_modules (agent->first_module,
+					       *dependencies);
+	  struct kernel_info *kernel = &module->kernels[i];
+	  init_single_kernel (kernel);
+
+	  shadow->kernarg_addresses[i] = GOMP_PLUGIN_malloc
+	    (kernel->kernarg_segment_size);
+	  shadow->objects[i] = kernel->object;
+
+	  hsa_signal_t sync_signal;
+	  hsa_status_t status = hsa_signal_create (1, 0, NULL, &sync_signal);
+	  if (status != HSA_STATUS_SUCCESS)
+	    hsa_fatal ("Error creating the HSA sync signal", status);
+
+	  shadow->signals[i] = sync_signal;
+	  shadow->private_segments_size[i] = kernel->private_segment_size;
+	  shadow->group_segments_size[i] = kernel->private_segment_size;
+
+	  fprintf (stderr, "%s\n", *dependencies);
+	  dependencies++;
+	}
+    }
+
   kernel->initialized = true;
   if (pthread_mutex_unlock (&kernel->init_mutex))
     GOMP_PLUGIN_fatal ("Could not unlock an HSA kernel initialization "
