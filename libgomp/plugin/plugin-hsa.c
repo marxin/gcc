@@ -724,12 +724,12 @@ init_kernel (struct kernel_info *kernel)
 	{
 	  int index = get_kernel_index_in_modules (agent->first_module,
 						   kernel->dependencies[i]);
-	  struct kernel_info *kernel = &module->kernels[index];
-	  init_single_kernel (kernel);
+	  struct kernel_info *dependency = &module->kernels[index];
+	  init_single_kernel (dependency);
 
 	  shadow->kernarg_addresses[index] = GOMP_PLUGIN_malloc
-	    (kernel->kernarg_segment_size);
-	  shadow->objects[index] = kernel->object;
+	    (dependency->kernarg_segment_size);
+	  shadow->objects[index] = dependency->object;
 
 	  hsa_signal_t sync_signal;
 	  hsa_status_t status = hsa_signal_create (1, 0, NULL, &sync_signal);
@@ -737,10 +737,10 @@ init_kernel (struct kernel_info *kernel)
 	    hsa_fatal ("Error creating the HSA sync signal", status);
 
 	  shadow->signals[index] = sync_signal;
-	  shadow->private_segments_size[index] = kernel->private_segment_size;
-	  shadow->group_segments_size[index] = kernel->private_segment_size;
+	  shadow->private_segments_size[index] = dependency->private_segment_size;
+	  shadow->group_segments_size[index] = dependency->private_segment_size;
 
-	  fprintf (stderr, "%s\n", kernel->dependencies[i]);
+	  fprintf (stderr, "%s\n", dependency->name);
 	}
     }
 
