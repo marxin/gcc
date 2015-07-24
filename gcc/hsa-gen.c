@@ -2094,6 +2094,17 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
   hsa_append_insn (hbb, insn2);
   */
   /* Load an address of the command queue to a register.  */
+  hsa_op_immed *debug_c = new (hsa_allocp_operand_immed) hsa_op_immed (777, BRIG_TYPE_U64);
+  hsa_insn_mem *debug_mem = new (hsa_allocp_inst_mem)
+    hsa_insn_mem (BRIG_OPCODE_ST, BRIG_TYPE_U64);
+
+  debug_mem->operands[0] = debug_c;
+  debug_mem->operands[1] = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg2, 0);
+  hsa_append_insn (hbb, debug_mem);
+
+
+
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("load base address of command queue"));
 
@@ -2108,16 +2119,6 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
 	hsa_op_address (NULL, shadow_reg, offsetof (hsa_kernel_runtime, queue));
   set_reg_def (queue_reg, mem);
   hsa_append_insn (hbb, mem);
-
-  hsa_op_immed *debug_c = new (hsa_allocp_operand_immed) hsa_op_immed (777, BRIG_TYPE_U64);
-  mem = new (hsa_allocp_inst_mem)
-    hsa_insn_mem (BRIG_OPCODE_ST, BRIG_TYPE_U64);
-
-  mem->operands[0] = debug_c;
-  mem->operands[1] = new (hsa_allocp_operand_address)
-	hsa_op_address (NULL, shadow_reg2, 0);
-  hsa_append_insn (hbb, mem);
-
 
   /* Load an address of prepared memory for a kernel arguments.  */
   unsigned byte_offset = sizeof (void *) * index;
