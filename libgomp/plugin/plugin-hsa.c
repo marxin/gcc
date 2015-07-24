@@ -771,8 +771,9 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   void *kernarg_addr;
 
   /* Increment segment size if we append a shadow HSA runtime argument.  */
+  // TODO: remove
   unsigned shadow_space = kernel->dependencies_count > 0
-    ? sizeof (struct hsa_kernel_runtime) : 0;
+    ? sizeof (struct hsa_kernel_runtime) + 8: 0;
 
   /* Allocate the kernel argument buffer from the correct region.  */
   status = hsa_memory_allocate (agent->kernarg_region,
@@ -814,9 +815,16 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   memcpy (kernarg_addr, &vars, sizeof(vars));
 
   /* Append shadow pointer to kernel arguments.  */
+  // TODO
   if (kernel->dependencies_count > 0)
     memcpy (kernarg_addr + sizeof (vars), &shadow,
 	    sizeof (struct hsa_kernel_runtime *));
+
+  /* Set shadow argument for debugging purpose.  */
+  uint64_t *p = GOMP_PLUGIN_malloc (8);
+  *p = 0;
+  memcpy (kernarg_addr + sizeof(vars) + sizeof (struct hsa_kernel_runtime *), p,
+	  8);
 
   uint16_t header;
   header = HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE;
@@ -835,6 +843,11 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
 			  UINT64_MAX, HSA_WAIT_STATE_BLOCKED);
   if (debug)
     fprintf (stderr, "Kernel %s returned\n", kernel->name);
+
+  if (debug)
+    fprintf (stderr, "Value in shadow debug argument: %lu\n", *p);
+
+
   hsa_signal_destroy(sync_signal);
   hsa_memory_free (kernarg_addr);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))
