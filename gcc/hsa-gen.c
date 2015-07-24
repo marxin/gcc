@@ -2051,6 +2051,13 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
 {
   hsa_op_reg *shadow_reg = hsa_cfun->get_shadow_reg ();
 
+  /* Test. */
+  hsa_op_immed *c2 = new (hsa_allocp_operand_immed) hsa_op_immed (7777,
+								 BRIG_TYPE_U32);
+  hsa_insn_basic *insn2 = new (hsa_allocp_inst_basic)
+    hsa_insn_basic (1, BRIG_OPCODE_DEBUGTRAP, BRIG_TYPE_U32, c2);
+  hsa_append_insn (hbb, insn2);
+
   /* Load an address of the command queue to a register.  */
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("load base address of command queue"));
