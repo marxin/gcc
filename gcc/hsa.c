@@ -377,7 +377,7 @@ hsa_add_kernel_dependency (tree caller, char *called_function)
 
   hash_set<char *> *s = NULL;
   hash_set<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
-  if (s == NULL)
+  if (slot == NULL)
     {
       s = new hash_set<char *> ();
       hsa_decl_kernel_dependencies->put (caller, s);

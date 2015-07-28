@@ -505,6 +505,7 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
 	      do
 		p++;
 	      while (*p);
+	      p++;
 	    }
 	}
 
@@ -536,6 +537,7 @@ GOMP_OFFLOAD_load_image (int ord, void *target_data,
 	      do
 		p++;
 	      while (*p);
+	      p++;
 	    }
 	}
 
@@ -731,24 +733,40 @@ init_single_kernel (struct kernel_info *kernel)
 }
 
 static void
-print_kernel_dispatch (struct hsa_kernel_dispatch *dispatch)
+indent_stream (FILE *f, unsigned indent)
 {
-  fprintf (stderr, "  this: %p\n", dispatch);
-  fprintf (stderr, "  queue: %p\n", dispatch->queue);
-  fprintf (stderr, "  omp_data_memory: %p\n", dispatch->omp_data_memory);
-  fprintf (stderr, "  kernarg_address: %p\n", dispatch->kernarg_address);
-  fprintf (stderr, "  object: %lu\n", dispatch->object);
-  fprintf (stderr, "  signal: %lu\n", dispatch->signal);
-  fprintf (stderr, "  private_segment_size: %u\n",
+  for (int i = 0; i < indent; i++)
+    fputc (' ', f);
+}
+
+static void
+print_kernel_dispatch (struct hsa_kernel_dispatch *dispatch, unsigned indent)
+{
+  indent_stream (stderr, indent);
+  fprintf (stderr, "this: %p\n", dispatch);
+  indent_stream (stderr, indent);
+  fprintf (stderr, "queue: %p\n", dispatch->queue);
+  indent_stream (stderr, indent);
+  fprintf (stderr, "omp_data_memory: %p\n", dispatch->omp_data_memory);
+  indent_stream (stderr, indent);
+  fprintf (stderr, "kernarg_address: %p\n", dispatch->kernarg_address);
+  indent_stream (stderr, indent);
+  fprintf (stderr, "object: %lu\n", dispatch->object);
+  indent_stream (stderr, indent);
+  fprintf (stderr, "signal: %lu\n", dispatch->signal);
+  indent_stream (stderr, indent);
+  fprintf (stderr, "private_segment_size: %u\n",
 	   dispatch->private_segment_size);
-  fprintf (stderr, "  group_segment_size: %u\n",
+  indent_stream (stderr, indent);
+  fprintf (stderr, "group_segment_size: %u\n",
 	   dispatch->group_segment_size);
-  fprintf (stderr, "  children dispatches: %lu\n",
+  indent_stream (stderr, indent);
+  fprintf (stderr, "children dispatches: %lu\n",
 	   dispatch->kernel_dispatch_count);
   fprintf (stderr, "\n");
 
   for (unsigned i = 0; i < dispatch->kernel_dispatch_count; i++)
-      print_kernel_dispatch (dispatch->children_dispatches[i]);
+      print_kernel_dispatch (dispatch->children_dispatches[i], indent + 2);
 }
 
 /* Do all the work that is necessary before running KERNEL for the first time.
@@ -813,7 +831,7 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   struct hsa_kernel_dispatch *shadow = init_kernel (kernel);
 
   if (debug)
-    print_kernel_dispatch (shadow);
+    print_kernel_dispatch (shadow, 2);
 
   uint64_t index = hsa_queue_add_write_index_release (agent->command_q, 1);
   if (debug)
