@@ -652,7 +652,7 @@ dump_hsa_immed (FILE *f, hsa_op_immed *imm)
   if (imm->value)
     print_generic_expr (f, imm->value, 0);
   else
-    fprintf (f, "%u", imm->int_value);
+    fprintf (f, "%lu", imm->int_value);
   fprintf (f, " (%s)", hsa_type_name (imm->type));
 }
 

@@ -771,7 +771,6 @@ public:
 
   /* Builds a shodow register that is utilized to a kernel dispatch.  */
   hsa_op_reg *get_shadow_reg ();
-  hsa_op_reg *get_shadow_reg2 ();
 
   /* Name of the function.  */
   char *name;
@@ -816,7 +815,6 @@ public:
 
   /* Runtime shadow register.  */
   hsa_op_reg *shadow_reg;
-  hsa_op_reg *shadow_reg2;
 };
 
 /* in hsa.c */

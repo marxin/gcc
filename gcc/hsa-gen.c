@@ -159,7 +159,6 @@ hsa_function_representation::hsa_function_representation ()
   declaration_p = false;
   called_functions = vNULL;
   shadow_reg = NULL;
-  shadow_reg2 = NULL;
 }
 
 /* Destructor of class holding function/kernel-wide informaton and state.  */
@@ -207,38 +206,6 @@ hsa_function_representation::get_shadow_reg ()
 
   return r;
 }
-
-hsa_op_reg *
-hsa_function_representation::get_shadow_reg2 ()
-{
-  gcc_assert (kern_p);
-
-  if (shadow_reg2)
-    return shadow_reg2;
-
-  /* Append the shadow argument.  */
-  hsa_symbol *debug = &input_args[input_args_count++];
-  debug->type = BRIG_TYPE_U64;
-  debug->segment = BRIG_SEGMENT_KERNARG;
-  debug->linkage = BRIG_LINKAGE_FUNCTION;
-  debug->name = "hsa_runtime_debug";
-
-  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
-    hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
-
-  hsa_op_reg *r = new (hsa_allocp_operand_reg) hsa_op_reg (BRIG_TYPE_U64);
-  hsa_cfun->shadow_reg2 = r;
-
-  mem->operands[0] = r;
-  mem->operands[1] = new (hsa_allocp_operand_address)
-    hsa_op_address (debug, NULL, 0);
-  set_reg_def (r, mem);
-  hsa_append_insn (&prologue, mem);
-  shadow_reg2 = r;
-
-  return r;
-}
-
 
 /* Allocate HSA structures that we need only while generating with this.  */
 
@@ -2143,11 +2110,9 @@ gen_hsa_insns_for_known_library_call (gimple stmt, hsa_bb *hbb,
    Instructions will be appended to HBB.  */
 
 static void
-gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
-			       vec <hsa_op_reg_p> *ssa_map, gcall *call)
+gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
 {
   hsa_op_reg *shadow_reg = hsa_cfun->get_shadow_reg ();
-  hsa_op_reg *shadow_reg2 = hsa_cfun->get_shadow_reg2 ();
 
   /* Load an address of the command queue to a register.  */
 
@@ -2609,8 +2574,6 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
   hsa_append_insn (hbb, mem);
 
   /* Write to packet->kernarg_address.  */
-  HOST_WIDE_INT offset = 0;
-
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("write argument0 to "
 				     "*packet->kernarg_address"));
@@ -2694,15 +2657,6 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
   signal->operands[2] = c;
   signal->operands[3] = c2;
   hsa_append_insn (hbb, signal);
-
-  hsa_op_immed *debug_c = new (hsa_allocp_operand_immed) hsa_op_immed (777, BRIG_TYPE_U64);
-  hsa_insn_mem *debug_mem = new (hsa_allocp_inst_mem)
-    hsa_insn_mem (BRIG_OPCODE_ST, BRIG_TYPE_U64);
-
-  debug_mem->operands[0] = debug_c;
-  debug_mem->operands[1] = new (hsa_allocp_operand_address)
-	hsa_op_address (NULL, shadow_reg2, 0);
-  hsa_append_insn (hbb, debug_mem);
 }
 
 
@@ -2861,8 +2815,7 @@ specialop:
 
 	const char *name = get_declaration_name (called);
 	unsigned index = hsa_add_kernel_dependency (hsa_cfun->decl, hsa_brig_function_name (name));
-	gen_hsa_insns_for_kernel_call (called, hbb, index, ssa_map,
-				       as_a <gcall *> (stmt));
+	gen_hsa_insns_for_kernel_call (hbb, index,  as_a <gcall *> (stmt));
 
 	break;
       }
@@ -3122,8 +3075,7 @@ gen_function_def_parameters (hsa_function_representation *f,
 
   /* Allocate one more argument which can be potentially used for a kernel
      dispatching.  */
-  // TODO: fixme
-  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 2);
+  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 1);
   for (parm = DECL_ARGUMENTS (cfun->decl), i = 0;
        parm;
        parm = DECL_CHAIN (parm), i++)
