@@ -26,6 +26,8 @@ struct hsa_kernel_runtime
 {
   /* Pointer to a command queue associated with a kernel dispatch agent.  */
   void *queue;
+  /* Pointer to reserved memory for OMP data struct copying.  */
+  void *omp_data_memory;
   /* List of pointers where is a space passing of kernel arguments.  */
   void **kernarg_addresses;
   /* List of kernel objects.  */

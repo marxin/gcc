@@ -2049,6 +2049,69 @@ gen_hsa_insns_for_return (greturn *stmt, hsa_bb *hbb,
   hsa_append_insn (hbb, ret);
 }
 
+/* Return unsigned brig type according to provided SIZE in bytes.  */
+
+static BrigType16_t
+get_unsinged_type_by_bytes (unsigned size)
+{
+  switch (size)
+    {
+    case 1:
+      return BRIG_TYPE_U8;
+    case 2:
+      return BRIG_TYPE_U16;
+    case 4:
+      return BRIG_TYPE_U32;
+    case 8:
+      return BRIG_TYPE_U64;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+static void
+gen_hsa_memory_copy (hsa_bb *hbb, hsa_symbol *src, hsa_op_reg *target)
+{
+  hsa_op_address *addr;
+  hsa_insn_mem *mem;
+
+  gcc_assert (src->type | BRIG_TYPE_U8);
+
+  unsigned size = src->dim;
+  unsigned offset = 0;
+
+  while (size)
+    {
+      unsigned s;
+      if (size >= 8)
+	s = 8;
+      else if (size >= 4)
+	s = 4;
+      else if (size >= 2)
+	s = 2;
+      else
+	s = 1;
+
+      BrigType16_t t = get_unsinged_type_by_bytes (s);
+
+      hsa_op_reg *tmp = new (hsa_allocp_operand_reg) hsa_op_reg (t);
+      addr = new (hsa_allocp_operand_address) hsa_op_address (src, NULL,
+							      offset);
+      mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, t,
+						    tmp, addr);
+      hsa_append_insn (hbb, mem);
+      set_reg_def (tmp, mem);
+
+      addr = new (hsa_allocp_operand_address) hsa_op_address
+	(NULL, target, offset);
+      mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_ST, t, tmp,
+						    addr);
+      hsa_append_insn (hbb, mem);
+      offset += s;
+      size -= s;
+    }
+}
+
 /* If STMT is a call of a known library function, generate code to perform
    it and return true.  */
 
@@ -2513,13 +2576,26 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
     (BRIG_OPCODE_ST, BRIG_TYPE_U64, object_reg, addr);
   hsa_append_insn (hbb, mem);
 
-  /* Write to packet->kernarg_address.  */
-  HOST_WIDE_INT offset = 0;
+  /* Copy locally allocated memory for arguments to a prepared one.  */
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("get address of omp data memory"));
 
-  // TODO: FIXME
-  // HARDWIRED argument passing
-//  gcc_assert (hsa_cfun->input_args_count == 3);
+  hsa_op_reg *omp_data_memory_reg = new (hsa_allocp_operand_reg)
+    hsa_op_reg (BRIG_TYPE_U64);
+  addr = new (hsa_allocp_operand_address) hsa_op_address
+    (NULL, shadow_reg, offsetof (hsa_kernel_runtime, omp_data_memory));
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
+						omp_data_memory_reg, addr);
+  set_reg_def (omp_data_memory_reg, mem);
+  hsa_append_insn (hbb, mem);
 
+  tree argument = gimple_call_arg (call, 1);
+  gcc_assert (TREE_CODE (argument) == ADDR_EXPR);
+  hsa_symbol *var_decl = get_symbol_for_decl (TREE_OPERAND (argument, 0));
+
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("memory copy instructions"));
+  gen_hsa_memory_copy (hbb, var_decl, omp_data_memory_reg);
 
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("write memory pointer to "
@@ -2532,6 +2608,9 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
     (BRIG_OPCODE_ST, BRIG_TYPE_U64, kernarg_reg, addr);
   hsa_append_insn (hbb, mem);
 
+  /* Write to packet->kernarg_address.  */
+  HOST_WIDE_INT offset = 0;
+
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("write argument0 to "
 				     "*packet->kernarg_address"));
@@ -2539,20 +2618,8 @@ gen_hsa_insns_for_kernel_call (tree fndecl, hsa_bb *hbb, unsigned index,
   addr = new (hsa_allocp_operand_address)
 	hsa_op_address (NULL, kernarg_reg, 0);
 
-  // TODO: repack passed OMP data
-  hsa_op_reg *omp_data_reg = new (hsa_allocp_operand_reg)
-    hsa_op_reg (BRIG_TYPE_U64);
-
-  tree ddef = ssa_default_def (cfun, hsa_cfun->input_args[0].decl);
-  hsa_op_reg *src = hsa_reg_for_gimple_ssa (ddef, ssa_map);
-  mem = new (hsa_allocp_inst_mem) hsa_insn_mem
-    (BRIG_OPCODE_LD, BRIG_TYPE_U64, omp_data_reg,
-     new (hsa_allocp_operand_address) hsa_op_address (NULL, src, 0));
-  hsa_append_insn (hbb, mem);
-  set_reg_def (omp_data_reg, mem);
-
   mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_ST, BRIG_TYPE_U64);
-  mem->operands[0] = omp_data_reg;
+  mem->operands[0] = omp_data_memory_reg;
   mem->operands[1] = addr;
   hsa_append_insn (hbb, mem);
 

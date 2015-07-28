@@ -630,6 +630,9 @@ create_shadow_kernel_template (struct agent_info *agent)
 
   shadow->queue = agent->command_q;
 
+  /* Compute right size needed for memory allocation.  */
+  shadow->omp_data_memory = GOMP_PLUGIN_malloc (100);
+
   // TODO: assume that there's just a single module associated with the agent
   struct module_info *module = agent->first_module;
   unsigned dispatch_count = module->kernel_dispatch_count;
