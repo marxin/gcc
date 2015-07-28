@@ -31,7 +31,7 @@ struct hsa_kernel_runtime
   /* List of kernel objects.  */
   uint64_t *objects;
   /* List of sync signals, where we prepare a single for each called kernel.  */
-  hsa_signal_t *signals;
+  uint64_t *signals;
   /* List of sizes of private segments.  */
   uint32_t *private_segments_size;
   /* List of sizes of group segments.  */

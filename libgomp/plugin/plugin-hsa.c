@@ -663,6 +663,7 @@ init_single_kernel (struct kernel_info *kernel)
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_OBJECT, &kernel->object);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not extract a kernel object from its symbol", status);
+  fprintf (stderr, "received kernel for %s: %lu\n", kernel->name, kernel->object);
   status = hsa_executable_symbol_get_info
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_KERNARG_SEGMENT_SIZE,
      &kernel->kernarg_segment_size);
@@ -717,37 +718,56 @@ init_kernel (struct kernel_info *kernel)
   struct module_info *module = agent->first_module;
   struct hsa_kernel_runtime *shadow = create_shadow_kernel_template (agent);
 
-  if (debug)
+  fprintf (stderr, "=== SHADOW argument ===\n");
+  fprintf (stderr, "  pointer = %p:\n", shadow);
+  fprintf (stderr, "  command_q: %p\n", shadow->queue);
+  fprintf (stderr, "  Kernel has following dependencies:\n");
+  for (unsigned i = 0; i < kernel->dependencies_count; i++)
     {
-      fprintf (stderr, "Kernel has following dependencies:\n");
-      for (unsigned i = 0; i < kernel->dependencies_count; i++)
-	{
-	  int index = get_kernel_index_in_modules (agent->first_module,
-						   kernel->dependencies[i]);
-	  struct kernel_info *dependency = &module->kernels[index];
-	  init_single_kernel (dependency);
+      int index = get_kernel_index_in_modules (agent->first_module,
+					       kernel->dependencies[i]);
+      struct kernel_info *dependency = &module->kernels[index];
+      init_single_kernel (dependency);
 
-	  // TODO: i is not global!!!
+      // TODO: i is not global!!!
+      shadow->kernarg_addresses[i] = GOMP_PLUGIN_malloc
+	(dependency->kernarg_segment_size);
 
-	  shadow->kernarg_addresses[i] = GOMP_PLUGIN_malloc
-	    (dependency->kernarg_segment_size);
-	  shadow->objects[i] = dependency->object;
+      fprintf (stderr, "  dependency->object: %u: %lu\n", i, dependency->object);
+      shadow->objects[i] = dependency->object;
 
-	  hsa_signal_t sync_signal;
-	  hsa_status_t status = hsa_signal_create (1, 0, NULL, &sync_signal);
-	  if (status != HSA_STATUS_SUCCESS)
-	    hsa_fatal ("Error creating the HSA sync signal", status);
+      hsa_signal_t sync_signal;
+      hsa_status_t status = hsa_signal_create (1, 0, NULL, &sync_signal);
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Error creating the HSA sync signal", status);
 
-	  shadow->signals[i] = sync_signal;
-	  shadow->private_segments_size[i] = dependency->private_segment_size;
-	  shadow->group_segments_size[i] = dependency->private_segment_size;
-	}
+      fprintf (stderr, "  init value of signal: %lu\n", hsa_signal_load_relaxed (sync_signal));
+
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Error creating the HSA sync signal", status);
+
+      shadow->signals[i] = sync_signal.handle;
+      fprintf (stderr, "  dependency->signal: %u: %lu\n", i, shadow->signals[i]);
+      shadow->private_segments_size[i] = dependency->private_segment_size;
+      fprintf (stderr, "  dependency->private_segment_size: %u: %u\n", i, shadow->private_segments_size[i]);
+      shadow->group_segments_size[i] = dependency->private_segment_size;
+      fprintf (stderr, "  dependecy->group_segment_size: %u: %u\n", i, shadow->group_segments_size[i]);
+
+  status = hsa_memory_allocate (agent->kernarg_region,
+				dependency->kernarg_segment_size,
+				&shadow->kernarg_addresses[i]);
+  if (status != HSA_STATUS_SUCCESS)
+    hsa_fatal ("Could not allocate memory for HSA kernel arguments", status);
+      fprintf (stderr, "  dependency->kernarg_addr: %u: %p\n", i,
+	       shadow->kernarg_addresses[i]);
+
     }
 
   kernel->initialized = true;
   if (pthread_mutex_unlock (&kernel->init_mutex))
     GOMP_PLUGIN_fatal ("Could not unlock an HSA kernel initialization "
 		       "mutex");
+
 
   return shadow;
 }
@@ -775,6 +795,8 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   unsigned shadow_space = kernel->dependencies_count > 0
     ? sizeof (struct hsa_kernel_runtime) + 8: 0;
 
+  fprintf (stderr, "Extra shadow space: %u\n", shadow_space);
+
   /* Allocate the kernel argument buffer from the correct region.  */
   status = hsa_memory_allocate (agent->kernarg_region,
 				kernel->kernarg_segment_size + shadow_space,
@@ -798,9 +820,12 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   hsa_kernel_dispatch_packet_t *packet;
   packet = ((hsa_kernel_dispatch_packet_t*) agent->command_q->base_address)
     + index % agent->command_q->size;
+  fprintf (stderr, "command_q base address: %p\n", agent->command_q->base_address);
+  fprintf (stderr, "PACKET start: %p\n", packet);
   hsa_signal_store_relaxed (sync_signal, 1);
   memset (((uint8_t *)packet) + 4, 0, sizeof (*packet) - 4);
   packet->setup  |= (uint16_t) 1 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
+  fprintf (stderr, "packet->setup: %u\n", packet->setup);
   packet->grid_size_x = 1;
   packet->workgroup_size_x = 1;
   packet->grid_size_y = 1;
@@ -822,8 +847,9 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
 
   /* Set shadow argument for debugging purpose.  */
   uint64_t *p = GOMP_PLUGIN_malloc (8);
-  *p = 0;
-  memcpy (kernarg_addr + sizeof(vars) + sizeof (struct hsa_kernel_runtime *), p,
+  fprintf (stderr, "shadow debug pointer: %p\n", p);
+  *p = 123;
+  memcpy (kernarg_addr + sizeof(vars) + sizeof (struct hsa_kernel_runtime *), &p,
 	  8);
 
   uint16_t header;
@@ -832,10 +858,22 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   header |= HSA_FENCE_SCOPE_SYSTEM << HSA_PACKET_HEADER_RELEASE_FENCE_SCOPE;
 
   if (debug)
-    fprintf (stderr, "Going to dispatch kernel %s\n", kernel->name);
+    fprintf (stderr, "Going to dispatch kernel %s (header: %u)\n", kernel->name, header);
+
+
+  hsa_signal_t s;
+  s.handle = shadow->signals[0];
+  fprintf (stderr, "  pre execution value of signal: %lu\n", hsa_signal_load_relaxed (s));
 
   __atomic_store_n ((uint16_t*)(&packet->header), header, __ATOMIC_RELEASE);
+  uint32_t *ph = (uint32_t *)&packet->header;
+  fprintf (stderr, "XXX: %u\n", *ph);
   hsa_signal_store_release (agent->command_q->doorbell_signal, index);
+
+  fprintf (stderr, "  doorbell signal adrr: %p\n",
+	   &agent->command_q->doorbell_signal);
+  fprintf (stderr, "  doorbell signal: %lu\n",
+	   agent->command_q->doorbell_signal.handle);
 
   if (debug)
     fprintf (stderr, "Kernel dispatched, waiting for completion\n");
@@ -844,9 +882,29 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   if (debug)
     fprintf (stderr, "Kernel %s returned\n", kernel->name);
 
-  if (debug)
-    fprintf (stderr, "Value in shadow debug argument: %lu\n", *p);
+  fprintf (stderr, "Value in shadow debug argument: %lu (%p)\n", *p, (void*)*p);
 
+  hsa_kernel_dispatch_packet_t *packet_shadow;
+  packet_shadow = packet + 1;
+
+  fprintf (stderr, "Shadow packet address: %p\n", packet_shadow);
+
+  fprintf (stderr, "  packet_shadow->header (%p): %u\n", &packet_shadow->header, packet_shadow->header);
+  fprintf (stderr, "  packet_shadow->setup: %u\n", packet_shadow->setup);
+  fprintf (stderr, "  packet_shadow->grid_size_x: %u\n", packet_shadow->grid_size_x);
+  fprintf (stderr, "  packet_shadow->workgroup_size_x: %u\n", packet_shadow->workgroup_size_x);
+  fprintf (stderr, "  packet_shadow->grid_size_y: %u\n", packet_shadow->grid_size_y);
+  fprintf (stderr, "  packet_shadow->workgroup_size_y: %u\n", packet_shadow->workgroup_size_y);
+  fprintf (stderr, "  packet_shadow->grid_size_z: %u\n", packet_shadow->grid_size_z);
+  fprintf (stderr, "  packet_shadow->workgroup_size_z: %u\n", packet_shadow->workgroup_size_z);
+  fprintf (stderr, "  packet_shadow->private_segment_size: %u\n",
+	   packet_shadow->private_segment_size);
+  fprintf (stderr, "  packet_shadow->group_segment_size: %u\n", packet_shadow->group_segment_size);
+  fprintf (stderr, "  packet_shadow->kernel_object: %lu\n", packet_shadow->kernel_object);
+  fprintf (stderr, "  packet_shadow->kernarg_address: %p\n", packet_shadow->kernarg_address);
+  if (packet_shadow->kernarg_address)
+    fprintf (stderr, "  *packet_shadow->kernarg_address: %p\n", *((void **)packet_shadow->kernarg_address));
+  fprintf (stderr, "  packet_shadow->completion_signal: %lu\n", packet_shadow->completion_signal.handle);
 
   hsa_signal_destroy(sync_signal);
   hsa_memory_free (kernarg_addr);

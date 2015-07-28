@@ -267,6 +267,7 @@ hsa_num_def_ops (hsa_insn_basic *insn)
 
       case BRIG_OPCODE_SIGNAL:
 	return 1;
+
       case BRIG_OPCODE_SIGNALNORET:
 	return 0;
 
@@ -328,13 +329,15 @@ hsa_num_def_ops (hsa_insn_basic *insn)
 
       case BRIG_OPCODE_PACKETCOMPLETIONSIG:
       case BRIG_OPCODE_PACKETID:
-      case BRIG_OPCODE_ADDQUEUEWRITEINDEX:
       case BRIG_OPCODE_CASQUEUEWRITEINDEX:
       case BRIG_OPCODE_LDQUEUEREADINDEX:
       case BRIG_OPCODE_LDQUEUEWRITEINDEX:
       case BRIG_OPCODE_STQUEUEREADINDEX:
       case BRIG_OPCODE_STQUEUEWRITEINDEX:
 	return 1; /* ??? */
+
+      case BRIG_OPCODE_ADDQUEUEWRITEINDEX:
+	return 1;
 
       case BRIG_OPCODE_DEBUGTRAP:
 	return 0;

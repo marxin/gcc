@@ -1829,7 +1829,7 @@ hsa_output_kernel_mapping (tree brig_decl)
 	  hash_set<char *> *s = *slot;
 	  for (hash_set <char *>::iterator it = s->begin ();
 	       it != s->end (); ++it)
-	    len += strlen (*it);
+	    len += (strlen (*it) + 1);
 
 	  /* Add N-1 dot characters.  */
 	  len += 2 * (s->elements () - 1);
