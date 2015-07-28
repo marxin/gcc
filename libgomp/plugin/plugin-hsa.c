@@ -623,7 +623,7 @@ create_and_finalize_hsa_program (struct agent_info *agent)
 }
 
 static struct hsa_kernel_dispatch *
-create_shadow_kernel_template (struct kernel_info *kernel)
+create_shadow_kernel (struct kernel_info *kernel)
 {
   struct agent_info *agent = kernel->agent;
   struct hsa_kernel_dispatch *shadow = GOMP_PLUGIN_malloc_cleared
@@ -640,7 +640,47 @@ create_shadow_kernel_template (struct kernel_info *kernel)
   shadow->children_dispatches = GOMP_PLUGIN_malloc
     (dispatch_count * sizeof (struct hsa_kernel_dispatch *));
 
+  unsigned shadow_space = kernel->dependencies_count > 0
+    ? sizeof (struct hsa_kernel_dispatch *): 0;
+
+  shadow->kernarg_address = GOMP_PLUGIN_malloc
+    (kernel->kernarg_segment_size + shadow_space);
+  shadow->object = kernel->object;
+
+  hsa_signal_t sync_signal;
+  hsa_status_t status = hsa_signal_create (1, 0, NULL, &sync_signal);
+  if (status != HSA_STATUS_SUCCESS)
+    hsa_fatal ("Error creating the HSA sync signal", status);
+
+  shadow->signal = sync_signal.handle;
+  shadow->private_segment_size = kernel->private_segment_size;
+  shadow->group_segment_size = kernel->group_segment_size;
+
+  status = hsa_memory_allocate
+    (agent->kernarg_region, kernel->kernarg_segment_size,
+     &shadow->kernarg_address);
+  if (status != HSA_STATUS_SUCCESS)
+    hsa_fatal ("Could not allocate memory for HSA kernel arguments", status);
+
   return shadow;
+}
+
+static void
+release_shadow_kernel (struct hsa_kernel_dispatch *shadow)
+{
+  hsa_memory_free (shadow->kernarg_address);
+
+  hsa_signal_t s;
+  s.handle = shadow->signal;
+  hsa_signal_destroy (s);
+
+  free (shadow->omp_data_memory);
+
+  for (unsigned i = 0; i < shadow->kernel_dispatch_count; i++)
+    release_shadow_kernel (shadow->children_dispatches[i]);
+
+  free (shadow->children_dispatches);
+  free (shadow);
 }
 
 static void
@@ -732,7 +772,7 @@ init_kernel (struct kernel_info *kernel)
 
   struct agent_info *agent = kernel->agent;
   struct module_info *module = agent->first_module;
-  struct hsa_kernel_dispatch *shadow = create_shadow_kernel_template (kernel);
+  struct hsa_kernel_dispatch *shadow = create_shadow_kernel (kernel);
 
   if (debug)
     fprintf (stderr, "\nKernel has following dependencies:\n");
@@ -743,34 +783,7 @@ init_kernel (struct kernel_info *kernel)
 					       kernel->dependencies[i]);
       struct kernel_info *dependency = &module->kernels[index];
       init_single_kernel (dependency);
-      shadow->children_dispatches[i] = create_shadow_kernel_template
-	(dependency);
-
-      shadow->children_dispatches[i]->kernarg_address = GOMP_PLUGIN_malloc
-	(dependency->kernarg_segment_size);
-
-      if (debug)
-	fprintf (stderr, "  dependency->object: %u: %lu\n", i,
-		 dependency->object);
-      shadow->children_dispatches[i]->object = dependency->object;
-
-      hsa_signal_t sync_signal;
-      hsa_status_t status = hsa_signal_create (1, 0, NULL, &sync_signal);
-      if (status != HSA_STATUS_SUCCESS)
-	hsa_fatal ("Error creating the HSA sync signal", status);
-
-      shadow->children_dispatches[i]->signal = sync_signal.handle;
-      shadow->children_dispatches[i]->signal = sync_signal.handle;
-      shadow->children_dispatches[i]->private_segment_size
-	= dependency->private_segment_size;
-      shadow->children_dispatches[i]->group_segment_size
-	= dependency->group_segment_size;
-
-      status = hsa_memory_allocate
-	(agent->kernarg_region, dependency->kernarg_segment_size,
-	 &shadow->children_dispatches[i]->kernarg_address);
-      if (status != HSA_STATUS_SUCCESS)
-	hsa_fatal ("Could not allocate memory for HSA kernel arguments", status);
+      shadow->children_dispatches[i] = create_shadow_kernel (dependency);
     }
 
   if (debug)
@@ -799,27 +812,8 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   create_and_finalize_hsa_program (agent);
   struct hsa_kernel_dispatch *shadow = init_kernel (kernel);
 
-  hsa_status_t status;
-  void *kernarg_addr;
-
   if (debug)
     print_kernel_dispatch (shadow);
-
-  /* Increment segment size if we append a shadow HSA runtime argument.  */
-  // TODO
-  unsigned shadow_space = kernel->dependencies_count > 0
-    ? sizeof (struct hsa_kernel_dispatch *) + 8: 0;
-
-  /* Allocate the kernel argument buffer from the correct region.  */
-  status = hsa_memory_allocate (agent->kernarg_region,
-				kernel->kernarg_segment_size + shadow_space,
-				&kernarg_addr);
-  if (status != HSA_STATUS_SUCCESS)
-    hsa_fatal ("Could not allocate memory for HSA kernel arguments", status);
-  hsa_signal_t sync_signal;
-  status = hsa_signal_create (1, 0, NULL, &sync_signal);
-  if (status != HSA_STATUS_SUCCESS)
-    hsa_fatal ("Error creating the HSA sync signal", status);
 
   uint64_t index = hsa_queue_add_write_index_release (agent->command_q, 1);
   if (debug)
@@ -834,9 +828,6 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   packet = ((hsa_kernel_dispatch_packet_t*) agent->command_q->base_address)
     + index % agent->command_q->size;
 
-  fprintf (stderr, "packet: %p\n", packet);
-
-  hsa_signal_store_relaxed (sync_signal, 1);
   memset (((uint8_t *)packet) + 4, 0, sizeof (*packet) - 4);
   packet->setup  |= (uint16_t) 1 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
   packet->grid_size_x = 1;
@@ -848,21 +839,16 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   packet->private_segment_size = kernel->private_segment_size;
   packet->group_segment_size = kernel->group_segment_size;
   packet->kernel_object = kernel->object;
-  packet->kernarg_address = kernarg_addr;
-  packet->completion_signal = sync_signal;
-  memcpy (kernarg_addr, &vars, sizeof(vars));
+  packet->kernarg_address = shadow->kernarg_address;
+  hsa_signal_t s;
+  s.handle = shadow->signal;
+  packet->completion_signal = s;
+  memcpy (shadow->kernarg_address, &vars, sizeof(vars));
 
   /* Append shadow pointer to kernel arguments.  */
   if (kernel->dependencies_count > 0)
-    memcpy (kernarg_addr + sizeof (vars), &shadow,
+    memcpy (shadow->kernarg_address + sizeof (vars), &shadow,
 	    sizeof (struct hsa_kernel_runtime *));
-
-  uint64_t **ptr = (uint64_t **)(kernarg_addr + sizeof(vars)  +
-sizeof (struct hsa_kernel_runtime *));
-
-  uint64_t *p = malloc (sizeof(uint64_t));
-  *p = 123;
-  *ptr = p;
 
   uint16_t header;
   header = HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE;
@@ -874,14 +860,10 @@ sizeof (struct hsa_kernel_runtime *));
 
   if (debug)
     fprintf (stderr, "Kernel dispatched, waiting for completion\n");
-  hsa_signal_wait_acquire(sync_signal, HSA_SIGNAL_CONDITION_LT, 1,
+  hsa_signal_wait_acquire(s, HSA_SIGNAL_CONDITION_LT, 1,
 			  UINT64_MAX, HSA_WAIT_STATE_BLOCKED);
 
-  fprintf (stderr, "Debug value :%lu (%p)\n", *p, ((void *)*p));
-
-
-  hsa_signal_destroy(sync_signal);
-  hsa_memory_free (kernarg_addr);
+  release_shadow_kernel (shadow);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))
     GOMP_PLUGIN_fatal ("Unable to unlock an HSA agent rwlock");
 }

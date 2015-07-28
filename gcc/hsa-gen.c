@@ -207,37 +207,6 @@ hsa_function_representation::get_shadow_reg ()
   return r;
 }
 
-hsa_op_reg *
-hsa_function_representation::get_shadow_reg2 ()
-{
-  gcc_assert (kern_p);
-
-  if (shadow_reg2)
-    return shadow_reg2;
-
-  /* Append the shadow argument.  */
-  hsa_symbol *shadow = &input_args[input_args_count++];
-  shadow->type = BRIG_TYPE_U64;
-  shadow->segment = BRIG_SEGMENT_KERNARG;
-  shadow->linkage = BRIG_LINKAGE_FUNCTION;
-  shadow->name = "debug";
-
-  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
-    hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
-
-  hsa_op_reg *r = new (hsa_allocp_operand_reg) hsa_op_reg (BRIG_TYPE_U64);
-
-  mem->operands[0] = r;
-  mem->operands[1] = new (hsa_allocp_operand_address)
-    hsa_op_address (shadow, NULL, 0);
-  set_reg_def (r, mem);
-  hsa_append_insn (&prologue, mem);
-  shadow_reg2 = r;
-
-  return r;
-}
-
-
 /* Allocate HSA structures that we need only while generating with this.  */
 
 static void
@@ -2147,7 +2116,6 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   hsa_op_address *addr;
 
   hsa_op_reg *shadow_reg_ptr = hsa_cfun->get_shadow_reg ();
-  hsa_op_reg *shadow_reg2 = hsa_cfun->get_shadow_reg2 ();
 
   /* Get my kernel dispatch argument.  */
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
@@ -2640,18 +2608,7 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   signal->operands[2] = c;
   signal->operands[3] = c2;
   hsa_append_insn (hbb, signal);
-
-  // TODO
-  hsa_op_immed *c3 = new (hsa_allocp_operand_immed) hsa_op_immed (777,
-								 BRIG_TYPE_U64);
-
-  addr = new (hsa_allocp_operand_address)
-	hsa_op_address (NULL, shadow_reg2, 0);
-  mem = new (hsa_allocp_inst_mem) hsa_insn_mem
-    (BRIG_OPCODE_ST, BRIG_TYPE_U64, c3, addr);
-  hsa_append_insn (hbb, mem);
 }
-
 
 /* Generate HSA instructions for the given call statement STMT.  Instructions
    will be appended to HBB.  SSA_MAP maps gimple SSA names to HSA pseudo
@@ -3068,8 +3025,7 @@ gen_function_def_parameters (hsa_function_representation *f,
 
   /* Allocate one more argument which can be potentially used for a kernel
      dispatching.  */
-  // TODO
-  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 2);
+  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 1);
   for (parm = DECL_ARGUMENTS (cfun->decl), i = 0;
        parm;
        parm = DECL_CHAIN (parm), i++)

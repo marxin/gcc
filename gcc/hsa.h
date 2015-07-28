@@ -771,8 +771,6 @@ public:
 
   /* Builds a shodow register that is utilized to a kernel dispatch.  */
   hsa_op_reg *get_shadow_reg ();
-  // TODO
-  hsa_op_reg *get_shadow_reg2 ();
 
   /* Name of the function.  */
   char *name;
