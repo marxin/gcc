@@ -22,22 +22,26 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef HSA_TRAITS_H_
 #define HSA_TRAITS_H_
 
-struct hsa_kernel_runtime
+struct hsa_kernel_dispatch
 {
   /* Pointer to a command queue associated with a kernel dispatch agent.  */
   void *queue;
   /* Pointer to reserved memory for OMP data struct copying.  */
   void *omp_data_memory;
-  /* List of pointers where is a space passing of kernel arguments.  */
-  void **kernarg_addresses;
-  /* List of kernel objects.  */
-  uint64_t *objects;
-  /* List of sync signals, where we prepare a single for each called kernel.  */
-  uint64_t *signals;
-  /* List of sizes of private segments.  */
-  uint32_t *private_segments_size;
-  /* List of sizes of group segments.  */
-  uint32_t *group_segments_size;
+  /* Pointer to a memory space used for kernel arguments passing.  */
+  void *kernarg_address;
+  /* Kernel object.  */
+  uint64_t object;
+  /* Synchronization signal used for dispatch synchronization.  */
+  uint64_t signal;
+  /* Private segment size.  */
+  uint32_t private_segment_size;
+  /* Group segment size.  */
+  uint32_t group_segment_size;
+  /* Number of children kernel dispatches.  */
+  uint64_t kernel_dispatch_count;
+  /* Kernel dispatch structures created for children kernel dispatches.  */
+  struct hsa_kernel_dispatch **children_dispatches;
 };
 
 #endif // HSA_TRAITS_H_ 
