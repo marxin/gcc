@@ -772,9 +772,6 @@ public:
   /* Builds a shadow register that is utilized to a kernel dispatch.  */
   hsa_op_reg *get_shadow_reg ();
 
-  /* Builds a debug register that is quite usefull for debugging purpose.  */
-  hsa_op_reg *get_debug_reg ();
-
   /* Name of the function.  */
   char *name;
 
@@ -819,8 +816,8 @@ public:
   /* Runtime shadow register.  */
   hsa_op_reg *shadow_reg;
 
-  /* Runtime debugging purpose register.  */
-  hsa_op_reg *debug_reg;
+  /* Number of kernel dispatched which take place in the function.  */
+  unsigned kernel_dispatch_count;
 };
 
 /* in hsa.c */
@@ -842,7 +839,7 @@ unsigned hsa_get_number_decl_kernel_mappings (void);
 tree hsa_get_decl_kernel_mapping_decl (unsigned i);
 char *hsa_get_decl_kernel_mapping_name (unsigned i);
 void hsa_free_decl_kernel_mapping (void);
-unsigned hsa_add_kernel_dependency (tree caller, char *called_function);
+void hsa_add_kernel_dependency (tree caller, char *called_function);
 void hsa_sanitize_name (char *p);
 char *hsa_brig_function_name (const char *p);
 const char *get_declaration_name (tree decl);

@@ -158,7 +158,7 @@ hsa_function_representation::hsa_function_representation ()
   declaration_p = false;
   called_functions = vNULL;
   shadow_reg = NULL;
-  debug_reg = NULL;
+  kernel_dispatch_count = 0;
 }
 
 /* Destructor of class holding function/kernel-wide informaton and state.  */
@@ -205,37 +205,6 @@ hsa_function_representation::get_shadow_reg ()
 
   return r;
 }
-
-hsa_op_reg *
-hsa_function_representation::get_debug_reg ()
-{
-  gcc_assert (kern_p);
-
-  if (debug_reg)
-    return debug_reg;
-
-  /* Append the shadow argument.  */
-  hsa_symbol *debug = &input_args[input_args_count++];
-  debug->type = BRIG_TYPE_U64;
-  debug->segment = BRIG_SEGMENT_KERNARG;
-  debug->linkage = BRIG_LINKAGE_FUNCTION;
-  debug->name = "hsa_runtime_debug";
-
-  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
-    hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
-
-  hsa_op_reg *r = new (hsa_allocp_operand_reg) hsa_op_reg (BRIG_TYPE_U64);
-
-  mem->operands[0] = r;
-  mem->operands[1] = new (hsa_allocp_operand_address)
-    hsa_op_address (debug, NULL, 0);
-  set_reg_def (r, mem);
-  hsa_append_insn (&prologue, mem);
-  debug_reg = r;
-
-  return r;
-}
-
 
 /* Allocate HSA structures that we need only while generating with this.  */
 
@@ -2140,10 +2109,11 @@ gen_hsa_insns_for_known_library_call (gimple stmt, hsa_bb *hbb,
    Instructions will be appended to HBB.  */
 
 static void
-gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
+gen_hsa_insns_for_kernel_call (hsa_bb *hbb, gcall *call)
 {
   hsa_insn_mem *mem;
   hsa_op_address *addr;
+  hsa_op_immed *c;
 
   hsa_op_reg *shadow_reg_ptr = hsa_cfun->get_shadow_reg ();
 
@@ -2161,6 +2131,7 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   set_reg_def (shadow_reg_base_ptr, mem);
   hsa_append_insn (hbb, mem);
 
+  unsigned index = hsa_cfun->kernel_dispatch_count;
   unsigned byte_offset = index * sizeof (hsa_kernel_dispatch *);
 
   addr = new (hsa_allocp_operand_address)
@@ -2171,6 +2142,17 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64,
 						shadow_reg, addr);
   set_reg_def (shadow_reg, mem);
+  hsa_append_insn (hbb, mem);
+
+  /* Emit store to debug argument.  */
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, shadow_reg,
+			offsetof (hsa_kernel_dispatch, debug));
+
+  /* Create a magic number that is going to be printed by libgomp.  */
+  c = new (hsa_allocp_operand_immed) hsa_op_immed (1000 + index, BRIG_TYPE_U64);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_ST, BRIG_TYPE_U64,
+						c, addr);
   hsa_append_insn (hbb, mem);
 
   /* Load an address of the command queue to a register.  */
@@ -2238,8 +2220,7 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("store 1 to signal handle"));
 
-  hsa_op_immed *c = new (hsa_allocp_operand_immed) hsa_op_immed (1,
-								 BRIG_TYPE_U64);
+  c = new (hsa_allocp_operand_immed) hsa_op_immed (1, BRIG_TYPE_U64);
 
   hsa_insn_signal *signal= new (hsa_allocp_inst_signal)
     hsa_insn_signal (2, BRIG_OPCODE_SIGNALNORET, BRIG_ATOMIC_ST,
@@ -2567,6 +2548,17 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   mem->operands[1] = addr;
   hsa_append_insn (hbb, mem);
 
+  /* Pass shadow argument to another dispatched kernel module.  */
+  hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
+		   hsa_insn_comment ("write argument1 to "
+				     "*packet->kernarg_address"));
+
+  addr = new (hsa_allocp_operand_address)
+	hsa_op_address (NULL, kernarg_reg, 8);
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_ST, BRIG_TYPE_U64,
+						shadow_reg, addr);
+  hsa_append_insn (hbb, mem);
+
   /* Write to packet->competion_signal.  */
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("set packet->completion_signal"));
@@ -2639,17 +2631,6 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   signal->operands[3] = c2;
   hsa_append_insn (hbb, signal);
 
-  /* Emit store to debug argument if enabled.  */
-#ifdef HSA_DEBUG_ARGUMENT
-  hsa_op_reg *debug_reg = hsa_cfun->get_debug_reg ();
-
-  c = new (hsa_allocp_operand_immed) hsa_op_immed (77777, BRIG_TYPE_U64);
-  addr = new (hsa_allocp_operand_address) hsa_op_address (NULL, debug_reg, 0);
-
-  mem = new (hsa_allocp_inst_mem) hsa_insn_mem
-    (BRIG_OPCODE_ST, BRIG_TYPE_U64, c, addr);
-  hsa_append_insn (hbb, mem);
-
   /* Emit NOPS to be able to assemble a HSAIL file and replace it
      in an ELF container.  */
   for (unsigned i = 0; i < 128; i++)
@@ -2657,7 +2638,8 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
       insn = new (hsa_allocp_inst_basic) hsa_insn_basic (0, BRIG_OPCODE_NOP);
       hsa_append_insn(hbb, insn);
     }
-#endif
+
+  hsa_cfun->kernel_dispatch_count++;
 }
 
 /* Generate HSA instructions for the given call statement STMT.  Instructions
@@ -2814,8 +2796,8 @@ specialop:
 	gcc_checking_assert (TREE_CODE (called) == FUNCTION_DECL);
 
 	const char *name = get_declaration_name (called);
-	unsigned index = hsa_add_kernel_dependency (hsa_cfun->decl, hsa_brig_function_name (name));
-	gen_hsa_insns_for_kernel_call (hbb, index,  as_a <gcall *> (stmt));
+	hsa_add_kernel_dependency (hsa_cfun->decl, hsa_brig_function_name (name));
+	gen_hsa_insns_for_kernel_call (hbb, as_a <gcall *> (stmt));
 
 	break;
       }
@@ -3075,11 +3057,7 @@ gen_function_def_parameters (hsa_function_representation *f,
 
   /* Allocate one more argument which can be potentially used for a kernel
      dispatching.  */
-#ifdef HSA_DEBUG_ARGUMENT
-  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 2);
-#else
   f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 1);
-#endif
 
   for (parm = DECL_ARGUMENTS (cfun->decl), i = 0;
        parm;

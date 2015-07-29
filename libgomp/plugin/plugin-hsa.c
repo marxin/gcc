@@ -642,12 +642,7 @@ create_shadow_kernel (struct kernel_info *kernel)
   shadow->children_dispatches = GOMP_PLUGIN_malloc
     (dispatch_count * sizeof (struct hsa_kernel_dispatch *));
 
-  unsigned shadow_space = kernel->dependencies_count > 0
-    ? sizeof (struct hsa_kernel_dispatch *): 0;
-
-#ifdef HSA_DEBUG_ARGUMENT
-  shadow_space += sizeof (uint64_t *);
-#endif
+  unsigned shadow_space =  sizeof (struct hsa_kernel_dispatch *);
 
   shadow->kernarg_address = GOMP_PLUGIN_malloc
     (kernel->kernarg_segment_size + shadow_space);
@@ -674,13 +669,17 @@ create_shadow_kernel (struct kernel_info *kernel)
 static void
 release_shadow_kernel (struct hsa_kernel_dispatch *shadow)
 {
+  if (debug)
+    fprintf (stderr, "Released kernel dispatch: %p has value: %lu (%p)\n",
+	     shadow, shadow->debug, (void *)shadow->debug);
+
   hsa_memory_free (shadow->kernarg_address);
 
   hsa_signal_t s;
   s.handle = shadow->signal;
   hsa_signal_destroy (s);
 
-  free (shadow->omp_data_memory);
+  free (shadow->omp_data_memory);  
 
   for (unsigned i = 0; i < shadow->kernel_dispatch_count; i++)
     release_shadow_kernel (shadow->children_dispatches[i]);
@@ -778,7 +777,7 @@ print_kernel_dispatch (struct hsa_kernel_dispatch *dispatch, unsigned indent)
    create_and_finalize_hsa_program.  */
 
 static struct hsa_kernel_dispatch *
-init_kernel (struct kernel_info *kernel)
+init_kernel (struct kernel_info *kernel, unsigned debug_argument)
 {
   if (pthread_mutex_lock (&kernel->init_mutex))
     GOMP_PLUGIN_fatal ("Could not lock an HSA kernel initialization mutex");
@@ -795,6 +794,7 @@ init_kernel (struct kernel_info *kernel)
   struct agent_info *agent = kernel->agent;
   struct module_info *module = agent->first_module;
   struct hsa_kernel_dispatch *shadow = create_shadow_kernel (kernel);
+  shadow->debug = debug_argument;
 
   if (debug)
     fprintf (stderr, "\nKernel has following dependencies:\n");
@@ -804,8 +804,8 @@ init_kernel (struct kernel_info *kernel)
       int index = get_kernel_index_in_modules (module,
 					       kernel->dependencies[i]);
       struct kernel_info *dependency = &module->kernels[index];
-      init_single_kernel (dependency);
-      shadow->children_dispatches[i] = create_shadow_kernel (dependency);
+      shadow->children_dispatches[i] = init_kernel (dependency,
+						    debug_argument++);
     }
 
   if (debug)
@@ -832,7 +832,7 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
     GOMP_PLUGIN_fatal ("Unable to read-lock an HSA agent rwlock");
 
   create_and_finalize_hsa_program (agent);
-  struct hsa_kernel_dispatch *shadow = init_kernel (kernel);
+  struct hsa_kernel_dispatch *shadow = init_kernel (kernel, 0);
 
   if (debug)
     print_kernel_dispatch (shadow, 2);
@@ -872,17 +872,6 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
     memcpy (shadow->kernarg_address + sizeof (vars), &shadow,
 	    sizeof (struct hsa_kernel_runtime *));
 
-  /* Allocate pointer for debugging purpose.  */
-#ifdef HSA_DEBUG_ARGUMENT
-  uint64_t *debug_shadow = GOMP_PLUGIN_malloc (sizeof (uint64_t));
-  memcpy (shadow->kernarg_address + sizeof (vars) +
-	  sizeof (struct hsa_kernel_runtime *), &debug_shadow,
-	  sizeof (uint64_t));
-
-  *debug_shadow = 12345;
-
-#endif
-
   uint16_t header;
   header = HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE;
   header |= HSA_FENCE_SCOPE_SYSTEM << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE;
@@ -891,16 +880,10 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   __atomic_store_n ((uint16_t*)(&packet->header), header, __ATOMIC_RELEASE);
   hsa_signal_store_release (agent->command_q->doorbell_signal, index);
 
-  if (debug_shadow)
+  if (debug)
     fprintf (stderr, "Kernel dispatched, waiting for completion\n");
   hsa_signal_wait_acquire(s, HSA_SIGNAL_CONDITION_LT, 1,
 			  UINT64_MAX, HSA_WAIT_STATE_BLOCKED);
-
-#ifdef HSA_DEBUG_ARGUMENT
-  if (debug_shadow)
-    fprintf (stderr, "Debug argument has value: %lu (%p)\n",
-	     *debug_shadow, (void *)*debug_shadow);
-#endif
 
   release_shadow_kernel (shadow);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))

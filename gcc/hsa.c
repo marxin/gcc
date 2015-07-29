@@ -91,9 +91,6 @@ struct GTY(()) hsa_decl_kernel_map_element
 
 static GTY (()) vec<hsa_decl_kernel_map_element, va_gc> *hsa_decl_kernel_mapping;
 
-/* Global counter for all kernel from kernel calls.  */
-unsigned hsa_kernel_calls_counter = 0;
-
 /* Mapping between decls and corresponding HSA kernels
    called by the function.   */
 hash_map <tree, vec <char *> *> *hsa_decl_kernel_dependencies;
@@ -369,7 +366,7 @@ hsa_free_decl_kernel_mapping (void)
 
 /* Add new kernel dependency.  */
 
-unsigned
+void
 hsa_add_kernel_dependency (tree caller, char *called_function)
 {
   if (hsa_decl_kernel_dependencies == NULL)
@@ -386,7 +383,6 @@ hsa_add_kernel_dependency (tree caller, char *called_function)
     s = *slot;
 
   s->safe_push (called_function);
-  return hsa_kernel_calls_counter++;
 }
 
 /* Modify the name P in-place so that it is a valid HSA identifier.  */
