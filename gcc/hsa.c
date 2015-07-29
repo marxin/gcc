@@ -96,7 +96,7 @@ unsigned hsa_kernel_calls_counter = 0;
 
 /* Mapping between decls and corresponding HSA kernels
    called by the function.   */
-hash_map <tree, hash_set <char *> *> *hsa_decl_kernel_dependencies;
+hash_map <tree, vec <char *> *> *hsa_decl_kernel_dependencies;
 
 /* Hash function to lookup a symbol for a decl.  */
 hash_table <hsa_free_symbol_hasher> *hsa_global_variable_symbols;
@@ -373,19 +373,19 @@ unsigned
 hsa_add_kernel_dependency (tree caller, char *called_function)
 {
   if (hsa_decl_kernel_dependencies == NULL)
-    hsa_decl_kernel_dependencies = new hash_map<tree, hash_set<char *> *> ();
+    hsa_decl_kernel_dependencies = new hash_map<tree, vec<char *> *> ();
 
-  hash_set<char *> *s = NULL;
-  hash_set<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
+  vec <char *> *s = NULL;
+  vec <char *> **slot = hsa_decl_kernel_dependencies->get (caller);
   if (slot == NULL)
     {
-      s = new hash_set<char *> ();
+      s = new vec <char *> ();
       hsa_decl_kernel_dependencies->put (caller, s);
     }
   else
     s = *slot;
 
-  s->add (called_function);
+  s->safe_push (called_function);
   return hsa_kernel_calls_counter++;
 }
 

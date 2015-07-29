@@ -123,7 +123,6 @@ static void
 hsa_append_insn (hsa_bb *hbb, hsa_insn_basic *insn)
 {
   /* Make sure we did not forget to set the kind.  */
-  gcc_assert (insn->opcode != 0);
   gcc_assert (!insn->bb);
 
   insn->bb = hbb->bb;
@@ -159,7 +158,7 @@ hsa_function_representation::hsa_function_representation ()
   declaration_p = false;
   called_functions = vNULL;
   shadow_reg = NULL;
-  shadow_reg2 = NULL;
+  debug_reg = NULL;
 }
 
 /* Destructor of class holding function/kernel-wide informaton and state.  */
@@ -206,6 +205,37 @@ hsa_function_representation::get_shadow_reg ()
 
   return r;
 }
+
+hsa_op_reg *
+hsa_function_representation::get_debug_reg ()
+{
+  gcc_assert (kern_p);
+
+  if (debug_reg)
+    return debug_reg;
+
+  /* Append the shadow argument.  */
+  hsa_symbol *debug = &input_args[input_args_count++];
+  debug->type = BRIG_TYPE_U64;
+  debug->segment = BRIG_SEGMENT_KERNARG;
+  debug->linkage = BRIG_LINKAGE_FUNCTION;
+  debug->name = "hsa_runtime_debug";
+
+  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
+    hsa_insn_mem (BRIG_OPCODE_LD, BRIG_TYPE_U64);
+
+  hsa_op_reg *r = new (hsa_allocp_operand_reg) hsa_op_reg (BRIG_TYPE_U64);
+
+  mem->operands[0] = r;
+  mem->operands[1] = new (hsa_allocp_operand_address)
+    hsa_op_address (debug, NULL, 0);
+  set_reg_def (r, mem);
+  hsa_append_insn (&prologue, mem);
+  debug_reg = r;
+
+  return r;
+}
+
 
 /* Allocate HSA structures that we need only while generating with this.  */
 
@@ -2608,6 +2638,26 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, unsigned index, gcall *call)
   signal->operands[2] = c;
   signal->operands[3] = c2;
   hsa_append_insn (hbb, signal);
+
+  /* Emit store to debug argument if enabled.  */
+#ifdef HSA_DEBUG_ARGUMENT
+  hsa_op_reg *debug_reg = hsa_cfun->get_debug_reg ();
+
+  c = new (hsa_allocp_operand_immed) hsa_op_immed (77777, BRIG_TYPE_U64);
+  addr = new (hsa_allocp_operand_address) hsa_op_address (NULL, debug_reg, 0);
+
+  mem = new (hsa_allocp_inst_mem) hsa_insn_mem
+    (BRIG_OPCODE_ST, BRIG_TYPE_U64, c, addr);
+  hsa_append_insn (hbb, mem);
+
+  /* Emit NOPS to be able to assemble a HSAIL file and replace it
+     in an ELF container.  */
+  for (unsigned i = 0; i < 128; i++)
+    {
+      insn = new (hsa_allocp_inst_basic) hsa_insn_basic (0, BRIG_OPCODE_NOP);
+      hsa_append_insn(hbb, insn);
+    }
+#endif
 }
 
 /* Generate HSA instructions for the given call statement STMT.  Instructions
@@ -3025,7 +3075,12 @@ gen_function_def_parameters (hsa_function_representation *f,
 
   /* Allocate one more argument which can be potentially used for a kernel
      dispatching.  */
+#ifdef HSA_DEBUG_ARGUMENT
+  f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 2);
+#else
   f->input_args = XCNEWVEC (hsa_symbol, f->input_args_count + 1);
+#endif
+
   for (parm = DECL_ARGUMENTS (cfun->decl), i = 0;
        parm;
        parm = DECL_CHAIN (parm), i++)

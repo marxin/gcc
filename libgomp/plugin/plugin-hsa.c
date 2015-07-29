@@ -645,6 +645,10 @@ create_shadow_kernel (struct kernel_info *kernel)
   unsigned shadow_space = kernel->dependencies_count > 0
     ? sizeof (struct hsa_kernel_dispatch *): 0;
 
+#ifdef HSA_DEBUG_ARGUMENT
+  shadow_space += sizeof (uint64_t *);
+#endif
+
   shadow->kernarg_address = GOMP_PLUGIN_malloc
     (kernel->kernarg_segment_size + shadow_space);
   shadow->object = kernel->object;
@@ -868,6 +872,17 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
     memcpy (shadow->kernarg_address + sizeof (vars), &shadow,
 	    sizeof (struct hsa_kernel_runtime *));
 
+  /* Allocate pointer for debugging purpose.  */
+#ifdef HSA_DEBUG_ARGUMENT
+  uint64_t *debug_shadow = GOMP_PLUGIN_malloc (sizeof (uint64_t));
+  memcpy (shadow->kernarg_address + sizeof (vars) +
+	  sizeof (struct hsa_kernel_runtime *), &debug_shadow,
+	  sizeof (uint64_t));
+
+  *debug_shadow = 12345;
+
+#endif
+
   uint16_t header;
   header = HSA_PACKET_TYPE_KERNEL_DISPATCH << HSA_PACKET_HEADER_TYPE;
   header |= HSA_FENCE_SCOPE_SYSTEM << HSA_PACKET_HEADER_ACQUIRE_FENCE_SCOPE;
@@ -876,10 +891,16 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars)
   __atomic_store_n ((uint16_t*)(&packet->header), header, __ATOMIC_RELEASE);
   hsa_signal_store_release (agent->command_q->doorbell_signal, index);
 
-  if (debug)
+  if (debug_shadow)
     fprintf (stderr, "Kernel dispatched, waiting for completion\n");
   hsa_signal_wait_acquire(s, HSA_SIGNAL_CONDITION_LT, 1,
 			  UINT64_MAX, HSA_WAIT_STATE_BLOCKED);
+
+#ifdef HSA_DEBUG_ARGUMENT
+  if (debug_shadow)
+    fprintf (stderr, "Debug argument has value: %lu (%p)\n",
+	     *debug_shadow, (void *)*debug_shadow);
+#endif
 
   release_shadow_kernel (shadow);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))

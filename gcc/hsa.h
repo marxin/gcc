@@ -769,8 +769,11 @@ public:
   hsa_function_representation ();
   ~hsa_function_representation ();
 
-  /* Builds a shodow register that is utilized to a kernel dispatch.  */
+  /* Builds a shadow register that is utilized to a kernel dispatch.  */
   hsa_op_reg *get_shadow_reg ();
+
+  /* Builds a debug register that is quite usefull for debugging purpose.  */
+  hsa_op_reg *get_debug_reg ();
 
   /* Name of the function.  */
   char *name;
@@ -815,13 +818,15 @@ public:
 
   /* Runtime shadow register.  */
   hsa_op_reg *shadow_reg;
-  hsa_op_reg *shadow_reg2;
+
+  /* Runtime debugging purpose register.  */
+  hsa_op_reg *debug_reg;
 };
 
 /* in hsa.c */
 extern struct hsa_function_representation *hsa_cfun;
 extern hash_table <hsa_free_symbol_hasher> *hsa_global_variable_symbols;
-extern hash_map <tree, hash_set <char *> *> *hsa_decl_kernel_dependencies;
+extern hash_map <tree, vec <char *> *> *hsa_decl_kernel_dependencies;
 extern unsigned hsa_kernel_calls_counter;
 void hsa_init_compilation_unit_data (void);
 void hsa_deinit_compilation_unit_data (void);

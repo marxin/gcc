@@ -1823,16 +1823,15 @@ hsa_output_kernel_mapping (tree brig_decl)
     {
       tree caller = hsa_get_decl_kernel_mapping_decl (i);
 
-      hash_set<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
+      vec<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
       if (slot)
 	{
-	  hash_set<char *> *s = *slot;
-	  for (hash_set <char *>::iterator it = s->begin ();
-	       it != s->end (); ++it)
-	    len += (strlen (*it) + 1);
+	  vec<char *> *s = *slot;
+	  for (unsigned i = 0; i < s->length (); i++)
+	    len += (strlen ((*s)[i]) + 1);
 
 	  /* Add N-1 dot characters.  */
-	  len += 2 * (s->elements () - 1);
+	  len += 2 * (s->length () - 1);
 	}
 
       /* Zero termination character.  */
@@ -1845,23 +1844,22 @@ hsa_output_kernel_mapping (tree brig_decl)
     {
       tree caller = hsa_get_decl_kernel_mapping_decl (i);
 
-      hash_set<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
+      vec<char *> **slot = hsa_decl_kernel_dependencies->get (caller);
       if (slot)
 	{
-	  hash_set<char *> *s = *slot;
-	  unsigned j = 0;
-	  for (hash_set <char *>::iterator it = s->begin ();
-	       it != s->end (); ++it)
+	  vec<char *> *s = *slot;
+	  unsigned k, j = 0;
+	  for (k = 0; k < s->length (); k++)
 	    {
-	      unsigned ll = strlen (*it);
+	      unsigned ll = strlen ((*s)[k]);
 	      gcc_assert (ll > 0);
-	      memcpy (p, *it, ll);
+	      memcpy (p, (*s)[k], ll);
 	      p += ll;
 	      *p = '\0';
 	      p++;
 
 	      /* If it is not a last elements, append '.' string.  */
-	      if (j != s->elements () - 1)
+	      if (j != s->length () - 1)
 		{
 		  *p++ = '.';
 		  *p++ = '\0';
