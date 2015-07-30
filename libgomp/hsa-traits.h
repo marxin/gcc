@@ -22,6 +22,9 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef HSA_TRAITS_H_
 #define HSA_TRAITS_H_
 
+/* HSA kernel dispatch is collection of informations needed for
+   a kernel dispatch.  */
+
 struct hsa_kernel_dispatch
 {
   /* Pointer to a command queue associated with a kernel dispatch agent.  */
@@ -44,6 +47,38 @@ struct hsa_kernel_dispatch
   uint64_t debug;
   /* Kernel dispatch structures created for children kernel dispatches.  */
   struct hsa_kernel_dispatch **children_dispatches;
+};
+
+/* HSA queue packet is shadow structure, originally provided by AMD.  */
+
+struct hsa_queue_packet {
+  uint16_t header;
+  uint16_t setup;
+  uint16_t workgroup_size_x;
+  uint16_t workgroup_size_y;
+  uint16_t workgroup_size_z;
+  uint16_t reserved0;
+  uint32_t grid_size_x;
+  uint32_t grid_size_y;
+  uint32_t grid_size_z;
+  uint32_t private_segment_size;
+  uint32_t group_segment_size;
+  uint64_t kernel_object;
+  void *kernarg_address;
+  uint64_t reserved2;
+  uint64_t completion_signal;
+};
+
+/* HSA queue is shadow structure, originally provided by AMD.  */
+
+struct hsa_queue {
+  int type;
+  uint32_t features;
+  void *base_address;
+  uint64_t doorbell_signal;
+  uint32_t size;
+  uint32_t reserved1;
+  uint64_t id;
 };
 
 #endif // HSA_TRAITS_H_ 

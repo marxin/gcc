@@ -704,7 +704,6 @@ init_single_kernel (struct kernel_info *kernel)
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_OBJECT, &kernel->object);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not extract a kernel object from its symbol", status);
-  fprintf (stderr, "received kernel for %s: %lu\n", kernel->name, kernel->object);
   status = hsa_executable_symbol_get_info
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_KERNARG_SEGMENT_SIZE,
      &kernel->kernarg_segment_size);
