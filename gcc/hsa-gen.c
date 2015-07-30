@@ -2123,7 +2123,7 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, gcall *call)
 
   /* Get my kernel dispatch argument.  */
   hsa_append_insn (hbb, new (hsa_allocp_inst_comment)
-		   hsa_insn_comment ("get my kernel dispatch"));
+		   hsa_insn_comment ("get kernel dispatch structure"));
   addr = new (hsa_allocp_operand_address)
 	hsa_op_address (NULL, shadow_reg_ptr,
 			offsetof (hsa_kernel_dispatch, children_dispatches));
