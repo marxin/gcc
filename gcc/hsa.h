@@ -632,12 +632,16 @@ is_a_helper <hsa_insn_arg_block *>::test (hsa_insn_basic *p)
 class hsa_insn_comment: public hsa_insn_basic
 {
 public:
+  /* Constructor of class representing the comment in HSAIL.  */
   hsa_insn_comment (const char *s);
 
   /* Destructor.  */
   ~hsa_insn_comment ();
 
-  const char *comment;
+  /* Release memory for comment.  */
+  void release_string ();
+
+  char *comment;
 };
 
 /* Report whether or not P is a call block instruction.  */

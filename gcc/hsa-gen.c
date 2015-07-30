@@ -932,7 +932,6 @@ hsa_insn_arg_block::hsa_insn_arg_block (BrigKind brig_kind,
 {
 }
 
-/* Constructor of class representing the comment in HSAIL.  */
 hsa_insn_comment::hsa_insn_comment (const char *s)
   : hsa_insn_basic (0, BRIG_KIND_DIRECTIVE_COMMENT)
 {
@@ -942,6 +941,14 @@ hsa_insn_comment::hsa_insn_comment (const char *s)
   char *buf = XNEWVEC (char, l + 4);
   sprintf (buf, "// %s", s);
   comment = buf;
+}
+
+void
+hsa_insn_comment::release_string ()
+{
+  gcc_checking_assert (comment);
+  free (comment);
+  comment = NULL;
 }
 
 /* Constructor of class representing the queue instruction in HSAIL.  */

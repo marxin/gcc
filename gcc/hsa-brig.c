@@ -1470,6 +1470,7 @@ emit_comment_insn (hsa_insn_comment *insn)
   repr.base.kind = htole16 (insn->opcode);
   repr.name = brig_emit_string (insn->comment, '\0', false);
   brig_code.add (&repr, sizeof (repr));
+  insn->release_string ();
 }
 
 /* Emit queue instruction.  */
