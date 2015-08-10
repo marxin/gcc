@@ -428,7 +428,12 @@ const char *
 get_declaration_name (tree decl)
 {
   if (!DECL_NAME (decl))
-    sorry ("Support for HSA does not implement anonymous declarations");
+    {
+      /* FIXME: release allocated memory.  */
+      char *b = XNEWVEC (char, 64);
+      sprintf (b, "__hsa_anonymous_%i", DECL_UID (decl));
+      return b;
+    }
   else
     return IDENTIFIER_POINTER (DECL_NAME (decl));
 
