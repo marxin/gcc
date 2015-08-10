@@ -1850,7 +1850,34 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
 				      dest, hbb, ssa_map);
       }
       return;
+    case COND_EXPR:
+      {
+	hsa_op_reg *ctrl = new (hsa_allocp_operand_reg) hsa_op_reg
+	  (BRIG_TYPE_B1);
+	tree cond = gimple_assign_rhs1 (assign);
 
+	gen_hsa_cmp_insn_from_gimple (TREE_CODE (cond),
+			      TREE_OPERAND (cond, 0),
+			      TREE_OPERAND (cond, 1),
+			      ctrl, hbb, ssa_map);
+
+	hsa_op_reg *dest = hsa_reg_for_gimple_ssa (gimple_assign_lhs (assign),
+						   ssa_map);
+
+	hsa_op_reg *rhs2 = hsa_reg_for_gimple_ssa (gimple_assign_rhs2 (assign),
+						   ssa_map);
+	hsa_op_reg *rhs3 = hsa_reg_for_gimple_ssa (gimple_assign_rhs3 (assign),
+						   ssa_map);
+
+	hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
+	  hsa_insn_basic (3, BRIG_OPCODE_CMOV, dest->type, ctrl,
+			  rhs2, rhs3);
+
+	dest->set_definition (insn);
+	hbb->append_insn (insn);
+
+	return;
+      }
     default:
       /* Implement others as we come across them.  */
       sorry ("Support for HSA does not implement operation %s",
