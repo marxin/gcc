@@ -3132,13 +3132,8 @@ gen_function_def_parameters (hsa_function_representation *f,
 				       BRIG_SEGMENT_ARG;
 
       f->input_args[i].linkage = BRIG_LINKAGE_FUNCTION;
-      if (!DECL_NAME (parm))
-	{
-	  /* FIXME: Just generate some UID.  */
-	  sorry ("Support for HSA does not implement anonymous C++ parameters");
-	  return;
-	}
-      f->input_args[i].name = IDENTIFIER_POINTER (DECL_NAME (parm));
+      f->input_args[i].name = get_declaration_name (parm);
+
       slot = f->local_symbols->find_slot (&f->input_args[i],
 						INSERT);
       gcc_assert (!*slot);
