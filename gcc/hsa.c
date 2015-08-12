@@ -269,6 +269,26 @@ hsa_type_float_p (BrigType16_t type)
     }
 }
 
+/* Return true iff TYPE is an integer number type.  */
+
+bool
+hsa_type_integer_p (BrigType16_t type)
+{
+  switch (type & BRIG_TYPE_BASE_MASK)
+    {
+    case BRIG_TYPE_U16:
+    case BRIG_TYPE_U32:
+    case BRIG_TYPE_U64:
+    case BRIG_TYPE_S8:
+    case BRIG_TYPE_S16:
+    case BRIG_TYPE_S32:
+    case BRIG_TYPE_S64:
+      return true;
+    default:
+      return false;
+    }
+}
+
 /* Call the correct destructor on a statement STMT.  */
 
 void
