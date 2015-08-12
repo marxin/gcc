@@ -1896,6 +1896,9 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
     case BIT_NOT_EXPR:
       opcode = BRIG_OPCODE_NOT;
       break;
+    case FIX_TRUNC_EXPR:
+      opcode = BRIG_OPCODE_TRUNC;
+      break;
 
     case LT_EXPR:
     case LE_EXPR:
