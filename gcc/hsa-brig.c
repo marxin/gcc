@@ -885,6 +885,31 @@ emit_immediate_operand (hsa_op_immed *imm)
       /* Vectors should have the exact size.  */
       gcc_assert (total_len == 0);
     }
+  else if (TREE_CODE (imm->value) == STRING_CST)
+    {
+      unsigned len = TREE_STRING_LENGTH (imm->value);
+      const char *p = TREE_STRING_POINTER (imm->value);
+
+      for (unsigned i = 0; i < len; i++)
+	{
+	  unsigned actual = emit_immediate_scalar_to_data_section
+	    (build_int_cstu (unsigned_char_type_node, *p), 0);
+
+	  total_len -= actual;
+
+	  p++;
+	}
+
+      gcc_assert (total_len == 0);
+    }
+  else if (TREE_CODE (imm->value) == COMPLEX_CST)
+    {
+      gcc_assert (total_len % 2 == 0);
+      emit_immediate_scalar_to_data_section (TREE_REALPART (imm->value),
+					     total_len / 2);
+      emit_immediate_scalar_to_data_section (TREE_IMAGPART (imm->value),
+					     total_len / 2);
+    }
   else
     emit_immediate_scalar_to_data_section (imm->value, total_len);
 
@@ -1566,7 +1591,7 @@ emit_basic_insn (hsa_insn_basic *insn)
 	repr.round = 0;
       /* We assume that destination and sources agree in packing
          layout.  */
-      if (insn->operands[2])
+      if (insn->operands.length () >= 2)
 	repr.pack = BRIG_PACK_PP;
       else
 	repr.pack = BRIG_PACK_P;
