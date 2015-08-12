@@ -1566,7 +1566,7 @@ emit_basic_insn (hsa_insn_basic *insn)
 	repr.round = 0;
       /* We assume that destination and sources agree in packing
          layout.  */
-      if (insn->operands[2])
+      if (insn->operands.length () >= 2)
 	repr.pack = BRIG_PACK_PP;
       else
 	repr.pack = BRIG_PACK_P;
