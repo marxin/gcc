@@ -1601,7 +1601,7 @@ gen_hsa_insns_for_single_assignment (gimple assign, hsa_bb *hbb,
       gen_hsa_insns_for_load (dest, rhs, TREE_TYPE (lhs), hbb, ssa_map);
     }
   else if (TREE_CODE (rhs) == SSA_NAME
-	   || is_gimple_min_invariant (rhs))
+	   || (is_gimple_min_invariant (rhs) && TREE_CODE (rhs) != STRING_CST))
     {
       /* Store to memory.  */
       hsa_op_base *src = hsa_reg_or_immed_for_gimple_op (rhs, hbb, ssa_map,
