@@ -1642,6 +1642,73 @@ gen_hsa_insns_for_store (tree lhs, hsa_op_base *src, hsa_bb *hbb,
   hbb->append_insn (mem);
 }
 
+/* Return unsigned brig type according to provided SIZE in bytes.  */
+
+static BrigType16_t
+get_unsinged_type_by_bytes (unsigned size)
+{
+  switch (size)
+    {
+    case 1:
+      return BRIG_TYPE_U8;
+    case 2:
+      return BRIG_TYPE_U16;
+    case 4:
+      return BRIG_TYPE_U32;
+    case 8:
+      return BRIG_TYPE_U64;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Generate memory copy instructions that are going to be used
+   for copying a HSA symbol SRC_SYMBOL (or SRC_REG) to TARGET memory,
+   represented by pointer in a register.  */
+
+static void
+gen_hsa_memory_copy (hsa_bb *hbb, hsa_symbol *src_symbol, hsa_op_reg *src_reg,
+		     hsa_op_reg *target, unsigned size,
+		     unsigned source_offset = 0,
+		     unsigned target_offset = 0)
+{
+  hsa_op_address *addr;
+  hsa_insn_mem *mem;
+
+  unsigned offset = 0;
+
+  while (size)
+    {
+      unsigned s;
+      if (size >= 8)
+	s = 8;
+      else if (size >= 4)
+	s = 4;
+      else if (size >= 2)
+	s = 2;
+      else
+	s = 1;
+
+      BrigType16_t t = get_unsinged_type_by_bytes (s);
+
+      hsa_op_reg *tmp = new (hsa_allocp_operand_reg) hsa_op_reg (t);
+      addr = new (hsa_allocp_operand_address) hsa_op_address
+	(src_symbol, src_reg, source_offset + offset);
+      mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, t,
+						    tmp, addr);
+      hbb->append_insn (mem);
+      tmp->set_definition (mem);
+
+      addr = new (hsa_allocp_operand_address) hsa_op_address
+	(NULL, target, target_offset + offset);
+      mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_ST, t, tmp,
+						    addr);
+      hbb->append_insn (mem);
+      offset += s;
+      size -= s;
+    }
+}
+
 /* Generate HSA instructions for a single assignment.  HBB is the basic block
    they will be appended to.  SSA_MAP maps gimple SSA names to HSA pseudo
    registers.  */
@@ -1670,8 +1737,26 @@ gen_hsa_insns_for_single_assignment (gimple assign, hsa_bb *hbb,
     }
   else
     {
+      /* FIXME: reconsider following asserts.  */
+      gcc_checking_assert (TREE_CODE (rhs) == MEM_REF);
+      gcc_checking_assert (TREE_CODE (lhs) == MEM_REF);
+
+      tree lhs_arg0 = TREE_OPERAND (lhs, 0);
+      unsigned lhs_offset = tree_to_uhwi (TREE_OPERAND (lhs, 1));
+
+      tree rhs_arg0 = TREE_OPERAND (rhs, 0);
+      unsigned rhs_offset = tree_to_uhwi (TREE_OPERAND (rhs, 1));
+
+      gcc_checking_assert (TREE_CODE (rhs_arg0) == SSA_NAME);
+      gcc_checking_assert (TREE_CODE (lhs_arg0) == SSA_NAME);
+
+      hsa_op_reg *src = hsa_reg_for_gimple_ssa (rhs_arg0, ssa_map);
+      hsa_op_reg *dst = hsa_reg_for_gimple_ssa (lhs_arg0, ssa_map);
+
       gcc_assert (!is_gimple_reg_type (TREE_TYPE (lhs)));
-      sorry ("Support for HSA does not implement non-scalar memory moves.");
+
+      unsigned size = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (rhs)));
+      gen_hsa_memory_copy (hbb, NULL, src, dst, size, lhs_offset, rhs_offset);
     }
 }
 
@@ -2163,73 +2248,6 @@ gen_hsa_insns_for_return (greturn *stmt, hsa_bb *hbb,
   hbb->append_insn (ret);
 }
 
-/* Return unsigned brig type according to provided SIZE in bytes.  */
-
-static BrigType16_t
-get_unsinged_type_by_bytes (unsigned size)
-{
-  switch (size)
-    {
-    case 1:
-      return BRIG_TYPE_U8;
-    case 2:
-      return BRIG_TYPE_U16;
-    case 4:
-      return BRIG_TYPE_U32;
-    case 8:
-      return BRIG_TYPE_U64;
-    default:
-      gcc_unreachable ();
-    }
-}
-
-/* Generate memory copy instructions that are going to be used
-   for copying a HSA symbol SRC to TARGET memory, represented by
-   pointer in a register.  */
-
-static void
-gen_hsa_memory_copy (hsa_bb *hbb, hsa_symbol *src, hsa_op_reg *target)
-{
-  hsa_op_address *addr;
-  hsa_insn_mem *mem;
-
-  gcc_assert (src->type | BRIG_TYPE_U8);
-
-  unsigned size = src->dim;
-  unsigned offset = 0;
-
-  while (size)
-    {
-      unsigned s;
-      if (size >= 8)
-	s = 8;
-      else if (size >= 4)
-	s = 4;
-      else if (size >= 2)
-	s = 2;
-      else
-	s = 1;
-
-      BrigType16_t t = get_unsinged_type_by_bytes (s);
-
-      hsa_op_reg *tmp = new (hsa_allocp_operand_reg) hsa_op_reg (t);
-      addr = new (hsa_allocp_operand_address) hsa_op_address (src, NULL,
-							      offset);
-      mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_LD, t,
-						    tmp, addr);
-      hbb->append_insn (mem);
-      tmp->set_definition (mem);
-
-      addr = new (hsa_allocp_operand_address) hsa_op_address
-	(NULL, target, offset);
-      mem = new (hsa_allocp_inst_mem) hsa_insn_mem (BRIG_OPCODE_ST, t, tmp,
-						    addr);
-      hbb->append_insn (mem);
-      offset += s;
-      size -= s;
-    }
-}
-
 /* If STMT is a call of a known library function, generate code to perform
    it and return true.  */
 
@@ -2692,7 +2710,7 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, gcall *call)
 
   hbb->append_insn (new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("memory copy instructions"));
-  gen_hsa_memory_copy (hbb, var_decl, omp_data_memory_reg);
+  gen_hsa_memory_copy (hbb, var_decl, NULL, omp_data_memory_reg, var_decl->dim);
 
   hbb->append_insn (new (hsa_allocp_inst_comment)
 		   hsa_insn_comment ("write memory pointer to "
