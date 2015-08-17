@@ -721,7 +721,8 @@ hsa_op_immed::hsa_op_immed (tree tree_val, bool min32int)
 						     min32int))
 {
   gcc_checking_assert (is_gimple_min_invariant (tree_val)
-		       && !POINTER_TYPE_P (TREE_TYPE (tree_val)));
+		       && (!POINTER_TYPE_P (TREE_TYPE (tree_val))
+			   || TREE_CODE (tree_val) == INTEGER_CST));
   value = tree_val;
 }
 
@@ -1415,6 +1416,20 @@ static void
 gen_hsa_addr_insns (tree val, hsa_op_reg *dest, hsa_bb *hbb,
 		    vec <hsa_op_reg_p> *ssa_map)
 {
+  /* Handle cases like tmp = NULL, where we just emit a move instruction
+     to a register.  */
+  if (TREE_CODE (val) == INTEGER_CST)
+    {
+      hsa_op_immed *c = new (hsa_allocp_operand_immed)
+	hsa_op_immed (val);
+
+      hsa_insn_basic *insn = new (hsa_allocp_inst_basic) hsa_insn_basic
+	(2, BRIG_OPCODE_MOV, dest->type, dest, c);
+      hbb->append_insn (insn);
+      dest->set_definition (insn);
+      return;
+    }
+
   hsa_op_address *addr;
   hsa_insn_basic *insn = new (hsa_allocp_inst_basic) hsa_insn_basic
     (2, BRIG_OPCODE_LDA);
@@ -3078,7 +3093,9 @@ gen_hsa_phi_from_gimple_phi (gimple phi_stmt, hsa_bb *hbb,
       else
 	{
 	  gcc_assert (is_gimple_min_invariant (op));
-	  if (!POINTER_TYPE_P (TREE_TYPE (op)))
+	  tree t = TREE_TYPE (op);
+	  if (!POINTER_TYPE_P (t)
+	      || TREE_CODE (TREE_TYPE (t)) == INTEGER_TYPE)
 	    hphi->operands[i] = new (hsa_allocp_operand_immed)
 	      hsa_op_immed (op);
 	  else if (TREE_CODE (op) == ADDR_EXPR)
