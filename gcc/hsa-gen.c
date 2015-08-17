@@ -1936,17 +1936,15 @@ gen_hsa_cmp_insn_from_gimple (enum tree_code code, tree lhs, tree rhs,
   hbb->append_insn (cmp);
 }
 
-/* Generate HSA instruction for an assignment ASSIGN with an operation.
-   Instructions will be appended to HBB.  SSA_MAP maps gimple SSA names to HSA
-   pseudo registers.  */
-
 static void
-gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
-					vec <hsa_op_reg_p> *ssa_map)
+gen_hsa_insns_for_assignment (tree_code code, tree_code expr_code,
+			      tree lhs, tree rhs1, tree rhs2, tree rhs3,
+			      hsa_op_reg *dest,
+			      hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map)
 {
   int opcode;
 
-  switch (gimple_assign_rhs_code (assign))
+  switch (code)
     {
     CASE_CONVERT:
     case FLOAT_EXPR:
@@ -1954,8 +1952,8 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
 	/* HSA is a bit unforgiving with CVT, the types must not be
 	   same sized without float/int conversion, otherwise we need
 	   to use MOV.  */
-	tree tl = TREE_TYPE (gimple_assign_lhs (assign));
-	tree tr = TREE_TYPE (gimple_assign_rhs1 (assign));
+	tree tl = TREE_TYPE (lhs);
+	tree tr = TREE_TYPE (rhs1);
 	/* We don't need to check for float/float conversion of same size,
 	   as that wouldn't result in a gimple instruction.  */
 	if ((INTEGRAL_TYPE_P (tl) || POINTER_TYPE_P (tl))
@@ -2020,8 +2018,30 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
       break;
     case LROTATE_EXPR:
     case RROTATE_EXPR:
-      sorry ("Support for HSA does not implement LROTATE_EXPR or RROTATE_EXPR");
-      return;
+      {
+	tree_code code1 = code == LROTATE_EXPR ? LSHIFT_EXPR : RSHIFT_EXPR;
+	tree_code code2 = code != LROTATE_EXPR ? LSHIFT_EXPR : RSHIFT_EXPR;
+
+	hsa_op_reg *op1 = new (hsa_allocp_operand_reg)
+	  hsa_op_reg (hsa_type_for_scalar_tree_type (TREE_TYPE (lhs), true));
+	hsa_op_reg *op2 = new (hsa_allocp_operand_reg)
+	  hsa_op_reg (hsa_type_for_scalar_tree_type (TREE_TYPE (lhs), true));
+
+	tree type = TREE_TYPE (rhs2);
+	tree size = build_int_cstu (unsigned_type_node,
+				    TREE_INT_CST_LOW (TYPE_SIZE (type)));
+	tree s = fold_build2 (MINUS_EXPR, unsigned_type_node, size, rhs2);
+	gen_hsa_insns_for_assignment (code1, expr_code, NULL_TREE, rhs1, rhs2,
+				      NULL_TREE, op1, hbb, ssa_map);
+	gen_hsa_insns_for_assignment (code2, expr_code, NULL_TREE, rhs1, s,
+				      NULL_TREE, op2, hbb, ssa_map);
+
+	hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
+	  hsa_insn_basic (3, BRIG_OPCODE_OR, dest->type, dest, op1, op2);
+	dest->set_definition (insn);
+	hbb->append_insn (insn);
+	return;
+      }
     case BIT_IOR_EXPR:
       opcode = BRIG_OPCODE_OR;
       break;
@@ -2045,26 +2065,44 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
     case EQ_EXPR:
     case NE_EXPR:
       {
-	hsa_op_reg *dest = hsa_reg_for_gimple_ssa (gimple_assign_lhs (assign),
-						   ssa_map);
-	gen_hsa_cmp_insn_from_gimple (gimple_assign_rhs_code (assign),
-				      gimple_assign_rhs1 (assign),
-				      gimple_assign_rhs2 (assign),
-				      dest, hbb, ssa_map);
+	gen_hsa_cmp_insn_from_gimple (code, rhs1, rhs2, dest, hbb, ssa_map);
+	return;
       }
-      return;
-    case COMPLEX_EXPR:
+    case COND_EXPR:
       {
-	hsa_op_reg *dest = hsa_reg_for_gimple_ssa (gimple_assign_lhs (assign),
-						   ssa_map);
+	hsa_op_reg *ctrl = new (hsa_allocp_operand_reg) hsa_op_reg
+	  (BRIG_TYPE_B1);
+	tree cond = rhs1;
 
-	hsa_op_base *rhs1 = hsa_reg_or_immed_for_gimple_op
-	  (gimple_assign_rhs1 (assign), hbb, ssa_map, NULL);
-	hsa_op_base *rhs2 = hsa_reg_or_immed_for_gimple_op
-	  (gimple_assign_rhs2 (assign), hbb, ssa_map, NULL);
+	gen_hsa_cmp_insn_from_gimple (TREE_CODE (cond),
+			      TREE_OPERAND (cond, 0),
+			      TREE_OPERAND (cond, 1),
+			      ctrl, hbb, ssa_map);
+
+	hsa_op_base *rhs2_reg = hsa_reg_or_immed_for_gimple_op
+	  (rhs2, hbb, ssa_map, NULL);
+	hsa_op_base *rhs3_reg = hsa_reg_or_immed_for_gimple_op
+	  (rhs3, hbb, ssa_map, NULL);
 
 	hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
-	  hsa_insn_basic (3, BRIG_OPCODE_COMBINE, dest->type, dest, rhs1, rhs2);
+	  hsa_insn_basic (3, BRIG_OPCODE_CMOV, dest->type, ctrl,
+			  rhs2_reg, rhs3_reg);
+
+	dest->set_definition (insn);
+	hbb->append_insn (insn);
+
+	return;
+      }
+    case COMPLEX_EXPR:
+      {
+	hsa_op_base *rhs1_reg = hsa_reg_or_immed_for_gimple_op
+	  (rhs1, hbb, ssa_map, NULL);
+	hsa_op_base *rhs2_reg = hsa_reg_or_immed_for_gimple_op
+	  (rhs2, hbb, ssa_map, NULL);
+
+	hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
+	  hsa_insn_basic (3, BRIG_OPCODE_COMBINE, dest->type, dest,
+			  rhs1_reg, rhs2_reg);
 
 	dest->set_definition (insn);
 	hbb->append_insn (insn);
@@ -2074,12 +2112,12 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
     default:
       /* Implement others as we come across them.  */
       sorry ("Support for HSA does not implement operation %s",
-	     get_tree_code_name (gimple_assign_rhs_code (assign)));
+	     get_tree_code_name (code));
       return;
     }
 
   unsigned nops;
-  switch (get_gimple_rhs_class (gimple_expr_code (assign)))
+  switch (get_gimple_rhs_class (expr_code))
     {
     case GIMPLE_TERNARY_RHS:
       nops = 4;
@@ -2094,15 +2132,14 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
       gcc_unreachable ();
     }
 
-  hsa_op_reg *dest = hsa_reg_for_gimple_ssa (gimple_assign_lhs (assign),
-					     ssa_map);
   /* FIXME: Allocate an instruction with modifiers if appropriate.  */
   hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
     hsa_insn_basic (nops, opcode, dest->type);
+  gcc_checking_assert (dest);
   insn->operands[0] = dest;
   dest->set_definition (insn);
 
-  switch (get_gimple_rhs_class (gimple_expr_code (assign)))
+  switch (get_gimple_rhs_class (expr_code))
     {
     case GIMPLE_TERNARY_RHS:
       /* FIXME: Implement.  */
@@ -2112,17 +2149,39 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
       /* Fall through */
     case GIMPLE_BINARY_RHS:
       {
-	tree top = gimple_assign_rhs2 (assign);
-	if ((opcode == BRIG_OPCODE_SHL || opcode == BRIG_OPCODE_SHR)
-	    && TREE_CODE (top) != SSA_NAME)
-	  top = build_int_cstu (unsigned_type_node, TREE_INT_CST_LOW (top));
-	insn->operands[2] = hsa_reg_or_immed_for_gimple_op (top, hbb, ssa_map,
-							    insn);
+	tree top = rhs2;
+	hsa_op_base *op2 = NULL;
+	if (opcode == BRIG_OPCODE_SHL || opcode == BRIG_OPCODE_SHR)
+	    {
+	      if (TREE_CODE (top) == INTEGER_CST)
+		{
+		  top = build_int_cstu (unsigned_type_node,
+					TREE_INT_CST_LOW (top));
+		  op2 = hsa_reg_or_immed_for_gimple_op (top, hbb, ssa_map, insn);
+		}
+	      else if (TREE_CODE (top) == MINUS_EXPR)
+		{
+		  hsa_op_reg *tmp = new (hsa_allocp_operand_reg) hsa_op_reg
+		    (dest->type);
+		  gen_hsa_insns_for_assignment (MINUS_EXPR, expr_code,
+						NULL_TREE,
+						TREE_OPERAND (top, 0),
+						TREE_OPERAND (top, 1),
+						NULL_TREE, tmp,
+						hbb, ssa_map);
+		  op2 = tmp;
+		}
+	    }
+
+	if (op2 == NULL)
+	  op2 = hsa_reg_or_immed_for_gimple_op (top, hbb, ssa_map, insn);
+
+	insn->operands[2] = op2;
       }
       /* Fall through */
     case GIMPLE_UNARY_RHS:
       {
-	tree top = gimple_assign_rhs1 (assign);
+	tree top = rhs1;
 	if (opcode == BRIG_OPCODE_ABS || opcode == BRIG_OPCODE_NEG)
 	  {
 	    /* ABS and NEG only exist in _s form :-/  */
@@ -2140,6 +2199,21 @@ gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
     }
 
   hbb->append_insn (insn);
+}
+
+/* Generate HSA instruction for an assignment ASSIGN with an operation.
+   Instructions will be appended to HBB.  SSA_MAP maps gimple SSA names to HSA
+   pseudo registers.  */
+
+static void
+gen_hsa_insns_for_operation_assignment (gimple assign, hsa_bb *hbb,
+					vec <hsa_op_reg_p> *ssa_map)
+{
+  gen_hsa_insns_for_assignment
+    (gimple_assign_rhs_code (assign), gimple_expr_code (assign),
+     gimple_assign_lhs (assign), gimple_assign_rhs1 (assign),
+     gimple_assign_rhs2 (assign), gimple_assign_rhs3 (assign),
+     hsa_reg_for_gimple_ssa (gimple_assign_lhs (assign), ssa_map), hbb, ssa_map);
 }
 
 /* Generate HSA instructions for a given gimple condition statement COND.
