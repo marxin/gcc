@@ -1272,16 +1272,6 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map,
       symbol = hsa_get_string_cst_symbol (ref);
       goto out;
     }
-  else if (TREE_CODE (ref) == COMPONENT_REF && false)
-    {
-      tree fld = TREE_OPERAND (ref, 1);
-      if (DECL_BIT_FIELD (fld))
-	{
-	  sorry ("Support for HSA does not implement references to "
-		 "bit fields such as %D", fld);
-	  goto out;
-	}
-    }
   else if (TREE_CODE (ref) == BIT_FIELD_REF
 	   && ((tree_to_uhwi (TREE_OPERAND (ref, 1)) % BITS_PER_UNIT) != 0
 	       || (tree_to_uhwi (TREE_OPERAND (ref, 2)) % BITS_PER_UNIT) != 0))
@@ -1402,10 +1392,10 @@ out:
     sorry ("Support for HSA does not implement unhandled bit field reference "
 	   "such as %E", ref);
 
-  if (output_bitpos != NULL && output_bitsize != NULL)
+  if (output_bitsize != NULL && output_bitpos != NULL)
     {
-      *output_bitpos = bitpos;
       *output_bitsize = bitsize;
+      *output_bitpos = bitpos;
     }
 
   return new (hsa_allocp_operand_address) hsa_op_address (symbol,
@@ -1553,6 +1543,73 @@ hsa_build_append_simple_mov (hsa_op_reg *dest, hsa_op_base *src, hsa_bb *hbb)
   hbb->append_insn (insn);
 }
 
+/* Generate HSAIL instructions loading a bit field into register DEST. ADDR is
+   prepared memory address which is used to load the bit field.  To identify
+   a bit file,d BITPOS is offset to the loaded memory and BITSIZE is number
+   of bits of the bit field. Add instructions to HBB.  */
+
+void
+gen_hsa_insns_for_bitfield_load (hsa_op_reg *dest, hsa_op_address *addr,
+				HOST_WIDE_INT bitsize, HOST_WIDE_INT bitpos,
+				hsa_bb *hbb)
+{
+  unsigned type_bitsize = hsa_type_bit_size (dest->type);
+  unsigned left_shift = type_bitsize - (bitsize + bitpos);
+  unsigned right_shift = left_shift + bitpos;
+
+  hsa_op_reg *value_reg = new (hsa_allocp_operand_reg) hsa_op_reg
+    (dest->type);
+
+  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
+    hsa_insn_mem (BRIG_OPCODE_LD, dest->type, value_reg, addr);
+  value_reg->set_definition (mem);
+  hbb->append_insn (mem);
+
+  if (addr->reg)
+    addr->reg->uses.safe_push (mem);
+
+  if (left_shift)
+    {
+      hsa_op_reg *value_reg_2 = new (hsa_allocp_operand_reg) hsa_op_reg
+	(dest->type);
+
+      hsa_op_immed *c = new (hsa_allocp_operand_immed)
+	hsa_op_immed (build_int_cstu (unsigned_type_node, left_shift));
+
+      hsa_insn_basic *lshift = new (hsa_allocp_inst_basic)
+	hsa_insn_basic (3, BRIG_OPCODE_SHL, value_reg_2->type,
+			value_reg_2, value_reg, c);
+
+      value_reg_2->set_definition (lshift);
+      hbb->append_insn (lshift);
+
+      value_reg = value_reg_2;
+    }
+
+  if (right_shift)
+    {
+      hsa_op_reg *value_reg_2 = new (hsa_allocp_operand_reg) hsa_op_reg
+	(dest->type);
+
+      hsa_op_immed *c = new (hsa_allocp_operand_immed)
+	hsa_op_immed (build_int_cstu (unsigned_type_node, right_shift));
+
+      hsa_insn_basic *rshift = new (hsa_allocp_inst_basic)
+	hsa_insn_basic (3, BRIG_OPCODE_SHR, value_reg_2->type,
+			value_reg_2, value_reg, c);
+
+      value_reg_2->set_definition (rshift);
+      hbb->append_insn (rshift);
+
+      value_reg = value_reg_2;
+    }
+
+    hsa_insn_basic *assignment = new (hsa_allocp_inst_basic)
+      hsa_insn_basic (2, BRIG_OPCODE_MOV, dest->type, dest, value_reg);
+    hbb->append_insn (assignment);
+    dest->set_definition (assignment);
+}
+
 /* Generate HSAIL instructions loading something into register DEST.  RHS is
    tree representation of the loaded data, which are loaded as type TYPE.  Add
    instructions to HBB, use SSA_MAP for HSA SSA lookup.  */
@@ -1661,63 +1718,7 @@ gen_hsa_insns_for_load (hsa_op_reg *dest, tree rhs, tree type, hsa_bb *hbb,
 
       /* Handle load of a bit field.  */
       if (bitsize || bitpos)
-	{
-	  unsigned type_bitsize = hsa_type_bit_size (dest->type);
-	  unsigned left_shift = type_bitsize - (bitsize + bitpos);
-	  unsigned right_shift = left_shift + bitpos;
-
-	  hsa_op_reg *value_reg = new (hsa_allocp_operand_reg) hsa_op_reg
-	    (dest->type);
-
-	  hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
-	    hsa_insn_mem (BRIG_OPCODE_LD, dest->type, value_reg, addr);
-	  value_reg->set_definition (mem);
-	  hbb->append_insn (mem);
-
-	  if (addr->reg)
-	    addr->reg->uses.safe_push (mem);
-
-	  if (left_shift)
-	    {
-	      hsa_op_reg *value_reg_2 = new (hsa_allocp_operand_reg) hsa_op_reg
-		(dest->type);
-
-	      hsa_op_immed *c = new (hsa_allocp_operand_immed)
-		hsa_op_immed (build_int_cstu (unsigned_type_node, left_shift));
-
-	      hsa_insn_basic *lshift = new (hsa_allocp_inst_basic)
-		hsa_insn_basic (3, BRIG_OPCODE_SHL, value_reg_2->type,
-				value_reg_2, value_reg, c);
-
-	      value_reg_2->set_definition (lshift);
-	      hbb->append_insn (lshift);
-
-	      value_reg = value_reg_2;
-	    }
-
-	  if (right_shift)
-	    {
-	      hsa_op_reg *value_reg_2 = new (hsa_allocp_operand_reg) hsa_op_reg
-		(dest->type);
-
-	      hsa_op_immed *c = new (hsa_allocp_operand_immed)
-		hsa_op_immed (build_int_cstu (unsigned_type_node, right_shift));
-
-	      hsa_insn_basic *rshift = new (hsa_allocp_inst_basic)
-		hsa_insn_basic (3, BRIG_OPCODE_SHR, value_reg_2->type,
-				value_reg_2, value_reg, c);
-
-	      value_reg_2->set_definition (rshift);
-	      hbb->append_insn (rshift);
-
-	      value_reg = value_reg_2;
-	    }
-
-	    hsa_insn_basic *assignment = new (hsa_allocp_inst_basic)
-	      hsa_insn_basic (2, BRIG_OPCODE_MOV, dest->type, dest, value_reg);
-	    hbb->append_insn (assignment);
-	    dest->set_definition (assignment);
-	}
+	gen_hsa_insns_for_bitfield_load (dest, addr, bitsize, bitpos, hbb);
       else
 	{
 	  BrigType16_t mtype;
@@ -1778,7 +1779,7 @@ gen_hsa_insns_for_store (tree lhs, hsa_op_base *src, hsa_bb *hbb,
       BrigType16_t mem_type = get_unsinged_type_by_bytes
 	(type_bitsize / BITS_PER_UNIT);
 
-      for (int i = 0; i < type_bitsize; i++)
+      for (unsigned i = 0; i < type_bitsize; i++)
 	if (i < bitpos || i >= bitpos + bitsize)
 	  mask |= (1 << i);
 
