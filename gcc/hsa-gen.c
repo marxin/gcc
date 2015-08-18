@@ -341,6 +341,26 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_cfun;
 }
 
+/* Return unsigned brig type according to provided SIZE in bytes.  */
+
+static BrigType16_t
+get_unsinged_type_by_bytes (unsigned size)
+{
+  switch (size)
+    {
+    case 1:
+      return BRIG_TYPE_U8;
+    case 2:
+      return BRIG_TYPE_U16;
+    case 4:
+      return BRIG_TYPE_U32;
+    case 8:
+      return BRIG_TYPE_U64;
+    default:
+      gcc_unreachable ();
+    }
+}
+
 /* Return the type which holds addresses in the given SEGMENT.  */
 
 static BrigType16_t
@@ -1576,7 +1596,7 @@ gen_hsa_insns_for_load (hsa_op_reg *dest, tree rhs, tree type, hsa_bb *hbb,
 	    hsa_op_reg (hsa_type_for_scalar_tree_type (TREE_TYPE (type), false));
 	  hsa_op_reg *imag_part_reg = new (hsa_allocp_operand_reg)
 	    hsa_op_reg (hsa_type_for_scalar_tree_type (TREE_TYPE (type), false));
-	  
+
 	  hsa_build_append_simple_mov (real_part_reg, real_part, hbb);
 	  hsa_build_append_simple_mov (imag_part_reg, imag_part, hbb);
 
@@ -1719,6 +1739,20 @@ gen_hsa_insns_for_load (hsa_op_reg *dest, tree rhs, tree type, hsa_bb *hbb,
 	   rhs);
 }
 
+static unsigned
+get_bitfield_size (unsigned bitpos, unsigned bitsize)
+{
+  unsigned s = bitpos + bitsize;
+  unsigned sizes[] = {8, 16, 32, 64};
+
+  for (unsigned i = 0; i < 4; i++)
+    if (s <= sizes[i])
+      return sizes[i];
+
+  gcc_unreachable ();
+  return 0;
+}
+
 /* Generate HSAIL instructions storing into memory.  LHS is the destination of
    the store, SRC is the source operand.  Add instructions to HBB, use SSA_MAP
    for HSA SSA lookup.  */
@@ -1727,11 +1761,87 @@ static void
 gen_hsa_insns_for_store (tree lhs, hsa_op_base *src, hsa_bb *hbb,
 			 vec <hsa_op_reg_p> *ssa_map)
 {
+  HOST_WIDE_INT bitsize = 0, bitpos = 0;
   BrigType16_t mtype;
   mtype = mem_type_for_type (hsa_type_for_scalar_tree_type (TREE_TYPE (lhs),
 							    false));
   hsa_op_address *addr;
-  addr = gen_hsa_addr (lhs, hbb, ssa_map);
+  addr = gen_hsa_addr (lhs, hbb, ssa_map, &bitsize, &bitpos);
+
+  /* Handle store to a bit field.  */
+  if (bitsize || bitpos)
+    {
+      /* We need to build AND mask which will be used for erasing of
+	 the original value.  */
+      unsigned type_bitsize = get_bitfield_size (bitpos, bitsize);
+      unsigned mask = 0;
+      BrigType16_t mem_type = get_unsinged_type_by_bytes
+	(type_bitsize / BITS_PER_UNIT);
+
+      for (int i = 0; i < type_bitsize; i++)
+	if (i < bitpos || i >= bitpos + bitsize)
+	  mask |= (1 << i);
+
+      hsa_op_reg *value_reg = new (hsa_allocp_operand_reg) hsa_op_reg
+	(mem_type);
+
+      /* Load value from memory.  */
+      hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
+	hsa_insn_mem (BRIG_OPCODE_LD, mem_type, value_reg, addr);
+      value_reg->set_definition (mem);
+      hbb->append_insn (mem);
+
+      /* AND the loaded value with prepared mask.  */
+      hsa_op_reg *cleared_reg = new (hsa_allocp_operand_reg) hsa_op_reg
+	(mem_type);
+
+      hsa_op_immed *c = new (hsa_allocp_operand_immed)
+	hsa_op_immed (build_int_cstu (unsigned_type_node, mask));
+
+      hsa_insn_basic *clearing = new (hsa_allocp_inst_basic)
+	hsa_insn_basic (3, BRIG_OPCODE_AND, mem_type, cleared_reg, value_reg, c);
+      cleared_reg->set_definition (clearing);
+      hbb->append_insn (clearing);
+
+      /* Shift to left a value that is going to be stored.  */
+      hsa_op_reg *new_value_reg = new (hsa_allocp_operand_reg) hsa_op_reg
+	(mem_type);
+
+      hsa_insn_basic *basic = new (hsa_allocp_inst_basic)
+	hsa_insn_basic (2, BRIG_OPCODE_MOV, mem_type, new_value_reg, src);
+      new_value_reg->set_definition (basic);
+      hbb->append_insn (basic);
+
+      if (bitpos)
+	{
+	  hsa_op_reg *shifted_value_reg = new (hsa_allocp_operand_reg)
+	    hsa_op_reg (mem_type);
+
+	  c = new (hsa_allocp_operand_immed)
+	    hsa_op_immed (build_int_cstu (unsigned_type_node, bitpos));
+
+	  hsa_insn_basic *basic = new (hsa_allocp_inst_basic)
+	    hsa_insn_basic (3, BRIG_OPCODE_SHL, mem_type, shifted_value_reg,
+			    new_value_reg, c);
+	  shifted_value_reg->set_definition (basic);
+	  hbb->append_insn (basic);
+
+	  new_value_reg = shifted_value_reg;
+	}
+
+      /* OR the prepared value with prepared chunk loaded from memory.  */
+      hsa_op_reg *prepared_reg= new (hsa_allocp_operand_reg)
+	hsa_op_reg (mem_type);
+      basic = new (hsa_allocp_inst_basic)
+	hsa_insn_basic (3, BRIG_OPCODE_OR, mem_type, prepared_reg,
+			new_value_reg, cleared_reg);
+      prepared_reg->set_definition (basic);
+      hbb->append_insn (basic);
+
+      src = prepared_reg;
+      mtype = mem_type;
+    }
+
   hsa_insn_mem *mem = new (hsa_allocp_inst_mem)
     hsa_insn_mem (BRIG_OPCODE_ST, mtype, src, addr);
 
@@ -1773,26 +1883,6 @@ gen_hsa_insns_for_store (tree lhs, hsa_op_base *src, hsa_bb *hbb,
   if (addr->reg)
     addr->reg->uses.safe_push (mem);
   hbb->append_insn (mem);
-}
-
-/* Return unsigned brig type according to provided SIZE in bytes.  */
-
-static BrigType16_t
-get_unsinged_type_by_bytes (unsigned size)
-{
-  switch (size)
-    {
-    case 1:
-      return BRIG_TYPE_U8;
-    case 2:
-      return BRIG_TYPE_U16;
-    case 4:
-      return BRIG_TYPE_U32;
-    case 8:
-      return BRIG_TYPE_U64;
-    default:
-      gcc_unreachable ();
-    }
 }
 
 /* Generate memory copy instructions that are going to be used
