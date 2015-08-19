@@ -2233,8 +2233,10 @@ gen_hsa_insns_for_assignment (tree_code code, gimple_rhs_class rhs_class,
 			      TREE_OPERAND (cond, 1),
 			      ctrl, hbb, ssa_map);
 
-	hsa_op_reg *rhs2_reg = hsa_reg_for_gimple_ssa (rhs2, ssa_map);
-	hsa_op_reg *rhs3_reg = hsa_reg_for_gimple_ssa (rhs3, ssa_map);
+	hsa_op_base *rhs2_reg = hsa_reg_or_immed_for_gimple_op
+	  (rhs2, hbb, ssa_map, NULL);
+	hsa_op_base *rhs3_reg = hsa_reg_or_immed_for_gimple_op
+	  (rhs3, hbb, ssa_map, NULL);
 
 	hsa_insn_basic *insn = new (hsa_allocp_inst_basic)
 	  hsa_insn_basic (3, BRIG_OPCODE_CMOV, dest->type, ctrl,
