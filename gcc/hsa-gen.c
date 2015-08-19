@@ -2503,6 +2503,13 @@ gen_hsa_insns_for_return (greturn *stmt, hsa_bb *hbb,
   tree retval = gimple_return_retval (stmt);
   if (retval)
     {
+      if (AGGREGATE_TYPE_P (TREE_TYPE (retval)))
+	{
+	  sorry ("HSA does not support return statement with an aggregate "
+		 "value type");
+	  return;
+	}
+
       /* Store of return value.  */
       BrigType16_t mtype = mem_type_for_type
 	(hsa_type_for_scalar_tree_type (TREE_TYPE (retval), false));
@@ -3633,6 +3640,12 @@ hsa_generate_function_declaration (tree decl)
 static unsigned int
 generate_hsa (bool kernel)
 {
+  if (DECL_STATIC_CHAIN (cfun->decl))
+    {
+      sorry ("HSA does not support nested functions");
+      return 0;
+    }
+
   vec <hsa_op_reg_p> ssa_map = vNULL;
 
   hsa_init_data_for_cfun ();
