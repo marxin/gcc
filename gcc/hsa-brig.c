@@ -814,8 +814,7 @@ emit_immediate_scalar_to_data_section (tree value, unsigned need_len)
   gcc_checking_assert (TREE_CODE (type) != VECTOR_TYPE);
   unsigned data_len = tree_to_uhwi (TYPE_SIZE (type))/BITS_PER_UNIT;
   if (INTEGRAL_TYPE_P (type)
-      || (TREE_CODE (type) == POINTER_TYPE
-	  && TREE_CODE (TREE_TYPE (type)) == INTEGER_TYPE))
+      || (TREE_CODE (type) == POINTER_TYPE && TREE_CODE (value) == INTEGER_CST))
     switch (data_len)
       {
       case 1:
