@@ -812,6 +812,14 @@ emit_immediate_scalar_to_data_section (tree value, unsigned need_len)
   memset (&bytes, 0, sizeof (bytes));
   tree type = TREE_TYPE (value);
   gcc_checking_assert (TREE_CODE (type) != VECTOR_TYPE);
+
+  if (TREE_CODE (type) == REFERENCE_TYPE)
+    {
+      sorry ("Support for HSA does not implement immediate value "
+	     "of a reference type");
+      return 0;
+    }
+
   unsigned data_len = tree_to_uhwi (TYPE_SIZE (type))/BITS_PER_UNIT;
   if (INTEGRAL_TYPE_P (type)
       || (TREE_CODE (type) == POINTER_TYPE && TREE_CODE (value) == INTEGER_CST))
@@ -1716,9 +1724,8 @@ perhaps_emit_branch (basic_block bb, basic_block next_bb)
 	gcc_assert (!ff);
 	ff = e->dest;
       }
-  gcc_assert (ff);
-  if (ff == next_bb
-      || ff == EXIT_BLOCK_PTR_FOR_FN (cfun))
+
+  if (!ff || ff == next_bb || ff == EXIT_BLOCK_PTR_FOR_FN (cfun))
     return;
 
   repr.base.base.byteCount = htole16 (sizeof (repr));
