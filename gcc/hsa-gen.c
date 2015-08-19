@@ -3171,7 +3171,7 @@ gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
 	  return;
 	}
 
-      if (lookup_attribute ("hsafunc", DECL_ATTRIBUTES (function_decl)))
+      if (true || lookup_attribute ("hsafunc", DECL_ATTRIBUTES (function_decl)))
         gen_hsa_insns_for_direct_call (stmt, hbb, ssa_map);
       else if (!gen_hsa_insns_for_known_library_call (stmt, hbb, ssa_map))
 	sorry ("HSA does support only call for functions with 'hsafunc' "
@@ -3977,6 +3977,8 @@ pass_gen_hsail::gate (function *)
 unsigned int
 pass_gen_hsail::execute (function *)
 {
+  return generate_hsa (false);
+
   if (cgraph_node::get_create (current_function_decl)->hsa_imp_of
       || lookup_attribute ("hsa", DECL_ATTRIBUTES (current_function_decl))
       || lookup_attribute ("hsakernel",
