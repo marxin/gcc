@@ -3117,11 +3117,6 @@ gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
 	  sorry ("HSA does not support indirect calls");
 	  return;
 	}
-      else if (DECL_STATIC_CHAIN (function_decl))
-	{
-	  sorry ("HSA does not support call of a nested function");
-	  return;
-	}
 
       if (lookup_attribute ("hsafunc", DECL_ATTRIBUTES (function_decl)))
         gen_hsa_insns_for_direct_call (stmt, hbb, ssa_map);
@@ -3639,6 +3634,12 @@ hsa_generate_function_declaration (tree decl)
 static unsigned int
 generate_hsa (bool kernel)
 {
+  if (DECL_STATIC_CHAIN (cfun->decl))
+    {
+      sorry ("HSA does not support nested functions");
+      return 0;
+    }
+
   vec <hsa_op_reg_p> ssa_map = vNULL;
 
   hsa_init_data_for_cfun ();
