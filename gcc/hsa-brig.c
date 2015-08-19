@@ -922,6 +922,14 @@ emit_immediate_operand (hsa_op_immed *imm)
 
       gcc_assert (total_len == 0);
     }
+  else if (TREE_CODE (imm->value) == COMPLEX_CST)
+    {
+      gcc_assert (total_len % 2 == 0);
+      emit_immediate_scalar_to_data_section (TREE_REALPART (imm->value),
+					     total_len / 2);
+      emit_immediate_scalar_to_data_section (TREE_IMAGPART (imm->value),
+					     total_len / 2);
+    }
   else
     emit_immediate_scalar_to_data_section (imm->value, total_len);
 
