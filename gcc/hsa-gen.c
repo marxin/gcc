@@ -470,6 +470,14 @@ hsa_type_for_scalar_tree_type (const_tree type, bool min32int)
   if (TREE_CODE (type) == VECTOR_TYPE || TREE_CODE (type) == COMPLEX_TYPE)
     {
       HOST_WIDE_INT tsize = tree_to_uhwi (TYPE_SIZE (type));
+
+      if (bsize == tsize)
+	{
+	  sorry ("Support for HSA does not implement a vector type where "
+		 "a type and unit size are equal: %T", type);
+	  return res;
+	}
+
       switch (tsize)
 	{
 	case 32:
@@ -1136,11 +1144,7 @@ gen_address_calculation (tree exp, hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map,
       {
        hsa_op_immed *imm = new (hsa_allocp_operand_immed) hsa_op_immed (exp);
        if (addrtype != imm->type)
-	 {
-	   gcc_assert (hsa_type_bit_size (addrtype)
-		       > hsa_type_bit_size (imm->type));
-	   imm->type = addrtype;
-	 }
+	 imm->type = addrtype;
        return imm;
       }
 
