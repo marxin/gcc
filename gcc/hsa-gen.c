@@ -2501,6 +2501,13 @@ gen_hsa_insns_for_return (greturn *stmt, hsa_bb *hbb,
   tree retval = gimple_return_retval (stmt);
   if (retval)
     {
+      if (AGGREGATE_TYPE_P (TREE_TYPE (retval)))
+	{
+	  sorry ("HSA does not support return statement with an aggregate "
+		 "value type");
+	  return;
+	}
+
       /* Store of return value.  */
       BrigType16_t mtype = mem_type_for_type
 	(hsa_type_for_scalar_tree_type (TREE_TYPE (retval), false));
@@ -3112,6 +3119,11 @@ gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
       if (function_decl == NULL_TREE)
 	{
 	  sorry ("HSA does not support indirect calls");
+	  return;
+	}
+      else if (DECL_STATIC_CHAIN (function_decl))
+	{
+	  sorry ("HSA does not support call of a nested function");
 	  return;
 	}
 
