@@ -681,7 +681,13 @@ linear_scan_regalloc (struct reg_class_desc *classes)
 
 #ifdef ENABLE_CHECKING
   for (unsigned i = 0; i < ind2reg.length (); i++)
-    gcc_assert (ind2reg[i]);
+    {
+      if (!ind2reg[i])
+	{
+	  sorry ("HSA RA issue!");
+	  return;
+	}
+    }
 #endif
 
   ind2reg.qsort (cmp_begin);
@@ -789,6 +795,10 @@ regalloc (void)
     }
 
   linear_scan_regalloc (classes);
+
+  // TODO: remove
+  if (seen_error ())
+    return;
 
   rewrite_code_bb (ENTRY_BLOCK_PTR_FOR_FN (cfun), classes);
   FOR_EACH_BB_FN (bb, cfun)
