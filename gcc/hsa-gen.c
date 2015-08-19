@@ -540,7 +540,6 @@ hsa_type_for_tree_type (const_tree type, unsigned HOST_WIDE_INT *dim_p)
   if (RECORD_OR_UNION_TYPE_P (type))
     {
       *dim_p = tree_to_uhwi (TYPE_SIZE_UNIT (type));
-      gcc_assert (*dim_p);
       return BRIG_TYPE_U8 | BRIG_TYPE_ARRAY;
     }
 
@@ -1222,8 +1221,15 @@ process_mem_base (tree base, hsa_symbol **symbol, BrigType16_t *addrtype,
     {
       tree decl = TREE_OPERAND (base, 0);
 
-      gcc_checking_assert (DECL_P (decl));
+      if (!DECL_P (decl) || TREE_CODE (decl) == FUNCTION_DECL)
+	{
+	  sorry ("Support for HSA does not implement a memory reference to "
+		 "a non-declaration type");
+	  return;
+	}
+
       gcc_assert (!*symbol);
+
       *symbol = get_symbol_for_decl (decl);
       *addrtype = hsa_get_segment_addr_type ((*symbol)->segment);
     }
@@ -1708,6 +1714,14 @@ gen_hsa_insns_for_load (hsa_op_reg *dest, tree rhs, tree type, hsa_bb *hbb,
       addr = gen_hsa_addr (rhs, hbb, ssa_map, &bitsize, &bitpos);
 
       /* Handle load of a bit field.  */
+      if (bitsize > 64)
+	{
+	  sorry ("Support for HSA does not implement load from a bit field "
+		 "bigger than 64 bits");
+	  return;
+	}
+
+
       if (bitsize || bitpos)
 	gen_hsa_insns_for_bitfield_load (dest, addr, bitsize, bitpos, hbb);
       else
@@ -2022,6 +2036,9 @@ gen_hsa_insns_for_single_assignment (gimple assign, hsa_bb *hbb,
       /* Store to memory.  */
       hsa_op_base *src = hsa_reg_or_immed_for_gimple_op (rhs, hbb, ssa_map,
 							 NULL);
+      if (seen_error ())
+	return;
+
       gen_hsa_insns_for_store (lhs, src, hbb, ssa_map);
     }
   else
@@ -2290,14 +2307,23 @@ gen_hsa_insns_for_assignment (tree_code code, gimple_rhs_class rhs_class,
       }
     case COND_EXPR:
       {
-	hsa_op_reg *ctrl = new (hsa_allocp_operand_reg) hsa_op_reg
-	  (BRIG_TYPE_B1);
+	hsa_op_base *ctrl = NULL;
 	tree cond = rhs1;
 
-	gen_hsa_cmp_insn_from_gimple (TREE_CODE (cond),
-			      TREE_OPERAND (cond, 0),
-			      TREE_OPERAND (cond, 1),
-			      ctrl, hbb, ssa_map);
+	if (CONSTANT_CLASS_P (cond) || TREE_CODE (cond) == SSA_NAME)
+	  ctrl = hsa_reg_or_immed_for_gimple_op (cond, hbb, ssa_map, NULL);
+	else
+	  {
+	    hsa_op_reg *r = new (hsa_allocp_operand_reg) hsa_op_reg
+	      (BRIG_TYPE_B1);
+
+	    gen_hsa_cmp_insn_from_gimple (TREE_CODE (cond),
+				  TREE_OPERAND (cond, 0),
+				  TREE_OPERAND (cond, 1),
+				  r, hbb, ssa_map);
+
+	    ctrl = r;
+	  }
 
 	hsa_op_base *rhs2_reg = hsa_reg_or_immed_for_gimple_op
 	  (rhs2, hbb, ssa_map, NULL);
@@ -2519,7 +2545,7 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
       if (AGGREGATE_TYPE_P (result_type))
 	{
 	  sorry ("Support for HSA does not implement returning a value "
-		 "which is of an aggregate type: %D", result_type);
+		 "which is of an aggregate type: %T", result_type);
 	  return;
 	}
 
@@ -2546,8 +2572,17 @@ gen_hsa_insns_for_direct_call (gimple stmt, hsa_bb *hbb,
 	hsa_op_code_list (1);
     }
   else
-    call_insn->result_code_list = new (hsa_allocp_operand_code_list)
-      hsa_op_code_list (0);
+    {
+      if (result)
+	{
+	  sorry ("Support for HSA does not implement an assignment of return "
+		 "value from a void function");
+	  return;
+	}
+
+      call_insn->result_code_list = new (hsa_allocp_operand_code_list)
+	hsa_op_code_list (0);
+    }
 
   /* Argument block start.  */
   hsa_insn_arg_block *arg_end = new (hsa_allocp_inst_arg_block)
@@ -2567,6 +2602,13 @@ gen_hsa_insns_for_return (greturn *stmt, hsa_bb *hbb,
   tree retval = gimple_return_retval (stmt);
   if (retval)
     {
+      if (AGGREGATE_TYPE_P (TREE_TYPE (retval)))
+	{
+	  sorry ("HSA does not support return statement with an aggregate "
+		 "value type");
+	  return;
+	}
+
       /* Store of return value.  */
       BrigType16_t mtype = mem_type_for_type
 	(hsa_type_for_scalar_tree_type (TREE_TYPE (retval), false));
@@ -3704,6 +3746,18 @@ hsa_generate_function_declaration (tree decl)
 static unsigned int
 generate_hsa (bool kernel)
 {
+  if (DECL_STATIC_CHAIN (cfun->decl))
+    {
+      sorry ("HSA does not support nested functions");
+      return 0;
+    }
+  else if (!TYPE_ARG_TYPES (TREE_TYPE (cfun->decl)))
+    {
+      sorry ("HSA does not support functions with variadic arguments "
+	     "(or unknown return type)");
+      return 0;
+    }
+
   vec <hsa_op_reg_p> ssa_map = vNULL;
 
   hsa_init_data_for_cfun ();
