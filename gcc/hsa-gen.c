@@ -3399,6 +3399,7 @@ specialop:
       /* FIXME: Using the native instruction may not be precise enough.
 	 Perhaps only allow if using -ffast-math?  */
       gen_hsa_unaryop_for_builtin (BRIG_OPCODE_NSIN, stmt, hbb, ssa_map);
+      break;
 
     case BUILT_IN_ATOMIC_LOAD_1:
     case BUILT_IN_ATOMIC_LOAD_2:
