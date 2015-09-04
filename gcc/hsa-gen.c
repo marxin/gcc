@@ -857,7 +857,7 @@ hsa_op_reg::operator new (size_t)
 /* Verify register operand.  */
 
 void
-hsa_op_reg::verify ()
+hsa_op_reg::verify_ssa ()
 {
   /* Verify that each HSA register has a definition assigned.
      Exceptions are VAR_DECL and PARM_DECL that are a default
@@ -868,6 +868,45 @@ hsa_op_reg::verify ()
 		               || (TREE_CODE (SSA_NAME_VAR (gimple_ssa))
 				   != PARM_DECL))
 			   && SSA_NAME_IS_DEFAULT_DEF (gimple_ssa)));
+
+  /* Verify that every use of the register is really present
+     in an instruction.  */
+  for (unsigned i = 0; i < uses.length (); i++)
+    {
+      hsa_insn_basic *use = uses[i];
+
+      hsa_op_address *addr;
+      bool is_visited = false;
+      for (unsigned j = 0; j < use->operand_count (); j++)
+	{
+	  hsa_op_base *u = use->get_op (j);
+	  if ((addr = dyn_cast <hsa_op_address *> (u)) && addr->reg)
+	    u = addr->reg;
+
+	  if (u == this)
+	    {
+	      bool r = hsa_opcode_op_output_p (use->opcode, j);
+
+	      if (r)
+		{
+		  error ("HSA SSA name not defined by an instruction");
+		  debug_hsa_operand (this);
+		  debug_hsa_insn (use);
+		  internal_error ("HSA SSA verification failed");
+		}
+
+	      is_visited = true;
+	    }
+	}
+
+      if (!is_visited)
+	{
+	  error ("HSA SSA name is not used as an instruction argument");
+	  debug_hsa_operand (this);
+	  debug_hsa_insn (use);
+	  internal_error ("HSA SSA verification failed");
+	}
+    }
 }
 
 hsa_op_address::hsa_op_address (hsa_symbol *sym, hsa_op_reg *r,
@@ -1073,6 +1112,47 @@ void *
 hsa_insn_basic::operator new (size_t)
 {
   return hsa_allocp_inst_basic->vallocate ();
+}
+
+/* Verify the instruction.  */
+
+void
+hsa_insn_basic::verify ()
+{
+  hsa_op_address *addr;
+  hsa_op_reg *reg;
+
+  /* Iterate all register operands and verify that the instruction
+     is set in uses of the register.  */
+  for (unsigned i = 0; i < operand_count (); i++)
+    {
+      hsa_op_base *use = get_op (i);
+
+      if ((addr = dyn_cast <hsa_op_address *> (use)) && addr->reg)
+	{
+	  gcc_assert (addr->reg->def_insn != this);
+	  use = addr->reg;
+	}
+
+      if ((reg = dyn_cast <hsa_op_reg *> (use))
+	  && !hsa_opcode_op_output_p (opcode, i))
+	{
+	  unsigned j;
+	  for (j = 0; j < reg->uses.length (); j++)
+	    {
+	      if (reg->uses[j] == this)
+		break;
+	    }
+
+	  if (j == reg->uses.length ())
+	    {
+	      error ("An output register of an HSA instruction has not marked "
+		     "a definition");
+	      debug_hsa_insn (this);
+	      internal_error ("HSA instruction verification failed");
+	    }
+	}
+    }
 }
 
 /* Constructor of an instruction representing a PHI node.  NOPS is the number
@@ -4150,7 +4230,17 @@ generate_hsa (bool kernel)
 #ifdef ENABLE_CHECKING
   for (unsigned i = 0; i < ssa_map.length (); i++)
     if (ssa_map[i])
-      ssa_map[i]->verify ();
+      ssa_map[i]->verify_ssa ();
+
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      hsa_bb *hbb = hsa_bb_for_bb (bb);
+
+      for (hsa_insn_basic *insn = hbb->first_insn; insn; insn = insn->next)
+	insn->verify ();
+    }
+
 #endif
 
   ssa_map.release ();
