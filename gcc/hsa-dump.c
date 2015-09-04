@@ -677,7 +677,14 @@ dump_hsa_reg (FILE *f, hsa_op_reg *reg, bool dump_type = false)
 static void
 dump_hsa_immed (FILE *f, hsa_op_immed *imm)
 {
-  print_generic_expr (f, imm->value, 0);
+  if (imm->value)
+    print_generic_expr (f, imm->value, 0);
+  else
+    {
+      gcc_checking_assert (imm->brig_repr_size <= 8);
+      fprintf (f, HOST_WIDE_INT_PRINT_DEC, imm->int_value);
+    }
+
   fprintf (f, " (%s)", hsa_type_name (imm->type));
 }
 

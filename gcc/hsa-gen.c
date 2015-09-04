@@ -163,6 +163,7 @@ static object_allocator<hsa_symbol> *hsa_allocp_symbols;
    a destruction.  */
 static vec <hsa_op_code_list *> hsa_list_operand_code_list;
 static vec <hsa_op_reg *> hsa_list_operand_reg;
+static vec <hsa_op_immed*> hsa_list_operand_immed;
 
 /* Constructor of class representing global HSA function/kernel information and
    state.  */
@@ -319,8 +320,12 @@ hsa_deinit_data_for_cfun (void)
   for (unsigned int i = 0; i < hsa_list_operand_reg.length (); i++)
     hsa_list_operand_reg[i]->~hsa_op_reg ();
 
+  for (unsigned int i = 0; i < hsa_list_operand_immed.length (); i++)
+    hsa_list_operand_immed[i]->~hsa_op_immed ();
+
   hsa_list_operand_code_list.release ();
   hsa_list_operand_reg.release ();
+  hsa_list_operand_immed.release ();
 
   delete hsa_allocp_operand_address;
   delete hsa_allocp_operand_immed;
@@ -758,14 +763,70 @@ hsa_op_immed::hsa_op_immed (tree tree_val, bool min32int)
 		       && (!POINTER_TYPE_P (TREE_TYPE (tree_val))
 			   || TREE_CODE (tree_val) == INTEGER_CST));
   value = tree_val;
+
+  brig_repr_size = hsa_get_imm_brig_type_len (type);
+
+  if (TREE_CODE (value) == STRING_CST)
+    brig_repr_size = TREE_STRING_LENGTH (value);
+
+  emit_to_buffer (value);
+  hsa_list_operand_immed.safe_push (this);
 }
 
-/* New operator to allocate immediate operands from pool alloc.  */
+/* Constructor of class representing HSA immediate values.  INTEGER_VALUE is the
+   integer representation of the immediate value.  TYPE is BRIG type.  */
+
+hsa_op_immed::hsa_op_immed (HOST_WIDE_INT integer_value, BrigKind16_t type)
+  : hsa_op_with_type (BRIG_KIND_OPERAND_CONSTANT_BYTES, type), value (NULL)
+{
+  gcc_assert (hsa_type_integer_p (type));
+  int_value = integer_value;
+  brig_repr_size = hsa_type_bit_size (type) / BITS_PER_UNIT;
+
+  hsa_bytes bytes;
+
+  switch (brig_repr_size)
+    {
+    case 1:
+      bytes.b8 = (uint8_t) int_value;
+      break;
+    case 2:
+      bytes.b16 = (uint16_t) int_value;
+      break;
+    case 4:
+      bytes.b32 = (uint32_t) int_value;
+      break;
+    case 8:
+      bytes.b64 = (uint64_t) int_value;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  brig_repr = XNEWVEC (char, brig_repr_size);
+  memcpy (brig_repr, &bytes, brig_repr_size);
+  hsa_list_operand_immed.safe_push (this);
+}
 
 void *
 hsa_op_immed::operator new (size_t)
 {
   return hsa_allocp_operand_immed->vallocate ();
+}
+
+/* Destructor.  */
+
+hsa_op_immed::~hsa_op_immed ()
+{
+  free (brig_repr);
+}
+
+/* Change type of the immediate value to T.  */
+
+void
+hsa_op_immed::set_type (BrigType16_t t)
+{
+  type = t;
 }
 
 /* Constructor of class representing HSA registers and pseudo-registers.  T is
