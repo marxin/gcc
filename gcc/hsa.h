@@ -352,6 +352,8 @@ public:
   hsa_op_base **get_op_addr (int index);
   unsigned int operand_count ();
   void verify ();
+  unsigned num_def_ops ();
+  unsigned num_nondef_ops ();
 
   /* The previous and next instruction in the basic block.  */
   hsa_insn_basic *prev, *next;
