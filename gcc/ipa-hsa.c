@@ -97,10 +97,11 @@ process_hsa_functions (void)
       if (s->binded_function != NULL)
 	continue;
 
+      cgraph_node *clone = NULL;
       if (s->kind != HSA_NONE)
 	{
-	  cgraph_node *clone = node->create_virtual_clone
-	    (vec <cgraph_edge *> (), NULL, NULL, "hsa");
+	  clone = node->create_virtual_clone (vec <cgraph_edge *> (),
+					      NULL, NULL, "hsa");
 
 	  clone->force_output = true;
 	  hsa_summaries->link_functions (clone, node, s->kind);
@@ -112,8 +113,8 @@ process_hsa_functions (void)
 	}
       else if (hsa_callable_function_p (node->decl))
 	{
-	  cgraph_node *clone = node->create_virtual_clone
-	    (vec <cgraph_edge *> (), NULL, NULL, "hsa");
+	  clone = node->create_virtual_clone (vec <cgraph_edge *> (),
+					      NULL, NULL, "hsa");
 
 	  hsa_summaries->link_functions (clone, node, HSA_FUNCTION);
 
