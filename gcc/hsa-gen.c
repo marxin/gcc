@@ -183,7 +183,7 @@ hsa_function_representation::hsa_function_representation ()
   int sym_init_len = (vec_safe_length (cfun->local_decls) / 2) + 1;;
   local_symbols = new hash_table <hsa_noop_symbol_hasher> (sym_init_len);
   spill_symbols = vNULL;
-  string_constants = vNULL;
+  readonly_variables = vNULL;
   hbb_count = 0;
   in_ssa = true;	/* We start in SSA.  */
   kern_p = false;
@@ -206,7 +206,7 @@ hsa_function_representation::~hsa_function_representation ()
   if (!kern_p)
     free (name);
   spill_symbols.release ();
-  string_constants.release ();
+  readonly_variables.release ();
   called_functions.release ();
 }
 
@@ -427,7 +427,8 @@ hsa_type_for_scalar_tree_type (const_tree type, bool min32int)
   /* Handle string constants.  */
   if (TREE_CODE (type) == ARRAY_TYPE
       && TREE_CODE (TREE_TYPE (type)) == INTEGER_TYPE)
-    return BRIG_TYPE_U8_ARRAY;
+    return BRIG_TYPE_ARRAY | hsa_type_for_scalar_tree_type (TREE_TYPE (type),
+							    false);
 
   gcc_checking_assert (TYPE_P (type));
   gcc_checking_assert (!AGGREGATE_TYPE_P (type));
@@ -644,8 +645,20 @@ get_symbol_for_decl (tree decl)
       sym = XCNEW (struct hsa_symbol);
       sym->segment = BRIG_SEGMENT_GLOBAL;
       sym->linkage = BRIG_LINKAGE_FUNCTION;
-      warning (0, "referring to global symbol %q+D by name from HSA code "
-	       "won't work", decl);
+
+      /* Following type of global variables can be handled.  */
+      if (TREE_READONLY (decl) && !TREE_ADDRESSABLE (decl)
+	  && DECL_INITIAL (decl) && TREE_CODE (TREE_TYPE (decl)) == ARRAY_TYPE
+	  && TREE_CODE (TREE_TYPE (TREE_TYPE (decl))) == INTEGER_TYPE)
+	{
+	  sym->segment = BRIG_SEGMENT_READONLY;
+	  sym->linkage = BRIG_LINKAGE_MODULE;
+	  sym->cst_value = new hsa_op_immed (DECL_INITIAL (decl), false);
+	  hsa_cfun->readonly_variables.safe_push (sym);
+	}
+      else
+	warning (0, "referring to global symbol %q+D by name from HSA code "
+		 "won't work", decl);
     }
   else
     {
@@ -721,12 +734,12 @@ hsa_get_string_cst_symbol (tree string_cst)
 
   sym->segment = BRIG_SEGMENT_GLOBAL;
   sym->linkage = BRIG_LINKAGE_MODULE;
-  sym->type = BRIG_TYPE_U8_ARRAY;
   sym->cst_value = new hsa_op_immed (string_cst);
+  sym->type = sym->cst_value->type;
   sym->dim = TREE_STRING_LENGTH (string_cst);
-  sym->name_number = hsa_cfun->string_constants.length ();
+  sym->name_number = hsa_cfun->readonly_variables.length ();
 
-  hsa_cfun->string_constants.safe_push (sym);
+  hsa_cfun->readonly_variables.safe_push (sym);
   hsa_cfun->string_constants_map.put (string_cst, sym);
   return sym;
 }
@@ -759,15 +772,18 @@ hsa_op_immed::hsa_op_immed (tree tree_val, bool min32int)
 		      hsa_type_for_scalar_tree_type (TREE_TYPE (tree_val),
 						     min32int))
 {
-  gcc_checking_assert (is_gimple_min_invariant (tree_val)
+  gcc_checking_assert ((is_gimple_min_invariant (tree_val)
 		       && (!POINTER_TYPE_P (TREE_TYPE (tree_val))
-			   || TREE_CODE (tree_val) == INTEGER_CST));
+			   || TREE_CODE (tree_val) == INTEGER_CST))
+		       || TREE_CODE (tree_val) == CONSTRUCTOR);
   tree_value = tree_val;
 
   brig_repr_size = hsa_get_imm_brig_type_len (type);
 
   if (TREE_CODE (tree_value) == STRING_CST)
     brig_repr_size = TREE_STRING_LENGTH (tree_value);
+  else if (TREE_CODE (tree_value) == CONSTRUCTOR)
+    brig_repr_size = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (tree_value)));
 
   emit_to_buffer (tree_value);
   hsa_list_operand_immed.safe_push (this);
