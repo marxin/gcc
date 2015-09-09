@@ -326,8 +326,8 @@ is_a_helper <hsa_op_code_list *>::test (hsa_op_base *p)
 /* Opcodes of instructions that are not part of HSA but that we use to
    represent it nevertheless.  */
 
-#define HSA_OPCODE_PHI (-1)
-#define HSA_OPCODE_ARG_BLOCK (-2)
+#define HSA_OPCODE_PHI ((BrigOpcode16_t) -1)
+#define HSA_OPCODE_ARG_BLOCK ((BrigOpcode16_t) -2)
 
 /* The number of operand pointers we can directly in an instruction.  */
 #define HSA_BRIG_INT_STORAGE_OPERANDS 5
