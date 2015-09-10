@@ -154,6 +154,7 @@ static object_allocator<hsa_insn_signal> *hsa_allocp_inst_signal;
 static object_allocator<hsa_insn_seg> *hsa_allocp_inst_seg;
 static object_allocator<hsa_insn_cmp> *hsa_allocp_inst_cmp;
 static object_allocator<hsa_insn_br> *hsa_allocp_inst_br;
+static object_allocator<hsa_insn_sbr> *hsa_allocp_inst_sbr;
 static object_allocator<hsa_insn_call> *hsa_allocp_inst_call;
 static object_allocator<hsa_insn_arg_block> *hsa_allocp_inst_arg_block;
 static object_allocator<hsa_insn_comment> *hsa_allocp_inst_comment;
@@ -268,6 +269,9 @@ hsa_init_data_for_cfun ()
     = new object_allocator<hsa_insn_cmp> ("HSA comparison instructions", 16);
   hsa_allocp_inst_br
     = new object_allocator<hsa_insn_br> ("HSA branching instructions", 16);
+  hsa_allocp_inst_sbr
+    = new object_allocator<hsa_insn_sbr> ("HSA switch branching instructions",
+					  16);
   hsa_allocp_inst_call
     = new object_allocator<hsa_insn_call> ("HSA call instructions", 16);
   hsa_allocp_inst_arg_block
@@ -341,6 +345,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_inst_seg;
   delete hsa_allocp_inst_cmp;
   delete hsa_allocp_inst_br;
+  delete hsa_allocp_inst_sbr;
   delete hsa_allocp_inst_call;
   delete hsa_allocp_inst_arg_block;
   delete hsa_allocp_inst_comment;
@@ -1210,6 +1215,36 @@ void *
 hsa_insn_br::operator new (size_t)
 {
   return hsa_allocp_inst_br->vallocate ();
+}
+
+/* Constructor of class representing instruction for switch jump, CTRL is
+   the index register.  */
+
+hsa_insn_sbr::hsa_insn_sbr (hsa_op_reg *index, unsigned jump_count)
+: hsa_insn_basic (1, BRIG_OPCODE_SBR, BRIG_TYPE_B1, index)
+{
+  width = BRIG_WIDTH_1;
+  jump_table = vNULL;
+  default_bb = NULL;
+  label_code_list = new hsa_op_code_list (jump_count);
+}
+
+/* New operator to allocate switch branch instruction from pool alloc.  */
+
+void *
+hsa_insn_sbr::operator new (size_t)
+{
+  return hsa_allocp_inst_sbr->vallocate ();
+}
+
+/* Redirect OLD_BB basic block in jump table to NEW_BB.  */
+
+void
+hsa_insn_sbr::redirect_label (basic_block old_bb, basic_block new_bb)
+{
+  for (unsigned i = 0; i < jump_table.length (); i++)
+    if (jump_table[i] == old_bb)
+      jump_table[i] = new_bb;
 }
 
 /* Constructor of comparison instructin.  CMP is the comparison operation and T
@@ -2805,6 +2840,71 @@ gen_hsa_insns_for_cond_stmt (gimple cond, hsa_bb *hbb,
   hbb->append_insn (cbr);
 }
 
+/* Maximum number of elements in a jump table for an HSA SBR instruction.  */
+
+#define HSA_MAXIMUM_SBR_LABELS	16
+
+/* Return highest value of a switch S that is handled in a non-default
+   label.  */
+
+static unsigned HOST_WIDE_INT
+get_switch_high (gswitch *s)
+{
+  unsigned labels = gimple_switch_num_labels (s);
+
+  /* Compare last label to maximum number of labels.  */
+  tree label = gimple_switch_label (s, labels - 1);
+  tree low = CASE_LOW (label);
+  tree high = CASE_HIGH (label);
+
+  return high != NULL_TREE ? tree_to_uhwi (high) : tree_to_uhwi (low);
+}
+
+/* Generate HSA instructions for a given gimple switch.
+   Instructions will be appended to HBB and SSA_MAP maps gimple SSA
+   names to HSA pseudo registers.  */
+
+static void
+gen_hsa_insns_for_switch_stmt (gswitch *s, hsa_bb *hbb,
+			       vec <hsa_op_reg_p> *ssa_map)
+{
+  function *func = DECL_STRUCT_FUNCTION (current_function_decl);
+  tree index_tree = gimple_switch_index (s);
+  hsa_op_reg *index  = hsa_reg_for_gimple_ssa (index_tree, ssa_map);
+
+  unsigned labels = gimple_switch_num_labels (s);
+  unsigned HOST_WIDE_INT high = get_switch_high (s);
+
+  hsa_insn_sbr *sbr = new hsa_insn_sbr (index, high + 1);
+  tree default_label = gimple_switch_default_label (s);
+  basic_block default_label_bb = label_to_block_fn
+    (func, CASE_LABEL (default_label));
+
+  sbr->default_bb = default_label_bb;
+
+  /* Prepare array with default label destination.  */
+  for (unsigned HOST_WIDE_INT i = 0; i <= high; i++)
+    sbr->jump_table.safe_push (default_label_bb);
+
+  /* Iterate all labels and fill up the jump table.  */
+  for (unsigned i = 1; i < labels; i++)
+    {
+      tree label = gimple_switch_label (s, i);
+      basic_block bb = label_to_block_fn (func, CASE_LABEL (label));
+
+      unsigned HOST_WIDE_INT low = tree_to_uhwi (CASE_LOW (label));
+
+      tree h = CASE_HIGH (label);
+      unsigned HOST_WIDE_INT high = h != NULL_TREE ? tree_to_uhwi (h) : low;
+
+      for (unsigned HOST_WIDE_INT j = low; j <= high; j++)
+	sbr->jump_table[j] = bb;
+    }
+
+  hbb->append_insn (sbr);
+}
+
+
 /* Generate HSA instructions for a direct call instruction.
    Instructions will be appended to HBB, which also needs to be the
    corresponding structure to the basic_block of STMT. SSA_MAP maps gimple SSA
@@ -3922,6 +4022,11 @@ gen_hsa_insns_for_gimple_stmt (gimple stmt, hsa_bb *hbb,
       hbb->append_insn (new hsa_insn_basic (0, BRIG_OPCODE_NOP));
       break;
     }
+    case GIMPLE_SWITCH:
+    {
+      gen_hsa_insns_for_switch_stmt (as_a <gswitch *> (stmt), hbb, ssa_map);
+      break;
+    }
     default:
       sorry ("Support for HSA does not implement gimple statement %s",
 	     gimple_code_name[(int) gimple_code (stmt)]);
@@ -4230,6 +4335,28 @@ hsa_generate_function_declaration (tree decl)
   return fun;
 }
 
+/* Return true if switch statement S can be transformed
+   to a SBR instruction in HSAIL.  */
+
+static bool
+handleable_switch_p (gswitch *s)
+{
+  /* Identify if a switch statement can be transformed to
+     SBR instruction, like:
+
+     sbr_u32 $s1 [@label1, @label2, @label3];
+  */
+  tree index = gimple_switch_index (s);
+
+  if (!TYPE_UNSIGNED (TREE_TYPE (index)))
+    return false;
+
+  if (get_switch_high (s) > HSA_MAXIMUM_SBR_LABELS)
+    return false;
+
+  return true;
+}
+
 static void
 convert_switch_statements ()
 {
@@ -4249,9 +4376,12 @@ convert_switch_statements ()
 
     if (gimple_code (stmt) == GIMPLE_SWITCH)
       {
+	gswitch *s = as_a <gswitch *> (stmt);
+	if (handleable_switch_p (s))
+	  continue;
+
 	need_update = true;
 
-	gswitch *s = as_a <gswitch *> (stmt);
 	unsigned labels = gimple_switch_num_labels (s);
 	tree index = gimple_switch_index (s);
 	tree default_label = gimple_switch_default_label (s);
