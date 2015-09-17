@@ -215,7 +215,9 @@ hsa_function_representation::~hsa_function_representation ()
 hsa_op_reg *
 hsa_function_representation::get_shadow_reg ()
 {
+#ifndef HSA_TESTING
   gcc_assert (kern_p);
+#endif
 
   if (shadow_reg)
     return shadow_reg;
@@ -690,6 +692,10 @@ get_symbol_for_decl (tree decl)
 static tree
 hsa_get_gpu_function (tree decl)
 {
+#ifdef HSA_TESTING
+  return decl;
+#endif
+
   hsa_function_summary *s = hsa_summaries->get (cgraph_node::get_create (decl));
   gcc_assert (s->kind != HSA_NONE);
   gcc_assert (!s->gpu_implementation_p);
@@ -3670,7 +3676,12 @@ gen_hsa_insns_for_call (gimple stmt, hsa_bb *hbb,
 	  return;
 	}
 
-      if (hsa_callable_function_p (function_decl))
+#ifdef HSA_TESTING
+      bool v = true;
+#else
+      bool v = false;
+#endif
+      if (hsa_callable_function_p (function_decl) || v)
         gen_hsa_insns_for_direct_call (stmt, hbb, ssa_map);
       else if (!gen_hsa_insns_for_known_library_call (stmt, hbb, ssa_map))
 	sorry ("HSA does support only call for functions with 'hsafunc' "
@@ -4684,7 +4695,13 @@ pass_gen_hsail::execute (function *)
   hsa_function_summary *s = hsa_summaries->get
     (cgraph_node::get_create (current_function_decl));
 
-  if (s->gpu_implementation_p)
+#ifdef HSA_TESTING
+      bool v = true;
+#else
+      bool v = false;
+#endif
+
+  if (s->gpu_implementation_p || v)
     {
       convert_switch_statements ();
       generate_hsa (s->kind == HSA_KERNEL);
