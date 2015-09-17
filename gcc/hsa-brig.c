@@ -2326,7 +2326,9 @@ hsa_output_brig (void)
   if (saved_section)
     switch_to_section (saved_section);
 
+#ifndef HSA_TESTING
   hsa_output_kernel_mapping (brig_decl);
+#endif
 
   hsa_free_decl_kernel_mapping ();
   brig_release_data ();
