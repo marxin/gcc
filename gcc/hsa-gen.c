@@ -1672,7 +1672,6 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map,
 
   switch (TREE_CODE (ref))
     {
-    case SSA_NAME:
     case ADDR_EXPR:
       gcc_unreachable ();
 
@@ -1732,6 +1731,7 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map,
     case FUNCTION_DECL:
       sorry ("HSA does not support indirect calls");
       goto out;
+    case SSA_NAME:
     default:
       sorry ("Support for HSA does not implement memory access to %E", origref);
       goto out;
