@@ -1773,12 +1773,16 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map,
 	    disp1 = idx;
 	  reg = add_addr_regs_if_needed (reg, disp1, hbb);
 	}
-      if (TMR_INDEX2 (ref))
+      if (TMR_INDEX2 (ref) && integer_zerop (TMR_INDEX2 (ref)))
 	{
-	  hsa_op_reg *disp2;
-	  disp2 = hsa_reg_for_gimple_ssa_reqtype (TMR_INDEX2 (ref), ssa_map,
-						  hbb, addrtype);
-	  reg = add_addr_regs_if_needed (reg, disp2, hbb);
+	  /* TMP_OFFSET must be an INTEGER_CST.  */
+	  hsa_op_reg *disp2 = new hsa_op_reg (addrtype);
+	  hsa_op_immed *tmp_offset = new hsa_op_immed (TMR_INDEX2 (ref));
+	  tmp_offset->type = addrtype;
+
+	  hbb->append_insn (new hsa_insn_basic (3, BRIG_OPCODE_ADD, addrtype,
+						disp2, reg, tmp_offset));
+	  reg = disp2;
 	}
       offset += wi::to_offset (TMR_OFFSET (ref));
       break;
