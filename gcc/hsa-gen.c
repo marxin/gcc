@@ -4282,6 +4282,24 @@ gen_body_from_gimple (vec <hsa_op_reg_p> *ssa_map)
 {
   basic_block bb;
 
+  /* Verify CFG for complex edges we are unable to handle.  */
+  edge_iterator ei;
+  edge e;
+  int unsupported_flags = EDGE_ABNORMAL | EDGE_ABNORMAL_CALL | EDGE_EH;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	{
+	  if (e->flags & unsupported_flags)
+	    {
+	      sorry ("HSA does not support an edge with complex flags: 0x%x\n",
+		     e->flags);
+	      return;
+	    }
+	}
+    }
+
   FOR_EACH_BB_FN (bb, cfun)
     {
       gimple_stmt_iterator gsi;
