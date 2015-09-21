@@ -867,6 +867,23 @@ hsa_op_reg::operator new (size_t)
   return hsa_allocp_operand_reg->vallocate ();
 }
 
+/* For a given INSN, return INDEX-th operand of the instruction.
+   If the operand is an address and it's the address of an HSAIL register,
+   return the register.  */
+
+static hsa_op_base *
+get_use_as_register (hsa_insn_basic *insn, unsigned index)
+{
+  gcc_checking_assert (index < insn->operand_count ());
+
+  hsa_op_base *u = insn->get_op (index);
+  hsa_op_address *addr = dyn_cast <hsa_op_address *> (u);
+  if (addr && addr->reg)
+    u = addr->reg;
+
+  return u;
+}
+
 /* Verify register operand.  */
 
 void
@@ -892,7 +909,7 @@ hsa_op_reg::verify_ssa ()
       for (unsigned j = 0; j < use->operand_count (); j++)
 	{
 	  hsa_op_base *u = use->get_op (j);
-	  hsa_op_address *addr; addr = dyn_cast <hsa_op_address *> (u);
+	  hsa_op_address *addr = dyn_cast <hsa_op_address *> (u);
 	  if (addr && addr->reg)
 	    u = addr->reg;
 
@@ -902,11 +919,25 @@ hsa_op_reg::verify_ssa ()
 
 	      if (r)
 		{
-		  error ("HSA SSA name defined by intruction that is supposed "
-			 "to be using it");
-		  debug_hsa_operand (this);
-		  debug_hsa_insn (use);
-		  internal_error ("HSA SSA verification failed");
+		  /* There are instructions that can use a register as both
+		     input and output.
+		     Example: add_u32 $_11, $_11, 2 (u32).  */
+		  bool output_reg_p = false;
+		  for (unsigned k = j + 1; k < use->operand_count (); k++)
+		    if (get_use_as_register (use, k) == u)
+		      {
+			output_reg_p = true;
+			break;
+		      }
+
+		  if (!output_reg_p)
+		    {
+		      error ("HSA SSA name defined by instruction that "
+			     "is supposed to be using it");
+		      debug_hsa_operand (this);
+		      debug_hsa_insn (use);
+		      internal_error ("HSA SSA verification failed");
+		    }
 		}
 
 	      is_visited = true;
