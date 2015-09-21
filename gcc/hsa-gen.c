@@ -940,11 +940,13 @@ hsa_op_reg::verify_ssa ()
       bool is_visited = false;
       for (unsigned j = 0; j < use->operand_count (); j++)
 	{
-	  hsa_op_base *u = get_use_as_register (use, j);
+	  hsa_op_base *u = use->get_op (j);
+	  hsa_op_address *addr = dyn_cast <hsa_op_address *> (u);
+	  if (addr && addr->reg)
+	    u = addr->reg;
 
 	  if (u == this)
 	    {
-	      hsa_op_address *addr = dyn_cast <hsa_op_address *> (u);
 	      bool r = !addr && hsa_opcode_op_output_p (use->opcode, j);
 
 	      if (r)
