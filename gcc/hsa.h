@@ -1061,6 +1061,7 @@ hsa_op_reg *hsa_spill_out (hsa_insn_basic *, hsa_op_reg *, hsa_op_reg **);
 hsa_bb *hsa_init_new_bb (basic_block);
 hsa_function_representation *hsa_generate_function_declaration (tree decl);
 tree hsa_get_host_function (tree decl);
+void hsa_verify_function_arguments (tree decl);
 
 /* In hsa-regalloc.c.  */
 void hsa_regalloc (void);
