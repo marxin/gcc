@@ -4382,7 +4382,12 @@ gen_function_def_parameters (hsa_function_representation *f,
 void
 hsa_verify_function_arguments (tree decl)
 {
-  if (!TYPE_ARG_TYPES (TREE_TYPE (decl)))
+  if (DECL_STATIC_CHAIN (cfun->decl))
+    {
+      sorry ("HSA does not support nested functions");
+      return;
+    }
+  else if (!TYPE_ARG_TYPES (TREE_TYPE (decl)))
     {
       sorry ("HSA does not support functions with variadic arguments "
 	     "(or unknown return type)");
@@ -4640,12 +4645,6 @@ convert_switch_statements ()
 static void
 generate_hsa (bool kernel)
 {
-  if (DECL_STATIC_CHAIN (cfun->decl))
-    {
-      sorry ("HSA does not support nested functions");
-      return;
-    }
-
   hsa_verify_function_arguments (cfun->decl);
   if (seen_error ())
     return;
