@@ -767,18 +767,34 @@ hsa_op_immed::hsa_op_immed (tree tree_val, bool min32int)
 		      hsa_type_for_tree_type (TREE_TYPE (tree_val), NULL,
 					      min32int))
 {
+  if (seen_error ())
+    return;
+
   gcc_checking_assert ((is_gimple_min_invariant (tree_val)
 		       && (!POINTER_TYPE_P (TREE_TYPE (tree_val))
 			   || TREE_CODE (tree_val) == INTEGER_CST))
 		       || TREE_CODE (tree_val) == CONSTRUCTOR);
   tree_value = tree_val;
-
   brig_repr_size = hsa_get_imm_brig_type_len (type);
 
   if (TREE_CODE (tree_value) == STRING_CST)
     brig_repr_size = TREE_STRING_LENGTH (tree_value);
   else if (TREE_CODE (tree_value) == CONSTRUCTOR)
-    brig_repr_size = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (tree_value)));
+    {
+      brig_repr_size = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (tree_value)));
+
+      /* Verify that all elements of a contructor are constants.  */
+      for (unsigned i = 0; i < vec_safe_length (CONSTRUCTOR_ELTS (tree_value));
+	   i++)
+	{
+	  tree v = CONSTRUCTOR_ELT (tree_value, i)->value;
+	  if (!CONSTANT_CLASS_P (v))
+	    {
+	      sorry ("HSA ctor should have only constants");
+	      return;
+	    }
+	}
+    }
 
   emit_to_buffer (tree_value);
   hsa_list_operand_immed.safe_push (this);
@@ -1705,8 +1721,9 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map,
   switch (TREE_CODE (ref))
     {
     case ADDR_EXPR:
-      gcc_unreachable ();
-
+      ref = TREE_OPERAND (ref, 0);
+      gcc_assert (DECL_P (ref));
+      /* Fall-through.  */
     case PARM_DECL:
     case VAR_DECL:
     case RESULT_DECL:
@@ -4470,6 +4487,22 @@ gen_function_def_parameters (hsa_function_representation *f,
     }
 }
 
+void
+hsa_verify_function_arguments (tree decl)
+{
+  if (DECL_STATIC_CHAIN (cfun->decl))
+    {
+      sorry ("HSA does not support nested functions");
+      return;
+    }
+  else if (!TYPE_ARG_TYPES (TREE_TYPE (decl)))
+    {
+      sorry ("HSA does not support functions with variadic arguments "
+	     "(or unknown return type)");
+      return;
+    }
+}
+
 /* Generate function representation that corresponds to
    a function declaration.  */
 
@@ -4508,6 +4541,26 @@ transformable_switch_to_sbr_p (gswitch *s)
     return false;
 
   return true;
+}
+
+/* Verify that types of an index variable in a SWITCH statement S
+   are equal to types of labels.  */
+
+static void verify_switch_types (gswitch *s)
+{
+  tree index = gimple_switch_index (s);
+
+  for (unsigned i = 1; i < gimple_switch_num_labels (s); i++)
+    {
+      tree label = CASE_LOW (gimple_switch_label (s, i));
+      if (TREE_TYPE (label) != TREE_TYPE (index))
+	{
+	  sorry ("HSA does not support emission of switch "
+		 "with a different types: %T and %T", TREE_TYPE (index),
+		 TREE_TYPE (label));
+	  return;
+	}
+    }
 }
 
 /* Structure hold connection between PHI nodes and immediate
@@ -4592,6 +4645,10 @@ convert_switch_statements ()
 	/* If the switch can utilize SBR insn, skip the statement.  */
 	if (transformable_switch_to_sbr_p (s))
 	  continue;
+
+	verify_switch_types (s);
+	if (seen_error ())
+	  return;
 
 	need_update = true;
 
@@ -4746,17 +4803,9 @@ convert_switch_statements ()
 static void
 generate_hsa (bool kernel)
 {
-  if (DECL_STATIC_CHAIN (cfun->decl))
-    {
-      sorry ("HSA does not support nested functions");
-      return;
-    }
-  else if (!TYPE_ARG_TYPES (TREE_TYPE (cfun->decl)))
-    {
-      sorry ("HSA does not support functions with variadic arguments "
-	     "(or unknown return type)");
-      return;
-    }
+  hsa_verify_function_arguments (cfun->decl);
+  if (seen_error ())
+    return;
 
   vec <hsa_op_reg_p> ssa_map = vNULL;
 
