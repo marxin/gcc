@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-table.h"
 #include "basic-block.h"
 
+#define HSA_TESTING
 
 /* Return true if the compiler should produce HSAIL.  */
 
