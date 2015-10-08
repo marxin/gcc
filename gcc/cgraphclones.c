@@ -570,7 +570,12 @@ cgraph_node::create_virtual_clone (vec<cgraph_edge *> redirect_callers,
   char *name;
 
   if (!in_lto_p)
-    gcc_checking_assert (tree_versionable_function_p (old_decl));
+    {
+      if (!local.versionability_initialized)
+	local.versionable_for_cloning = tree_versionable_function_p (decl);
+
+      gcc_checking_assert (local.versionable_for_cloning);
+    }
 
   gcc_assert (local.can_change_signature || !args_to_skip);
 

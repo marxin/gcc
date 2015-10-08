@@ -487,7 +487,7 @@ determine_versionability (struct cgraph_node *node)
      present.  */
   if (node->alias || node->thunk.thunk_p)
     reason = "alias or thunk";
-  else if (!node->local.versionable)
+  else if (!node->local.versionable_for_cloning)
     reason = "not a tree_versionable_function";
   else if (node->get_availability () <= AVAIL_INTERPOSABLE)
     reason = "insufficient body availability";
@@ -4497,11 +4497,7 @@ ipcp_generate_summary (void)
   ipa_register_cgraph_hooks ();
 
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
-      {
-	node->local.versionable
-	  = tree_versionable_function_p (node->decl);
-	ipa_analyze_node (node);
-      }
+    ipa_analyze_node (node);
 }
 
 /* Write ipcp summary for nodes in SET.  */
