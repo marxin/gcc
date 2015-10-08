@@ -595,6 +595,9 @@ struct GTY(()) cgraph_local_info {
   /* False when there is something makes versioning impossible.  */
   unsigned versionable : 1;
 
+  /* True when versionability has been initialized.  */
+  unsigned versionability_initialized : 1;
+
   /* False when function calling convention and signature can not be changed.
      This is the case when __builtin_apply_args is used.  */
   unsigned can_change_signature : 1;

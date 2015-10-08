@@ -4062,6 +4062,13 @@ inline_analyze_function (struct cgraph_node *node)
 {
   push_cfun (DECL_STRUCT_FUNCTION (node->decl));
 
+  if (!node->local.versionability_initialized
+      && DECL_STRUCT_FUNCTION (node->decl))
+    {
+      node->local.versionable = tree_versionable_function_p (node->decl);
+      node->local.versionability_initialized = true;
+    }
+
   if (dump_file)
     fprintf (dump_file, "\nAnalyzing function: %s/%u\n",
 	     node->name (), node->order);
