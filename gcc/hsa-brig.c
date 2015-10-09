@@ -1948,6 +1948,16 @@ static GTY(()) tree hsa_dtor_statements;
 static void
 hsa_output_kernel_mapping (tree brig_decl)
 {
+  tree offload_register = builtin_decl_explicit
+    (BUILT_IN_GOMP_OFFLOAD_REGISTER);
+
+  if (offload_register == NULL)
+    {
+      warning (OPT_Whsa, "could not emit BRIG section"
+	       " (probably -fopenmp option is missing)");
+      return;
+    }
+
   unsigned map_count = hsa_get_number_decl_kernel_mappings ();
 
   tree int_num_of_kernels;
@@ -2207,11 +2217,6 @@ hsa_output_kernel_mapping (tree brig_decl)
   varpool_node::finalize_decl (hsa_libgomp_host_table);
 
   /* Generate an initializer with a call to the registration routine.  */
-
-  tree offload_register = builtin_decl_explicit
-    (BUILT_IN_GOMP_OFFLOAD_REGISTER);
-  gcc_checking_assert (offload_register);
-
   append_to_statement_list
     (build_call_expr (offload_register, 3,
 		      build_fold_addr_expr (hsa_libgomp_host_table),
