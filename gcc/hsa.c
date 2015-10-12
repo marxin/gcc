@@ -409,6 +409,19 @@ hsa_type_bit_size (BrigType16_t t)
     }
 }
 
+/* Return index of the first output argument of an instruction.  */
+
+unsigned
+hsa_insn_basic::get_op_output_index ()
+{
+  for (unsigned i = 0; i < operand_count (); i++)
+    if (hsa_opcode_op_output_p (opcode, i))
+      return i;
+
+  gcc_unreachable ();
+  return 0;
+}
+
 /* Return HSA bit-type with the same size as the type T.  */
 
 BrigType16_t
