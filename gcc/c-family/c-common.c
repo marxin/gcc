@@ -7373,7 +7373,6 @@ handle_hsa_attribute (tree *node, tree name,
     }
 
   TREE_USED (*node) = 1;
-  DECL_UNINLINABLE (*node) = 1;
 
   return NULL_TREE;
 }

@@ -47,6 +47,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-inline.h"
 #include "tree-inline.h"
 #include "tree-pass.h"
+#include "stringpool.h"
+#include "hsa.h"
 
 int ncalls_inlined;
 int nfunctions_inlined;
