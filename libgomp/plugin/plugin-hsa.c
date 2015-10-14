@@ -779,13 +779,16 @@ create_kernel_dispatch (struct kernel_info *kernel, unsigned omp_data_size)
 static void
 release_kernel_dispatch (struct hsa_kernel_dispatch *shadow)
 {
-  HSA_DEBUG ("Released kernel dispatch: %p has value: %lu (%p)\n",
-	     shadow, shadow->debug, (void *)shadow->debug);
-
   hsa_memory_free (shadow->kernarg_address);
 
   hsa_signal_t s;
   s.handle = shadow->signal;
+
+  HSA_DEBUG ("Released kernel dispatch: %p has value: %lu (%p), "
+	     "signal value: %ld\n",
+	     shadow, shadow->debug, (void *)shadow->debug,
+	     hsa_signal_load_acquire (s));
+
   hsa_signal_destroy (s);
 
   free (shadow->omp_data_memory);
@@ -1130,8 +1133,8 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars, const void* kern_launch)
   hsa_signal_store_release (agent->command_q->doorbell_signal, index);
 
   HSA_DEBUG ("Kernel dispatched, waiting for completion\n");
-  hsa_signal_wait_acquire (s, HSA_SIGNAL_CONDITION_LT, 1,
-			   UINT64_MAX, HSA_WAIT_STATE_BLOCKED);
+  while (hsa_signal_wait_acquire (s, HSA_SIGNAL_CONDITION_LT, 1,
+				  UINT64_MAX, HSA_WAIT_STATE_BLOCKED) != 0);
 
   release_kernel_dispatch (shadow);
 
