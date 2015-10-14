@@ -3958,21 +3958,30 @@ gen_hsa_insns_for_kernel_call (hsa_bb *hbb, gcall *call)
   hbb->append_insn (signal);
 
   /* Emit blocking signal waiting instruction.  */
+  edge e = EDGE_SUCC (hbb->bb, 0);
+  hsa_bb *new_hbb = hsa_bb_for_bb (e->dest);
+
   hbb->append_insn (new hsa_insn_comment ("wait for the signal"));
 
-  hsa_op_reg *signal_result_reg = new hsa_op_reg (BRIG_TYPE_U64);
+  hsa_op_reg *signal_result_reg = new hsa_op_reg (BRIG_TYPE_S64);
   c = new hsa_op_immed (1, BRIG_TYPE_S64);
-  hsa_op_immed *c2 = new hsa_op_immed (UINT64_MAX, BRIG_TYPE_U64);
 
-  signal = new hsa_insn_signal (4, BRIG_OPCODE_SIGNAL,
-				BRIG_ATOMIC_WAITTIMEOUT_LT, BRIG_TYPE_S64);
+  signal = new hsa_insn_signal (3, BRIG_OPCODE_SIGNAL,
+				BRIG_ATOMIC_WAIT_LT, BRIG_TYPE_S64);
   signal->memoryorder = BRIG_MEMORY_ORDER_SC_ACQUIRE;
   signal->memoryscope = BRIG_MEMORY_SCOPE_SYSTEM;
   signal->set_op (0, signal_result_reg);
   signal->set_op (1, signal_reg);
   signal->set_op (2, c);
-  signal->set_op (3, c2);
-  hbb->append_insn (signal);
+  new_hbb->append_insn (signal);
+
+  hsa_op_reg *ctrl = new hsa_op_reg (BRIG_TYPE_B1);
+  hsa_insn_cmp *cmp = new hsa_insn_cmp
+    (BRIG_COMPARE_EQ, ctrl->type, ctrl, signal_result_reg,
+     new hsa_op_immed (1, signal_result_reg->type));
+
+  new_hbb->append_insn (cmp);
+  new_hbb->append_insn (new hsa_insn_br (ctrl));
 
   hsa_cfun->kernel_dispatch_count++;
 }
@@ -4752,6 +4761,40 @@ init_hsa_num_threads (void)
   prologue->append_insn (basic);
 }
 
+/* As kernel dispatch code needs to wait in a loop for finishing signal,
+   we need to split the existing basic block and prepare a new one.  */
+
+static void
+gen_kernel_dispatch_bbs (void)
+{
+  basic_block bb;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_stmt_iterator gsi;
+
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple *stmt = gsi_stmt (gsi);
+	  if (gimple_code (stmt) == GIMPLE_CALL
+	      && gimple_call_builtin_p (stmt, BUILT_IN_NORMAL)
+	      && DECL_FUNCTION_CODE (gimple_call_fndecl (stmt))
+		 == BUILT_IN_GOMP_PARALLEL)
+	    {
+	      edge e = split_block (bb, stmt);
+
+	      basic_block dest = split_edge (e);
+	      edge false_e = EDGE_SUCC (dest, 0);
+
+	      false_e->flags &= ~EDGE_FALLTHRU;
+	      false_e->flags |= EDGE_FALSE_VALUE;
+
+	      make_edge (e->dest, dest, EDGE_TRUE_VALUE);
+	    }
+	}
+    }
+}
+
 /* Go over gimple representation and generate our internal HSA one.  SSA_MAP
    maps gimple SSA names to HSA pseudo registers.  */
 
@@ -4780,10 +4823,16 @@ gen_body_from_gimple (vec <hsa_op_reg_p> *ssa_map)
 	}
     }
 
+  gen_kernel_dispatch_bbs ();
+
+  /* Create HSA basic blocks.  */
+  FOR_EACH_BB_FN (bb, cfun)
+    hsa_init_new_bb (bb);
+
   FOR_EACH_BB_FN (bb, cfun)
     {
       gimple_stmt_iterator gsi;
-      hsa_bb *hbb = hsa_init_new_bb (bb);
+      hsa_bb *hbb = hsa_bb_for_bb (bb);
 
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
