@@ -763,6 +763,10 @@ static void indent_stream (FILE *f, int indent)
     fputc (' ', f);
 }
 
+/* Line start for BRIG offsets dump.  */
+
+#define BRIG_OFFSET_COLUMN_START 60
+
 /* Dump textual representation of HSA IL instruction INSN to file F.  Prepend
    the instruction with *INDENT spaces and adjust the indentation for call
    instructions as appropriate.  */
@@ -771,10 +775,13 @@ static void
 dump_hsa_insn_1 (FILE *f, hsa_insn_basic *insn, int *indent)
 {
   gcc_checking_assert (insn);
-  indent_stream (f, *indent);
+
+  long position = ftell (f);
 
   if (insn->number)
     fprintf (f, "%5d: ", insn->number);
+
+  indent_stream (f, *indent);
 
   if (is_a <hsa_insn_phi *> (insn))
     {
@@ -1000,9 +1007,14 @@ dump_hsa_insn_1 (FILE *f, hsa_insn_basic *insn, int *indent)
 	}
     }
 
+  long width = ftell (f) - position;
+
+  if (width < BRIG_OFFSET_COLUMN_START)
+    indent_stream (f, BRIG_OFFSET_COLUMN_START - width);
+
   if (insn->brig_offset)
     {
-      fprintf (f, "             /* BRIG offset: %u", insn->brig_offset);
+      fprintf (f, "/* BRIG offset: %u", insn->brig_offset);
 
       for (unsigned i = 0; i < insn->operand_count (); i++)
 	fprintf (f, ", op%u: %u", i, insn->get_op (i)->brig_op_offset);
