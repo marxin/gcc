@@ -1792,8 +1792,7 @@ gen_hsa_addr (tree ref, hsa_bb *hbb, vec <hsa_op_reg_p> *ssa_map,
   switch (TREE_CODE (ref))
     {
     case ADDR_EXPR:
-      gcc_unreachable ();
-
+      ref = TREE_OPERAND (ref, 0);
     case PARM_DECL:
     case VAR_DECL:
     case RESULT_DECL:
