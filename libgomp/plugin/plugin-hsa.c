@@ -220,6 +220,7 @@ struct agent_info
   hsa_isa_t isa;
   /* Command queue of the agent.  */
   hsa_queue_t* command_q;
+  hsa_queue_t* command_q_2;
   /* The HSA memory region from which to allocate kernel arguments.  */
   hsa_region_t kernarg_region;
 
@@ -447,6 +448,12 @@ GOMP_OFFLOAD_init_device (int n)
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Error creating command queue", status);
 
+  status = hsa_queue_create (agent->id, queue_size, HSA_QUEUE_TYPE_MULTI,
+			     queue_callback, NULL, UINT32_MAX, UINT32_MAX,
+			     &agent->command_q_2);
+  if (status != HSA_STATUS_SUCCESS)
+    hsa_fatal ("Error creating command queue", status);
+
   agent->kernarg_region.handle = (uint64_t) -1;
   status = hsa_agent_iterate_regions (agent->id, get_kernarg_memory_region,
 				      &agent->kernarg_region);
@@ -455,6 +462,8 @@ GOMP_OFFLOAD_init_device (int n)
 		       "arguments");
   HSA_DEBUG ("HSA agent initialized, queue has id %llu\n",
 	     (long long unsigned) agent->command_q->id);
+  HSA_DEBUG ("HSA agent initialized, queue_2 has id %llu\n",
+	     (long long unsigned) agent->command_q_2->id);
   agent->initialized = true;
 }
 
@@ -936,6 +945,7 @@ create_kernel_dispatch_recursive (struct kernel_info *kernel,
 	(kernel->agent, kernel->dependencies[i]);
       shadow->children_dispatches[i] = create_kernel_dispatch_recursive
 	(dependency, omp_data_size);
+      shadow->children_dispatches[i]->queue = kernel->agent->command_q_2;
     }
 
   return shadow;
@@ -1215,6 +1225,9 @@ GOMP_OFFLOAD_fini_device (int n)
   release_agent_shared_libraries (agent);
 
   hsa_status_t status = hsa_queue_destroy (agent->command_q);
+  if (status != HSA_STATUS_SUCCESS)
+    hsa_fatal ("Error destroying command queue", status);
+  status = hsa_queue_destroy (agent->command_q_2);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Error destroying command queue", status);
   if (pthread_mutex_destroy (&agent->prog_mutex))

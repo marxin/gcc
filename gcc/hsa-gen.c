@@ -3303,6 +3303,10 @@ gen_hsa_insns_for_return (greturn *stmt, hsa_bb *hbb,
   /* HSAIL return instruction emission.  */
   hsa_insn_basic *ret = new hsa_insn_basic (0, BRIG_OPCODE_RET);
   hbb->append_insn (ret);
+
+  /* Emit padding to the function */
+  for (unsigned i = 0; i < 1000; i++)
+    hbb->append_insn (new hsa_insn_comment ("padding"));
 }
 
 /* Set OP_INDEX-th operand of the instruction to DEST, as the DEST
