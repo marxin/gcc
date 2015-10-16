@@ -3159,6 +3159,8 @@ gen_hsa_insns_for_direct_call (gimple *stmt, hsa_bb *hbb,
     (BRIG_KIND_DIRECTIVE_ARG_BLOCK_START, call_insn);
   hbb->append_insn (arg_start);
 
+  tree decl_parm = DECL_ARGUMENTS (decl);
+
   /* Preparation of arguments that will be passed to function.  */
   const unsigned args = gimple_call_num_args (stmt);
   for (unsigned i = 0; i < args; ++i)
@@ -3173,20 +3175,27 @@ gen_hsa_insns_for_direct_call (gimple *stmt, hsa_bb *hbb,
 	  return;
 	}
 
-      BrigType16_t mtype = mem_type_for_type (hsa_type_for_scalar_tree_type
-					      (TREE_TYPE (parm), false));
+      BrigType16_t decl_type = hsa_type_for_scalar_tree_type
+	(TREE_TYPE (decl_parm), false);
+      BrigType16_t decl_mtype = mem_type_for_type (decl_type);
 
       if (hsa_seen_error ())
 	return;
 
-      hsa_op_address *addr = gen_hsa_addr_for_arg (TREE_TYPE (parm), i);
-      hsa_op_base *src = hsa_reg_or_immed_for_gimple_op (parm, hbb, ssa_map);
-      hsa_insn_mem *mem = new hsa_insn_mem (BRIG_OPCODE_ST, mtype, src, addr);
+      hsa_op_with_type *src = hsa_reg_or_immed_for_gimple_op (parm, hbb,
+							      ssa_map);
+      if (src->m_type != decl_type)
+	src = src->get_in_type (decl_type, hbb);
+
+      hsa_op_address *addr = gen_hsa_addr_for_arg (TREE_TYPE (decl_parm), i);
+      hsa_insn_mem *mem = new hsa_insn_mem (BRIG_OPCODE_ST, decl_mtype, src,
+					    addr);
 
       call_insn->m_input_args.safe_push (addr->m_symbol);
       hbb->append_insn (mem);
 
       call_insn->m_args_symbols.safe_push (addr->m_symbol);
+      decl_parm = TREE_CHAIN (decl_parm);
     }
 
   call_insn->m_args_code_list = new hsa_op_code_list (args);
