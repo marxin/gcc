@@ -1142,6 +1142,14 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars, const void* kern_launch)
   __atomic_store_n ((uint16_t*)(&packet->header), header, __ATOMIC_RELEASE);
   hsa_signal_store_release (agent->command_q->doorbell_signal, index);
 
+  hsa_signal_t s2;
+  s2.handle = shadow->children_dispatches[0]->signal;
+
+  HSA_DEBUG ("Kernel dispatched, waiting for completion\n");
+  while (hsa_signal_wait_acquire (s2, HSA_SIGNAL_CONDITION_LT, 1,
+				  UINT64_MAX, HSA_WAIT_STATE_BLOCKED) != 0);
+
+
   HSA_DEBUG ("Kernel dispatched, waiting for completion\n");
   while (hsa_signal_wait_acquire (s, HSA_SIGNAL_CONDITION_LT, 1,
 				  UINT64_MAX, HSA_WAIT_STATE_BLOCKED) != 0);
