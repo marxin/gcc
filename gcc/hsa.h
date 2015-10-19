@@ -415,7 +415,7 @@ public:
   void *operator new (size_t);
 
   /* Destination.  */
-  hsa_op_reg *dest;
+  hsa_op_reg *m_dest;
 
 private:
   /* Make the default constructor inaccessible.  */
