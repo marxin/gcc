@@ -300,6 +300,9 @@ protected:
 /* Rebuild the callgraph edges.  */
 #define TODO_rebuild_cgraph_edges       (1 << 22)
 
+/* Stop pass manager after execution of a pass.  */
+#define TODO_stop_pass_execution	(1 << 23)
+
 /* Internally used in execute_function_todo().  */
 #define TODO_update_ssa_any		\
     (TODO_update_ssa			\
