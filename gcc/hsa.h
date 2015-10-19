@@ -53,6 +53,9 @@ typedef hsa_insn_basic *hsa_insn_basic_p;
 
 struct hsa_symbol
 {
+  /* Default constructor.  */
+  hsa_symbol ();
+
   /* Pointer to the original tree, which is PARM_DECL for input parameters and
      RESULT_DECL for the output parameters.  */
   tree m_decl;

@@ -203,6 +203,12 @@ static vec <hsa_op_code_list *> hsa_list_operand_code_list;
 static vec <hsa_op_reg *> hsa_list_operand_reg;
 static vec <hsa_op_immed*> hsa_list_operand_immed;
 
+hsa_symbol::hsa_symbol (): m_decl (NULL_TREE), m_name (NULL), m_name_number (0),
+  m_directive_offset (0), m_type (0), m_segment (0), m_linkage (0), m_dim (0),
+  m_cst_value (NULL), m_global_scope_p (false), m_seen_error (false)
+{
+}
+
 /* Constructor of class representing global HSA function/kernel information and
    state.  */
 
@@ -5236,7 +5242,6 @@ static void
 emit_hsa_module_variables (void)
 {
   hsa_num_threads = new hsa_symbol ();
-  memset (hsa_num_threads, 0, sizeof (hsa_symbol));
 
   hsa_num_threads->m_name = "hsa_num_threads";
   hsa_num_threads->m_type = BRIG_TYPE_U32;
