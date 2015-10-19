@@ -1011,19 +1011,19 @@ emit_address_operand (hsa_op_address *addr)
 
   out.base.byteCount = htole16 (sizeof (out));
   out.base.kind = htole16 (BRIG_KIND_OPERAND_ADDRESS);
-  out.symbol = addr->symbol
-    ? htole32 (emit_directive_variable (addr->symbol)) : 0;
-  out.reg = addr->reg ? htole32 (enqueue_op (addr->reg)) : 0;
+  out.symbol = addr->m_symbol
+    ? htole32 (emit_directive_variable (addr->m_symbol)) : 0;
+  out.reg = addr->m_reg ? htole32 (enqueue_op (addr->m_reg)) : 0;
 
   /* FIXME: This is very clumsy.  */
-  if (sizeof (addr->imm_offset) == 8)
+  if (sizeof (addr->m_imm_offset) == 8)
     {
-      out.offset.lo = htole32 ((uint32_t)addr->imm_offset);
-      out.offset.hi = htole32 (((long long) addr->imm_offset) >> 32);
+      out.offset.lo = htole32 ((uint32_t)addr->m_imm_offset);
+      out.offset.hi = htole32 (((long long) addr->m_imm_offset) >> 32);
     }
   else
     {
-      out.offset.lo = htole32 (addr->imm_offset);
+      out.offset.lo = htole32 (addr->m_imm_offset);
       out.offset.hi = 0;
     }
 
@@ -1135,8 +1135,8 @@ emit_memory_insn (hsa_insn_mem *mem)
   brig_data.add (&operand_offsets, sizeof (operand_offsets));
   brig_data.round_size_up (4);
 
-  if (addr->symbol)
-    repr.segment = addr->symbol->m_segment;
+  if (addr->m_symbol)
+    repr.segment = addr->m_symbol->m_segment;
   else
     repr.segment = BRIG_SEGMENT_FLAT;
   repr.modifier.allBits = 0 ;
@@ -1232,8 +1232,8 @@ emit_atomic_insn (hsa_insn_atomic *mem)
   brig_data.round_size_up (4);
   free (operand_offsets);
 
-  if (addr->symbol)
-    repr.segment = addr->symbol->m_segment;
+  if (addr->m_symbol)
+    repr.segment = addr->m_symbol->m_segment;
   else
     repr.segment = BRIG_SEGMENT_FLAT;
   repr.memoryOrder = mem->memoryorder;
@@ -1273,8 +1273,8 @@ emit_addr_insn (hsa_insn_basic *insn)
   brig_data.round_size_up (4);
   free (operand_offsets);
 
-  if (addr->symbol)
-    repr.segment = addr->symbol->m_segment;
+  if (addr->m_symbol)
+    repr.segment = addr->m_symbol->m_segment;
   else
     repr.segment = BRIG_SEGMENT_FLAT;
   memset (&repr.reserved, 0, sizeof (repr.reserved));
