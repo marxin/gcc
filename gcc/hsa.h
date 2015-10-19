@@ -794,7 +794,7 @@ public:
   /* Release memory for comment.  */
   void release_string ();
 
-  char *comment;
+  char *m_comment;
 };
 
 /* Report whether or not P is a call block instruction.  */
