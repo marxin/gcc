@@ -4770,6 +4770,7 @@ pop_cfun (void)
      pop_cfun.  */
   gcc_checking_assert (in_dummy_function
 		       || !cfun
+		       || !gimple_has_body_p (current_function_decl)
 		       || current_function_decl == cfun->decl);
   set_cfun (new_cfun);
   current_function_decl = new_cfun ? new_cfun->decl : NULL_TREE;

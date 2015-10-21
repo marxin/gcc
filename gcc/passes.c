@@ -2387,6 +2387,19 @@ execute_one_pass (opt_pass *pass)
   if (!((todo_after | pass->todo_flags_finish) & TODO_do_not_ggc_collect))
     ggc_collect ();
 
+  if (todo_after & TODO_discard_function)
+    {
+      /* As cgraph_node::release_body expects release dominators info,
+	 we have to release it.  */
+      if (dom_info_available_p (CDI_DOMINATORS))
+	free_dominance_info (CDI_DOMINATORS);
+
+      if (dom_info_available_p (CDI_POST_DOMINATORS))
+	free_dominance_info (CDI_POST_DOMINATORS);
+
+      cgraph_node::get (cfun->decl)->release_body ();
+    }
+
   return true;
 }
 
@@ -2397,6 +2410,10 @@ execute_pass_list_1 (opt_pass *pass)
     {
       gcc_assert (pass->type == GIMPLE_PASS
 		  || pass->type == RTL_PASS);
+
+
+      if (!gimple_has_body_p (current_function_decl))
+	return;
       if (execute_one_pass (pass) && pass->sub)
         execute_pass_list_1 (pass->sub);
       pass = pass->next;
@@ -2409,7 +2426,7 @@ execute_pass_list (function *fn, opt_pass *pass)
 {
   push_cfun (fn);
   execute_pass_list_1 (pass);
-  if (fn->cfg)
+  if (gimple_has_body_p (current_function_decl) && fn->cfg)
     {
       free_dominance_info (CDI_DOMINATORS);
       free_dominance_info (CDI_POST_DOMINATORS);
