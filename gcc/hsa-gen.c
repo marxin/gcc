@@ -5358,7 +5358,7 @@ pass_gen_hsail::execute (function *)
   convert_switch_statements ();
   generate_hsa (s->m_kind == HSA_KERNEL);
   TREE_ASM_WRITTEN (current_function_decl) = 1;
-  return TODO_stop_pass_execution;
+  return 0;
 }
 
 } // anon namespace
