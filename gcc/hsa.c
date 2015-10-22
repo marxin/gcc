@@ -145,6 +145,9 @@ hsa_deinit_compilation_unit_data (void)
 
   if (hsa_failed_functions)
     delete hsa_failed_functions;
+
+  if (hsa_num_threads)
+    delete hsa_num_threads;
 }
 
 /* Return true if we are generating large HSA machine model.  */

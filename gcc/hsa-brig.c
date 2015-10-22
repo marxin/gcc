@@ -1919,13 +1919,17 @@ hsa_brig_emit_function (void)
     }
 
   if (comment_instructions)
-    for (unsigned i = 0; i < comment_instructions->length (); i++)
-      (*comment_instructions)[i]->release_string ();
+    {
+      for (unsigned i = 0; i < comment_instructions->length (); i++)
+	(*comment_instructions)[i]->release_string ();
+
+      comment_instructions->release ();
+      delete comment_instructions;
+      comment_instructions = NULL;
+    }
 
   delete switch_instructions;
   switch_instructions = NULL;
-  delete comment_instructions;
-  comment_instructions = NULL;
 
   emit_queued_operands ();
 }
