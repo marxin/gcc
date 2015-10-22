@@ -1124,7 +1124,7 @@ hsa_reg_for_gimple_ssa (tree ssa, vec <hsa_op_reg_p> *ssa_map)
   if ((*ssa_map)[SSA_NAME_VERSION (ssa)])
     return (*ssa_map)[SSA_NAME_VERSION (ssa)];
 
-  hreg = new  hsa_op_reg (hsa_type_for_scalar_tree_type (TREE_TYPE (ssa),
+  hreg = new hsa_op_reg (hsa_type_for_scalar_tree_type (TREE_TYPE (ssa),
 							 true));
   hreg->m_gimple_ssa = ssa;
   (*ssa_map)[SSA_NAME_VERSION (ssa)] = hreg;
@@ -3190,6 +3190,20 @@ verify_function_arguments (tree decl)
     }
 }
 
+/* Return BRIG type for FORMAL_ARG_TYPE.  If the formal argument type is NULL,
+   return ACTUAL_ARG_TYPE.  */
+
+static BrigType16_t
+get_format_argument_type (tree formal_arg_type, BrigType16_t actual_arg_type)
+{
+  if (formal_arg_type == NULL)
+    return actual_arg_type;
+
+  BrigType16_t decl_type = hsa_type_for_scalar_tree_type
+    (formal_arg_type, false);
+  return mem_type_for_type (decl_type);
+}
+
 /* Generate HSA instructions for a direct call instruction.
    Instructions will be appended to HBB, which also needs to be the
    corresponding structure to the basic_block of STMT. SSA_MAP maps gimple SSA
@@ -3212,11 +3226,15 @@ gen_hsa_insns_for_direct_call (gimple *stmt, hsa_bb *hbb,
     (BRIG_KIND_DIRECTIVE_ARG_BLOCK_START, call_insn);
   hbb->append_insn (arg_start);
 
+  tree parm_decl_chain = TYPE_ARG_TYPES (gimple_call_fntype (stmt));
+
   /* Preparation of arguments that will be passed to function.  */
   const unsigned args = gimple_call_num_args (stmt);
   for (unsigned i = 0; i < args; ++i)
     {
       tree parm = gimple_call_arg (stmt, (int)i);
+      tree parm_decl_type = parm_decl_chain != NULL_TREE
+	? TREE_TYPE (TREE_VALUE (parm_decl_chain)) : NULL_TREE;
 
       if (AGGREGATE_TYPE_P (TREE_TYPE (parm)))
 	{
@@ -3226,20 +3244,27 @@ gen_hsa_insns_for_direct_call (gimple *stmt, hsa_bb *hbb,
 	  return;
 	}
 
-      BrigType16_t mtype = mem_type_for_type (hsa_type_for_scalar_tree_type
-					      (TREE_TYPE (parm), false));
-
+      hsa_op_with_type *src = hsa_reg_or_immed_for_gimple_op (parm, hbb,
+							      ssa_map);
+      BrigType16_t formal_arg_type = get_format_argument_type
+	(parm_decl_type, src->m_type);
       if (hsa_seen_error ())
 	return;
 
-      hsa_op_address *addr = gen_hsa_addr_for_arg (TREE_TYPE (parm), i);
-      hsa_op_base *src = hsa_reg_or_immed_for_gimple_op (parm, hbb, ssa_map);
-      hsa_insn_mem *mem = new hsa_insn_mem (BRIG_OPCODE_ST, mtype, src, addr);
+      if (src->m_type != formal_arg_type)
+	src = src->get_in_type (formal_arg_type, hbb);
 
-      call_insn->m_input_args.safe_push (addr->m_symbol);
+      hsa_op_address *addr = gen_hsa_addr_for_arg
+	(parm_decl_type != NULL_TREE ? parm_decl_type: TREE_TYPE (parm), i);
+      hsa_insn_mem *mem = new hsa_insn_mem (BRIG_OPCODE_ST, formal_arg_type,
+					    src, addr);
+
       hbb->append_insn (mem);
 
+      call_insn->m_input_args.safe_push (addr->m_symbol);
       call_insn->m_args_symbols.safe_push (addr->m_symbol);
+      if (parm_decl_chain)
+	parm_decl_chain = TREE_CHAIN (parm_decl_chain);
     }
 
   call_insn->m_args_code_list = new hsa_op_code_list (args);
