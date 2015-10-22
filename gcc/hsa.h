@@ -63,6 +63,9 @@ struct hsa_symbol
   /* New operator to allocate HSA symbol from pool alloc.  */
   void *operator new (size_t);
 
+  /* Return total size of the symbol.  */
+  unsigned HOST_WIDE_INT total_byte_size ();
+
   /* Pointer to the original tree, which is PARM_DECL for input parameters and
      RESULT_DECL for the output parameters.  */
   tree m_decl;
