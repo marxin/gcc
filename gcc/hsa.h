@@ -948,6 +948,9 @@ public:
      so we need hsa_bb instances of them.  */
   void init_extra_bbs ();
 
+  /* Create a private symbol of requested TYPE.  */
+  hsa_symbol *create_hsa_temporary (BrigType16_t type);
+
   /* Name of the function.  */
   char *m_name;
 
@@ -974,6 +977,9 @@ public:
   /* Vector of pointers to symbols (string constants and global,
      noni-addressable variables with a constructor).  */
   vec <struct hsa_symbol *> m_readonly_variables;
+
+  /* Private function artificial variables.  */
+  vec <struct hsa_symbol *> m_private_variables;
 
   /* Vector of called function declarations.  */
   vec <tree> m_called_functions;
@@ -1116,6 +1122,8 @@ hsa_op_reg *hsa_spill_out (hsa_insn_basic *, hsa_op_reg *, hsa_op_reg **);
 hsa_bb *hsa_init_new_bb (basic_block);
 hsa_function_representation *hsa_generate_function_declaration (tree decl);
 tree hsa_get_host_function (tree decl);
+void gen_hsa_addr_insns (tree val, hsa_op_reg *dest, hsa_bb *hbb,
+			 vec <hsa_op_reg_p> *ssa_map);
 
 /* In hsa-regalloc.c.  */
 void hsa_regalloc (void);
