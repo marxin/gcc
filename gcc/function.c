@@ -4763,6 +4763,13 @@ push_cfun (struct function *new_cfun)
 void
 pop_cfun (void)
 {
+  if (cfun_stack.is_empty ())
+    {
+      set_cfun (NULL);
+      current_function_decl = NULL_TREE;
+      return;
+    }
+
   struct function *new_cfun = cfun_stack.pop ();
   /* When in_dummy_function, we do have a cfun but current_function_decl is
      NULL.  We also allow pushing NULL cfun and subsequently changing

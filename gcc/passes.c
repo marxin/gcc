@@ -2378,6 +2378,26 @@ execute_one_pass (opt_pass *pass)
 
   current_pass = NULL;
 
+  if (todo_after & TODO_discard_function)
+    {
+      gcc_assert (cfun);
+      /* As cgraph_node::release_body expects release dominators info,
+	 we have to release it.  */
+      if (dom_info_available_p (CDI_DOMINATORS))
+	free_dominance_info (CDI_DOMINATORS);
+
+      if (dom_info_available_p (CDI_POST_DOMINATORS))
+	free_dominance_info (CDI_POST_DOMINATORS);
+
+      /* Pop function inserted in execute_pass_list.  */
+      pop_cfun ();
+
+      cgraph_node::get (cfun->decl)->release_body ();
+
+      /* Set cfun and current_function_decl to be NULL.  */
+      pop_cfun ();
+    }
+
   /* Signal this is a suitable GC collection point.  */
   if (!((todo_after | pass->todo_flags_finish) & TODO_do_not_ggc_collect))
     ggc_collect ();
@@ -2392,6 +2412,9 @@ execute_pass_list_1 (opt_pass *pass)
     {
       gcc_assert (pass->type == GIMPLE_PASS
 		  || pass->type == RTL_PASS);
+
+      if (current_function_decl == NULL)
+	return;
       if (execute_one_pass (pass) && pass->sub)
         execute_pass_list_1 (pass->sub);
 
@@ -2405,11 +2428,12 @@ execute_pass_list (function *fn, opt_pass *pass)
 {
   push_cfun (fn);
   execute_pass_list_1 (pass);
-  if (fn->cfg)
+  if (current_function_decl && fn->cfg)
     {
       free_dominance_info (CDI_DOMINATORS);
       free_dominance_info (CDI_POST_DOMINATORS);
     }
+
   pop_cfun ();
 }
 
