@@ -221,6 +221,12 @@ hsa_symbol::hsa_symbol (BrigType16_t type, BrigSegment8_t segment,
 {
 }
 
+void *
+hsa_symbol::operator new (size_t)
+{
+  return hsa_allocp_symbols->vallocate ();
+}
+
 /* Constructor of class representing global HSA function/kernel information and
    state.  */
 
@@ -284,6 +290,13 @@ bool hsa_function_representation::has_shadow_reg_p ()
   return m_shadow_reg != NULL;
 }
 
+void
+hsa_function_representation::init_extra_bbs ()
+{
+  hsa_init_new_bb (ENTRY_BLOCK_PTR_FOR_FN (cfun));
+  hsa_init_new_bb (EXIT_BLOCK_PTR_FOR_FN (cfun));
+}
+
 /* Allocate HSA structures that we need only while generating with this.  */
 
 static void
@@ -326,12 +339,6 @@ hsa_init_data_for_cfun ()
     = new object_allocator<hsa_insn_queue> ("HSA queue instructions");
   hsa_allocp_bb = new object_allocator<hsa_bb> ("HSA basic blocks");
   hsa_allocp_symbols = new object_allocator<hsa_symbol> ("HSA symbols");
-
-  /* The entry/exit blocks don't contain incoming code,
-     but the HSA generator might use them to put code into,
-     so we need hsa_bb instances of them.  */
-  hsa_init_new_bb (ENTRY_BLOCK_PTR_FOR_FN (cfun));
-  hsa_init_new_bb (EXIT_BLOCK_PTR_FOR_FN (cfun));
 }
 
 /* Deinitialize HSA subsystem and free all allocated memory.  */
@@ -1878,10 +1885,8 @@ out:
 static hsa_op_address *
 gen_hsa_addr_for_arg (tree tree_type, int index)
 {
-  hsa_symbol *sym = hsa_allocp_symbols->allocate ();
-  memset (sym, 0, sizeof (hsa_symbol));
-  sym->m_segment = BRIG_SEGMENT_ARG;
-  sym->m_linkage = BRIG_LINKAGE_ARG;
+  hsa_symbol *sym = new hsa_symbol (BRIG_TYPE_NONE, BRIG_SEGMENT_ARG,
+				    BRIG_LINKAGE_ARG);
   sym->m_type = hsa_type_for_tree_type (tree_type, &sym->m_dim);
 
   if (index == -1) /* Function result.  */
@@ -4438,9 +4443,9 @@ gen_hsa_insns_for_call (gimple *stmt, hsa_bb *hbb,
 	called = TREE_OPERAND (called, 0);
 	gcc_checking_assert (TREE_CODE (called) == FUNCTION_DECL);
 
-	char *name = xstrdup (hsa_get_declaration_name (called));
 	hsa_add_kernel_dependency
-	  (hsa_cfun->m_decl, hsa_brig_function_name (name));
+	  (hsa_cfun->m_decl,
+	   hsa_brig_function_name (hsa_get_declaration_name (called)));
 	gen_hsa_insns_for_kernel_call (hbb, as_a <gcall *> (stmt));
 
 	break;
@@ -5205,6 +5210,7 @@ convert_switch_statements ()
 
 	      gphi *phi = it.phi ();
 	      add_phi_arg (phi, phi_def->phi_value, new_edge, UNKNOWN_LOCATION);
+	      delete phi_def;
 	    }
 
 	/* Remove the original GIMPLE switch statement.  */
@@ -5227,8 +5233,8 @@ convert_switch_statements ()
 static void
 emit_hsa_module_variables (void)
 {
-  hsa_num_threads = new hsa_symbol (BRIG_TYPE_U32, BRIG_SEGMENT_PRIVATE,
-				    BRIG_LINKAGE_MODULE);
+  hsa_num_threads = ::new hsa_symbol (BRIG_TYPE_U32, BRIG_SEGMENT_PRIVATE,
+				      BRIG_LINKAGE_MODULE);
 
   hsa_num_threads->m_name = "hsa_num_threads";
   hsa_num_threads->m_global_scope_p = true;
@@ -5245,13 +5251,14 @@ static void
 generate_hsa (bool kernel)
 {
   vec <hsa_op_reg_p> ssa_map = vNULL;
+  hsa_init_data_for_cfun ();
 
   if (hsa_num_threads == NULL)
     emit_hsa_module_variables ();
 
   /* Initialize hsa_cfun.  */
   hsa_cfun = new hsa_function_representation (cfun->decl, kernel);
-  hsa_init_data_for_cfun ();
+  hsa_cfun->init_extra_bbs ();
 
   if (flag_tm)
     {

@@ -60,6 +60,9 @@ struct hsa_symbol
   hsa_symbol (BrigType16_t type, BrigSegment8_t segment,
 	      BrigLinkage8_t linkage);
 
+  /* New operator to allocate HSA symbol from pool alloc.  */
+  void *operator new (size_t);
+
   /* Pointer to the original tree, which is PARM_DECL for input parameters and
      RESULT_DECL for the output parameters.  */
   tree m_decl;
@@ -940,6 +943,11 @@ public:
      shadow register.  */
   bool has_shadow_reg_p ();
 
+  /* The entry/exit blocks don't contain incoming code,
+     but the HSA generator might use them to put code into,
+     so we need hsa_bb instances of them.  */
+  void init_extra_bbs ();
+
   /* Name of the function.  */
   char *m_name;
 
@@ -998,6 +1006,9 @@ public:
 
   /* Return true if there's an HSA-specific warning already seen.  */
   bool m_seen_error;
+
+  /* Counter for temporary symbols created in the function representation.  */
+  unsigned m_temp_symbol_count;
 };
 
 enum hsa_function_kind
