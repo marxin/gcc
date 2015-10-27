@@ -262,7 +262,7 @@ hsa_function_representation::hsa_function_representation
   m_private_variables (vNULL), m_called_functions (vNULL), m_hbb_count (0),
   m_in_ssa (true), m_kern_p (kernel_p), m_declaration_p (false), m_decl (fdecl),
   m_shadow_reg (NULL), m_kernel_dispatch_count (0), m_maximum_omp_data_size (0),
-  m_seen_error (false), m_temp_symbol_count (0)
+  m_seen_error (false), m_temp_symbol_count (0), m_ssa_map ()
 {
   int sym_init_len = (vec_safe_length (cfun->local_decls) / 2) + 1;;
   m_local_symbols = new hash_table <hsa_noop_symbol_hasher> (sym_init_len);
@@ -296,6 +296,7 @@ hsa_function_representation::~hsa_function_representation ()
     delete m_private_variables[i];
   m_private_variables.release ();
   m_called_functions.release ();
+  m_ssa_map.release ();
 }
 
 hsa_op_reg *
@@ -5341,7 +5342,6 @@ emit_hsa_module_variables (void)
 static void
 generate_hsa (bool kernel)
 {
-  vec <hsa_op_reg_p> ssa_map = vNULL;
   hsa_init_data_for_cfun ();
 
   if (hsa_num_threads == NULL)
@@ -5349,6 +5349,7 @@ generate_hsa (bool kernel)
 
   /* Initialize hsa_cfun.  */
   hsa_cfun = new hsa_function_representation (cfun->decl, kernel);
+  hsa_cfun->m_ssa_map.safe_grow_cleared (SSANAMES (cfun)->length ());
   hsa_cfun->init_extra_bbs ();
 
   if (flag_tm)
@@ -5362,16 +5363,15 @@ generate_hsa (bool kernel)
   if (hsa_seen_error ())
     goto fail;
 
-  ssa_map.safe_grow_cleared (SSANAMES (cfun)->length ());
   hsa_cfun->m_name = get_brig_function_name (cfun->decl);
 
-  gen_function_def_parameters (&ssa_map);
+  gen_function_def_parameters (&hsa_cfun->m_ssa_map);
   if (hsa_seen_error ())
     goto fail;
 
   init_prologue ();
 
-  gen_body_from_gimple (&ssa_map);
+  gen_body_from_gimple (&hsa_cfun->m_ssa_map);
   if (hsa_seen_error ())
     goto fail;
 
@@ -5385,9 +5385,9 @@ generate_hsa (bool kernel)
     }
 
 #ifdef ENABLE_CHECKING
-  for (unsigned i = 0; i < ssa_map.length (); i++)
-    if (ssa_map[i])
-      ssa_map[i]->verify_ssa ();
+  for (unsigned i = 0; i < hsa_cfun->m_ssa_map.length (); i++)
+    if (hsa_cfun->m_ssa_map[i])
+      hsa_cfun->m_ssa_map[i]->verify_ssa ();
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
@@ -5401,12 +5401,9 @@ generate_hsa (bool kernel)
 #endif
 
   hsa_regalloc ();
-
   hsa_brig_emit_function ();
 
  fail:
-  ssa_map.release ();
-
   hsa_deinit_data_for_cfun ();
 }
 
