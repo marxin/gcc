@@ -954,6 +954,15 @@ public:
   /* Create a private symbol of requested TYPE.  */
   hsa_symbol *create_hsa_temporary (BrigType16_t type);
 
+  /* Generate the vector of parameters of the HSA representation of the current
+     function.  This also includes the output parameter representing the
+     result.  */
+  void gen_function_def_parameters ();
+
+  /* Go over gimple representation and generate our internal HSA one.  SSA_MAP
+     maps gimple SSA names to HSA pseudo registers.  */
+  void gen_body_from_gimple ();
+
   /* Name of the function.  */
   char *m_name;
 
@@ -1016,6 +1025,9 @@ public:
 
   /* Counter for temporary symbols created in the function representation.  */
   unsigned m_temp_symbol_count;
+
+  /* SSA names mapping.  */
+  vec <hsa_op_reg_p> m_ssa_map;
 };
 
 enum hsa_function_kind

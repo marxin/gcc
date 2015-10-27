@@ -1127,3 +1127,23 @@ debug_hsa_operand (hsa_op_base *opc)
   dump_hsa_operand (stderr, opc, true);
   fprintf (stderr, "\n");
 }
+
+/* Dump textual representation of as HSA symbol.  */
+
+DEBUG_FUNCTION void
+debug_hsa_symbol (hsa_symbol *symbol)
+{
+  const char *name;
+  if (symbol->m_name)
+    name = symbol->m_name;
+  else
+    {
+      char buf[64];
+      sprintf (buf, "__%s_%i", hsa_seg_name (symbol->m_segment),
+	       symbol->m_name_number);
+
+      name = buf;
+    }
+
+  fprintf (stderr, "%s (%s)\n", name, hsa_type_name (symbol->m_type));
+}
