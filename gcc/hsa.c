@@ -180,6 +180,8 @@ hsa_opcode_op_output_p (int opcode, int opnum)
     case BRIG_OPCODE_SIGNALNORET:
       /* FIXME: There are probably missing cases here, double check.  */
       return false;
+    case BRIG_OPCODE_EXPAND:
+      return opnum == 0 || opnum == 1;
     default:
      return opnum == 0;
     }
@@ -408,12 +410,10 @@ hsa_type_bit_size (BrigType16_t t)
     }
 }
 
-/* Return HSA bit-type with the same size as the type T.  */
-
 BrigType16_t
-hsa_bittype_for_type (BrigType16_t t)
+hsa_bittype_for_bitsize (unsigned bitsize)
 {
-  switch (hsa_type_bit_size (t))
+  switch (bitsize)
     {
     case 1:
       return BRIG_TYPE_B1;
@@ -428,8 +428,16 @@ hsa_bittype_for_type (BrigType16_t t)
     case 128:
       return BRIG_TYPE_B128;
     default:
-      return t;
+      gcc_unreachable ();
     }
+}
+
+/* Return HSA bit-type with the same size as the type T.  */
+
+BrigType16_t
+hsa_bittype_for_type (BrigType16_t t)
+{
+  return hsa_bittype_for_bitsize (hsa_type_bit_size (t));
 }
 
 /* Return true if and only if TYPE is a floating point number type.  */
@@ -503,7 +511,7 @@ hsa_natural_alignment (BrigType16_t type)
   return hsa_alignment_encoding (hsa_type_bit_size (type & ~BRIG_TYPE_ARRAY));
 }
 
-/* Call the correct destructor on a statement STMT.  */
+/* Call the correct destructor of a HSA instruction.  */
 
 void
 hsa_destroy_insn (hsa_insn_basic *insn)
@@ -561,6 +569,23 @@ hsa_destroy_insn (hsa_insn_basic *insn)
 
   insn->~hsa_insn_basic ();
   return;
+}
+
+/* Call the correct destructor of a HSA operand.  */
+
+void
+hsa_destroy_operand (hsa_op_base *op)
+{
+  if (hsa_op_code_list *list = dyn_cast <hsa_op_code_list *> (op))
+    list->~hsa_op_code_list ();
+  if (hsa_op_operand_list *list = dyn_cast <hsa_op_operand_list *> (op))
+    list->~hsa_op_operand_list ();
+  else if (hsa_op_reg *reg = dyn_cast <hsa_op_reg *> (op))
+    reg->~hsa_op_reg ();
+  else if (hsa_op_immed *immed = dyn_cast <hsa_op_immed *> (op))
+    immed->~hsa_op_immed ();
+
+  op->~hsa_op_base ();
 }
 
 /* Create a mapping between the original function DECL and kernel name NAME.  */
