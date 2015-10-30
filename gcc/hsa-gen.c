@@ -181,6 +181,7 @@ static object_allocator<hsa_op_address> *hsa_allocp_operand_address;
 static object_allocator<hsa_op_immed> *hsa_allocp_operand_immed;
 static object_allocator<hsa_op_reg> *hsa_allocp_operand_reg;
 static object_allocator<hsa_op_code_list> *hsa_allocp_operand_code_list;
+static object_allocator<hsa_op_operand_list> *hsa_allocp_operand_operand_list;
 static object_allocator<hsa_insn_basic> *hsa_allocp_inst_basic;
 static object_allocator<hsa_insn_phi> *hsa_allocp_inst_phi;
 static object_allocator<hsa_insn_mem> *hsa_allocp_inst_mem;
@@ -194,6 +195,7 @@ static object_allocator<hsa_insn_call> *hsa_allocp_inst_call;
 static object_allocator<hsa_insn_arg_block> *hsa_allocp_inst_arg_block;
 static object_allocator<hsa_insn_comment> *hsa_allocp_inst_comment;
 static object_allocator<hsa_insn_queue> *hsa_allocp_inst_queue;
+static object_allocator<hsa_insn_packed> *hsa_allocp_inst_packed;
 static object_allocator<hsa_bb> *hsa_allocp_bb;
 
 /* List of pointers to all instructions that come from an object allocator.  */
@@ -360,6 +362,8 @@ hsa_init_data_for_cfun ()
     = new object_allocator<hsa_op_reg> ("HSA register operands");
   hsa_allocp_operand_code_list
     = new object_allocator<hsa_op_code_list> ("HSA code list operands");
+  hsa_allocp_operand_operand_list
+    = new object_allocator<hsa_op_operand_list> ("HSA operand list operands");
   hsa_allocp_inst_basic
     = new object_allocator<hsa_insn_basic> ("HSA basic instructions");
   hsa_allocp_inst_phi
@@ -386,6 +390,8 @@ hsa_init_data_for_cfun ()
     = new object_allocator<hsa_insn_comment> ("HSA comment instructions");
   hsa_allocp_inst_queue
     = new object_allocator<hsa_insn_queue> ("HSA queue instructions");
+  hsa_allocp_inst_packed
+    = new object_allocator<hsa_insn_packed> ("HSA packed instructions");
   hsa_allocp_bb = new object_allocator<hsa_bb> ("HSA basic blocks");
 }
 
@@ -426,6 +432,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_operand_immed;
   delete hsa_allocp_operand_reg;
   delete hsa_allocp_operand_code_list;
+  delete hsa_allocp_operand_operand_list;
   delete hsa_allocp_inst_basic;
   delete hsa_allocp_inst_phi;
   delete hsa_allocp_inst_atomic;
@@ -439,6 +446,7 @@ hsa_deinit_data_for_cfun (void)
   delete hsa_allocp_inst_arg_block;
   delete hsa_allocp_inst_comment;
   delete hsa_allocp_inst_queue;
+  delete hsa_allocp_inst_packed;
   delete hsa_allocp_bb;
   delete hsa_cfun;
 }
@@ -506,6 +514,28 @@ get_integer_type_by_bytes (unsigned size, bool sign)
   return 0;
 }
 
+static BrigType16_t 
+pack_type (const_tree type, BrigType16_t btype, unsigned tsize)
+{
+  switch (tsize)
+    {
+    case 32:
+      btype |= BRIG_TYPE_PACK_32;
+      break;
+    case 64:
+      btype |= BRIG_TYPE_PACK_64;
+      break;
+    case 128:
+      btype |= BRIG_TYPE_PACK_128;
+      break;
+    default:
+      HSA_SORRY_ATV (EXPR_LOCATION (type),
+		     "support for HSA does not implement type %T", type);
+    }
+
+  return btype;
+}
+
 /* Return HSA type for tree TYPE, which has to fit into BrigType16_t.  Pointers
    are assumed to use flat addressing.  If min32int is true, always expand
    integer types to one that has at least 32 bits.  */
@@ -564,7 +594,7 @@ hsa_type_for_scalar_tree_type (const_tree type, bool min32int)
       return res;
     }
 
-  if (TREE_CODE (type) == VECTOR_TYPE || TREE_CODE (type) == COMPLEX_TYPE)
+  if (TREE_CODE (type) == VECTOR_TYPE)
     {
       HOST_WIDE_INT tsize = tree_to_uhwi (TYPE_SIZE (type));
 
@@ -576,21 +606,7 @@ hsa_type_for_scalar_tree_type (const_tree type, bool min32int)
 	  return res;
 	}
 
-      switch (tsize)
-	{
-	case 32:
-	  res |= BRIG_TYPE_PACK_32;
-	  break;
-	case 64:
-	  res |= BRIG_TYPE_PACK_64;
-	  break;
-	case 128:
-	  res |= BRIG_TYPE_PACK_128;
-	  break;
-	default:
-	  HSA_SORRY_ATV (EXPR_LOCATION (type),
-			 "support for HSA does not implement type %T", type);
-	}
+      res = pack_type (type, res, tsize);
     }
 
   if (min32int)
@@ -602,6 +618,13 @@ hsa_type_for_scalar_tree_type (const_tree type, bool min32int)
       else if (res == BRIG_TYPE_S8 || res == BRIG_TYPE_S16)
 	res = BRIG_TYPE_S32;
     }
+
+  if (TREE_CODE (type) == COMPLEX_TYPE)
+    {
+      unsigned bsize = 2 * hsa_type_bit_size (res);
+      res = hsa_bittype_for_bitsize (bsize);
+    }
+
   return res;
 }
 
@@ -1114,6 +1137,26 @@ hsa_op_code_list::operator new (size_t)
   return hsa_allocp_operand_code_list->vallocate ();
 }
 
+/* Constructor of an operand representing an operand list.
+   Set it up so that it can contain ELEMENTS number of elements.  */
+
+hsa_op_operand_list::hsa_op_operand_list (unsigned elements)
+  : hsa_op_base (BRIG_KIND_OPERAND_OPERAND_LIST)
+{
+  m_offsets.create (elements);
+  m_offsets.safe_grow (elements);
+  // TODO: release
+}
+
+/* New operator to allocate operand list operands from pool alloc.  */
+
+void *
+hsa_op_operand_list::operator new (size_t)
+{
+  return hsa_allocp_operand_operand_list->vallocate ();
+}
+
+
 /* Lookup or create a HSA pseudo register for a given gimple SSA name.  */
 
 static hsa_op_reg *
@@ -1403,8 +1446,7 @@ hsa_insn_mem::hsa_insn_mem (int opc, BrigType16_t t, hsa_op_base *arg0,
   : hsa_insn_basic (2, opc, t, arg0, arg1),
   m_align (hsa_natural_alignment (t)), m_equiv_class (0)
 {
-  gcc_checking_assert (opc == BRIG_OPCODE_LD || opc == BRIG_OPCODE_ST
-		       || opc == BRIG_OPCODE_EXPAND);
+  gcc_checking_assert (opc == BRIG_OPCODE_LD || opc == BRIG_OPCODE_ST);
 }
 
 /* Constructor for descendants allowing different opcodes and number of
@@ -1598,6 +1640,28 @@ hsa_insn_comment::~hsa_insn_comment ()
 hsa_insn_queue::hsa_insn_queue (int nops, BrigOpcode opcode)
   : hsa_insn_basic (nops, opcode, BRIG_TYPE_U64)
 {
+}
+
+/* New operator to allocate packed instruction from pool alloc.  */
+
+void *
+hsa_insn_packed::operator new (size_t)
+{
+  hsa_insn_packed *packed = (hsa_insn_packed *)
+    hsa_allocp_inst_packed->vallocate ();
+  hsa_instructions.safe_push (packed);
+  return packed;
+}
+
+/* Constructor of class representing the packed instruction in HSAIL.  */
+hsa_insn_packed::hsa_insn_packed (int nops, BrigOpcode opcode,
+				  BrigType16_t destt, BrigType16_t srct,
+				  hsa_op_base *arg0, hsa_op_base *arg1,
+				  hsa_op_base *arg2)
+  : hsa_insn_basic (nops, opcode, destt, arg0, arg1, arg2),
+  m_source_type (srct)
+{
+  m_operand_list = new hsa_op_operand_list (nops - 1);
 }
 
 /* Append an instruction INSN into the basic block.  */
@@ -2223,22 +2287,24 @@ gen_hsa_insns_for_load (hsa_op_reg *dest, tree rhs, tree type, hsa_bb *hbb,
 	}
       else if (TREE_CODE (rhs) == COMPLEX_CST)
 	{
-	  tree pack_type = TREE_TYPE (rhs);
 	  hsa_op_immed *real_part = new hsa_op_immed (TREE_REALPART (rhs));
 	  hsa_op_immed *imag_part = new hsa_op_immed (TREE_IMAGPART (rhs));
 
 	  hsa_op_reg *real_part_reg = new hsa_op_reg
-	    (hsa_type_for_scalar_tree_type (TREE_TYPE (type), false));
+	    (hsa_type_for_scalar_tree_type (TREE_TYPE (type), true));
 	  hsa_op_reg *imag_part_reg = new hsa_op_reg
-	    (hsa_type_for_scalar_tree_type (TREE_TYPE (type), false));
+	    (hsa_type_for_scalar_tree_type (TREE_TYPE (type), true));
 
 	  hsa_build_append_simple_mov (real_part_reg, real_part, hbb);
 	  hsa_build_append_simple_mov (imag_part_reg, imag_part, hbb);
 
-	  hsa_insn_basic *insn = new hsa_insn_basic
-	    (3, BRIG_OPCODE_COMBINE,
-	     hsa_type_for_scalar_tree_type (pack_type, false), dest,
-	     real_part_reg, imag_part_reg);
+	  unsigned dst_type_length = hsa_type_bit_size (imag_part_reg->m_type);
+	  BrigType16_t packed_type = BRIG_TYPE_B64;
+	  BrigType16_t src_type = hsa_bittype_for_type (real_part_reg->m_type);
+
+	  hsa_insn_packed *insn = new hsa_insn_packed
+	    (3, BRIG_OPCODE_COMBINE, packed_type, src_type, dest, real_part_reg,
+	     imag_part_reg);
 	  hbb->append_insn (insn);
 	}
       else
@@ -2252,22 +2318,23 @@ gen_hsa_insns_for_load (hsa_op_reg *dest, tree rhs, tree type, hsa_bb *hbb,
       tree pack_type = TREE_TYPE (TREE_OPERAND (rhs, 0));
 
       hsa_op_reg *packed_reg = new hsa_op_reg
-	(hsa_type_for_scalar_tree_type (pack_type, false));
+	(hsa_type_for_scalar_tree_type (pack_type, true));
 
       gen_hsa_insns_for_load (packed_reg, TREE_OPERAND (rhs, 0), type, hbb,
 			      ssa_map);
 
       hsa_op_reg *real_reg = new hsa_op_reg
-	(hsa_type_for_scalar_tree_type (type, false));
+	(hsa_type_for_scalar_tree_type (type, true));
 
       hsa_op_reg *imag_reg = new hsa_op_reg
-	(hsa_type_for_scalar_tree_type (type, false));
+	(hsa_type_for_scalar_tree_type (type, true));
 
       BrigKind16_t brig_type = packed_reg->m_type;
-      hsa_insn_basic *expand = new hsa_insn_basic
-	(3, BRIG_OPCODE_EXPAND, brig_type, real_reg, imag_reg, packed_reg);
+      hsa_insn_packed *packed = new hsa_insn_packed
+	(3, BRIG_OPCODE_EXPAND, hsa_bittype_for_type (real_reg->m_type),
+	 brig_type, real_reg, imag_reg, packed_reg);
 
-      hbb->append_insn (expand);
+      hbb->append_insn (packed);
 
       hsa_op_reg *source = TREE_CODE (rhs) == REALPART_EXPR ?
 	real_reg : imag_reg;

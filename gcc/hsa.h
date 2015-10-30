@@ -351,6 +351,35 @@ is_a_helper <hsa_op_code_list *>::test (hsa_op_base *p)
   return p->m_kind == BRIG_KIND_OPERAND_CODE_LIST;
 }
 
+/* Operand list HSA operand.  */
+
+class hsa_op_operand_list: public hsa_op_base
+{
+public:
+  hsa_op_operand_list (unsigned elements);
+  void *operator new (size_t);
+
+  /* Offset to variable-sized array in hsa_data section, where
+     are offsets to entries in the hsa_code section.  */
+  auto_vec<unsigned> m_offsets;
+private:
+  /* Make the default constructor inaccessible.  */
+  hsa_op_operand_list () : hsa_op_base (BRIG_KIND_NONE) {}
+  /* All objects are deallocated by destroying their pool, so make delete
+     inaccessible too.  */
+  void operator delete (void *) {}
+};
+
+/* Report whether or not P is a code list operand.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_op_operand_list *>::test (hsa_op_base *p)
+{
+  return p->m_kind == BRIG_KIND_OPERAND_OPERAND_LIST;
+}
+
 /* Opcodes of instructions that are not part of HSA but that we use to
    represent it nevertheless.  */
 
@@ -828,7 +857,7 @@ public:
   ~hsa_insn_queue ();
 };
 
-/* Report whether or not P is a call block instruction.  */
+/* Report whether or not P is a queue instruction.  */
 
 template <>
 template <>
@@ -837,6 +866,40 @@ is_a_helper <hsa_insn_queue *>::test (hsa_insn_basic *p)
 {
   return (p->m_opcode == BRIG_OPCODE_ADDQUEUEWRITEINDEX);
 }
+
+/* HSA packed instruction.  */
+
+class hsa_insn_packed : public hsa_insn_basic
+{
+public:
+  hsa_insn_packed (int nops, BrigOpcode opcode, BrigType16_t destt,
+		   BrigType16_t srct, hsa_op_base *arg0, hsa_op_base *arg1,
+		   hsa_op_base *arg2);
+
+  /* Pool allocator.  */
+  void *operator new (size_t);
+
+  /* Source type.  */
+  BrigType16_t m_source_type;
+
+  /* Operand list for an operand of the instruction.  */
+  hsa_op_operand_list *m_operand_list;
+
+  /* Destructor.  */
+  ~hsa_insn_packed ();
+};
+
+/* Report whether or not P is a combine instruction.  */
+
+template <>
+template <>
+inline bool
+is_a_helper <hsa_insn_packed *>::test (hsa_insn_basic *p)
+{
+  return (p->m_opcode == BRIG_OPCODE_COMBINE
+	  || p->m_opcode == BRIG_OPCODE_EXPAND);
+}
+
 
 /* Basic block of HSA instructions.  */
 
@@ -1104,6 +1167,7 @@ bool hsa_full_profile_p (void);
 bool hsa_opcode_op_output_p (int, int);
 bool hsa_opcode_floating_bit_insn_p (BrigOpcode16_t);
 unsigned hsa_type_bit_size (BrigType16_t t);
+BrigType16_t hsa_bittype_for_bitsize (unsigned bitsize);
 BrigType16_t hsa_bittype_for_type (BrigType16_t t);
 bool hsa_type_float_p (BrigType16_t type);
 bool hsa_type_integer_p (BrigType16_t type);
