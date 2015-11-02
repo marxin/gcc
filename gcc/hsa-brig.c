@@ -1446,7 +1446,7 @@ emit_switch_insn (hsa_insn_sbr *sbr)
    necessary operands for writing.  */
 
 static void
-emit_cvt_insn (hsa_insn_basic *insn)
+emit_cvt_insn (hsa_insn_cvt *insn)
 {
   struct BrigInstCvt repr;
   BrigType16_t srctype;
@@ -1645,12 +1645,6 @@ emit_basic_insn (hsa_insn_basic *insn)
   struct BrigInstMod repr;
   BrigType16_t type;
 
-  if (insn->m_opcode == BRIG_OPCODE_CVT)
-    {
-      emit_cvt_insn (insn);
-      return;
-    }
-
   memset (&repr, 0, sizeof (repr));
   repr.base.base.byteCount = htole16 (sizeof (BrigInstBasic));
   repr.base.base.kind = htole16 (BRIG_KIND_INST_BASIC);
@@ -1737,6 +1731,8 @@ emit_insn (hsa_insn_basic *insn)
     emit_queue_insn (queue);
   else if (hsa_insn_packed *packed = dyn_cast <hsa_insn_packed *> (insn))
     emit_packed_insn (packed);
+  else if (hsa_insn_cvt *cvt = dyn_cast <hsa_insn_cvt *> (insn))
+    emit_cvt_insn (cvt);
   else
     emit_basic_insn (insn);
 }
