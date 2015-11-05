@@ -1079,7 +1079,7 @@ public:
   vec <struct hsa_symbol *> m_spill_symbols;
 
   /* Vector of pointers to symbols (string constants and global,
-     non-addressable variables with a constructor).  */
+     noni-addressable variables with a constructor).  */
   vec <struct hsa_symbol *> m_readonly_variables;
 
   /* Private function artificial variables.  */
