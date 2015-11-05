@@ -698,7 +698,21 @@ hsa_get_declaration_name (tree decl)
       return ggc_str;
     }
   else if (TREE_CODE (decl) == FUNCTION_DECL)
-    return cgraph_node::get_create (decl)->asm_name ();
+    {
+      cgraph_node *node = cgraph_node::get_create (decl);
+      if (DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
+	{
+	  /* It's quite tricky as asm_name begin either with '__builtin_' or
+	     with '*__' like '*__exp2_finite'.  */
+
+	  const char *name = node->name ();
+	  if (strstr (name, "*__") == NULL
+	      && strstr (name, "__builtin_") == NULL)
+	    return name;
+	}
+
+      return node->asm_name ();
+    }
   else
     return IDENTIFIER_POINTER (DECL_NAME (decl));
 
