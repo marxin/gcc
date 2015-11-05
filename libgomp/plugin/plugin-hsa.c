@@ -132,6 +132,12 @@ struct hsa_kernel_description
   const char **kernel_dependencies;
 };
 
+struct hsa_global_var_description
+{
+  const char *name;
+  const uintptr_t address;
+};
+
 /* Data passed by the static initializer of a compilation unit containing BRIG
    to GOMP_offload_register.  */
 
@@ -140,6 +146,8 @@ struct brig_image_desc
   hsa_ext_module_t brig_module;
   const unsigned kernel_count;
   struct hsa_kernel_description *kernel_infos;
+  const unsigned global_variable_count;
+  struct hsa_global_var_description *global_variables;
 };
 
 struct agent_info;
@@ -182,6 +190,12 @@ struct kernel_info
   unsigned max_omp_data_size;
 };
 
+struct global_var_info
+{
+  const char *name;
+  void *address;
+};
+
 /* Information about a particular brig module, its image and kernels.  */
 
 struct module_info
@@ -193,6 +207,13 @@ struct module_info
 
   /* Number of kernels in this module.  */
   int kernel_count;
+
+  /* Number of global variables in this module.  */
+  int global_variable_count;
+
+  /* Pointer to array with global_var_info describing each variable.  */
+  struct global_var_info *global_variables;
+
   /* An array of kernel_info structures describing each kernel in this
      module.  */
   struct kernel_info kernels[];
@@ -565,6 +586,9 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version  __attribute__ ((unused)),
 				+ kernel_count * sizeof (struct kernel_info));
   module->image_desc = image_desc;
   module->kernel_count = kernel_count;
+  module->global_variable_count = image_desc->global_variable_count;
+  module->global_variables = GOMP_PLUGIN_malloc_cleared
+    (sizeof (struct global_var_info) * module->global_variable_count);
 
   kernel = &module->kernels[0];
 
@@ -587,6 +611,10 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version  __attribute__ ((unused)),
       kernel++;
       pair++;
     }
+
+  /* Copy info about global variables.  */
+  memcpy (module->global_variables, image_desc->global_variables,
+	  sizeof (struct global_var_info) * module->global_variable_count);
 
   add_module_to_agent (agent, module);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))
@@ -667,6 +695,7 @@ create_and_finalize_hsa_program (struct agent_info *agent)
 					   module->image_desc->brig_module);
       if (status != HSA_STATUS_SUCCESS)
 	hsa_fatal ("Could not add a module to the HSA program", status);
+
       module = module->next;
       mi++;
     }
@@ -720,6 +749,27 @@ create_and_finalize_hsa_program (struct agent_info *agent)
 				 "", &agent->executable);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not create HSA executable", status);
+
+  module = agent->first_module;
+  while (module)
+    {
+      /* Initialize all global variables declared in the module.  */
+      for (unsigned i = 0; i < module->global_variable_count; i++)
+	{
+	  struct global_var_info *var = &module->global_variables[i];
+	  status = hsa_executable_global_variable_define
+	    (agent->executable, var->name, var->address);
+
+	  HSA_DEBUG ("Defining global variable: %s, address: %p\n", var->name,
+		     var->address);
+
+	  if (status != HSA_STATUS_SUCCESS)
+	    hsa_fatal ("Could not define a global variable in the HSA program",
+		       status);
+	}
+
+      module = module->next;
+    }
 
   status = hsa_executable_load_code_object(agent->executable, agent->id,
 					   code_object, "");
@@ -1213,6 +1263,7 @@ GOMP_OFFLOAD_unload_image (int n, unsigned version  __attribute__ ((unused)),
 
   remove_module_from_agent (agent, module);
   destroy_module (module);
+  free (module->global_variables);
   free (module);
   destroy_hsa_program (agent);
   if (pthread_rwlock_unlock (&agent->modules_rwlock))
@@ -1237,6 +1288,7 @@ GOMP_OFFLOAD_fini_device (int n)
     {
       struct module_info *module = next_module;
       next_module = module->next;
+      free (module->global_variables);
       destroy_module (module);
       free (module);
     }
