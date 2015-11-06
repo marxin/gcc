@@ -121,7 +121,7 @@ static void dump_dominator_optimization_stats (FILE *file,
 
 /* Free the edge_info data attached to E, if it exists.  */
 
-static void
+void
 free_edge_info (edge e)
 {
   struct edge_info *edge_info = (struct edge_info *)e->aux;

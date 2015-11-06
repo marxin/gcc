@@ -3194,6 +3194,7 @@ noce_convert_multiple_sets (struct noce_if_info *if_info)
     }
 
   num_updated_if_blocks++;
+  targets.release ();
   return TRUE;
 }
 

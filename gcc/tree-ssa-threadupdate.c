@@ -290,7 +290,10 @@ remove_ctrl_stmt_and_useless_edges (basic_block bb, basic_block dest_bb)
   for (ei = ei_start (bb->succs); (e = ei_safe_edge (ei)); )
     {
       if (e->dest != dest_bb)
-	remove_edge (e);
+	{
+	  free_edge_info (e);
+	  remove_edge (e);
+	}
       else
 	ei_next (&ei);
     }
