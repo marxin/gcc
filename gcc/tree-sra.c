@@ -669,6 +669,10 @@ sra_deinitialize (void)
   assign_link_pool.release ();
   obstack_free (&name_obstack, NULL);
 
+  for (hash_map<tree, auto_vec<access_p> >::iterator it =
+       base_access_vec->begin (); it != base_access_vec->end (); ++it)
+    (*it).second.release ();
+
   delete base_access_vec;
 }
 

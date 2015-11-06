@@ -1557,6 +1557,8 @@ lower_try_finally_switch (struct leh_state *state, struct leh_tf_state *tf)
      due to not wanting to process the same goto stmts twice.  */
   gimple_seq_add_stmt (&tf->top_p_seq, switch_stmt);
   gimple_seq_add_seq (&tf->top_p_seq, switch_body);
+
+  case_label_vec.release ();
 }
 
 /* Decide whether or not we are going to duplicate the finally block.
