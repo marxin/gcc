@@ -3076,12 +3076,12 @@ noce_convert_multiple_sets (struct noce_if_info *if_info)
   rtx_code cond_code = GET_CODE (cond);
 
   /* The true targets for a conditional move.  */
-  vec<rtx> targets = vNULL;
+  auto_vec<rtx> targets;
   /* The temporaries introduced to allow us to not consider register
      overlap.  */
-  vec<rtx> temporaries = vNULL;
+  auto_vec<rtx> temporaries;
   /* The insns we've emitted.  */
-  vec<rtx_insn *> unmodified_insns = vNULL;
+  auto_vec<rtx_insn *> unmodified_insns;
   int count = 0;
 
   FOR_BB_INSNS (then_bb, insn)
@@ -3160,6 +3160,8 @@ noce_convert_multiple_sets (struct noce_if_info *if_info)
       set_used_flags (temporaries[i]);
       set_used_flags (targets[i]);
     }
+
+  temporaries.release ();
 
   set_used_flags (cond);
   set_used_flags (x);
