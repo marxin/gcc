@@ -43,5 +43,7 @@ main (int argc, char **argv)
   driver d (false, /* can_finalize */
 	    false); /* debug */
 
-  return d.main (argc, argv);
+  int r = d.main (argc, argv);
+  d.release ();
+  return r;
 }

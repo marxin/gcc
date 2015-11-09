@@ -1881,6 +1881,10 @@ set_spec (const char *name, const char *spec, bool user_p)
     }
 
   old_spec = *(sl->ptr_spec);
+
+  if (sl->ptr_spec == &compiler_version)
+    free (const_cast <char *> (compiler_version));
+
   *(sl->ptr_spec) = ((spec[0] == '+' && ISSPACE ((unsigned char)spec[1]))
 		     ? concat (old_spec, spec + 1, NULL)
 		     : xstrdup (spec));
@@ -2264,6 +2268,7 @@ read_specs (const char *filename, bool main_p, bool user_p)
 	}
       *out = 0;
 
+      bool release_suffix = false;
       if (suffix[0] == '*')
 	{
 	  if (! strcmp (suffix, "*link_command"))
@@ -2273,6 +2278,8 @@ read_specs (const char *filename, bool main_p, bool user_p)
 	      set_spec (suffix + 1, spec, user_p);
 	      free (spec);
 	    }
+
+	  release_suffix = true;
 	}
       else
 	{
@@ -2288,6 +2295,9 @@ read_specs (const char *filename, bool main_p, bool user_p)
 
       if (*suffix == 0)
 	link_command_spec = spec;
+
+      if (release_suffix)
+	free (suffix);
     }
 
   if (link_command_spec == 0)
@@ -2410,12 +2420,28 @@ delete_if_ordinary (const char *name)
 }
 
 static void
+release_temp_file_queue (temp_file *queue)
+{
+  temp_file *next;
+  temp_file *iter = queue;
+
+  while (iter)
+    {
+      next = iter->next;
+      free (const_cast <char *> (iter->name));
+      XDELETE (iter);
+      iter = next;
+    }
+}
+
+static void
 delete_temp_files (void)
 {
   struct temp_file *temp;
 
   for (temp = always_delete_queue; temp; temp = temp->next)
     delete_if_ordinary (temp->name);
+  release_temp_file_queue (always_delete_queue);
   always_delete_queue = 0;
 }
 
@@ -2433,6 +2459,7 @@ delete_failure_queue (void)
 static void
 clear_failure_queue (void)
 {
+  release_temp_file_queue (failure_delete_queue);
   failure_delete_queue = 0;
 }
 
@@ -3999,10 +4026,11 @@ driver_handle_option (struct gcc_options *opts,
 	   GCC in the same directory.  Hence we must check to see
 	   if appending a directory separator actually makes a
 	   valid directory name.  */
+	char *tmp = NULL;
 	if (!IS_DIR_SEPARATOR (arg[len - 1])
 	    && is_directory (arg, false))
 	  {
-	    char *tmp = XNEWVEC (char, len + 2);
+	    tmp = XNEWVEC (char, len + 2);
 	    strcpy (tmp, arg);
 	    tmp[len] = DIR_SEPARATOR;
 	    tmp[++len] = 0;
@@ -4015,6 +4043,8 @@ driver_handle_option (struct gcc_options *opts,
 		    PREFIX_PRIORITY_B_OPT, 0, 0);
 	add_prefix (&include_prefixes, arg, NULL,
 		    PREFIX_PRIORITY_B_OPT, 0, 0);
+
+	free (tmp);
       }
       validated = true;
       break;
@@ -4162,7 +4192,9 @@ process_command (unsigned int decoded_options_count,
 					     standard_bindir_prefix,
 					     standard_libexec_prefix);
       if (gcc_exec_prefix)
-	xputenv (concat ("GCC_EXEC_PREFIX=", gcc_exec_prefix, NULL));
+	{
+	  xputenv (concat ("GCC_EXEC_PREFIX=", gcc_exec_prefix, NULL));
+	}
     }
   else
     {
@@ -4486,12 +4518,13 @@ process_command (unsigned int decoded_options_count,
 	      accel_dir_suffix, dir_separator_str, tooldir_prefix2, NULL);
   free (tooldir_prefix2);
 
-  add_prefix (&exec_prefixes,
-	      concat (tooldir_prefix, "bin", dir_separator_str, NULL),
-	      "BINUTILS", PREFIX_PRIORITY_LAST, 0, 0);
-  add_prefix (&startfile_prefixes,
-	      concat (tooldir_prefix, "lib", dir_separator_str, NULL),
-	      "BINUTILS", PREFIX_PRIORITY_LAST, 0, 1);
+  char *s = concat (tooldir_prefix, "bin", dir_separator_str, NULL);
+  add_prefix (&exec_prefixes, s, "BINUTILS", PREFIX_PRIORITY_LAST, 0, 0);
+  free (s);
+
+  s = concat (tooldir_prefix, "lib", dir_separator_str, NULL);
+  add_prefix (&startfile_prefixes, s, "BINUTILS", PREFIX_PRIORITY_LAST, 0, 1);
+  free (s);
   free (tooldir_prefix);
 
 #if defined(TARGET_SYSTEM_ROOT_RELOCATABLE) && !defined(VMS)
@@ -7337,6 +7370,8 @@ driver::set_up_specs () const
   else
     init_spec ();
 
+  free (specs_file);
+
 #ifdef ACCEL_COMPILER
   spec_machine_suffix = machine_suffix;
 #else
@@ -7447,12 +7482,12 @@ driver::set_up_specs () const
 			      PREFIX_PRIORITY_LAST, 0, 1);
       else if (*cross_compile == '0')
 	{
-	  add_prefix (&startfile_prefixes,
-		      concat (gcc_exec_prefix
-			      ? gcc_exec_prefix : standard_exec_prefix,
-			      machine_suffix,
-			      standard_startfile_prefix, NULL),
-		      NULL, PREFIX_PRIORITY_LAST, 0, 1);
+	  char *s = concat (gcc_exec_prefix
+			    ? gcc_exec_prefix : standard_exec_prefix,
+			    machine_suffix,
+			    standard_startfile_prefix, NULL);
+	  add_prefix (&startfile_prefixes, s, NULL, PREFIX_PRIORITY_LAST, 0, 1);
+	  free (s);
 	}
 
       /* Sysrooted prefixes are relocated because target_system_root is
@@ -7530,9 +7565,14 @@ driver::set_up_specs () const
 
   /* If we have a GCC_EXEC_PREFIX envvar, modify it for cpp's sake.  */
   if (gcc_exec_prefix)
-    gcc_exec_prefix = concat (gcc_exec_prefix, spec_host_machine,
-			      dir_separator_str, spec_version,
-			      accel_dir_suffix, dir_separator_str, NULL);
+    {
+      const char *old_ptr = gcc_exec_prefix;
+      gcc_exec_prefix = concat (gcc_exec_prefix, spec_host_machine,
+				dir_separator_str, spec_version,
+				accel_dir_suffix, dir_separator_str, NULL);
+
+      free (const_cast <char *> (old_ptr));
+    }
 
   /* Now we have the specs.
      Set the `valid' bits for switches that match anything in any spec.  */
@@ -9740,6 +9780,59 @@ path_prefix_reset (path_prefix *prefix)
    from opts.c.
 
    This function also restores any environment variables that were changed.  */
+void
+driver::release ()
+{
+  finalize_options_struct (&global_options);
+  finalize_options_struct (&global_options_set);
+
+  obstack_free (&obstack, NULL);
+  obstack_free (&opts_obstack, NULL); /* in opts.c */
+  obstack_free (&collect_obstack, NULL);
+  obstack_free (&multilib_obstack, NULL);
+
+  /* Within the "compilers" vec, the fields "suffix" and "spec" were
+     statically allocated for the default compilers, but dynamically
+     allocated for additional compilers.  Delete them for the latter. */
+  for (int i = n_default_compilers; i < n_compilers; i++)
+    {
+      free (const_cast <char *> (compilers[i].suffix));
+      free (const_cast <char *> (compilers[i].spec));
+    }
+  XDELETEVEC (compilers);
+
+  linker_options.truncate (0);
+  assembler_options.truncate (0);
+  preprocessor_options.truncate (0);
+
+  path_prefix_reset (&exec_prefixes);
+  path_prefix_reset (&startfile_prefixes);
+  path_prefix_reset (&include_prefixes);
+
+  for (unsigned i = 0; i < ARRAY_SIZE (static_specs); i++)
+    {
+      spec_list *sl = &static_specs[i];
+      if (sl->alloc_p)
+	{
+	  free (const_cast <char *> (*(sl->ptr_spec)));
+	  sl->alloc_p = false;
+	}
+      *(sl->ptr_spec) = sl->default_ptr;
+    }
+
+  for (int i = 0; i < n_switches; i++)
+    free (switches[i].args);
+
+  XDELETEVEC (switches);
+  XDELETEVEC (infiles);
+  XDELETEVEC (outfiles);
+
+  release_temp_file_queue (failure_delete_queue);
+  release_temp_file_queue (always_delete_queue);
+
+  free (const_cast <char *> (gcc_exec_prefix));
+  free (const_cast <char *> (compiler_version));
+}
 
 void
 driver::finalize ()
@@ -9747,6 +9840,8 @@ driver::finalize ()
   env.restore ();
   params_c_finalize ();
   diagnostic_finish (global_dc);
+
+  release ();
 
   is_cpp_driver = 0;
   at_file_supplied = 0;
@@ -9766,39 +9861,13 @@ driver::finalize ()
   spec_machine = DEFAULT_TARGET_MACHINE;
   greatest_status = 1;
 
-  finalize_options_struct (&global_options);
-  finalize_options_struct (&global_options_set);
-
-  obstack_free (&obstack, NULL);
-  obstack_free (&opts_obstack, NULL); /* in opts.c */
-  obstack_free (&collect_obstack, NULL);
-
   link_command_spec = LINK_COMMAND_SPEC;
-
-  obstack_free (&multilib_obstack, NULL);
 
   user_specs_head = NULL;
   user_specs_tail = NULL;
 
-  /* Within the "compilers" vec, the fields "suffix" and "spec" were
-     statically allocated for the default compilers, but dynamically
-     allocated for additional compilers.  Delete them for the latter. */
-  for (int i = n_default_compilers; i < n_compilers; i++)
-    {
-      free (const_cast <char *> (compilers[i].suffix));
-      free (const_cast <char *> (compilers[i].spec));
-    }
-  XDELETEVEC (compilers);
   compilers = NULL;
   n_compilers = 0;
-
-  linker_options.truncate (0);
-  assembler_options.truncate (0);
-  preprocessor_options.truncate (0);
-
-  path_prefix_reset (&exec_prefixes);
-  path_prefix_reset (&startfile_prefixes);
-  path_prefix_reset (&include_prefixes);
 
   machine_suffix = 0;
   just_machine_suffix = 0;
@@ -9811,19 +9880,7 @@ driver::finalize ()
   multilib_os_dir = 0;
   multiarch_dir = 0;
 
-  XDELETEVEC (specs);
   specs = 0;
-  for (unsigned i = 0; i < ARRAY_SIZE (static_specs); i++)
-    {
-      spec_list *sl = &static_specs[i];
-      if (sl->alloc_p)
-	{
-	  if (0)
-	    free (const_cast <char *> (*(sl->ptr_spec)));
-	  sl->alloc_p = false;
-	}
-      *(sl->ptr_spec) = sl->default_ptr;
-    }
 #ifdef EXTRA_SPECS
   extra_specs = NULL;
 #endif
@@ -9844,7 +9901,6 @@ driver::finalize ()
   always_delete_queue = NULL;
   failure_delete_queue = NULL;
 
-  XDELETEVEC (switches);
   switches = NULL;
   n_switches = 0;
   n_switches_alloc = 0;
@@ -9860,14 +9916,12 @@ driver::finalize ()
       debug_check_temp_file[i] = NULL;
     }
 
-  XDELETEVEC (infiles);
   infiles = NULL;
   n_infiles = 0;
   n_infiles_alloc = 0;
 
   combine_inputs = false;
   added_libraries = 0;
-  XDELETEVEC (outfiles);
   outfiles = NULL;
   spec_lang = 0;
   last_language_n_infiles = 0;

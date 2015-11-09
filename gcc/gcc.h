@@ -33,6 +33,7 @@ class driver
   driver (bool can_finalize, bool debug);
   ~driver ();
   int main (int argc, char **argv);
+  void release ();
   void finalize ();
 
  private:
