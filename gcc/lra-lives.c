@@ -1240,6 +1240,7 @@ lra_create_live_ranges_1 (bool all_p, bool dead_insn_p)
   dead_set = sparseset_alloc (max_regno);
   unused_set = sparseset_alloc (max_regno);
   curr_point = 0;
+  point_freq_vec.release ();
   point_freq_vec.create (get_max_uid () * 2);
   lra_point_freq = point_freq_vec.address ();
   int *post_order_rev_cfg = XNEWVEC (int, last_basic_block_for_fn (cfun));
