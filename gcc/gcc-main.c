@@ -43,5 +43,9 @@ main (int argc, char **argv)
   driver d (false, /* can_finalize */
 	    false); /* debug */
 
-  return d.main (argc, argv);
+  int r = d.main (argc, argv);
+#ifdef ENABLE_VALGRIND_ANNOTATIONS
+  d.release ();
+#endif
+  return r;
 }

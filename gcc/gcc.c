@@ -1071,6 +1071,8 @@ static const char *sysroot_suffix_spec = SYSROOT_SUFFIX_SPEC;
 static const char *sysroot_hdrs_suffix_spec = SYSROOT_HEADERS_SUFFIX_SPEC;
 static const char *self_spec = "";
 
+static string_pool *strpool;
+
 /* Standard options to cpp, cc1, and as, to reduce duplication in specs.
    There should be no need to override these in target dependent files,
    but we need to copy them to the specs file so that newer versions
@@ -1526,13 +1528,11 @@ struct spec_list
   struct spec_list *next;	/* Next spec in linked list.  */
   int name_len;			/* length of the name */
   bool user_p;			/* whether string come from file spec.  */
-  bool alloc_p;			/* whether string was allocated */
   const char *default_ptr;	/* The default value of *ptr_spec.  */
 };
 
 #define INIT_STATIC_SPEC(NAME,PTR) \
-  { NAME, NULL, PTR, (struct spec_list *) 0, sizeof (NAME) - 1, false, false, \
-    *PTR }
+  { NAME, NULL, PTR, (struct spec_list *) 0, sizeof (NAME) - 1, false, *PTR }
 
 /* List of statically defined specs.  */
 static struct spec_list static_specs[] =
@@ -1836,6 +1836,7 @@ init_spec (void)
   specs = sl;
 }
 
+
 /* Change the value of spec NAME to SPEC.  If SPEC is empty, then the spec is
    removed; If the spec starts with a + then SPEC is added to the end of the
    current spec.  */
@@ -1873,7 +1874,6 @@ set_spec (const char *name, const char *spec, bool user_p)
       sl->name = xstrdup (name);
       sl->name_len = name_len;
       sl->ptr_spec = &sl->ptr;
-      sl->alloc_p = 0;
       *(sl->ptr_spec) = "";
       sl->next = specs;
       sl->default_ptr = NULL;
@@ -1881,21 +1881,20 @@ set_spec (const char *name, const char *spec, bool user_p)
     }
 
   old_spec = *(sl->ptr_spec);
-  *(sl->ptr_spec) = ((spec[0] == '+' && ISSPACE ((unsigned char)spec[1]))
-		     ? concat (old_spec, spec + 1, NULL)
-		     : xstrdup (spec));
+
+  const char *str = ((spec[0] == '+' && ISSPACE ((unsigned char)spec[1]))
+		    ? concat (old_spec, spec + 1, NULL)
+		    : xstrdup (spec));
+
+  strpool->add (str);
+  *(sl->ptr_spec) = str;
 
 #ifdef DEBUG_SPECS
   if (verbose_flag)
     fnotice (stderr, "Setting spec %s to '%s'\n\n", name, *(sl->ptr_spec));
 #endif
 
-  /* Free the old spec.  */
-  if (old_spec && sl->alloc_p)
-    free (CONST_CAST (char *, old_spec));
-
   sl->user_p = user_p;
-  sl->alloc_p = true;
 }
 
 /* Accumulate a command (program name and args), and run it.  */
@@ -2201,11 +2200,7 @@ read_specs (const char *filename, bool main_p, bool user_p)
 		}
 
 	      set_spec (p2, *(sl->ptr_spec), user_p);
-	      if (sl->alloc_p)
-		free (CONST_CAST (char *, *(sl->ptr_spec)));
-
 	      *(sl->ptr_spec) = "";
-	      sl->alloc_p = 0;
 	      continue;
 	    }
 	  else
@@ -2232,6 +2227,7 @@ read_specs (const char *filename, bool main_p, bool user_p)
 
       /* Copy the suffix to a string.  */
       suffix = save_string (p, p2 - p);
+      strpool->add (suffix);
       /* Find the next line.  */
       p = skip_whitespace (p1 + 1);
       if (p[1] == 0)
@@ -2246,6 +2242,7 @@ read_specs (const char *filename, bool main_p, bool user_p)
 
       /* Specs end at the blank line and do not include the newline.  */
       spec = save_string (p, p1 - p);
+      strpool->add (spec);
       p = p1;
 
       /* Delete backslash-newline sequences from the spec.  */
@@ -2269,10 +2266,7 @@ read_specs (const char *filename, bool main_p, bool user_p)
 	  if (! strcmp (suffix, "*link_command"))
 	    link_command_spec = spec;
 	  else
-	    {
-	      set_spec (suffix + 1, spec, user_p);
-	      free (spec);
-	    }
+	    set_spec (suffix + 1, spec, user_p);
 	}
       else
 	{
@@ -2338,17 +2332,14 @@ static struct temp_file *failure_delete_queue;
 void
 record_temp_file (const char *filename, int always_delete, int fail_delete)
 {
-  char *const name = xstrdup (filename);
+  char *const name = strpool->dup (filename);
 
   if (always_delete)
     {
       struct temp_file *temp;
       for (temp = always_delete_queue; temp; temp = temp->next)
 	if (! filename_cmp (name, temp->name))
-	  {
-	    free (name);
-	    goto already1;
-	  }
+	  goto already1;
 
       temp = XNEW (struct temp_file);
       temp->next = always_delete_queue;
@@ -2363,10 +2354,7 @@ record_temp_file (const char *filename, int always_delete, int fail_delete)
       struct temp_file *temp;
       for (temp = failure_delete_queue; temp; temp = temp->next)
 	if (! filename_cmp (name, temp->name))
-	  {
-	    free (name);
-	    goto already2;
-	  }
+	  goto already2;
 
       temp = XNEW (struct temp_file);
       temp->next = failure_delete_queue;
@@ -2410,12 +2398,27 @@ delete_if_ordinary (const char *name)
 }
 
 static void
+release_temp_file_queue (temp_file *queue)
+{
+  temp_file *next;
+  temp_file *iter = queue;
+
+  while (iter)
+    {
+      next = iter->next;
+      XDELETE (iter);
+      iter = next;
+    }
+}
+
+static void
 delete_temp_files (void)
 {
   struct temp_file *temp;
 
   for (temp = always_delete_queue; temp; temp = temp->next)
     delete_if_ordinary (temp->name);
+  release_temp_file_queue (always_delete_queue);
   always_delete_queue = 0;
 }
 
@@ -2433,6 +2436,7 @@ delete_failure_queue (void)
 static void
 clear_failure_queue (void)
 {
+  release_temp_file_queue (failure_delete_queue);
   failure_delete_queue = 0;
 }
 
@@ -2471,14 +2475,14 @@ for_each_path (const struct path_prefix *paths,
   just_multi_suffix = just_machine_suffix;
   if (do_multi && multilib_dir && strcmp (multilib_dir, ".") != 0)
     {
-      multi_dir = concat (multilib_dir, dir_separator_str, NULL);
-      multi_suffix = concat (multi_suffix, multi_dir, NULL);
-      just_multi_suffix = concat (just_multi_suffix, multi_dir, NULL);
+      multi_dir = strpool->cat (multilib_dir, dir_separator_str);
+      multi_suffix = strpool->cat (multi_suffix, multi_dir);
+      just_multi_suffix = strpool->cat (just_multi_suffix, multi_dir);
     }
   if (do_multi && multilib_os_dir && strcmp (multilib_os_dir, ".") != 0)
-    multi_os_dir = concat (multilib_os_dir, dir_separator_str, NULL);
+    multi_os_dir = strpool->cat (multilib_os_dir, dir_separator_str);
   if (multiarch_dir)
-    multiarch_suffix = concat (multiarch_dir, dir_separator_str, NULL);
+    multiarch_suffix = strpool->cat (multiarch_dir, dir_separator_str);
 
   while (1)
     {
@@ -2502,7 +2506,7 @@ for_each_path (const struct path_prefix *paths,
 	{
 	  len = paths->max_len + extra_space + 1;
 	  len += MAX (MAX (suffix_len, multi_os_dir_len), multiarch_len);
-	  path = XNEWVEC (char, len);
+	  path = strpool->allocate (len);
 	}
 
       for (pl = paths->plist; pl != 0; pl = pl->next)
@@ -2578,34 +2582,18 @@ for_each_path (const struct path_prefix *paths,
 	 Don't repeat any we have already seen.  */
       if (multi_dir)
 	{
-	  free (CONST_CAST (char *, multi_dir));
 	  multi_dir = NULL;
-	  free (CONST_CAST (char *, multi_suffix));
 	  multi_suffix = machine_suffix;
-	  free (CONST_CAST (char *, just_multi_suffix));
 	  just_multi_suffix = just_machine_suffix;
 	}
       else
 	skip_multi_dir = true;
       if (multi_os_dir)
-	{
-	  free (CONST_CAST (char *, multi_os_dir));
-	  multi_os_dir = NULL;
-	}
+	multi_os_dir = NULL;
       else
 	skip_multi_os_dir = true;
     }
 
-  if (multi_dir)
-    {
-      free (CONST_CAST (char *, multi_dir));
-      free (CONST_CAST (char *, multi_suffix));
-      free (CONST_CAST (char *, just_multi_suffix));
-    }
-  if (multi_os_dir)
-    free (CONST_CAST (char *, multi_os_dir));
-  if (ret != path)
-    free (path);
   return ret;
 }
 
@@ -2815,6 +2803,7 @@ add_prefix (struct path_prefix *pprefix, const char *prefix,
   /* Keep track of the longest prefix.  */
 
   prefix = update_path (prefix, component);
+  strpool->add (prefix);
   len = strlen (prefix);
   if (len > pprefix->max_len)
     pprefix->max_len = len;
@@ -3193,9 +3182,6 @@ execute (void)
 	      }
 	  }
       }
-
-   if (commands[0].argv[0] != commands[0].prog)
-     free (CONST_CAST (char *, commands[0].argv[0]));
 
     return ret_code;
   }
@@ -3614,8 +3600,7 @@ handle_foffload_option (const char *arg)
          the list of offload targets.  */
       if (strcmp (target, "disable") == 0)
 	{
-	  free (offload_targets);
-	  offload_targets = xstrdup ("");
+	  offload_targets = strpool->dup ("");
 	  break;
 	}
 
@@ -3906,19 +3891,19 @@ driver_handle_option (struct gcc_options *opts,
     case OPT_l:
       /* POSIX allows separation of -l and the lib arg; canonicalize
 	 by concatenating -l with its arg */
-      add_infile (concat ("-l", arg, NULL), "*");
+      add_infile (strpool->cat ("-l", arg, NULL), "*");
       do_save = false;
       break;
 
     case OPT_L:
       /* Similarly, canonicalize -L for linkers that may not accept
 	 separate arguments.  */
-      save_switch (concat ("-L", arg, NULL), 0, NULL, validated, true);
+      save_switch (strpool->cat ("-L", arg, NULL), 0, NULL, validated, true);
       return true;
 
     case OPT_F:
       /* Likewise -F.  */
-      save_switch (concat ("-F", arg, NULL), 0, NULL, validated, true);
+      save_switch (strpool->cat ("-F", arg, NULL), 0, NULL, validated, true);
       return true;
 
     case OPT_save_temps:
@@ -3999,10 +3984,11 @@ driver_handle_option (struct gcc_options *opts,
 	   GCC in the same directory.  Hence we must check to see
 	   if appending a directory separator actually makes a
 	   valid directory name.  */
+	char *tmp = NULL;
 	if (!IS_DIR_SEPARATOR (arg[len - 1])
 	    && is_directory (arg, false))
 	  {
-	    char *tmp = XNEWVEC (char, len + 2);
+	    tmp = XNEWVEC (char, len + 2);
 	    strcpy (tmp, arg);
 	    tmp[len] = DIR_SEPARATOR;
 	    tmp[++len] = 0;
@@ -4015,6 +4001,8 @@ driver_handle_option (struct gcc_options *opts,
 		    PREFIX_PRIORITY_B_OPT, 0, 0);
 	add_prefix (&include_prefixes, arg, NULL,
 		    PREFIX_PRIORITY_B_OPT, 0, 0);
+
+	free (tmp);
       }
       validated = true;
       break;
@@ -4038,7 +4026,7 @@ driver_handle_option (struct gcc_options *opts,
 #endif
       output_file = arg;
       /* Save the output name in case -save-temps=obj was used.  */
-      save_temps_prefix = xstrdup (arg);
+      save_temps_prefix = strpool->dup (arg);
       /* On some systems, ld cannot handle "-o" without a space.  So
 	 split the option from its argument.  */
       save_switch ("-o", 1, &arg, validated, true);
@@ -4120,7 +4108,7 @@ process_command (unsigned int decoded_options_count,
 
   /* Figure compiler version from version string.  */
 
-  compiler_version = temp1 = xstrdup (version_string);
+  compiler_version = temp1 = strpool->dup (version_string);
 
   for (; *temp1; ++temp1)
     {
@@ -4158,11 +4146,17 @@ process_command (unsigned int decoded_options_count,
       gcc_exec_prefix = get_relative_prefix (decoded_options[0].arg,
 					     standard_bindir_prefix,
 					     standard_exec_prefix);
+      strpool->add (gcc_exec_prefix);
       gcc_libexec_prefix = get_relative_prefix (decoded_options[0].arg,
 					     standard_bindir_prefix,
 					     standard_libexec_prefix);
+      strpool->add (gcc_libexec_prefix);
       if (gcc_exec_prefix)
-	xputenv (concat ("GCC_EXEC_PREFIX=", gcc_exec_prefix, NULL));
+	{
+	  const char *env = strpool->cat ("GCC_EXEC_PREFIX=", gcc_exec_prefix,
+					  NULL);
+	  xputenv (env);
+	}
     }
   else
     {
@@ -4357,26 +4351,22 @@ process_command (unsigned int decoded_options_count,
 	      && sscanf (p, "@%li%n", &offset, &consumed) >= 1
 	      && strlen (p) == (unsigned int)consumed)
 	    {
-              fname = (char *)xmalloc (p - arg + 1);
+              fname = strpool->allocate (p - arg + 1);
               memcpy (fname, arg, p - arg);
               fname[p - arg] = '\0';
 	      /* Only accept non-stdin and existing FNAME parts, otherwise
 		 try with the full name.  */
 	      if (strcmp (fname, "-") == 0 || access (fname, F_OK) < 0)
-		{
-		  free (fname);
-		  fname = xstrdup (arg);
-		}
+		fname = strpool->dup (arg);
 	    }
 	  else
-	    fname = xstrdup (arg);
+	    fname = strpool->dup (arg);
 
           if (strcmp (fname, "-") != 0 && access (fname, F_OK) < 0)
 	    perror_with_name (fname);
           else
 	    add_infile (arg, spec_lang);
 
-          free (fname);
 	  continue;
 	}
 
@@ -4419,10 +4409,7 @@ process_command (unsigned int decoded_options_count,
 
     }
   else if (save_temps_prefix != NULL)
-    {
-      free (save_temps_prefix);
-      save_temps_prefix = NULL;
-    }
+    save_temps_prefix = NULL;
 
   if (save_temps_flag && use_pipes)
     {
@@ -4486,12 +4473,13 @@ process_command (unsigned int decoded_options_count,
 	      accel_dir_suffix, dir_separator_str, tooldir_prefix2, NULL);
   free (tooldir_prefix2);
 
-  add_prefix (&exec_prefixes,
-	      concat (tooldir_prefix, "bin", dir_separator_str, NULL),
-	      "BINUTILS", PREFIX_PRIORITY_LAST, 0, 0);
-  add_prefix (&startfile_prefixes,
-	      concat (tooldir_prefix, "lib", dir_separator_str, NULL),
-	      "BINUTILS", PREFIX_PRIORITY_LAST, 0, 1);
+  char *s = concat (tooldir_prefix, "bin", dir_separator_str, NULL);
+  add_prefix (&exec_prefixes, s, "BINUTILS", PREFIX_PRIORITY_LAST, 0, 0);
+  free (s);
+
+  s = concat (tooldir_prefix, "lib", dir_separator_str, NULL);
+  add_prefix (&startfile_prefixes, s, "BINUTILS", PREFIX_PRIORITY_LAST, 0, 1);
+  free (s);
   free (tooldir_prefix);
 
 #if defined(TARGET_SYSTEM_ROOT_RELOCATABLE) && !defined(VMS)
@@ -5283,7 +5271,7 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 
 		if (compare_debug < 0)
 		  {
-		    suffix = concat (".gk", suffix, NULL);
+		    suffix = strpool->cat (".gk", suffix, NULL);
 		    suffix_length += 3;
 		  }
 
@@ -7123,6 +7111,8 @@ driver::main (int argc, char **argv)
 {
   bool early_exit;
 
+  strpool = new string_pool ();
+
   set_progname (argv[0]);
   expand_at_files (&argc, &argv);
   decode_argv (argc, const_cast <const char **> (argv));
@@ -7447,12 +7437,12 @@ driver::set_up_specs () const
 			      PREFIX_PRIORITY_LAST, 0, 1);
       else if (*cross_compile == '0')
 	{
-	  add_prefix (&startfile_prefixes,
-		      concat (gcc_exec_prefix
-			      ? gcc_exec_prefix : standard_exec_prefix,
-			      machine_suffix,
-			      standard_startfile_prefix, NULL),
-		      NULL, PREFIX_PRIORITY_LAST, 0, 1);
+	  char *s = concat (gcc_exec_prefix
+			    ? gcc_exec_prefix : standard_exec_prefix,
+			    machine_suffix,
+			    standard_startfile_prefix, NULL);
+	  add_prefix (&startfile_prefixes, s, NULL, PREFIX_PRIORITY_LAST, 0, 1);
+	  free (s);
 	}
 
       /* Sysrooted prefixes are relocated because target_system_root is
@@ -7530,9 +7520,11 @@ driver::set_up_specs () const
 
   /* If we have a GCC_EXEC_PREFIX envvar, modify it for cpp's sake.  */
   if (gcc_exec_prefix)
-    gcc_exec_prefix = concat (gcc_exec_prefix, spec_host_machine,
-			      dir_separator_str, spec_version,
-			      accel_dir_suffix, dir_separator_str, NULL);
+    {
+      gcc_exec_prefix = strpool->cat
+	(gcc_exec_prefix, spec_host_machine, dir_separator_str, spec_version,
+	 accel_dir_suffix, dir_separator_str);
+    }
 
   /* Now we have the specs.
      Set the `valid' bits for switches that match anything in any spec.  */
@@ -7554,7 +7546,8 @@ driver::putenv_COLLECT_GCC (const char *argv0) const
   obstack_init (&collect_obstack);
   obstack_grow (&collect_obstack, "COLLECT_GCC=", sizeof ("COLLECT_GCC=") - 1);
   obstack_grow (&collect_obstack, argv0, strlen (argv0) + 1);
-  xputenv (XOBFINISH (&collect_obstack, char *));
+  char *env = XOBFINISH (&collect_obstack, char *);
+  xputenv (env);
 }
 
 /* Set up to remember the pathname of the lto wrapper. */
@@ -7573,7 +7566,6 @@ driver::maybe_putenv_COLLECT_LTO_WRAPPER () const
     {
       lto_wrapper_file = convert_white_space (lto_wrapper_file);
       lto_wrapper_spec = lto_wrapper_file;
-      obstack_init (&collect_obstack);
       obstack_grow (&collect_obstack, "COLLECT_LTO_WRAPPER=",
 		    sizeof ("COLLECT_LTO_WRAPPER=") - 1);
       obstack_grow (&collect_obstack, lto_wrapper_spec,
@@ -9459,7 +9451,7 @@ compare_debug_dump_opt_spec_function (int arg,
   if (*random_seed)
     {
       char *tmp = ret;
-      ret = concat ("%{!frandom-seed=*:-frandom-seed=", random_seed, "} ",
+      ret = strpool->cat ("%{!frandom-seed=*:-frandom-seed=", random_seed, "} ",
 		    ret, NULL);
       free (tmp);
     }
@@ -9497,7 +9489,7 @@ compare_debug_self_opt_spec_function (int arg,
   else
     debug_auxbase_opt = NULL;
 
-  return concat ("\
+  return strpool->cat ("\
 %<o %<MD %<MMD %<MF* %<MG %<MP %<MQ* %<MT* \
 %<fdump-final-insns=* -w -S -o %j \
 %{!fcompare-debug-second:-fcompare-debug-second} \
@@ -9556,14 +9548,13 @@ compare_debug_auxbase_opt_spec_function (int arg,
 const char *
 pass_through_libs_spec_func (int argc, const char **argv)
 {
-  char *prepended = xstrdup (" ");
+  char *prepended = strpool->dup (" ");
   int n;
   /* Shlemiel the painter's algorithm.  Innately horrible, but at least
      we know that there will never be more than a handful of strings to
      concat, and it's only once per run, so it's not worth optimising.  */
   for (n = 0; n < argc; n++)
     {
-      char *old = prepended;
       /* Anything that isn't an option is a full path to an output
          file; pass it through if it ends in '.a'.  Among options,
 	 pass only -l.  */
@@ -9577,16 +9568,12 @@ pass_through_libs_spec_func (int argc, const char **argv)
 	    break;
 	  else if (!*lopt)
 	    lopt = argv[n];
-	  prepended = concat (prepended, "-plugin-opt=-pass-through=-l",
+	  prepended = strpool->cat (prepended, "-plugin-opt=-pass-through=-l",
 		lopt, " ", NULL);
 	}
       else if (!strcmp (".a", argv[n] + strlen (argv[n]) - 2))
-	{
-	  prepended = concat (prepended, "-plugin-opt=-pass-through=",
-		argv[n], " ", NULL);
-	}
-      if (prepended != old)
-	free (old);
+	prepended = strpool->cat (prepended, "-plugin-opt=-pass-through=",
+	      argv[n], " ", NULL);
     }
   return prepended;
 }
@@ -9718,7 +9705,6 @@ path_prefix_reset (path_prefix *prefix)
   while (iter)
     {
       next = iter->next;
-      free (const_cast <char *> (iter->prefix));
       XDELETE (iter);
       iter = next;
     }
@@ -9740,6 +9726,46 @@ path_prefix_reset (path_prefix *prefix)
    from opts.c.
 
    This function also restores any environment variables that were changed.  */
+void
+driver::release ()
+{
+  finalize_options_struct (&global_options);
+  finalize_options_struct (&global_options_set);
+
+  obstack_free (&obstack, NULL);
+  obstack_free (&opts_obstack, NULL); /* in opts.c */
+  obstack_free (&collect_obstack, NULL);
+  obstack_free (&multilib_obstack, NULL);
+
+  XDELETEVEC (compilers);
+
+  linker_options.truncate (0);
+  assembler_options.truncate (0);
+  preprocessor_options.truncate (0);
+
+  path_prefix_reset (&exec_prefixes);
+  path_prefix_reset (&startfile_prefixes);
+  path_prefix_reset (&include_prefixes);
+
+  for (unsigned i = 0; i < ARRAY_SIZE (static_specs); i++)
+    {
+      spec_list *sl = &static_specs[i];
+      *(sl->ptr_spec) = sl->default_ptr;
+    }
+
+  for (int i = 0; i < n_switches; i++)
+    free (switches[i].args);
+
+  XDELETEVEC (switches);
+  XDELETEVEC (infiles);
+  XDELETEVEC (outfiles);
+
+  release_temp_file_queue (failure_delete_queue);
+  release_temp_file_queue (always_delete_queue);
+
+  delete strpool;
+  strpool = NULL;
+}
 
 void
 driver::finalize ()
@@ -9747,6 +9773,8 @@ driver::finalize ()
   env.restore ();
   params_c_finalize ();
   diagnostic_finish (global_dc);
+
+  release ();
 
   is_cpp_driver = 0;
   at_file_supplied = 0;
@@ -9766,39 +9794,13 @@ driver::finalize ()
   spec_machine = DEFAULT_TARGET_MACHINE;
   greatest_status = 1;
 
-  finalize_options_struct (&global_options);
-  finalize_options_struct (&global_options_set);
-
-  obstack_free (&obstack, NULL);
-  obstack_free (&opts_obstack, NULL); /* in opts.c */
-  obstack_free (&collect_obstack, NULL);
-
   link_command_spec = LINK_COMMAND_SPEC;
-
-  obstack_free (&multilib_obstack, NULL);
 
   user_specs_head = NULL;
   user_specs_tail = NULL;
 
-  /* Within the "compilers" vec, the fields "suffix" and "spec" were
-     statically allocated for the default compilers, but dynamically
-     allocated for additional compilers.  Delete them for the latter. */
-  for (int i = n_default_compilers; i < n_compilers; i++)
-    {
-      free (const_cast <char *> (compilers[i].suffix));
-      free (const_cast <char *> (compilers[i].spec));
-    }
-  XDELETEVEC (compilers);
   compilers = NULL;
   n_compilers = 0;
-
-  linker_options.truncate (0);
-  assembler_options.truncate (0);
-  preprocessor_options.truncate (0);
-
-  path_prefix_reset (&exec_prefixes);
-  path_prefix_reset (&startfile_prefixes);
-  path_prefix_reset (&include_prefixes);
 
   machine_suffix = 0;
   just_machine_suffix = 0;
@@ -9811,19 +9813,7 @@ driver::finalize ()
   multilib_os_dir = 0;
   multiarch_dir = 0;
 
-  XDELETEVEC (specs);
   specs = 0;
-  for (unsigned i = 0; i < ARRAY_SIZE (static_specs); i++)
-    {
-      spec_list *sl = &static_specs[i];
-      if (sl->alloc_p)
-	{
-	  if (0)
-	    free (const_cast <char *> (*(sl->ptr_spec)));
-	  sl->alloc_p = false;
-	}
-      *(sl->ptr_spec) = sl->default_ptr;
-    }
 #ifdef EXTRA_SPECS
   extra_specs = NULL;
 #endif
@@ -9844,7 +9834,6 @@ driver::finalize ()
   always_delete_queue = NULL;
   failure_delete_queue = NULL;
 
-  XDELETEVEC (switches);
   switches = NULL;
   n_switches = 0;
   n_switches_alloc = 0;
@@ -9860,14 +9849,12 @@ driver::finalize ()
       debug_check_temp_file[i] = NULL;
     }
 
-  XDELETEVEC (infiles);
   infiles = NULL;
   n_infiles = 0;
   n_infiles_alloc = 0;
 
   combine_inputs = false;
   added_libraries = 0;
-  XDELETEVEC (outfiles);
   outfiles = NULL;
   spec_lang = 0;
   last_language_n_infiles = 0;
