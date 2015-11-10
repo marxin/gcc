@@ -23,6 +23,57 @@ along with GCC; see the file COPYING3.  If not see
 #include "version.h"
 #include "diagnostic-core.h"
 
+class string_pool
+{
+public:
+  string_pool (): m_items (8) {}
+
+  ~string_pool ()
+  {
+    for (hash_set <const char *>::iterator it = m_items.begin ();
+	 it != m_items.end (); ++it)
+      free (const_cast <char *> (*it));
+  }
+
+  inline char *allocate (size_t size)
+  {
+    char *ptr = XNEWVEC (char, size);
+    add (ptr);
+    return ptr;
+  }
+
+  inline void add (const char *ptr)
+  {
+    if (ptr == NULL)
+      return;
+
+    gcc_assert (!m_items.contains (ptr));
+
+    m_items.add (ptr);
+  }
+
+  char *dup (const char *s)
+  {
+    size_t l = strlen (s);
+    char *ptr = allocate (l + 1);
+    memcpy (ptr, s, l + 1);
+    return ptr;
+  }
+
+  char *cat (const char *str0, const char *str1, const char *str2 = NULL,
+	     const char *str3 = NULL, const char *str4 = NULL,
+	     const char *str5 = NULL)
+  {
+    char *ptr = concat (str0, str1, str2, str3, str4, str5, NULL);
+    add (ptr);
+
+    return ptr;
+  }
+
+private:
+  hash_set <const char *> m_items;
+};
+
 /* The top-level "main" within the driver would be ~1000 lines long.
    This class breaks it up into smaller functions and contains some
    state shared by them.  */
@@ -33,6 +84,7 @@ class driver
   driver (bool can_finalize, bool debug);
   ~driver ();
   int main (int argc, char **argv);
+  void release ();
   void finalize ();
 
  private:

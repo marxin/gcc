@@ -1030,6 +1030,8 @@ handle_toplevel_file (directive_handler_t handle_directive)
     base_dir = xstrndup (in_fname, base - in_fname);
 
   handle_file (handle_directive);
+
+  free (base_dir);
 }
 
 /* Parse a -I option with argument ARG.  */

@@ -251,6 +251,8 @@ emit_documentation (const char *in_fname)
 		  printf ("\n@%sx {%s} {%s} %s",
 			  deftype, hook_array[j].docname,
 			  hook_array[j].type, namex);
+
+		  free (namex);
 		}
 	      if (hook_array[i].doc[0])
 		{
