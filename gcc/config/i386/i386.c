@@ -6172,9 +6172,7 @@ ix86_valid_target_attribute_tree (tree args,
       opts->x_ix86_tune_string = orig_tune_string;
       opts_set->x_ix86_fpmath = orig_fpmath_set;
 
-      /* Free up memory allocated to hold the strings */
-      for (i = 0; i < IX86_FUNCTION_SPECIFIC_MAX; i++)
-	free (option_strings[i]);
+      /* TODO: Free up memory allocated to hold the strings.  */
     }
 
   return t;
