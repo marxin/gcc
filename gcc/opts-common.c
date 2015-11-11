@@ -706,6 +706,7 @@ decode_cmdline_option (const char **argv, unsigned int lang_mask,
 /* Obstack for option strings.  */
 
 struct obstack opts_obstack;
+bool opts_obstack_initialized = false;
 
 /* Like libiberty concat, but allocate using opts_obstack.  */
 
