@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa.h"
 #include "params.h"
 #include "tree-cfg.h"
+#include "alloc-pool.h"
 
 /* This implements the pass that does predicate aware warning on uses of
    possibly uninitialized variables. The pass first collects the set of
@@ -490,10 +491,23 @@ struct pred_info
 
 typedef vec<pred_info, va_heap, vl_ptr> pred_chain;
 
+static object_allocator <pred_chain> pred_chain_pool ("Predicat chain");
+
+/* Allocate and create a predicate chain.  */
+
+static pred_chain *
+create_pred_chain ()
+{
+  pred_chain *pc = pred_chain_pool.allocate ();
+  pc->create (0);
+
+  return pc;
+}
+
 /* The type to represent a sequence of pred_chains grouped
   with .OR. operation.  */
 
-typedef vec<pred_chain, va_heap, vl_ptr> pred_chain_union;
+typedef vec<pred_chain *, va_heap, vl_ptr> pred_chain_union;
 
 /* Converts the chains of control dependence edges into a set of
    predicates. A control dependence chain is represented by a vector
@@ -525,7 +539,7 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
       vec<edge> one_cd_chain = dep_chains[i];
 
       has_valid_pred = false;
-      pred_chain t_chain = vNULL;
+      pred_chain *t_chain = create_pred_chain ();
       for (j = 0; j < one_cd_chain.length (); j++)
         {
 	  gimple *cond_stmt;
@@ -574,7 +588,7 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
 	      one_pred.pred_rhs = gimple_cond_rhs (cond_stmt);
 	      one_pred.cond_code = gimple_cond_code (cond_stmt);
 	      one_pred.invert = !!(e->flags & EDGE_FALSE_VALUE);
-	      t_chain.safe_push (one_pred);
+	      t_chain->safe_push (one_pred);
 	      has_valid_pred = true;
 	    }
 	  else if (gswitch *gs = dyn_cast <gswitch *> (cond_stmt))
@@ -603,7 +617,7 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
 		    }
 		}
 	      /* If more than one label reaches this block or the case
-	         label doesn't have a single value (like the default one)
+		 label doesn't have a single value (like the default one)
 		 fail.  */
 	      if (!l
 		  || !CASE_LOW (l)
@@ -617,20 +631,20 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
 	      one_pred.pred_rhs = CASE_LOW (l);
 	      one_pred.cond_code = EQ_EXPR;
 	      one_pred.invert = false;
-	      t_chain.safe_push (one_pred);
+	      t_chain->safe_push (one_pred);
 	      has_valid_pred = true;
 	    }
 	  else
-            {
-              has_valid_pred = false;
-              break;
-            }
-        }
+	    {
+	      has_valid_pred = false;
+	      break;
+	    }
+	}
 
       if (!has_valid_pred)
-        break;
+	break;
       else
-        preds->safe_push (t_chain);
+	preds->safe_push (t_chain);
     }
   return has_valid_pred;
 }
@@ -739,7 +753,7 @@ find_def_preds (pred_chain_union *preds, gphi *phi)
   size_t num_chains = 0, i, n;
   vec<edge> dep_chains[MAX_NUM_CHAINS];
   auto_vec<edge, MAX_CHAIN_LEN + 1> cur_chain;
-  vec<edge> def_edges = vNULL;
+  auto_vec<edge> def_edges;
   bool has_valid_pred = false;
   basic_block phi_bb, cd_root = 0;
 
@@ -789,26 +803,26 @@ find_def_preds (pred_chain_union *preds, gphi *phi)
 /* Dumps the predicates (PREDS) for USESTMT.  */
 
 static void
-dump_predicates (gimple *usestmt, pred_chain_union preds,
+dump_predicates (gimple *usestmt, pred_chain_union *preds,
                  const char* msg)
 {
   size_t i, j;
-  pred_chain one_pred_chain = vNULL;
+  pred_chain *one_pred_chain;
   fprintf (dump_file, "%s", msg);
   print_gimple_stmt (dump_file, usestmt, 0, 0);
   fprintf (dump_file, "is guarded by :\n\n");
-  size_t num_preds = preds.length ();
+  size_t num_preds = preds->length ();
   /* Do some dumping here:  */
   for (i = 0; i < num_preds; i++)
     {
       size_t np;
 
-      one_pred_chain = preds[i];
-      np = one_pred_chain.length ();
+      one_pred_chain = (*preds)[i];
+      np = one_pred_chain->length ();
 
       for (j = 0; j < np; j++)
         {
-          pred_info one_pred = one_pred_chain[j];
+          pred_info one_pred = (*one_pred_chain)[j];
           if (one_pred.invert)
             fprintf (dump_file, " (.NOT.) ");
           print_generic_expr (dump_file, one_pred.pred_lhs, 0);
@@ -831,11 +845,6 @@ dump_predicates (gimple *usestmt, pred_chain_union preds,
 static void
 destroy_predicate_vecs (pred_chain_union preds)
 {
-  size_t i;
-
-  size_t n = preds.length ();
-  for (i = 0; i < n; i++)
-    preds[i].release ();
   preds.release ();
 }
 
@@ -943,11 +952,11 @@ find_matching_predicate_in_rest_chains (pred_info pred,
   for (i = 1; i < num_pred_chains; i++)
     {
       bool found = false;
-      pred_chain one_chain = preds[i];
-      n = one_chain.length ();
+      pred_chain *one_chain = preds[i];
+      n = one_chain->length ();
       for (j = 0; j < n; j++)
         {
-          pred_info pred2 = one_chain[j];
+          pred_info pred2 = (*one_chain)[j];
           /* Can relax the condition comparison to not
              use address comparison. However, the most common
              case is that multiple control dependent paths share
@@ -1200,7 +1209,7 @@ use_pred_not_overlap_with_undef_path_pred (pred_chain_union preds,
   enum tree_code cmp_code;
   bool swap_cond = false;
   bool invert = false;
-  pred_chain the_pred_chain = vNULL;
+  pred_chain *the_pred_chain;
   bitmap visited_flag_phis = NULL;
   bool all_pruned = false;
   size_t num_preds = preds.length ();
@@ -1210,12 +1219,12 @@ use_pred_not_overlap_with_undef_path_pred (pred_chain_union preds,
      a predicate that is a comparison of a flag variable against
      a constant.  */
   the_pred_chain = preds[0];
-  n = the_pred_chain.length ();
+  n = the_pred_chain->length ();
   for (i = 0; i < n; i++)
     {
       tree cond_lhs, cond_rhs, flag = 0;
 
-      pred_info the_pred = the_pred_chain[i];
+      pred_info the_pred = (*the_pred_chain)[i];
 
       invert = the_pred.invert;
       cond_lhs = the_pred.pred_lhs;
@@ -1376,29 +1385,29 @@ is_pred_expr_subset_of (pred_info expr1, pred_info expr2)
    of that of PRED2. Returns false if it can not be proved so.  */
 
 static bool
-is_pred_chain_subset_of (pred_chain pred1,
-                         pred_chain pred2)
+is_pred_chain_subset_of (pred_chain *pred1,
+			 pred_chain *pred2)
 {
   size_t np1, np2, i1, i2;
 
-  np1 = pred1.length ();
-  np2 = pred2.length ();
+  np1 = pred1->length ();
+  np2 = pred2->length ();
 
   for (i2 = 0; i2 < np2; i2++)
     {
       bool found = false;
-      pred_info info2 = pred2[i2];
+      pred_info info2 = (*pred2)[i2];
       for (i1 = 0; i1 < np1; i1++)
-        {
-          pred_info info1 = pred1[i1];
-          if (is_pred_expr_subset_of (info1, info2))
-            {
-              found = true;
-              break;
-            }
-        }
+	{
+	  pred_info info1 = (*pred1)[i1];
+	  if (is_pred_expr_subset_of (info1, info2))
+	    {
+	      found = true;
+	      break;
+	    }
+	}
       if (!found)
-        return false;
+	return false;
     }
   return true;
 }
@@ -1413,7 +1422,7 @@ is_pred_chain_subset_of (pred_chain pred1,
    In other words, the result is conservative.  */
 
 static bool
-is_included_in (pred_chain one_pred, pred_chain_union preds)
+is_included_in (pred_chain *one_pred, pred_chain_union preds)
 {
   size_t i;
   size_t n = preds.length ();
@@ -1444,7 +1453,7 @@ static bool
 is_superset_of (pred_chain_union preds1, pred_chain_union preds2)
 {
   size_t i, n2;
-  pred_chain one_pred_chain = vNULL;
+  pred_chain *one_pred_chain;
 
   n2 = preds2.length ();
 
@@ -1505,7 +1514,7 @@ simplify_pred (pred_chain *one_chain)
 {
   size_t i, j, n;
   bool simplified = false;
-  pred_chain s_chain = vNULL;
+  pred_chain *s_chain = create_pred_chain ();
 
   n = one_chain->length ();
 
@@ -1552,12 +1561,11 @@ simplify_pred (pred_chain *one_chain)
     {
       pred_info *a_pred = &(*one_chain)[i];
       if (!a_pred->pred_lhs)
-        continue;
-      s_chain.safe_push (*a_pred);
+	continue;
+      s_chain->safe_push (*a_pred);
     }
 
-   one_chain->release ();
-   *one_chain = s_chain;
+   one_chain = s_chain;
 }
 
 /* The helper function implements the rule 2 for the
@@ -1579,7 +1587,7 @@ simplify_preds_2 (pred_chain_union *preds)
   for (i = 0; i < n; i++)
     {
       pred_info x, y;
-      pred_chain *a_chain = &(*preds)[i];
+      pred_chain *a_chain = (*preds)[i];
 
       if (a_chain->length () != 2)
         continue;
@@ -1595,7 +1603,7 @@ simplify_preds_2 (pred_chain_union *preds)
           if (j == i)
             continue;
 
-          b_chain = &(*preds)[j];
+          b_chain = (*preds)[j];
           if (b_chain->length () != 2)
             continue;
 
@@ -1627,7 +1635,7 @@ simplify_preds_2 (pred_chain_union *preds)
     {
       for (i = 0; i < n; i++)
         {
-          if ((*preds)[i].is_empty ())
+          if ((*preds)[i]->is_empty ())
             continue;
           s_preds.safe_push ((*preds)[i]);
         }
@@ -1660,7 +1668,7 @@ simplify_preds_3 (pred_chain_union *preds)
   for (i = 0; i < n; i++)
     {
       pred_info x;
-      pred_chain *a_chain = &(*preds)[i];
+      pred_chain *a_chain = (*preds)[i];
 
       if (a_chain->length () != 1)
         continue;
@@ -1676,7 +1684,7 @@ simplify_preds_3 (pred_chain_union *preds)
           if (j == i)
             continue;
 
-          b_chain = &(*preds)[j];
+          b_chain = (*preds)[j];
           if (b_chain->length () < 2)
             continue;
 
@@ -1713,7 +1721,7 @@ simplify_preds_4 (pred_chain_union *preds)
   for (i = 0; i < n; i++)
     {
       pred_info z;
-      pred_chain *a_chain = &(*preds)[i];
+      pred_chain *a_chain = (*preds)[i];
 
       if (a_chain->length () != 1)
         continue;
@@ -1738,7 +1746,7 @@ simplify_preds_4 (pred_chain_union *preds)
           if (j == i)
             continue;
 
-          b_chain = &(*preds)[j];
+          b_chain = (*preds)[j];
           if (b_chain->length () != 2)
             continue;
 
@@ -1765,7 +1773,7 @@ simplify_preds_4 (pred_chain_union *preds)
     {
       for (i = 0; i < n; i++)
         {
-          if ((*preds)[i].is_empty ())
+          if ((*preds)[i]->is_empty ())
             continue;
           s_preds.safe_push ((*preds)[i]);
         }
@@ -1789,11 +1797,11 @@ simplify_preds (pred_chain_union *preds, gimple *use_or_def, bool is_use)
   if (dump_file && dump_flags & TDF_DETAILS)
     {
       fprintf (dump_file, "[BEFORE SIMPLICATION -- ");
-      dump_predicates (use_or_def, *preds, is_use ? "[USE]:\n" : "[DEF]:\n");
+      dump_predicates (use_or_def, preds, is_use ? "[USE]:\n" : "[DEF]:\n");
     }
 
   for (i = 0; i < preds->length (); i++)
-    simplify_pred (&(*preds)[i]);
+    simplify_pred ((*preds)[i]);
 
   n = preds->length ();
   if (n < 2)
@@ -1853,9 +1861,9 @@ simplify_preds (pred_chain_union *preds, gimple *use_or_def, bool is_use)
 inline static void
 push_pred (pred_chain_union *norm_preds, pred_info pred)
 {
-  pred_chain pred_chain = vNULL;
-  pred_chain.safe_push (pred);
-  norm_preds->safe_push (pred_chain);
+  pred_chain *pc = create_pred_chain ();
+  pc->safe_push (pred);
+  norm_preds->safe_push (pc);
 }
 
 /* A helper function that creates a predicate of the form
@@ -2046,11 +2054,11 @@ normalize_one_pred_1 (pred_chain_union *norm_preds,
 
 static void
 normalize_one_pred (pred_chain_union *norm_preds,
-                    pred_info pred)
+		    pred_info pred)
 {
   vec<pred_info, va_heap, vl_ptr> work_list = vNULL;
   enum tree_code and_or_code = ERROR_MARK;
-  pred_chain norm_chain = vNULL;
+  pred_chain *norm_chain = create_pred_chain ();
 
   if (!is_neq_zero_form_p (pred))
     {
@@ -2081,7 +2089,7 @@ normalize_one_pred (pred_chain_union *norm_preds,
   while (!work_list.is_empty ())
     {
       pred_info a_pred = work_list.pop ();
-      normalize_one_pred_1 (norm_preds, &norm_chain, a_pred,
+      normalize_one_pred_1 (norm_preds, norm_chain, a_pred,
                             and_or_code, &work_list, &mark_set);
     }
   if (and_or_code == BIT_AND_EXPR)
@@ -2092,23 +2100,23 @@ normalize_one_pred (pred_chain_union *norm_preds,
 
 static void
 normalize_one_pred_chain (pred_chain_union *norm_preds,
-                          pred_chain one_chain)
+                          pred_chain *one_chain)
 {
   vec<pred_info, va_heap, vl_ptr> work_list = vNULL;
   hash_set<tree> mark_set;
-  pred_chain norm_chain = vNULL;
+  pred_chain *norm_chain = create_pred_chain ();
   size_t i;
 
-  for (i = 0; i < one_chain.length (); i++)
+  for (i = 0; i < one_chain->length (); i++)
     {
-      work_list.safe_push (one_chain[i]);
-      mark_set.add (one_chain[i].pred_lhs);
+      work_list.safe_push ((*one_chain)[i]);
+      mark_set.add ((*one_chain)[i].pred_lhs);
     }
 
   while (!work_list.is_empty ())
     {
       pred_info a_pred = work_list.pop ();
-      normalize_one_pred_1 (0, &norm_chain, a_pred,
+      normalize_one_pred_1 (0, norm_chain, a_pred,
                             BIT_AND_EXPR, &work_list, &mark_set);
     }
 
@@ -2128,24 +2136,24 @@ normalize_preds (pred_chain_union preds, gimple *use_or_def, bool is_use)
   if (dump_file && dump_flags & TDF_DETAILS)
     {
       fprintf (dump_file, "[BEFORE NORMALIZATION --");
-      dump_predicates (use_or_def, preds, is_use ? "[USE]:\n" : "[DEF]:\n");
+      dump_predicates (use_or_def, &preds, is_use ? "[USE]:\n" : "[DEF]:\n");
     }
 
   for (i = 0; i < n; i++)
     {
-      if (preds[i].length () != 1)
+      if (preds[i]->length () != 1)
         normalize_one_pred_chain (&norm_preds, preds[i]);
       else
         {
-          normalize_one_pred (&norm_preds, preds[i][0]);
-          preds[i].release ();
+          normalize_one_pred (&norm_preds, (*preds[i])[0]);
+          preds[i]->release ();
         }
     }
 
   if (dump_file)
     {
       fprintf (dump_file, "[AFTER NORMALIZATION -- ");
-      dump_predicates (use_or_def, norm_preds, is_use ? "[USE]:\n" : "[DEF]:\n");
+      dump_predicates (use_or_def, &norm_preds, is_use ? "[USE]:\n" : "[DEF]:\n");
     }
 
   preds.release ();
