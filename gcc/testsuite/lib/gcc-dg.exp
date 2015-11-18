@@ -310,6 +310,19 @@ proc gcc-dg-test { prog do_what extra_tool_flags } {
     return [gcc-dg-test-1 gcc_target_compile $prog $do_what $extra_tool_flags]
 }
 
+proc dg-test-valgrind { test flags default-extra-flags } {
+    global srcdir
+    global run_under_valgrind
+
+    set valgrind_command "valgrind,--leak-check=yes,--trace-children=yes,--suppressions=${srcdir}/../../contrib/valgrind.supp,--error-exitcode=111,-q"
+
+    if $run_under_valgrind {
+	dg-test $test "$flags -wrapper $valgrind_command" ${default-extra-flags}
+    } else {
+        dg-test $test $flags ${default-extra-flags}
+    }
+}
+
 proc gcc-dg-prune { system text } {
     global additional_prunes
 
@@ -443,6 +456,19 @@ proc search_for { file pattern } {
     return 0
 }
 
+proc dg-runtest-valgrind { testcases flags default-extra-flags } {
+    global runtests
+
+    foreach testcase $testcases {
+	# If we're only testing specific files and this isn't one of them, skip it.
+	if {![runtest_file_p $runtests $testcase]} {
+	    continue
+	}
+	verbose "Testing [file tail [file dirname $testcase]]/[file tail $testcase]"
+	dg-test-valgrind $testcase $flags ${default-extra-flags}
+    }
+}
+
 # Modified dg-runtest that can cycle through a list of optimization options
 # as c-torture does.
 proc gcc-dg-runtest { testcases flags default-extra-flags } {
@@ -477,7 +503,7 @@ proc gcc-dg-runtest { testcases flags default-extra-flags } {
 
 	foreach flags_t $option_list {
 	    verbose "Testing $nshort, $flags $flags_t" 1
-	    dg-test $test "$flags $flags_t" ${default-extra-flags}
+	    dg-test-valgrind $test "$flags $flags_t" ${default-extra-flags}
 	}
     }
 
@@ -556,7 +582,7 @@ proc gcc-dg-debug-runtest { target_compile trivial opt_opts testcases } {
 
 	    if { $doit } {
 		verbose -log "Testing $nshort, $flags" 1
-		dg-test $test $flags ""
+		dg-test-valgrind $test $flags ""
 	    }
 	}
     }

@@ -352,3 +352,6 @@ proc gcc-set-multilib-library-path { compiler } {
 
     return $libpath
 }
+
+global run_under_valgrind
+set run_under_valgrind [info exists env(RUN_UNDER_VALGRIND)]

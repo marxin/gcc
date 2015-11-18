@@ -55,7 +55,7 @@ proc g++-dg-runtest { testcases flags default-extra-flags } {
 
 	foreach flags_t $option_list {
 	    verbose "Testing $nshort, $flags $flags_t" 1
-	    dg-test $test "$flags $flags_t" ${default-extra-flags}
+	    dg-test-valgrind $test "$flags $flags_t" ${default-extra-flags}
 	}
     }
 }

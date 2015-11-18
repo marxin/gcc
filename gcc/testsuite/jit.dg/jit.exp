@@ -138,6 +138,7 @@ proc fixed_host_execute {args} {
     global env
     global text
     global spawn_id
+    global run_under_valgrind
 
     verbose "fixed_host_execute: $args"
 
@@ -169,7 +170,6 @@ proc fixed_host_execute {args} {
     # Run under valgrind if RUN_UNDER_VALGRIND is present in the environment.
     # Note that it's best to configure gcc with --enable-valgrind-annotations
     # when testing under valgrind.
-    set run_under_valgrind [info exists env(RUN_UNDER_VALGRIND)]
     if $run_under_valgrind {
 	set valgrind_logfile "${executable}.valgrind.txt"
 	set valgrind_params {"valgrind"}

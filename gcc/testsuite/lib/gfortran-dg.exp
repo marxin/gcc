@@ -134,7 +134,7 @@ proc gfortran-dg-runtest { testcases flags default-extra-flags } {
 
 	foreach flags_t $option_list {
 	    verbose "Testing $nshort, $flags $flags_t" 1
-	    dg-test $test "$flags $flags_t" ${default-extra-flags}
+	    dg-test-valgrind $test "$flags $flags_t" ${default-extra-flags}
 	    cleanup-modules ""
 	}
     }
@@ -200,7 +200,7 @@ proc gfortran-dg-debug-runtest { target_compile trivial opt_opts testcases } {
 
            if { $doit } {
                verbose -log "Testing $nshort, $flags" 1
-               dg-test $test $flags ""
+               dg-test-valgrind $test $flags ""
 		cleanup-modules ""
            }
        }
