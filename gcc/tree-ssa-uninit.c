@@ -35,15 +35,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 
 /* This implements the pass that does predicate aware warning on uses of
-   possibly uninitialized variables. The pass first collects the set of
-   possibly uninitialized SSA names. For each such name, it walks through
-   all its immediate uses. For each immediate use, it rebuilds the condition
-   expression (the predicate) that guards the use. The predicate is then
+   possibly uninitialized variables.  The pass first collects the set of
+   possibly uninitialized SSA names.  For each such name, it walks through
+   all its immediate uses.  For each immediate use, it rebuilds the condition
+   expression (the predicate) that guards the use.  The predicate is then
    examined to see if the variable is always defined under that same condition.
    This is done either by pruning the unrealizable paths that lead to the
    default definitions or by checking if the predicate set that guards the
    defining paths is a superset of the use predicate.  */
-
 
 /* Pointer set of potentially undefined ssa names, i.e.,
    ssa names that are defined by phi with operands that
@@ -56,7 +55,7 @@ static hash_set<tree> *possibly_undefined_names = 0;
 #define MASK_EMPTY(mask) (mask == 0)
 
 /* Returns the first bit position (starting from LSB)
-   in mask that is non zero. Returns -1 if the mask is empty.  */
+   in mask that is non zero.  Returns -1 if the mask is empty.  */
 static int
 get_mask_first_set_bit (unsigned mask)
 {
@@ -76,17 +75,16 @@ static bool
 has_undefined_value_p (tree t)
 {
   return (ssa_undefined_value_p (t)
-          || (possibly_undefined_names
-              && possibly_undefined_names->contains (t)));
+	  || (possibly_undefined_names
+	      && possibly_undefined_names->contains (t)));
 }
-
-
 
 /* Like has_undefined_value_p, but don't return true if TREE_NO_WARNING
    is set on SSA_NAME_VAR.  */
 
 static inline bool
-uninit_undefined_value_p (tree t) {
+uninit_undefined_value_p (tree t)
+{
   if (!has_undefined_value_p (t))
     return false;
   if (SSA_NAME_VAR (t) && TREE_NO_WARNING (SSA_NAME_VAR (t)))
@@ -112,7 +110,7 @@ uninit_undefined_value_p (tree t) {
 /* Emit a warning for EXPR based on variable VAR at the point in the
    program T, an SSA_NAME, is used being uninitialized.  The exact
    warning text is in MSGID and DATA is the gimple stmt with info about
-   the location in source code. When DATA is a GIMPLE_PHI, PHIARG_IDX
+   the location in source code.  When DATA is a GIMPLE_PHI, PHIARG_IDX
    gives which argument of the phi node to take the location from.  WC
    is the warning code.  */
 
@@ -149,8 +147,7 @@ warn_uninit (enum opt_code wc, tree t, tree expr, tree var,
   else
     location = DECL_SOURCE_LOCATION (var);
   location = linemap_resolve_location (line_table, location,
-				       LRK_SPELLING_LOCATION,
-				       NULL);
+				       LRK_SPELLING_LOCATION, NULL);
   cfun_loc = DECL_SOURCE_LOCATION (cfun->decl);
   xloc = expand_location (location);
   floc = expand_location (cfun_loc);
@@ -161,10 +158,8 @@ warn_uninit (enum opt_code wc, tree t, tree expr, tree var,
       if (location == DECL_SOURCE_LOCATION (var))
 	return;
       if (xloc.file != floc.file
-	  || linemap_location_before_p (line_table,
-					location, cfun_loc)
-	  || linemap_location_before_p (line_table,
-					cfun->function_end_locus,
+	  || linemap_location_before_p (line_table, location, cfun_loc)
+	  || linemap_location_before_p (line_table, cfun->function_end_locus,
 					location))
 	inform (DECL_SOURCE_LOCATION (var), "%qD was declared here", var);
     }
@@ -178,8 +173,9 @@ warn_uninitialized_vars (bool warn_possibly_uninitialized)
 
   FOR_EACH_BB_FN (bb, cfun)
     {
-      bool always_executed = dominated_by_p (CDI_POST_DOMINATORS,
-					     single_succ (ENTRY_BLOCK_PTR_FOR_FN (cfun)), bb);
+      bool always_executed
+	= dominated_by_p (CDI_POST_DOMINATORS,
+			  single_succ (ENTRY_BLOCK_PTR_FOR_FN (cfun)), bb);
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gimple *stmt = gsi_stmt (gsi);
@@ -196,13 +192,13 @@ warn_uninitialized_vars (bool warn_possibly_uninitialized)
 	    {
 	      use = USE_FROM_PTR (use_p);
 	      if (always_executed)
-		warn_uninit (OPT_Wuninitialized, use,
-			     SSA_NAME_VAR (use), SSA_NAME_VAR (use),
-			     "%qD is used uninitialized in this function",
-			     stmt, UNKNOWN_LOCATION);
+		warn_uninit (OPT_Wuninitialized, use, SSA_NAME_VAR (use),
+			     SSA_NAME_VAR (use),
+			     "%qD is used uninitialized in this function", stmt,
+			     UNKNOWN_LOCATION);
 	      else if (warn_possibly_uninitialized)
-		warn_uninit (OPT_Wmaybe_uninitialized, use,
-			     SSA_NAME_VAR (use), SSA_NAME_VAR (use),
+		warn_uninit (OPT_Wmaybe_uninitialized, use, SSA_NAME_VAR (use),
+			     SSA_NAME_VAR (use),
 			     "%qD may be used uninitialized in this function",
 			     stmt, UNKNOWN_LOCATION);
 	    }
@@ -232,9 +228,8 @@ warn_uninitialized_vars (bool warn_possibly_uninitialized)
 		continue;
 
 	      if (always_executed)
-		warn_uninit (OPT_Wuninitialized, use,
-			     gimple_assign_rhs1 (stmt), base,
-			     "%qE is used uninitialized in this function",
+		warn_uninit (OPT_Wuninitialized, use, gimple_assign_rhs1 (stmt),
+			     base, "%qE is used uninitialized in this function",
 			     stmt, UNKNOWN_LOCATION);
 	      else if (warn_possibly_uninitialized)
 		warn_uninit (OPT_Wmaybe_uninitialized, use,
@@ -250,9 +245,9 @@ warn_uninitialized_vars (bool warn_possibly_uninitialized)
 
 /* Checks if the operand OPND of PHI is defined by
    another phi with one operand defined by this PHI,
-   but the rest operands are all defined. If yes,
+   but the rest operands are all defined.  If yes,
    returns true to skip this operand as being
-   redundant. Can be enhanced to be more general.  */
+   redundant.  Can be enhanced to be more general.  */
 
 static bool
 can_skip_redundant_opnd (tree opnd, gimple *phi)
@@ -270,9 +265,9 @@ can_skip_redundant_opnd (tree opnd, gimple *phi)
     {
       tree op = gimple_phi_arg_def (op_def, i);
       if (TREE_CODE (op) != SSA_NAME)
-        continue;
+	continue;
       if (op != phi_def && uninit_undefined_value_p (op))
-        return false;
+	return false;
     }
 
   return true;
@@ -296,10 +291,10 @@ compute_uninit_opnds_pos (gphi *phi)
     {
       tree op = gimple_phi_arg_def (phi, i);
       if (TREE_CODE (op) == SSA_NAME
-          && uninit_undefined_value_p (op)
-          && !can_skip_redundant_opnd (op, phi))
+	  && uninit_undefined_value_p (op)
+	  && !can_skip_redundant_opnd (op, phi))
 	{
-          if (cfun->has_nonlocal_label || cfun->calls_setjmp)
+	  if (cfun->has_nonlocal_label || cfun->calls_setjmp)
 	    {
 	      /* Ignore SSA_NAMEs that appear on abnormal edges
 		 somewhere.  */
@@ -318,37 +313,35 @@ compute_uninit_opnds_pos (gphi *phi)
 static inline basic_block
 find_pdom (basic_block block)
 {
-   if (block == EXIT_BLOCK_PTR_FOR_FN (cfun))
-     return EXIT_BLOCK_PTR_FOR_FN (cfun);
-   else
-     {
-       basic_block bb
-           = get_immediate_dominator (CDI_POST_DOMINATORS, block);
-       if (! bb)
-	 return EXIT_BLOCK_PTR_FOR_FN (cfun);
-       return bb;
-     }
+  if (block == EXIT_BLOCK_PTR_FOR_FN (cfun))
+    return EXIT_BLOCK_PTR_FOR_FN (cfun);
+  else
+    {
+      basic_block bb = get_immediate_dominator (CDI_POST_DOMINATORS, block);
+      if (!bb)
+	return EXIT_BLOCK_PTR_FOR_FN (cfun);
+      return bb;
+    }
 }
 
-/* Find the immediate DOM of the specified
-   basic block BLOCK.  */
+/* Find the immediate DOM of the specified basic block BLOCK.  */
 
 static inline basic_block
 find_dom (basic_block block)
 {
-   if (block == ENTRY_BLOCK_PTR_FOR_FN (cfun))
-     return ENTRY_BLOCK_PTR_FOR_FN (cfun);
-   else
-     {
-       basic_block bb = get_immediate_dominator (CDI_DOMINATORS, block);
-       if (! bb)
-	 return ENTRY_BLOCK_PTR_FOR_FN (cfun);
-       return bb;
-     }
+  if (block == ENTRY_BLOCK_PTR_FOR_FN (cfun))
+    return ENTRY_BLOCK_PTR_FOR_FN (cfun);
+  else
+    {
+      basic_block bb = get_immediate_dominator (CDI_DOMINATORS, block);
+      if (!bb)
+	return ENTRY_BLOCK_PTR_FOR_FN (cfun);
+      return bb;
+    }
 }
 
 /* Returns true if BB1 is postdominating BB2 and BB1 is
-   not a loop exit bb. The loop exit bb check is simple and does
+   not a loop exit bb.  The loop exit bb check is simple and does
    not cover all cases.  */
 
 static bool
@@ -366,7 +359,7 @@ is_non_loop_exit_postdominating (basic_block bb1, basic_block bb2)
 /* Find the closest postdominator of a specified BB, which is control
    equivalent to BB.  */
 
-static inline  basic_block
+static inline basic_block
 find_control_equiv_block (basic_block bb)
 {
   basic_block pdom;
@@ -398,8 +391,8 @@ find_control_equiv_block (basic_block bb)
 
 static bool
 compute_control_dep_chain (basic_block bb, basic_block dep_bb,
-                           vec<edge> *cd_chains,
-                           size_t *num_chains,
+			   vec<edge> *cd_chains,
+			   size_t *num_chains,
 			   vec<edge> *cur_cd_chain,
 			   int *num_calls)
 {
@@ -424,9 +417,9 @@ compute_control_dep_chain (basic_block bb, basic_block dep_bb,
   for (i = 0; i < cur_chain_len; i++)
     {
       edge e = (*cur_cd_chain)[i];
-      /* Cycle detected. */
+      /* Cycle detected.  */
       if (e->src == bb)
-        return false;
+	return false;
     }
 
   FOR_EACH_EDGE (e, ei, bb->succs)
@@ -434,39 +427,39 @@ compute_control_dep_chain (basic_block bb, basic_block dep_bb,
       basic_block cd_bb;
       int post_dom_check = 0;
       if (e->flags & (EDGE_FAKE | EDGE_ABNORMAL))
-        continue;
+	continue;
 
       cd_bb = e->dest;
       cur_cd_chain->safe_push (e);
       while (!is_non_loop_exit_postdominating (cd_bb, bb))
-        {
-          if (cd_bb == dep_bb)
-            {
-              /* Found a direct control dependence.  */
-              if (*num_chains < MAX_NUM_CHAINS)
-                {
-                  cd_chains[*num_chains] = cur_cd_chain->copy ();
-                  (*num_chains)++;
-                }
-              found_cd_chain = true;
-              /* Check path from next edge.  */
-              break;
-            }
+	{
+	  if (cd_bb == dep_bb)
+	    {
+	      /* Found a direct control dependence.  */
+	      if (*num_chains < MAX_NUM_CHAINS)
+		{
+		  cd_chains[*num_chains] = cur_cd_chain->copy ();
+		  (*num_chains)++;
+		}
+	      found_cd_chain = true;
+	      /* Check path from next edge.  */
+	      break;
+	    }
 
-          /* Now check if DEP_BB is indirectly control dependent on BB.  */
-          if (compute_control_dep_chain (cd_bb, dep_bb, cd_chains,
-					 num_chains, cur_cd_chain, num_calls))
-            {
-              found_cd_chain = true;
-              break;
-            }
+	  /* Now check if DEP_BB is indirectly control dependent on BB.  */
+	  if (compute_control_dep_chain (cd_bb, dep_bb, cd_chains, num_chains,
+					 cur_cd_chain, num_calls))
+	    {
+	      found_cd_chain = true;
+	      break;
+	    }
 
-          cd_bb = find_pdom (cd_bb);
-          post_dom_check++;
-	  if (cd_bb == EXIT_BLOCK_PTR_FOR_FN (cfun) || post_dom_check >
-	      MAX_POSTDOM_CHECK)
-            break;
-        }
+	  cd_bb = find_pdom (cd_bb);
+	  post_dom_check++;
+	  if (cd_bb == EXIT_BLOCK_PTR_FOR_FN (cfun)
+	      || post_dom_check > MAX_POSTDOM_CHECK)
+	    break;
+	}
       cur_cd_chain->pop ();
       gcc_assert (cur_cd_chain->length () == cur_chain_len);
     }
@@ -475,7 +468,7 @@ compute_control_dep_chain (basic_block bb, basic_block dep_bb,
   return found_cd_chain;
 }
 
-/* The type to represent a simple predicate  */
+/* The type to represent a simple predicate.  */
 
 struct pred_info
 {
@@ -496,20 +489,20 @@ typedef vec<pred_info, va_heap, vl_ptr> pred_chain;
 typedef vec<pred_chain, va_heap, vl_ptr> pred_chain_union;
 
 /* Converts the chains of control dependence edges into a set of
-   predicates. A control dependence chain is represented by a vector
-   edges. DEP_CHAINS points to an array of dependence chains.
-   NUM_CHAINS is the size of the chain array. One edge in a dependence
+   predicates.  A control dependence chain is represented by a vector
+   edges.  DEP_CHAINS points to an array of dependence chains.
+   NUM_CHAINS is the size of the chain array.  One edge in a dependence
    chain is mapped to predicate expression represented by pred_info
-   type. One dependence chain is converted to a composite predicate that
+   type.  One dependence chain is converted to a composite predicate that
    is the result of AND operation of pred_info mapped to each edge.
-   A composite predicate is presented by a vector of pred_info. On
+   A composite predicate is presented by a vector of pred_info.  On
    return, *PREDS points to the resulting array of composite predicates.
    *NUM_PREDS is the number of composite predictes.  */
 
 static bool
 convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
-                                      size_t num_chains,
-                                      pred_chain_union *preds)
+				      size_t num_chains,
+				      pred_chain_union *preds)
 {
   bool has_valid_pred = false;
   size_t i, j;
@@ -527,48 +520,47 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
       has_valid_pred = false;
       pred_chain t_chain = vNULL;
       for (j = 0; j < one_cd_chain.length (); j++)
-        {
+	{
 	  gimple *cond_stmt;
-          gimple_stmt_iterator gsi;
-          basic_block guard_bb;
-          pred_info one_pred;
-          edge e;
+	  gimple_stmt_iterator gsi;
+	  basic_block guard_bb;
+	  pred_info one_pred;
+	  edge e;
 
-          e = one_cd_chain[j];
-          guard_bb = e->src;
-          gsi = gsi_last_bb (guard_bb);
-          if (gsi_end_p (gsi))
-            {
-              has_valid_pred = false;
-              break;
-            }
-          cond_stmt = gsi_stmt (gsi);
-          if (is_gimple_call (cond_stmt)
-              && EDGE_COUNT (e->src->succs) >= 2)
-            {
-              /* Ignore EH edge. Can add assertion
-                 on the other edge's flag.  */
-              continue;
-            }
-          /* Skip if there is essentially one succesor.  */
-          if (EDGE_COUNT (e->src->succs) == 2)
-            {
-              edge e1;
-              edge_iterator ei1;
-              bool skip = false;
+	  e = one_cd_chain[j];
+	  guard_bb = e->src;
+	  gsi = gsi_last_bb (guard_bb);
+	  if (gsi_end_p (gsi))
+	    {
+	      has_valid_pred = false;
+	      break;
+	    }
+	  cond_stmt = gsi_stmt (gsi);
+	  if (is_gimple_call (cond_stmt) && EDGE_COUNT (e->src->succs) >= 2)
+	    {
+	      /* Ignore EH edge.  Can add assertion
+		 on the other edge's flag.  */
+	      continue;
+	    }
+	  /* Skip if there is essentially one succesor.  */
+	  if (EDGE_COUNT (e->src->succs) == 2)
+	    {
+	      edge e1;
+	      edge_iterator ei1;
+	      bool skip = false;
 
-              FOR_EACH_EDGE (e1, ei1, e->src->succs)
-                {
-                  if (EDGE_COUNT (e1->dest->succs) == 0)
-                    {
-                      skip = true;
-                      break;
-                    }
-                }
-              if (skip)
-                continue;
-            }
-          if (gimple_code (cond_stmt) == GIMPLE_COND)
+	      FOR_EACH_EDGE (e1, ei1, e->src->succs)
+		{
+		  if (EDGE_COUNT (e1->dest->succs) == 0)
+		    {
+		      skip = true;
+		      break;
+		    }
+		}
+	      if (skip)
+		continue;
+	    }
+	  if (gimple_code (cond_stmt) == GIMPLE_COND)
 	    {
 	      one_pred.pred_lhs = gimple_cond_lhs (cond_stmt);
 	      one_pred.pred_rhs = gimple_cond_rhs (cond_stmt);
@@ -577,7 +569,7 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
 	      t_chain.safe_push (one_pred);
 	      has_valid_pred = true;
 	    }
-	  else if (gswitch *gs = dyn_cast <gswitch *> (cond_stmt))
+	  else if (gswitch *gs = dyn_cast<gswitch *> (cond_stmt))
 	    {
 	      /* Avoid quadratic behavior.  */
 	      if (gimple_switch_num_labels (gs) > MAX_SWITCH_CASES)
@@ -603,12 +595,12 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
 		    }
 		}
 	      /* If more than one label reaches this block or the case
-	         label doesn't have a single value (like the default one)
+		 label doesn't have a single value (like the default one)
 		 fail.  */
 	      if (!l
 		  || !CASE_LOW (l)
-		  || (CASE_HIGH (l) && !operand_equal_p (CASE_LOW (l),
-							 CASE_HIGH (l), 0)))
+		  || (CASE_HIGH (l)
+		      && !operand_equal_p (CASE_LOW (l), CASE_HIGH (l), 0)))
 		{
 		  has_valid_pred = false;
 		  break;
@@ -621,11 +613,11 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
 	      has_valid_pred = true;
 	    }
 	  else
-            {
-              has_valid_pred = false;
-              break;
-            }
-        }
+	    {
+	      has_valid_pred = false;
+	      break;
+	    }
+	}
 
       if (!has_valid_pred)
 	break;
@@ -635,15 +627,15 @@ convert_control_dep_chain_into_preds (vec<edge> *dep_chains,
   return has_valid_pred;
 }
 
-/* Computes all control dependence chains for USE_BB. The control
+/* Computes all control dependence chains for USE_BB.  The control
    dependence chains are then converted to an array of composite
    predicates pointed to by PREDS.  PHI_BB is the basic block of
    the phi whose result is used in USE_BB.  */
 
 static bool
 find_predicates (pred_chain_union *preds,
-                 basic_block phi_bb,
-                 basic_block use_bb)
+		 basic_block phi_bb,
+		 basic_block use_bb)
 {
   size_t num_chains = 0, i;
   int num_calls = 0;
@@ -659,9 +651,9 @@ find_predicates (pred_chain_union *preds,
     {
       basic_block ctrl_eq_bb = find_control_equiv_block (cd_root);
       if (ctrl_eq_bb && dominated_by_p (CDI_DOMINATORS, use_bb, ctrl_eq_bb))
-        cd_root = ctrl_eq_bb;
+	cd_root = ctrl_eq_bb;
       else
-        break;
+	break;
     }
 
   compute_control_dep_chain (cd_root, use_bb, dep_chains, &num_chains,
@@ -676,8 +668,8 @@ find_predicates (pred_chain_union *preds,
 
 /* Computes the set of incoming edges of PHI that have non empty
    definitions of a phi chain.  The collection will be done
-   recursively on operands that are defined by phis. CD_ROOT
-   is the control dependence root. *EDGES holds the result, and
+   recursively on operands that are defined by phis.  CD_ROOT
+   is the control dependence root.  *EDGES holds the result, and
    VISITED_PHIS is a pointer set for detecting cycles.  */
 
 static void
@@ -699,33 +691,33 @@ collect_phi_def_edges (gphi *phi, basic_block cd_root,
       opnd = gimple_phi_arg_def (phi, i);
 
       if (TREE_CODE (opnd) != SSA_NAME)
-        {
-          if (dump_file && (dump_flags & TDF_DETAILS))
-            {
-              fprintf (dump_file, "\n[CHECK] Found def edge %d in ", (int)i);
-              print_gimple_stmt (dump_file, phi, 0, 0);
-            }
-          edges->safe_push (opnd_edge);
-        }
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    {
+	      fprintf (dump_file, "\n[CHECK] Found def edge %d in ", (int) i);
+	      print_gimple_stmt (dump_file, phi, 0, 0);
+	    }
+	  edges->safe_push (opnd_edge);
+	}
       else
-        {
+	{
 	  gimple *def = SSA_NAME_DEF_STMT (opnd);
 
-          if (gimple_code (def) == GIMPLE_PHI
-              && dominated_by_p (CDI_DOMINATORS,
-                                 gimple_bb (def), cd_root))
-            collect_phi_def_edges (as_a <gphi *> (def), cd_root, edges,
-                                   visited_phis);
-          else if (!uninit_undefined_value_p (opnd))
-            {
-              if (dump_file && (dump_flags & TDF_DETAILS))
-                {
-                  fprintf (dump_file, "\n[CHECK] Found def edge %d in ", (int)i);
-                  print_gimple_stmt (dump_file, phi, 0, 0);
-                }
-              edges->safe_push (opnd_edge);
-            }
-        }
+	  if (gimple_code (def) == GIMPLE_PHI
+	      && dominated_by_p (CDI_DOMINATORS, gimple_bb (def), cd_root))
+	    collect_phi_def_edges (as_a<gphi *> (def), cd_root, edges,
+				   visited_phis);
+	  else if (!uninit_undefined_value_p (opnd))
+	    {
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		{
+		  fprintf (dump_file, "\n[CHECK] Found def edge %d in ",
+			   (int) i);
+		  print_gimple_stmt (dump_file, phi, 0, 0);
+		}
+	      edges->safe_push (opnd_edge);
+	    }
+	}
     }
 }
 
@@ -745,7 +737,7 @@ find_def_preds (pred_chain_union *preds, gphi *phi)
 
   phi_bb = gimple_bb (phi);
   /* First find the closest dominating bb to be
-     the control dependence root  */
+     the control dependence root.  */
   cd_root = find_dom (phi_bb);
   if (!cd_root)
     return false;
@@ -769,14 +761,14 @@ find_def_preds (pred_chain_union *preds, gphi *phi)
 				 &num_chains, &cur_chain, &num_calls);
 
       /* Now update the newly added chains with
-         the phi operand edge:  */
+	 the phi operand edge:  */
       if (EDGE_COUNT (opnd_edge->src->succs) > 1)
-        {
+	{
 	  if (prev_nc == num_chains && num_chains < MAX_NUM_CHAINS)
 	    dep_chains[num_chains++] = vNULL;
-          for (j = prev_nc; j < num_chains; j++)
+	  for (j = prev_nc; j < num_chains; j++)
 	    dep_chains[j].safe_push (opnd_edge);
-        }
+	}
     }
 
   has_valid_pred
@@ -789,8 +781,7 @@ find_def_preds (pred_chain_union *preds, gphi *phi)
 /* Dumps the predicates (PREDS) for USESTMT.  */
 
 static void
-dump_predicates (gimple *usestmt, pred_chain_union preds,
-                 const char* msg)
+dump_predicates (gimple *usestmt, pred_chain_union preds, const char *msg)
 {
   size_t i, j;
   pred_chain one_pred_chain = vNULL;
@@ -807,22 +798,22 @@ dump_predicates (gimple *usestmt, pred_chain_union preds,
       np = one_pred_chain.length ();
 
       for (j = 0; j < np; j++)
-        {
-          pred_info one_pred = one_pred_chain[j];
-          if (one_pred.invert)
-            fprintf (dump_file, " (.NOT.) ");
-          print_generic_expr (dump_file, one_pred.pred_lhs, 0);
-          fprintf (dump_file, " %s ", op_symbol_code (one_pred.cond_code));
-          print_generic_expr (dump_file, one_pred.pred_rhs, 0);
-          if (j < np - 1)
-            fprintf (dump_file, " (.AND.) ");
-          else
-            fprintf (dump_file, "\n");
-        }
+	{
+	  pred_info one_pred = one_pred_chain[j];
+	  if (one_pred.invert)
+	    fprintf (dump_file, " (.NOT.) ");
+	  print_generic_expr (dump_file, one_pred.pred_lhs, 0);
+	  fprintf (dump_file, " %s ", op_symbol_code (one_pred.cond_code));
+	  print_generic_expr (dump_file, one_pred.pred_rhs, 0);
+	  if (j < np - 1)
+	    fprintf (dump_file, " (.AND.) ");
+	  else
+	    fprintf (dump_file, "\n");
+	}
       if (i < num_preds - 1)
-        fprintf (dump_file, "(.OR.)\n");
+	fprintf (dump_file, "(.OR.)\n");
       else
-        fprintf (dump_file, "\n\n");
+	fprintf (dump_file, "\n\n");
     }
 }
 
@@ -839,13 +830,11 @@ destroy_predicate_vecs (pred_chain_union *preds)
   preds->release ();
 }
 
-
 /* Computes the 'normalized' conditional code with operand
    swapping and condition inversion.  */
 
 static enum tree_code
-get_cmp_code (enum tree_code orig_cmp_code,
-              bool swap_cond, bool invert)
+get_cmp_code (enum tree_code orig_cmp_code, bool swap_cond, bool invert)
 {
   enum tree_code tc = orig_cmp_code;
 
@@ -880,14 +869,12 @@ is_value_included_in (tree val, tree boundary, enum tree_code cmpc)
   bool result;
 
   /* Only handle integer constant here.  */
-  if (TREE_CODE (val) != INTEGER_CST
-      || TREE_CODE (boundary) != INTEGER_CST)
+  if (TREE_CODE (val) != INTEGER_CST || TREE_CODE (boundary) != INTEGER_CST)
     return true;
 
   is_unsigned = TYPE_UNSIGNED (TREE_TYPE (val));
 
-  if (cmpc == GE_EXPR || cmpc == GT_EXPR
-      || cmpc == NE_EXPR)
+  if (cmpc == GE_EXPR || cmpc == GT_EXPR || cmpc == NE_EXPR)
     {
       cmpc = invert_tree_comparison (cmpc, false);
       inverted = true;
@@ -896,27 +883,27 @@ is_value_included_in (tree val, tree boundary, enum tree_code cmpc)
   if (is_unsigned)
     {
       if (cmpc == EQ_EXPR)
-        result = tree_int_cst_equal (val, boundary);
+	result = tree_int_cst_equal (val, boundary);
       else if (cmpc == LT_EXPR)
-        result = tree_int_cst_lt (val, boundary);
+	result = tree_int_cst_lt (val, boundary);
       else
-        {
-          gcc_assert (cmpc == LE_EXPR);
-          result = tree_int_cst_le (val, boundary);
-        }
+	{
+	  gcc_assert (cmpc == LE_EXPR);
+	  result = tree_int_cst_le (val, boundary);
+	}
     }
   else
     {
       if (cmpc == EQ_EXPR)
-        result = tree_int_cst_equal (val, boundary);
+	result = tree_int_cst_equal (val, boundary);
       else if (cmpc == LT_EXPR)
-        result = tree_int_cst_lt (val, boundary);
+	result = tree_int_cst_lt (val, boundary);
       else
-        {
-          gcc_assert (cmpc == LE_EXPR);
-          result = (tree_int_cst_equal (val, boundary)
-                    || tree_int_cst_lt (val, boundary));
-        }
+	{
+	  gcc_assert (cmpc == LE_EXPR);
+	  result = (tree_int_cst_equal (val, boundary)
+		    || tree_int_cst_lt (val, boundary));
+	}
     }
 
   if (inverted)
@@ -931,8 +918,8 @@ is_value_included_in (tree val, tree boundary, enum tree_code cmpc)
 
 static bool
 find_matching_predicate_in_rest_chains (pred_info pred,
-                                        pred_chain_union preds,
-                                        size_t num_pred_chains)
+					pred_chain_union preds,
+					size_t num_pred_chains)
 {
   size_t i, j, n;
 
@@ -946,39 +933,38 @@ find_matching_predicate_in_rest_chains (pred_info pred,
       pred_chain one_chain = preds[i];
       n = one_chain.length ();
       for (j = 0; j < n; j++)
-        {
-          pred_info pred2 = one_chain[j];
-          /* Can relax the condition comparison to not
-             use address comparison. However, the most common
-             case is that multiple control dependent paths share
-             a common path prefix, so address comparison should
-             be ok.  */
+	{
+	  pred_info pred2 = one_chain[j];
+	  /* Can relax the condition comparison to not
+	     use address comparison.  However, the most common
+	     case is that multiple control dependent paths share
+	     a common path prefix, so address comparison should
+	     be ok.  */
 
-          if (operand_equal_p (pred2.pred_lhs, pred.pred_lhs, 0)
-              && operand_equal_p (pred2.pred_rhs, pred.pred_rhs, 0)
-              && pred2.invert == pred.invert)
-            {
-              found = true;
-              break;
-            }
-        }
+	  if (operand_equal_p (pred2.pred_lhs, pred.pred_lhs, 0)
+	      && operand_equal_p (pred2.pred_rhs, pred.pred_rhs, 0)
+	      && pred2.invert == pred.invert)
+	    {
+	      found = true;
+	      break;
+	    }
+	}
       if (!found)
-        return false;
+	return false;
     }
   return true;
 }
 
 /* Forward declaration.  */
-static bool
-is_use_properly_guarded (gimple *use_stmt,
-                         basic_block use_bb,
-                         gphi *phi,
-                         unsigned uninit_opnds,
-			 pred_chain_union *def_preds,
-                         hash_set<gphi *> *visited_phis);
+static bool is_use_properly_guarded (gimple *use_stmt,
+				     basic_block use_bb,
+				     gphi *phi,
+				     unsigned uninit_opnds,
+				     pred_chain_union *def_preds,
+				     hash_set<gphi *> *visited_phis);
 
-/* Returns true if all uninitialized opnds are pruned. Returns false
-   otherwise. PHI is the phi node with uninitialized operands,
+/* Returns true if all uninitialized opnds are pruned.  Returns false
+   otherwise.  PHI is the phi node with uninitialized operands,
    UNINIT_OPNDS is the bitmap of the uninitialize operand positions,
    FLAG_DEF is the statement defining the flag guarding the use of the
    PHI output, BOUNDARY_CST is the const value used in the predicate
@@ -990,7 +976,7 @@ is_use_properly_guarded (gimple *use_stmt,
    Example scenario:
 
    BB1:
-   flag_1 = phi <0, 1>                  // (1)
+   flag_1 = phi <0, 1>		  // (1)
    var_1  = phi <undef, some_val>
 
 
@@ -1001,13 +987,14 @@ is_use_properly_guarded (gimple *use_stmt,
       goto BB3;
 
    BB3:
-   use of var_2                         // (3)
+   use of var_2			 // (3)
 
    Because some flag arg in (1) is not constant, if we do not look into the
    flag phis recursively, it is conservatively treated as unknown and var_1
-   is thought to be flowed into use at (3). Since var_1 is potentially uninitialized
-   a false warning will be emitted. Checking recursively into (1), the compiler can
-   find out that only some_val (which is defined) can flow into (3) which is OK.
+   is thought to be flowed into use at (3).  Since var_1 is potentially
+   uninitialized a false warning will be emitted.
+   Checking recursively into (1), the compiler can find out that only some_val
+   (which is defined) can flow into (3) which is OK.
 
 */
 
@@ -1027,89 +1014,87 @@ prune_uninit_phi_opnds_in_unrealizable_paths (gphi *phi,
       tree flag_arg;
 
       if (!MASK_TEST_BIT (uninit_opnds, i))
-        continue;
+	continue;
 
       flag_arg = gimple_phi_arg_def (flag_def, i);
       if (!is_gimple_constant (flag_arg))
-        {
-          gphi *flag_arg_def, *phi_arg_def;
-          tree phi_arg;
-          unsigned uninit_opnds_arg_phi;
+	{
+	  gphi *flag_arg_def, *phi_arg_def;
+	  tree phi_arg;
+	  unsigned uninit_opnds_arg_phi;
 
-          if (TREE_CODE (flag_arg) != SSA_NAME)
-            return false;
-          flag_arg_def = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (flag_arg));
+	  if (TREE_CODE (flag_arg) != SSA_NAME)
+	    return false;
+	  flag_arg_def = dyn_cast<gphi *> (SSA_NAME_DEF_STMT (flag_arg));
 	  if (!flag_arg_def)
-            return false;
+	    return false;
 
-          phi_arg = gimple_phi_arg_def (phi, i);
-          if (TREE_CODE (phi_arg) != SSA_NAME)
-            return false;
+	  phi_arg = gimple_phi_arg_def (phi, i);
+	  if (TREE_CODE (phi_arg) != SSA_NAME)
+	    return false;
 
-          phi_arg_def = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (phi_arg));
+	  phi_arg_def = dyn_cast<gphi *> (SSA_NAME_DEF_STMT (phi_arg));
 	  if (!phi_arg_def)
-            return false;
+	    return false;
 
-          if (gimple_bb (phi_arg_def) != gimple_bb (flag_arg_def))
-            return false;
+	  if (gimple_bb (phi_arg_def) != gimple_bb (flag_arg_def))
+	    return false;
 
-          if (!*visited_flag_phis)
-            *visited_flag_phis = BITMAP_ALLOC (NULL);
+	  if (!*visited_flag_phis)
+	    *visited_flag_phis = BITMAP_ALLOC (NULL);
 
-          if (bitmap_bit_p (*visited_flag_phis,
-                            SSA_NAME_VERSION (gimple_phi_result (flag_arg_def))))
-            return false;
+	  if (bitmap_bit_p (*visited_flag_phis,
+			    SSA_NAME_VERSION (
+			      gimple_phi_result (flag_arg_def))))
+	    return false;
 
-          bitmap_set_bit (*visited_flag_phis,
-                          SSA_NAME_VERSION (gimple_phi_result (flag_arg_def)));
+	  bitmap_set_bit (*visited_flag_phis,
+			  SSA_NAME_VERSION (gimple_phi_result (flag_arg_def)));
 
-          /* Now recursively prune the uninitialized phi args.  */
-          uninit_opnds_arg_phi = compute_uninit_opnds_pos (phi_arg_def);
-          if (!prune_uninit_phi_opnds_in_unrealizable_paths
-		 (phi_arg_def, uninit_opnds_arg_phi, flag_arg_def,
-		  boundary_cst, cmp_code, visited_phis, visited_flag_phis))
-            return false;
+	  /* Now recursively prune the uninitialized phi args.  */
+	  uninit_opnds_arg_phi = compute_uninit_opnds_pos (phi_arg_def);
+	  if (!prune_uninit_phi_opnds_in_unrealizable_paths
+	      (phi_arg_def, uninit_opnds_arg_phi, flag_arg_def, boundary_cst,
+	       cmp_code, visited_phis, visited_flag_phis))
+	    return false;
 
-          bitmap_clear_bit (*visited_flag_phis,
-                            SSA_NAME_VERSION (gimple_phi_result (flag_arg_def)));
-          continue;
-        }
+	  bitmap_clear_bit (*visited_flag_phis,
+			    SSA_NAME_VERSION (
+			      gimple_phi_result (flag_arg_def)));
+	  continue;
+	}
 
       /* Now check if the constant is in the guarded range.  */
       if (is_value_included_in (flag_arg, boundary_cst, cmp_code))
-        {
-          tree opnd;
+	{
+	  tree opnd;
 	  gimple *opnd_def;
 
-          /* Now that we know that this undefined edge is not
-             pruned. If the operand is defined by another phi,
-             we can further prune the incoming edges of that
-             phi by checking the predicates of this operands.  */
+	  /* Now that we know that this undefined edge is not
+	     pruned.  If the operand is defined by another phi,
+	     we can further prune the incoming edges of that
+	     phi by checking the predicates of this operands.  */
 
-          opnd = gimple_phi_arg_def (phi, i);
-          opnd_def = SSA_NAME_DEF_STMT (opnd);
-          if (gphi *opnd_def_phi = dyn_cast <gphi *> (opnd_def))
-            {
-              edge opnd_edge;
-              unsigned uninit_opnds2
-                  = compute_uninit_opnds_pos (opnd_def_phi);
-              pred_chain_union def_preds = vNULL;
-              bool ok;
-              gcc_assert (!MASK_EMPTY (uninit_opnds2));
-              opnd_edge = gimple_phi_arg_edge (phi, i);
-              ok = is_use_properly_guarded (phi,
-					    opnd_edge->src,
-					    opnd_def_phi,
-					    uninit_opnds2,
-					    &def_preds,
+	  opnd = gimple_phi_arg_def (phi, i);
+	  opnd_def = SSA_NAME_DEF_STMT (opnd);
+	  if (gphi *opnd_def_phi = dyn_cast<gphi *> (opnd_def))
+	    {
+	      edge opnd_edge;
+	      unsigned uninit_opnds2 = compute_uninit_opnds_pos (opnd_def_phi);
+	      pred_chain_union def_preds = vNULL;
+	      bool ok;
+	      gcc_assert (!MASK_EMPTY (uninit_opnds2));
+	      opnd_edge = gimple_phi_arg_edge (phi, i);
+	      ok = is_use_properly_guarded (phi, opnd_edge->src, opnd_def_phi,
+					    uninit_opnds2, &def_preds,
 					    visited_phis);
 	      destroy_predicate_vecs (&def_preds);
 	      if (!ok)
 		return false;
-            }
-          else
-            return false;
-        }
+	    }
+	  else
+	    return false;
+	}
     }
 
   return true;
@@ -1119,50 +1104,50 @@ prune_uninit_phi_opnds_in_unrealizable_paths (gphi *phi,
    of the use is not overlapping with that of the uninit paths.
    The most common senario of guarded use is in Example 1:
      Example 1:
-           if (some_cond)
-           {
-              x = ...;
-              flag = true;
-           }
+	   if (some_cond)
+	   {
+	      x = ...;
+	      flag = true;
+	   }
 
-            ... some code ...
+	    ... some code ...
 
-           if (flag)
-              use (x);
+	   if (flag)
+	      use (x);
 
      The real world examples are usually more complicated, but similar
      and usually result from inlining:
 
-         bool init_func (int * x)
-         {
-             if (some_cond)
-                return false;
-             *x  =  ..
-             return true;
-         }
+	 bool init_func (int * x)
+	 {
+	     if (some_cond)
+		return false;
+	     *x  =  ..
+	     return true;
+	 }
 
-         void foo(..)
-         {
-             int x;
+	 void foo (..)
+	 {
+	     int x;
 
-             if (!init_func(&x))
-                return;
+	     if (!init_func (&x))
+		return;
 
-             .. some_code ...
-             use (x);
-         }
+	     .. some_code ...
+	     use (x);
+	 }
 
      Another possible use scenario is in the following trivial example:
 
      Example 2:
-          if (n > 0)
-             x = 1;
-          ...
-          if (n > 0)
-            {
-              if (m < 2)
-                 .. = x;
-            }
+	  if (n > 0)
+	     x = 1;
+	  ...
+	  if (n > 0)
+	    {
+	      if (m < 2)
+		 .. = x;
+	    }
 
      Predicate analysis needs to compute the composite predicate:
 
@@ -1173,11 +1158,11 @@ prune_uninit_phi_opnds_in_unrealizable_paths (gphi *phi,
        bb and is dominating the operand def.)
 
        and check overlapping:
-          (n > 0) .AND. (m < 2) .AND. (.NOT. (n > 0))
-        <==> false
+	  (n > 0) .AND. (m < 2) .AND. (.NOT. (n > 0))
+	<==> false
 
      This implementation provides framework that can handle
-     scenarios. (Note that many simple cases are handled properly
+     scenarios.  (Note that many simple cases are handled properly
      without the predicate analysis -- this is due to jump threading
      transformation which eliminates the merge point thus makes
      path sensitive analysis unnecessary.)
@@ -1185,18 +1170,17 @@ prune_uninit_phi_opnds_in_unrealizable_paths (gphi *phi,
      NUM_PREDS is the number is the number predicate chains, PREDS is
      the array of chains, PHI is the phi node whose incoming (undefined)
      paths need to be pruned, and UNINIT_OPNDS is the bitmap holding
-     uninit operand positions. VISITED_PHIS is the pointer set of phi
+     uninit operand positions.  VISITED_PHIS is the pointer set of phi
      stmts being checked.  */
-
 
 static bool
 use_pred_not_overlap_with_undef_path_pred (pred_chain_union preds,
-				           gphi *phi, unsigned uninit_opnds,
+					   gphi *phi, unsigned uninit_opnds,
 					   hash_set<gphi *> *visited_phis)
 {
   unsigned int i, n;
   gimple *flag_def = 0;
-  tree  boundary_cst = 0;
+  tree boundary_cst = 0;
   enum tree_code cmp_code;
   bool swap_cond = false;
   bool invert = false;
@@ -1223,32 +1207,32 @@ use_pred_not_overlap_with_undef_path_pred (pred_chain_union preds,
       cmp_code = the_pred.cond_code;
 
       if (cond_lhs != NULL_TREE && TREE_CODE (cond_lhs) == SSA_NAME
-          && cond_rhs != NULL_TREE && is_gimple_constant (cond_rhs))
-        {
-          boundary_cst = cond_rhs;
-          flag = cond_lhs;
-        }
+	  && cond_rhs != NULL_TREE && is_gimple_constant (cond_rhs))
+	{
+	  boundary_cst = cond_rhs;
+	  flag = cond_lhs;
+	}
       else if (cond_rhs != NULL_TREE && TREE_CODE (cond_rhs) == SSA_NAME
-               && cond_lhs != NULL_TREE && is_gimple_constant (cond_lhs))
-        {
-          boundary_cst = cond_lhs;
-          flag = cond_rhs;
-          swap_cond = true;
-        }
+	       && cond_lhs != NULL_TREE && is_gimple_constant (cond_lhs))
+	{
+	  boundary_cst = cond_lhs;
+	  flag = cond_rhs;
+	  swap_cond = true;
+	}
 
       if (!flag)
-        continue;
+	continue;
 
       flag_def = SSA_NAME_DEF_STMT (flag);
 
       if (!flag_def)
-        continue;
+	continue;
 
       if ((gimple_code (flag_def) == GIMPLE_PHI)
-          && (gimple_bb (flag_def) == gimple_bb (phi))
-          && find_matching_predicate_in_rest_chains (the_pred, preds,
+	  && (gimple_bb (flag_def) == gimple_bb (phi))
+	  && find_matching_predicate_in_rest_chains (the_pred, preds,
 						     num_preds))
-        break;
+	break;
 
       flag_def = 0;
     }
@@ -1263,13 +1247,9 @@ use_pred_not_overlap_with_undef_path_pred (pred_chain_union preds,
   if (cmp_code == ERROR_MARK)
     return false;
 
-  all_pruned = prune_uninit_phi_opnds_in_unrealizable_paths (phi,
-                                                             uninit_opnds,
-                                                             as_a <gphi *> (flag_def),
-                                                             boundary_cst,
-                                                             cmp_code,
-                                                             visited_phis,
-                                                             &visited_flag_phis);
+  all_pruned = prune_uninit_phi_opnds_in_unrealizable_paths
+    (phi, uninit_opnds, as_a<gphi *> (flag_def), boundary_cst, cmp_code,
+     visited_phis, &visited_flag_phis);
 
   if (visited_flag_phis)
     BITMAP_FREE (visited_flag_phis);
@@ -1278,7 +1258,7 @@ use_pred_not_overlap_with_undef_path_pred (pred_chain_union preds,
 }
 
 /* The helper function returns true if two predicates X1 and X2
-   are equivalent. It assumes the expressions have already
+   are equivalent.  It assumes the expressions have already
    properly re-associated.  */
 
 static inline bool
@@ -1305,13 +1285,13 @@ static inline bool
 is_neq_relop_p (pred_info pred)
 {
 
-  return (pred.cond_code == NE_EXPR && !pred.invert) 
-          || (pred.cond_code == EQ_EXPR && pred.invert);
+  return (pred.cond_code == NE_EXPR && !pred.invert)
+	 || (pred.cond_code == EQ_EXPR && pred.invert);
 }
 
 /* Returns true if pred is of the form X != 0.  */
 
-static inline bool 
+static inline bool
 is_neq_zero_form_p (pred_info pred)
 {
   if (!is_neq_relop_p (pred) || !integer_zerop (pred.pred_rhs)
@@ -1333,7 +1313,7 @@ pred_expr_equal_p (pred_info x1, tree x2)
 }
 
 /* Returns true of the domain of single predicate expression
-   EXPR1 is a subset of that of EXPR2. Returns false if it
+   EXPR1 is a subset of that of EXPR2.  Returns false if it
    can not be proved.  */
 
 static bool
@@ -1358,8 +1338,7 @@ is_pred_expr_subset_of (pred_info expr1, pred_info expr2)
   if (expr2.invert)
     code2 = invert_tree_comparison (code2, false);
 
-  if ((code1 == EQ_EXPR || code1 == BIT_AND_EXPR)
-      && code2 == BIT_AND_EXPR)
+  if ((code1 == EQ_EXPR || code1 == BIT_AND_EXPR) && code2 == BIT_AND_EXPR)
     return wi::eq_p (expr1.pred_rhs,
 		     wi::bit_and (expr1.pred_rhs, expr2.pred_rhs));
 
@@ -1373,11 +1352,10 @@ is_pred_expr_subset_of (pred_info expr1, pred_info expr2)
 }
 
 /* Returns true if the domain of PRED1 is a subset
-   of that of PRED2. Returns false if it can not be proved so.  */
+   of that of PRED2.  Returns false if it can not be proved so.  */
 
 static bool
-is_pred_chain_subset_of (pred_chain pred1,
-                         pred_chain pred2)
+is_pred_chain_subset_of (pred_chain pred1, pred_chain pred2)
 {
   size_t np1, np2, i1, i2;
 
@@ -1389,23 +1367,23 @@ is_pred_chain_subset_of (pred_chain pred1,
       bool found = false;
       pred_info info2 = pred2[i2];
       for (i1 = 0; i1 < np1; i1++)
-        {
-          pred_info info1 = pred1[i1];
-          if (is_pred_expr_subset_of (info1, info2))
-            {
-              found = true;
-              break;
-            }
-        }
+	{
+	  pred_info info1 = pred1[i1];
+	  if (is_pred_expr_subset_of (info1, info2))
+	    {
+	      found = true;
+	      break;
+	    }
+	}
       if (!found)
-        return false;
+	return false;
     }
   return true;
 }
 
 /* Returns true if the domain defined by
    one pred chain ONE_PRED is a subset of the domain
-   of *PREDS. It returns false if ONE_PRED's domain is
+   of *PREDS.  It returns false if ONE_PRED's domain is
    not a subset of any of the sub-domains of PREDS
    (corresponding to each individual chains in it), even
    though it may be still be a subset of whole domain
@@ -1421,7 +1399,7 @@ is_included_in (pred_chain one_pred, pred_chain_union preds)
   for (i = 0; i < n; i++)
     {
       if (is_pred_chain_subset_of (one_pred, preds[i]))
-        return true;
+	return true;
     }
 
   return false;
@@ -1429,15 +1407,15 @@ is_included_in (pred_chain one_pred, pred_chain_union preds)
 
 /* Compares two predicate sets PREDS1 and PREDS2 and returns
    true if the domain defined by PREDS1 is a superset
-   of PREDS2's domain. N1 and N2 are array sizes of PREDS1 and
-   PREDS2 respectively. The implementation chooses not to build
+   of PREDS2's domain.  N1 and N2 are array sizes of PREDS1 and
+   PREDS2 respectively.  The implementation chooses not to build
    generic trees (and relying on the folding capability of the
    compiler), but instead performs brute force comparison of
    individual predicate chains (won't be a compile time problem
-   as the chains are pretty short). When the function returns
+   as the chains are pretty short).  When the function returns
    false, it does not necessarily mean *PREDS1 is not a superset
    of *PREDS2, but mean it may not be so since the analysis can
-   not prove it. In such cases, false warnings may still be
+   not prove it.  In such cases, false warnings may still be
    emitted.  */
 
 static bool
@@ -1452,7 +1430,7 @@ is_superset_of (pred_chain_union preds1, pred_chain_union preds2)
     {
       one_pred_chain = preds2[i];
       if (!is_included_in (one_pred_chain, preds1))
-        return false;
+	return false;
     }
 
   return true;
@@ -1464,8 +1442,8 @@ static inline bool
 is_and_or_or_p (enum tree_code tc, tree type)
 {
   return (tc == BIT_IOR_EXPR
-          || (tc == BIT_AND_EXPR
-              && (type == 0 || TREE_CODE (type) == BOOLEAN_TYPE)));
+	  || (tc == BIT_AND_EXPR
+	      && (type == 0 || TREE_CODE (type) == BOOLEAN_TYPE)));
 }
 
 /* Returns true if X1 is the negate of X2.  */
@@ -1477,7 +1455,7 @@ pred_neg_p (pred_info x1, pred_info x2)
   if (!operand_equal_p (x1.pred_lhs, x2.pred_lhs, 0)
       || !operand_equal_p (x1.pred_rhs, x2.pred_rhs, 0))
     return false;
-      
+
   c1 = x1.cond_code;
   if (x1.invert == x2.invert)
     c2 = invert_tree_comparison (x2.cond_code, false);
@@ -1493,7 +1471,7 @@ pred_neg_p (pred_info x1, pred_info x2)
    4) ((x IAND y) != 0) || (x != 0 AND y != 0)) is equivalent to
       (x != 0 AND y != 0)
    5) (X AND Y) OR (!X AND Z) OR (!Y AND Z) is equivalent to
-      (X AND Y) OR Z 
+      (X AND Y) OR Z
 
    PREDS is the predicate chains, and N is the number of chains.  */
 
@@ -1514,50 +1492,50 @@ simplify_pred (pred_chain *one_chain)
       pred_info *a_pred = &(*one_chain)[i];
 
       if (!a_pred->pred_lhs)
-        continue;
+	continue;
       if (!is_neq_zero_form_p (*a_pred))
-        continue;
+	continue;
 
       gimple *def_stmt = SSA_NAME_DEF_STMT (a_pred->pred_lhs);
       if (gimple_code (def_stmt) != GIMPLE_ASSIGN)
-        continue;
+	continue;
       if (gimple_assign_rhs_code (def_stmt) == BIT_IOR_EXPR)
-        {
-          for (j = 0; j < n; j++)
-            {
-              pred_info *b_pred = &(*one_chain)[j];
+	{
+	  for (j = 0; j < n; j++)
+	    {
+	      pred_info *b_pred = &(*one_chain)[j];
 
-              if (!b_pred->pred_lhs)
-                continue;
-              if (!is_neq_zero_form_p (*b_pred))
-                continue;
+	      if (!b_pred->pred_lhs)
+		continue;
+	      if (!is_neq_zero_form_p (*b_pred))
+		continue;
 
-              if (pred_expr_equal_p (*b_pred, gimple_assign_rhs1 (def_stmt))
-                  || pred_expr_equal_p (*b_pred, gimple_assign_rhs2 (def_stmt)))
-                 {
-                   /* Mark a_pred for removal.  */
-                   a_pred->pred_lhs = NULL;
-                   a_pred->pred_rhs = NULL;
-                   simplified = true;
-                   break;
-                 }
-            }
-        }
+	      if (pred_expr_equal_p (*b_pred, gimple_assign_rhs1 (def_stmt))
+		  || pred_expr_equal_p (*b_pred, gimple_assign_rhs2 (def_stmt)))
+		{
+		  /* Mark a_pred for removal.  */
+		  a_pred->pred_lhs = NULL;
+		  a_pred->pred_rhs = NULL;
+		  simplified = true;
+		  break;
+		}
+	    }
+	}
     }
 
   if (!simplified)
-     return;
+    return;
 
   for (i = 0; i < n; i++)
     {
       pred_info *a_pred = &(*one_chain)[i];
       if (!a_pred->pred_lhs)
-        continue;
+	continue;
       s_chain.safe_push (*a_pred);
     }
 
-   one_chain->release ();
-   *one_chain = s_chain;
+  one_chain->release ();
+  *one_chain = s_chain;
 }
 
 /* The helper function implements the rule 2 for the
@@ -1572,7 +1550,7 @@ simplify_preds_2 (pred_chain_union *preds)
   bool simplified = false;
   pred_chain_union s_preds = vNULL;
 
-  /* (X AND Y) OR (!X AND Y) is equivalent to Y.  
+  /* (X AND Y) OR (!X AND Y) is equivalent to Y.
      (X AND Y) OR (X AND !Y) is equivalent to X.  */
 
   n = preds->length ();
@@ -1582,55 +1560,55 @@ simplify_preds_2 (pred_chain_union *preds)
       pred_chain *a_chain = &(*preds)[i];
 
       if (a_chain->length () != 2)
-        continue;
+	continue;
 
       x = (*a_chain)[0];
       y = (*a_chain)[1];
 
       for (j = 0; j < n; j++)
-        {
-          pred_chain *b_chain;
-          pred_info x2, y2;
+	{
+	  pred_chain *b_chain;
+	  pred_info x2, y2;
 
-          if (j == i)
-            continue;
+	  if (j == i)
+	    continue;
 
-          b_chain = &(*preds)[j];
-          if (b_chain->length () != 2)
-            continue;
+	  b_chain = &(*preds)[j];
+	  if (b_chain->length () != 2)
+	    continue;
 
-          x2 = (*b_chain)[0];
-          y2 = (*b_chain)[1];
+	  x2 = (*b_chain)[0];
+	  y2 = (*b_chain)[1];
 
-          if (pred_equal_p (x, x2) && pred_neg_p (y, y2))
-            {
-              /* Kill a_chain.  */
-              a_chain->release ();
-              b_chain->release ();
-              b_chain->safe_push (x);
-              simplified = true;
-              break;
-            }
-          if (pred_neg_p (x, x2) && pred_equal_p (y, y2))
-            {
-              /* Kill a_chain.  */
-              a_chain->release ();
-              b_chain->release ();
-              b_chain->safe_push (y);
-              simplified = true;
-              break;
-            }
-        }
+	  if (pred_equal_p (x, x2) && pred_neg_p (y, y2))
+	    {
+	      /* Kill a_chain.  */
+	      a_chain->release ();
+	      b_chain->release ();
+	      b_chain->safe_push (x);
+	      simplified = true;
+	      break;
+	    }
+	  if (pred_neg_p (x, x2) && pred_equal_p (y, y2))
+	    {
+	      /* Kill a_chain.  */
+	      a_chain->release ();
+	      b_chain->release ();
+	      b_chain->safe_push (y);
+	      simplified = true;
+	      break;
+	    }
+	}
     }
   /* Now clean up the chain.  */
   if (simplified)
     {
       for (i = 0; i < n; i++)
-        {
-          if ((*preds)[i].is_empty ())
-            continue;
-          s_preds.safe_push ((*preds)[i]);
-        }
+	{
+	  if ((*preds)[i].is_empty ())
+	    continue;
+	  s_preds.safe_push ((*preds)[i]);
+	}
       preds->release ();
       (*preds) = s_preds;
       s_preds = vNULL;
@@ -1663,34 +1641,34 @@ simplify_preds_3 (pred_chain_union *preds)
       pred_chain *a_chain = &(*preds)[i];
 
       if (a_chain->length () != 1)
-        continue;
+	continue;
 
       x = (*a_chain)[0];
 
       for (j = 0; j < n; j++)
-        {
-          pred_chain *b_chain;
-          pred_info x2;
-          size_t k;
+	{
+	  pred_chain *b_chain;
+	  pred_info x2;
+	  size_t k;
 
-          if (j == i)
-            continue;
+	  if (j == i)
+	    continue;
 
-          b_chain = &(*preds)[j];
-          if (b_chain->length () < 2)
-            continue;
+	  b_chain = &(*preds)[j];
+	  if (b_chain->length () < 2)
+	    continue;
 
-          for (k = 0; k < b_chain->length (); k++)
-            {
-              x2 = (*b_chain)[k];
-              if (pred_neg_p (x, x2))
-                {
-                  b_chain->unordered_remove (k);
-                  simplified = true;
-                  break;
-                }
-            }
-        }
+	  for (k = 0; k < b_chain->length (); k++)
+	    {
+	      x2 = (*b_chain)[k];
+	      if (pred_neg_p (x, x2))
+		{
+		  b_chain->unordered_remove (k);
+		  simplified = true;
+		  break;
+		}
+	    }
+	}
     }
   return simplified;
 }
@@ -1716,59 +1694,58 @@ simplify_preds_4 (pred_chain_union *preds)
       pred_chain *a_chain = &(*preds)[i];
 
       if (a_chain->length () != 1)
-        continue;
+	continue;
 
       z = (*a_chain)[0];
 
       if (!is_neq_zero_form_p (z))
-        continue;
+	continue;
 
       def_stmt = SSA_NAME_DEF_STMT (z.pred_lhs);
       if (gimple_code (def_stmt) != GIMPLE_ASSIGN)
-        continue;
+	continue;
 
       if (gimple_assign_rhs_code (def_stmt) != BIT_AND_EXPR)
-        continue;
+	continue;
 
       for (j = 0; j < n; j++)
-        {
-          pred_chain *b_chain;
-          pred_info x2, y2;
+	{
+	  pred_chain *b_chain;
+	  pred_info x2, y2;
 
-          if (j == i)
-            continue;
+	  if (j == i)
+	    continue;
 
-          b_chain = &(*preds)[j];
-          if (b_chain->length () != 2)
-            continue;
+	  b_chain = &(*preds)[j];
+	  if (b_chain->length () != 2)
+	    continue;
 
-          x2 = (*b_chain)[0];
-          y2 = (*b_chain)[1];
-          if (!is_neq_zero_form_p (x2)
-              || !is_neq_zero_form_p (y2))
-            continue;
+	  x2 = (*b_chain)[0];
+	  y2 = (*b_chain)[1];
+	  if (!is_neq_zero_form_p (x2) || !is_neq_zero_form_p (y2))
+	    continue;
 
-          if ((pred_expr_equal_p (x2, gimple_assign_rhs1 (def_stmt))
-               && pred_expr_equal_p (y2, gimple_assign_rhs2 (def_stmt)))
-              || (pred_expr_equal_p (x2, gimple_assign_rhs2 (def_stmt))
-                  && pred_expr_equal_p (y2, gimple_assign_rhs1 (def_stmt))))
-            {
-              /* Kill a_chain.  */
-              a_chain->release ();
-              simplified = true;
-              break;
-            }
-        }
+	  if ((pred_expr_equal_p (x2, gimple_assign_rhs1 (def_stmt))
+	       && pred_expr_equal_p (y2, gimple_assign_rhs2 (def_stmt)))
+	      || (pred_expr_equal_p (x2, gimple_assign_rhs2 (def_stmt))
+		  && pred_expr_equal_p (y2, gimple_assign_rhs1 (def_stmt))))
+	    {
+	      /* Kill a_chain.  */
+	      a_chain->release ();
+	      simplified = true;
+	      break;
+	    }
+	}
     }
   /* Now clean up the chain.  */
   if (simplified)
     {
       for (i = 0; i < n; i++)
-        {
-          if ((*preds)[i].is_empty ())
-            continue;
-          s_preds.safe_push ((*preds)[i]);
-        }
+	{
+	  if ((*preds)[i].is_empty ())
+	    continue;
+	  s_preds.safe_push ((*preds)[i]);
+	}
 
       destroy_predicate_vecs (preds);
       (*preds) = s_preds;
@@ -1777,7 +1754,6 @@ simplify_preds_4 (pred_chain_union *preds)
 
   return simplified;
 }
-
 
 /* This function simplifies predicates in PREDS.  */
 
@@ -1804,24 +1780,24 @@ simplify_preds (pred_chain_union *preds, gimple *use_or_def, bool is_use)
     {
       changed = false;
       if (simplify_preds_2 (preds))
-        changed = true;
+	changed = true;
 
       /* Now iteratively simplify X OR (!X AND Z ..)
        into X OR (Z ...).  */
       if (simplify_preds_3 (preds))
-        changed = true;
+	changed = true;
 
       if (simplify_preds_4 (preds))
-        changed = true;
-
-    } while (changed);
+	changed = true;
+    }
+  while (changed);
 
   return;
 }
 
 /* This is a helper function which attempts to normalize predicate chains
-  by following UD chains. It basically builds up a big tree of either IOR
-  operations or AND operations, and convert the IOR tree into a 
+  by following UD chains.  It basically builds up a big tree of either IOR
+  operations or AND operations, and convert the IOR tree into a
   pred_chain_union or BIT_AND tree into a pred_chain.
   Example:
 
@@ -1846,7 +1822,7 @@ simplify_preds (pred_chain_union *preds, gimple *use_or_def, bool is_use)
 
  then _t != 0 will be normalized into a pred_chain:
    (_2 RELOP1 _1) AND (_5 RELOP2 _4) AND (_8 RELOP3 _7) AND (_0 != 0)
-   
+
   */
 
 /* This is a helper function that stores a PRED into NORM_PREDS.  */
@@ -1864,7 +1840,7 @@ push_pred (pred_chain_union *norm_preds, pred_info pred)
 
 inline static void
 push_to_worklist (tree op, vec<pred_info, va_heap, vl_ptr> *work_list,
-                  hash_set<tree> *mark_set)
+		  hash_set<tree> *mark_set)
 {
   if (mark_set->contains (op))
     return;
@@ -1893,7 +1869,7 @@ get_pred_info_from_cmp (gimple *cmp_assign)
 }
 
 /* Returns true if the PHI is a degenerated phi with
-   all args with the same value (relop). In that case, *PRED
+   all args with the same value (relop).  In that case, *PRED
    will be updated to that value.  */
 
 static bool
@@ -1913,8 +1889,7 @@ is_degenerated_phi (gimple *phi, pred_info *pred_p)
   def0 = SSA_NAME_DEF_STMT (op0);
   if (gimple_code (def0) != GIMPLE_ASSIGN)
     return false;
-  if (TREE_CODE_CLASS (gimple_assign_rhs_code (def0))
-      != tcc_comparison)
+  if (TREE_CODE_CLASS (gimple_assign_rhs_code (def0)) != tcc_comparison)
     return false;
   pred0 = get_pred_info_from_cmp (def0);
 
@@ -1925,76 +1900,74 @@ is_degenerated_phi (gimple *phi, pred_info *pred_p)
       tree op = gimple_phi_arg_def (phi, i);
 
       if (TREE_CODE (op) != SSA_NAME)
-        return false;
+	return false;
 
       def = SSA_NAME_DEF_STMT (op);
       if (gimple_code (def) != GIMPLE_ASSIGN)
-        return false;
-      if (TREE_CODE_CLASS (gimple_assign_rhs_code (def))
-          != tcc_comparison)
-        return false;
+	return false;
+      if (TREE_CODE_CLASS (gimple_assign_rhs_code (def)) != tcc_comparison)
+	return false;
       pred = get_pred_info_from_cmp (def);
       if (!pred_equal_p (pred, pred0))
-        return false;
+	return false;
     }
 
   *pred_p = pred0;
   return true;
 }
 
-/* Normalize one predicate PRED  
+/* Normalize one predicate PRED
    1) if PRED can no longer be normlized, put it into NORM_PREDS.
    2) otherwise if PRED is of the form x != 0, follow x's definition
       and put normalized predicates into WORK_LIST.  */
- 
+
 static void
-normalize_one_pred_1 (pred_chain_union *norm_preds, 
-                      pred_chain *norm_chain,
-                      pred_info pred,
-                      enum tree_code and_or_code,
-                      vec<pred_info, va_heap, vl_ptr> *work_list,
+normalize_one_pred_1 (pred_chain_union *norm_preds,
+		      pred_chain *norm_chain,
+		      pred_info pred,
+		      enum tree_code and_or_code,
+		      vec<pred_info, va_heap, vl_ptr> *work_list,
 		      hash_set<tree> *mark_set)
 {
   if (!is_neq_zero_form_p (pred))
     {
       if (and_or_code == BIT_IOR_EXPR)
-        push_pred (norm_preds, pred);
+	push_pred (norm_preds, pred);
       else
-        norm_chain->safe_push (pred);
+	norm_chain->safe_push (pred);
       return;
     }
 
   gimple *def_stmt = SSA_NAME_DEF_STMT (pred.pred_lhs);
- 
+
   if (gimple_code (def_stmt) == GIMPLE_PHI
       && is_degenerated_phi (def_stmt, &pred))
     work_list->safe_push (pred);
-  else if (gimple_code (def_stmt) == GIMPLE_PHI
-           && and_or_code == BIT_IOR_EXPR)
+  else if (gimple_code (def_stmt) == GIMPLE_PHI && and_or_code == BIT_IOR_EXPR)
     {
       int i, n;
       n = gimple_phi_num_args (def_stmt);
 
-      /* If we see non zero constant, we should punt. The predicate
+      /* If we see non zero constant, we should punt.  The predicate
        * should be one guarding the phi edge.  */
       for (i = 0; i < n; ++i)
-        {
-          tree op = gimple_phi_arg_def (def_stmt, i);
-          if (TREE_CODE (op) == INTEGER_CST && !integer_zerop (op))
-            {
-              push_pred (norm_preds, pred);
-              return;
-            }
-        }
+	{
+	  tree op = gimple_phi_arg_def (def_stmt, i);
+	  if (TREE_CODE (op) == INTEGER_CST && !integer_zerop (op))
+	    {
+	      push_pred (norm_preds, pred);
+	      return;
+	    }
+	}
 
       for (i = 0; i < n; ++i)
-        {
-          tree op = gimple_phi_arg_def (def_stmt, i);
-          if (integer_zerop (op))
-            continue;
+	{
+	  tree op = gimple_phi_arg_def (def_stmt, i);
+	  if (integer_zerop (op))
+	    continue;
 
-          push_to_worklist (op, work_list, mark_set);
-        }
+	  push_to_worklist (op, work_list, mark_set);
+	}
     }
   else if (gimple_code (def_stmt) != GIMPLE_ASSIGN)
     {
@@ -2046,8 +2019,7 @@ normalize_one_pred_1 (pred_chain_union *norm_preds,
 /* Normalize PRED and store the normalized predicates into NORM_PREDS.  */
 
 static void
-normalize_one_pred (pred_chain_union *norm_preds,
-                    pred_info pred)
+normalize_one_pred (pred_chain_union *norm_preds, pred_info pred)
 {
   vec<pred_info, va_heap, vl_ptr> work_list = vNULL;
   enum tree_code and_or_code = ERROR_MARK;
@@ -2062,17 +2034,15 @@ normalize_one_pred (pred_chain_union *norm_preds,
   gimple *def_stmt = SSA_NAME_DEF_STMT (pred.pred_lhs);
   if (gimple_code (def_stmt) == GIMPLE_ASSIGN)
     and_or_code = gimple_assign_rhs_code (def_stmt);
-  if (and_or_code != BIT_IOR_EXPR
-      && and_or_code != BIT_AND_EXPR)
+  if (and_or_code != BIT_IOR_EXPR && and_or_code != BIT_AND_EXPR)
     {
-      if (TREE_CODE_CLASS (and_or_code)
-          == tcc_comparison)
-        {
-          pred_info n_pred = get_pred_info_from_cmp (def_stmt);
-          push_pred (norm_preds, n_pred);
-        } 
-       else
-          push_pred (norm_preds, pred);
+      if (TREE_CODE_CLASS (and_or_code) == tcc_comparison)
+	{
+	  pred_info n_pred = get_pred_info_from_cmp (def_stmt);
+	  push_pred (norm_preds, n_pred);
+	}
+      else
+	push_pred (norm_preds, pred);
       return;
     }
 
@@ -2082,8 +2052,8 @@ normalize_one_pred (pred_chain_union *norm_preds,
   while (!work_list.is_empty ())
     {
       pred_info a_pred = work_list.pop ();
-      normalize_one_pred_1 (norm_preds, &norm_chain, a_pred,
-                            and_or_code, &work_list, &mark_set);
+      normalize_one_pred_1 (norm_preds, &norm_chain, a_pred, and_or_code,
+			    &work_list, &mark_set);
     }
   if (and_or_code == BIT_AND_EXPR)
     norm_preds->safe_push (norm_chain);
@@ -2092,8 +2062,7 @@ normalize_one_pred (pred_chain_union *norm_preds,
 }
 
 static void
-normalize_one_pred_chain (pred_chain_union *norm_preds,
-                          pred_chain one_chain)
+normalize_one_pred_chain (pred_chain_union *norm_preds, pred_chain one_chain)
 {
   vec<pred_info, va_heap, vl_ptr> work_list = vNULL;
   hash_set<tree> mark_set;
@@ -2109,8 +2078,8 @@ normalize_one_pred_chain (pred_chain_union *norm_preds,
   while (!work_list.is_empty ())
     {
       pred_info a_pred = work_list.pop ();
-      normalize_one_pred_1 (0, &norm_chain, a_pred,
-                            BIT_AND_EXPR, &work_list, &mark_set);
+      normalize_one_pred_1 (0, &norm_chain, a_pred, BIT_AND_EXPR, &work_list,
+			    &mark_set);
     }
 
   norm_preds->safe_push (norm_chain);
@@ -2135,37 +2104,37 @@ normalize_preds (pred_chain_union preds, gimple *use_or_def, bool is_use)
   for (i = 0; i < n; i++)
     {
       if (preds[i].length () != 1)
-        normalize_one_pred_chain (&norm_preds, preds[i]);
+	normalize_one_pred_chain (&norm_preds, preds[i]);
       else
-        {
-          normalize_one_pred (&norm_preds, preds[i][0]);
-          preds[i].release ();
-        }
+	{
+	  normalize_one_pred (&norm_preds, preds[i][0]);
+	  preds[i].release ();
+	}
     }
 
   if (dump_file)
     {
       fprintf (dump_file, "[AFTER NORMALIZATION -- ");
-      dump_predicates (use_or_def, norm_preds, is_use ? "[USE]:\n" : "[DEF]:\n");
+      dump_predicates (use_or_def, norm_preds,
+		       is_use ? "[USE]:\n" : "[DEF]:\n");
     }
 
   destroy_predicate_vecs (&preds);
   return norm_preds;
 }
 
-
 /* Computes the predicates that guard the use and checks
    if the incoming paths that have empty (or possibly
-   empty) definition can be pruned/filtered. The function returns
+   empty) definition can be pruned/filtered.  The function returns
    true if it can be determined that the use of PHI's def in
    USE_STMT is guarded with a predicate set not overlapping with
    predicate sets of all runtime paths that do not have a definition.
 
-   Returns false if it is not or it can not be determined. USE_BB is
+   Returns false if it is not or it can not be determined.  USE_BB is
    the bb of the use (for phi operand use, the bb is not the bb of
    the phi stmt, but the src bb of the operand edge).
 
-   UNINIT_OPNDS is a bit vector. If an operand of PHI is uninitialized, the
+   UNINIT_OPNDS is a bit vector.  If an operand of PHI is uninitialized, the
    corresponding bit in the vector is 1.  VISITED_PHIS is a pointer
    set of phis being visited.
 
@@ -2177,11 +2146,11 @@ normalize_preds (pred_chain_union preds, gimple *use_or_def, bool is_use)
 
 static bool
 is_use_properly_guarded (gimple *use_stmt,
-                         basic_block use_bb,
-                         gphi *phi,
-                         unsigned uninit_opnds,
+			 basic_block use_bb,
+			 gphi *phi,
+			 unsigned uninit_opnds,
 			 pred_chain_union *def_preds,
-                         hash_set<gphi *> *visited_phis)
+			 hash_set<gphi *> *visited_phis)
 {
   basic_block phi_bb;
   pred_chain_union preds = vNULL;
@@ -2204,7 +2173,7 @@ is_use_properly_guarded (gimple *use_stmt,
       return false;
     }
 
-  /* Try to prune the dead incoming phi edges. */
+  /* Try to prune the dead incoming phi edges.  */
   is_properly_guarded
     = use_pred_not_overlap_with_undef_path_pred (preds, phi, uninit_opnds,
 						 visited_phis);
@@ -2240,16 +2209,16 @@ is_use_properly_guarded (gimple *use_stmt,
 
 /* Searches through all uses of a potentially
    uninitialized variable defined by PHI and returns a use
-   statement if the use is not properly guarded. It returns
-   NULL if all uses are guarded. UNINIT_OPNDS is a bitvector
-   holding the position(s) of uninit PHI operands. WORKLIST
+   statement if the use is not properly guarded.  It returns
+   NULL if all uses are guarded.  UNINIT_OPNDS is a bitvector
+   holding the position(s) of uninit PHI operands.  WORKLIST
    is the vector of candidate phis that may be updated by this
-   function. ADDED_TO_WORKLIST is the pointer set tracking
+   function.  ADDED_TO_WORKLIST is the pointer set tracking
    if the new phi is already in the worklist.  */
 
 static gimple *
 find_uninit_use (gphi *phi, unsigned uninit_opnds,
-                 vec<gphi *> *worklist,
+		 vec<gphi *> *worklist,
 		 hash_set<gphi *> *added_to_worklist)
 {
   tree phi_result;
@@ -2269,9 +2238,9 @@ find_uninit_use (gphi *phi, unsigned uninit_opnds,
       if (is_gimple_debug (use_stmt))
 	continue;
 
-      if (gphi *use_phi = dyn_cast <gphi *> (use_stmt))
-	use_bb = gimple_phi_arg_edge (use_phi,
-				      PHI_ARG_INDEX_FROM_USE (use_p))->src;
+      if (gphi *use_phi = dyn_cast<gphi *> (use_stmt))
+	use_bb
+	  = gimple_phi_arg_edge (use_phi, PHI_ARG_INDEX_FROM_USE (use_p))->src;
       else
 	use_bb = gimple_bb (use_stmt);
 
@@ -2281,10 +2250,10 @@ find_uninit_use (gphi *phi, unsigned uninit_opnds,
 	continue;
 
       if (dump_file && (dump_flags & TDF_DETAILS))
-        {
-          fprintf (dump_file, "[CHECK]: Found unguarded use: ");
-          print_gimple_stmt (dump_file, use_stmt, 0, 0);
-        }
+	{
+	  fprintf (dump_file, "[CHECK]: Found unguarded use: ");
+	  print_gimple_stmt (dump_file, use_stmt, 0, 0);
+	}
       /* Found one real use, return.  */
       if (gimple_code (use_stmt) != GIMPLE_PHI)
 	{
@@ -2293,18 +2262,18 @@ find_uninit_use (gphi *phi, unsigned uninit_opnds,
 	}
 
       /* Found a phi use that is not guarded,
-         add the phi to the worklist.  */
-      if (!added_to_worklist->add (as_a <gphi *> (use_stmt)))
-        {
-          if (dump_file && (dump_flags & TDF_DETAILS))
-            {
-              fprintf (dump_file, "[WORKLIST]: Update worklist with phi: ");
-              print_gimple_stmt (dump_file, use_stmt, 0, 0);
-            }
+	 add the phi to the worklist.  */
+      if (!added_to_worklist->add (as_a<gphi *> (use_stmt)))
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    {
+	      fprintf (dump_file, "[WORKLIST]: Update worklist with phi: ");
+	      print_gimple_stmt (dump_file, use_stmt, 0, 0);
+	    }
 
-          worklist->safe_push (as_a <gphi *> (use_stmt));
-          possibly_undefined_names->add (phi_result);
-        }
+	  worklist->safe_push (as_a<gphi *> (use_stmt));
+	  possibly_undefined_names->add (phi_result);
+	}
     }
 
   destroy_predicate_vecs (&def_preds);
@@ -2313,15 +2282,15 @@ find_uninit_use (gphi *phi, unsigned uninit_opnds,
 
 /* Look for inputs to PHI that are SSA_NAMEs that have empty definitions
    and gives warning if there exists a runtime path from the entry to a
-   use of the PHI def that does not contain a definition. In other words,
-   the warning is on the real use. The more dead paths that can be pruned
-   by the compiler, the fewer false positives the warning is. WORKLIST
-   is a vector of candidate phis to be examined. ADDED_TO_WORKLIST is
+   use of the PHI def that does not contain a definition.  In other words,
+   the warning is on the real use.  The more dead paths that can be pruned
+   by the compiler, the fewer false positives the warning is.  WORKLIST
+   is a vector of candidate phis to be examined.  ADDED_TO_WORKLIST is
    a pointer set tracking if the new phi is added to the worklist or not.  */
 
 static void
 warn_uninitialized_phi (gphi *phi, vec<gphi *> *worklist,
-                        hash_set<gphi *> *added_to_worklist)
+			hash_set<gphi *> *added_to_worklist)
 {
   unsigned uninit_opnds;
   gimple *uninit_use_stmt = 0;
@@ -2335,7 +2304,7 @@ warn_uninitialized_phi (gphi *phi, vec<gphi *> *worklist,
 
   uninit_opnds = compute_uninit_opnds_pos (phi);
 
-  if  (MASK_EMPTY (uninit_opnds))
+  if (MASK_EMPTY (uninit_opnds))
     return;
 
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -2345,8 +2314,8 @@ warn_uninitialized_phi (gphi *phi, vec<gphi *> *worklist,
     }
 
   /* Now check if we have any use of the value without proper guard.  */
-  uninit_use_stmt = find_uninit_use (phi, uninit_opnds,
-                                     worklist, added_to_worklist);
+  uninit_use_stmt
+    = find_uninit_use (phi, uninit_opnds, worklist, added_to_worklist);
 
   /* All uses are properly guarded.  */
   if (!uninit_use_stmt)
@@ -2362,9 +2331,8 @@ warn_uninitialized_phi (gphi *phi, vec<gphi *> *worklist,
     loc = UNKNOWN_LOCATION;
   warn_uninit (OPT_Wmaybe_uninitialized, uninit_op, SSA_NAME_VAR (uninit_op),
 	       SSA_NAME_VAR (uninit_op),
-               "%qD may be used uninitialized in this function",
-               uninit_use_stmt, loc);
-
+	       "%qD may be used uninitialized in this function",
+	       uninit_use_stmt, loc);
 }
 
 static bool
@@ -2377,15 +2345,15 @@ namespace {
 
 const pass_data pass_data_late_warn_uninitialized =
 {
-  GIMPLE_PASS, /* type */
-  "uninit", /* name */
+  GIMPLE_PASS,   /* type */
+  "uninit",      /* name */
   OPTGROUP_NONE, /* optinfo_flags */
-  TV_NONE, /* tv_id */
-  PROP_ssa, /* properties_required */
-  0, /* properties_provided */
-  0, /* properties_destroyed */
-  0, /* todo_flags_start */
-  0, /* todo_flags_finish */
+  TV_NONE,       /* tv_id */
+  PROP_ssa,      /* properties_required */
+  0,		 /* properties_provided */
+  0,		 /* properties_destroyed */
+  0,		 /* todo_flags_start */
+  0,		 /* todo_flags_finish */
 };
 
 class pass_late_warn_uninitialized : public gimple_opt_pass
@@ -2393,14 +2361,27 @@ class pass_late_warn_uninitialized : public gimple_opt_pass
 public:
   pass_late_warn_uninitialized (gcc::context *ctxt)
     : gimple_opt_pass (pass_data_late_warn_uninitialized, ctxt)
-  {}
+  {
+  }
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_late_warn_uninitialized (m_ctxt); }
-  virtual bool gate (function *) { return gate_warn_uninitialized (); }
+  opt_pass *clone ();
+  virtual bool gate (function *);
   virtual unsigned int execute (function *);
 
 }; // class pass_late_warn_uninitialized
+
+opt_pass *
+pass_late_warn_uninitialized::clone ()
+{
+  return new pass_late_warn_uninitialized (m_ctxt);
+}
+
+bool
+pass_late_warn_uninitialized::gate (function *)
+{
+  return gate_warn_uninitialized ();
+}
 
 unsigned int
 pass_late_warn_uninitialized::execute (function *fun)
@@ -2437,8 +2418,7 @@ pass_late_warn_uninitialized::execute (function *fun)
 	for (i = 0; i < n; ++i)
 	  {
 	    tree op = gimple_phi_arg_def (phi, i);
-	    if (TREE_CODE (op) == SSA_NAME
-		&& uninit_undefined_value_p (op))
+	    if (TREE_CODE (op) == SSA_NAME && uninit_undefined_value_p (op))
 	      {
 		worklist.safe_push (phi);
 		added_to_worklist.add (phi);
@@ -2475,12 +2455,11 @@ make_pass_late_warn_uninitialized (gcc::context *ctxt)
   return new pass_late_warn_uninitialized (ctxt);
 }
 
-
 static unsigned int
 execute_early_warn_uninitialized (void)
 {
   /* Currently, this pass runs always but
-     execute_late_warn_uninitialized only runs with optimization. With
+     execute_late_warn_uninitialized only runs with optimization.  With
      optimization we want to warn about possible uninitialized as late
      as possible, thus don't do it here.  However, without
      optimization we need to warn here about "may be uninitialized".  */
@@ -2488,27 +2467,26 @@ execute_early_warn_uninitialized (void)
 
   warn_uninitialized_vars (/*warn_possibly_uninitialized=*/!optimize);
 
-  /* Post-dominator information can not be reliably updated. Free it
+  /* Post-dominator information can not be reliably updated.  Free it
      after the use.  */
 
   free_dominance_info (CDI_POST_DOMINATORS);
   return 0;
 }
 
-
 namespace {
 
 const pass_data pass_data_early_warn_uninitialized =
 {
-  GIMPLE_PASS, /* type */
+  GIMPLE_PASS,		       /* type */
   "*early_warn_uninitialized", /* name */
-  OPTGROUP_NONE, /* optinfo_flags */
-  TV_TREE_UNINIT, /* tv_id */
-  PROP_ssa, /* properties_required */
-  0, /* properties_provided */
-  0, /* properties_destroyed */
-  0, /* todo_flags_start */
-  0, /* todo_flags_finish */
+  OPTGROUP_NONE,	       /* optinfo_flags */
+  TV_TREE_UNINIT,	       /* tv_id */
+  PROP_ssa,		       /* properties_required */
+  0,			       /* properties_provided */
+  0,			       /* properties_destroyed */
+  0,			       /* todo_flags_start */
+  0,			       /* todo_flags_finish */
 };
 
 class pass_early_warn_uninitialized : public gimple_opt_pass
@@ -2519,13 +2497,22 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return gate_warn_uninitialized (); }
-  virtual unsigned int execute (function *)
-    {
-      return execute_early_warn_uninitialized ();
-    }
+  virtual bool gate (function *);
+  virtual unsigned int execute (function *);
 
 }; // class pass_early_warn_uninitialized
+
+bool
+pass_early_warn_uninitialized::gate (function *)
+{
+  return gate_warn_uninitialized ();
+}
+
+unsigned int
+pass_early_warn_uninitialized::execute (function *)
+{
+  return execute_early_warn_uninitialized ();
+}
 
 } // anon namespace
 
