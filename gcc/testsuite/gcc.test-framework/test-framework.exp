@@ -59,7 +59,7 @@ set dg-do-what-default compile
 dg-init
 
 # Run tests from the source directory.
-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/dg-*.c]] "" ""
+dg-runtest-valgrind [lsort [glob -nocomplain $srcdir/$subdir/dg-*.c]] "" ""
 
 # Skip generated tests unless CHECK_TEST_FRAMEWORK is 1.
 if { $env(CHECK_TEST_FRAMEWORK) != 1 } {
@@ -76,7 +76,7 @@ set status [remote_exec host "$generator $tstobjdir"]
 set status [lindex $status 0]
 if { $status == 0 } {
     # Run the generated tests.
-    dg-runtest [lsort [find $tstobjdir *.c]] "" "-DY1 -DY2"
+    dg-runtest-valgrind [lsort [find $tstobjdir *.c]] "" "-DY1 -DY2"
 } else {
     warning "Could not generate test framework tests"
 }

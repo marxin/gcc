@@ -59,7 +59,7 @@ if { $status == 0 } then {
             }
 
 	    gcc_parallel_test_enable 0
-            dg-runtest $src "" $DEFAULT_CFLAGS
+            dg-runtest-valgrind $src "" $DEFAULT_CFLAGS
 	    gcc_parallel_test_enable 1
         }
     } else {

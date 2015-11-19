@@ -67,7 +67,7 @@ foreach offload_target_openacc $offload_targets_s_openacc {
 
     setenv ACC_DEVICE_TYPE $offload_target_openacc
 
-    dg-runtest $tests "$tagopt" $DEFAULT_CFLAGS
+    dg-runtest-valgrind $tests "$tagopt" $DEFAULT_CFLAGS
 }
 
 # All done.

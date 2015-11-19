@@ -72,7 +72,7 @@ if { $lang_test_file_found } {
     }
 
     # Main loop.
-    dg-runtest $tests "" $libstdcxx_includes
+    dg-runtest-valgrind $tests "" $libstdcxx_includes
 }
 
 # All done.

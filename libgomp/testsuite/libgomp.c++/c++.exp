@@ -65,7 +65,7 @@ if { $lang_test_file_found } {
     }
 
     # Main loop.
-    dg-runtest $tests "" "$libstdcxx_includes $DEFAULT_CFLAGS"
+    dg-runtest-valgrind $tests "" "$libstdcxx_includes $DEFAULT_CFLAGS"
 }
 
 # All done.

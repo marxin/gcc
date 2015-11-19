@@ -31,11 +31,11 @@ dg-init
 set tests [lsort [glob -nocomplain $srcdir/$subdir/*.m]]
 
 # Main loop.
-dg-runtest $tests "-fgnu-runtime" $DEFAULT_CFLAGS
+dg-runtest-valgrind $tests "-fgnu-runtime" $DEFAULT_CFLAGS
 
 # darwin targets can also run code with the NeXT runtime.
 if [istarget "*-*-darwin*" ] {
-  dg-runtest $tests "-fnext-runtime" $DEFAULT_CFLAGS
+  dg-runtest-valgrind $tests "-fnext-runtime" $DEFAULT_CFLAGS
 }
 
 # All done.

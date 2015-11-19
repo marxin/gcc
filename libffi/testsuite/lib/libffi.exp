@@ -285,7 +285,7 @@ proc libffi-dg-runtest { testcases default-extra-flags } {
 
 	foreach flags $option_list {
 	    verbose "Testing $nshort, $flags" 1
-	    dg-test $test $flags ${default-extra-flags}
+	    dg-test-valgrind $test $flags ${default-extra-flags}
 	}
     }
 }
@@ -333,7 +333,7 @@ proc run-many-tests { testcases extra_flags } {
             foreach abi $abis {
                 set options [concat $common $opt $abi]
                 verbose "Testing $testname, $options" 1
-                dg-test $test $options ""
+                dg-test-valgrind $test $options ""
             }
         }
     }

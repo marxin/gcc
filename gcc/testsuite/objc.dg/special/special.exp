@@ -43,7 +43,7 @@ set lines [objc_target_compile "$srcdir/$subdir/unclaimed-category-1a.m" "unclai
 if ![string match "" $lines] then {
     fail "unclaimed-category-1a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/unclaimed-category-1.m" "unclaimed-category-1a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/unclaimed-category-1.m" "unclaimed-category-1a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
     file delete unclaimed-category-1a.o
 }
 
@@ -54,7 +54,7 @@ set lines [objc_target_compile "$srcdir/$subdir/unclaimed-category-1a.m" "unclai
 if ![string match "" $lines] then {
     fail "unclaimed-category-1a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/unclaimed-category-1.m" "unclaimed-category-1a.o" "-fnext-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/unclaimed-category-1.m" "unclaimed-category-1a.o" "-fnext-runtime"
     file delete unclaimed-category-1a.o
 }
 }
@@ -70,7 +70,7 @@ set lines [objc_target_compile "$srcdir/$subdir/load-category-1a.m" "load-catego
 if ![string match "" $lines] then {
     fail "load-category-1a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/load-category-1.m" "load-category-1a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/load-category-1.m" "load-category-1a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
     file delete load-category-1a.o
 }
 
@@ -81,7 +81,7 @@ set lines [objc_target_compile "$srcdir/$subdir/load-category-1a.m" "load-catego
 if ![string match "" $lines] then {
     fail "load-category-1a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/load-category-1.m" "load-category-1a.o" "-fnext-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/load-category-1.m" "load-category-1a.o" "-fnext-runtime"
     file delete load-category-1a.o
 }
 }
@@ -97,7 +97,7 @@ set lines [objc_target_compile "$srcdir/$subdir/load-category-2a.m" "load-catego
 if ![string match "" $lines] then {
     fail "load-category-2a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/load-category-2.m" "load-category-2a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/load-category-2.m" "load-category-2a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
     file delete load-category-2a.o
 }
 
@@ -108,7 +108,7 @@ set lines [objc_target_compile "$srcdir/$subdir/load-category-2a.m" "load-catego
 if ![string match "" $lines] then {
     fail "load-category-2a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/load-category-2.m" "load-category-2a.o" "-fnext-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/load-category-2.m" "load-category-2a.o" "-fnext-runtime"
     file delete load-category-2a.o
 }
 }
@@ -124,7 +124,7 @@ set lines [objc_target_compile "$srcdir/$subdir/load-category-3a.m" "load-catego
 if ![string match "" $lines] then {
     fail "load-category-3a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/load-category-3.m" "load-category-3a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/load-category-3.m" "load-category-3a.o" "-I${srcdir}/../../libobjc -fgnu-runtime"
     file delete load-category-3a.o
 }
 
@@ -135,7 +135,7 @@ set lines [objc_target_compile "$srcdir/$subdir/load-category-3a.m" "load-catego
 if ![string match "" $lines] then {
     fail "load-category-3a.o"
 } else {
-    dg-runtest "$srcdir/$subdir/load-category-3.m" "load-category-3a.o" "-fnext-runtime"
+    dg-runtest-valgrind "$srcdir/$subdir/load-category-3.m" "load-category-3a.o" "-fnext-runtime"
     file delete load-category-3a.o
 }
 }

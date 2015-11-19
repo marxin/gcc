@@ -62,22 +62,22 @@ if { $lang_test_file_found } {
     # Run the tests with -fvtable-verify=std
     foreach flags $VTV_FLAGS {
 	foreach srcfile [lsort [glob -nocomplain ${srcdir}/libvtv.cc/*.cc]] {
-	    dg-runtest $srcfile "$flags -fvtable-verify=std" $libstdcxx_includes
+	    dg-runtest-valgrind $srcfile "$flags -fvtable-verify=std" $libstdcxx_includes
 	}
 
 	foreach srcfile [lsort [glob -nocomplain ${srcdir}/libvtv.cc/@*.list]] {
-	    dg-runtest $srcfile "$flags -fvtable-verify=std" $libstdcxx_includes
+	    dg-runtest-valgrind $srcfile "$flags -fvtable-verify=std" $libstdcxx_includes
 	}
     }
 
     # Run the tests with -fvtable-verify=preinit
     foreach flags $VTV_FLAGS {
 	foreach srcfile [lsort [glob -nocomplain ${srcdir}/libvtv.cc/*.cc]] {
-	    dg-runtest $srcfile "$flags -fvtable-verify=preinit" $libstdcxx_includes
+	    dg-runtest-valgrind $srcfile "$flags -fvtable-verify=preinit" $libstdcxx_includes
 	}
 
 	foreach srcfile [lsort [glob -nocomplain ${srcdir}/libvtv.cc/@*.list]] {
-	    dg-runtest $srcfile "$flags -fvtable-verify=preinit" $libstdcxx_includes
+	    dg-runtest-valgrind $srcfile "$flags -fvtable-verify=preinit" $libstdcxx_includes
 	}
     }
 }

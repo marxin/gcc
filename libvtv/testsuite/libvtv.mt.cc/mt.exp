@@ -62,7 +62,7 @@ if { $lang_test_file_found } {
     # Run the tests with -fvtable-verify=std
     foreach flags $VTV_FLAGS {
 	foreach srcfile [lsort [glob -nocomplain ${srcdir}/libvtv.mt.cc/*.cc]] {
-	    dg-runtest $srcfile "$flags -fvtable-verify=std -lpthread" $libstdcxx_includes
+	    dg-runtest-valgrind $srcfile "$flags -fvtable-verify=std -lpthread" $libstdcxx_includes
 	}
     }
 }

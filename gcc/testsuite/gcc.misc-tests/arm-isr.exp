@@ -22,7 +22,7 @@ load_lib gcc-dg.exp
 
 dg-init
 if { [istarget "arm*-*-*"] } {
-  dg-runtest "$srcdir/$subdir/arm-isr.c" "" ""
+  dg-runtest-valgrind "$srcdir/$subdir/arm-isr.c" "" ""
 }
 dg-finish
 
