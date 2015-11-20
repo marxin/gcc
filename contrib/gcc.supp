@@ -1,0 +1,108 @@
+{
+   cpp_get_buff
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:xmalloc
+   fun:new_buff
+   fun:_cpp_get_buff
+   ...
+}
+{
+   gnu-as
+   Memcheck:Leak
+   match-leak-kinds: definite,possible
+   fun:malloc
+   ...
+   obj:/usr/bin/as
+   ...
+}
+{
+   gnu-as
+   Memcheck:Leak
+   match-leak-kinds: definite,possible
+   fun:calloc
+   fun:xcalloc
+   ...
+   obj:/usr/bin/as
+   ...
+}
+{
+   todo-fix-mpfr
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:__gmp_default_allocate
+   fun:mpfr_init2
+   fun:mpfr_cache
+   fun:mpfr_log
+   ...
+}
+{
+   cpp-front-end
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:xmalloc
+   fun:_ZL22cp_literal_operator_idPKc
+   fun:cp_parser_template_name
+   ...
+}
+{
+   todo-fix-options1
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:xcalloc
+   fun:_Z20lang_specific_driverPP17cl_decoded_optionPjPi
+   fun:_ZL15process_commandjP17cl_decoded_option
+   fun:_ZNK6driver12set_up_specsEv
+   fun:_ZN6driver4mainEiPPc
+   fun:main
+}
+{
+   todo-fix-options2
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:xmalloc
+   fun:_Z20lang_specific_driverPP17cl_decoded_optionPjPi
+   fun:_ZL15process_commandjP17cl_decoded_option
+   fun:_ZNK6driver12set_up_specsEv
+   fun:_ZN6driver4mainEiPPc
+   fun:main
+}
+{
+   ld.bfd-alloc
+   Memcheck:Leak
+   match-leak-kinds: definite,possible
+   fun:malloc
+   ...
+   obj:/usr/bin/ld.bfd
+   ...
+}
+{
+   ld.bfd-realloc
+   Memcheck:Leak
+   match-leak-kinds: definite,possible
+   fun:realloc
+   ...
+   obj:/usr/bin/ld.bfd
+   ...
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:xcalloc
+   fun:main
+}
+{
+   collect2
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:xcalloc
+   fun:main
+}
