@@ -3024,32 +3024,43 @@ execute (void)
 #endif /* DEBUG */
     }
 
-#ifdef ENABLE_VALGRIND_CHECKING
-  /* Run the each command through valgrind.  To simplify prepending the
-     path to valgrind and the option "-q" (for quiet operation unless
-     something triggers), we allocate a separate argv array.  */
-
-  for (i = 0; i < n_commands; i++)
+  if (env.get ("RUN_UNDER_VALGRIND"))
     {
-      const char **argv;
-      int argc;
-      int j;
+      /* Run the each command through valgrind.  To simplify prepending the
+	 path to valgrind and the option "-q" (for quiet operation unless
+	 something triggers), we allocate a separate argv array.  */
 
-      for (argc = 0; commands[i].argv[argc] != NULL; argc++)
-	;
+      auto_vec<const char *> valgrind_options;
+      valgrind_options.safe_push ("valgrind");
+      valgrind_options.safe_push ("-q");
+      valgrind_options.safe_push ("--leak-check=yes");
+      valgrind_options.safe_push ("--error-exitcode=111");
+      valgrind_options.safe_push ("--suppressions=/tmp/gcc.supp");
+      valgrind_options.safe_push ("--num-callers=30");
 
-      argv = XALLOCAVEC (const char *, argc + 3);
+      for (i = 0; i < n_commands; i++)
+	{
+	  const char **argv;
+	  unsigned argc;
 
-      argv[0] = VALGRIND_PATH;
-      argv[1] = "-q";
-      for (j = 2; j < argc + 2; j++)
-	argv[j] = commands[i].argv[j - 2];
-      argv[j] = NULL;
+	  for (argc = 0; commands[i].argv[argc] != NULL; argc++)
+	    ;
 
-      commands[i].argv = argv;
-      commands[i].prog = argv[0];
+	  unsigned l = argc + valgrind_options.length ();
+	  argv = XALLOCAVEC (const char *, l + 1);
+
+	  for (unsigned j = 0; j < valgrind_options.length (); j++)
+	    argv[j] = valgrind_options[j];
+
+	  for (unsigned j = 0; j < argc; j++)
+	    argv[j + valgrind_options.length ()] = commands[i].argv[j];
+
+	  argv[l] = NULL;
+
+	  commands[i].argv = argv;
+	  commands[i].prog = argv[0];
+	}
     }
-#endif
 
   /* Run each piped subprocess.  */
 
