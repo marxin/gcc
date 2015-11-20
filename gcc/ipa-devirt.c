@@ -3837,7 +3837,7 @@ ipa_devirt (void)
 
       if (warn_suggest_final_methods)
 	{
-	  vec<const decl_warn_count*> decl_warnings_vec = vNULL;
+	  auto_vec<const decl_warn_count*> decl_warnings_vec;
 
 	  final_warning_records->decl_warnings.traverse
 	    <vec<const decl_warn_count *> *, add_decl_warning> (&decl_warnings_vec);
@@ -3887,7 +3887,8 @@ ipa_devirt (void)
 			      decl, count, dyn_count);
 	    }
 	}
-	
+
+      final_warning_records->type_warnings.release ();
       delete (final_warning_records);
       final_warning_records = 0;
     }
