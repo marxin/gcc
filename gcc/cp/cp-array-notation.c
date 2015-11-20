@@ -97,7 +97,7 @@ make_triplet_val_inv (tree *value)
 */
 
 static vec<tree, va_gc> *
-create_array_refs (location_t loc, vec<vec<an_parts> > an_info,
+create_array_refs (location_t loc, const vec<vec<an_parts> > &an_info,
 		   vec<an_loop_parts> an_loop_info, size_t size,  size_t rank)
 {
   tree ind_mult, ind_incr;
@@ -134,7 +134,7 @@ create_array_refs (location_t loc, vec<vec<an_parts> > an_info,
 
 void
 create_cmp_incr (location_t loc, vec <an_loop_parts> *node, size_t rank, 
-		 vec<vec<an_parts> > an_info, tsubst_flags_t complain)
+		 const vec<vec<an_parts> > &an_info, tsubst_flags_t complain)
 {
   for (size_t ii = 0; ii < rank; ii++)
     {
@@ -494,7 +494,7 @@ expand_sec_reduce_builtin (tree an_builtin_fn, tree *new_var)
     }
   append_to_statement_list (body, &loop_with_init);
 
-  an_info.release ();
+  release_vec_vec (an_info);
   an_loop_info.release ();
 
   return loop_with_init;
@@ -768,11 +768,11 @@ expand_an_in_modify_expr (location_t location, tree lhs,
     }
   append_to_statement_list (body, &loop_with_init);
 
-  lhs_an_info.release ();
+  release_vec_vec (lhs_an_info);
   lhs_an_loop_info.release ();
   if (rhs_rank) 
     { 
-      rhs_an_info.release (); 
+      release_vec_vec (rhs_an_info);
       rhs_an_loop_info.release ();
     }
   cond_expr.release ();
@@ -957,7 +957,7 @@ cp_expand_cond_array_notations (tree orig_stmt)
     }
   append_to_statement_list (body, &loop_with_init);
 
-  an_info.release ();
+  release_vec_vec (an_info);
   an_loop_info.release ();
   
   return loop_with_init;
@@ -1060,7 +1060,7 @@ expand_unary_array_notation_exprs (tree orig_stmt)
     }
   append_to_statement_list (body, &loop_with_init);
 
-  an_info.release ();
+  release_vec_vec (an_info);
   an_loop_info.release ();
 
   return loop_with_init;

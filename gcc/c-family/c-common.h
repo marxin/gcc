@@ -1438,6 +1438,7 @@ extern tree replace_inv_trees (tree *, int *, void *);
 extern tree find_correct_array_notation_type (tree op);
 extern void cilkplus_extract_an_triplets (vec<tree, va_gc> *, size_t, size_t,
 					  vec<vec<an_parts> > *);
+
 extern vec <tree, va_gc> *fix_sec_implicit_args
   (location_t, vec <tree, va_gc> *, vec<an_loop_parts>, size_t, tree);
 extern bool is_cilkplus_vector_p (tree);
