@@ -98,7 +98,7 @@ make_triplet_val_inv (location_t loc, tree *value)
 
 static void
 create_cmp_incr (location_t loc, vec<an_loop_parts> *node, size_t rank,
-		 vec<vec<an_parts> > an_info)
+		 const vec<vec<an_parts> > &an_info)
 {
   for (size_t ii = 0; ii < rank; ii++)
     {
@@ -122,7 +122,7 @@ create_cmp_incr (location_t loc, vec<an_loop_parts> *node, size_t rank,
 */
 
 static vec<tree, va_gc> *
-create_array_refs (location_t loc, vec<vec<an_parts> > an_info,
+create_array_refs (location_t loc, const vec<vec<an_parts> > &an_info,
 		   vec<an_loop_parts> an_loop_info, size_t size, size_t rank)
 {
   tree ind_mult, ind_incr;
@@ -593,7 +593,7 @@ fix_builtin_array_notation_fn (tree an_builtin_fn, tree *new_var)
     }
   append_to_statement_list_force (body, &loop_with_init);
 
-  an_info.release ();
+  release_vec_vec (an_info);
   an_loop_info.release ();
   
   return loop_with_init;
@@ -881,11 +881,11 @@ build_array_notation_expr (location_t location, tree lhs, tree lhs_origtype,
     }
   append_to_statement_list_force (body, &loop_with_init);
 
-  lhs_an_info.release ();
+  release_vec_vec (lhs_an_info);
   lhs_an_loop_info.release ();
   if (rhs_rank)
     {
-      rhs_an_info.release ();
+      release_vec_vec (rhs_an_info);
       rhs_an_loop_info.release ();
     }
   cond_expr.release ();
@@ -1007,7 +1007,7 @@ fix_conditional_array_notations_1 (tree stmt)
   append_to_statement_list_force (body, &loop_with_init);
 
   an_loop_info.release ();
-  an_info.release ();
+  release_vec_vec (an_info);
 
   return loop_with_init;
 }
@@ -1110,7 +1110,7 @@ fix_array_notation_expr (location_t location, enum tree_code code,
     }
   append_to_statement_list_force (body, &loop_with_init);
   arg.value = loop_with_init;
-  an_info.release ();
+  release_vec_vec (an_info);
   an_loop_info.release ();
   return arg;
 }
@@ -1195,7 +1195,7 @@ fix_array_notation_call_expr (tree arg)
     }
   append_to_statement_list_force (body, &loop_with_init);
   an_loop_info.release ();
-  an_info.release ();
+  release_vec_vec (an_info);
   return loop_with_init;
 }
 
