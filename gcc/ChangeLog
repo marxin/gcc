@@ -1,3 +1,63 @@
+2015-11-23  Martin Liska  <mliska@suse.cz>
+
+	Backport from mainline
+	2015-06-22  Jan Hubicka  <hubicka@ucw.cz>
+		    Martin Liska  <mliska@suse.cz>
+
+	PR ipa/65908
+	* ipa-icf.c (sem_item::target_supports_symbol_aliases): Remove
+	construction of arg_types.
+	(sem_function::sem_function): Likewise.
+	(sem_function::~sem_function): Remove destruction of arg_types.
+	(sem_function::compatible_parm_types_p): New function.
+	(sem_function::equals_wpa): Reorg matching of return values
+	and parameter types.
+	(sem_function::equals_private): Reorg mathcing of argument types.
+	(sem_function::parse_tree_args): Remove.
+	(sem_function::param_used_p): New function.
+	* ipa-icf.h (init_wpa): Do not call it.
+	(parse_tree_args): Remove.
+	(compatible_parm_types_p): Declare.
+	(result_type): Remove.
+	(arg_types): Remove.
+	(param_used_p): Declare.
+
+2015-11-23  Richard Biener  <rguenther@suse.de>
+
+	Backport from mainline
+	2015-10-29  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/56956
+	* fold-const.c (fold_cond_expr_with_comparison): Do not fold
+	unsigned conditonal negation to ABS_EXPR.
+
+2015-11-22  Dominique d'Humieres  <dominiq@lps.ens.fr>
+
+	Backport from mainline
+	2015-09-14  Manuel López-Ibáñe<manu@gcc.gnu.org>
+
+	PR fortran/67460
+	* diagnostic.c (diagnostic_initialize): Do not set
+	some_warnings_are_errors.
+	(diagnostic_finish): Use DK_WERROR count instead.
+	(diagnostic_report_diagnostic): Do not set
+	some_warnings_are_errors.
+	* diagnostic.h (struct diagnostic_context): Remove
+	some_warnings_are_errors.
+
+2015-11-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/66432
+	* tree-inline.c (copy_debug_stmt): If
+	gimple_debug_source_bind_get_value is DECL_ORIGIN of a PARM_DECL
+	in decl_debug_args, don't call remap_gimple_op_r on it.
+
+2015-11-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/68339
+	* omp-low.c (expand_simd_clones): Call node->get_body () before
+	allocating stuff in GC.
+
 2015-11-20  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* doc/md.texi (Standard Names): Move entry for addptr3 around,
