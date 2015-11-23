@@ -121,6 +121,11 @@ redirect_edge_var_map_vector (edge e)
 void
 redirect_edge_var_map_destroy (void)
 {
+  if (edge_var_maps)
+    for (hash_map<edge, auto_vec<edge_var_map> >::iterator it =
+	 edge_var_maps->begin (); it != edge_var_maps->end (); ++it)
+      (*it).second.release ();
+
   delete edge_var_maps;
   edge_var_maps = NULL;
 }
