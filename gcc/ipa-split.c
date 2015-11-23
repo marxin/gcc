@@ -1603,7 +1603,16 @@ split_function (basic_block return_bb, struct split_point *split_point,
 		}
 	    }
 	  else
-	    gsi_insert_after (&gsi, call, GSI_NEW_STMT);
+	    {
+	      gsi_insert_after (&gsi, call, GSI_NEW_STMT);
+
+	      for (gimple_stmt_iterator gsi = gsi_start_bb (return_bb);
+		   !gsi_end_p (gsi); gsi_next (&gsi))
+		if (gimple_code (gsi_stmt (gsi)) != GIMPLE_RETURN
+		    && gimple_code (gsi_stmt (gsi)) != GIMPLE_LABEL)
+		  gsi_remove (&gsi, true);
+		else break;
+	    }
 	  if (tsan_func_exit_call)
 	    gsi_insert_after (&gsi, tsan_func_exit_call, GSI_NEW_STMT);
 	}
