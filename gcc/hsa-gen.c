@@ -3742,6 +3742,19 @@ set_debug_value (hsa_bb *hbb, hsa_op_with_type *value)
   hbb->append_insn (mem);
 }
 
+/* Return true if ARRAY of strings contains FUNCTION.
+   Otherwise return false.  */
+
+static bool
+array_contains (const char **array, const char *function)
+{
+  for (const char **a = array; *a; a++)
+    if (strcmp (*a, function) == 0)
+      return true;
+
+  return false;
+}
+
 /* If STMT is a call of a known library function, generate code to perform
    it and return true.  */
 
@@ -3750,7 +3763,38 @@ gen_hsa_insns_for_known_library_call (gimple *stmt, hsa_bb *hbb)
 {
   const char *name = hsa_get_declaration_name (gimple_call_fndecl (stmt));
 
-  if (strcmp (name, "omp_is_initial_device") == 0)
+  static const char *ignored_lock_routines[] =
+    { "omp_init_lock", "omp_init_lock_with_hint",
+      "omp_init_nest_lock_with_hint", "omp_destroy_lock", "omp_set_lock",
+      "omp_unset_lock", "omp_test_lock", NULL };
+
+  static const char *ignored_timing_routines[] =
+    { "omp_get_wtime", "omp_get_wtick", NULL };
+
+  static const char *ignored_device_routines[] =
+    { "omp_target_alloc", "omp_target_free", "omp_target_is_present",
+      "omp_target_memcpy", "omp_target_memcpy_rect", "omp_target_associate_ptr",
+      "omp_target_disassociate_ptr", NULL };
+
+  if (array_contains (ignored_lock_routines, name))
+    {
+      HSA_SORRY_ATV (gimple_location (stmt),
+		     "support for HSA does not implement OMP lock routine: %s",
+		     name);
+    }
+  else if (array_contains (ignored_timing_routines, name))
+    {
+      HSA_SORRY_ATV (gimple_location (stmt),
+		     "support for HSA does not implement OMP timing "
+		     "routine: %s", name);
+    }
+  else if (array_contains (ignored_device_routines, name))
+    {
+      HSA_SORRY_ATV (gimple_location (stmt),
+		     "support for HSA does not implement OMP device memory "
+		     "routine: %s", name);
+    }
+  else if (strcmp (name, "omp_is_initial_device") == 0)
     {
       hbb->append_insn (new hsa_insn_comment (name));
       gen_return_zero (stmt, hbb);
