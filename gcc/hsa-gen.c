@@ -3626,6 +3626,56 @@ gen_get_level (gimple *stmt, hsa_bb *hbb)
   mem->set_output_in_type (dest, 0, hbb);
 }
 
+/* Emit instructions that assign zero to lhs of gimple STMT.
+   Instructions are appended to basic block HBB.  */
+
+static void
+gen_return_zero (gimple *stmt, hsa_bb *hbb)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  if (!lhs)
+    return;
+
+  hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
+  hsa_op_immed *imm = new hsa_op_immed (build_zero_cst (TREE_TYPE (lhs)));
+
+  hsa_build_append_simple_mov (dest, imm, hbb);
+}
+
+/* Emit instructions that implement omp_get_initiali_device of gimple STMT.
+   Instructions are appended to basic block HBB.  */
+
+static void
+gen_get_initial_device (gimple *stmt, hsa_bb *hbb)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  if (!lhs)
+    return;
+
+  hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
+  hsa_op_immed *imm = new hsa_op_immed (GOMP_DEVICE_HOST, BRIG_TYPE_U64);
+
+  hsa_insn_basic *insn = new hsa_insn_basic (2, BRIG_OPCODE_MOV, imm->m_type,
+					     NULL, imm);
+  hbb->append_insn (insn);
+  insn->set_output_in_type (dest, 0, hbb);
+}
+
+/* Emit instruction that implement omp_get_max_threads of gimple STMT.  */
+
+static void
+gen_get_max_threads (gimple *stmt, hsa_bb *hbb)
+{
+  tree lhs = gimple_call_lhs (stmt);
+  if (!lhs)
+    return;
+
+  hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
+  hsa_op_with_type *num_theads_reg = gen_num_threads_for_dispatch (hbb)
+    ->get_in_type (dest->m_type, hbb);
+  hsa_build_append_simple_mov (dest, num_theads_reg, hbb);
+}
+
 /* Emit instructions that implement alloca builtin gimple STMT.
    Instructions are appended to basic block HBB.  */
 
@@ -3699,16 +3749,7 @@ gen_hsa_insns_for_known_library_call (gimple *stmt, hsa_bb *hbb)
   const char *name = hsa_get_declaration_name (gimple_call_fndecl (stmt));
 
   if (strcmp (name, "omp_is_initial_device") == 0)
-    {
-      tree lhs = gimple_call_lhs (stmt);
-      if (!lhs)
-	return true;
-
-      hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
-      hsa_op_immed *imm = new hsa_op_immed (build_zero_cst (TREE_TYPE (lhs)));
-
-      hsa_build_append_simple_mov (dest, imm, hbb);
-    }
+    gen_return_zero (stmt, hbb);
   else if (strcmp (name, "omp_set_num_threads") == 0)
     gen_set_num_threads (gimple_call_arg (stmt, 0), hbb);
   else if (strcmp (name, "omp_get_thread_num") == 0)
@@ -3721,7 +3762,19 @@ gen_hsa_insns_for_known_library_call (gimple *stmt, hsa_bb *hbb)
     gen_get_team_num (stmt, hbb);
   else if (strcmp (name, "omp_get_level") == 0)
     gen_get_level (stmt, hbb);
-  else if (strcmp (name, "hsa_set_debug_value") == 0)
+  else if (strcmp (name, "omp_get_active_level") == 0)
+    gen_get_level (stmt, hbb);
+  else if (strcmp (name, "omp_in_parallel") == 0)
+    gen_get_level (stmt, hbb);
+  else if (strcmp (name, "omp_get_dynamic") == 0)
+    gen_return_zero (stmt, hbb);
+  else if (strcmp (name, "omp_set_dynamic") == 0)
+    {}
+  else if (strcmp (name, "omp_get_max_threads") == 0)
+    gen_get_max_threads (stmt, hbb);
+  else if (strcmp (name, "omp_get_initial_device") == 0)
+    gen_get_initial_device (stmt, hbb);
+  else if (strcmp (name, "__hsa_set_debug_value") == 0)
     {
       if (hsa_cfun->has_shadow_reg_p ())
 	{
