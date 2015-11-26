@@ -3559,8 +3559,7 @@ gen_get_num_teams (gimple *stmt, hsa_bb *hbb)
   if (gimple_call_lhs (stmt) == NULL_TREE)
     return;
 
-  hbb->append_insn
-    (new hsa_insn_comment ("__builtin_omp_get_num_teams"));
+  hbb->append_insn (new hsa_insn_comment ("omp_get_num_teams"));
 
   tree lhs = gimple_call_lhs (stmt);
   hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
@@ -3581,8 +3580,7 @@ gen_get_team_num (gimple *stmt, hsa_bb *hbb)
   if (gimple_call_lhs (stmt) == NULL_TREE)
     return;
 
-  hbb->append_insn
-    (new hsa_insn_comment ("__builtin_omp_get_team_num"));
+  hbb->append_insn (new hsa_insn_comment ("omp_get_team_num"));
 
   tree lhs = gimple_call_lhs (stmt);
   hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
@@ -3652,6 +3650,8 @@ gen_get_initial_device (gimple *stmt, hsa_bb *hbb)
   if (!lhs)
     return;
 
+  hbb->append_insn (new hsa_insn_comment ("omp_get_initial_device"));
+
   hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
   hsa_op_immed *imm = new hsa_op_immed (GOMP_DEVICE_HOST, BRIG_TYPE_U64);
 
@@ -3669,6 +3669,8 @@ gen_get_max_threads (gimple *stmt, hsa_bb *hbb)
   tree lhs = gimple_call_lhs (stmt);
   if (!lhs)
     return;
+
+  hbb->append_insn (new hsa_insn_comment ("omp_get_max_threads"));
 
   hsa_op_reg *dest = hsa_cfun->reg_for_gimple_ssa (lhs);
   hsa_op_with_type *num_theads_reg = gen_num_threads_for_dispatch (hbb)
@@ -3749,13 +3751,22 @@ gen_hsa_insns_for_known_library_call (gimple *stmt, hsa_bb *hbb)
   const char *name = hsa_get_declaration_name (gimple_call_fndecl (stmt));
 
   if (strcmp (name, "omp_is_initial_device") == 0)
-    gen_return_zero (stmt, hbb);
+    {
+      hbb->append_insn (new hsa_insn_comment (name));
+      gen_return_zero (stmt, hbb);
+    }
   else if (strcmp (name, "omp_set_num_threads") == 0)
     gen_set_num_threads (gimple_call_arg (stmt, 0), hbb);
   else if (strcmp (name, "omp_get_thread_num") == 0)
-    query_hsa_grid (stmt, BRIG_OPCODE_WORKITEMABSID, 0, hbb);
+    {
+      hbb->append_insn (new hsa_insn_comment (name));
+      query_hsa_grid (stmt, BRIG_OPCODE_WORKITEMABSID, 0, hbb);
+    }
   else if (strcmp (name, "omp_get_num_threads") == 0)
-    query_hsa_grid (stmt, BRIG_OPCODE_GRIDSIZE, 0, hbb);
+    {
+      hbb->append_insn (new hsa_insn_comment (name));
+      query_hsa_grid (stmt, BRIG_OPCODE_GRIDSIZE, 0, hbb);
+    }
   else if (strcmp (name, "omp_get_num_teams") == 0)
     gen_get_num_teams (stmt, hbb);
   else if (strcmp (name, "omp_get_team_num") == 0)
@@ -3767,7 +3778,10 @@ gen_hsa_insns_for_known_library_call (gimple *stmt, hsa_bb *hbb)
   else if (strcmp (name, "omp_in_parallel") == 0)
     gen_get_level (stmt, hbb);
   else if (strcmp (name, "omp_get_dynamic") == 0)
-    gen_return_zero (stmt, hbb);
+    {
+      hbb->append_insn (new hsa_insn_comment (name));
+      gen_return_zero (stmt, hbb);
+    }
   else if (strcmp (name, "omp_set_dynamic") == 0)
     {}
   else if (strcmp (name, "omp_get_max_threads") == 0)
