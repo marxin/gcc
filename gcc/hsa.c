@@ -37,6 +37,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "symbol-summary.h"
 #include "hsa.h"
+#include "internal-fn.h"
+#include "ctype.h"
 
 /* Structure containing intermediate HSA representation of the generated
    function. */
@@ -797,6 +799,17 @@ hsa_fail_cfun (void)
 {
   hsa_failed_functions->add (hsa_cfun->m_decl);
   hsa_cfun->m_seen_error = true;
+}
+
+char *
+hsa_internal_fn::name ()
+{
+  char *name = xstrdup (internal_fn_name (m_fn));
+  for (char *ptr = name; *ptr; ptr++)
+    *ptr = TOLOWER (*ptr);
+
+  hsa_sanitize_name (name);
+  return name;
 }
 
 #include "gt-hsa.h"

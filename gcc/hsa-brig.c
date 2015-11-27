@@ -99,8 +99,11 @@ static bool brig_initialized = false;
 /* Mapping between emitted HSA functions and their offset in code segment.  */
 static hash_map<tree, BrigCodeOffset32_t> *function_offsets;
 
-/* Set of emitted function declarations.  */
+/* Hash map of emitted function declarations.  */
 static hash_map <tree, BrigDirectiveExecutable *> *emitted_declarations;
+
+/* Hash table of emitted internal function declaration offsets.  */
+static hash_table <hsa_internal_fn_hasher> *emitted_internal_decls;
 
 /* List of sbr instructions.  */
 static vec <hsa_insn_sbr *> *switch_instructions;
@@ -585,17 +588,28 @@ emit_function_directives (hsa_function_representation *f, bool is_declaration)
   fndir.firstInArg = htole32 (inarg_off);
   fndir.firstCodeBlockEntry = htole32 (scoped_off);
   fndir.nextModuleEntry = htole32 (next_toplev_off);
-  fndir.linkage = f->m_kern_p || TREE_PUBLIC (f->m_decl) ?
-    BRIG_LINKAGE_PROGRAM : BRIG_LINKAGE_MODULE;
-
+  fndir.linkage = f->get_linkage ();
   if (!f->m_declaration_p)
     fndir.modifier.allBits |= BRIG_EXECUTABLE_DEFINITION;
   memset (&fndir.reserved, 0, sizeof (fndir.reserved));
 
   /* Once we put a definition of function_offsets, we should not overwrite
      it with a declaration of the function.  */
-  if (!function_offsets->get (f->m_decl) || !is_declaration)
-    function_offsets->put (f->m_decl, brig_code.total_size);
+  // TODO
+  if (f->m_decl)
+    {
+      if (!function_offsets->get (f->m_decl) || !is_declaration)
+	function_offsets->put (f->m_decl, brig_code.total_size);
+    }
+  else
+    {
+      /* Internal function.  */
+      hsa_internal_fn **slot = emitted_internal_decls->find_slot
+	(&f->m_internal_fn, INSERT);
+      hsa_internal_fn *int_fn = new hsa_internal_fn (f->m_internal_fn);
+      int_fn->m_offset = brig_code.total_size;
+      *slot = int_fn;
+    }
 
   brig_code.add (&fndir, sizeof (fndir));
   /* XXX terrible hack: we need to set instCount after we emit all
@@ -1053,7 +1067,7 @@ emit_queued_operands (void)
 }
 
 /* Emit directives describing the function that is used for
-a function declaration.  */
+   a function declaration.  */
 
 static BrigDirectiveExecutable *
 emit_function_declaration (tree decl)
@@ -1067,6 +1081,23 @@ emit_function_declaration (tree decl)
 
   return e;
 }
+
+/* Emit directives describing the function that is used for
+   an internal function declaration.  */
+
+static BrigDirectiveExecutable *
+emit_internal_fn_decl (hsa_internal_fn fn)
+{
+  hsa_function_representation *f = hsa_generate_internal_fn_decl (fn);
+
+  BrigDirectiveExecutable *e = emit_function_directives (f, true);
+  emit_queued_operands ();
+
+  delete f;
+
+  return e;
+}
+
 
 /* Enqueue all operands of INSN and return offset to BRIG data section
    to list of operand offsets.  */
@@ -1476,9 +1507,19 @@ emit_call_insn (hsa_insn_call *call)
     (emit_operands (call->m_result_code_list, &call->m_func,
 		    call->m_args_code_list));
 
-  function_call_linkage.safe_push
-    (function_linkage_pair (call->m_called_function,
-			    call->m_func.m_brig_op_offset));
+  /* Internal functions have not set m_called_function.  */
+  if (call->m_called_function)
+    function_call_linkage.safe_push
+      (function_linkage_pair (call->m_called_function,
+			      call->m_func.m_brig_op_offset));
+  else
+    {
+      hsa_internal_fn *slot = emitted_internal_decls->find
+	(&call->m_called_internal_fn);
+      gcc_assert (slot);
+      gcc_assert (slot->m_offset > 0);
+      call->m_func.m_directive_offset = slot->m_offset;
+    }
 
   repr.width = BRIG_WIDTH_ALL;
   memset (&repr.reserved, 0, sizeof (repr.reserved));
@@ -1786,6 +1827,18 @@ hsa_brig_emit_function (void)
 	  BrigDirectiveExecutable *e = emit_function_declaration (called);
 	  emitted_declarations->put (called, e);
 	}
+    }
+
+  if (!emitted_internal_decls)
+    emitted_internal_decls = new hash_table <hsa_internal_fn_hasher> (2); 
+
+  for (unsigned i = 0; i < hsa_cfun->m_called_internal_fns.length (); i++)
+    {
+      hsa_internal_fn called = hsa_cfun->m_called_internal_fns[i];
+      hsa_internal_fn *slot = emitted_internal_decls->find (&called);
+      if (!slot)
+	/* Function offset will be set in emission of declaration.  */
+	emit_internal_fn_decl (called);
     }
 
   ptr_to_fndir = emit_function_directives (hsa_cfun, false);
@@ -2391,6 +2444,8 @@ hsa_output_brig (void)
 
   delete emitted_declarations;
   emitted_declarations = NULL;
+  delete emitted_internal_decls;
+  emitted_internal_decls = NULL;
   delete function_offsets;
   function_offsets = NULL;
 }
