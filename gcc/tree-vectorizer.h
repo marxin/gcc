@@ -698,6 +698,8 @@ vinfo_for_stmt (gimple *stmt)
   return stmt_vec_info_vec[uid - 1];
 }
 
+extern void free_stmt_vec_info (gimple *stmt);
+
 /* Set vectorizer information INFO for STMT.  */
 
 static inline void
@@ -712,7 +714,11 @@ set_vinfo_for_stmt (gimple *stmt, stmt_vec_info info)
       stmt_vec_info_vec.safe_push (info);
     }
   else
-    stmt_vec_info_vec[uid - 1] = info;
+    {
+      if (stmt_vec_info_vec[uid - 1])
+	free_stmt_vec_info (STMT_VINFO_STMT (stmt_vec_info_vec[uid - 1]));
+      stmt_vec_info_vec[uid - 1] = info;
+    }
 }
 
 /* Return the earlier statement between STMT1 and STMT2.  */
@@ -961,7 +967,6 @@ extern bool supportable_narrowing_operation (enum tree_code, tree, tree,
 					     enum tree_code *,
 					     int *, vec<tree> *);
 extern stmt_vec_info new_stmt_vec_info (gimple *stmt, vec_info *);
-extern void free_stmt_vec_info (gimple *stmt);
 extern tree vectorizable_function (gcall *, tree, tree);
 extern void vect_model_simple_cost (stmt_vec_info, int, enum vect_def_type *,
                                     stmt_vector_for_cost *,

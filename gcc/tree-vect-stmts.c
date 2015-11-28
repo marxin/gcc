@@ -2665,7 +2665,7 @@ vectorizable_simd_clone_call (gimple *stmt, gimple_stmt_iterator *gsi,
   gimple *def_stmt;
   gimple *new_stmt = NULL;
   int ncopies, j;
-  vec<simd_call_arg_info> arginfo = vNULL;
+  auto_vec<simd_call_arg_info> arginfo;
   vec<tree> vargs = vNULL;
   size_t i, nargs;
   tree lhs, rtype, ratype;
@@ -2731,7 +2731,6 @@ vectorizable_simd_clone_call (gimple *stmt, gimple_stmt_iterator *gsi,
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
 			     "use not simple.\n");
-	  arginfo.release ();
 	  return false;
 	}
 
@@ -2887,10 +2886,7 @@ vectorizable_simd_clone_call (gimple *stmt, gimple_stmt_iterator *gsi,
       }
 
   if (bestn == NULL)
-    {
-      arginfo.release ();
-      return false;
-    }
+    return false;
 
   for (i = 0; i < nargs; i++)
     if ((arginfo[i].dt == vect_constant_def
@@ -2903,10 +2899,7 @@ vectorizable_simd_clone_call (gimple *stmt, gimple_stmt_iterator *gsi,
 	if (arginfo[i].vectype == NULL
 	    || (TYPE_VECTOR_SUBPARTS (arginfo[i].vectype)
 		> bestn->simdclone->simdlen))
-	  {
-	    arginfo.release ();
-	    return false;
-	  }
+	  return false;
       }
 
   fndecl = bestn->decl;
@@ -2918,10 +2911,7 @@ vectorizable_simd_clone_call (gimple *stmt, gimple_stmt_iterator *gsi,
      performed using SIMD instructions.  */
   if ((loop == NULL || (unsigned) loop->safelen < nunits)
       && gimple_vuse (stmt))
-    {
-      arginfo.release ();
-      return false;
-    }
+    return false;
 
   /* Sanity check: make sure that at least one copy of the vectorized stmt
      needs to be generated.  */
@@ -2950,7 +2940,6 @@ vectorizable_simd_clone_call (gimple *stmt, gimple_stmt_iterator *gsi,
 	dump_printf_loc (MSG_NOTE, vect_location,
 			 "=== vectorizable_simd_clone_call ===\n");
 /*      vect_model_simple_cost (stmt_info, ncopies, dt, NULL, NULL); */
-      arginfo.release ();
       return true;
     }
 
