@@ -745,7 +745,7 @@ struct ipa_parm_adjustment
   unsigned by_ref : 1;
 };
 
-typedef vec<ipa_parm_adjustment> ipa_parm_adjustment_vec;
+typedef auto_vec<ipa_parm_adjustment> ipa_parm_adjustment_vec;
 
 vec<tree> ipa_get_vector_of_formal_parms (tree fndecl);
 vec<tree> ipa_get_vector_of_formal_parm_types (tree fntype);
