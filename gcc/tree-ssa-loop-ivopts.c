@@ -101,6 +101,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-propagate.h"
 #include "tree-ssa-address.h"
 #include "builtins.h"
+#include "alloc-pool.h"
 #include "tree-vectorizer.h"
 
 /* FIXME: Expressions are expanded to RTL in this pass to determine the

@@ -44,6 +44,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "params.h"
 #include "tree-scalar-evolution.h"
+#include "alloc-pool.h"
 #include "tree-vectorizer.h"
 #include "gimple-fold.h"
 #include "cgraph.h"

@@ -39,6 +39,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-loop.h"
 #include "tree-into-ssa.h"
 #include "tree-ssa.h"
+#include "alloc-pool.h"
 #include "cfgloop.h"
 #include "tree-scalar-evolution.h"
 #include "params.h"

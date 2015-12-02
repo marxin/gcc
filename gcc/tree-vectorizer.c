@@ -71,6 +71,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-loop-manip.h"
 #include "tree-cfg.h"
 #include "cfgloop.h"
+#include "alloc-pool.h"
 #include "tree-vectorizer.h"
 #include "tree-ssa-propagate.h"
 #include "dbgcnt.h"
@@ -82,6 +83,9 @@ source_location vect_location;
 
 /* Vector mapping GIMPLE stmt to stmt_vec_info. */
 vec<stmt_vec_info> stmt_vec_info_vec;
+
+object_allocator <_stmt_vec_info> stmt_vec_info_pool ("STMT vec info");
+
 
 /* For mapping simduid to vectorization factor.  */
 

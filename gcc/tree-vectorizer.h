@@ -478,7 +478,20 @@ enum slp_vect_type {
 
 typedef struct data_reference *dr_p;
 
-typedef struct _stmt_vec_info {
+struct _stmt_vec_info
+{
+  _stmt_vec_info (): type ((enum stmt_vec_info_type) 0), live (false),
+  in_pattern_p (false), stmt (NULL), vinfo (0), vectype (NULL_TREE),
+  vectorized_stmt (NULL), data_ref_info (0), dr_base_address (NULL_TREE),
+  dr_init (NULL_TREE), dr_offset (NULL_TREE), dr_step (NULL_TREE),
+  dr_aligned_to (NULL_TREE), loop_phi_evolution_base_unchanged (NULL_TREE),
+  loop_phi_evolution_part (NULL_TREE), related_stmt (NULL), pattern_def_seq (0),
+  same_align_refs (0), simd_clone_info (0), def_type ((enum vect_def_type) 0),
+  slp_type ((enum slp_vect_type) 0), first_element (NULL), next_element (NULL),
+  same_dr_stmt (NULL), size (0), store_count (0), gap (0), min_neg_dist (0),
+  relevant ((enum vect_relevant) 0), vectorizable (false),
+  gather_scatter_p (false), strided_p (false), simd_lane_access_p (false),
+  v_reduc_type ((enum vect_reduction_type) 0) {}
 
   enum stmt_vec_info_type type;
 
@@ -543,12 +556,12 @@ typedef struct _stmt_vec_info {
 
   /* List of datarefs that are known to have the same alignment as the dataref
      of this stmt.  */
-  vec<dr_p> same_align_refs;
+  auto_vec<dr_p> same_align_refs;
 
   /* Selected SIMD clone's function info.  First vector element
      is SIMD clone's function decl, followed by a pair of trees (base + step)
      for linear arguments (pair of NULLs for other arguments).  */
-  vec<tree> simd_clone_info;
+  auto_vec<tree> simd_clone_info;
 
   /* Classify the def of this stmt.  */
   enum vect_def_type def_type;
@@ -597,8 +610,9 @@ typedef struct _stmt_vec_info {
 
   /* For reduction loops, this is the type of reduction.  */
   enum vect_reduction_type v_reduc_type;
+};
 
-} *stmt_vec_info;
+typedef struct _stmt_vec_info *stmt_vec_info;
 
 /* Access Functions.  */
 #define STMT_VINFO_TYPE(S)                 (S)->type
@@ -685,6 +699,7 @@ struct dataref_aux {
 #define MAX_VECTORIZATION_FACTOR 64
 
 extern vec<stmt_vec_info> stmt_vec_info_vec;
+extern object_allocator <_stmt_vec_info> stmt_vec_info_pool;
 
 void init_stmt_vec_info_vec (void);
 void free_stmt_vec_info_vec (void);

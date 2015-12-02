@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "gimple-iterator.h"
 #include "cfgloop.h"
+#include "alloc-pool.h"
 #include "tree-vectorizer.h"
 #include "langhooks.h"
 #include "gimple-walk.h"

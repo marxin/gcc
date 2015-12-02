@@ -45,6 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-loop.h"
 #include "cfgloop.h"
 #include "tree-scalar-evolution.h"
+#include "alloc-pool.h"
 #include "tree-vectorizer.h"
 #include "expr.h"
 #include "builtins.h"
