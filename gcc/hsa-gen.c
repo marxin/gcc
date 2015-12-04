@@ -5370,7 +5370,7 @@ gen_hsa_insns_for_call (gimple *stmt, hsa_bb *hbb)
       {
 	tree byte_size = gimple_call_arg (stmt, 2);
 
-	if (TREE_CODE (byte_size) != INTEGER_CST)
+	if (!tree_fits_uhwi_p (byte_size))
 	  {
 	    gen_hsa_insns_for_direct_call (stmt, hbb);
 	    return;
@@ -5429,7 +5429,7 @@ gen_hsa_insns_for_call (gimple *stmt, hsa_bb *hbb)
 
 	tree byte_size = gimple_call_arg (stmt, 2);
 
-	if (TREE_CODE (byte_size) != INTEGER_CST)
+	if (!tree_fits_uhwi_p (byte_size))
 	  {
 	    gen_hsa_insns_for_direct_call (stmt, hbb);
 	    return;
