@@ -10570,7 +10570,7 @@
 
 2015-07-16  Martin Liska  <mliska@suse.cz>
 
-	* g++.dg/ipa/pr66896.c: New test.
+	* g++.dg/ipa/pr66896.C: New test.
 
 2015-07-16  Richard Biener  <rguenther@suse.de>
 
