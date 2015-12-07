@@ -381,6 +381,24 @@ cgraph_node::expand_all_artificial_thunks ()
       e = e->next_caller;
 }
 
+static void
+dump_callgraph_transformation (const cgraph_node *original,
+			       const cgraph_node *clone,
+			       const char *suffix)
+{
+  if (symtab->ipa_clones_dump_file)
+    fprintf (symtab->ipa_clones_dump_file,
+	     "Callgraph clone: %s/%d (%s:%d:%d) <- %s/%d "
+	     "(location:%s:%d:%d) (optimization:%s)\n",
+	     original->asm_name (), original->order,
+	     DECL_SOURCE_FILE (original->decl),
+	     DECL_SOURCE_LINE (original->decl),
+	     DECL_SOURCE_COLUMN (original->decl), clone->asm_name (),
+	     clone->order, DECL_SOURCE_FILE (clone->decl),
+	     DECL_SOURCE_LINE (clone->decl), DECL_SOURCE_COLUMN (clone->decl),
+	     suffix);
+}
+
 /* Create node representing clone of N executed COUNT times.  Decrease
    the execution counts from original node too.
    The new clone will have decl set to DECL that may or may not be the same
@@ -403,12 +421,15 @@ cgraph_node::create_clone (tree new_decl, gcov_type gcov_count, int freq,
 			   vec<cgraph_edge *> redirect_callers,
 			   bool call_duplication_hook,
 			   cgraph_node *new_inlined_to,
-			   bitmap args_to_skip)
+			   bitmap args_to_skip, const char *suffix)
 {
   cgraph_node *new_node = symtab->create_empty ();
   cgraph_edge *e;
   gcov_type count_scale;
   unsigned i;
+
+  if (new_inlined_to)
+    dump_callgraph_transformation (this, new_inlined_to, "inlining to");
 
   new_node->decl = new_decl;
   new_node->register_symbol ();
@@ -494,6 +515,10 @@ cgraph_node::create_clone (tree new_decl, gcov_type gcov_count, int freq,
 
   if (call_duplication_hook)
     symtab->call_cgraph_duplication_hooks (this, new_node);
+
+  if (!new_inlined_to)
+    dump_callgraph_transformation (this, new_node, suffix);
+
   return new_node;
 }
 
@@ -580,7 +605,7 @@ cgraph_node::create_virtual_clone (vec<cgraph_edge *> redirect_callers,
   SET_DECL_RTL (new_decl, NULL);
 
   new_node = create_clone (new_decl, count, CGRAPH_FREQ_BASE, false,
-			   redirect_callers, false, NULL, args_to_skip);
+			   redirect_callers, false, NULL, args_to_skip, suffix);
 
   /* Update the properties.
      Make clone visible only within this translation unit.  Make sure
@@ -866,7 +891,8 @@ update_call_expr (cgraph_node *new_version)
 cgraph_node *
 cgraph_node::create_version_clone (tree new_decl,
 				  vec<cgraph_edge *> redirect_callers,
-				  bitmap bbs_to_copy)
+				  bitmap bbs_to_copy,
+				  const char *suffix)
  {
    cgraph_node *new_version;
    cgraph_edge *e;
@@ -907,6 +933,8 @@ cgraph_node::create_version_clone (tree new_decl,
 
    symtab->call_cgraph_duplication_hooks (this, new_version);
 
+   dump_callgraph_transformation (this, new_version, suffix);
+
    return new_version;
  }
 
@@ -934,7 +962,7 @@ cgraph_node::create_version_clone_with_body
   (vec<cgraph_edge *> redirect_callers,
    vec<ipa_replace_map *, va_gc> *tree_map, bitmap args_to_skip,
    bool skip_return, bitmap bbs_to_copy, basic_block new_entry_block,
-   const char *clone_name)
+   const char *suffix)
 {
   tree old_decl = decl;
   cgraph_node *new_version_node = NULL;
@@ -953,7 +981,7 @@ cgraph_node::create_version_clone_with_body
       = build_function_decl_skip_args (old_decl, args_to_skip, skip_return);
 
   /* Generate a new name for the new version. */
-  DECL_NAME (new_decl) = clone_function_name (old_decl, clone_name);
+  DECL_NAME (new_decl) = clone_function_name (old_decl, suffix);
   SET_DECL_ASSEMBLER_NAME (new_decl, DECL_NAME (new_decl));
   SET_DECL_RTL (new_decl, NULL);
 
@@ -964,7 +992,7 @@ cgraph_node::create_version_clone_with_body
   /* Create the new version's call-graph node.
      and update the edges of the new node. */
   new_version_node = create_version_clone (new_decl, redirect_callers,
-					  bbs_to_copy);
+					  bbs_to_copy, suffix);
 
   if (ipa_transforms_to_apply.exists ())
     new_version_node->ipa_transforms_to_apply

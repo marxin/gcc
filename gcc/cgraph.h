@@ -883,13 +883,14 @@ public:
      If the new node is being inlined into another one, NEW_INLINED_TO should be
      the outline function the new one is (even indirectly) inlined to.
      All hooks will see this in node's global.inlined_to, when invoked.
-     Can be NULL if the node is not inlined.  */
+     Can be NULL if the node is not inlined. SUFFIX is string that is appended
+     to the original name.  */
   cgraph_node *create_clone (tree decl, gcov_type count, int freq,
 			     bool update_original,
 			     vec<cgraph_edge *> redirect_callers,
 			     bool call_duplication_hook,
 			     cgraph_node *new_inlined_to,
-			     bitmap args_to_skip);
+			     bitmap args_to_skip, const char *sufix = NULL);
 
   /* Create callgraph node clone with new declaration.  The actual body will
      be copied later at compilation stage.  */
@@ -910,11 +911,14 @@ public:
 
      If non-NULL BLOCK_TO_COPY determine what basic blocks
      was copied to prevent duplications of calls that are dead
-     in the clone.  */
+     in the clone.
+
+     SUFFIX is string that is appended to the original name.  */
 
   cgraph_node *create_version_clone (tree new_decl,
 				    vec<cgraph_edge *> redirect_callers,
-				    bitmap bbs_to_copy);
+				    bitmap bbs_to_copy,
+				    const char *suffix = NULL);
 
   /* Perform function versioning.
      Function versioning includes copying of the tree and
@@ -2170,6 +2174,8 @@ public:
   hash_map<symtab_node *, symbol_priority_map> *init_priority_hash;
 
   FILE* GTY ((skip)) dump_file;
+
+  FILE* GTY ((skip)) ipa_clones_dump_file;
 
 private:
   /* Allocate new callgraph node.  */

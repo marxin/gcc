@@ -262,6 +262,9 @@ symbol_table::initialize (void)
 {
   if (!dump_file)
     dump_file = dump_begin (TDI_cgraph, NULL);
+
+  if (!ipa_clones_dump_file)
+    ipa_clones_dump_file = dump_begin (TDI_clones, NULL);
 }
 
 /* Allocate new callgraph node and insert it into basic data structures.  */
