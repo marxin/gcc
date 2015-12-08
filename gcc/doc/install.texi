@@ -1584,6 +1584,11 @@ do a @samp{make -C gcc gnatlib_and_tools}.
 Specify that the run-time libraries for the various sanitizers should
 not be built.
 
+@item --enable-valgrind-annotations
+Specify that the compiler should interact with valgrind runtime, where
+selected invalid memory reads are marked as false positives and
+garbage collected memory is properly marked for proper interaction.
+
 @item --disable-libssp
 Specify that the run-time libraries for stack smashing protection
 should not be built.
