@@ -53,13 +53,15 @@ namespace ipa_icf_gimple {
 func_checker::func_checker (tree source_func_decl, tree target_func_decl,
 			    bool compare_polymorphic,
 			    bool ignore_labels,
+			    bool new_comparison,
 			    hash_set<symtab_node *> *ignored_source_nodes,
 			    hash_set<symtab_node *> *ignored_target_nodes)
   : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
     m_ignored_source_nodes (ignored_source_nodes),
     m_ignored_target_nodes (ignored_target_nodes),
     m_compare_polymorphic (compare_polymorphic),
-    m_ignore_labels (ignore_labels)
+    m_ignore_labels (ignore_labels),
+    m_new_comparison (new_comparison)
 {
   function *source_func = DECL_STRUCT_FUNCTION (source_func_decl);
   function *target_func = DECL_STRUCT_FUNCTION (target_func_decl);
@@ -83,6 +85,58 @@ func_checker::~func_checker ()
 {
   m_source_ssa_names.release();
   m_target_ssa_names.release();
+}
+
+bool
+func_checker::equal_ssa (const_tree t1, const_tree t2, unsigned int flags)
+{
+  gcc_assert (TREE_CODE (t1) == SSA_NAME);
+  gcc_assert (TREE_CODE (t2) == SSA_NAME);
+
+  unsigned i1 = SSA_NAME_VERSION (t1);
+  unsigned i2 = SSA_NAME_VERSION (t2);
+
+  if (m_source_ssa_names[i1] == -1)
+    m_source_ssa_names[i1] = i2;
+  else if (m_source_ssa_names[i1] != (int) i2)
+    return false;
+
+  if(m_target_ssa_names[i2] == -1)
+    m_target_ssa_names[i2] = i1;
+  else if (m_target_ssa_names[i2] != (int) i1)
+    return false;
+
+  if (SSA_NAME_IS_DEFAULT_DEF (t1))
+    {
+      tree b1 = SSA_NAME_VAR (t1);
+      tree b2 = SSA_NAME_VAR (t2);
+
+      return compare_operand_with_null (b1, b2, flags);
+    }
+
+  return true;
+}
+
+bool func_checker::equal_obj_type_ref (const_tree arg0, const_tree arg1,
+				       unsigned int flags)
+{
+  if (!compare_ssa_name (OBJ_TYPE_REF_EXPR (arg0), OBJ_TYPE_REF_EXPR (arg1)))
+    return return_false ();
+  if (opt_for_fn (m_source_func_decl, flag_devirtualize)
+      && virtual_method_call_p (arg0))
+    {
+      if (tree_to_uhwi (OBJ_TYPE_REF_TOKEN (arg0))
+	  != tree_to_uhwi (OBJ_TYPE_REF_TOKEN (arg1)))
+	return return_false_with_msg ("OBJ_TYPE_REF token mismatch");
+      if (!types_same_for_odr (obj_type_ref_class (arg0),
+			       obj_type_ref_class (arg1)))
+	return return_false_with_msg ("OBJ_TYPE_REF OTR type mismatch");
+      if (!compare_operand (OBJ_TYPE_REF_OBJECT (arg0),
+			    OBJ_TYPE_REF_OBJECT (arg1)))
+	return return_false_with_msg ("OBJ_TYPE_REF object mismatch");
+    }
+
+  return return_with_debug (true);
 }
 
 /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
@@ -148,7 +202,77 @@ func_checker::compare_edge (edge e1, edge e2)
    come from functions FUNC1 and FUNC2.  */
 
 bool
-func_checker::compare_decl (tree t1, tree t2)
+func_checker::equal_decl (const_tree t1, const_tree t2, unsigned int)
+{
+  bool ret;
+
+  switch (TREE_CODE (t1))
+    {
+    case FUNCTION_DECL:
+      /* All function decls are in the symbol table and known to match
+	 before we start comparing bodies.  */
+      return true;
+    case VAR_DECL:
+      {
+	if (t1 == t2)
+	  return true;
+
+	if (DECL_ALIGN (t1) != DECL_ALIGN (t2))
+	  return return_false_with_msg ("alignments are different");
+
+	if (DECL_HARD_REGISTER (t1) != DECL_HARD_REGISTER (t2))
+	  return return_false_with_msg ("DECL_HARD_REGISTER are different");
+
+	// TODO: fixme
+	// if (DECL_HARD_REGISTER (t1)
+	//    && DECL_ASSEMBLER_NAME (t1) != DECL_ASSEMBLER_NAME (t2))
+	//  return return_false_with_msg ("HARD REGISTERS are different");
+
+	/* Symbol table variables are known to match before we start comparing
+	   bodies.  */
+	if (decl_in_symtab_p (t1))
+	  return decl_in_symtab_p (t2);
+	ret = compare_decl (t1, t2);
+
+	return return_with_debug (ret);
+      }
+    case FIELD_DECL:
+      {
+	tree offset1 = DECL_FIELD_OFFSET (t1);
+	tree offset2 = DECL_FIELD_OFFSET (t2);
+
+	tree bit_offset1 = DECL_FIELD_BIT_OFFSET (t1);
+	tree bit_offset2 = DECL_FIELD_BIT_OFFSET (t2);
+
+	ret = compare_operand (offset1, offset2)
+	      && compare_operand (bit_offset1, bit_offset2);
+
+	return return_with_debug (ret);
+      }
+    case LABEL_DECL:
+      {
+	int *bb1 = m_label_bb_map.get (t1);
+	int *bb2 = m_label_bb_map.get (t2);
+
+	return return_with_debug (*bb1 == *bb2);
+      }
+    case PARM_DECL:
+    case RESULT_DECL:
+    case CONST_DECL:
+      {
+	ret = compare_decl (t1, t2);
+	return return_with_debug (ret);
+      }
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Verification function for declaration trees T1 and T2 that
+   come from functions FUNC1 and FUNC2.  */
+
+bool
+func_checker::compare_decl (const_tree t1, const_tree t2)
 {
   if (!auto_var_in_fn_p (t1, m_source_func_decl)
       || !auto_var_in_fn_p (t2, m_target_func_decl))
@@ -179,7 +303,7 @@ func_checker::compare_decl (tree t1, tree t2)
 
   bool existed_p;
 
-  tree &slot = m_decl_map.get_or_insert (t1, &existed_p);
+  const_tree &slot = m_decl_map.get_or_insert (t1, &existed_p);
   if (existed_p)
     return return_with_debug (slot == t2);
   else
@@ -256,6 +380,14 @@ func_checker::compare_memory_operand (tree t1, tree t2)
     return true;
   else if (!t1 || !t2)
     return false;
+
+  if (m_new_comparison)
+    {
+      if (!compare_operand (t1, t2, OEP_MATCH_SIDE_EFFECTS))
+	return return_false ();
+
+      return (TREE_THIS_VOLATILE (t1) == TREE_THIS_VOLATILE (t2));
+    }
 
   ao_ref r1, r2;
   ao_ref_init (&r1, t1);
@@ -379,13 +511,27 @@ func_checker::compare_cst_or_decl (tree t1, tree t2)
     }
 }
 
+bool
+func_checker::compare_operand_with_null (tree arg0, tree arg1,
+					 unsigned int flags)
+{
+  if (!m_new_comparison)
+    return compare_operand (arg0, arg1);
+
+  return (!arg0 || !arg1) ? arg0 == arg1
+    : operand_equal_p (arg0, arg1, flags, this);
+}
+
 /* Function responsible for comparison of various operands T1 and T2.
    If these components, from functions FUNC1 and FUNC2, are equal, true
    is returned.  */
 
 bool
-func_checker::compare_operand (tree t1, tree t2)
+func_checker::compare_operand (tree t1, tree t2, unsigned int flags)
 {
+  if (m_new_comparison)
+    return operand_equal_p (t1, t2, flags, this);
+
   tree x1, x2, y1, y2, z1, z2;
   bool ret;
 
@@ -761,9 +907,7 @@ func_checker::compare_gimple_call (gcall *s1, gcall *s2)
 
   tree chain1 = gimple_call_chain (s1);
   tree chain2 = gimple_call_chain (s2);
-  if ((chain1 && !chain2)
-      || (!chain1 && chain2)
-      || !compare_operand (chain1, chain2))
+  if (!compare_operand_with_null (chain1, chain2))
     return return_false_with_msg ("static call chains are different");
 
   /* Checking of argument.  */

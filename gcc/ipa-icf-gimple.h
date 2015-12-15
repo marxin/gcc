@@ -127,7 +127,7 @@ public:
 
 /* A class aggregating all connections and semantic equivalents
    for a given pair of semantic function candidates.  */
-class func_checker
+class func_checker: operand_equal_comparer
 {
 public:
   /* Initialize internal structures for a given SOURCE_FUNC_DECL and
@@ -139,11 +139,16 @@ public:
   func_checker (tree source_func_decl, tree target_func_decl,
 		bool compare_polymorphic,
 		bool ignore_labels = false,
+		bool new_comparison = false,
 		hash_set<symtab_node *> *ignored_source_nodes = NULL,
 		hash_set<symtab_node *> *ignored_target_nodes = NULL);
 
   /* Memory release routine.  */
-  ~func_checker();
+  virtual ~func_checker();
+
+  bool equal_decl (const_tree arg0, const_tree arg1, unsigned int flags);
+  bool equal_ssa (const_tree arg0, const_tree arg1, unsigned int flags);
+  bool equal_obj_type_ref (const_tree arg0, const_tree arg1, unsigned int flags);
 
   /* Function visits all gimple labels and creates corresponding
      mapping between basic blocks and labels.  */
@@ -198,7 +203,7 @@ public:
   bool compare_gimple_asm (const gasm *s1, const gasm *s2);
 
   /* Verification function for declaration trees T1 and T2.  */
-  bool compare_decl (tree t1, tree t2);
+  bool compare_decl (const_tree t1, const_tree t2);
 
   /* Verifies that tree labels T1 and T2 correspond.  */
   bool compare_tree_ssa_label (tree t1, tree t2);
@@ -213,7 +218,9 @@ public:
   /* Function responsible for comparison of various operands T1 and T2.
      If these components, from functions FUNC1 and FUNC2, are equal, true
      is returned.  */
-  bool compare_operand (tree t1, tree t2);
+  bool compare_operand (tree t1, tree t2, unsigned int flags = 0);
+
+  bool compare_operand_with_null (tree t1, tree t2, unsigned int flags = 0);
 
   /* Compares two tree list operands T1 and T2 and returns true if these
      two trees are semantically equivalent.  */
@@ -263,16 +270,18 @@ private:
   hash_map <edge, edge> m_edge_map;
 
   /* Source to target declaration map.  */
-  hash_map <tree, tree> m_decl_map;
+  hash_map <const_tree, const_tree> m_decl_map;
 
   /* Label to basic block index mapping.  */
-  hash_map <tree, int> m_label_bb_map;
+  hash_map <const_tree, int> m_label_bb_map;
 
   /* Flag if polymorphic comparison should be executed.  */
   bool m_compare_polymorphic;
 
   /* Flag if ignore labels in comparison.  */
   bool m_ignore_labels;
+
+  bool m_new_comparison;
 };
 
 } // ipa_icf_gimple namespace

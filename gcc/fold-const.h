@@ -34,6 +34,15 @@ extern tree native_interpret_expr (tree, const unsigned char *, int);
    if the argument itself cannot be simplified, its
    subexpressions are not changed.  */
 
+class operand_equal_comparer
+{
+public:
+  virtual bool equal_ssa (const_tree arg0, const_tree arg, unsigned int flags);
+  virtual bool equal_decl (const_tree arg0, const_tree arg, unsigned int flags);
+  virtual bool equal_obj_type_ref (const_tree arg0, const_tree arg, unsigned int flags);
+};
+extern operand_equal_comparer base_comparer;
+
 extern tree fold (tree);
 #define fold_unary(CODE,T1,T2)\
    fold_unary_loc (UNKNOWN_LOCATION, CODE, T1, T2)
@@ -86,7 +95,9 @@ extern void fold_defer_overflow_warnings (void);
 extern void fold_undefer_overflow_warnings (bool, const gimple *, int);
 extern void fold_undefer_and_ignore_overflow_warnings (void);
 extern bool fold_deferring_overflow_warnings_p (void);
-extern int operand_equal_p (const_tree, const_tree, unsigned int);
+extern int operand_equal_p (const_tree, const_tree, unsigned int,
+			    operand_equal_comparer *cmp
+			    = &base_comparer);
 extern int multiple_of_p (tree, const_tree, const_tree);
 #define omit_one_operand(T1,T2,T3)\
    omit_one_operand_loc (UNKNOWN_LOCATION, T1, T2, T3)

@@ -2700,6 +2700,26 @@ combine_comparisons (location_t loc,
     }
 }
 
+bool
+operand_equal_comparer::equal_ssa (const_tree, const_tree, unsigned int)
+{
+  return false;
+}
+
+bool
+operand_equal_comparer::equal_decl (const_tree, const_tree, unsigned int)
+{
+  return false;
+}
+
+bool
+operand_equal_comparer::equal_obj_type_ref (const_tree, const_tree, unsigned int)
+{
+  return false;
+}
+
+operand_equal_comparer base_comparer;
+
 /* Return nonzero if two operands (typically of the same tree node)
    are necessarily equal. FLAGS modifies behavior as follows:
 
@@ -2736,7 +2756,8 @@ combine_comparisons (location_t loc,
    even if var is volatile.  */
 
 int
-operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
+operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags,
+		 operand_equal_comparer *cmp)
 {
   /* If either is ERROR_MARK, they aren't equal.  */
   if (TREE_CODE (arg0) == ERROR_MARK || TREE_CODE (arg1) == ERROR_MARK
@@ -2809,9 +2830,9 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 
       if (TREE_CODE (arg0) == swap_code)
 	return operand_equal_p (TREE_OPERAND (arg0, 0),
-			        TREE_OPERAND (arg1, 1), flags)
+			        TREE_OPERAND (arg1, 1), flags, cmp)
 	       && operand_equal_p (TREE_OPERAND (arg0, 1),
-				   TREE_OPERAND (arg1, 0), flags);
+				   TREE_OPERAND (arg1, 0), flags, cmp);
     }
 
   if (TREE_CODE (arg0) != TREE_CODE (arg1))
@@ -2901,7 +2922,7 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	  for (i = 0; i < VECTOR_CST_NELTS (arg0); ++i)
 	    {
 	      if (!operand_equal_p (VECTOR_CST_ELT (arg0, i),
-				    VECTOR_CST_ELT (arg1, i), flags))
+				    VECTOR_CST_ELT (arg1, i), flags, cmp))
 		return 0;
 	    }
 	  return 1;
@@ -2909,9 +2930,9 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 
       case COMPLEX_CST:
 	return (operand_equal_p (TREE_REALPART (arg0), TREE_REALPART (arg1),
-				 flags)
+				 flags, cmp)
 		&& operand_equal_p (TREE_IMAGPART (arg0), TREE_IMAGPART (arg1),
-				    flags));
+				    flags, cmp));
 
       case STRING_CST:
 	return (TREE_STRING_LENGTH (arg0) == TREE_STRING_LENGTH (arg1)
@@ -2923,7 +2944,7 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	gcc_checking_assert (!(flags & OEP_ADDRESS_OF));
 	return operand_equal_p (TREE_OPERAND (arg0, 0), TREE_OPERAND (arg1, 0),
 				flags | OEP_ADDRESS_OF
-				| OEP_MATCH_SIDE_EFFECTS);
+				| OEP_MATCH_SIDE_EFFECTS, cmp);
       case CONSTRUCTOR:
 	/* In GIMPLE empty constructors are allowed in initializers of
 	   aggregates.  */
@@ -2941,7 +2962,7 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
    non-null value.  In the latter case, if either is null, the both
    must be; otherwise, do the normal comparison.  */
 #define OP_SAME(N) operand_equal_p (TREE_OPERAND (arg0, N),	\
-				    TREE_OPERAND (arg1, N), flags)
+				    TREE_OPERAND (arg1, N), flags, cmp)
 
 #define OP_SAME_WITH_NULL(N)				\
   ((!TREE_OPERAND (arg0, N) || !TREE_OPERAND (arg1, N))	\
@@ -2974,9 +2995,9 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
       /* For commutative ops, allow the other order.  */
       return (commutative_tree_code (TREE_CODE (arg0))
 	      && operand_equal_p (TREE_OPERAND (arg0, 0),
-				  TREE_OPERAND (arg1, 1), flags)
+				  TREE_OPERAND (arg1, 1), flags, cmp)
 	      && operand_equal_p (TREE_OPERAND (arg0, 1),
-				  TREE_OPERAND (arg1, 0), flags));
+				  TREE_OPERAND (arg1, 0), flags, cmp));
 
     case tcc_reference:
       /* If either of the pointer (or reference) expressions we are
@@ -3012,16 +3033,17 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 		      || !TYPE_SIZE (TREE_TYPE (arg1))
 		      || !operand_equal_p (TYPE_SIZE (TREE_TYPE (arg0)),
 					   TYPE_SIZE (TREE_TYPE (arg1)),
-					   flags)))
+					   flags, cmp)))
 		return 0;
 	      /* Verify that accesses are TBAA compatible.  */
-	      if (!alias_ptr_types_compatible_p
-		    (TREE_TYPE (TREE_OPERAND (arg0, 1)),
-		     TREE_TYPE (TREE_OPERAND (arg1, 1)))
-		  || (MR_DEPENDENCE_CLIQUE (arg0)
-		      != MR_DEPENDENCE_CLIQUE (arg1))
-		  || (MR_DEPENDENCE_BASE (arg0)
-		      != MR_DEPENDENCE_BASE (arg1)))
+	      tree c0 = TREE_OPERAND (arg0, 1);
+	      tree c1 = TREE_OPERAND (arg1, 1) ;
+	      if (!alias_ptr_types_compatible_p (TREE_TYPE (c0), TREE_TYPE (c1))
+		  && !integer_zerop (c0) && !integer_zerop (c1))
+		return 0;
+
+	      if (MR_DEPENDENCE_CLIQUE (arg0) != MR_DEPENDENCE_CLIQUE (arg1)
+		  || MR_DEPENDENCE_BASE (arg0) != MR_DEPENDENCE_BASE (arg1))
 		return 0;
 	     /* Verify that alignment is compatible.  */
 	     if (TYPE_ALIGN (TREE_TYPE (arg0))
@@ -3077,7 +3099,7 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	  gcc_checking_assert (!(flags & OEP_ADDRESS_OF));
 	  return operand_equal_p (TREE_OPERAND (arg0, 0),
 				  TREE_OPERAND (arg1, 0),
-				  flags | OEP_ADDRESS_OF);
+				  flags | OEP_ADDRESS_OF, cmp);
 
 	case TRUTH_NOT_EXPR:
 	  return OP_SAME (0);
@@ -3102,14 +3124,17 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 
 	  /* Otherwise take into account this is a commutative operation.  */
 	  return (operand_equal_p (TREE_OPERAND (arg0, 0),
-				   TREE_OPERAND (arg1, 1), flags)
+				   TREE_OPERAND (arg1, 1), flags, cmp)
 		  && operand_equal_p (TREE_OPERAND (arg0, 1),
-				      TREE_OPERAND (arg1, 0), flags));
+				      TREE_OPERAND (arg1, 0), flags, cmp));
 
 	case COND_EXPR:
 	case VEC_COND_EXPR:
 	case DOT_PROD_EXPR:
 	  return OP_SAME (0) && OP_SAME (1) && OP_SAME (2);
+
+	case OBJ_TYPE_REF:
+	  return cmp->equal_obj_type_ref (arg0, arg1, flags);
 
 	default:
 	  return 0;
@@ -3136,7 +3161,7 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	      /* If the CALL_EXPRs call different functions, then they are not
 		 equal.  */
 	      if (! operand_equal_p (CALL_EXPR_FN (arg0), CALL_EXPR_FN (arg1),
-				     flags))
+				     flags, cmp))
 		return 0;
 	    }
 
@@ -3160,7 +3185,7 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 		 a0 && a1;
 		 a0 = next_const_call_expr_arg (&iter0),
 		   a1 = next_const_call_expr_arg (&iter1))
-	      if (! operand_equal_p (a0, a1, flags))
+	      if (! operand_equal_p (a0, a1, flags, cmp))
 		return 0;
 
 	    /* If we get here and both argument lists are exhausted
@@ -3173,10 +3198,13 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 
     case tcc_declaration:
       /* Consider __builtin_sqrt equal to sqrt.  */
-      return (TREE_CODE (arg0) == FUNCTION_DECL
-	      && DECL_BUILT_IN (arg0) && DECL_BUILT_IN (arg1)
-	      && DECL_BUILT_IN_CLASS (arg0) == DECL_BUILT_IN_CLASS (arg1)
-	      && DECL_FUNCTION_CODE (arg0) == DECL_FUNCTION_CODE (arg1));
+      if (TREE_CODE (arg0) == FUNCTION_DECL
+	  && DECL_BUILT_IN (arg0) && DECL_BUILT_IN (arg1)
+	  && DECL_BUILT_IN_CLASS (arg0) == DECL_BUILT_IN_CLASS (arg1)
+	  && DECL_FUNCTION_CODE (arg0) == DECL_FUNCTION_CODE (arg1))
+	return 1;
+
+      return cmp->equal_decl (arg0, arg1, flags);
 
     case tcc_exceptional:
       if (TREE_CODE (arg0) == CONSTRUCTOR)
@@ -3212,7 +3240,7 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	      constructor_elt *c0 = &(*v0)[i];
 	      constructor_elt *c1 = &(*v1)[i];
 
-	      if (!operand_equal_p (c0->value, c1->value, flags)
+	      if (!operand_equal_p (c0->value, c1->value, flags, cmp)
 		  /* In GIMPLE the indexes can be either NULL or matching i.
 		     Double check this so we won't get false
 		     positives for GENERIC.  */
@@ -3226,6 +3254,9 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	    }
 	  return 1;
 	}
+      else if (TREE_CODE (arg0) == SSA_NAME)
+	return cmp->equal_ssa (arg0, arg1, flags);
+
       return 0;
 
     default:
