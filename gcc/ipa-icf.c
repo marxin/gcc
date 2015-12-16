@@ -869,13 +869,7 @@ sem_function::equals (sem_item *item,
 		      hash_map <symtab_node *, sem_item *> &)
 {
   gcc_assert (item->type == FUNC);
-  bool eq = equals_private (item, false);
-  bool new_eq = equals_private (item, true);
-
-  if (new_eq && !eq)
-    fprintf (stderr, "NEW HIT");
-  else if (!new_eq && eq)
-    gcc_unreachable ();
+  bool eq = equals_private (item);
 
   if (m_checker != NULL)
     {
@@ -900,7 +894,7 @@ sem_function::equals (sem_item *item,
 /* Processes function equality comparison.  */
 
 bool
-sem_function::equals_private (sem_item *item, bool new_comparison)
+sem_function::equals_private (sem_item *item)
 {
   if (item->type != FUNC)
     return false;
@@ -923,7 +917,6 @@ sem_function::equals_private (sem_item *item, bool new_comparison)
   m_checker = new func_checker (decl, m_compared_func->decl,
 				compare_polymorphic_p (),
 				false,
-				new_comparison,
 				&refs_set,
 				&m_compared_func->refs_set);
   arg1 = DECL_ARGUMENTS (decl);

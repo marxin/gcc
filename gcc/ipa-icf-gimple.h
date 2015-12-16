@@ -139,7 +139,6 @@ public:
   func_checker (tree source_func_decl, tree target_func_decl,
 		bool compare_polymorphic,
 		bool ignore_labels = false,
-		bool new_comparison = false,
 		hash_set<symtab_node *> *ignored_source_nodes = NULL,
 		hash_set<symtab_node *> *ignored_target_nodes = NULL);
 
@@ -157,9 +156,6 @@ public:
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 correspond.  */
   bool compare_bb (sem_bb *bb1, sem_bb *bb2);
-
-  /* Verifies that trees T1 and T2 are equivalent from perspective of ICF.  */
-  bool compare_ssa_name (tree t1, tree t2);
 
   /* Verification function for edges E1 and E2.  */
   bool compare_edge (edge e1, edge e2);
@@ -207,13 +203,6 @@ public:
 
   /* Verifies that tree labels T1 and T2 correspond.  */
   bool compare_tree_ssa_label (tree t1, tree t2);
-
-  /* Function compare for equality given memory operands T1 and T2.  */
-  bool compare_memory_operand (tree t1, tree t2);
-
-  /* Function compare for equality given trees T1 and T2 which
-     can be either a constant or a declaration type.  */
-  bool compare_cst_or_decl (tree t1, tree t2);
 
   /* Function responsible for comparison of various operands T1 and T2.
      If these components, from functions FUNC1 and FUNC2, are equal, true
@@ -280,8 +269,6 @@ private:
 
   /* Flag if ignore labels in comparison.  */
   bool m_ignore_labels;
-
-  bool m_new_comparison;
 };
 
 } // ipa_icf_gimple namespace
