@@ -3036,14 +3036,13 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags,
 					   flags, cmp)))
 		return 0;
 	      /* Verify that accesses are TBAA compatible.  */
-	      tree c0 = TREE_OPERAND (arg0, 1);
-	      tree c1 = TREE_OPERAND (arg1, 1) ;
-	      if (!alias_ptr_types_compatible_p (TREE_TYPE (c0), TREE_TYPE (c1))
-		  && !integer_zerop (c0) && !integer_zerop (c1))
-		return 0;
-
-	      if (MR_DEPENDENCE_CLIQUE (arg0) != MR_DEPENDENCE_CLIQUE (arg1)
-		  || MR_DEPENDENCE_BASE (arg0) != MR_DEPENDENCE_BASE (arg1))
+             if (!alias_ptr_types_compatible_p
+                   (TREE_TYPE (TREE_OPERAND (arg0, 1)),
+                    TREE_TYPE (TREE_OPERAND (arg1, 1)))
+                 || (MR_DEPENDENCE_CLIQUE (arg0)
+                     != MR_DEPENDENCE_CLIQUE (arg1))
+                 || (MR_DEPENDENCE_BASE (arg0)
+                     != MR_DEPENDENCE_BASE (arg1)))
 		return 0;
 	     /* Verify that alignment is compatible.  */
 	     if (TYPE_ALIGN (TREE_TYPE (arg0))
