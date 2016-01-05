@@ -658,11 +658,10 @@ func_checker::parse_labels (sem_bb *bb)
 
 /* Return true if gimple STMT is just a local definition in a
    basic block.  Local definition in this context means that a product
-   of the statement (transitively) does not escape the basic block.
-   Used SSA names are contained in SSA_NAMES_SET.  */
+   of the statement (transitively) does not escape the basic block.  */
 
 bool
-func_checker::stmt_local_def (gimple *stmt, ssa_names_set *ssa_names_set)
+func_checker::stmt_local_def (gimple *stmt)
 {
   basic_block bb, def_bb;
   imm_use_iterator iter;
@@ -700,10 +699,6 @@ func_checker::stmt_local_def (gimple *stmt, ssa_names_set *ssa_names_set)
 
       return false;
     }
-
-  for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
-    if (ssa_names_set && ssa_names_set->contains (gimple_op (stmt, i)))
-      return false;
 
   return true;
 }
@@ -804,18 +799,12 @@ func_checker::compare_bb (sem_bb *bb1, sem_bb *bb2)
   gsi1 = gsi_start_bb_nondebug (bb1->bb);
   gsi2 = gsi_start_bb_nondebug (bb2->bb);
 
-  ssa_names_set ssa_names_set1;
-  ssa_names_set ssa_names_set2;
-
-  ssa_names_set1.build (bb1->bb);
-  ssa_names_set2.build (bb2->bb);
-
   while (true)
     {
       if (m_tail_merge_mode)
 	{
-	  gsi_next_nonlocal (&gsi1, &ssa_names_set1);
-	  gsi_next_nonlocal (&gsi2, &ssa_names_set2);
+	  gsi_next_nonlocal (&gsi1);
+	  gsi_next_nonlocal (&gsi2);
 	}
 
       if (gsi_end_p (gsi1) || gsi_end_p (gsi2))
@@ -1244,69 +1233,6 @@ func_checker::compare_gimple_asm (const gasm *g1, const gasm *g2)
     }
 
   return true;
-}
-
-void
-ssa_names_set::build (basic_block bb)
-{
-  tree var;
-  ssa_op_iter iter;
-
-  /* Build default set of important SSA names.  */
-  gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
-
-  /* In the first phase, we iterate all non-local statements and
-     we extract all SSA names that are used in these statements.  */
-  while (!gsi_end_p (gsi))
-    {
-      gimple *stmt = gsi_stmt (gsi);
-      if (!func_checker::stmt_local_def (stmt, NULL))
-	for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
-	  add (gimple_op (stmt, i));
-
-      gsi_next_nondebug (&gsi);
-    }
-
-  gsi = gsi_last_nondebug_bb (bb);
-
-  /* In the second phase, we process reverse run through all statements
-     and we add all SSA names whose values is based on a SSA name already
-     belonging to set.  The set was created in previous step and
-     is incrementally expanded.  At the end of this phase, we will have
-     all SSA names that not used just locally.  */
-  while (!gsi_end_p (gsi))
-    {
-      gimple *stmt = gsi_stmt (gsi);
-
-      switch (gimple_code (stmt))
-	{
-	  case GIMPLE_ASSIGN:
-	    {
-	      tree lhs = gimple_assign_lhs (stmt);
-	      if (contains (lhs))
-		{
-		  FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
-		    add (var);
-		}
-	      break;
-	    }
-	  case GIMPLE_COND:
-	  case GIMPLE_SWITCH:
-	  case GIMPLE_CALL:
-	  case GIMPLE_RETURN:
-	  case GIMPLE_ASM:
-	    {
-	      FOR_EACH_SSA_TREE_OPERAND (var, stmt, iter, SSA_OP_USE)
-		add (var);
-
-	      break;
-	    }
-	  default:
-	    break;
-	}
-
-      gsi_prev_nondebug (&gsi);
-    }
 }
 
 } // icf namespace

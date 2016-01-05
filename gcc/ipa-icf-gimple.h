@@ -126,9 +126,6 @@ public:
   unsigned edge_count;
 };
 
-/* Forward declaration.  */
-class ssa_names_set;
-
 /* A class aggregating all connections and semantic equivalents
    for a given pair of semantic function candidates.  */
 class func_checker
@@ -158,16 +155,16 @@ public:
      equivalent in these blocks.  */
   bool compare_phi_node (sem_bb *sem_bb1, sem_bb *sem_bb2);
 
+  /* Verifies that trees T1 and T2 are equivalent from
+     identical code perspective.  */
+  bool compare_ssa_name (tree t1, tree t2);
+
   /* Run tail-merge comparison for basic blocks BB1 and BB2.  */
   bool compare_bb_tail_merge (sem_bb *bb1, sem_bb *bb2);
 
   /* Basic block equivalence comparison function that returns true if
      basic blocks BB1 and BB2 correspond.  */
   bool compare_bb (sem_bb *bb1, sem_bb *bb2);
-
-  /* Verifies that trees T1 and T2 are equivalent from
-     identical code perspective.  */
-  bool compare_ssa_name (tree t1, tree t2);
 
   /* Verification function for edges E1 and E2.  */
   bool compare_edge (edge e1, edge e2);
@@ -254,13 +251,11 @@ public:
 
   /* Return true if gimple STMT is just a local definition in a
      basic block.  Local definition in this context means that a product
-     of the statement (transitively) does not escape the basic block.
-     Used SSA names are contained in SSA_NAMES_SET.  */
-  static bool stmt_local_def (gimple *stmt, ssa_names_set *ssa_names_set);
+     of the statement (transitively) does not escape the basic block.  */
+  static bool stmt_local_def (gimple *stmt);
 
   /* Advance the iterator to the next non-local gimple statement.  */
-  static void gsi_next_nonlocal (gimple_stmt_iterator *i,
-			  ssa_names_set *ssa_names_set);
+  static void gsi_next_nonlocal (gimple_stmt_iterator *i);
 
 private:
   /* Vector mapping source SSA names to target ones.  */
@@ -302,54 +297,13 @@ private:
   bool m_comparing_sensitive_rhs;
 };
 
-/* SSA NAMES set.  */
-class ssa_names_set
-{
-public:
-  /* Return true if SSA_NAME is in the set.  */
-  bool contains (tree ssa_name);
-
-  /* Add a new SSA_NAME to the set.  */
-  void add (tree ssa_name);
-
-  /* Build the set for given basic block BB.  In the first phase, we collect
-     all SSA names that are not used not just in the basic block.  After that,
-     having this set of SSA names, we can efficiently mark all statements
-     in the basic block that must be compared for equality.  The rest can be
-     just skipped.  Very similar operation was processed
-     in original implementation of tree-ssa-tail merge pass.  */
-  void build (basic_block bb);
-
-private:
-  hash_set <tree> m_set;
-};
-
 inline void
-func_checker::gsi_next_nonlocal (gimple_stmt_iterator *i,
-				 ssa_names_set *ssa_names_set)
+func_checker::gsi_next_nonlocal (gimple_stmt_iterator *i)
 {
   while (!gsi_end_p (*i) &&
 	 (is_gimple_debug (gsi_stmt (*i))
-	  || func_checker::stmt_local_def (gsi_stmt (*i), ssa_names_set)))
+	  || func_checker::stmt_local_def (gsi_stmt (*i))))
     gsi_next (i);
-}
-
-inline bool
-ssa_names_set::contains (tree ssa_name)
-{
-  if (ssa_name == NULL || TREE_CODE (ssa_name) != SSA_NAME)
-    return false;
-
-  return m_set.contains (ssa_name);
-}
-
-inline void
-ssa_names_set::add (tree ssa_name)
-{
-  if (ssa_name == NULL || TREE_CODE (ssa_name) != SSA_NAME)
-    return;
-
-  m_set.add (ssa_name);
 }
 
 } // icf namespace
