@@ -2804,17 +2804,6 @@ copy_cfg_body (copy_body_data * id, gcov_type count, int frequency_scale,
   entry_block_map->aux = NULL;
   exit_block_map->aux = NULL;
 
-  if (id->eh_map)
-    {
-      delete id->eh_map;
-      id->eh_map = NULL;
-    }
-  if (id->dependence_map)
-    {
-      delete id->dependence_map;
-      id->dependence_map = NULL;
-    }
-
   return new_fndecl;
 }
 
@@ -2959,6 +2948,17 @@ copy_body (copy_body_data *id, gcov_type count, int frequency_scale,
   body = copy_cfg_body (id, count, frequency_scale, entry_block_map, exit_block_map,
 			new_entry);
   copy_debug_stmts (id);
+
+  if (id->eh_map)
+    {
+      delete id->eh_map;
+      id->eh_map = NULL;
+    }
+  if (id->dependence_map)
+    {
+      delete id->dependence_map;
+      id->dependence_map = NULL;
+    }
 
   return body;
 }
