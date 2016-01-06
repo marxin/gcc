@@ -381,7 +381,7 @@ cgraph_node::expand_all_artificial_thunks ()
       e = e->next_caller;
 }
 
-static void
+void
 dump_callgraph_transformation (const cgraph_node *original,
 			       const cgraph_node *clone,
 			       const char *suffix)
