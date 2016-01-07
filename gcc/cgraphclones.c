@@ -388,8 +388,8 @@ dump_callgraph_transformation (const cgraph_node *original,
 {
   if (symtab->ipa_clones_dump_file)
     fprintf (symtab->ipa_clones_dump_file,
-	     "Callgraph clone: %s/%d (%s:%d:%d) <- %s/%d "
-	     "(location:%s:%d:%d) (optimization:%s)\n",
+	     "Callgraph clone;%s;%d;%s;%d;%d;<-;%s;%d;"
+	     ";location:;%s;%d;%d;optimization:;%s\n",
 	     original->asm_name (), original->order,
 	     DECL_SOURCE_FILE (original->decl),
 	     DECL_SOURCE_LINE (original->decl),
