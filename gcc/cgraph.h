@@ -655,6 +655,8 @@ bool cgraph_propagate_frequency (struct cgraph_node *node);
 /* In cgraphunit.c  */
 struct asm_node *add_asm_node (tree);
 extern FILE *cgraph_dump_file;
+extern FILE *ipa_clones_dump_file;
+extern struct pointer_set_t *cloned_nodes;
 void cgraph_finalize_function (tree, bool);
 void finalize_compilation_unit (void);
 void compile (void);
@@ -673,7 +675,7 @@ struct cgraph_edge * cgraph_clone_edge (struct cgraph_edge *,
 					unsigned, gcov_type, int, bool);
 struct cgraph_node * cgraph_clone_node (struct cgraph_node *, tree, gcov_type,
 					int, bool, vec<cgraph_edge_p>,
-					bool);
+					bool, const char *);
 tree clone_function_name (tree decl, const char *);
 struct cgraph_node * cgraph_create_virtual_clone (struct cgraph_node *old_node,
 			                          vec<cgraph_edge_p>,
@@ -689,7 +691,7 @@ void cgraph_create_edge_including_clones (struct cgraph_node *,
 					  cgraph_inline_failed_t);
 void cgraph_materialize_all_clones (void);
 struct cgraph_node * cgraph_copy_node_for_versioning (struct cgraph_node *,
-		tree, vec<cgraph_edge_p>, bitmap);
+		tree, vec<cgraph_edge_p>, bitmap, const char *);
 struct cgraph_node *cgraph_function_versioning (struct cgraph_node *,
 						vec<cgraph_edge_p>,
 						vec<ipa_replace_map_p, va_gc> *,
@@ -698,6 +700,9 @@ struct cgraph_node *cgraph_function_versioning (struct cgraph_node *,
 void tree_function_versioning (tree, tree, vec<ipa_replace_map_p, va_gc> *,
 			       bool, bitmap, bool, bitmap, basic_block);
 
+void dump_callgraph_transformation (cgraph_node *original,
+				    cgraph_node *clone,
+				    const char *suffix);
 /* In cgraphbuild.c  */
 unsigned int rebuild_cgraph_edges (void);
 void cgraph_rebuild_references (void);

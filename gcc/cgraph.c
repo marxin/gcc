@@ -1313,6 +1313,14 @@ cgraph_remove_node (struct cgraph_node *node)
   struct cgraph_node *n;
   int uid = node->uid;
 
+  if (ipa_clones_dump_file && pointer_set_contains (cloned_nodes, node))
+    fprintf (ipa_clones_dump_file,
+	     "Callgraph removal;%s;%d;%s;%d;%d\n",
+	     symtab_node_asm_name ((symtab_node)node), node->symbol.order,
+	     DECL_SOURCE_FILE (node->symbol.decl),
+	     DECL_SOURCE_LINE (node->symbol.decl),
+	     DECL_SOURCE_COLUMN (node->symbol.decl));
+
   cgraph_call_node_removal_hooks (node);
   cgraph_node_remove_callers (node);
   cgraph_node_remove_callees (node);

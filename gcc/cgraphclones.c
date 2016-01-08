@@ -158,6 +158,32 @@ cgraph_clone_edge (struct cgraph_edge *e, struct cgraph_node *n,
 }
 
 
+void
+dump_callgraph_transformation (cgraph_node *original,
+			       cgraph_node *clone,
+			       const char *suffix)
+{
+  if (ipa_clones_dump_file)
+  {
+    fprintf (ipa_clones_dump_file,
+	     "Callgraph clone;%s;%d;%s;%d;%d;<-;%s;%d;"
+	     "%s;%d;%d;optimization:;%s\n",
+	     symtab_node_asm_name ((symtab_node)original),
+	     original->symbol.order,
+	     DECL_SOURCE_FILE (original->symbol.decl),
+	     DECL_SOURCE_LINE (original->symbol.decl),
+	     DECL_SOURCE_COLUMN (original->symbol.decl),
+	     symtab_node_asm_name ((symtab_node)clone),
+	     clone->symbol.order, DECL_SOURCE_FILE (clone->symbol.decl),
+	     DECL_SOURCE_LINE (clone->symbol.decl),
+	     DECL_SOURCE_COLUMN (clone->symbol.decl),
+	     suffix);
+
+      pointer_set_insert (cloned_nodes, original);
+      pointer_set_insert (cloned_nodes, clone);
+  }
+}
+
 /* Create node representing clone of N executed COUNT times.  Decrease
    the execution counts from original node too.
    The new clone will have decl set to DECL that may or may not be the same
@@ -173,7 +199,8 @@ struct cgraph_node *
 cgraph_clone_node (struct cgraph_node *n, tree decl, gcov_type count, int freq,
 		   bool update_original,
 		   vec<cgraph_edge_p> redirect_callers,
-		   bool call_duplication_hook)
+		   bool call_duplication_hook,
+		   const char *suffix)
 {
   struct cgraph_node *new_node = cgraph_create_empty_node ();
   struct cgraph_edge *e;
@@ -240,6 +267,9 @@ cgraph_clone_node (struct cgraph_node *n, tree decl, gcov_type count, int freq,
 
   if (call_duplication_hook)
     cgraph_call_node_duplication_hooks (n, new_node);
+
+  dump_callgraph_transformation (n, new_node, suffix);
+
   return new_node;
 }
 
@@ -306,7 +336,7 @@ cgraph_create_virtual_clone (struct cgraph_node *old_node,
 
   new_node = cgraph_clone_node (old_node, new_decl, old_node->count,
 				CGRAPH_FREQ_BASE, false,
-				redirect_callers, false);
+				redirect_callers, false, suffix);
   /* Update the properties.
      Make clone visible only within this translation unit.  Make sure
      that is not weak also.
@@ -620,7 +650,8 @@ struct cgraph_node *
 cgraph_copy_node_for_versioning (struct cgraph_node *old_version,
 				 tree new_decl,
 				 vec<cgraph_edge_p> redirect_callers,
-				 bitmap bbs_to_copy)
+				 bitmap bbs_to_copy,
+				 const char *suffix)
  {
    struct cgraph_node *new_version;
    struct cgraph_edge *e;
@@ -661,6 +692,8 @@ cgraph_copy_node_for_versioning (struct cgraph_node *old_version,
 
    cgraph_call_node_duplication_hooks (old_version, new_version);
 
+   dump_callgraph_transformation (old_version, new_version, suffix);
+
    return new_version;
  }
 
@@ -692,7 +725,7 @@ cgraph_function_versioning (struct cgraph_node *old_version_node,
 			    bool skip_return,
 			    bitmap bbs_to_copy,
 			    basic_block new_entry_block,
-			    const char *clone_name)
+			    const char *suffix)
 {
   tree old_decl = old_version_node->symbol.decl;
   struct cgraph_node *new_version_node = NULL;
@@ -711,7 +744,7 @@ cgraph_function_versioning (struct cgraph_node *old_version_node,
       = build_function_decl_skip_args (old_decl, args_to_skip, skip_return);
 
   /* Generate a new name for the new version. */
-  DECL_NAME (new_decl) = clone_function_name (old_decl, clone_name);
+  DECL_NAME (new_decl) = clone_function_name (old_decl, suffix);
   SET_DECL_ASSEMBLER_NAME (new_decl, DECL_NAME (new_decl));
   SET_DECL_RTL (new_decl, NULL);
 
@@ -723,7 +756,7 @@ cgraph_function_versioning (struct cgraph_node *old_version_node,
      and update the edges of the new node. */
   new_version_node =
     cgraph_copy_node_for_versioning (old_version_node, new_decl,
-				     redirect_callers, bbs_to_copy);
+				     redirect_callers, bbs_to_copy, suffix);
 
   /* Copy the OLD_VERSION_NODE function tree to the new version.  */
   tree_function_versioning (old_decl, new_decl, tree_map, false, args_to_skip,
