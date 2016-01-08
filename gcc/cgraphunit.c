@@ -206,6 +206,8 @@ static void cgraph_analyze_function (struct cgraph_node *);
 static void handle_alias_pairs (void);
 
 FILE *cgraph_dump_file;
+FILE *ipa_clones_dump_file;
+struct pointer_set_t *cloned_nodes;
 
 /* Linked list of cgraph asm nodes.  */
 struct asm_node *asm_nodes;
@@ -1957,8 +1959,13 @@ init_cgraph (void)
 {
   if (!cgraph_dump_file)
     cgraph_dump_file = dump_begin (TDI_cgraph, NULL);
-}
 
+ if (!ipa_clones_dump_file)
+    ipa_clones_dump_file = dump_begin (TDI_clones, NULL);
+
+ if (!cloned_nodes)
+   cloned_nodes = pointer_set_create ();
+}
 
 /* Perform simple optimizations based on callgraph.  */
 
