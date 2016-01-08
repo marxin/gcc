@@ -387,16 +387,21 @@ dump_callgraph_transformation (const cgraph_node *original,
 			       const char *suffix)
 {
   if (symtab->ipa_clones_dump_file)
-    fprintf (symtab->ipa_clones_dump_file,
-	     "Callgraph clone;%s;%d;%s;%d;%d;<-;%s;%d;"
-	     "%s;%d;%d;optimization:;%s\n",
-	     original->asm_name (), original->order,
-	     DECL_SOURCE_FILE (original->decl),
-	     DECL_SOURCE_LINE (original->decl),
-	     DECL_SOURCE_COLUMN (original->decl), clone->asm_name (),
-	     clone->order, DECL_SOURCE_FILE (clone->decl),
-	     DECL_SOURCE_LINE (clone->decl), DECL_SOURCE_COLUMN (clone->decl),
-	     suffix);
+    {
+      fprintf (symtab->ipa_clones_dump_file,
+	       "Callgraph clone;%s;%d;%s;%d;%d;<-;%s;%d;"
+	       "%s;%d;%d;optimization:;%s\n",
+	       original->asm_name (), original->order,
+	       DECL_SOURCE_FILE (original->decl),
+	       DECL_SOURCE_LINE (original->decl),
+	       DECL_SOURCE_COLUMN (original->decl), clone->asm_name (),
+	       clone->order, DECL_SOURCE_FILE (clone->decl),
+	       DECL_SOURCE_LINE (clone->decl), DECL_SOURCE_COLUMN (clone->decl),
+	       suffix);
+
+      symtab->cloned_nodes.add (original);
+      symtab->cloned_nodes.add (clone);
+    }
 }
 
 /* Create node representing clone of N executed COUNT times.  Decrease

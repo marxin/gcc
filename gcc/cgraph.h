@@ -2177,6 +2177,8 @@ public:
 
   FILE* GTY ((skip)) ipa_clones_dump_file;
 
+  hash_set <const cgraph_node *> GTY ((skip)) cloned_nodes;
+
 private:
   /* Allocate new callgraph node.  */
   inline cgraph_node * allocate_cgraph_symbol (void);

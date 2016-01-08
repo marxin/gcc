@@ -1803,7 +1803,7 @@ cgraph_node::remove (void)
   cgraph_node *n;
   int uid = this->uid;
 
-  if (symtab->ipa_clones_dump_file)
+  if (symtab->ipa_clones_dump_file && symtab->cloned_nodes.contains (this))
     fprintf (symtab->ipa_clones_dump_file,
 	     "Callgraph removal;%s;%d;%s;%d;%d\n", asm_name (), order,
 	     DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl),
