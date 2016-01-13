@@ -97,6 +97,8 @@ class Decorator: public __sanitizer::SanitizerCommonDecorator {
         return Yellow();
       case kAsanIntraObjectRedzone:
         return Yellow();
+      case kAsanHeapClobberedMagic:
+      	return Cyan();
       default:
         return Default();
     }
@@ -149,6 +151,8 @@ static void PrintLegend(InternalScopedString *str) {
                   kAsanHeapLeftRedzoneMagic);
   PrintShadowByte(str, "  Heap right redzone:      ",
                   kAsanHeapRightRedzoneMagic);
+  PrintShadowByte(str, "  Heap clobbered memory    ",
+                  kAsanHeapClobberedMagic);
   PrintShadowByte(str, "  Freed heap region:       ", kAsanHeapFreeMagic);
   PrintShadowByte(str, "  Stack left redzone:      ",
                   kAsanStackLeftRedzoneMagic);
@@ -1066,6 +1070,9 @@ void ReportGenericError(uptr pc, uptr bp, uptr sp, uptr addr, bool is_write,
       case kAsanAllocaRightMagic:
         bug_descr = "dynamic-stack-buffer-overflow";
         break;
+      case kAsanHeapClobberedMagic:
+        bug_descr = "heap-clobbered-memory-read";
+	break;
     }
   }
 

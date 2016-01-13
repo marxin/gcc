@@ -117,6 +117,7 @@ extern void (*death_callback)(void);
 const int kAsanHeapLeftRedzoneMagic = 0xfa;
 const int kAsanHeapRightRedzoneMagic = 0xfb;
 const int kAsanHeapFreeMagic = 0xfd;
+const int kAsanHeapClobberedMagic = 0xf0;
 const int kAsanStackLeftRedzoneMagic = 0xf1;
 const int kAsanStackMidRedzoneMagic = 0xf2;
 const int kAsanStackRightRedzoneMagic = 0xf3;

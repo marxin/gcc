@@ -155,6 +155,47 @@ void __asan_report_ ## type ## _n_noabort(uptr addr, uptr size) {           \
 ASAN_REPORT_ERROR_N(load, false)
 ASAN_REPORT_ERROR_N(store, true)
 
+#include <stdio.h>
+
+extern "C" NOINLINE INTERFACE_ATTRIBUTE
+void __asan_clobber_n (uptr ptr, uptr size) {
+//  fprintf (stderr, "__clobbering memory input: %p, size: %u\n", ptr, size);
+  uptr ptr_rem = ptr % 8;
+
+  /* Clobber just 8-bytes aligned addresses.  */
+  if (ptr_rem)
+  {
+    ptr += 8 - ptr_rem;
+    size -= 8 - ptr_rem;
+  }
+
+  /* Clobber just size which is multiple of 8 bytes.  */
+  size = (size >> 3) << 3;
+
+//  fprintf (stderr, "__clobbering memory: %p, size: %u\n", ptr, size);
+
+  PoisonShadow(ptr, size, kAsanHeapClobberedMagic);
+}
+
+extern "C" NOINLINE INTERFACE_ATTRIBUTE
+void __asan_mark_store_n (uptr ptr, uptr size) {
+//  fprintf (stderr, "__asan_mark_store_n input: %p, size: %u\n", ptr, size);
+  /* Mark written entire 8-bytes aligned addresses.  */
+  uptr ptr_rem = ptr % 8;
+  if (ptr_rem)
+  {
+    ptr -= ptr_rem;
+    size += ptr_rem;
+  }
+
+  size = (size >> 3) << 3;
+  if (size < 8)
+    size = 8;
+
+//  fprintf (stderr, "__asan_mark_store_n: %p, size: %u\n", ptr, size);
+  PoisonShadow (ptr, size, 0);
+}
+
 #define ASAN_MEMORY_ACCESS_CALLBACK_BODY(type, is_write, size, exp_arg, fatal) \
     uptr sp = MEM_TO_SHADOW(addr);                                             \
     uptr s = size <= SHADOW_GRANULARITY ? *reinterpret_cast<u8 *>(sp)          \
