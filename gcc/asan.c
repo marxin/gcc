@@ -1628,7 +1628,7 @@ build_shadow_mem_access (gimple_stmt_iterator *gsi, location_t location,
     {
       char v = ~0xf0;
 
-      tree c = build_int_cst (char_type_node, v);
+      tree c = build_int_cst (TREE_TYPE (gimple_assign_lhs (g)), v);
       g = gimple_build_assign (make_ssa_name (shadow_type), BIT_AND_EXPR,
 			       gimple_assign_lhs (g), c);
       gimple_set_location (g, location);
@@ -1849,7 +1849,9 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
 	{
 	  /* Automatic vars in the current function will be always
 	     accessible.  */
+	  // TODO: clobber local variable read
 	  if (decl_function_context (inner) == current_function_decl)
+//	      && !is_clobber)
 	    return;
 	}
       /* Always instrument external vars, they might be dynamically
@@ -2077,6 +2079,19 @@ maybe_instrument_call (gimple_stmt_iterator *iter)
       gimple_set_location (g, gimple_location (stmt));
       gsi_insert_before (iter, g, GSI_SAME_STMT);
     }
+  else if (gimple_store_p (stmt))
+    {
+      tree ref_expr = gimple_call_lhs (stmt);
+      bool is_store = true;
+      bool is_clobber = gimple_clobber_p (stmt);
+      instrument_derefs (iter, ref_expr,
+			 gimple_location (stmt),
+			 is_store, is_clobber);
+      gsi_next (iter);
+
+      return true;
+    }
+
   return false;
 }
 

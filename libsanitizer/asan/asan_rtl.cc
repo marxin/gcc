@@ -159,7 +159,16 @@ ASAN_REPORT_ERROR_N(store, true)
 
 extern "C" NOINLINE INTERFACE_ATTRIBUTE
 void __asan_clobber_n (uptr ptr, uptr size) {
+  bool r = false;
+  asanThreadRegistry().Lock();
+  r = FindThreadByStackAddress(ptr);
+  asanThreadRegistry().Unlock();
+  if (r)
+    return;
+
 //  fprintf (stderr, "__clobbering memory input: %p, size: %u\n", ptr, size);
+  if (size < 8)
+    return;
   uptr ptr_rem = ptr % 8;
 
   /* Clobber just 8-bytes aligned addresses.  */
@@ -174,6 +183,7 @@ void __asan_clobber_n (uptr ptr, uptr size) {
 
 //  fprintf (stderr, "__clobbering memory: %p, size: %u\n", ptr, size);
 
+//  fprintf (stderr, "clobber: %p, size: %u\n", ptr, size);
   PoisonShadow(ptr, size, kAsanHeapClobberedMagic);
 }
 

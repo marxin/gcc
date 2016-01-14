@@ -60,6 +60,8 @@ struct AsanInterceptorContext {
       GET_STACK_TRACE_FATAL_HERE;                                       \
       ReportStringFunctionSizeOverflow(__offset, __size, &stack);       \
     }                                                                   \
+    if (isWrite)							\
+      MarkStore (__offset, __size);					\
     if (!QuickCheckForUnpoisonedRegion(__offset, __size) &&             \
         (__bad = __asan_region_is_poisoned(__offset, __size))) {        \
       AsanInterceptorContext *_ctx = (AsanInterceptorContext *)ctx;     \

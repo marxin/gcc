@@ -1028,6 +1028,7 @@ void ReportGenericError(uptr pc, uptr bp, uptr sp, uptr addr, bool is_write,
     // If we are in the partial right redzone, look at the next shadow byte.
     if (*shadow_addr > 0 && *shadow_addr < 128)
       shadow_addr++;
+
     switch (*shadow_addr) {
       case kAsanHeapLeftRedzoneMagic:
       case kAsanHeapRightRedzoneMagic:

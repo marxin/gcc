@@ -302,6 +302,23 @@ static inline bool AddressIsPoisoned(uptr a) {
   return false;
 }
 
+static inline void MarkStore (uptr ptr, uptr size) {
+  PROFILE_ASAN_MAPPING();
+
+  uptr rem = size % 8;
+  if (rem)
+    size += 8 - rem;
+
+  for (uptr offset = 0; offset < size; offset += 8)
+  {
+    u8 *shadow_address = (u8*)MEM_TO_SHADOW(ptr + offset);
+    u8 shadow_value = *shadow_address;
+
+    if (shadow_value == ((u8)kAsanHeapClobberedMagic))
+      *shadow_address = 0;
+  }
+}
+
 // Must be after all calls to PROFILE_ASAN_MAPPING().
 static const uptr kAsanMappingProfileSize = __LINE__;
 
