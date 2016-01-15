@@ -1,3 +1,30 @@
+/* HSA BRIG (binary representation of HSAIL) 1.0.1 representation description.
+
+   The content of the file was created by extracting data structures, enum,
+   typedef and other definitions from HSA Programmer's Reference Manual
+   Version 1.0.1 (http://www.hsafoundation.com/?ddownload=4945).
+
+   HTML version is provided on the following link:
+   http://www.hsafoundation.com/html/Content/PRM/Topics/PRM_title_page.htm
+
+   Copyright (C) 2016 Free Software Foundation, Inc.
+
+This file is part of GCC.
+
+GCC is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3, or (at your option)
+any later version.
+
+GCC is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
+
 #ifndef HSA_BRIG_FORMAT_NEW_H
 #define HSA_BRIG_FORMAT_NEW_H
 
