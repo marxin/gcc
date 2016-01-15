@@ -13,6 +13,7 @@ typedef BrigDataOffset32_t BrigDataOffsetString32_t;
 typedef BrigDataOffset32_t BrigDataOffsetCodeList32_t;
 typedef BrigDataOffset32_t BrigDataOffsetOperandList32_t;
 typedef uint8_t BrigAlignment8_t;
+
 enum BrigAlignment {
   BRIG_ALIGNMENT_NONE = 0,
   BRIG_ALIGNMENT_1 = 1,
@@ -25,19 +26,24 @@ enum BrigAlignment {
   BRIG_ALIGNMENT_128 = 8,
   BRIG_ALIGNMENT_256 = 9
 };
+
 typedef uint8_t BrigAllocation8_t;
+
 enum BrigAllocation {
   BRIG_ALLOCATION_NONE = 0,
   BRIG_ALLOCATION_PROGRAM = 1,
   BRIG_ALLOCATION_AGENT = 2,
   BRIG_ALLOCATION_AUTOMATIC = 3
 };
+
 typedef uint8_t BrigAluModifier8_t;
+
 enum BrigAluModifierMask {
   BRIG_ALU_FTZ = 1
 };
 
 typedef uint8_t BrigAtomicOperation8_t;
+
 enum BrigAtomicOperation {
   BRIG_ATOMIC_ADD = 0,
   BRIG_ATOMIC_AND = 1,
@@ -61,11 +67,14 @@ enum BrigAtomicOperation {
   BRIG_ATOMIC_WAITTIMEOUT_LT = 19,
   BRIG_ATOMIC_WAITTIMEOUT_GTE = 20
 };
+
 struct BrigBase {
   uint16_t byteCount;
   BrigKind16_t kind;
 }; 
+
 typedef uint8_t BrigCompareOperation8_t;
+
 enum BrigCompareOperation {
   BRIG_COMPARE_EQ = 0,
   BRIG_COMPARE_NE = 1,
@@ -96,7 +105,9 @@ enum BrigCompareOperation {
   BRIG_COMPARE_SNAN = 26,
   BRIG_COMPARE_SGTU = 27
 };
+
 typedef uint16_t BrigControlDirective16_t;
+
 enum BrigControlDirective {
   BRIG_CONTROL_NONE = 0,
   BRIG_CONTROL_ENABLEBREAKEXCEPTIONS = 1,
@@ -110,8 +121,9 @@ enum BrigControlDirective {
   BRIG_CONTROL_REQUIRENOPARTIALWORKGROUPS = 9
  }; 
 
- typedef uint32_t BrigExceptions32_t;
- enum BrigExceptionsMask {
+typedef uint32_t BrigExceptions32_t;
+
+enum BrigExceptionsMask {
    BRIG_EXCEPTIONS_INVALID_OPERATION = 1 << 0,
    BRIG_EXCEPTIONS_DIVIDE_BY_ZERO = 1 << 1,
    BRIG_EXCEPTIONS_OVERFLOW = 1 << 2,
@@ -121,10 +133,13 @@ enum BrigControlDirective {
  };
 
 typedef uint8_t BrigExecutableModifier8_t;
+
 enum BrigExecutableModifierMask {
   BRIG_EXECUTABLE_DEFINITION = 1
 };
+
 typedef uint8_t BrigImageChannelOrder8_t;
+
 enum BrigImageChannelOrder {
   BRIG_CHANNEL_ORDER_A = 0,
   BRIG_CHANNEL_ORDER_R = 1,
@@ -150,6 +165,7 @@ enum BrigImageChannelOrder {
 };
 
 typedef uint8_t BrigImageChannelType8_t;
+
 enum BrigImageChannelType {
   BRIG_CHANNEL_TYPE_SNORM_INT8 = 0,
   BRIG_CHANNEL_TYPE_SNORM_INT16 = 1,
@@ -171,6 +187,7 @@ enum BrigImageChannelType {
 };
 
 typedef uint8_t BrigImageGeometry8_t;
+
 enum BrigImageGeometry {
   BRIG_GEOMETRY_1D = 0,
   BRIG_GEOMETRY_2D = 1,
@@ -184,6 +201,7 @@ enum BrigImageGeometry {
 };
 
 typedef uint8_t BrigImageQuery8_t;
+
 enum BrigImageQuery {
   BRIG_IMAGE_QUERY_WIDTH = 0,
   BRIG_IMAGE_QUERY_HEIGHT = 1,
@@ -192,6 +210,7 @@ enum BrigImageQuery {
   BRIG_IMAGE_QUERY_CHANNELORDER = 4,
   BRIG_IMAGE_QUERY_CHANNELTYPE = 5
 };
+
 enum BrigKind {
   BRIG_KIND_NONE = 0x0000,
   BRIG_KIND_DIRECTIVE_BEGIN = 0x1000,
@@ -249,6 +268,7 @@ enum BrigKind {
 };
 
 typedef uint8_t BrigLinkage8_t;
+
 enum BrigLinkage {
   BRIG_LINKAGE_NONE = 0,
   BRIG_LINKAGE_PROGRAM = 1,
@@ -256,16 +276,22 @@ enum BrigLinkage {
   BRIG_LINKAGE_FUNCTION = 3,
   BRIG_LINKAGE_ARG = 4
 };
+
 typedef uint8_t BrigMachineModel8_t;
+
 enum BrigMachineModel {
   BRIG_MACHINE_SMALL = 0,
   BRIG_MACHINE_LARGE = 1
 };
+
 typedef uint8_t BrigMemoryModifier8_t;
+
 enum BrigMemoryModifierMask {
   BRIG_MEMORY_CONST = 1
 };
+
 typedef uint8_t BrigMemoryOrder8_t;
+
 enum BrigMemoryOrder {
   BRIG_MEMORY_ORDER_NONE = 0,
   BRIG_MEMORY_ORDER_RELAXED = 1,
@@ -273,7 +299,9 @@ enum BrigMemoryOrder {
   BRIG_MEMORY_ORDER_SC_RELEASE = 3,
   BRIG_MEMORY_ORDER_SC_ACQUIRE_RELEASE = 4
 };
+
 typedef uint8_t BrigMemoryScope8_t;
+
 enum BrigMemoryScope {
   BRIG_MEMORY_SCOPE_NONE = 0,
   BRIG_MEMORY_SCOPE_WORKITEM = 1,
@@ -282,6 +310,7 @@ enum BrigMemoryScope {
   BRIG_MEMORY_SCOPE_AGENT = 4,
   BRIG_MEMORY_SCOPE_SYSTEM = 5
 };
+
 struct BrigModuleHeader {
   char identification[8];
   BrigVersion32_t brigMajor;
@@ -294,6 +323,7 @@ struct BrigModuleHeader {
 };
 
 typedef uint16_t BrigOpcode16_t;
+
 enum BrigOpcode {
   BRIG_OPCODE_NOP = 0,
   BRIG_OPCODE_ABS = 1,
@@ -436,6 +466,7 @@ enum BrigOpcode {
  };
 
 typedef uint8_t BrigPack8_t;
+
 enum BrigPack {
   BRIG_PACK_NONE = 0,
   BRIG_PACK_PP = 1,
@@ -451,19 +482,25 @@ enum BrigPack {
   BRIG_PACK_SSAT = 11,
   BRIG_PACK_PSAT = 12
 };
+
 typedef uint8_t BrigProfile8_t;
+
 enum BrigProfile {
   BRIG_PROFILE_BASE = 0,
   BRIG_PROFILE_FULL = 1
 };
+
 typedef uint16_t BrigRegisterKind16_t;
+
 enum BrigRegisterKind {
   BRIG_REGISTER_KIND_CONTROL = 0,
   BRIG_REGISTER_KIND_SINGLE = 1,
   BRIG_REGISTER_KIND_DOUBLE = 2,
   BRIG_REGISTER_KIND_QUAD = 3
 };
+
 typedef uint8_t BrigRound8_t;
+
 enum BrigRound {
   BRIG_ROUND_NONE = 0,
   BRIG_ROUND_FLOAT_DEFAULT = 1,
@@ -490,6 +527,7 @@ enum BrigRound {
 };
 
 typedef uint8_t BrigSamplerAddressing8_t;
+
 enum BrigSamplerAddressing {
   BRIG_ADDRESSING_UNDEFINED = 0,
   BRIG_ADDRESSING_CLAMP_TO_EDGE = 1,
@@ -500,11 +538,14 @@ enum BrigSamplerAddressing {
 };
 
 typedef uint8_t BrigSamplerCoordNormalization8_t;
+
 enum BrigSamplerCoordNormalization {
   BRIG_COORD_UNNORMALIZED = 0,
   BRIG_COORD_NORMALIZED = 1
 };
+
 typedef uint8_t BrigSamplerFilter8_t;
+
 enum BrigSamplerFilter {
   BRIG_FILTER_NEAREST = 0,
   BRIG_FILTER_LINEAR = 1,
@@ -512,29 +553,37 @@ enum BrigSamplerFilter {
 };
 
 typedef uint8_t BrigSamplerQuery8_t;
+
 enum BrigSamplerQuery {
   BRIG_SAMPLER_QUERY_ADDRESSING = 0,
   BRIG_SAMPLER_QUERY_COORD = 1,
   BRIG_SAMPLER_QUERY_FILTER = 2
 };
+
 typedef uint32_t BrigSectionIndex32_t;
+
 enum BrigSectionIndex {
   BRIG_SECTION_INDEX_DATA = 0,
   BRIG_SECTION_INDEX_CODE = 1,
   BRIG_SECTION_INDEX_OPERAND = 2,
   BRIG_SECTION_INDEX_BEGIN_IMPLEMENTATION_DEFINED = 3
 };
+
 struct BrigSectionHeader {
   uint64_t byteCount;
   uint32_t headerByteCount;
   uint32_t nameLength;
   uint8_t name[1];
 };
+
 typedef uint8_t BrigSegCvtModifier8_t;
+
 enum BrigSegCvtModifierMask {
   BRIG_SEG_CVT_NONULL = 1
 };
+
 typedef uint8_t BrigSegment8_t;
+
 enum BrigSegment {
   BRIG_SEGMENT_NONE = 0,
   BRIG_SEGMENT_FLAT = 1,
@@ -570,6 +619,7 @@ enum {
  };
 
 typedef uint16_t BrigType16_t;
+
 enum BrigType {
   BRIG_TYPE_NONE = 0,
  
@@ -707,6 +757,7 @@ struct BrigUInt64 {
  };
 
 typedef uint8_t BrigVariableModifier8_t;
+
 enum BrigVariableModifierMask {
   BRIG_VARIABLE_DEFINITION = 1,
   BRIG_VARIABLE_CONST = 2
@@ -721,6 +772,7 @@ enum BrigVersion {
 };
 
 typedef uint8_t BrigWidth8_t;
+
 enum BrigWidth {
   BRIG_WIDTH_NONE = 0,
   BRIG_WIDTH_1 = 1,
@@ -758,23 +810,28 @@ enum BrigWidth {
   BRIG_WIDTH_WAVESIZE = 33,
   BRIG_WIDTH_ALL = 34
 };
+
 struct BrigData {
   uint32_t byteCount; 
   uint8_t bytes[1];    
   };
+
 struct BrigDirectiveArgBlock {
   BrigBase base;
 };
+
 struct BrigDirectiveComment {
   BrigBase base;
   BrigDataOffsetString32_t name;
 };
+
 struct BrigDirectiveControl {
   BrigBase base;
   BrigControlDirective16_t control;
   uint16_t reserved;
   BrigDataOffsetOperandList32_t operands;
 };                
+
 struct BrigDirectiveExecutable {
   BrigBase base;
   BrigDataOffsetString32_t name;
@@ -787,10 +844,12 @@ struct BrigDirectiveExecutable {
   BrigLinkage8_t linkage;
   uint16_t reserved;
 };
+
 struct BrigDirectiveExtension {
   BrigBase base;
   BrigDataOffsetString32_t name;
 };
+
 struct BrigDirectiveFbarrier {
   BrigBase base;
   BrigDataOffsetString32_t name;
@@ -798,6 +857,7 @@ struct BrigDirectiveFbarrier {
   BrigLinkage8_t linkage;
   uint16_t reserved;
 };
+
 struct BrigDirectiveLabel {
   BrigBase base;
   BrigDataOffsetString32_t name;
@@ -808,6 +868,7 @@ struct BrigDirectiveLoc {
   uint32_t line;
   uint32_t column;
 };
+
 struct BrigDirectiveModule {
   BrigBase base;
   BrigDataOffsetString32_t name;
@@ -822,10 +883,12 @@ struct BrigDirectiveModule {
 struct BrigDirectiveNone {
   BrigBase base;
 };
+
 struct BrigDirectivePragma {
   BrigBase base;
   BrigDataOffsetOperandList32_t operands;
 };
+
 struct BrigDirectiveVariable {
   BrigBase base;
   BrigDataOffsetString32_t name;
@@ -839,6 +902,7 @@ struct BrigDirectiveVariable {
   BrigAllocation8_t allocation;
   uint8_t reserved;
 };  
+
 struct BrigInstBase {
   BrigBase base;
   BrigOpcode16_t opcode;
@@ -851,6 +915,7 @@ struct BrigInstAddr {
   BrigSegment8_t segment;
   uint8_t reserved[3];
 };              
+
 struct BrigInstAtomic {
   BrigInstBase base;
   BrigSegment8_t segment;
@@ -860,14 +925,17 @@ struct BrigInstAtomic {
   uint8_t equivClass;
   uint8_t reserved[3];
 };              
+
 struct BrigInstBasic {
   BrigInstBase base; 
 };
+
 struct BrigInstBr {
   BrigInstBase base;
   BrigWidth8_t width;
   uint8_t reserved[3];
 }; 
+
 struct BrigInstCmp {
   BrigInstBase base;
   BrigType16_t sourceType;
@@ -876,12 +944,14 @@ struct BrigInstCmp {
   BrigPack8_t pack;
   uint8_t reserved[3];
 };
+
 struct BrigInstCvt {
   BrigInstBase base; 
   BrigType16_t sourceType;
   BrigAluModifier8_t modifier;
   BrigRound8_t round;
 };
+
 struct BrigInstImage {
   BrigInstBase base;
   BrigType16_t imageType;
@@ -890,12 +960,14 @@ struct BrigInstImage {
   uint8_t equivClass;
   uint16_t reserved;
 };  
+
 struct BrigInstLane {
   BrigInstBase base;
   BrigType16_t sourceType;
   BrigWidth8_t width;
   uint8_t reserved;
 };
+
 struct BrigInstMem {
   BrigInstBase base; 
   BrigSegment8_t segment;
@@ -905,6 +977,7 @@ struct BrigInstMem {
   BrigMemoryModifier8_t modifier;
   uint8_t reserved[3];
 };
+
 struct BrigInstMemFence {
   BrigInstBase base;
   BrigMemoryOrder8_t memoryOrder;
@@ -912,6 +985,7 @@ struct BrigInstMemFence {
   BrigMemoryScope8_t groupSegmentMemoryScope;
   BrigMemoryScope8_t imageSegmentMemoryScope;
 };    
+
 struct BrigInstMod {
   BrigInstBase base;
   BrigAluModifier8_t modifier;
@@ -919,51 +993,60 @@ struct BrigInstMod {
   BrigPack8_t pack;
   uint8_t reserved;
 };  
+
 struct BrigInstQueryImage {
   BrigInstBase base;
   BrigType16_t imageType;
   BrigImageGeometry8_t geometry;
   BrigImageQuery8_t query;
 };
+
 struct BrigInstQuerySampler {
   BrigInstBase base;
   BrigSamplerQuery8_t query;
   uint8_t reserved[3];
 };
+
 struct BrigInstQueue {
   BrigInstBase base;
   BrigSegment8_t segment;
   BrigMemoryOrder8_t memoryOrder;
   uint16_t reserved;
 };
+
 struct BrigInstSeg {
   BrigInstBase base;
   BrigSegment8_t segment;
   uint8_t reserved[3];
 };
+
 struct BrigInstSegCvt {
   BrigInstBase base;
   BrigType16_t sourceType;
   BrigSegment8_t segment;
   BrigSegCvtModifier8_t modifier;
 };
+
 struct BrigInstSignal {
   BrigInstBase base;
   BrigType16_t signalType;
   BrigMemoryOrder8_t memoryOrder;
   BrigAtomicOperation8_t signalOperation;
 };
+
 struct BrigInstSourceType {
   BrigInstBase base;
   BrigType16_t sourceType;
   uint16_t reserved;
 };
+
 struct BrigOperandAddress {
   BrigBase base; 
   BrigCodeOffset32_t symbol;
   BrigOperandOffset32_t reg;
   BrigUInt64 offset;  
-};                    
+};    
+
 struct BrigOperandAlign {
   BrigBase base; 
   BrigAlignment8_t align;
@@ -973,17 +1056,20 @@ struct BrigOperandAlign {
 struct BrigOperandCodeList {
   BrigBase base;
   BrigDataOffsetCodeList32_t elements;
-};                      
+};     
+
 struct BrigOperandCodeRef {
   BrigBase base;
   BrigCodeOffset32_t ref;
-};       
+};     
+
 struct BrigOperandConstantBytes {
   BrigBase base;
   BrigType16_t type;
   uint16_t reserved;
   BrigDataOffsetString32_t bytes;
 };
+
 struct BrigOperandConstantImage {
   BrigBase base;
   BrigType16_t type;
@@ -996,6 +1082,7 @@ struct BrigOperandConstantImage {
   BrigUInt64 depth;
   BrigUInt64 array;
 };
+
 struct BrigOperandConstantOperandList {
   BrigBase base;
   BrigType16_t type;
@@ -1015,16 +1102,19 @@ struct BrigOperandConstantSampler {
 struct BrigOperandOperandList {
   BrigBase base;
   BrigDataOffsetOperandList32_t elements;
-};                      
+};    
+
 struct BrigOperandRegister {
   BrigBase base;
   BrigRegisterKind16_t regKind;
   uint16_t regNum;
 };     
+
 struct BrigOperandString {
   BrigBase base;
   BrigDataOffsetString32_t string;
 };
+
 struct BrigOperandWavesize {
   BrigBase base;
 };
