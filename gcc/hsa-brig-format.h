@@ -1,5 +1,9 @@
-#ifndef HSA_BRIG_FORMAT_H
-#define HSA_BRIG_FORMAT_H
+#ifndef HSA_BRIG_FORMAT_NEW_H
+#define HSA_BRIG_FORMAT_NEW_H
+
+struct BrigModuleHeader;
+typedef uint16_t BrigKind16_t;
+typedef uint32_t BrigVersion32_t;
 
 typedef BrigModuleHeader* BrigModule_t;
 typedef uint32_t BrigDataOffset32_t;
@@ -188,7 +192,6 @@ enum BrigImageQuery {
   BRIG_IMAGE_QUERY_CHANNELORDER = 4,
   BRIG_IMAGE_QUERY_CHANNELTYPE = 5
 };
-typedef uint16_t BrigKind16_t;
 enum BrigKind {
   BRIG_KIND_NONE = 0x0000,
   BRIG_KIND_DIRECTIVE_BEGIN = 0x1000,
@@ -429,7 +432,7 @@ enum BrigOpcode {
   BRIG_OPCODE_MAXWAVEID = 134,
   BRIG_OPCODE_NULLPTR = 135,
   BRIG_OPCODE_WAVEID = 136,
-  BRIG_OPCODE_FIRST_USER_DEFINED = 32768,
+  BRIG_OPCODE_FIRST_USER_DEFINED = 32768
  };
 
 typedef uint8_t BrigPack8_t;
@@ -702,7 +705,7 @@ struct BrigUInt64 {
   uint32_t lo;
   uint32_t hi;
  };
-value = (uint64_t(hi) << 32) | uint64_t(lo)
+
 typedef uint8_t BrigVariableModifier8_t;
 enum BrigVariableModifierMask {
   BRIG_VARIABLE_DEFINITION = 1,
@@ -710,7 +713,6 @@ enum BrigVariableModifierMask {
 };
 
 
-typedef_uint32_t BrigVersion32_t;
 enum BrigVersion {
   BRIG_VERSION_HSAIL_MAJOR = 1,
   BRIG_VERSION_HSAIL_MINOR = 0,
@@ -1027,4 +1029,4 @@ struct BrigOperandWavesize {
   BrigBase base;
 };
 
-#endif /* HSA_BRIG_FORMAT_H */
+#endif /* HSA_BRIG_FORMAT_NEW_H */
