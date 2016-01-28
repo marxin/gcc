@@ -320,15 +320,6 @@ static GTY(()) tree shadow_ptr_types[2];
 /* Decl for __asan_option_detect_stack_use_after_return.  */
 static GTY(()) tree asan_detect_stack_use_after_return;
 
-/* Various flags for Asan builtins.  */
-enum asan_check_flags
-{
-  ASAN_CHECK_STORE = 1 << 0,
-  ASAN_CHECK_SCALAR_ACCESS = 1 << 1,
-  ASAN_CHECK_NON_ZERO_LEN = 1 << 2,
-  ASAN_CHECK_LAST = 1 << 3
-};
-
 /* Hashtable support for memory references used by gimple
    statements.  */
 
@@ -1685,7 +1676,8 @@ static void
 build_check_stmt (location_t loc, tree base, tree len,
 		  HOST_WIDE_INT size_in_bytes, gimple_stmt_iterator *iter,
 		  bool is_non_zero_len, bool before_p, bool is_store,
-		  bool is_scalar_access, unsigned int align = 0)
+		  bool is_scalar_access, bool is_clobber,
+		  unsigned int align = 0)
 {
   gimple_stmt_iterator gsi = *iter;
   gimple *g;
@@ -1757,7 +1749,7 @@ build_check_stmt (location_t loc, tree base, tree len,
 
 static void
 instrument_derefs (gimple_stmt_iterator *iter, tree t,
-		   location_t location, bool is_store)
+		   location_t location, bool is_store, bool is_clobber)
 {
   if (is_store && !ASAN_INSTRUMENT_WRITES)
     return;
@@ -1799,7 +1791,8 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
       tree repr = DECL_BIT_FIELD_REPRESENTATIVE (TREE_OPERAND (t, 1));
       instrument_derefs (iter, build3 (COMPONENT_REF, TREE_TYPE (repr),
 				       TREE_OPERAND (t, 0), repr,
-				       NULL_TREE), location, is_store);
+				       NULL_TREE), location, is_store,
+			 is_clobber);
       return;
     }
 
@@ -1823,7 +1816,25 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
 	  /* Automatic vars in the current function will be always
 	     accessible.  */
 	  if (decl_function_context (inner) == current_function_decl)
-	    return;
+	    {
+	      if (is_store && is_clobber)
+		{
+		  base = build_fold_addr_expr (t);
+
+		  if (!has_mem_ref_been_instrumented (base, size_in_bytes))
+		    {
+		      unsigned int align = get_object_alignment (t);
+		      build_check_stmt (location, base, NULL_TREE,
+					size_in_bytes, iter,
+					/*is_non_zero_len*/size_in_bytes > 0,
+					/*before_p=*/true,
+					true, /*is_scalar_access*/true,
+					true, align);
+		    }
+		}
+
+	      return;
+	    }
 	}
       /* Always instrument external vars, they might be dynamically
 	 initialized.  */
@@ -1843,7 +1854,7 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
       unsigned int align = get_object_alignment (t);
       build_check_stmt (location, base, NULL_TREE, size_in_bytes, iter,
 			/*is_non_zero_len*/size_in_bytes > 0, /*before_p=*/true,
-			is_store, /*is_scalar_access*/true, align);
+			is_store, /*is_scalar_access*/true, is_clobber, align);
       update_mem_ref_hash_table (base, size_in_bytes);
       update_mem_ref_hash_table (t, size_in_bytes);
     }
@@ -1891,7 +1902,8 @@ instrument_mem_region_access (tree base, tree len,
     {
       build_check_stmt (location, base, len, size_in_bytes, iter,
 			/*is_non_zero_len*/size_in_bytes > 0, /*before_p*/true,
-			is_store, /*is_scalar_access*/false, /*align*/0);
+			is_store, /*is_clobber*/false,
+			/*is_scalar_access*/false, /*align*/0);
     }
 
   maybe_update_mem_ref_hash_table (base, len);
@@ -1934,7 +1946,8 @@ instrument_builtin_call (gimple_stmt_iterator *iter)
     {
       if (dest_is_deref)
 	{
-	  instrument_derefs (iter, dest.start, loc, dest_is_store);
+	  instrument_derefs (iter, dest.start, loc, dest_is_store,
+			     /*is_clobber*/false);
 	  gsi_next (iter);
 	  iter_advanced_p = true;
 	}
@@ -1983,15 +1996,16 @@ maybe_instrument_assignment (gimple_stmt_iterator *iter)
   gcc_assert (gimple_assign_single_p (s));
 
   tree ref_expr = NULL_TREE;
-  bool is_store, is_instrumented = false;
+  bool is_store, is_instrumented = false, is_clobber = false;
 
   if (gimple_store_p (s))
     {
       ref_expr = gimple_assign_lhs (s);
       is_store = true;
+      is_clobber = gimple_clobber_p (s);
       instrument_derefs (iter, ref_expr,
 			 gimple_location (s),
-			 is_store);
+			 is_store, is_clobber);
       is_instrumented = true;
     }
 
@@ -2001,7 +2015,7 @@ maybe_instrument_assignment (gimple_stmt_iterator *iter)
       is_store = false;
       instrument_derefs (iter, ref_expr,
 			 gimple_location (s),
-			 is_store);
+			 is_store, is_clobber);
       is_instrumented = true;
     }
 
@@ -2103,7 +2117,6 @@ transform_statements (void)
 	  if (has_stmt_been_instrumented_p (s))
 	    gsi_next (&i);
 	  else if (gimple_assign_single_p (s)
-		   && !gimple_clobber_p (s)
 		   && maybe_instrument_assignment (&i))
 	    /*  Nothing to do as maybe_instrument_assignment advanced
 		the iterator I.  */;
@@ -2569,6 +2582,8 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
   bool is_scalar_access = (flags & ASAN_CHECK_SCALAR_ACCESS) != 0;
   bool is_store = (flags & ASAN_CHECK_STORE) != 0;
   bool is_non_zero_len = (flags & ASAN_CHECK_NON_ZERO_LEN) != 0;
+  bool is_clobber = (flags & ASAN_CHECK_CLOBBER) != 0;
+  bool is_unclobber = (flags & ASAN_CHECK_UNCLOBBER) != 0;
 
   tree base = gimple_call_arg (g, 1);
   tree len = gimple_call_arg (g, 2);
@@ -2576,6 +2591,30 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
 
   HOST_WIDE_INT size_in_bytes
     = is_scalar_access && tree_fits_shwi_p (len) ? tree_to_shwi (len) : -1;
+
+  if (is_clobber || is_unclobber)
+    {
+      gcc_assert (size_in_bytes);
+
+      gimple *g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+				      NOP_EXPR, base);
+      gimple_set_location (g, loc);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      tree base_addr = gimple_assign_lhs (g);
+
+      g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			       NOP_EXPR, len);
+      gimple_set_location (g, loc);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      tree sz_arg = gimple_assign_lhs (g);
+
+      tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
+					: BUILT_IN_ASAN_UNCLOBBER_N);
+      g = gimple_build_call (fun, 2, base_addr, sz_arg);
+      gimple_set_location (g, loc);
+      gsi_replace (iter, g, false);
+      return false;
+    }
 
   if (use_calls)
     {

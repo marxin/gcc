@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-walk.h"
 #include "langhooks-def.h"	/* FIXME: for lhd_set_decl_assembler_name */
 #include "builtins.h"
+#include "asan.h"
 
 enum gimplify_omp_var_data
 {
@@ -1195,6 +1196,26 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  gimple_set_location (clobber_stmt, end_locus);
 	  gimplify_seq_add_stmt (&cleanup, clobber_stmt);
 
+	  if ((flag_sanitize & SANITIZE_ADDRESS) != 0)
+	    {
+	      TREE_ADDRESSABLE (t) = 1;
+	      tree base = build_fold_addr_expr (t);
+	      unsigned int align = get_object_alignment (base);
+
+	      HOST_WIDE_INT flags = ASAN_CHECK_CLOBBER;
+
+	      gimplify_seq_add_stmt
+		(&cleanup, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
+						    build_int_cst (integer_type_node,
+								   flags),
+						    base,
+						    DECL_SIZE (t),
+						    build_int_cst (integer_type_node,
+								   align / BITS_PER_UNIT)));
+
+	    }
+
+
 	  if (flag_openacc && oacc_declare_returns != NULL)
 	    {
 	      tree *c = oacc_declare_returns->get (t);
@@ -1447,6 +1468,23 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 
   if (TREE_CODE (decl) == VAR_DECL && !DECL_EXTERNAL (decl))
     {
+      if ((flag_sanitize & SANITIZE_ADDRESS) != 0)
+	{
+	  TREE_ADDRESSABLE (decl) = 1;
+	  tree base = build_fold_addr_expr (decl);
+	  unsigned int align = get_object_alignment (base);
+
+	  HOST_WIDE_INT flags = ASAN_CHECK_UNCLOBBER;
+	  gimplify_seq_add_stmt
+	    (seq_p, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
+						build_int_cst (integer_type_node,
+							       flags),
+						base,
+						DECL_SIZE (decl),
+						build_int_cst (integer_type_node,
+							       align / BITS_PER_UNIT)));
+	}
+
       tree init = DECL_INITIAL (decl);
 
       if (TREE_CODE (DECL_SIZE_UNIT (decl)) != INTEGER_CST
