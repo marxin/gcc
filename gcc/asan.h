@@ -59,6 +59,17 @@ extern alias_set_type asan_shadow_set;
 #define ASAN_STACK_FRAME_MAGIC		0x41b58ab3
 #define ASAN_STACK_RETIRED_MAGIC	0x45e0360e
 
+/* Various flags for Asan builtins.  */
+enum asan_check_flags
+{
+  ASAN_CHECK_STORE = 1 << 0,
+  ASAN_CHECK_SCALAR_ACCESS = 1 << 1,
+  ASAN_CHECK_NON_ZERO_LEN = 1 << 2,
+  ASAN_CHECK_CLOBBER = 1 << 3,
+  ASAN_CHECK_UNCLOBBER = 1 << 4,
+  ASAN_CHECK_LAST = 1 << 5
+};
+
 /* Return true if DECL should be guarded on the stack.  */
 
 static inline bool
