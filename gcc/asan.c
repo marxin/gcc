@@ -1217,8 +1217,29 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 	  emit_move_insn (shadow_mem, asan_shadow_cst (shadow_bytes));
 	  offset += ASAN_RED_ZONE_SIZE;
 	}
+
       cur_shadow_byte = ASAN_STACK_MAGIC_MIDDLE;
     }
+
+  /* Poison stack variable.  */
+  unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
+  if ((flag_sanitize & p) == p)
+    for (l = length; l > 2; l -= 2)
+      {
+	HOST_WIDE_INT var_offset = offsets[l - 2];
+	HOST_WIDE_INT var_end_offset = offsets[l - 3];
+
+	rtx source = expand_binop (Pmode, add_optab, base,
+				   gen_int_mode
+				    (var_offset - base_offset, Pmode),
+				   NULL_RTX, 1, OPTAB_DIRECT);
+
+	rtx size = GEN_INT (var_end_offset - var_offset);
+	ret = init_one_libfunc ("__asan_poison_stack_memory");
+	emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
+			   size, TYPE_MODE (pointer_sized_int_node));
+      }
+
   do_pending_stack_adjust ();
 
   /* Construct epilogue sequence.  */
@@ -1676,8 +1697,7 @@ static void
 build_check_stmt (location_t loc, tree base, tree len,
 		  HOST_WIDE_INT size_in_bytes, gimple_stmt_iterator *iter,
 		  bool is_non_zero_len, bool before_p, bool is_store,
-		  bool is_scalar_access, bool is_clobber,
-		  unsigned int align = 0)
+		  bool is_scalar_access, unsigned int align = 0)
 {
   gimple_stmt_iterator gsi = *iter;
   gimple *g;
@@ -1749,7 +1769,7 @@ build_check_stmt (location_t loc, tree base, tree len,
 
 static void
 instrument_derefs (gimple_stmt_iterator *iter, tree t,
-		   location_t location, bool is_store, bool is_clobber)
+		   location_t location, bool is_store)
 {
   if (is_store && !ASAN_INSTRUMENT_WRITES)
     return;
@@ -1791,8 +1811,7 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
       tree repr = DECL_BIT_FIELD_REPRESENTATIVE (TREE_OPERAND (t, 1));
       instrument_derefs (iter, build3 (COMPONENT_REF, TREE_TYPE (repr),
 				       TREE_OPERAND (t, 0), repr,
-				       NULL_TREE), location, is_store,
-			 is_clobber);
+				       NULL_TREE), location, is_store);
       return;
     }
 
@@ -1816,25 +1835,7 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
 	  /* Automatic vars in the current function will be always
 	     accessible.  */
 	  if (decl_function_context (inner) == current_function_decl)
-	    {
-	      if (is_store && is_clobber)
-		{
-		  base = build_fold_addr_expr (t);
-
-		  if (!has_mem_ref_been_instrumented (base, size_in_bytes))
-		    {
-		      unsigned int align = get_object_alignment (t);
-		      build_check_stmt (location, base, NULL_TREE,
-					size_in_bytes, iter,
-					/*is_non_zero_len*/size_in_bytes > 0,
-					/*before_p=*/true,
-					true, /*is_scalar_access*/true,
-					true, align);
-		    }
-		}
-
-	      return;
-	    }
+	    return;
 	}
       /* Always instrument external vars, they might be dynamically
 	 initialized.  */
@@ -1854,7 +1855,7 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
       unsigned int align = get_object_alignment (t);
       build_check_stmt (location, base, NULL_TREE, size_in_bytes, iter,
 			/*is_non_zero_len*/size_in_bytes > 0, /*before_p=*/true,
-			is_store, /*is_scalar_access*/true, is_clobber, align);
+			is_store, /*is_scalar_access*/true, align);
       update_mem_ref_hash_table (base, size_in_bytes);
       update_mem_ref_hash_table (t, size_in_bytes);
     }
@@ -1902,8 +1903,7 @@ instrument_mem_region_access (tree base, tree len,
     {
       build_check_stmt (location, base, len, size_in_bytes, iter,
 			/*is_non_zero_len*/size_in_bytes > 0, /*before_p*/true,
-			is_store, /*is_clobber*/false,
-			/*is_scalar_access*/false, /*align*/0);
+			is_store, /*is_scalar_access*/false, /*align*/0);
     }
 
   maybe_update_mem_ref_hash_table (base, len);
@@ -1946,8 +1946,7 @@ instrument_builtin_call (gimple_stmt_iterator *iter)
     {
       if (dest_is_deref)
 	{
-	  instrument_derefs (iter, dest.start, loc, dest_is_store,
-			     /*is_clobber*/false);
+	  instrument_derefs (iter, dest.start, loc, dest_is_store);
 	  gsi_next (iter);
 	  iter_advanced_p = true;
 	}
@@ -1996,16 +1995,15 @@ maybe_instrument_assignment (gimple_stmt_iterator *iter)
   gcc_assert (gimple_assign_single_p (s));
 
   tree ref_expr = NULL_TREE;
-  bool is_store, is_instrumented = false, is_clobber = false;
+  bool is_store, is_instrumented = false;
 
   if (gimple_store_p (s))
     {
       ref_expr = gimple_assign_lhs (s);
       is_store = true;
-      is_clobber = gimple_clobber_p (s);
       instrument_derefs (iter, ref_expr,
 			 gimple_location (s),
-			 is_store, is_clobber);
+			 is_store);
       is_instrumented = true;
     }
 
@@ -2015,7 +2013,7 @@ maybe_instrument_assignment (gimple_stmt_iterator *iter)
       is_store = false;
       instrument_derefs (iter, ref_expr,
 			 gimple_location (s),
-			 is_store, is_clobber);
+			 is_store);
       is_instrumented = true;
     }
 
@@ -2117,6 +2115,7 @@ transform_statements (void)
 	  if (has_stmt_been_instrumented_p (s))
 	    gsi_next (&i);
 	  else if (gimple_assign_single_p (s)
+		   && !gimple_clobber_p (s)
 		   && maybe_instrument_assignment (&i))
 	    /*  Nothing to do as maybe_instrument_assignment advanced
 		the iterator I.  */;

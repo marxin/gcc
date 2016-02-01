@@ -1210,7 +1210,7 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 						    build_int_cst (integer_type_node,
 								   flags),
 						    base,
-						    DECL_SIZE (t),
+						    DECL_SIZE_UNIT (t),
 						    build_int_cst (integer_type_node,
 								   align / BITS_PER_UNIT)));
 
@@ -1482,7 +1482,7 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 						build_int_cst (integer_type_node,
 							       flags),
 						base,
-						DECL_SIZE (decl),
+						DECL_SIZE_UNIT (decl),
 						build_int_cst (integer_type_node,
 							       align / BITS_PER_UNIT)));
 	}
