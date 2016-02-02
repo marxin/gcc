@@ -1858,7 +1858,7 @@ build_user_friendly_ref_for_offset (tree *res, tree type, HOST_WIDE_INT offset,
 
 /* Return true iff TYPE is stdarg va_list type.  */
 
-static inline bool
+bool
 is_va_list_type (tree type)
 {
   return TYPE_MAIN_VARIANT (type) == TYPE_MAIN_VARIANT (va_list_type_node);

@@ -5429,4 +5429,6 @@ desired_pro_or_demotion_p (const_tree to_type, const_tree from_type)
   return to_type_precision <= TYPE_PRECISION (from_type);
 }
 
+bool is_va_list_type (tree type);
+
 #endif  /* GCC_TREE_H  */

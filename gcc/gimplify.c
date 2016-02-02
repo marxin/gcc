@@ -1198,7 +1198,8 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 
 	  unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
 	  if ((flag_sanitize & p) == p
-	      && !stdarg_p (TREE_TYPE (current_function_decl)))
+	      && !stdarg_p (TREE_TYPE (current_function_decl))
+	      && !is_va_list_type (TREE_TYPE (t)))
 	    {
 	      TREE_ADDRESSABLE (t) = 1;
 	      tree base = build_fold_addr_expr (t);
@@ -1481,7 +1482,8 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 
       unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
       if ((flag_sanitize & p) == p
-	  && !stdarg_p (TREE_TYPE (current_function_decl)))
+	  && !stdarg_p (TREE_TYPE (current_function_decl))
+	  && !is_va_list_type (TREE_TYPE (decl)))
 	{
 	  TREE_ADDRESSABLE (decl) = 1;
 	  DECL_GIMPLE_REG_P (decl) = 0;
