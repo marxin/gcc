@@ -1226,6 +1226,10 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   if ((flag_sanitize & p) == p)
     for (l = length; l > 2; l -= 2)
       {
+	tree decl = decls[(l - 2) / 2 - 1];
+	if (is_va_list_type (TREE_TYPE (decl)))
+	  continue;
+
 	HOST_WIDE_INT var_offset = offsets[l - 2];
 	HOST_WIDE_INT var_end_offset = offsets[l - 3];
 
