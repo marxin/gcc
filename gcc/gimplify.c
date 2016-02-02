@@ -1197,7 +1197,8 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  gimplify_seq_add_stmt (&cleanup, clobber_stmt);
 
 	  unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-	  if ((flag_sanitize & p) == p)
+	  if ((flag_sanitize & p) == p
+	      && !stdarg_p (TREE_TYPE (current_function_decl)))
 	    {
 	      TREE_ADDRESSABLE (t) = 1;
 	      tree base = build_fold_addr_expr (t);
@@ -1469,14 +1470,26 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 
   if (TREE_CODE (decl) == VAR_DECL && !DECL_EXTERNAL (decl))
     {
+      tree init = DECL_INITIAL (decl);
+
+      if (TREE_CODE (DECL_SIZE_UNIT (decl)) != INTEGER_CST
+	  || (!TREE_STATIC (decl)
+	      && flag_stack_check == GENERIC_STACK_CHECK
+	      && compare_tree_int (DECL_SIZE_UNIT (decl),
+				   STACK_CHECK_MAX_VAR_SIZE) > 0))
+	gimplify_vla_decl (decl, seq_p);
+
       unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-      if ((flag_sanitize & p) == p)
+      if ((flag_sanitize & p) == p
+	  && !stdarg_p (TREE_TYPE (current_function_decl)))
 	{
 	  TREE_ADDRESSABLE (decl) = 1;
+	  DECL_GIMPLE_REG_P (decl) = 0;
 	  tree base = build_fold_addr_expr (decl);
 	  unsigned int align = get_object_alignment (base);
 
 	  HOST_WIDE_INT flags = ASAN_CHECK_UNCLOBBER;
+
 	  gimplify_seq_add_stmt
 	    (seq_p, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
 						build_int_cst (integer_type_node,
@@ -1487,14 +1500,6 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 							       align / BITS_PER_UNIT)));
 	}
 
-      tree init = DECL_INITIAL (decl);
-
-      if (TREE_CODE (DECL_SIZE_UNIT (decl)) != INTEGER_CST
-	  || (!TREE_STATIC (decl)
-	      && flag_stack_check == GENERIC_STACK_CHECK
-	      && compare_tree_int (DECL_SIZE_UNIT (decl),
-				   STACK_CHECK_MAX_VAR_SIZE) > 0))
-	gimplify_vla_decl (decl, seq_p);
 
       /* Some front ends do not explicitly declare all anonymous
 	 artificial variables.  We compensate here by declaring the
