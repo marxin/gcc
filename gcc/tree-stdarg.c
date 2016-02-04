@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "tree-stdarg.h"
 #include "tree-chkp.h"
+#include "asan.h"
 
 /* A simple pass that attempts to optimize stdarg functions on architectures
    that need to save register arguments to stack on entry to stdarg functions.
@@ -1068,7 +1069,8 @@ expand_ifn_va_arg_1 (function *fun)
 	    /* We use gimplify_assign here, rather than gimple_build_assign,
 	       because gimple_assign knows how to deal with variable-sized
 	       types.  */
-	    gimplify_assign (lhs, expr, &pre);
+	    gimple *r = gimplify_assign (lhs, expr, &pre);
+	    asan_va_mem_refs.add (r);
 	  }
 	else
 	  gimplify_expr (&expr, &pre, &post, is_gimple_lvalue, fb_lvalue);
