@@ -1013,6 +1013,33 @@ asan_function_start (void)
 			 current_function_funcdef_no);
 }
 
+static void
+asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
+			     HOST_WIDE_INT *offsets, int length,
+			     bool poison)
+{
+  unsigned int use_after_scope = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
+  if ((flag_sanitize & use_after_scope) == use_after_scope)
+    for (int l = length - 2; l > 0; l -= 2)
+      {
+	HOST_WIDE_INT var_offset = offsets[l];
+	HOST_WIDE_INT var_end_offset = offsets[l - 1];
+
+	rtx source = expand_binop (Pmode, add_optab, base,
+				   gen_int_mode
+				    (var_offset - base_offset, Pmode),
+				   NULL_RTX, 1, OPTAB_DIRECT);
+
+	rtx size = GEN_INT (var_end_offset - var_offset);
+	const char *fname = poison ?  "__asan_poison_stack_memory"
+	  :"__asan_unpoison_stack_memory";
+	rtx ret = init_one_libfunc (fname);
+	emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
+			   size, TYPE_MODE (pointer_sized_int_node));
+      }
+}
+
+
 /* Insert code to protect stack vars.  The prologue sequence should be emitted
    directly, epilogue sequence returned.  BASE is the register holding the
    stack base, against which OFFSETS array offsets are relative to, OFFSETS
@@ -1225,23 +1252,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 
   /* Poison stack variable just in situation where the function
      is not a variadic function.  */
-  unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-  if ((flag_sanitize & p) == p)
-    for (l = length - 2; l > 0; l -= 2)
-      {
-	HOST_WIDE_INT var_offset = offsets[l];
-	HOST_WIDE_INT var_end_offset = offsets[l - 1];
-
-	rtx source = expand_binop (Pmode, add_optab, base,
-				   gen_int_mode
-				    (var_offset - base_offset, Pmode),
-				   NULL_RTX, 1, OPTAB_DIRECT);
-
-	rtx size = GEN_INT (var_end_offset - var_offset);
-	ret = init_one_libfunc ("__asan_poison_stack_memory");
-	emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
-			   size, TYPE_MODE (pointer_sized_int_node));
-      }
+  asan_poison_stack_variables (base, base_offset, offsets, length, true);
 
   do_pending_stack_adjust ();
 
@@ -1323,6 +1334,8 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 				   >> ASAN_SHADOW_SHIFT);
       asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
     }
+
+  asan_poison_stack_variables (base, base_offset, offsets, length, false);
 
   do_pending_stack_adjust ();
   if (lab)
