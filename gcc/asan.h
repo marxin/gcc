@@ -116,4 +116,7 @@ asan_intercepted_p (enum built_in_function fcode)
 	 || fcode == BUILT_IN_STRNCMP
 	 || fcode == BUILT_IN_STRNCPY;
 }
+
+extern hash_set <gimple *> asan_va_mem_refs;
+
 #endif /* TREE_ASAN */

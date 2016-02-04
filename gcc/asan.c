@@ -239,6 +239,8 @@ along with GCC; see the file COPYING3.  If not see
    A destructor function that calls the runtime asan library function
    _asan_unregister_globals is also installed.  */
 
+hash_set <gimple *> asan_va_mem_refs;
+
 static unsigned HOST_WIDE_INT asan_shadow_offset_value;
 static bool asan_shadow_offset_computed;
 static vec<char *> sanitized_sections;
@@ -1221,17 +1223,14 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       cur_shadow_byte = ASAN_STACK_MAGIC_MIDDLE;
     }
 
-  /* Poison stack variable.  */
+  /* Poison stack variable just in situation where the function
+     is not a variadic function.  */
   unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
   if ((flag_sanitize & p) == p)
-    for (l = length; l > 2; l -= 2)
+    for (l = length - 2; l > 0; l -= 2)
       {
-	tree decl = decls[(l - 2) / 2 - 1];
-	if (is_va_list_type (TREE_TYPE (decl)))
-	  continue;
-
-	HOST_WIDE_INT var_offset = offsets[l - 2];
-	HOST_WIDE_INT var_end_offset = offsets[l - 3];
+	HOST_WIDE_INT var_offset = offsets[l];
+	HOST_WIDE_INT var_end_offset = offsets[l - 1];
 
 	rtx source = expand_binop (Pmode, add_optab, base,
 				   gen_int_mode
@@ -2013,6 +2012,9 @@ maybe_instrument_assignment (gimple_stmt_iterator *iter)
 
   if (gimple_assign_load_p (s))
     {
+      if (asan_va_mem_refs.contains (s))
+	return false;
+
       ref_expr = gimple_assign_rhs1 (s);
       is_store = false;
       instrument_derefs (iter, ref_expr,

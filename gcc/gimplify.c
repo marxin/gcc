@@ -1197,9 +1197,7 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  gimplify_seq_add_stmt (&cleanup, clobber_stmt);
 
 	  unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-	  if ((flag_sanitize & p) == p
-	      && !stdarg_p (TREE_TYPE (current_function_decl))
-	      && !is_va_list_type (TREE_TYPE (t)))
+	  if ((flag_sanitize & p) == p)
 	    {
 	      TREE_ADDRESSABLE (t) = 1;
 	      tree base = build_fold_addr_expr (t);
@@ -1480,10 +1478,9 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 				   STACK_CHECK_MAX_VAR_SIZE) > 0))
 	gimplify_vla_decl (decl, seq_p);
 
+      tree unit_size = DECL_SIZE_UNIT (decl);
       unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-      if ((flag_sanitize & p) == p
-	  && !stdarg_p (TREE_TYPE (current_function_decl))
-	  && !is_va_list_type (TREE_TYPE (decl)))
+      if ((flag_sanitize & p) == p && TREE_CODE (unit_size) == INTEGER_CST)
 	{
 	  TREE_ADDRESSABLE (decl) = 1;
 	  DECL_GIMPLE_REG_P (decl) = 0;
@@ -1496,8 +1493,7 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 	    (seq_p, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
 						build_int_cst (integer_type_node,
 							       flags),
-						base,
-						DECL_SIZE_UNIT (decl),
+						base, unit_size,
 						build_int_cst (integer_type_node,
 							       align / BITS_PER_UNIT)));
 	}
