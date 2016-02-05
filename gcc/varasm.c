@@ -1295,6 +1295,7 @@ make_decl_rtl (tree decl)
   gcc_assert (TREE_CODE (decl) != VAR_DECL
 	      || TREE_STATIC (decl)
 	      || TREE_PUBLIC (decl)
+	      || TREE_ADDRESSABLE (decl)
 	      || DECL_EXTERNAL (decl)
 	      || DECL_REGISTER (decl));
 
