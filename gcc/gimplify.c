@@ -1186,15 +1186,17 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  && !DECL_HAS_VALUE_EXPR_P (t)
 	  /* Only care for variables that have to be in memory.  Others
 	     will be rewritten into SSA names, hence moved to the top-level.  */
-	  && !is_gimple_reg (t)
-	  && flag_stack_reuse != SR_NONE)
+	  && !is_gimple_reg (t))
 	{
-	  tree clobber = build_constructor (TREE_TYPE (t), NULL);
-	  gimple *clobber_stmt;
-	  TREE_THIS_VOLATILE (clobber) = 1;
-	  clobber_stmt = gimple_build_assign (t, clobber);
-	  gimple_set_location (clobber_stmt, end_locus);
-	  gimplify_seq_add_stmt (&cleanup, clobber_stmt);
+	  if (flag_stack_reuse != SR_NONE)
+	    {
+	      tree clobber = build_constructor (TREE_TYPE (t), NULL);
+	      gimple *clobber_stmt;
+	      TREE_THIS_VOLATILE (clobber) = 1;
+	      clobber_stmt = gimple_build_assign (t, clobber);
+	      gimple_set_location (clobber_stmt, end_locus);
+	      gimplify_seq_add_stmt (&cleanup, clobber_stmt);
+	    }
 
 	  if (asan_sanitize_use_after_scope ())
 	    {
@@ -1215,8 +1217,9 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 
 	    }
 
-
-	  if (flag_openacc && oacc_declare_returns != NULL)
+	  if (flag_stack_reuse != SR_NONE
+	      && flag_openacc
+	      && oacc_declare_returns != NULL)
 	    {
 	      tree *c = oacc_declare_returns->get (t);
 	      if (c != NULL)
