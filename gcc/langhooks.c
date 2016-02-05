@@ -155,6 +155,7 @@ lhd_set_decl_assembler_name (tree decl)
 	      || (TREE_CODE (decl) == VAR_DECL
 		  && (TREE_STATIC (decl)
 		      || DECL_EXTERNAL (decl)
+		      || TREE_ADDRESSABLE (decl)
 		      || TREE_PUBLIC (decl))));
 
   /* By default, assume the name to use in assembly code is the same
