@@ -239,8 +239,6 @@ along with GCC; see the file COPYING3.  If not see
    A destructor function that calls the runtime asan library function
    _asan_unregister_globals is also installed.  */
 
-hash_set <gimple *> asan_va_mem_refs;
-
 static unsigned HOST_WIDE_INT asan_shadow_offset_value;
 static bool asan_shadow_offset_computed;
 static vec<char *> sanitized_sections;
@@ -2024,9 +2022,6 @@ maybe_instrument_assignment (gimple_stmt_iterator *iter)
 
   if (gimple_assign_load_p (s))
     {
-      if (asan_va_mem_refs.contains (s))
-	return false;
-
       ref_expr = gimple_assign_rhs1 (s);
       is_store = false;
       instrument_derefs (iter, ref_expr,
