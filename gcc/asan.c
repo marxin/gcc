@@ -1018,8 +1018,7 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
 			     HOST_WIDE_INT *offsets, int length,
 			     bool poison)
 {
-  unsigned int use_after_scope = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-  if ((flag_sanitize & use_after_scope) == use_after_scope)
+  if (asan_sanitize_use_after_scope ())
     for (int l = length - 2; l > 0; l -= 2)
       {
 	HOST_WIDE_INT var_offset = offsets[l];

@@ -1196,8 +1196,7 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  gimple_set_location (clobber_stmt, end_locus);
 	  gimplify_seq_add_stmt (&cleanup, clobber_stmt);
 
-	  unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-	  if ((flag_sanitize & p) == p)
+	  if (asan_sanitize_use_after_scope ())
 	    {
 	      TREE_ADDRESSABLE (t) = 1;
 	      tree base = build_fold_addr_expr (t);
@@ -1479,8 +1478,9 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 	gimplify_vla_decl (decl, seq_p);
 
       tree unit_size = DECL_SIZE_UNIT (decl);
-      unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-      if ((flag_sanitize & p) == p && TREE_CODE (unit_size) == INTEGER_CST)
+      // TODO
+      if (asan_sanitize_use_after_scope ()
+	  && TREE_CODE (unit_size) == INTEGER_CST)
 	{
 	  TREE_ADDRESSABLE (decl) = 1;
 	  DECL_GIMPLE_REG_P (decl) = 0;

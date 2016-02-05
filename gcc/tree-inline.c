@@ -3220,8 +3220,7 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
 	  insert_init_stmt (id, bb, init_stmt);
 
 	  /* Unpoison the variable if we sanitize for use-after-scope.  */
-	  unsigned int p = (SANITIZE_ADDRESS | SANITIZE_USE_AFTER_SCOPE);
-	  if ((flag_sanitize & p) == p)
+	  if (asan_sanitize_use_after_scope ())
 	    {
 	      TREE_ADDRESSABLE (var) = 1;
 	      DECL_GIMPLE_REG_P (var) = 0;
