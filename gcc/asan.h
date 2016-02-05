@@ -117,4 +117,13 @@ asan_intercepted_p (enum built_in_function fcode)
 	 || fcode == BUILT_IN_STRNCPY;
 }
 
+/* Return TRUE if we should instrument for use-after-scope sanity checking.  */
+static inline bool
+asan_sanitize_use_after_scope (void)
+{
+  return (flag_sanitize & SANITIZE_ADDRESS_USE_AFTER_SCOPE)
+    == SANITIZE_ADDRESS_USE_AFTER_SCOPE
+    && flag_stack_reuse == SR_NONE;
+}
+
 #endif /* TREE_ASAN */
