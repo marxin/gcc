@@ -1,4 +1,5 @@
 ! { dg-do run }
+! { dg-additional-options "-Wno-hsa" }
 
 module e_55_1_mod
   integer, parameter :: N = 100000, CHUNKSZ = 10000

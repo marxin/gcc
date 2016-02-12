@@ -1,3 +1,5 @@
+/* { dg-additional-options "-Wno-hsa" } */
+
 extern void abort (void);
 
 void

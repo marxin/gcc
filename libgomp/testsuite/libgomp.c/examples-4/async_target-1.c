@@ -1,6 +1,6 @@
 /* { dg-do run } */
-/* { dg-additional-options "-DCHUNKSZ=5000" { target { ! run_expensive_tests } } } */
-/* { dg-additional-options "-DCHUNKSZ=1000" { target run_expensive_tests } } */
+/* { dg-additional-options "-DCHUNKSZ=5000 -Wno-hsa" { target { ! run_expensive_tests } } } */
+/* { dg-additional-options "-DCHUNKSZ=1000 -Wno-hsa" { target run_expensive_tests } } */
 
 #include <stdlib.h>
 

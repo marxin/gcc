@@ -1,3 +1,5 @@
+/* { dg-additional-options "-Wno-hsa" } */
+
 extern
 #ifdef __cplusplus
 "C"

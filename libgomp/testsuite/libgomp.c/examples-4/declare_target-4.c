@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-additional-options "-DTESTITERS=20" { target { ! run_expensive_tests } } } */
+/* { dg-additional-options "-DTESTITERS=20 -Wno-hsa" { target { ! run_expensive_tests } } } */
 
 #include <stdlib.h>
 

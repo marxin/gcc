@@ -1,4 +1,5 @@
 ! { dg-do run }
+! { dg-additional-options "-Wno-hsa" }
 
 module e_50_2_mod
 contains

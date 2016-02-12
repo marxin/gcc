@@ -1,4 +1,5 @@
 ! { dg-do run }
+! { dg-additional-options "-Wno-hsa" }
 
 function dotprod_ref (B, C, N) result (sum)
   implicit none

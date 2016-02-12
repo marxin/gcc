@@ -1,4 +1,5 @@
 /* { dg-do run } */
+/* { dg-additional-options "-Wno-hsa" } */
 
 #include <stdlib.h>
 

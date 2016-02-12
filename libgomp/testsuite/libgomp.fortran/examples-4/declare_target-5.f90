@@ -1,5 +1,5 @@
 ! { dg-do run { target vect_simd_clones } }
-! { dg-options "-O2" }
+! { dg-options "-O2 -Wno-hsa" }
 ! { dg-additional-options "-msse2" { target sse2_runtime } }
 ! { dg-additional-options "-mavx" { target avx_runtime } }
 

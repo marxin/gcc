@@ -1,4 +1,5 @@
 ! { dg-do run }
+! { dg-additional-options "-Wno-hsa" }
 
 module e_53_3_mod
   !$omp declare target (N, p, v1, v2)

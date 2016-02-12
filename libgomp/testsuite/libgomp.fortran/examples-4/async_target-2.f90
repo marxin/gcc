@@ -1,4 +1,5 @@
 ! { dg-do run }
+! { dg-additional-options "-Wno-hsa" }
 ! { dg-require-effective-target offload_device }
 
 subroutine init (v1, v2, N)

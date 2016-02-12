@@ -1,4 +1,4 @@
-/* { dg-additional-options "-std=gnu99" } */
+/* { dg-additional-options "-std=gnu99 -Wno-hsa" } */
 
 extern void abort ();
 

@@ -1,4 +1,5 @@
 // { dg-additional-sources "target-2-aux.cc" }
+// { dg-additional-options "-Wno-hsa" }
 
 extern "C" void abort (void);
 

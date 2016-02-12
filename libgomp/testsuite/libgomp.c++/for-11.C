@@ -1,3 +1,5 @@
+// { dg-additional-options "-Wno-hsa" }
+
 extern "C" void abort ();
 
 #define M(x, y, z) O(x, y, z)

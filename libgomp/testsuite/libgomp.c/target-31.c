@@ -1,3 +1,5 @@
+/* { dg-additional-options "-Wno-hsa" } */
+
 #include <omp.h>
 #include <stdlib.h>
 

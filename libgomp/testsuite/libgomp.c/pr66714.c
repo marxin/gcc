@@ -1,7 +1,7 @@
 /* { dg-do "compile" } */
 /* { dg-additional-options "--param ggc-min-expand=0" } */
 /* { dg-additional-options "--param ggc-min-heapsize=0" } */
-/* { dg-additional-options "-g" } */
+/* { dg-additional-options "-g -Wno-hsa" } */
 
 /* Minimized from on target-2.c.  */
 

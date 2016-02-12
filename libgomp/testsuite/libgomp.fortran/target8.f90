@@ -1,4 +1,5 @@
 ! { dg-do run }
+! { dg-additional-options "-Wno-hsa" }
 
   integer, parameter :: n = 1000
   integer, parameter :: c = 100

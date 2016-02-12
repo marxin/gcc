@@ -1,4 +1,5 @@
 /* { dg-do run { target vect_simd_clones } } */
+/* { dg-additional-options "-Wno-hsa" } */
 /* { dg-additional-options "-msse2" { target sse2_runtime } } */
 /* { dg-additional-options "-mavx" { target avx_runtime } } */
 
