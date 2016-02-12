@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-fopenmp -ffree-line-length-160" }
+! { dg-options "-fopenmp -ffree-line-length-160 -Wno-hsa" }
 
 subroutine foo (n, s, t, u, v, w)
   integer :: n, i, s, t, u, v, w

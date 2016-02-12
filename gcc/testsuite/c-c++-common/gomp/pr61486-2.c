@@ -1,6 +1,6 @@
 /* PR middle-end/61486 */
 /* { dg-do compile } */
-/* { dg-options "-fopenmp" } */
+/* { dg-options "-fopenmp -Wno-hsa" } */
 /* { dg-require-effective-target alloca } */
 
 #pragma omp declare target

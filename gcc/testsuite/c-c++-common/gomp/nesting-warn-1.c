@@ -1,3 +1,5 @@
+/* { dg-options "-fopenmp -Wno-hsa" } */
+
 extern int i;
 
 void

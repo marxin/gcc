@@ -1,5 +1,5 @@
 // { dg-do compile }
-// { dg-options "-fopenmp -fdump-tree-gimple" }
+// { dg-options "-fopenmp -fdump-tree-gimple -Wno-hsa" }
 
 int v = 6;
 void bar (int);

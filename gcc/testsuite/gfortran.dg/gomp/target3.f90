@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-fopenmp" }
+! { dg-options "-fopenmp -Wno-hsa" }
 
 subroutine foo (r)
   integer :: i, r

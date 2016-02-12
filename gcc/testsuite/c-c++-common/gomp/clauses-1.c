@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-fopenmp" } */
+/* { dg-options "-fopenmp -Wno-hsa" } */
 /* { dg-additional-options "-std=c99" { target c } } */
 
 int t;
