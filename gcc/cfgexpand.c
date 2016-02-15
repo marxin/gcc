@@ -294,8 +294,8 @@ set_rtl (tree t, rtx x)
 	     randomly chose one, hence we have to say that we don't know.
 	     This only happens with optimization, and there var-tracking
 	     will figure out the right thing.  */
-	  else if (DECL_RTL (var) != x)
-	    SET_DECL_RTL (var, pc_rtx);
+//	  else if (DECL_RTL (var) != x)
+//	    SET_DECL_RTL (var, pc_rtx);
 	}
     }
   else
