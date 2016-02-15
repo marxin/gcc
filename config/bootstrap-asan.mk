@@ -3,9 +3,9 @@
 # Suppress LeakSanitizer in bootstrap.
 export LSAN_OPTIONS="detect_leaks=0"
 
-STAGE2_CFLAGS += -fsanitize=address
-STAGE3_CFLAGS += -fsanitize=address
-POSTSTAGE1_LDFLAGS += -fsanitize=address -static-libasan \
+STAGE2_CFLAGS += -fsanitize=address -fsanitize=use-after-scope
+STAGE3_CFLAGS += -fsanitize=address -fsanitize=use-after-scope
+POSTSTAGE1_LDFLAGS += -fsanitize=address -fsanitize=use-after-scope -static-libasan \
 		      -B$$r/prev-$(TARGET_SUBDIR)/libsanitizer/ \
 		      -B$$r/prev-$(TARGET_SUBDIR)/libsanitizer/asan/ \
 		      -B$$r/prev-$(TARGET_SUBDIR)/libsanitizer/asan/.libs

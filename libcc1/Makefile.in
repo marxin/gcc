@@ -665,8 +665,8 @@ uninstall-am: uninstall-cc1libLTLIBRARIES uninstall-pluginLTLIBRARIES
 	pdf pdf-am ps ps-am tags uninstall uninstall-am \
 	uninstall-cc1libLTLIBRARIES uninstall-pluginLTLIBRARIES
 
-override CXXFLAGS := $(filter-out -fsanitize=address,$(CXXFLAGS))
-override LDFLAGS := $(filter-out -fsanitize=address,$(LDFLAGS))
+override CXXFLAGS := $(filter-out -fsanitize=address -fsanitize=use-after-scope,$(CXXFLAGS))
+override LDFLAGS := $(filter-out -fsanitize=address -fsanitize=use-after-scope,$(LDFLAGS))
 
 # Put this in a header so we don't run sed for each compilation.  This
 # is also simpler to debug as one can easily see the constant.
