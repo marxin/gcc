@@ -313,12 +313,12 @@ static void PoisonAlignedStackMemory(uptr addr, uptr size, bool do_poison) {
 }
 
 void __asan_poison_stack_memory(uptr addr, uptr size) {
-  VReport(1, "poisoning: %p %llu (0x%zx)\n", (void *)addr, size, size);
+  VReport(1, "poisoning: %p %zx\n", (void *)addr, size);
   PoisonAlignedStackMemory(addr, size, true);
 }
 
 void __asan_unpoison_stack_memory(uptr addr, uptr size) {
-  VReport(1, "unpoisoning: %p %llu (0x%zx)\n", (void *)addr, size, size);
+  VReport(1, "unpoisoning: %p %zx\n", (void *)addr, size);
   PoisonAlignedStackMemory(addr, size, false);
 }
 
