@@ -118,6 +118,7 @@ asan_intercepted_p (enum built_in_function fcode)
 }
 
 /* Return TRUE if we should instrument for use-after-scope sanity checking.  */
+
 static inline bool
 asan_sanitize_use_after_scope (void)
 {
