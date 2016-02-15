@@ -1011,6 +1011,12 @@ asan_function_start (void)
 			 current_function_funcdef_no);
 }
 
+/* Depending on POISON flag, emit a call to poison (or unpoison) stack memory
+   allocated for local variables, localted in OFFSETS.  LENGTH is number
+   of OFFSETS, BASE is the register holding the stack base,
+   against which OFFSETS array offsets are relative to.  BASE_OFFSET represents
+   an offset requested by alignment and similar stuff.  */
+
 static void
 asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
 			     HOST_WIDE_INT *offsets, int length,
@@ -1243,12 +1249,10 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 	  emit_move_insn (shadow_mem, asan_shadow_cst (shadow_bytes));
 	  offset += ASAN_RED_ZONE_SIZE;
 	}
-
       cur_shadow_byte = ASAN_STACK_MAGIC_MIDDLE;
     }
 
-  /* Poison stack variable just in situation where the function
-     is not a variadic function.  */
+  /* Poison stack variables at the very beginning of a function.  */
   asan_poison_stack_variables (base, base_offset, offsets, length, true);
 
   do_pending_stack_adjust ();
@@ -1332,6 +1336,8 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
     }
 
+  /* Unpoison stack variables at the end of a function.  As the former
+     stack memory can be reused, we have to unpoison the memory.  */
   asan_poison_stack_variables (base, base_offset, offsets, length, false);
 
   do_pending_stack_adjust ();
