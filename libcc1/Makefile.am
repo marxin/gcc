@@ -23,8 +23,8 @@ AM_CPPFLAGS = -I $(srcdir)/../include -I $(srcdir)/../libgcc \
 	-I $(srcdir)/../gcc/c -I $(srcdir)/../gcc/c-family \
 	-I $(srcdir)/../libcpp/include $(GMPINC)
 AM_CXXFLAGS = $(WARN_FLAGS) $(WERROR) $(visibility)
-override CXXFLAGS := $(filter-out -fsanitize=address,$(CXXFLAGS))
-override LDFLAGS := $(filter-out -fsanitize=address,$(LDFLAGS))
+override CXXFLAGS := $(filter-out -fsanitize=address -fsanitize=use-after-scope,$(CXXFLAGS))
+override LDFLAGS := $(filter-out -fsanitize=address -fsanitize=use-after-scope,$(LDFLAGS))
 # Can be simplified when libiberty becomes a normal convenience library.
 libiberty_normal = ../libiberty/libiberty.a
 libiberty_noasan = ../libiberty/noasan/libiberty.a
