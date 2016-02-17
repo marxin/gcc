@@ -1027,7 +1027,7 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
   if (asan_sanitize_use_after_scope ())
     for (int l = length - 2; l > 0; l -= 2)
       {
-	tree decl = decls[l];
+	tree decl = decls[l / 2 - 1];
 	if (asan_inlined_variables.contains (decl))
 	  continue;
 
