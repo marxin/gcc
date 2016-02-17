@@ -1029,7 +1029,10 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
       {
 	tree decl = decls[l / 2 - 1];
 	if (asan_inlined_variables.contains (decl))
-	  continue;
+	  {
+	    gcc_assert (DECL_ABSTRACT_ORIGIN (decl));
+	    continue;
+	  }
 
 	HOST_WIDE_INT var_offset = offsets[l];
 	HOST_WIDE_INT var_end_offset = offsets[l - 1];
