@@ -3197,6 +3197,7 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
       /* If we are in SSA form properly remap the default definition
          or assign to a dummy SSA name if the parameter is unused and
 	 we are not optimizing.  */
+      bool asan_handle_var = false;
       if (gimple_in_ssa_p (cfun) && is_gimple_reg (p))
 	{
 	  if (def)
@@ -3213,14 +3214,17 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
 	    }
 	}
       else
-        init_stmt = gimple_build_assign (var, rhs);
+	{
+	  init_stmt = gimple_build_assign (var, rhs);
+	  asan_handle_var = true;
+	}
 
       if (bb && init_stmt)
 	{
 	  insert_init_stmt (id, bb, init_stmt);
 
 	  /* Unpoison the variable if we sanitize for use-after-scope.  */
-	  if (asan_sanitize_use_after_scope ())
+	  if (asan_sanitize_use_after_scope () && asan_handle_var)
 	    {
 	      TREE_ADDRESSABLE (var) = 1;
 	      DECL_GIMPLE_REG_P (var) = 0;
