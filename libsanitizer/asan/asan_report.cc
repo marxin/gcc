@@ -194,7 +194,7 @@ void MaybeDumpInstructionBytes(uptr pc) {
   Report("%s", str.data());
 }
 
-static void PrintShadowMemoryForAddress(uptr addr) {
+void PrintShadowMemoryForAddress(uptr addr) {
   if (!AddrIsInMem(addr)) return;
   uptr shadow_addr = MemToShadow(addr);
   const uptr n_bytes_per_row = 16;

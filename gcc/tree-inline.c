@@ -3215,14 +3215,12 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
       else
 	init_stmt = gimple_build_assign (var, rhs);
 
-      if (bb && init_stmt)
-	{
-	  insert_init_stmt (id, bb, init_stmt);
+      /* Unpoison the variable if we sanitize for use-after-scope.  */
+      if (asan_sanitize_use_after_scope ())
+	asan_inlined_variables.add (var);
 
-	  /* Unpoison the variable if we sanitize for use-after-scope.  */
-	  if (asan_sanitize_use_after_scope ())
-	    asan_inlined_variables.add (var);
-	}
+      if (bb && init_stmt)
+	insert_init_stmt (id, bb, init_stmt);
     }
   return init_stmt;
 }
@@ -5470,6 +5468,9 @@ copy_decl_no_change (tree decl, copy_body_data *id)
   tree copy;
 
   copy = copy_node (decl);
+
+  if (TREE_CODE (decl) == VAR_DECL && asan_inlined_variables.contains (decl))
+    asan_inlined_variables.add (copy);
 
   /* The COPY is not abstract; it will be generated in DST_FN.  */
   DECL_ABSTRACT_P (copy) = false;
