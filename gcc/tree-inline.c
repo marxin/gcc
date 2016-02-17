@@ -3221,25 +3221,7 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
 
 	  /* Unpoison the variable if we sanitize for use-after-scope.  */
 	  if (asan_sanitize_use_after_scope ())
-	    {
-	      TREE_ADDRESSABLE (var) = 1;
-	      DECL_GIMPLE_REG_P (var) = 0;
-	      tree unit_size = DECL_SIZE_UNIT (var);
-	      tree base = build_fold_addr_expr (var);
-	      unsigned int align = get_object_alignment (base);
-	      HOST_WIDE_INT flags = ASAN_CHECK_UNCLOBBER;
-	      gcall *call = gimple_build_call_internal
-		(IFN_ASAN_CHECK, 4, build_int_cst (integer_type_node, flags),
-		 base, unit_size,
-		 build_int_cst (integer_type_node, align / BITS_PER_UNIT));
-
-	      gimple_stmt_iterator si = gsi_last_bb (bb);
-
-	      gassign *assign = gimple_build_assign (var, def);
-	      gsi_insert_after (&si, assign, GSI_NEW_STMT);
-
-	      gsi_insert_after (&si, call, GSI_NEW_STMT);
-	    }
+	    asan_inlined_variables.add (var);
 	}
     }
   return init_stmt;

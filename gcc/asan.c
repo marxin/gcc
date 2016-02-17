@@ -313,6 +313,8 @@ asan_shadow_offset ()
 
 alias_set_type asan_shadow_set = -1;
 
+hash_set <tree> asan_inlined_variables;
+
 /* Pointer types to 1 resp. 2 byte integers in shadow memory.  A separate
    alias set is used for all shadow memory accesses.  */
 static GTY(()) tree shadow_ptr_types[2];
@@ -1020,11 +1022,15 @@ asan_function_start (void)
 static void
 asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
 			     HOST_WIDE_INT *offsets, int length,
-			     bool poison)
+			     tree *decls, bool poison)
 {
   if (asan_sanitize_use_after_scope ())
     for (int l = length - 2; l > 0; l -= 2)
       {
+	tree decl = decls[l];
+	if (asan_inlined_variables.contains (decl))
+	  continue;
+
 	HOST_WIDE_INT var_offset = offsets[l];
 	HOST_WIDE_INT var_end_offset = offsets[l - 1];
 
@@ -1253,7 +1259,8 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
     }
 
   /* Poison stack variables at the very beginning of a function.  */
-  asan_poison_stack_variables (base, base_offset, offsets, length, true);
+  asan_poison_stack_variables (base, base_offset, offsets, length,
+			       decls, true);
 
   do_pending_stack_adjust ();
 
@@ -1338,7 +1345,8 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 
   /* Unpoison stack variables at the end of a function.  As the former
      stack memory can be reused, we have to unpoison the memory.  */
-  asan_poison_stack_variables (base, base_offset, offsets, length, false);
+  asan_poison_stack_variables (base, base_offset, offsets, length, decls,
+			       false);
 
   do_pending_stack_adjust ();
   if (lab)
