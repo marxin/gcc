@@ -61,6 +61,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "asan.h"
 
+static vec <tree> asan_unclobber_variables;
+
 enum gimplify_omp_var_data
 {
   GOVD_SEEN = 1,
@@ -1076,6 +1078,24 @@ build_stack_save_restore (gcall **save, gcall **restore)
 			 1, tmp_var);
 }
 
+static void
+asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
+{
+  tree unit_size = DECL_SIZE_UNIT (decl);
+  tree base = build_fold_addr_expr (decl);
+  unsigned int align = get_object_alignment (base);
+
+  HOST_WIDE_INT flags = poison ? ASAN_CHECK_CLOBBER : ASAN_CHECK_UNCLOBBER;
+
+  gimplify_seq_add_stmt
+    (seq_p, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
+					build_int_cst (integer_type_node,
+						       flags),
+					base, unit_size,
+					build_int_cst (integer_type_node,
+						       align / BITS_PER_UNIT)));
+}
+
 /* Gimplify a BIND_EXPR.  Just voidify and recurse.  */
 
 static enum gimplify_status
@@ -1178,6 +1198,14 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
   /* Add clobbers for all variables that go out of scope.  */
   for (t = BIND_EXPR_VARS (bind_expr); t ; t = DECL_CHAIN (t))
     {
+      for (unsigned i = 0; i < asan_unclobber_variables.length (); i++)
+	if (asan_unclobber_variables[i] == t)
+	  {
+	    asan_unclobber_variables.ordered_remove (i);
+//	      fprintf (stderr, "killing variable: %s (count: %d)\n", IDENTIFIER_POINTER
+//		       (DECL_NAME (t)), asan_unclobber_variables.length ());
+	  }
+
       if (TREE_CODE (t) == VAR_DECL
 	  && !is_global_var (t)
 	  && DECL_CONTEXT (t) == current_function_decl
@@ -1200,21 +1228,9 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 
 	  if (asan_sanitize_use_after_scope ())
 	    {
-	      TREE_ADDRESSABLE (t) = 1;
-	      tree base = build_fold_addr_expr (t);
-	      unsigned int align = get_object_alignment (base);
+	      // TODO: remove
 
-	      HOST_WIDE_INT flags = ASAN_CHECK_CLOBBER;
-
-	      gimplify_seq_add_stmt
-		(&cleanup, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
-						    build_int_cst (integer_type_node,
-								   flags),
-						    base,
-						    DECL_SIZE_UNIT (t),
-						    build_int_cst (integer_type_node,
-								   align / BITS_PER_UNIT)));
-
+	      asan_poison_variable (t, true, &cleanup);
 	    }
 
 	  if (flag_stack_reuse != SR_NONE
@@ -1483,24 +1499,18 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
       tree unit_size = DECL_SIZE_UNIT (decl);
       // TODO
       if (asan_sanitize_use_after_scope ()
-	  && TREE_CODE (unit_size) == INTEGER_CST)
+	  && TREE_CODE (unit_size) == INTEGER_CST
+	  && DECL_NAME (decl) != NULL
+	  && IDENTIFIER_POINTER (DECL_NAME (decl)) != NULL)
 	{
 	  TREE_ADDRESSABLE (decl) = 1;
 	  DECL_GIMPLE_REG_P (decl) = 0;
-	  tree base = build_fold_addr_expr (decl);
-	  unsigned int align = get_object_alignment (base);
+//	  fprintf (stderr, "adding variable: %s\n",
+//		   IDENTIFIER_POINTER (DECL_NAME(decl)));
 
-	  HOST_WIDE_INT flags = ASAN_CHECK_UNCLOBBER;
-
-	  gimplify_seq_add_stmt
-	    (seq_p, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
-						build_int_cst (integer_type_node,
-							       flags),
-						base, unit_size,
-						build_int_cst (integer_type_node,
-							       align / BITS_PER_UNIT)));
+	  asan_unclobber_variables.safe_push (decl);
+	  asan_poison_variable (decl, /* poison */false, seq_p);
 	}
-
 
       /* Some front ends do not explicitly declare all anonymous
 	 artificial variables.  We compensate here by declaring the
@@ -10443,11 +10453,15 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  break;
 
 	case LABEL_EXPR:
+	  // TODO: remove
+//	  fprintf (stderr, "gimplifying label_expr: %d\n", asan_unclobber_variables.length ());
 	  ret = GS_ALL_DONE;
 	  gcc_assert (decl_function_context (LABEL_EXPR_LABEL (*expr_p))
 		      == current_function_decl);
 	  gimplify_seq_add_stmt (pre_p,
 			  gimple_build_label (LABEL_EXPR_LABEL (*expr_p)));
+	  for (unsigned i = 0; i < asan_unclobber_variables.length (); i++)
+	    asan_poison_variable (asan_unclobber_variables[i], false, pre_p);
 	  break;
 
 	case CASE_LABEL_EXPR:
@@ -11493,7 +11507,12 @@ gimplify_function_tree (tree fndecl)
       && !needs_to_live_in_memory (ret))
     DECL_GIMPLE_REG_P (ret) = 1;
 
+  gcc_assert (asan_unclobber_variables.is_empty ());
   bind = gimplify_body (fndecl, true);
+
+  // TODO!
+  // gcc_assert (asan_unclobber_variables.is_empty ());
+  asan_unclobber_variables.truncate (0);
 
   /* The tree body of the function is no longer needed, replace it
      with the new GIMPLE body.  */
