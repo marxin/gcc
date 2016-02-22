@@ -1,6 +1,5 @@
 /* { dg-require-effective-target offload_hsa } */
-
-#include <assert.h>
+/* { dg-options "-O0" } */
 
 #define s 100
 
@@ -78,41 +77,41 @@ main (int argc)
 {
   int array[s];
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = low; i < high; i++)
       array[i - low] = switch1 (i);
   }
 
   for (int i = low; i < high; i++)
-    assert (array[i - low] == switch1 (i));
+    __builtin_assert (array[i - low] == switch1 (i));
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = low; i < high; i++)
       array[i - low] = switch2 (i);
   }
 
   for (int i = low; i < high; i++)
-    assert (array[i - low] == switch2 (i));
+    __builtin_assert (array[i - low] == switch2 (i));
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = low; i < high; i++)
       array[i - low] = switch3 (i);
   }
 
   for (int i = low; i < high; i++)
-    assert (array[i - low] == switch3 (i));
+    __builtin_assert (array[i - low] == switch3 (i));
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = low; i < high; i++)
       array[i - low] = switch4 (i);
   }
 
   for (int i = low; i < high; i++)
-    assert (array[i - low] == switch4 (i));
+    __builtin_assert (array[i - low] == switch4 (i));
 
   return 0;
 }

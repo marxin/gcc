@@ -1,5 +1,4 @@
-#include <stdlib.h>
-#include <assert.h>
+/* dg-options "-O0" */
 
 #define ASSIGN_SX(N)                                                           \
   s##N.a1 = 1;                                                                 \
@@ -14,16 +13,16 @@
   s##N.a10 = 10;
 
 #define ASSERT_SX(N)                                                           \
-  assert (s##N.a1 == 1);                                                       \
-  assert (s##N.a2 == 2);                                                       \
-  assert (s##N.a3 == 3);                                                       \
-  assert (s##N.a4 == 4);                                                       \
-  assert (s##N.a5 == 5);                                                       \
-  assert (s##N.a6 == 6);                                                       \
-  assert (s##N.a7 == 7);                                                       \
-  assert (s##N.a8 == 8);                                                       \
-  assert (s##N.a9 == 9);                                                       \
-  assert (s##N.a10 == 10);
+  __builtin_assert (s##N.a1 == 1); \
+  __builtin_assert (s##N.a2 == 2); \
+  __builtin_assert (s##N.a3 == 3); \
+  __builtin_assert (s##N.a4 == 4); \
+  __builtin_assert (s##N.a5 == 5); \
+  __builtin_assert (s##N.a6 == 6); \
+  __builtin_assert (s##N.a7 == 7); \
+  __builtin_assert (s##N.a8 == 8); \
+  __builtin_assert (s##N.a9 == 9); \
+  __builtin_assert (s##N.a10 == 10);
 
 struct S1
 {
@@ -92,18 +91,18 @@ main ()
 {
   struct S1 s1;
 
-#pragma omp target map(to : s1)
+#pragma omp target map(to: s1)
   {
     s1.a = 2;
     s1.b = 3;
   }
 
-  assert (s1.a == 2);
-  assert (s1.b == 3);
+  __builtin_assert (s1.a == 2);
+  __builtin_assert (s1.b == 3);
 
   struct S2 s2;
 
-#pragma omp target map(to : s2)
+#pragma omp target map(to: s2)
   {
     ASSIGN_SX (2)
   }
@@ -112,7 +111,7 @@ main ()
 
   struct S3 s3;
 
-#pragma omp target map(to : s3)
+#pragma omp target map(to: s3)
   {
     ASSIGN_SX (3)
   }
@@ -121,7 +120,7 @@ main ()
 
   struct S4 s4;
 
-#pragma omp target map(to : s4)
+#pragma omp target map(to: s4)
   {
     ASSIGN_SX (4)
   }
@@ -141,7 +140,7 @@ main ()
   s5.a9 = 8;
   s5.a10 = 9;
 
-#pragma omp target map(to : s5)
+#pragma omp target map(to: s5)
   {
     s5.a1++;
     s5.a2++;

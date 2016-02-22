@@ -1,6 +1,6 @@
-#include <stdlib.h>
+/* dg-options "-O0" */
+
 #include <limits.h>
-#include <assert.h>
 
 #define T unsigned int
 #define BITSIZE CHAR_BIT * sizeof (T)
@@ -19,7 +19,7 @@ main (int argc)
 {
   T v1, v2, v3, v4, v5;
 
-#pragma omp target map(to : v1, v2, v3, v4, v5)
+#pragma omp target map(to: v1, v2, v3, v4, v5)
   {
     v1 = rotate (C1, 10);
     v2 = rotate (C1, 2);
@@ -28,11 +28,11 @@ main (int argc)
     v5 = rotate (C1, 32);
   }
 
-  assert (v1 == C1);
-  assert (v2 == C1);
-  assert (v3 == C1);
-  assert (v4 == C1);
-  assert (v5 == C1);
+  __builtin_assert (v1 == C1);
+  __builtin_assert (v2 == C1);
+  __builtin_assert (v3 == C1);
+  __builtin_assert (v4 == C1);
+  __builtin_assert (v5 == C1);
 
   return 0;
 }

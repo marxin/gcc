@@ -1,4 +1,5 @@
-#include <stdlib.h>
+/* dg-options { "-O0" } */
+
 #include <omp.h>
 
 int
@@ -21,7 +22,7 @@ main ()
     level += omp_get_level ();
 
   if (level != 1)
-    abort ();
+    __builtin_abort ();
 
   return 0;
 }
