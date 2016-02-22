@@ -1,5 +1,6 @@
 /* dg-options "-O0" */
 
+#include <assert.h>
 #include <limits.h>
 
 #define T unsigned int
@@ -28,11 +29,11 @@ main (int argc)
     v5 = rotate (C1, 32);
   }
 
-  __builtin_assert (v1 == C1);
-  __builtin_assert (v2 == C1);
-  __builtin_assert (v3 == C1);
-  __builtin_assert (v4 == C1);
-  __builtin_assert (v5 == C1);
+  assert (v1 == C1);
+  assert (v2 == C1);
+  assert (v3 == C1);
+  assert (v4 == C1);
+  assert (v5 == C1);
 
   return 0;
 }

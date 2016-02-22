@@ -1,5 +1,7 @@
 /* dg-options "-O0" */
 
+#include <assert.h>
+
 #define ASSIGN_SX(N)                                                           \
   s##N.a1 = 1;                                                                 \
   s##N.a2 = 2;                                                                 \
@@ -13,16 +15,16 @@
   s##N.a10 = 10;
 
 #define ASSERT_SX(N)                                                           \
-  __builtin_assert (s##N.a1 == 1); \
-  __builtin_assert (s##N.a2 == 2); \
-  __builtin_assert (s##N.a3 == 3); \
-  __builtin_assert (s##N.a4 == 4); \
-  __builtin_assert (s##N.a5 == 5); \
-  __builtin_assert (s##N.a6 == 6); \
-  __builtin_assert (s##N.a7 == 7); \
-  __builtin_assert (s##N.a8 == 8); \
-  __builtin_assert (s##N.a9 == 9); \
-  __builtin_assert (s##N.a10 == 10);
+  assert (s##N.a1 == 1); \
+  assert (s##N.a2 == 2); \
+  assert (s##N.a3 == 3); \
+  assert (s##N.a4 == 4); \
+  assert (s##N.a5 == 5); \
+  assert (s##N.a6 == 6); \
+  assert (s##N.a7 == 7); \
+  assert (s##N.a8 == 8); \
+  assert (s##N.a9 == 9); \
+  assert (s##N.a10 == 10);
 
 struct S1
 {
@@ -97,8 +99,8 @@ main ()
     s1.b = 3;
   }
 
-  __builtin_assert (s1.a == 2);
-  __builtin_assert (s1.b == 3);
+  assert (s1.a == 2);
+  assert (s1.b == 3);
 
   struct S2 s2;
 

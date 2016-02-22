@@ -1,6 +1,8 @@
 /* { dg-require-effective-target offload_hsa } */
 /* { dg-options "-O0" } */
 
+#include <assert.h>
+
 #define s 100
 
 #pragma omp declare target
@@ -84,7 +86,7 @@ main (int argc)
   }
 
   for (int i = low; i < high; i++)
-    __builtin_assert (array[i - low] == switch1 (i));
+    assert (array[i - low] == switch1 (i));
 
 #pragma omp target map(tofrom : array[:s])
   {
@@ -93,7 +95,7 @@ main (int argc)
   }
 
   for (int i = low; i < high; i++)
-    __builtin_assert (array[i - low] == switch2 (i));
+    assert (array[i - low] == switch2 (i));
 
 #pragma omp target map(tofrom : array[:s])
   {
@@ -102,7 +104,7 @@ main (int argc)
   }
 
   for (int i = low; i < high; i++)
-    __builtin_assert (array[i - low] == switch3 (i));
+    assert (array[i - low] == switch3 (i));
 
 #pragma omp target map(tofrom : array[:s])
   {
@@ -111,7 +113,7 @@ main (int argc)
   }
 
   for (int i = low; i < high; i++)
-    __builtin_assert (array[i - low] == switch4 (i));
+    assert (array[i - low] == switch4 (i));
 
   return 0;
 }

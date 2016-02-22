@@ -1,6 +1,7 @@
 /* { dg-require-effective-target offload_hsa } */
 /* { dg-options "-ffast-math" } */
 
+#include <assert.h>
 #include <math.h>
 
 #define N 10
@@ -39,19 +40,19 @@
                                                                                \
     for (unsigned i = 0; i < N2; i++)                                          \
       {                                                                        \
-	__builtin_assert (clrsb[i] == __builtin_clrsb##S2 (arguments[i]));               \
+	assert (clrsb[i] == __builtin_clrsb##S2 (arguments[i]));               \
 	if (arguments[0] != 0)                                                 \
 	  {                                                                    \
-	    __builtin_assert (clz[i] == __builtin_clz##S2 (arguments[i]));               \
-	    __builtin_assert (ctz[i] == __builtin_ctz##S2 (arguments[i]));               \
+	    assert (clz[i] == __builtin_clz##S2 (arguments[i]));               \
+	    assert (ctz[i] == __builtin_ctz##S2 (arguments[i]));               \
 	  }                                                                    \
-	__builtin_assert (ffs[i] == __builtin_ffs##S2 (arguments[i]));                   \
-	__builtin_assert (parity[i] == __builtin_parity##S2 (arguments[i]));             \
-	__builtin_assert (popcount[i] == __builtin_popcount##S2 (arguments[i]));         \
+	assert (ffs[i] == __builtin_ffs##S2 (arguments[i]));                   \
+	assert (parity[i] == __builtin_parity##S2 (arguments[i]));             \
+	assert (popcount[i] == __builtin_popcount##S2 (arguments[i]));         \
       }                                                                        \
   }
 
-#define ASSERT(v1, v2) __builtin_assert (fabs (v1 - v2) < DELTA)
+#define ASSERT(v1, v2) assert (fabs (v1 - v2) < DELTA)
 
 int
 main ()

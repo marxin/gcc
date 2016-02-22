@@ -1,5 +1,6 @@
 /* dg-options { "-O0" } */
 
+#include <assert.h>
 #include <complex.h>
 #include <math.h>
 
@@ -42,25 +43,25 @@ main (void)
 #pragma omp target map(to: v)
   v = foo_char ();
 
-  __builtin_assert (v == C);
+  assert (v == C);
 
 #pragma omp target map(to: v)
   v = foo_uchar ();
 
-  __builtin_assert (v == C);
+  assert (v == C);
 
 #pragma omp target map(to: v)
   v = foo_short ();
 
-  __builtin_assert (v == C);
+  assert (v == C);
 
 #pragma omp target map(to: v)
   v = foo_int ();
 
-  __builtin_assert (v == C);
+  assert (v == C);
 
 #pragma omp target map(to: v2)
   v2 = bar (1.12f, 4.44f);
 
-  __builtin_assert (fabs (v2 - 14.12) < 0.0001f);
+  assert (fabs (v2 - 14.12) < 0.0001f);
 }

@@ -1,6 +1,8 @@
 /* { dg-require-effective-target offload_hsa } */
 /* { dg-options "-00" } */
 
+#include <assert.h>
+
 #define C 55
 
 int i, j, k;
@@ -19,7 +21,7 @@ test_bzero (unsigned size)
 
   char *buffer = (char *) x;
   for (unsigned i = 0; i < bsize; ++i)
-    __builtin_assert (buffer[i] == 0);
+    assert (buffer[i] == 0);
 }
 
 static void
@@ -37,7 +39,7 @@ test_memcpy (unsigned size)
 
   char *buffer = (char *) y;
   for (unsigned i = 0; i < bsize; ++i)
-    __builtin_assert (buffer[i] == C);
+    assert (buffer[i] == C);
 }
 
 static void
@@ -56,9 +58,9 @@ test_mempcpy (unsigned size)
 
   char *buffer = (char *) y;
   for (unsigned i = 0; i < bsize; ++i)
-    __builtin_assert (buffer[i] == C);
+    assert (buffer[i] == C);
 
-  __builtin_assert (ptr == y + size);
+  assert (ptr == y + size);
 }
 
 static void
@@ -75,7 +77,7 @@ test_memset (unsigned size)
 
   char *buffer = (char *) x;
   for (unsigned i = 0; i < bsize; ++i)
-    __builtin_assert (buffer[i] == C);
+    assert (buffer[i] == C);
 }
 
 int

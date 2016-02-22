@@ -1,6 +1,8 @@
 /* { dg-require-effective-target offload_hsa } */
 /* { dg-options "-O0" } */
 
+#include <assert.h>
+
 struct Cube
 {
   int x;
@@ -61,7 +63,7 @@ main (int argc)
   }
 
   for (int i = 0; i < s; i++)
-    __builtin_assert (array[i] == foo (i));
+    assert (array[i] == foo (i));
 
   /* Test 2: argument address is taken.  */
   int v = 2;
@@ -69,7 +71,7 @@ main (int argc)
 #pragma omp target map(tofrom : v)
   v = bar (v);
 
-  __builtin_assert (v == 200);
+  assert (v == 200);
 
   /* Test 3: passing a structure as a function argument.  */
   struct Cube r;
@@ -78,7 +80,7 @@ main (int argc)
 #pragma omp target map(to : r) map(from : c)
   r = baz (c);
 
-  __builtin_assert (r.x == 11);
-  __builtin_assert (r.y == c.y);
-  __builtin_assert (r.z == c.z);
+  assert (r.x == 11);
+  assert (r.y == c.y);
+  assert (r.z == c.z);
 }
