@@ -68,7 +68,7 @@ test_memset (unsigned size)
 {
   unsigned bsize = size * sizeof (int);
   int *x = __builtin_malloc (bsize);
-  bzero (x, bsize);
+  __builtin_bzero (x, bsize);
 
 #pragma omp target map(tofrom : x[:size]) map(from: bsize)
   {
