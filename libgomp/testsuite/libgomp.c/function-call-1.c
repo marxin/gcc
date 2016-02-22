@@ -1,4 +1,5 @@
-#include <stdlib.h>
+/* dg-options { "-O0" } */
+
 #define size 8
 
 #pragma omp declare target
@@ -36,7 +37,7 @@ main ()
   int i, j;
   int a[size][size];
 
-#pragma omp target teams map(from : a[ : size][ : size])
+#pragma omp target teams map(to:a[:size][:size])
 #pragma omp distribute parallel for default(none) private(i, j) shared(a)
   for (i = 0; i < size; ++i)
     for (j = 0; j < size; ++j)
@@ -45,7 +46,7 @@ main ()
   for (i = 0; i < size; ++i)
     for (j = 0; j < size; ++j)
       if (i * i + j * j != a[i][j])
-	abort ();
+	__builtin_abort ();
 
   return 0;
 }

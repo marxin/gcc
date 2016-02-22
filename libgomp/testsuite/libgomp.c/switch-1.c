@@ -1,6 +1,5 @@
 /* { dg-require-effective-target offload_hsa } */
-
-#include <assert.h>
+/* { dg-options "-O0" } */
 
 #define s 100
 
@@ -100,48 +99,48 @@ main (int argc)
 {
   int array[s];
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = 0; i < s; i++)
       array[i] = switch1 (i);
   }
 
   for (int i = 0; i < s; i++)
-    assert (array[i] == switch1 (i));
+    __builtin_assert (array[i] == switch1 (i));
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = 0; i < s; i++)
       array[i] = switch2 (i);
   }
 
   for (int i = 0; i < s; i++)
-    assert (array[i] == switch2 (i));
+    __builtin_assert (array[i] == switch2 (i));
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = 0; i < s; i++)
       array[i] = switch3 (i);
   }
 
   for (int i = 0; i < s; i++)
-    assert (array[i] == switch3 (i));
+    __builtin_assert (array[i] == switch3 (i));
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = 0; i < s; i++)
       array[i] = switch4 (i, i + 1);
   }
 
   for (int i = 0; i < s; i++)
-    assert (array[i] == switch4 (i, i + 1));
+    __builtin_assert (array[i] == switch4 (i, i + 1));
 
-#pragma omp target map(tofrom : array[ : s])
+#pragma omp target map(tofrom : array[:s])
   {
     for (int i = 0; i < s; i++)
       array[i] = switch5 (i, i + 1);
   }
 
   for (int i = 0; i < s; i++)
-    assert (array[i] == switch5 (i, i + 1));
+    __builtin_assert (array[i] == switch5 (i, i + 1));
 }

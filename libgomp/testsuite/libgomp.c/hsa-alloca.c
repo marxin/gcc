@@ -1,6 +1,5 @@
 /* { dg-require-effective-target offload_hsa } */
-
-#include <stdlib.h>
+/* { dg-options "-O0" } */
 
 #define size 10
 int i, j, k;
@@ -23,7 +22,7 @@ main ()
 
   for (i = 0; i < size; ++i)
     if (s[i] != 97 + i)
-      abort ();
+      __builtin_abort ();
 
   return 0;
 }

@@ -1,5 +1,6 @@
+/* dg-options { "-O0" } */
+
 #include <complex.h>
-#include <assert.h>
 #include <math.h>
 
 #define uchar unsigned char
@@ -38,28 +39,28 @@ main (void)
   int v = 0;
   float v2 = 0.0f;
 
-#pragma omp target map(from : v)
+#pragma omp target map(to: v)
   v = foo_char ();
 
-  assert (v == C);
+  __builtin_assert (v == C);
 
-#pragma omp target map(from : v)
+#pragma omp target map(to: v)
   v = foo_uchar ();
 
-  assert (v == C);
+  __builtin_assert (v == C);
 
-#pragma omp target map(from : v)
+#pragma omp target map(to: v)
   v = foo_short ();
 
-  assert (v == C);
+  __builtin_assert (v == C);
 
-#pragma omp target map(from : v)
+#pragma omp target map(to: v)
   v = foo_int ();
 
-  assert (v == C);
+  __builtin_assert (v == C);
 
-#pragma omp target map(from : v2)
+#pragma omp target map(to: v2)
   v2 = bar (1.12f, 4.44f);
 
-  assert (fabs (v2 - 14.12) < 0.0001f);
+  __builtin_assert (fabs (v2 - 14.12) < 0.0001f);
 }

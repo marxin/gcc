@@ -1,8 +1,5 @@
 /* { dg-require-effective-target offload_hsa } */
-
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
+/* { dg-options "-00" } */
 
 #define C 55
 
@@ -12,73 +9,73 @@ static void
 test_bzero (unsigned size)
 {
   unsigned bsize = size * sizeof (int);
-  int *x = malloc (bsize);
-  memset (x, C, bsize);
+  int *x = __builtin_malloc (bsize);
+  __builtin_memset (x, C, bsize);
 
-#pragma omp target map(tofrom : x[ : size]) map(from : bsize)
+#pragma omp target map(tofrom: x[:size]) map(from: bsize)
   {
     __builtin_bzero (x, bsize);
   }
 
   char *buffer = (char *) x;
   for (unsigned i = 0; i < bsize; ++i)
-    assert (buffer[i] == 0);
+    __builtin_assert (buffer[i] == 0);
 }
 
 static void
 test_memcpy (unsigned size)
 {
   unsigned bsize = size * sizeof (int);
-  int *x = malloc (bsize);
-  memset (x, C, bsize);
-  int *y = malloc (bsize);
+  int *x = __builtin_malloc (bsize);
+  __builtin_memset (x, C, bsize);
+  int *y = __builtin_malloc (bsize);
 
-#pragma omp target map(tofrom : x[ : size], y[ : size]) map(from : bsize)
+#pragma omp target map(tofrom: x[:size], y[:size]) map(from: bsize)
   {
     __builtin_memcpy (y, x, bsize);
   }
 
   char *buffer = (char *) y;
   for (unsigned i = 0; i < bsize; ++i)
-    assert (buffer[i] == C);
+    __builtin_assert (buffer[i] == C);
 }
 
 static void
 test_mempcpy (unsigned size)
 {
   unsigned bsize = size * sizeof (int);
-  int *x = malloc (bsize);
-  memset (x, C, bsize);
-  int *y = malloc (bsize);
+  int *x = __builtin_malloc (bsize);
+  __builtin_memset (x, C, bsize);
+  int *y = __builtin_malloc (bsize);
   int *ptr = NULL;
 
-#pragma omp target map(tofrom : x[ : size], y[ : size], ptr) map(from : bsize)
+#pragma omp target map(tofrom :x[:size], y[:size], ptr) map(from: bsize)
   {
     ptr = __builtin_mempcpy (y, x, bsize);
   }
 
   char *buffer = (char *) y;
   for (unsigned i = 0; i < bsize; ++i)
-    assert (buffer[i] == C);
+    __builtin_assert (buffer[i] == C);
 
-  assert (ptr == y + size);
+  __builtin_assert (ptr == y + size);
 }
 
 static void
 test_memset (unsigned size)
 {
   unsigned bsize = size * sizeof (int);
-  int *x = malloc (bsize);
+  int *x = __builtin_malloc (bsize);
   bzero (x, bsize);
 
-#pragma omp target map(tofrom : x[ : size]) map(from : bsize)
+#pragma omp target map(tofrom : x[:size]) map(from: bsize)
   {
     __builtin_memset (x, C, bsize);
   }
 
   char *buffer = (char *) x;
   for (unsigned i = 0; i < bsize; ++i)
-    assert (buffer[i] == C);
+    __builtin_assert (buffer[i] == C);
 }
 
 int
