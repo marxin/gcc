@@ -49,7 +49,7 @@ test_mempcpy (unsigned size)
   int *x = __builtin_malloc (bsize);
   __builtin_memset (x, C, bsize);
   int *y = __builtin_malloc (bsize);
-  int *ptr = NULL;
+  int *ptr = 0;
 
 #pragma omp target map(tofrom :x[:size], y[:size], ptr) map(from: bsize)
   {
