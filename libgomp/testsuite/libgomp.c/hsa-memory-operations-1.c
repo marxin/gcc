@@ -1,5 +1,5 @@
 /* { dg-require-effective-target offload_hsa } */
-/* { dg-options "-00" } */
+/* { dg-options "-O0" } */
 
 #include <assert.h>
 

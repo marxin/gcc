@@ -14,7 +14,7 @@ main ()
   }
 
   if (level != 0)
-    abort ();
+    __builtin_abort ();
 
 #pragma omp target teams map(tofrom : level)
 #pragma omp distribute parallel for default(none) private(i) shared(level)

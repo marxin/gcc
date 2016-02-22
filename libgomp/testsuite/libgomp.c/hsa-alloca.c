@@ -7,7 +7,7 @@ int i, j, k;
 int
 main ()
 {
-  char *s = malloc (size + 1);
+  char *s = __builtin_malloc (size + 1);
 
 #pragma omp target teams
   {
