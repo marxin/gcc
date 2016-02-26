@@ -1512,7 +1512,8 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
       if (asan_sanitize_use_after_scope ()
 	  && TREE_CODE (unit_size) == INTEGER_CST
 	  && DECL_NAME (decl) != NULL
-	  && IDENTIFIER_POINTER (DECL_NAME (decl)) != NULL)
+	  && IDENTIFIER_POINTER (DECL_NAME (decl)) != NULL
+	  && !TREE_STATIC (decl))
 	{
 	  TREE_ADDRESSABLE (decl) = 1;
 	  DECL_GIMPLE_REG_P (decl) = 0;
@@ -11648,10 +11649,7 @@ gimplify_function_tree (tree fndecl)
 
   gcc_assert (asan_unclobber_variables.is_empty ());
   bind = gimplify_body (fndecl, true);
-
-  // TODO!
-  // gcc_assert (asan_unclobber_variables.is_empty ());
-  asan_unclobber_variables.truncate (0);
+  gcc_assert (asan_unclobber_variables.length () == 0);
 
   /* The tree body of the function is no longer needed, replace it
      with the new GIMPLE body.  */
