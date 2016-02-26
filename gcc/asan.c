@@ -1028,7 +1028,8 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
     for (int l = length - 2; l > 0; l -= 2)
       {
 	tree decl = decls[l / 2 - 1];
-	if (asan_ignored_variables.contains (decl))
+	/* Allways unpoison here.  */
+	if (asan_ignored_variables.contains (decl) && poison)
 	  continue;
 
 	HOST_WIDE_INT var_offset = offsets[l];
