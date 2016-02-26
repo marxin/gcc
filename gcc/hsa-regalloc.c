@@ -606,7 +606,7 @@ linear_scan_regalloc (struct m_reg_class_desc *classes)
 	spill_at_interval (reg, active);
 
       /* Some interesting dumping as we go.  */
-      if (dump_file)
+      if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "  reg%d: [%5d, %5d)->",
 		   reg->m_order, reg->m_lr_begin, reg->m_lr_end);
@@ -638,7 +638,7 @@ linear_scan_regalloc (struct m_reg_class_desc *classes)
   BITMAP_FREE (work);
   free (bbs);
 
-  if (dump_file)
+  if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "------- After liveness: -------\n");
       dump_hsa_cfun_regalloc (dump_file);
@@ -703,7 +703,7 @@ hsa_regalloc (void)
 {
   naive_outof_ssa ();
 
-  if (dump_file)
+  if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "------- After out-of-SSA: -------\n");
       dump_hsa_cfun (dump_file);
@@ -711,7 +711,7 @@ hsa_regalloc (void)
 
   regalloc ();
 
-  if (dump_file)
+  if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "------- After register allocation: -------\n");
       dump_hsa_cfun (dump_file);
