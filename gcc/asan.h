@@ -36,7 +36,7 @@ extern gimple_stmt_iterator create_cond_insert_point
 /* Alias set for accessing the shadow memory.  */
 extern alias_set_type asan_shadow_set;
 
-extern hash_set <tree> asan_inlined_variables;
+extern hash_set <tree> asan_ignored_variables;
 
 /* Shadow memory is found at
    (address >> ASAN_SHADOW_SHIFT) + asan_shadow_offset ().  */

@@ -313,7 +313,7 @@ asan_shadow_offset ()
 
 alias_set_type asan_shadow_set = -1;
 
-hash_set <tree> asan_inlined_variables;
+hash_set <tree> asan_ignored_variables;
 
 /* Pointer types to 1 resp. 2 byte integers in shadow memory.  A separate
    alias set is used for all shadow memory accesses.  */
@@ -1028,11 +1028,8 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
     for (int l = length - 2; l > 0; l -= 2)
       {
 	tree decl = decls[l / 2 - 1];
-	if (asan_inlined_variables.contains (decl))
-	  {
-	    gcc_assert (DECL_ABSTRACT_ORIGIN (decl));
-	    continue;
-	  }
+	if (asan_ignored_variables.contains (decl))
+	  continue;
 
 	HOST_WIDE_INT var_offset = offsets[l];
 	HOST_WIDE_INT var_end_offset = offsets[l - 1];
