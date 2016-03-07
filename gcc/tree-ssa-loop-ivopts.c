@@ -468,6 +468,9 @@ struct iv_ca_delta
 #define ALWAYS_PRUNE_CAND_SET_BOUND \
   ((unsigned) PARAM_VALUE (PARAM_IV_ALWAYS_PRUNE_CAND_SET_BOUND))
 
+#define MINIMAL_STEP \
+  ((unsigned) PARAM_VALUE (PARAM_IV_MINIMAL_STEPS))
+
 /* The list of trees for that the decl_rtl field must be reset is stored
    here.  */
 
@@ -6826,7 +6829,8 @@ get_initial_solution (struct ivopts_data *data, bool originalp)
 
 static bool
 try_improve_iv_set (struct ivopts_data *data,
-		    struct iv_ca *ivs, bool *try_replace_p)
+		    struct iv_ca *ivs, bool *try_replace_p, comp_cost
+		    * original_cost)
 {
   unsigned i, n_ivs;
   comp_cost acost, best_cost = iv_ca_cost (ivs);
@@ -6857,9 +6861,29 @@ try_improve_iv_set (struct ivopts_data *data,
 
       if (compare_costs (acost, best_cost) < 0)
 	{
+	  unsigned HOST_WIDE_INT threshold = (original_cost->cost * MINIMAL_STEP / 1000);  
+
+	  if (threshold && dump_file)
+	    fprintf (dump_file, "threshold (%u)\n",threshold);
+
+	  acost.cost += threshold;
+	  
+	  if (compare_costs (acost, best_cost) < 0)
+	    acost.cost -= threshold;
+	  else
+	  {
+	  if (dump_file)
+	    fprintf (dump_file, "stopping because of small step (%u)\n",
+		     threshold);
+	    return false;
+	  }
+
 	  best_cost = acost;
 	  iv_ca_delta_free (&best_delta);
 	  best_delta = act_delta;
+
+	  if (dump_file)
+	    fprintf (dump_file, "improving by adding candidate: %d\n", i);
 	}
       else
 	iv_ca_delta_free (&act_delta);
@@ -6882,6 +6906,8 @@ try_improve_iv_set (struct ivopts_data *data,
 	     comments of iv_ca_replace, thus give general algorithm a chance
 	     to break local optimal fixed-point in these cases.  */
 	  best_cost = iv_ca_replace (data, ivs, &best_delta);
+	  if (dump_file)
+	    fprintf (dump_file, "improving by best_cost adjustment\n");
 	}
 
       if (!best_delta)
@@ -6899,7 +6925,7 @@ try_improve_iv_set (struct ivopts_data *data,
    solution and remove the unused ivs while this improves the cost.  */
 
 static struct iv_ca *
-find_optimal_iv_set_1 (struct ivopts_data *data, bool originalp)
+find_optimal_iv_set_1 (struct ivopts_data *data, bool originalp, comp_cost **original_cost)
 {
   struct iv_ca *set;
   bool try_replace_p = true;
@@ -6919,7 +6945,13 @@ find_optimal_iv_set_1 (struct ivopts_data *data, bool originalp)
       iv_ca_dump (data, dump_file, set);
     }
 
-  while (try_improve_iv_set (data, set, &try_replace_p))
+  if (*original_cost == NULL)
+    {
+      *original_cost = XNEW(comp_cost);
+      **original_cost = iv_ca_cost (set);
+    }
+
+  while (try_improve_iv_set (data, set, &try_replace_p, *original_cost))
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
@@ -6942,8 +6974,9 @@ find_optimal_iv_set (struct ivopts_data *data)
   /* Determine the cost based on a strategy that starts with original IVs,
      and try again using a strategy that prefers candidates not based
      on any IVs.  */
-  origset = find_optimal_iv_set_1 (data, true);
-  set = find_optimal_iv_set_1 (data, false);
+  comp_cost *original_cost = NULL;
+  origset = find_optimal_iv_set_1 (data, true, &original_cost);
+  set = find_optimal_iv_set_1 (data, false, &original_cost);
 
   if (!origset && !set)
     return NULL;
