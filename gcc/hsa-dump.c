@@ -929,7 +929,8 @@ dump_hsa_insn_1 (FILE *f, hsa_insn_basic *insn, int *indent)
 	    fprintf (f, ", ");
 	}
 
-      fprintf (f, "]");
+      fprintf (f, "] /* default: BB %i */",
+	       hsa_bb_for_bb (sbr->m_default_bb)->m_index);
     }
   else if (is_a <hsa_insn_arg_block *> (insn))
     {
