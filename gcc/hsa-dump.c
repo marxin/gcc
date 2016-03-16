@@ -721,6 +721,10 @@ dump_hsa_symbol (FILE *f, hsa_symbol *symbol)
 
   if (symbol->m_type & BRIG_TYPE_ARRAY_MASK)
     fprintf (f, "[%lu]", (unsigned long) symbol->m_dim);
+
+
+  if (symbol->m_directive_offset)
+    fprintf (f, "             /* BRIG offset: %u", symbol->m_directive_offset);
 }
 
 /* Dump textual representation of HSA IL operand OP to file F.  */
