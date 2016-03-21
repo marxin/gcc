@@ -578,6 +578,30 @@ hsa_natural_alignment (BrigType16_t type)
   return hsa_alignment_encoding (hsa_type_bit_size (type & ~BRIG_TYPE_ARRAY));
 }
 
+/* Return byte alignment of an HSA ALIGNMENT.  */
+
+unsigned
+hsa_alignment_in_bytes (BrigAlignment8_t alignment)
+{
+  switch (alignment)
+    {
+    case BRIG_ALIGNMENT_1:
+      return 1;
+    case BRIG_ALIGNMENT_2:
+      return 2;
+    case BRIG_ALIGNMENT_4:
+      return 4;
+    case BRIG_ALIGNMENT_8:
+      return 8;
+    case BRIG_ALIGNMENT_16:
+      return 16;
+    case BRIG_ALIGNMENT_32:
+      return 32;
+    default:
+      gcc_unreachable ();
+    }
+}
+
 /* Call the correct destructor of a HSA instruction.  */
 
 void

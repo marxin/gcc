@@ -1347,6 +1347,7 @@ bool hsa_type_integer_p (BrigType16_t type);
 bool hsa_btype_p (BrigType16_t type);
 BrigAlignment8_t hsa_alignment_encoding (unsigned n);
 BrigAlignment8_t hsa_natural_alignment (BrigType16_t type);
+unsigned hsa_alignment_in_bytes (BrigAlignment8_t alignment);
 void hsa_destroy_operand (hsa_op_base *op);
 void hsa_destroy_insn (hsa_insn_basic *insn);
 void hsa_add_kern_decl_mapping (tree decl, char *name, unsigned, bool);
@@ -1396,6 +1397,7 @@ void dump_hsa_bb (FILE *, hsa_bb *);
 void dump_hsa_cfun (FILE *);
 DEBUG_FUNCTION void debug_hsa_operand (hsa_op_base *opc);
 DEBUG_FUNCTION void debug_hsa_insn (hsa_insn_basic *insn);
+DEBUG_FUNCTION void debug_hsa_symbol (hsa_symbol *symbol);
 
 union hsa_bytes
 {

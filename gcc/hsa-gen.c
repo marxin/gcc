@@ -1488,6 +1488,36 @@ hsa_insn_basic::verify ()
 	    }
 	}
     }
+
+  hsa_insn_mem *mem = dyn_cast <hsa_insn_mem *> (this);
+  if (mem)
+    {
+      hsa_op_address *addr = as_a <hsa_op_address *> (mem->get_op (1));
+      if (addr->m_symbol && addr->m_symbol->m_decl)
+	{
+	  BrigAlignment8_t symbol_align = hsa_alignment_encoding
+	    (get_object_alignment (addr->m_symbol->m_decl));
+
+	  if (mem->m_align > symbol_align)
+	    {
+	      error ("HSA memory instruction has bigger alignment than "
+		     "the symbol used in the instruction");
+	      debug_hsa_symbol (addr->m_symbol);
+	      debug_hsa_insn (this);
+	      internal_error ("HSA instruction verification failed");
+	    }
+
+	  unsigned insn_alignment = hsa_alignment_in_bytes (mem->m_align);
+	  if (addr->m_imm_offset % insn_alignment != 0)
+	    {
+	      error ("HSA memory instruction uses an address operand "
+		     "that violates alignment of the used symbol");
+	      debug_hsa_operand (addr);
+	      debug_hsa_insn (this);
+	      internal_error ("HSA instruction verification failed");
+	    }
+	}
+    }
 }
 
 /* Constructor of an instruction representing a PHI node.  NOPS is the number
