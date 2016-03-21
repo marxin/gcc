@@ -70,6 +70,11 @@ struct hsa_symbol
      or a variable, local or global.  */
   void fillup_for_decl (tree decl);
 
+  /* Return alignment in bytes of a symbol that is derived from a PARM_DECL or
+     a RESULT_DECL.  */
+
+  unsigned get_alignment_in_bytes ();
+
   /* Pointer to the original tree, which is PARM_DECL for input parameters and
      RESULT_DECL for the output parameters.  */
   tree m_decl;

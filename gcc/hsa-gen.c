@@ -208,6 +208,16 @@ hsa_symbol::fillup_for_decl (tree decl)
     m_seen_error = true;
 }
 
+unsigned
+hsa_symbol::get_alignment_in_bytes ()
+{
+  if (m_decl)
+    return hsa_alignment_in_bytes (hsa_alignment_encoding
+				   (get_object_alignment (m_decl)));
+  else
+    return 0;
+}
+
 /* Constructor of class representing global HSA function/kernel information and
    state.  FNDECL is function declaration, KERNEL_P is true if the function
    is going to become a HSA kernel.  If the function has body, SSA_NAMES_COUNT
@@ -2737,6 +2747,22 @@ gen_hsa_memory_copy (hsa_bb *hbb, hsa_op_address *target, hsa_op_address *src,
   hsa_insn_mem *mem;
 
   unsigned offset = 0;
+  unsigned max_type = 8;
+
+  if (src->m_symbol)
+    {
+      unsigned alignment = src->m_symbol->get_alignment_in_bytes ();
+      if (alignment && alignment < max_type)
+	max_type = alignment;
+    }
+
+  if (target->m_symbol)
+    {
+      unsigned alignment = target->m_symbol->get_alignment_in_bytes ();
+      if (alignment && alignment < max_type)
+	max_type = alignment;
+    }
+
 
   while (size)
     {
@@ -2749,6 +2775,9 @@ gen_hsa_memory_copy (hsa_bb *hbb, hsa_op_address *target, hsa_op_address *src,
 	s = 2;
       else
 	s = 1;
+
+      if (s > max_type)
+	s = max_type;
 
       BrigType16_t t = get_integer_type_by_bytes (s, false);
 
