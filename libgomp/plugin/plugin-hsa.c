@@ -884,9 +884,10 @@ create_single_kernel_dispatch (struct kernel_info *kernel,
   shadow->private_segment_size = kernel->private_segment_size;
   shadow->group_segment_size = kernel->group_segment_size;
 
-  status
-    = hsa_memory_allocate (agent->kernarg_region, kernel->kernarg_segment_size,
-			   &shadow->kernarg_address);
+  size_t kernarg_size = kernel->kernarg_segment_size
+    + sizeof (struct hsa_kernel_runtime *);
+  status = hsa_memory_allocate (agent->kernarg_region, kernarg_size,
+				&shadow->kernarg_address);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not allocate memory for HSA kernel arguments", status);
 
