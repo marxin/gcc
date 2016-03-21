@@ -56,6 +56,8 @@ struct GTY(()) hsa_decl_kernel_map_element
   unsigned omp_data_size;
   /* True if the function is gridified kernel.  */
   bool gridified_kernel_p;
+  /* True if the function uses a shadow reg.  */
+  bool has_shadow_reg_p;
 };
 
 /* Mapping between decls and corresponding HSA kernels in this compilation
@@ -628,13 +630,14 @@ hsa_destroy_operand (hsa_op_base *op)
 
 void
 hsa_add_kern_decl_mapping (tree decl, char *name, unsigned omp_data_size,
-			   bool gridified_kernel_p)
+			   bool gridified_kernel_p, bool has_shadow_reg_p)
 {
   hsa_decl_kernel_map_element dkm;
   dkm.decl = decl;
   dkm.name = name;
   dkm.omp_data_size = omp_data_size;
   dkm.gridified_kernel_p = gridified_kernel_p;
+  dkm.has_shadow_reg_p = has_shadow_reg_p;
   vec_safe_push (hsa_decl_kernel_mapping, dkm);
 }
 
@@ -670,12 +673,20 @@ hsa_get_decl_kernel_mapping_omp_size (unsigned i)
   return (*hsa_decl_kernel_mapping)[i].omp_data_size;
 }
 
-/* Return if the function is gridified kernel in decl name mapping.  */
+/* Return true if the function is gridified kernel in decl name mapping.  */
 
 bool
 hsa_get_decl_kernel_mapping_gridified (unsigned i)
 {
   return (*hsa_decl_kernel_mapping)[i].gridified_kernel_p;
+}
+
+/* Return true if the function uses a shadow register.  */
+
+bool
+hsa_get_decl_kernel_mapping_has_shadow_reg_p (unsigned i)
+{
+  return (*hsa_decl_kernel_mapping)[i].has_shadow_reg_p;
 }
 
 /* Free the mapping between original decls and kernel names.  */

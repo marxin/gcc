@@ -198,6 +198,7 @@ struct hsa_kernel_description
   const char *name;
   unsigned omp_data_size;
   bool gridified_kernel_p;
+  bool has_shadow_reg_p;
   unsigned kernel_dependencies_count;
   const char **kernel_dependencies;
 };
@@ -260,6 +261,8 @@ struct kernel_info
   unsigned max_omp_data_size;
   /* True if the kernel is gridified.  */
   bool gridified_kernel_p;
+  /* True if the kernel uses a shadow register.  */
+  bool has_shadow_reg_p;
 };
 
 /* Information about a particular brig module, its image and kernels.  */
@@ -665,6 +668,7 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version, void *target_data,
       kernel->name = d->name;
       kernel->omp_data_size = d->omp_data_size;
       kernel->gridified_kernel_p = d->gridified_kernel_p;
+      kernel->has_shadow_reg_p = d->has_shadow_reg_p;
       kernel->dependencies_count = d->kernel_dependencies_count;
       kernel->dependencies = d->kernel_dependencies;
       if (pthread_mutex_init (&kernel->init_mutex, NULL))
@@ -966,6 +970,7 @@ init_single_kernel (struct kernel_info *kernel, unsigned *max_omp_data_size)
 	     (unsigned) kernel->kernarg_segment_size);
   HSA_DEBUG ("  omp_data_size: %u\n", kernel->omp_data_size);
   HSA_DEBUG ("  gridified_kernel_p: %u\n", kernel->gridified_kernel_p);
+  HSA_DEBUG ("  has_shadow_reg_p: %u\n", kernel->has_shadow_reg_p);
 
   if (kernel->omp_data_size > *max_omp_data_size)
     *max_omp_data_size = kernel->omp_data_size;
@@ -1255,8 +1260,9 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars, void **args)
   hsa_signal_store_relaxed (s, 1);
   memcpy (shadow->kernarg_address, &vars, sizeof (vars));
 
-  memcpy (shadow->kernarg_address + sizeof (vars), &shadow,
-	  sizeof (struct hsa_kernel_runtime *));
+  if (kernel->has_shadow_reg_p)
+    memcpy (shadow->kernarg_address + sizeof (vars), &shadow,
+	    sizeof (struct hsa_kernel_runtime *));
 
   HSA_DEBUG ("Copying kernel runtime pointer to kernarg_address\n");
 

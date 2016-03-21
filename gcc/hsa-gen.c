@@ -6114,7 +6114,8 @@ generate_hsa (bool kernel)
 	= hsa_summaries->get (cgraph_node::get (hsa_cfun->m_decl));
       hsa_add_kern_decl_mapping (current_function_decl, hsa_cfun->m_name,
 				 hsa_cfun->m_maximum_omp_data_size,
-				 s->m_gridified_kernel_p);
+				 s->m_gridified_kernel_p,
+				 hsa_cfun->has_shadow_reg_p ());
     }
 
   if (flag_checking)

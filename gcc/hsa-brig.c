@@ -2146,15 +2146,20 @@ hsa_output_kernels (tree *host_func_table, tree *kernels)
 			   boolean_type_node);
   DECL_CHAIN (id_f3) = id_f2;
   tree id_f4 = build_decl (BUILTINS_LOCATION, FIELD_DECL,
-			   get_identifier ("kernel_dependencies_count"),
-			   unsigned_type_node);
+			   get_identifier ("has_shadow_reg_p"),
+			   boolean_type_node);
+
   DECL_CHAIN (id_f4) = id_f3;
   tree id_f5 = build_decl (BUILTINS_LOCATION, FIELD_DECL,
+			   get_identifier ("kernel_dependencies_count"),
+			   unsigned_type_node);
+  DECL_CHAIN (id_f5) = id_f4;
+  tree id_f6 = build_decl (BUILTINS_LOCATION, FIELD_DECL,
 			   get_identifier ("kernel_dependencies"),
 			   build_pointer_type (build_pointer_type
 					       (char_type_node)));
-  DECL_CHAIN (id_f5) = id_f4;
-  finish_builtin_struct (kernel_info_type, "__hsa_kernel_info", id_f5,
+  DECL_CHAIN (id_f6) = id_f5;
+  finish_builtin_struct (kernel_info_type, "__hsa_kernel_info", id_f6,
 			 NULL_TREE);
 
   int_num_of_kernels = build_int_cstu (uint32_type_node, map_count);
@@ -2187,6 +2192,11 @@ hsa_output_kernels (tree *host_func_table, tree *kernels)
       bool gridified_kernel_p = hsa_get_decl_kernel_mapping_gridified (i);
       tree gridified_kernel_p_tree = build_int_cstu (boolean_type_node,
 						     gridified_kernel_p);
+
+      bool has_shadow_reg_p = hsa_get_decl_kernel_mapping_has_shadow_reg_p (i);
+      tree has_shadow_reg_p_tree = build_int_cstu (boolean_type_node,
+						   has_shadow_reg_p);
+
       unsigned count = 0;
 
       kernel_dependencies_vector_type
@@ -2237,6 +2247,8 @@ hsa_output_kernels (tree *host_func_table, tree *kernels)
       CONSTRUCTOR_APPEND_ELT (kernel_info_vec, NULL_TREE, omp_data_size);
       CONSTRUCTOR_APPEND_ELT (kernel_info_vec, NULL_TREE,
 			      gridified_kernel_p_tree);
+      CONSTRUCTOR_APPEND_ELT (kernel_info_vec, NULL_TREE,
+			      has_shadow_reg_p_tree);
       CONSTRUCTOR_APPEND_ELT (kernel_info_vec, NULL_TREE, dependencies_count);
 
       if (count > 0)
