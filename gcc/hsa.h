@@ -1123,7 +1123,8 @@ class hsa_function_representation
 {
 public:
   hsa_function_representation (tree fdecl, bool kernel_p,
-			       unsigned ssa_names_count);
+			       unsigned ssa_names_count,
+			       bool need_cfg_update = false);
   hsa_function_representation (hsa_internal_fn *fn);
   ~hsa_function_representation ();
 
@@ -1138,6 +1139,9 @@ public:
      but the HSA generator might use them to put code into,
      so we need hsa_bb instances of them.  */
   void init_extra_bbs ();
+
+  /* Update CFG dominators if m_need_cfg_update flag is set.  */
+  void update_cfg ();
 
   /* Return linkage of the representation.  */
   BrigLinkage8_t get_linkage ();
@@ -1219,6 +1223,9 @@ public:
 
   /* SSA names mapping.  */
   vec <hsa_op_reg_p> m_ssa_map;
+
+  /* Flag whether a function needs CFG update before RA.  */
+  bool m_need_cfg_update;
 };
 
 enum hsa_function_kind
