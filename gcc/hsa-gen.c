@@ -1087,8 +1087,6 @@ hsa_op_immed::hsa_op_immed (tree tree_val, bool min32int)
 	    }
 	}
     }
-
-  emit_to_buffer (m_tree_value);
 }
 
 /* Constructor of class representing HSA immediate values.  INTEGER_VALUE is the
@@ -1101,29 +1099,6 @@ hsa_op_immed::hsa_op_immed (HOST_WIDE_INT integer_value, BrigType16_t type)
   gcc_assert (hsa_type_integer_p (type));
   m_int_value = integer_value;
   m_brig_repr_size = hsa_type_bit_size (type) / BITS_PER_UNIT;
-
-  hsa_bytes bytes;
-
-  switch (m_brig_repr_size)
-    {
-    case 1:
-      bytes.b8 = (uint8_t) m_int_value;
-      break;
-    case 2:
-      bytes.b16 = (uint16_t) m_int_value;
-      break;
-    case 4:
-      bytes.b32 = (uint32_t) m_int_value;
-      break;
-    case 8:
-      bytes.b64 = (uint64_t) m_int_value;
-      break;
-    default:
-      gcc_unreachable ();
-    }
-
-  m_brig_repr = XNEWVEC (char, m_brig_repr_size);
-  memcpy (m_brig_repr, &bytes, m_brig_repr_size);
 }
 
 hsa_op_immed::hsa_op_immed ()
@@ -1152,6 +1127,7 @@ void
 hsa_op_immed::set_type (BrigType16_t t)
 {
   m_type = t;
+  m_brig_repr_size = hsa_type_bit_size (t) / BITS_PER_UNIT;
 }
 
 /* Constructor of class representing HSA registers and pseudo-registers.  T is
@@ -2668,7 +2644,7 @@ gen_hsa_insns_for_store (tree lhs, hsa_op_base *src, hsa_bb *hbb)
   if (hsa_op_immed *imm = dyn_cast <hsa_op_immed *> (src))
     {
       if (!hsa_type_packed_p (imm->m_type))
-	imm->m_type = mem->m_type;
+	imm->set_type (mem->m_type);
       else
 	{
 	  /* ...and all vector immediates apparently need to be vectors of
@@ -2678,13 +2654,13 @@ gen_hsa_insns_for_store (tree lhs, hsa_op_base *src, hsa_bb *hbb)
 	  switch (bs)
 	    {
 	    case 32:
-	      imm->m_type = BRIG_TYPE_U8X4;
+	      imm->set_type (BRIG_TYPE_U8X4);
 	      break;
 	    case 64:
-	      imm->m_type = BRIG_TYPE_U8X8;
+	      imm->set_type (BRIG_TYPE_U8X8);
 	      break;
 	    case 128:
-	      imm->m_type = BRIG_TYPE_U8X16;
+	      imm->set_type (BRIG_TYPE_U8X16);
 	      break;
 	    default:
 	      gcc_unreachable ();

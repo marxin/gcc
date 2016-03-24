@@ -933,61 +933,88 @@ emit_immediate_scalar_to_buffer (tree value, char *data, unsigned need_len)
 }
 
 void
-hsa_op_immed::emit_to_buffer (tree value)
+hsa_op_immed::emit_to_buffer ()
 {
-  unsigned total_len = m_brig_repr_size;
-
-  /* As we can have a constructor with fewer elements, fill the memory
-     with zeros.  */
-  m_brig_repr = XCNEWVEC (char, total_len);
-  char *p = m_brig_repr;
-
-  if (TREE_CODE (value) == VECTOR_CST)
+  if (m_tree_value != NULL_TREE)
     {
-      int i, num = VECTOR_CST_NELTS (value);
-      for (i = 0; i < num; i++)
+      unsigned total_len = m_brig_repr_size;
+
+      /* As we can have a constructor with fewer elements, fill the memory
+	 with zeros.  */
+      m_brig_repr = XCNEWVEC (char, total_len);
+      char *p = m_brig_repr;
+
+      if (TREE_CODE (m_tree_value) == VECTOR_CST)
 	{
+	  int i, num = VECTOR_CST_NELTS (m_tree_value);
+	  for (i = 0; i < num; i++)
+	    {
+	      tree v = VECTOR_CST_ELT (m_tree_value, i);
+	      unsigned actual = emit_immediate_scalar_to_buffer (v, p, 0);
+	      total_len -= actual;
+	      p += actual;
+	    }
+	  /* Vectors should have the exact size.  */
+	  gcc_assert (total_len == 0);
+	}
+      else if (TREE_CODE (m_tree_value) == STRING_CST)
+	memcpy (m_brig_repr, TREE_STRING_POINTER (m_tree_value),
+		TREE_STRING_LENGTH (m_tree_value));
+      else if (TREE_CODE (m_tree_value) == COMPLEX_CST)
+	{
+	  gcc_assert (total_len % 2 == 0);
 	  unsigned actual;
 	  actual
-	    = emit_immediate_scalar_to_buffer (VECTOR_CST_ELT (value, i), p, 0);
-	  total_len -= actual;
+	    = emit_immediate_scalar_to_buffer (TREE_REALPART (m_tree_value), p,
+					       total_len / 2);
+
+	  gcc_assert (actual == total_len / 2);
 	  p += actual;
+
+	  actual
+	    = emit_immediate_scalar_to_buffer (TREE_IMAGPART (m_tree_value), p,
+					       total_len / 2);
+	  gcc_assert (actual == total_len / 2);
 	}
-      /* Vectors should have the exact size.  */
-      gcc_assert (total_len == 0);
-    }
-  else if (TREE_CODE (value) == STRING_CST)
-    memcpy (m_brig_repr, TREE_STRING_POINTER (value),
-	    TREE_STRING_LENGTH (value));
-  else if (TREE_CODE (value) == COMPLEX_CST)
-    {
-      gcc_assert (total_len % 2 == 0);
-      unsigned actual;
-      actual
-	= emit_immediate_scalar_to_buffer (TREE_REALPART (value), p,
-					   total_len / 2);
-
-      gcc_assert (actual == total_len / 2);
-      p += actual;
-
-      actual
-	= emit_immediate_scalar_to_buffer (TREE_IMAGPART (value), p,
-					   total_len / 2);
-      gcc_assert (actual == total_len / 2);
-    }
-  else if (TREE_CODE (value) == CONSTRUCTOR)
-    {
-      unsigned len = vec_safe_length (CONSTRUCTOR_ELTS (value));
-      for (unsigned i = 0; i < len; i++)
+      else if (TREE_CODE (m_tree_value) == CONSTRUCTOR)
 	{
-	  tree v = CONSTRUCTOR_ELT (value, i)->value;
-	  unsigned actual = emit_immediate_scalar_to_buffer (v, p, 0);
-	  total_len -= actual;
-	  p += actual;
+	  unsigned len = vec_safe_length (CONSTRUCTOR_ELTS (m_tree_value));
+	  for (unsigned i = 0; i < len; i++)
+	    {
+	      tree v = CONSTRUCTOR_ELT (m_tree_value, i)->value;
+	      unsigned actual = emit_immediate_scalar_to_buffer (v, p, 0);
+	      total_len -= actual;
+	      p += actual;
+	    }
 	}
+      else
+	emit_immediate_scalar_to_buffer (m_tree_value, p, total_len);
     }
   else
-    emit_immediate_scalar_to_buffer (value, p, total_len);
+    {
+      hsa_bytes bytes;
+
+      switch (m_brig_repr_size)
+	{
+	case 1:
+	  bytes.b8 = (uint8_t) m_int_value;
+	  break;
+	case 2:
+	  bytes.b16 = (uint16_t) m_int_value;
+	  break;
+	case 4:
+	  bytes.b32 = (uint32_t) m_int_value;
+	  break;
+	case 8:
+	  bytes.b64 = (uint64_t) m_int_value;
+	  break;
+	default:
+	  gcc_unreachable ();
+	}
+
+      m_brig_repr = XNEWVEC (char, m_brig_repr_size);
+      memcpy (m_brig_repr, &bytes, m_brig_repr_size);
+    }
 }
 
 /* Emit an immediate BRIG operand IMM.  The BRIG type of the immediate might
@@ -999,6 +1026,7 @@ hsa_op_immed::emit_to_buffer (tree value)
 static void
 emit_immediate_operand (hsa_op_immed *imm)
 {
+  imm->emit_to_buffer ();
   struct BrigOperandConstantBytes out;
 
   memset (&out, 0, sizeof (out));

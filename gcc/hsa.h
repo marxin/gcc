@@ -170,6 +170,7 @@ public:
   void *operator new (size_t);
   ~hsa_op_immed ();
   void set_type (BrigKind16_t t);
+  void emit_to_buffer ();
 
   /* Value as represented by middle end.  */
   tree m_tree_value;
@@ -189,7 +190,6 @@ private:
   /* All objects are deallocated by destroying their pool, so make delete
      inaccessible too.  */
   void operator delete (void *) {}
-  void emit_to_buffer (tree value);
 };
 
 /* Report whether or not P is a an immediate operand.  */
