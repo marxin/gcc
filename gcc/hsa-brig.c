@@ -932,17 +932,27 @@ emit_immediate_scalar_to_buffer (tree value, char *data, unsigned need_len)
   return len;
 }
 
-void
-hsa_op_immed::emit_to_buffer ()
+char *
+hsa_op_immed::emit_to_buffer (unsigned *brig_repr_size)
 {
+  char *brig_repr;
+  *brig_repr_size = hsa_get_imm_brig_type_len (m_type);
+
   if (m_tree_value != NULL_TREE)
     {
-      unsigned total_len = m_brig_repr_size;
+      /* Update brig_repr_size for special tree values.  */
+      if (TREE_CODE (m_tree_value) == STRING_CST)
+	*brig_repr_size = TREE_STRING_LENGTH (m_tree_value);
+      else if (TREE_CODE (m_tree_value) == CONSTRUCTOR)
+	*brig_repr_size
+	  = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (m_tree_value)));
+
+      unsigned total_len = *brig_repr_size;
 
       /* As we can have a constructor with fewer elements, fill the memory
 	 with zeros.  */
-      m_brig_repr = XCNEWVEC (char, total_len);
-      char *p = m_brig_repr;
+      brig_repr = XCNEWVEC (char, total_len);
+      char *p = brig_repr;
 
       if (TREE_CODE (m_tree_value) == VECTOR_CST)
 	{
@@ -958,7 +968,7 @@ hsa_op_immed::emit_to_buffer ()
 	  gcc_assert (total_len == 0);
 	}
       else if (TREE_CODE (m_tree_value) == STRING_CST)
-	memcpy (m_brig_repr, TREE_STRING_POINTER (m_tree_value),
+	memcpy (brig_repr, TREE_STRING_POINTER (m_tree_value),
 		TREE_STRING_LENGTH (m_tree_value));
       else if (TREE_CODE (m_tree_value) == COMPLEX_CST)
 	{
@@ -994,7 +1004,7 @@ hsa_op_immed::emit_to_buffer ()
     {
       hsa_bytes bytes;
 
-      switch (m_brig_repr_size)
+      switch (*brig_repr_size)
 	{
 	case 1:
 	  bytes.b8 = (uint8_t) m_int_value;
@@ -1012,9 +1022,11 @@ hsa_op_immed::emit_to_buffer ()
 	  gcc_unreachable ();
 	}
 
-      m_brig_repr = XNEWVEC (char, m_brig_repr_size);
-      memcpy (m_brig_repr, &bytes, m_brig_repr_size);
+      brig_repr = XNEWVEC (char, *brig_repr_size);
+      memcpy (brig_repr, &bytes, *brig_repr_size);
     }
+
+  return brig_repr;
 }
 
 /* Emit an immediate BRIG operand IMM.  The BRIG type of the immediate might
@@ -1026,18 +1038,21 @@ hsa_op_immed::emit_to_buffer ()
 static void
 emit_immediate_operand (hsa_op_immed *imm)
 {
-  imm->emit_to_buffer ();
+  unsigned brig_repr_size;
+  char *brig_repr = imm->emit_to_buffer (&brig_repr_size);
   struct BrigOperandConstantBytes out;
 
   memset (&out, 0, sizeof (out));
   out.base.byteCount = lendian16 (sizeof (out));
   out.base.kind = lendian16 (BRIG_KIND_OPERAND_CONSTANT_BYTES);
-  uint32_t byteCount = lendian32 (imm->m_brig_repr_size);
+  uint32_t byteCount = lendian32 (brig_repr_size);
   out.type = lendian16 (imm->m_type);
   out.bytes = lendian32 (brig_data.add (&byteCount, sizeof (byteCount)));
   brig_operand.add (&out, sizeof (out));
-  brig_data.add (imm->m_brig_repr, imm->m_brig_repr_size);
+  brig_data.add (brig_repr, brig_repr_size);
   brig_data.round_size_up (4);
+
+  free (brig_repr);
 }
 
 /* Emit a register BRIG operand REG.  */
