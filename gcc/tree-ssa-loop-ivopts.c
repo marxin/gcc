@@ -171,9 +171,45 @@ struct comp_cost
 
   comp_cost (int _cost, unsigned _complexity)
     : cost (_cost), complexity (_complexity), scratch (0) {}
+
+  static comp_cost get_infinite () { return comp_cost (INFTY, INFTY); }
   
   /* Returns true if COST is infinite.  */
   bool infinite_cost_p () { return cost == INFTY; }
+
+  /* Adds costs COST1 and COST2.  */
+
+  friend comp_cost operator+ (comp_cost cost1, comp_cost cost2)
+  {
+    if (cost1.infinite_cost_p () || cost2.infinite_cost_p ())
+      return get_infinite ();
+
+    cost1.cost += cost2.cost;
+    cost1.complexity += cost2.complexity;
+
+    return cost1;
+  }
+
+  comp_cost operator+= (comp_cost cost)
+    {
+      *this = *this + cost;
+      return *this;
+    }
+
+  /* Subtracts costs COST1 and COST2.  */
+  friend comp_cost operator- (comp_cost cost1, comp_cost cost2)
+  {
+    cost1.cost -= cost2.cost;
+    cost1.complexity -= cost2.complexity;
+
+    return cost1;
+  }
+
+  comp_cost operator-= (comp_cost cost)
+    {
+      *this = *this - cost;
+      return *this;
+    }
 
   int cost;		/* The runtime cost.  */
   unsigned complexity;	/* The estimate of the complexity of the code for
@@ -184,7 +220,6 @@ struct comp_cost
 };
 
 static const comp_cost no_cost (0, 0);
-static const comp_cost infinite_cost (INFTY, INFTY);
 
 /* The candidate - cost pair.  */
 struct cost_pair
@@ -3384,30 +3419,6 @@ alloc_use_cost_map (struct ivopts_data *data)
     }
 }
 
-/* Adds costs COST1 and COST2.  */
-
-static comp_cost
-add_costs (comp_cost cost1, comp_cost cost2)
-{
-  if (cost1.infinite_cost_p () || cost2.infinite_cost_p ())
-    return infinite_cost;
-
-  cost1.cost += cost2.cost;
-  cost1.complexity += cost2.complexity;
-
-  return cost1;
-}
-/* Subtracts costs COST1 and COST2.  */
-
-static comp_cost
-sub_costs (comp_cost cost1, comp_cost cost2)
-{
-  cost1.cost -= cost2.cost;
-  cost1.complexity -= cost2.complexity;
-
-  return cost1;
-}
-
 /* Returns a negative number if COST1 < COST2, a positive number if
    COST1 > COST2, and 0 if COST1 = COST2.  */
 
@@ -4286,11 +4297,11 @@ get_shiftadd_cost (tree expr, machine_mode mode, comp_cost cost0,
                 : shiftsub0_cost (speed, mode, m)));
 
   res = comp_cost (MIN (as_cost, sa_cost), 0);
-  res = add_costs (res, mult_in_op1 ? cost0 : cost1);
+  res += (mult_in_op1 ? cost0 : cost1);
 
   STRIP_NOPS (multop);
   if (!is_gimple_val (multop))
-    res = add_costs (res, force_expr_to_var_cost (multop, speed));
+    res = res + force_expr_to_var_cost (multop, speed);
 
   *cost = res;
   return true;
@@ -4456,8 +4467,8 @@ force_expr_to_var_cost (tree expr, bool speed)
       gcc_unreachable ();
     }
 
-  cost = add_costs (cost, cost0);
-  cost = add_costs (cost, cost1);
+  cost += cost0;
+  cost += cost1;
 
   /* Bound the cost by target_spill_cost.  The parts of complicated
      computations often are either loop invariant or at least can
@@ -4808,7 +4819,7 @@ get_computation_cost_at (struct ivopts_data *data,
 
   /* Only consider real candidates.  */
   if (!cand->iv)
-    return infinite_cost;
+    return comp_cost::get_infinite ();
 
   cbase = cand->iv->base;
   cstep = cand->iv->step;
@@ -4817,7 +4828,7 @@ get_computation_cost_at (struct ivopts_data *data,
   if (TYPE_PRECISION (utype) > TYPE_PRECISION (ctype))
     {
       /* We do not have a precision to express the values of use.  */
-      return infinite_cost;
+      return comp_cost::get_infinite ();
     }
 
   if (address_p
@@ -4834,7 +4845,7 @@ get_computation_cost_at (struct ivopts_data *data,
       if (use->iv->base_object
 	  && cand->iv->base_object
 	  && !operand_equal_p (use->iv->base_object, cand->iv->base_object, 0))
-	return infinite_cost;
+	return comp_cost::get_infinite ();
     }
 
   if (TYPE_PRECISION (utype) < TYPE_PRECISION (ctype))
@@ -4855,12 +4866,12 @@ get_computation_cost_at (struct ivopts_data *data,
     cstepi = 0;
 
   if (!constant_multiple_of (ustep, cstep, &rat))
-    return infinite_cost;
+    return comp_cost::get_infinite ();
 
   if (wi::fits_shwi_p (rat))
     ratio = rat.to_shwi ();
   else
-    return infinite_cost;
+    return comp_cost::get_infinite ();
 
   STRIP_NOPS (cbase);
   ctype = TREE_TYPE (cbase);
@@ -4931,11 +4942,9 @@ get_computation_cost_at (struct ivopts_data *data,
   else
     {
       cost = force_var_cost (data, cbase, depends_on);
-      cost = add_costs (cost,
-			difference_cost (data,
-					 ubase, build_int_cst (utype, 0),
-					 &symbol_present, &var_present,
-					 &offset, depends_on));
+      cost += difference_cost (data, ubase, build_int_cst (utype, 0),
+			       &symbol_present, &var_present, &offset,
+			       depends_on);
       cost.cost /= avg_loop_niter (data->current_loop);
       cost.cost += add_cost (data->speed, TYPE_MODE (ctype));
     }
@@ -4968,13 +4977,11 @@ get_computation_cost_at (struct ivopts_data *data,
      (symbol/var1/const parts may be omitted).  If we are looking for an
      address, find the cost of addressing this.  */
   if (address_p)
-    return add_costs (cost,
-		      get_address_cost (symbol_present, var_present,
-					offset, ratio, cstepi,
-					mem_mode,
-					TYPE_ADDR_SPACE (TREE_TYPE (utype)),
-					speed, stmt_is_after_inc,
-					can_autoinc));
+    return cost + get_address_cost (symbol_present, var_present,
+				    offset, ratio, cstepi,
+				    mem_mode,
+				    TYPE_ADDR_SPACE (TREE_TYPE (utype)),
+				    speed, stmt_is_after_inc, can_autoinc);
 
   /* Otherwise estimate the costs for computing the expression.  */
   if (!symbol_present && !var_present && !offset)
@@ -5011,7 +5018,7 @@ fallback:
     tree comp = get_computation_at (data->current_loop, use, cand, at);
 
     if (!comp)
-      return infinite_cost;
+      return comp_cost::get_infinite ();
 
     if (address_p)
       comp = build_simple_mem_ref (comp);
@@ -5092,7 +5099,7 @@ determine_use_iv_cost_address (struct ivopts_data *data,
 	 opportunities, and it turns out it can't be used, set the cost to
 	 infinity to make sure we ignore it.  */
       else if (cand->pos == IP_AFTER_USE || cand->pos == IP_BEFORE_USE)
-	cost = infinite_cost;
+	cost = comp_cost::get_infinite ();
     }
 
   if (!cost.infinite_cost_p () && use->next)
@@ -5126,12 +5133,12 @@ determine_use_iv_cost_address (struct ivopts_data *data,
 					       NULL, &can_autoinc, NULL);
 	      if (sub_cost.infinite_cost_p ())
 		{
-		  cost = infinite_cost;
+		  cost = comp_cost::get_infinite ();
 		  break;
 		}
 	    }
 
-	  cost = add_costs (cost, sub_cost);
+	  cost += sub_cost;
 	  sub_use = sub_use->next;
 	}
       while (sub_use);
@@ -5564,7 +5571,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
   /* Only consider real candidates.  */
   if (!cand->iv)
     {
-      set_use_iv_cost (data, use, cand, infinite_cost, NULL, NULL_TREE,
+      set_use_iv_cost (data, use, cand, comp_cost::get_infinite (), NULL, NULL_TREE,
 		       ERROR_MARK, -1);
       return false;
     }
@@ -5593,7 +5600,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
       elim_cost.cost = adjust_setup_cost (data, elim_cost.cost);
     }
   else
-    elim_cost = infinite_cost;
+    elim_cost = comp_cost::get_infinite ();
 
   /* Try expressing the original giv.  If it is compared with an invariant,
      note that we cannot get rid of it.  */
@@ -6087,7 +6094,7 @@ iv_ca_set_no_cp (struct ivopts_data *data, struct iv_ca *ivs,
       iv_ca_set_remove_invariants (ivs, cp->cand->depends_on);
     }
 
-  ivs->cand_use_cost = sub_costs (ivs->cand_use_cost, cp->cost);
+  ivs->cand_use_cost -= cp->cost;
 
   iv_ca_set_remove_invariants (ivs, cp->depends_on);
 
@@ -6152,7 +6159,7 @@ iv_ca_set_cp (struct ivopts_data *data, struct iv_ca *ivs,
 	  iv_ca_set_add_invariants (ivs, cp->cand->depends_on);
 	}
 
-      ivs->cand_use_cost = add_costs (ivs->cand_use_cost, cp->cost);
+      ivs->cand_use_cost += cp->cost;
       iv_ca_set_add_invariants (ivs, cp->depends_on);
 
       if (cp->inv_expr_id != -1)
@@ -6212,7 +6219,7 @@ iv_ca_cost (struct iv_ca *ivs)
   /* This was a conditional expression but it triggered a bug in
      Sun C 5.5.  */
   if (ivs->bad_uses)
-    return infinite_cost;
+    return comp_cost::get_infinite ();
   else
     return ivs->cost;
 }
@@ -6551,7 +6558,7 @@ iv_ca_narrow (struct ivopts_data *data, struct iv_ca *ivs,
       if (!new_cp)
 	{
 	  iv_ca_delta_free (delta);
-	  return infinite_cost;
+	  return comp_cost::get_infinite ();
 	}
 
       *delta = iv_ca_delta_add (use, old_cp, new_cp, *delta);
@@ -6977,8 +6984,8 @@ find_optimal_iv_set (struct ivopts_data *data)
   if (!origset && !set)
     return NULL;
 
-  origcost = origset ? iv_ca_cost (origset) : infinite_cost;
-  cost = set ? iv_ca_cost (set) : infinite_cost;
+  origcost = origset ? iv_ca_cost (origset) : comp_cost::get_infinite ();
+  cost = set ? iv_ca_cost (set) : comp_cost::get_infinite ();
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
