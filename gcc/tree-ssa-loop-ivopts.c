@@ -167,6 +167,11 @@ enum use_type
 /* Cost of a computation.  */
 struct comp_cost
 {
+  comp_cost (): cost (0), complexity (0), scratch (0) {}
+
+  comp_cost (int _cost, unsigned _complexity)
+    : cost (_cost), complexity (_complexity), scratch (0) {}
+
   int cost;		/* The runtime cost.  */
   unsigned complexity;	/* The estimate of the complexity of the code for
 			   the computation (in no concrete units --
@@ -175,8 +180,8 @@ struct comp_cost
   int scratch;		/* Scratch used during cost computation.  */
 };
 
-static const comp_cost no_cost = {0, 0, 0};
-static const comp_cost infinite_cost = {INFTY, INFTY, INFTY};
+static const comp_cost no_cost (0, 0);
+static const comp_cost infinite_cost (INFTY, INFTY);
 
 /* The candidate - cost pair.  */
 struct cost_pair
@@ -3376,20 +3381,6 @@ alloc_use_cost_map (struct ivopts_data *data)
     }
 }
 
-/* Returns description of computation cost of expression whose runtime
-   cost is RUNTIME and complexity corresponds to COMPLEXITY.  */
-
-static comp_cost
-new_cost (unsigned runtime, unsigned complexity)
-{
-  comp_cost cost;
-
-  cost.cost = runtime;
-  cost.complexity = complexity;
-
-  return cost;
-}
-
 /* Returns true if COST is infinite.  */
 
 static bool
@@ -4262,7 +4253,7 @@ get_address_cost (bool symbol_present, bool var_present,
   else
     acost = data->costs[symbol_present][var_present][offset_p][ratio_p];
   complexity = (symbol_present != 0) + (var_present != 0) + offset_p + ratio_p;
-  return new_cost (cost + acost, complexity);
+  return comp_cost (cost + acost, complexity);
 }
 
  /* Calculate the SPEED or size cost of shiftadd EXPR in MODE.  MULT is the
@@ -4299,7 +4290,7 @@ get_shiftadd_cost (tree expr, machine_mode mode, comp_cost cost0,
                 ? shiftsub1_cost (speed, mode, m)
                 : shiftsub0_cost (speed, mode, m)));
 
-  res = new_cost (MIN (as_cost, sa_cost), 0);
+  res = comp_cost (MIN (as_cost, sa_cost), 0);
   res = add_costs (res, mult_in_op1 ? cost0 : cost1);
 
   STRIP_NOPS (multop);
@@ -4369,7 +4360,7 @@ force_expr_to_var_cost (tree expr, bool speed)
   if (is_gimple_min_invariant (expr))
     {
       if (TREE_CODE (expr) == INTEGER_CST)
-	return new_cost (integer_cost [speed], 0);
+	return comp_cost (integer_cost [speed], 0);
 
       if (TREE_CODE (expr) == ADDR_EXPR)
 	{
@@ -4378,10 +4369,10 @@ force_expr_to_var_cost (tree expr, bool speed)
 	  if (TREE_CODE (obj) == VAR_DECL
 	      || TREE_CODE (obj) == PARM_DECL
 	      || TREE_CODE (obj) == RESULT_DECL)
-	    return new_cost (symbol_cost [speed], 0);
+	    return comp_cost (symbol_cost [speed], 0);
 	}
 
-      return new_cost (address_cost [speed], 0);
+      return comp_cost (address_cost [speed], 0);
     }
 
   switch (TREE_CODE (expr))
@@ -4405,7 +4396,7 @@ force_expr_to_var_cost (tree expr, bool speed)
 
     default:
       /* Just an arbitrary value, FIXME.  */
-      return new_cost (target_spill_cost[speed], 0);
+      return comp_cost (target_spill_cost[speed], 0);
     }
 
   if (op0 == NULL_TREE
@@ -4427,7 +4418,7 @@ force_expr_to_var_cost (tree expr, bool speed)
     case PLUS_EXPR:
     case MINUS_EXPR:
     case NEGATE_EXPR:
-      cost = new_cost (add_cost (speed, mode), 0);
+      cost = comp_cost (add_cost (speed, mode), 0);
       if (TREE_CODE (expr) != NEGATE_EXPR)
         {
           tree mult = NULL_TREE;
@@ -4450,20 +4441,20 @@ force_expr_to_var_cost (tree expr, bool speed)
 	tree inner_mode, outer_mode;
 	outer_mode = TREE_TYPE (expr);
 	inner_mode = TREE_TYPE (op0);
-	cost = new_cost (convert_cost (TYPE_MODE (outer_mode),
+	cost = comp_cost (convert_cost (TYPE_MODE (outer_mode),
 				       TYPE_MODE (inner_mode), speed), 0);
       }
       break;
 
     case MULT_EXPR:
       if (cst_and_fits_in_hwi (op0))
-	cost = new_cost (mult_by_coeff_cost (int_cst_value (op0),
+	cost = comp_cost (mult_by_coeff_cost (int_cst_value (op0),
 					     mode, speed), 0);
       else if (cst_and_fits_in_hwi (op1))
-	cost = new_cost (mult_by_coeff_cost (int_cst_value (op1),
+	cost = comp_cost (mult_by_coeff_cost (int_cst_value (op1),
 					     mode, speed), 0);
       else
-	return new_cost (target_spill_cost [speed], 0);
+	return comp_cost (target_spill_cost [speed], 0);
       break;
 
     default:
@@ -4530,7 +4521,7 @@ split_address_cost (struct ivopts_data *data,
       if (depends_on)
 	walk_tree (&addr, find_depends, depends_on, NULL);
 
-      return new_cost (target_spill_cost[data->speed], 0);
+      return comp_cost (target_spill_cost[data->speed], 0);
     }
 
   *offset += bitpos / BITS_PER_UNIT;
@@ -5030,9 +5021,7 @@ fallback:
     if (address_p)
       comp = build_simple_mem_ref (comp);
 
-    cost = new_cost (computation_cost (comp, speed), 0);
-    cost.scratch = 0;
-    return cost;
+    return comp_cost (computation_cost (comp, speed), 0);
   }
 }
 
