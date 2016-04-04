@@ -196,6 +196,35 @@ struct comp_cost
       return *this;
     }
 
+
+  comp_cost operator+= (int c)
+    {
+      this->cost += c;
+
+      return *this;
+    }
+
+  comp_cost operator-= (int c)
+    {
+      this->cost -= c;
+
+      return *this;
+    }
+
+  comp_cost operator/= (int c)
+    {
+      this->cost /= c;
+
+      return *this;
+    }
+
+  comp_cost operator*= (int c)
+    {
+      this->cost *= c;
+
+      return *this;
+    }
+
   /* Subtracts costs COST1 and COST2.  */
   friend comp_cost operator- (comp_cost cost1, comp_cost cost2)
   {
@@ -229,7 +258,20 @@ struct comp_cost
       return cost1 < cost2 || cost1 == cost2;
     }
 
+  int get_cost ()
+    {
+      return cost;
+    }
+
+  void set_cost (int c)
+    {
+      cost = c;
+    }
+
+private:  
   int cost;		/* The runtime cost.  */
+
+public:
   unsigned complexity;	/* The estimate of the complexity of the code for
 			   the computation (in no concrete units --
 			   complexity field should be larger for more
@@ -4480,8 +4522,8 @@ force_expr_to_var_cost (tree expr, bool speed)
      computations often are either loop invariant or at least can
      be shared between several iv uses, so letting this grow without
      limits would not give reasonable results.  */
-  if (cost.cost > (int) target_spill_cost [speed])
-    cost.cost = target_spill_cost [speed];
+  if (cost.get_cost () > (int) target_spill_cost [speed])
+    cost.set_cost (target_spill_cost [speed]);
 
   return cost;
 }
@@ -4633,7 +4675,7 @@ difference_cost (struct ivopts_data *data,
   if (integer_zerop (e1))
     {
       comp_cost cost = force_var_cost (data, e2, depends_on);
-      cost.cost += mult_by_coeff_cost (-1, mode, data->speed);
+      cost += mult_by_coeff_cost (-1, mode, data->speed);
       return cost;
     }
 
@@ -4898,7 +4940,7 @@ get_computation_cost_at (struct ivopts_data *data,
 			      ubase, build_int_cst (utype, 0),
 			      &symbol_present, &var_present, &offset,
 			      depends_on);
-      cost.cost /= avg_loop_niter (data->current_loop);
+      cost /= avg_loop_niter (data->current_loop);
     }
   else if (ratio == 1)
     {
@@ -4922,7 +4964,7 @@ get_computation_cost_at (struct ivopts_data *data,
 			      ubase, real_cbase,
 			      &symbol_present, &var_present, &offset,
 			      depends_on);
-      cost.cost /= avg_loop_niter (data->current_loop);
+      cost /= avg_loop_niter (data->current_loop);
     }
   else if (address_p
 	   && !POINTER_TYPE_P (ctype)
@@ -4943,7 +4985,7 @@ get_computation_cost_at (struct ivopts_data *data,
 			      ubase, cbase,
 			      &symbol_present, &var_present, &offset,
 			      depends_on);
-      cost.cost /= avg_loop_niter (data->current_loop);
+      cost /= avg_loop_niter (data->current_loop);
     }
   else
     {
@@ -4951,17 +4993,17 @@ get_computation_cost_at (struct ivopts_data *data,
       cost += difference_cost (data, ubase, build_int_cst (utype, 0),
 			       &symbol_present, &var_present, &offset,
 			       depends_on);
-      cost.cost /= avg_loop_niter (data->current_loop);
-      cost.cost += add_cost (data->speed, TYPE_MODE (ctype));
+      cost /= avg_loop_niter (data->current_loop);
+      cost += add_cost (data->speed, TYPE_MODE (ctype));
     }
 
   /* Record setup cost in scrach field.  */
-  cost.scratch = cost.cost;
+  cost.scratch = cost.get_cost ();
   /* Set of invariants depended on by sub use has already been computed
      for the first use in the group.  */
   if (use->sub_id)
     {
-      cost.cost = 0;
+      cost.set_cost (0);
       if (depends_on && *depends_on)
 	bitmap_clear (*depends_on);
     }
@@ -4993,14 +5035,14 @@ get_computation_cost_at (struct ivopts_data *data,
   if (!symbol_present && !var_present && !offset)
     {
       if (ratio != 1)
-	cost.cost += mult_by_coeff_cost (ratio, TYPE_MODE (ctype), speed);
+	cost += mult_by_coeff_cost (ratio, TYPE_MODE (ctype), speed);
       return cost;
     }
 
   /* Symbol + offset should be compile-time computable so consider that they
       are added once to the variable, if present.  */
   if (var_present && (symbol_present || offset))
-    cost.cost += adjust_setup_cost (data,
+    cost += adjust_setup_cost (data,
 				    add_cost (speed, TYPE_MODE (ctype)));
 
   /* Having offset does not affect runtime cost in case it is added to
@@ -5008,11 +5050,11 @@ get_computation_cost_at (struct ivopts_data *data,
   if (offset)
     cost.complexity++;
 
-  cost.cost += add_cost (speed, TYPE_MODE (ctype));
+  cost += add_cost (speed, TYPE_MODE (ctype));
 
   aratio = ratio > 0 ? ratio : -ratio;
   if (aratio != 1)
-    cost.cost += mult_by_coeff_cost (aratio, TYPE_MODE (ctype), speed);
+    cost += mult_by_coeff_cost (aratio, TYPE_MODE (ctype), speed);
   return cost;
 
 fallback:
@@ -5100,7 +5142,7 @@ determine_use_iv_cost_address (struct ivopts_data *data,
   if (cand->ainc_use == use)
     {
       if (can_autoinc)
-	cost.cost -= cand->cost_step;
+	cost -= cand->cost_step;
       /* If we generated the candidate solely for exploiting autoincrement
 	 opportunities, and it turns out it can't be used, set the cost to
 	 infinity to make sure we ignore it.  */
@@ -5113,7 +5155,7 @@ determine_use_iv_cost_address (struct ivopts_data *data,
       first = true;
       sub_use = use->next;
       /* We don't want to add setup cost for sub-uses.  */
-      sub_cost.cost -= sub_cost.scratch;
+      sub_cost -= sub_cost.scratch;
       /* Add cost for sub uses in group.  */
       do
 	{
@@ -5586,10 +5628,10 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
   if (may_eliminate_iv (data, use, cand, &bound, &comp))
     {
       elim_cost = force_var_cost (data, bound, &depends_on_elim);
-      if (elim_cost.cost == 0)
-        elim_cost.cost = parm_decl_cost (data, bound);
+      if (elim_cost.get_cost () == 0)
+        elim_cost.set_cost (parm_decl_cost (data, bound));
       else if (TREE_CODE (bound) == INTEGER_CST)
-        elim_cost.cost = 0;
+        elim_cost.set_cost (0);
       /* If we replace a loop condition 'i < n' with 'p < base + n',
 	 depends_on_elim will have 'base' and 'n' set, which implies
 	 that both 'base' and 'n' will be live during the loop.	 More likely,
@@ -5603,7 +5645,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
 	}
       /* The bound is a loop invariant, so it will be only computed
 	 once.  */
-      elim_cost.cost = adjust_setup_cost (data, elim_cost.cost);
+      elim_cost.set_cost (adjust_setup_cost (data, elim_cost.get_cost ()));
     }
   else
     elim_cost = comp_cost::get_infinite ();
@@ -5624,7 +5666,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
       && integer_zerop (*bound_cst)
       && (operand_equal_p (*control_var, cand->var_after, 0)
 	  || operand_equal_p (*control_var, cand->var_before, 0)))
-    elim_cost.cost -= 1;
+    elim_cost -= 1;
 
   express_cost = get_computation_cost (data, use, cand, false,
 				       &depends_on_express, NULL,
@@ -5634,11 +5676,11 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
 
   /* Count the cost of the original bound as well.  */
   bound_cost = force_var_cost (data, *bound_cst, NULL);
-  if (bound_cost.cost == 0)
-    bound_cost.cost = parm_decl_cost (data, *bound_cst);
+  if (bound_cost.get_cost () == 0)
+    bound_cost.set_cost (parm_decl_cost (data, *bound_cst));
   else if (TREE_CODE (*bound_cst) == INTEGER_CST)
-    bound_cost.cost = 0;
-  express_cost.cost += bound_cost.cost;
+    bound_cost.set_cost (0);
+  express_cost += bound_cost;
 
   /* Choose the better approach, preferring the eliminated IV. */
   if (elim_cost <= express_cost)
@@ -5839,7 +5881,7 @@ determine_use_iv_costs (struct ivopts_data *data)
 
 	      fprintf (dump_file, "  %d\t%d\t%d\t",
 		       use->cost_map[j].cand->id,
-		       use->cost_map[j].cost.cost,
+		       use->cost_map[j].cost.get_cost (),
 		       use->cost_map[j].cost.complexity);
 	      if (use->cost_map[j].depends_on)
 		bitmap_print (dump_file,
@@ -5879,11 +5921,11 @@ determine_iv_cost (struct ivopts_data *data, struct iv_cand *cand)
   /* It will be exceptional that the iv register happens to be initialized with
      the proper value at no cost.  In general, there will at least be a regcopy
      or a const set.  */
-  if (cost_base.cost == 0)
-    cost_base.cost = COSTS_N_INSNS (1);
+  if (cost_base.get_cost () == 0)
+    cost_base.set_cost (COSTS_N_INSNS (1));
   cost_step = add_cost (data->speed, TYPE_MODE (TREE_TYPE (base)));
 
-  cost = cost_step + adjust_setup_cost (data, cost_base.cost);
+  cost = cost_step + adjust_setup_cost (data, cost_base.get_cost ());
 
   /* Prefer the original ivs unless we may gain something by replacing it.
      The reason is to make debugging simpler; so this is not relevant for
@@ -6040,10 +6082,10 @@ iv_ca_recount_cost (struct ivopts_data *data, struct iv_ca *ivs)
 {
   comp_cost cost = ivs->cand_use_cost;
 
-  cost.cost += ivs->cand_cost;
+  cost += ivs->cand_cost;
 
-  cost.cost += ivopts_global_cost_for_size (data,
-                                            ivs->n_regs + ivs->num_used_inv_expr);
+  cost += ivopts_global_cost_for_size (data,
+				       ivs->n_regs + ivs->num_used_inv_expr);
 
   ivs->cost = cost;
 }
@@ -6408,9 +6450,9 @@ iv_ca_dump (struct ivopts_data *data, FILE *file, struct iv_ca *ivs)
   unsigned i;
   comp_cost cost = iv_ca_cost (ivs);
 
-  fprintf (file, "  cost: %d (complexity %d)\n", cost.cost, cost.complexity);
+  fprintf (file, "  cost: %d (complexity %d)\n", cost.get_cost (), cost.complexity);
   fprintf (file, "  cand_cost: %d\n  cand_use_cost: %d (complexity %d)\n",
-           ivs->cand_cost, ivs->cand_use_cost.cost, ivs->cand_use_cost.complexity);
+           ivs->cand_cost, ivs->cand_use_cost.get_cost (), ivs->cand_use_cost.complexity);
   bitmap_print (file, ivs->cands, "  candidates: ","\n");
 
    for (i = 0; i < ivs->upto; i++)
@@ -6419,7 +6461,7 @@ iv_ca_dump (struct ivopts_data *data, FILE *file, struct iv_ca *ivs)
       struct cost_pair *cp = iv_ca_cand_for_use (ivs, use);
       if (cp)
         fprintf (file, "   use:%d --> iv_cand:%d, cost=(%d,%d)\n",
-                 use->id, cp->cand->id, cp->cost.cost, cp->cost.complexity);
+                 use->id, cp->cand->id, cp->cost.get_cost (), cp->cost.complexity);
       else
         fprintf (file, "   use:%d --> ??\n", use->id);
     }
@@ -6993,9 +7035,9 @@ find_optimal_iv_set (struct ivopts_data *data)
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "Original cost %d (complexity %d)\n\n",
-	       origcost.cost, origcost.complexity);
+	       origcost.get_cost (), origcost.complexity);
       fprintf (dump_file, "Final cost %d (complexity %d)\n\n",
-	       cost.cost, cost.complexity);
+	       cost.get_cost (), cost.complexity);
     }
 
   /* Choose the one with the best cost.  */
