@@ -103,6 +103,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "tree-vectorizer.h"
 
+#include <math.h>
+
 /* FIXME: Expressions are expanded to RTL in this pass to determine the
    cost of different addressing modes.  This should be moved to a TBD
    interface between the GIMPLE and RTL worlds.  */
@@ -167,10 +169,12 @@ enum use_type
 /* Cost of a computation.  */
 struct comp_cost
 {
-  comp_cost (): cost (0), complexity (0), scratch (0) {}
+  comp_cost (): cost (0), cost_scalled (0), complexity (0), scratch (0),
+    freq_nom (0), freq_denom (0) {}
 
   comp_cost (int _cost, unsigned _complexity)
-    : cost (_cost), complexity (_complexity), scratch (0) {}
+    : cost (_cost), cost_scalled (_cost), complexity (_complexity), scratch (0),
+    freq_nom (0), freq_denom (0) {}
 
   static comp_cost get_infinite () { return comp_cost (INFTY, INFTY); }
   
@@ -186,6 +190,7 @@ struct comp_cost
 
     cost1.cost += cost2.cost;
     cost1.complexity += cost2.complexity;
+    cost1.cost_scalled += cost2.cost_scalled;
 
     return cost1;
   }
@@ -200,6 +205,7 @@ struct comp_cost
   comp_cost operator+= (int c)
     {
       this->cost += c;
+      this->cost_scalled += scale_cost (c);
 
       return *this;
     }
@@ -207,6 +213,7 @@ struct comp_cost
   comp_cost operator-= (int c)
     {
       this->cost -= c;
+      this->cost_scalled -= scale_cost (c);
 
       return *this;
     }
@@ -214,6 +221,7 @@ struct comp_cost
   comp_cost operator/= (int c)
     {
       this->cost /= c;
+      this->cost_scalled /= scale_cost (c);
 
       return *this;
     }
@@ -221,6 +229,7 @@ struct comp_cost
   comp_cost operator*= (int c)
     {
       this->cost *= c;
+      this->cost_scalled *= scale_cost (c);
 
       return *this;
     }
@@ -230,6 +239,7 @@ struct comp_cost
   {
     cost1.cost -= cost2.cost;
     cost1.complexity -= cost2.complexity;
+    cost1.cost_scalled -= cost2.cost_scalled;
 
     return cost1;
   }
@@ -268,8 +278,46 @@ struct comp_cost
       cost = c;
     }
 
+  int get_cost_scalled ()
+    {
+      return cost_scalled;
+    }
+
+  void calculate_scalled_cost (int nominator, int denominator)
+    {
+      freq_nom = nominator;
+      freq_denom = denominator;
+
+      cost_scalled = scale_cost (cost);
+    }
+
+  void use_scalled_cost ()
+    {
+      if (cost < 0)
+	return;
+
+      gcc_assert (cost_scalled <= cost);
+      cost = cost_scalled;
+    }
+
+  inline bool is_valid_freq ()
+    {
+      return freq_nom > 0 && freq_denom > 0 && freq_nom < freq_denom;
+    }
+
+  inline float get_frequency ()
+    {
+      return is_valid_freq () ? 1.0f * freq_nom / freq_denom : 0.0f;
+    }
+
+  int scale_cost (int cost)
+    {
+      return is_valid_freq () ? freq_nom * cost / freq_denom : cost;
+    }
+
 private:  
   int cost;		/* The runtime cost.  */
+  int cost_scalled;   /* The runtime cost.  */
 
 public:
   unsigned complexity;	/* The estimate of the complexity of the code for
@@ -277,6 +325,9 @@ public:
 			   complexity field should be larger for more
 			   complex expressions and addressing modes).  */
   int scratch;		/* Scratch used during cost computation.  */
+
+  int freq_nom;
+  int freq_denom;
 };
 
 static const comp_cost no_cost (0, 0);
@@ -5025,18 +5076,22 @@ get_computation_cost_at (struct ivopts_data *data,
      (symbol/var1/const parts may be omitted).  If we are looking for an
      address, find the cost of addressing this.  */
   if (address_p)
-    return cost + get_address_cost (symbol_present, var_present,
-				    offset, ratio, cstepi,
-				    mem_mode,
-				    TYPE_ADDR_SPACE (TREE_TYPE (utype)),
-				    speed, stmt_is_after_inc, can_autoinc);
+    {
+      cost += get_address_cost (symbol_present, var_present,
+				      offset, ratio, cstepi,
+				      mem_mode,
+				      TYPE_ADDR_SPACE (TREE_TYPE (utype)),
+				      speed, stmt_is_after_inc, can_autoinc);
+      goto ret;
+    }
 
   /* Otherwise estimate the costs for computing the expression.  */
   if (!symbol_present && !var_present && !offset)
     {
       if (ratio != 1)
 	cost += mult_by_coeff_cost (ratio, TYPE_MODE (ctype), speed);
-      return cost;
+
+      goto ret;
     }
 
   /* Symbol + offset should be compile-time computable so consider that they
@@ -5055,7 +5110,7 @@ get_computation_cost_at (struct ivopts_data *data,
   aratio = ratio > 0 ? ratio : -ratio;
   if (aratio != 1)
     cost += mult_by_coeff_cost (aratio, TYPE_MODE (ctype), speed);
-  return cost;
+  goto ret;
 
 fallback:
   if (can_autoinc)
@@ -5071,8 +5126,14 @@ fallback:
     if (address_p)
       comp = build_simple_mem_ref (comp);
 
-    return comp_cost (computation_cost (comp, speed), 0);
+    cost = comp_cost (computation_cost (comp, speed), 0);
   }
+
+ret:
+
+  cost.calculate_scalled_cost (at->bb->frequency,
+			       data->current_loop->header->frequency);
+  return cost;
 }
 
 /* Determines the cost of the computation by that USE is expressed
@@ -5700,6 +5761,9 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
       inv_expr_id = express_inv_expr_id;
     }
 
+  cost.calculate_scalled_cost (use->stmt->bb->frequency,
+			       data->current_loop->header->frequency);
+
   set_use_iv_cost (data, use, cand, cost, depends_on, bound, comp, inv_expr_id);
 
   if (depends_on_elim)
@@ -5872,16 +5936,18 @@ determine_use_iv_costs (struct ivopts_data *data)
 	  use = iv_use (data, i);
 
 	  fprintf (dump_file, "Use %d:\n", i);
-	  fprintf (dump_file, "  cand\tcost\tcompl.\tdepends on\n");
+	  fprintf (dump_file, "  cand\tcost\tcost_f\tfreq\tcompl.\tdepends on\n");
 	  for (j = 0; j < use->n_map_members; j++)
 	    {
 	      if (!use->cost_map[j].cand
 		  || use->cost_map[j].cost.infinite_cost_p ())
 		continue;
 
-	      fprintf (dump_file, "  %d\t%d\t%d\t",
+	      fprintf (dump_file, "  %d\t%d\t%d\t%2.2f\t%d\t",
 		       use->cost_map[j].cand->id,
 		       use->cost_map[j].cost.get_cost (),
+		       use->cost_map[j].cost.get_cost_scalled (),
+		       use->cost_map[j].cost.get_frequency (),
 		       use->cost_map[j].cost.complexity);
 	      if (use->cost_map[j].depends_on)
 		bitmap_print (dump_file,
@@ -5889,11 +5955,29 @@ determine_use_iv_costs (struct ivopts_data *data)
               if (use->cost_map[j].inv_expr_id != -1)
                 fprintf (dump_file, " inv_expr:%d", use->cost_map[j].inv_expr_id);
 	      fprintf (dump_file, "\n");
+
 	    }
 
 	  fprintf (dump_file, "\n");
 	}
       fprintf (dump_file, "\n");
+    }
+
+  if (flag_profile_use)
+    {
+      for (i = 0; i < n_iv_uses (data); i++)
+	{
+	  use = iv_use (data, i);
+
+	  for (j = 0; j < use->n_map_members; j++)
+	    {
+	      if (!use->cost_map[j].cand
+		  || use->cost_map[j].cost.infinite_cost_p ())
+		continue;
+
+	      use->cost_map[j].cost.use_scalled_cost ();
+	    }
+	}
     }
 }
 
@@ -6450,9 +6534,12 @@ iv_ca_dump (struct ivopts_data *data, FILE *file, struct iv_ca *ivs)
   unsigned i;
   comp_cost cost = iv_ca_cost (ivs);
 
-  fprintf (file, "  cost: %d (complexity %d)\n", cost.get_cost (), cost.complexity);
-  fprintf (file, "  cand_cost: %d\n  cand_use_cost: %d (complexity %d)\n",
-           ivs->cand_cost, ivs->cand_use_cost.get_cost (), ivs->cand_use_cost.complexity);
+  fprintf (file, "  cost: %d (complexity %d, scalled: %d)\n", cost.get_cost (),
+	   cost.complexity, cost.get_cost_scalled ());
+  fprintf (file, "  cand_cost: %d\n  cand_use_cost: %d (complexity %d, scalled"
+	   ":%d)\n",
+           ivs->cand_cost, ivs->cand_use_cost.get_cost (), ivs->cand_use_cost.complexity,
+	   ivs->cand_use_cost.get_cost_scalled ());
   bitmap_print (file, ivs->cands, "  candidates: ","\n");
 
    for (i = 0; i < ivs->upto; i++)
@@ -6460,8 +6547,9 @@ iv_ca_dump (struct ivopts_data *data, FILE *file, struct iv_ca *ivs)
       struct iv_use *use = iv_use (data, i);
       struct cost_pair *cp = iv_ca_cand_for_use (ivs, use);
       if (cp)
-        fprintf (file, "   use:%d --> iv_cand:%d, cost=(%d,%d)\n",
-                 use->id, cp->cand->id, cp->cost.get_cost (), cp->cost.complexity);
+        fprintf (file, "   use:%d --> iv_cand:%d, cost=(%d,%d,%2.2f,%d)\n",
+                 use->id, cp->cand->id, cp->cost.get_cost (), cp->cost.complexity,
+		 cp->cost.get_frequency (), cp->cost.get_cost_scalled ());
       else
         fprintf (file, "   use:%d --> ??\n", use->id);
     }
@@ -7131,6 +7219,7 @@ create_new_ivs (struct ivopts_data *data, struct iv_ca *set)
 	fprintf (dump_file, " at %s:%d", LOCATION_FILE (data->loop_loc),
 		 LOCATION_LINE (data->loop_loc));
       fprintf (dump_file, ", %lu IVs:\n", bitmap_count_bits (set->cands));
+
       EXECUTE_IF_SET_IN_BITMAP (set->cands, 0, i, bi)
         {
           cand = iv_cand (data, i);
