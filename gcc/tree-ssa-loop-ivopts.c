@@ -171,6 +171,9 @@ struct comp_cost
 
   comp_cost (int _cost, unsigned _complexity)
     : cost (_cost), complexity (_complexity), scratch (0) {}
+  
+  /* Returns true if COST is infinite.  */
+  bool infinite_cost_p () { return cost == INFTY; }
 
   int cost;		/* The runtime cost.  */
   unsigned complexity;	/* The estimate of the complexity of the code for
@@ -3381,20 +3384,12 @@ alloc_use_cost_map (struct ivopts_data *data)
     }
 }
 
-/* Returns true if COST is infinite.  */
-
-static bool
-infinite_cost_p (comp_cost cost)
-{
-  return cost.cost == INFTY;
-}
-
 /* Adds costs COST1 and COST2.  */
 
 static comp_cost
 add_costs (comp_cost cost1, comp_cost cost2)
 {
-  if (infinite_cost_p (cost1) || infinite_cost_p (cost2))
+  if (cost1.infinite_cost_p () || cost2.infinite_cost_p ())
     return infinite_cost;
 
   cost1.cost += cost2.cost;
@@ -3437,7 +3432,7 @@ set_use_iv_cost (struct ivopts_data *data,
 {
   unsigned i, s;
 
-  if (infinite_cost_p (cost))
+  if (cost.infinite_cost_p ())
     {
       BITMAP_FREE (depends_on);
       return;
@@ -5072,7 +5067,7 @@ determine_use_iv_cost_generic (struct ivopts_data *data,
   set_use_iv_cost (data, use, cand, cost, depends_on, NULL_TREE, ERROR_MARK,
                    inv_expr_id);
 
-  return !infinite_cost_p (cost);
+  return !cost.infinite_cost_p ();
 }
 
 /* Determines cost of basing replacement of USE on CAND in an address.  */
@@ -5100,7 +5095,7 @@ determine_use_iv_cost_address (struct ivopts_data *data,
 	cost = infinite_cost;
     }
 
-  if (!infinite_cost_p (cost) && use->next)
+  if (!cost.infinite_cost_p () && use->next)
     {
       first = true;
       sub_use = use->next;
@@ -5129,7 +5124,7 @@ determine_use_iv_cost_address (struct ivopts_data *data,
 	      first = false;
 	      sub_cost = get_computation_cost (data, sub_use, cand, true,
 					       NULL, &can_autoinc, NULL);
-	      if (infinite_cost_p (sub_cost))
+	      if (sub_cost.infinite_cost_p ())
 		{
 		  cost = infinite_cost;
 		  break;
@@ -5145,7 +5140,7 @@ determine_use_iv_cost_address (struct ivopts_data *data,
   set_use_iv_cost (data, use, cand, cost, depends_on, NULL_TREE, ERROR_MARK,
                    inv_expr_id);
 
-  return !infinite_cost_p (cost);
+  return !cost.infinite_cost_p ();
 }
 
 /* Computes value of candidate CAND at position AT in iteration NITER, and
@@ -5612,7 +5607,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
      TODO: The constant that we're subtracting from the cost should
      be target-dependent.  This information should be added to the
      target costs for each backend.  */
-  if (!infinite_cost_p (elim_cost) /* Do not try to decrease infinite! */
+  if (!elim_cost.infinite_cost_p () /* Do not try to decrease infinite! */
       && integer_zerop (*bound_cst)
       && (operand_equal_p (*control_var, cand->var_after, 0)
 	  || operand_equal_p (*control_var, cand->var_before, 0)))
@@ -5657,7 +5652,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
   if (depends_on_express)
     BITMAP_FREE (depends_on_express);
 
-  return !infinite_cost_p (cost);
+  return !cost.infinite_cost_p ();
 }
 
 /* Determines cost of basing replacement of USE on CAND.  Returns false
@@ -5702,7 +5697,7 @@ autoinc_possible_for_pair (struct ivopts_data *data, struct iv_use *use,
 
   BITMAP_FREE (depends_on);
 
-  return !infinite_cost_p (cost) && can_autoinc;
+  return !cost.infinite_cost_p () && can_autoinc;
 }
 
 /* Examine IP_ORIGINAL candidates to see if they are incremented next to a
@@ -5826,7 +5821,7 @@ determine_use_iv_costs (struct ivopts_data *data)
 	  for (j = 0; j < use->n_map_members; j++)
 	    {
 	      if (!use->cost_map[j].cand
-		  || infinite_cost_p (use->cost_map[j].cost))
+		  || use->cost_map[j].cost.infinite_cost_p ())
 		continue;
 
 	      fprintf (dump_file, "  %d\t%d\t%d\t",
@@ -6789,7 +6784,7 @@ try_add_cand_for (struct ivopts_data *data, struct iv_ca *ivs,
 	iv_ca_delta_free (&act_delta);
     }
 
-  if (infinite_cost_p (best_cost))
+  if (best_cost.infinite_cost_p ())
     {
       for (i = 0; i < use->n_map_members; i++)
 	{
@@ -6833,7 +6828,7 @@ try_add_cand_for (struct ivopts_data *data, struct iv_ca *ivs,
   iv_ca_delta_commit (data, ivs, best_delta, true);
   iv_ca_delta_free (&best_delta);
 
-  return !infinite_cost_p (best_cost);
+  return !best_cost.infinite_cost_p ();
 }
 
 /* Finds an initial assignment of candidates to uses.  */
