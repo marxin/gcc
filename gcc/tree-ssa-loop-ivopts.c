@@ -211,6 +211,24 @@ struct comp_cost
       return *this;
     }
 
+  friend bool operator< (comp_cost cost1, comp_cost cost2)
+  {
+    if (cost1.cost == cost2.cost)
+      return cost1.complexity < cost2.complexity;
+
+    return cost1.cost < cost2.cost;
+  }
+
+  friend bool operator== (comp_cost cost1, comp_cost cost2)
+  {
+    return cost1.cost == cost2.cost && cost1.complexity == cost2.complexity;
+  }
+
+  friend bool operator<= (comp_cost cost1, comp_cost cost2)
+    {
+      return cost1 < cost2 || cost1 == cost2;
+    }
+
   int cost;		/* The runtime cost.  */
   unsigned complexity;	/* The estimate of the complexity of the code for
 			   the computation (in no concrete units --
@@ -3419,18 +3437,6 @@ alloc_use_cost_map (struct ivopts_data *data)
     }
 }
 
-/* Returns a negative number if COST1 < COST2, a positive number if
-   COST1 > COST2, and 0 if COST1 = COST2.  */
-
-static int
-compare_costs (comp_cost cost1, comp_cost cost2)
-{
-  if (cost1.cost == cost2.cost)
-    return cost1.complexity - cost2.complexity;
-
-  return cost1.cost - cost2.cost;
-}
-
 /* Sets cost of (USE, CANDIDATE) pair to COST and record that it depends
    on invariants DEPENDS_ON and that the value used in expressing it
    is VALUE, and in case of iv elimination the comparison operator is COMP.  */
@@ -5635,7 +5641,7 @@ determine_use_iv_cost_condition (struct ivopts_data *data,
   express_cost.cost += bound_cost.cost;
 
   /* Choose the better approach, preferring the eliminated IV. */
-  if (compare_costs (elim_cost, express_cost) <= 0)
+  if (elim_cost <= express_cost)
     {
       cost = elim_cost;
       depends_on = depends_on_elim;
@@ -5999,19 +6005,16 @@ determine_set_costs (struct ivopts_data *data)
 static bool
 cheaper_cost_pair (struct cost_pair *a, struct cost_pair *b)
 {
-  int cmp;
-
   if (!a)
     return false;
 
   if (!b)
     return true;
 
-  cmp = compare_costs (a->cost, b->cost);
-  if (cmp < 0)
+  if (a->cost < b->cost)
     return true;
 
-  if (cmp > 0)
+  if (b->cost < a->cost)
     return false;
 
   /* In case the costs are the same, prefer the cheaper candidate.  */
@@ -6522,7 +6525,7 @@ iv_ca_narrow (struct ivopts_data *data, struct iv_ca *ivs,
 	      iv_ca_set_cp (data, ivs, use, cp);
 	      acost = iv_ca_cost (ivs);
 
-	      if (compare_costs (acost, best_cost) < 0)
+	      if (acost < best_cost)
 		{
 		  best_cost = acost;
 		  new_cp = cp;
@@ -6545,7 +6548,7 @@ iv_ca_narrow (struct ivopts_data *data, struct iv_ca *ivs,
 	      iv_ca_set_cp (data, ivs, use, cp);
 	      acost = iv_ca_cost (ivs);
 
-	      if (compare_costs (acost, best_cost) < 0)
+	      if (acost < best_cost)
 		{
 		  best_cost = acost;
 		  new_cp = cp;
@@ -6597,7 +6600,7 @@ iv_ca_prune (struct ivopts_data *data, struct iv_ca *ivs,
 
       acost = iv_ca_narrow (data, ivs, cand, except_cand, &act_delta);
 
-      if (compare_costs (acost, best_cost) < 0)
+      if (acost < best_cost)
 	{
 	  best_cost = acost;
 	  iv_ca_delta_free (&best_delta);
@@ -6711,7 +6714,7 @@ iv_ca_replace (struct ivopts_data *data, struct iv_ca *ivs,
       iv_ca_delta_commit (data, ivs, act_delta, false);
       act_delta = iv_ca_delta_join (act_delta, tmp_delta);
 
-      if (compare_costs (acost, orig_cost) < 0)
+      if (acost < orig_cost)
 	{
 	  *delta = act_delta;
 	  return acost;
@@ -6780,7 +6783,7 @@ try_add_cand_for (struct ivopts_data *data, struct iv_ca *ivs,
       iv_ca_set_no_cp (data, ivs, use);
       act_delta = iv_ca_delta_add (use, NULL, cp, act_delta);
 
-      if (compare_costs (act_cost, best_cost) < 0)
+      if (act_cost < best_cost)
 	{
 	  best_cost = act_cost;
 
@@ -6819,7 +6822,7 @@ try_add_cand_for (struct ivopts_data *data, struct iv_ca *ivs,
 	  act_delta = iv_ca_delta_add (use, iv_ca_cand_for_use (ivs, use),
 				       cp, act_delta);
 
-	  if (compare_costs (act_cost, best_cost) < 0)
+	  if (act_cost < best_cost)
 	    {
 	      best_cost = act_cost;
 
@@ -6891,7 +6894,7 @@ try_improve_iv_set (struct ivopts_data *data,
 	  act_delta = iv_ca_delta_join (act_delta, tmp_delta);
 	}
 
-      if (compare_costs (acost, best_cost) < 0)
+      if (acost < best_cost)
 	{
 	  best_cost = acost;
 	  iv_ca_delta_free (&best_delta);
@@ -6925,7 +6928,7 @@ try_improve_iv_set (struct ivopts_data *data,
     }
 
   iv_ca_delta_commit (data, ivs, best_delta, true);
-  gcc_assert (compare_costs (best_cost, iv_ca_cost (ivs)) == 0);
+  gcc_assert (best_cost == iv_ca_cost (ivs));
   iv_ca_delta_free (&best_delta);
   return true;
 }
@@ -6996,7 +6999,7 @@ find_optimal_iv_set (struct ivopts_data *data)
     }
 
   /* Choose the one with the best cost.  */
-  if (compare_costs (origcost, cost) <= 0)
+  if (origcost <= cost)
     {
       if (set)
 	iv_ca_free (&set);
