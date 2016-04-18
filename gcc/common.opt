@@ -1116,7 +1116,7 @@ Common Report Var(flag_delete_dead_exceptions) Init(0) Optimization
 Delete dead instructions that may throw exceptions.
 
 fdelete-null-pointer-checks
-Common Report Var(flag_delete_null_pointer_checks) Init(-1) Optimization
+Common Report Var(flag_delete_null_pointer_checks) Init(0) Optimization
 Delete useless null pointer checks.
 
 fdevirtualize-at-ltrans
@@ -1831,6 +1831,10 @@ fpeel-loops
 Common Report Var(flag_peel_loops) Optimization
 Perform loop peeling.
 
+fpeel-all-loops
+Common Report Var(flag_peel_all_loops) Optimization
+Perform loop peeling of all loops.
+
 fpeephole
 Common Report Var(flag_no_peephole,0) Optimization
 Enable machine specific peephole optimizations.
@@ -2066,7 +2070,7 @@ Common Report Var(flag_sel_sched_reschedule_pipelined) Init(0) Optimization
 Reschedule pipelined regions without pipelining.
 
 fsemantic-interposition
-Common Report Var(flag_semantic_interposition) Init(1)
+Common Report Var(flag_semantic_interposition) Init(0)
 Allow interposing function (or variables) by ones with different semantics (or initializer) respectively by dynamic linker.
 
 ; sched_stalled_insns means that insns can be moved prematurely from the queue

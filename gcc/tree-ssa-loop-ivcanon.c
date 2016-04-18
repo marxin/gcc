@@ -935,7 +935,7 @@ try_peel_loop (struct loop *loop,
 	       edge exit, tree niter,
 	       HOST_WIDE_INT maxiter)
 {
-  HOST_WIDE_INT npeel;
+  int npeel;
   struct loop_size size;
   int peeled_size;
   sbitmap wont_exit;
