@@ -3640,7 +3640,11 @@ gimple_check_call_args (gimple *stmt, tree fndecl, bool args_count_match)
 	      || arg == error_mark_node
 	      || TREE_CODE (TREE_VALUE (p)) == VOID_TYPE
 	      || (!types_compatible_p (TREE_VALUE (p), TREE_TYPE (arg))
-		  && !fold_convertible_p (TREE_VALUE (p), arg)))
+		  && !fold_convertible_p (TREE_VALUE (p), arg)
+		  /* Match also possible passing by reference.  */
+		  && (!POINTER_TYPE_P (TREE_TYPE (arg))
+		      || !types_compatible_p (TREE_VALUE (p),
+					      TREE_TYPE (TREE_TYPE (arg))))))
             return false;
 	}
     }
