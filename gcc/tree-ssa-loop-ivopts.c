@@ -107,6 +107,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-address.h"
 #include "builtins.h"
 #include "tree-vectorizer.h"
+#include "sreal.h"
 
 /* FIXME: Expressions are expanded to RTL in this pass to determine the
    cost of different addressing modes.  This should be moved to a TBD
@@ -173,11 +174,13 @@ enum use_type
 /* Cost of a computation.  */
 struct comp_cost
 {
-  comp_cost (): m_cost (0), m_complexity (0), m_scratch (0)
+  comp_cost (): m_cost (0), m_complexity (0), m_scratch (0),
+    m_frequency (sreal (0)), m_cost_scaled (sreal (0))
   {}
 
   comp_cost (int cost, unsigned complexity)
-    : m_cost (cost), m_complexity (complexity), m_scratch (0)
+    : m_cost (cost), m_complexity (complexity), m_scratch (0),
+      m_frequency (sreal (0)), m_cost_scaled (sreal (0))
   {}
 
   comp_cost& operator= (const comp_cost& other);
@@ -236,6 +239,26 @@ struct comp_cost
   /* Set the scratch to S.  */
   void set_scratch (unsigned s);
 
+  /* Return scaled cost.  */
+  double get_cost_scaled ();
+
+  /* Calculate scaled cost based on frequency of a basic block with
+     frequency equal to NOMINATOR / DENOMINATOR.  */
+  void calculate_scaled_cost (int nominator, int denominator);
+
+  /* Propagate scaled cost which is based on frequency of basic block
+     the cost belongs to.  */
+  void propagate_scaled_cost ();
+
+  /* Return frequency of the cost.  */
+  double get_frequency ();
+
+  /* Scale COST by frequency of the cost.  */
+  const sreal scale_cost (int cost);
+
+  /* Return true if the frequency has a valid value.  */
+  bool has_frequency ();
+
   /* Return infinite comp_cost.  */
   static comp_cost get_infinite ();
 
@@ -249,6 +272,9 @@ private:
 			     complexity field should be larger for more
 			     complex expressions and addressing modes).  */
   int m_scratch;	  /* Scratch used during cost computation.  */
+  sreal m_frequency;	  /* Frequency of the basic block this comp_cost
+			     belongs to.  */
+  sreal m_cost_scaled;	  /* Scalled runtime cost.  */
 };
 
 comp_cost&
@@ -257,6 +283,8 @@ comp_cost::operator= (const comp_cost& other)
   m_cost = other.m_cost;
   m_complexity = other.m_complexity;
   m_scratch = other.m_scratch;
+  m_frequency = other.m_frequency;
+  m_cost_scaled = other.m_cost_scaled;
 
   return *this;
 }
@@ -275,6 +303,7 @@ operator+ (comp_cost cost1, comp_cost cost2)
 
   cost1.m_cost += cost2.m_cost;
   cost1.m_complexity += cost2.m_complexity;
+  cost1.m_cost_scaled += cost2.m_cost_scaled;
 
   return cost1;
 }
@@ -290,6 +319,8 @@ comp_cost
 comp_cost::operator+= (HOST_WIDE_INT c)
 {
   this->m_cost += c;
+  if (has_frequency ())
+    this->m_cost_scaled += scale_cost (c);
 
   return *this;
 }
@@ -298,6 +329,8 @@ comp_cost
 comp_cost::operator-= (HOST_WIDE_INT c)
 {
   this->m_cost -= c;
+  if (has_frequency ())
+    this->m_cost_scaled -= scale_cost (c);
 
   return *this;
 }
@@ -306,6 +339,8 @@ comp_cost
 comp_cost::operator/= (HOST_WIDE_INT c)
 {
   this->m_cost /= c;
+  if (has_frequency ())
+    this->m_cost_scaled /= scale_cost (c);
 
   return *this;
 }
@@ -314,6 +349,8 @@ comp_cost
 comp_cost::operator*= (HOST_WIDE_INT c)
 {
   this->m_cost *= c;
+  if (has_frequency ())
+    this->m_cost_scaled *= scale_cost (c);
 
   return *this;
 }
@@ -323,6 +360,7 @@ operator- (comp_cost cost1, comp_cost cost2)
 {
   cost1.m_cost -= cost2.m_cost;
   cost1.m_complexity -= cost2.m_complexity;
+  cost1.m_cost_scaled -= cost2.m_cost_scaled;
 
   return cost1;
 }
@@ -366,6 +404,7 @@ void
 comp_cost::set_cost (int c)
 {
   m_cost = c;
+  m_cost_scaled = scale_cost (c);
 }
 
 unsigned
@@ -390,6 +429,48 @@ void
 comp_cost::set_scratch (unsigned s)
 {
   m_scratch = s;
+}
+
+double
+comp_cost::get_cost_scaled ()
+{
+  return m_cost_scaled.to_double ();
+}
+
+void
+comp_cost::calculate_scaled_cost (int nominator, int denominator)
+{
+  m_frequency = denominator == 0
+    ? sreal (1) : sreal (nominator) / sreal (denominator);
+
+  m_cost_scaled = scale_cost (m_cost);
+}
+
+void
+comp_cost::propagate_scaled_cost ()
+{
+  if (m_cost < 0)
+    return;
+
+  m_cost = m_cost_scaled.to_int ();
+}
+
+double
+comp_cost::get_frequency ()
+{
+  return m_frequency.to_double ();
+}
+
+const sreal
+comp_cost::scale_cost (int cost)
+{
+  return m_frequency * cost;
+}
+
+bool
+comp_cost::has_frequency ()
+{
+  return m_frequency != sreal (0);
 }
 
 comp_cost
@@ -5022,18 +5103,21 @@ get_computation_cost_at (struct ivopts_data *data,
      (symbol/var1/const parts may be omitted).  If we are looking for an
      address, find the cost of addressing this.  */
   if (address_p)
-    return cost + get_address_cost (symbol_present, var_present,
-				    offset, ratio, cstepi,
-				    mem_mode,
-				    TYPE_ADDR_SPACE (TREE_TYPE (utype)),
-				    speed, stmt_is_after_inc, can_autoinc);
+    {
+      cost += get_address_cost (symbol_present, var_present,
+				offset, ratio, cstepi,
+				mem_mode,
+				TYPE_ADDR_SPACE (TREE_TYPE (utype)),
+				speed, stmt_is_after_inc, can_autoinc);
+      goto ret;
+    }
 
   /* Otherwise estimate the costs for computing the expression.  */
   if (!symbol_present && !var_present && !offset)
     {
       if (ratio != 1)
 	cost += mult_by_coeff_cost (ratio, TYPE_MODE (ctype), speed);
-      return cost;
+      goto ret;
     }
 
   /* Symbol + offset should be compile-time computable so consider that they
@@ -5052,7 +5136,8 @@ get_computation_cost_at (struct ivopts_data *data,
   aratio = ratio > 0 ? ratio : -ratio;
   if (aratio != 1)
     cost += mult_by_coeff_cost (aratio, TYPE_MODE (ctype), speed);
-  return cost;
+
+  goto ret;
 
 fallback:
   if (can_autoinc)
@@ -5068,8 +5153,13 @@ fallback:
     if (address_p)
       comp = build_simple_mem_ref (comp);
 
-    return comp_cost (computation_cost (comp, speed), 0);
+    cost = comp_cost (computation_cost (comp, speed), 0);
   }
+
+ret:
+  cost.calculate_scaled_cost (at->bb->frequency,
+			      data->current_loop->header->frequency);
+  return cost;
 }
 
 /* Determines the cost of the computation by that USE is expressed
@@ -5879,16 +5969,19 @@ determine_group_iv_costs (struct ivopts_data *data)
 	  group = data->vgroups[i];
 
 	  fprintf (dump_file, "Group %d:\n", i);
-	  fprintf (dump_file, "  cand\tcost\tcompl.\tdepends on\n");
+	  fprintf (dump_file, "  cand\tcost\tscaled\tfreq\tcompl.\t"
+		   "depends on\n");
 	  for (j = 0; j < group->n_map_members; j++)
 	    {
 	      if (!group->cost_map[j].cand
 		  || group->cost_map[j].cost.infinite_cost_p ())
 		continue;
 
-	      fprintf (dump_file, "  %d\t%d\t%d\t",
+	      fprintf (dump_file, "  %d\t%d\t%2.2f\t%2.2f%d\t",
 		       group->cost_map[j].cand->id,
 		       group->cost_map[j].cost.get_cost (),
+		       group->cost_map[j].cost.get_cost_scaled (),
+		       group->cost_map[j].cost.get_frequency (),
 		       group->cost_map[j].cost.get_complexity ());
 	      if (group->cost_map[j].depends_on)
 		bitmap_print (dump_file,
@@ -5902,6 +5995,19 @@ determine_group_iv_costs (struct ivopts_data *data)
 	  fprintf (dump_file, "\n");
 	}
       fprintf (dump_file, "\n");
+    }
+
+  for (i = 0; i < data->vgroups.length (); i++)
+    {
+      group = data->vgroups[i];
+      for (j = 0; j < group->n_map_members; j++)
+	{
+	  if (!group->cost_map[j].cand
+	      || group->cost_map[j].cost.infinite_cost_p ())
+	    continue;
+
+	  group->cost_map[j].cost.propagate_scaled_cost ();
+	}
     }
 }
 
