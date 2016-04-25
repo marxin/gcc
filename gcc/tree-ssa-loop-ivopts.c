@@ -666,6 +666,9 @@ struct ivopts_data
   /* The maximum invariant expression id.  */
   int max_inv_expr_id;
 
+  /* Dictionary of inv_expr with id used as a key.  */
+  vec<iv_inv_expr_ent *> inv_expr_map;
+
   /* The bitmap of indices in version_info whose value was changed.  */
   bitmap relevant;
 
@@ -1186,6 +1189,7 @@ tree_ssa_iv_optimize_init (struct ivopts_data *data)
   data->important_candidates = BITMAP_ALLOC (NULL);
   data->max_inv_id = 0;
   data->niters = NULL;
+  data->inv_expr_map.create (20);
   data->vgroups.create (20);
   data->vcands.create (20);
   data->inv_expr_tab = new hash_table<iv_inv_expr_hasher> (10);
@@ -4812,6 +4816,12 @@ get_expr_id (struct ivopts_data *data, tree expr)
   (*slot)->expr = expr;
   (*slot)->hash = ent.hash;
   (*slot)->id = data->max_inv_expr_id++;
+
+  unsigned id = (*slot)->id;
+  if (id + 1 >= data->inv_expr_map.length ())
+    data->inv_expr_map.safe_grow (id + 1);
+  data->inv_expr_map[id] = *slot;
+
   return (*slot)->id;
 }
 
@@ -6591,6 +6601,20 @@ iv_ca_dump (struct ivopts_data *data, FILE *file, struct iv_ca *ivs)
 	fprintf (file, "%s%d", pref, i);
 	pref = ", ";
       }
+
+  if (ivs->num_used_inv_expr)
+    {
+      fprintf (dump_file, "\n  used invariant expressions:\n");
+      for (int i = 0; i <= data->max_inv_expr_id; i++)
+	if (ivs->used_inv_expr[i])
+	  {
+	    fprintf (dump_file, "   inv_expr:%d: \t", i);
+	    print_generic_expr (dump_file, data->inv_expr_map[i]->expr,
+				TDF_SLIM);
+	    fprintf (dump_file, "\n");
+	  }
+    }
+
   fprintf (file, "\n\n");
 }
 
@@ -7252,6 +7276,9 @@ create_new_ivs (struct ivopts_data *data, struct iv_ca *set)
       if (data->loop_loc != UNKNOWN_LOCATION)
 	fprintf (dump_file, " at %s:%d", LOCATION_FILE (data->loop_loc),
 		 LOCATION_LINE (data->loop_loc));
+      fprintf (dump_file, ", %lu avg niters",
+	       avg_loop_niter (data->current_loop));
+      fprintf (dump_file, ", %u expressions:", set->num_used_inv_expr);
       fprintf (dump_file, ", %lu IVs:\n", bitmap_count_bits (set->cands));
       EXECUTE_IF_SET_IN_BITMAP (set->cands, 0, i, bi)
         {
@@ -7821,6 +7848,7 @@ tree_ssa_iv_optimize_finalize (struct ivopts_data *data)
   BITMAP_FREE (data->important_candidates);
 
   decl_rtl_to_reset.release ();
+  data->inv_expr_map.release ();
   data->vgroups.release ();
   data->vcands.release ();
   delete data->inv_expr_tab;
