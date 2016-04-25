@@ -139,6 +139,8 @@ DEF_PREDICTOR (PRED_HOT_LABEL, "hot label", HITRATE (85), 0)
 DEF_PREDICTOR (PRED_COLD_LABEL, "cold label", PROB_VERY_LIKELY,
 	       PRED_FLAG_FIRST_MATCH)
 
+DEF_PREDICTOR (PRED_LOOP_GUARD, "loop guard",
+	       HITRATE (80), 0)
 
 /* The following predictors are used in Fortran. */
 

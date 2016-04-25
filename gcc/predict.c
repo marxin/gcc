@@ -63,7 +63,9 @@ static sreal real_almost_one, real_br_prob_base,
 static void combine_predictions_for_insn (rtx_insn *, basic_block);
 static void dump_prediction (FILE *, enum br_predictor, int, basic_block, int);
 static void predict_paths_leading_to (basic_block, enum br_predictor, enum prediction);
-static void predict_paths_leading_to_edge (edge, enum br_predictor, enum prediction);
+static void predict_paths_leading_to_edge (edge, enum br_predictor,
+					   enum prediction,
+					   struct loop *in_loop = NULL);
 static bool can_predict_insn_p (const rtx_insn *);
 
 /* Information we hold about each branch predictor.
@@ -1626,6 +1628,22 @@ predict_loops (void)
 				   tree_to_shwi (loop_bound_step));
 	}
 
+	/* In the following code
+	   for (loop1)
+	     if (cond)
+	       for (loop2)
+	   guess that cond is unlikely.  */
+	struct loop *outer_loop = loop_outer (loop);
+	basic_block header = outer_loop->header;
+
+	if (loop_outer (loop)->num
+	    && !dominated_by_p (CDI_POST_DOMINATORS, header, loop->header)
+	    && loop_depth (loop) >= 4)
+	  {
+	    edge e = loop_preheader_edge (loop);
+	    predict_paths_leading_to_edge (e, PRED_LOOP_GUARD, NOT_TAKEN);
+	  }
+
       /* Free basic blocks from get_loop_body.  */
       free (bbs);
     }
@@ -2375,11 +2393,15 @@ static void
 predict_paths_for_bb (basic_block cur, basic_block bb,
 		      enum br_predictor pred,
 		      enum prediction taken,
-		      bitmap visited)
+		      bitmap visited, struct loop *in_loop = NULL)
 {
   edge e;
   edge_iterator ei;
   basic_block son;
+
+  /* If basic block is unconditional in the loop, there is nothing to do.  */
+  if (in_loop && dominated_by_p (CDI_POST_DOMINATORS, cur, in_loop->header))
+    return;
 
   /* We are looking for all edges forming edge cut induced by
      set of all blocks postdominated by BB.  */
@@ -2441,7 +2463,7 @@ predict_paths_leading_to (basic_block bb, enum br_predictor pred,
 
 static void
 predict_paths_leading_to_edge (edge e, enum br_predictor pred,
-			       enum prediction taken)
+			       enum prediction taken, struct loop *in_loop)
 {
   bool has_nonloop_edge = false;
   edge_iterator ei;
@@ -2459,7 +2481,7 @@ predict_paths_leading_to_edge (edge e, enum br_predictor pred,
   if (!has_nonloop_edge)
     {
       bitmap visited = BITMAP_ALLOC (NULL);
-      predict_paths_for_bb (bb, bb, pred, taken, visited);
+      predict_paths_for_bb (bb, bb, pred, taken, visited, in_loop);
       BITMAP_FREE (visited);
     }
   else
