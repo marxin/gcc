@@ -62,6 +62,9 @@ struct hsa_runtime_fn_info
      void (*callback)(hsa_status_t status, hsa_queue_t *source, void *data),
      void *data, uint32_t private_segment_size,
      uint32_t group_segment_size, hsa_queue_t **queue);
+  hsa_status_t (*hsa_soft_queue_create_fn)
+    (hsa_region_t region, uint32_t size, hsa_queue_type_t type,
+     uint32_t features, hsa_signal_t doorbell_signal, hsa_queue_t **queue);
   hsa_status_t (*hsa_agent_iterate_regions_fn)
     (hsa_agent_t agent,
      hsa_status_t (*callback)(hsa_region_t region, void *data), void *data);
@@ -94,6 +97,8 @@ struct hsa_runtime_fn_info
   uint64_t (*hsa_queue_add_write_index_release_fn) (const hsa_queue_t *queue,
 						    uint64_t value);
   uint64_t (*hsa_queue_load_read_index_acquire_fn) (const hsa_queue_t *queue);
+  uint64_t (*hsa_queue_load_read_index_relaxed_fn) (const hsa_queue_t *queue);
+  uint64_t (*hsa_queue_load_write_index_relaxed_fn) (const hsa_queue_t *queue);
   void (*hsa_signal_store_relaxed_fn) (hsa_signal_t signal,
 				       hsa_signal_value_t value);
   void (*hsa_signal_store_release_fn) (hsa_signal_t signal,
@@ -404,8 +409,10 @@ struct agent_info
   hsa_queue_t *command_q;
   /* Kernel from kernel dispatch command queue.  */
   hsa_queue_t *kernel_dispatch_command_q;
+  hsa_signal_t host_command_queue_signal;
   /* The HSA memory region from which to allocate kernel arguments.  */
   hsa_region_t kernarg_region;
+  hsa_region_t global_region;
 
   /* Read-write lock that protects kernels which are running or about to be run
      from interference with loading and unloading of images.  Needs to be
@@ -467,6 +474,7 @@ init_hsa_runtime_functions (void)
   DLSYM_FN (hsa_iterate_agents)
   DLSYM_FN (hsa_region_get_info)
   DLSYM_FN (hsa_queue_create)
+  DLSYM_FN (hsa_soft_queue_create)
   DLSYM_FN (hsa_agent_iterate_regions)
   DLSYM_FN (hsa_executable_destroy)
   DLSYM_FN (hsa_executable_create)
@@ -481,6 +489,8 @@ init_hsa_runtime_functions (void)
   DLSYM_FN (hsa_executable_symbol_get_info)
   DLSYM_FN (hsa_queue_add_write_index_release)
   DLSYM_FN (hsa_queue_load_read_index_acquire)
+  DLSYM_FN (hsa_queue_load_write_index_relaxed)
+  DLSYM_FN (hsa_queue_load_read_index_relaxed)
   DLSYM_FN (hsa_signal_wait_acquire)
   DLSYM_FN (hsa_signal_store_relaxed)
   DLSYM_FN (hsa_signal_store_release)
@@ -629,6 +639,33 @@ queue_callback (hsa_status_t status,
    DATA and break the query.  */
 
 static hsa_status_t
+get_fine_grained_memory_region (hsa_region_t region, void *data)
+{
+  hsa_status_t status;
+  hsa_region_segment_t segment;
+
+  status = hsa_fns.hsa_region_get_info_fn (region, HSA_REGION_INFO_SEGMENT,
+					   &segment);
+  if (status != HSA_STATUS_SUCCESS)
+    return status;
+  if (segment != HSA_REGION_SEGMENT_GLOBAL)
+    return HSA_STATUS_SUCCESS;
+
+  uint32_t flags;
+  status = hsa_fns.hsa_region_get_info_fn (region, HSA_REGION_INFO_GLOBAL_FLAGS,
+					   &flags);
+  if (status != HSA_STATUS_SUCCESS)
+    return status;
+  if (flags & HSA_REGION_GLOBAL_FLAG_FINE_GRAINED)
+    {
+      hsa_region_t *ret = (hsa_region_t *) data;
+      *ret = region;
+      return HSA_STATUS_INFO_BREAK;
+    }
+  return HSA_STATUS_SUCCESS;
+}
+
+static hsa_status_t
 get_kernarg_memory_region (hsa_region_t region, void *data)
 {
   hsa_status_t status;
@@ -654,6 +691,7 @@ get_kernarg_memory_region (hsa_region_t region, void *data)
     }
   return HSA_STATUS_SUCCESS;
 }
+
 
 /* Part of the libgomp plugin interface.  Return the number of HSA devices on
    the system.  */
@@ -703,11 +741,20 @@ GOMP_OFFLOAD_init_device (int n)
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Error creating command queue", status);
 
+  status = hsa_fns.hsa_signal_create_fn (1, 0, NULL,
+					 &agent->host_command_queue_signal);
+  if (status != HSA_STATUS_SUCCESS)
+    hsa_fatal ("Error creating the HSA host queue signal", status);
+
+
+  /*
   status = hsa_fns.hsa_queue_create_fn (agent->id, queue_size,
 					HSA_QUEUE_TYPE_MULTI,
 					queue_callback, NULL, UINT32_MAX,
 					UINT32_MAX,
 					&agent->kernel_dispatch_command_q);
+					*/
+
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Error creating kernel dispatch command queue", status);
 
@@ -718,6 +765,21 @@ GOMP_OFFLOAD_init_device (int n)
   if (agent->kernarg_region.handle == (uint64_t) -1)
     GOMP_PLUGIN_fatal ("Could not find suitable memory region for kernel "
 		       "arguments");
+  agent->global_region.handle = (uint64_t) -1;
+  status = hsa_fns.hsa_agent_iterate_regions_fn (agent->id,
+						 get_fine_grained_memory_region,
+						 &agent->global_region);
+  if (agent->global_region.handle == (uint64_t) -1)
+    GOMP_PLUGIN_fatal ("Could not find suitable memory region for kernel "
+		       "arguments");
+
+  status = hsa_fns.hsa_soft_queue_create_fn (agent->global_region,
+					     128, HSA_QUEUE_TYPE_MULTI,
+					     HSA_QUEUE_FEATURE_AGENT_DISPATCH,
+					     agent->host_command_queue_signal,
+					     &agent->kernel_dispatch_command_q);
+
+
   HSA_DEBUG ("HSA agent initialized, queue has id %llu\n",
 	     (long long unsigned) agent->command_q->id);
   HSA_DEBUG ("HSA agent initialized, kernel dispatch queue has id %llu\n",
@@ -1514,11 +1576,30 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars, void **args)
      limitation will be resolved, this workaround can be removed.  */
 
   HSA_DEBUG ("Kernel dispatched, waiting for completion\n");
+  index = hsa_fns.hsa_queue_load_write_index_relaxed_fn(agent->kernel_dispatch_command_q);
+  HSA_DEBUG ("Soft queue write index before: %ld\n", index);
 
   /* Root signal waits with 1ms timeout.  */
   while (hsa_fns.hsa_signal_wait_acquire_fn (s, HSA_SIGNAL_CONDITION_LT, 1,
-					     1000 * 1000,
+					     1000 * 1000 * 1000,
 					     HSA_WAIT_STATE_BLOCKED) != 0)
+    {
+      index = hsa_fns.hsa_queue_load_write_index_relaxed_fn(agent->kernel_dispatch_command_q);
+      HSA_DEBUG ("Soft queue write index: %ld\n", index);
+
+      if (index >= 1)
+	{
+	  packet = (((hsa_kernel_dispatch_packet_t *)
+		    agent->kernel_dispatch_command_q->base_address) + (index - 1));
+	  HSA_DEBUG ("kernel object in kernel_dispatch_command_q: %ld,"
+		     "kern_arg_addr: %p, signal: %ld\n",
+		     packet->kernel_object, packet->kernarg_address,
+		     packet->completion_signal.handle);
+	  hsa_fns.hsa_signal_store_release_fn (packet->completion_signal,
+				    0);
+
+	}
+
     for (unsigned i = 0; i < shadow->kernel_dispatch_count; i++)
       {
 	hsa_signal_t child_s;
@@ -1528,6 +1609,7 @@ GOMP_OFFLOAD_run (int n, void *fn_ptr, void *vars, void **args)
 		   shadow->children_dispatches[i]->signal);
 	hsa_fns.hsa_signal_load_acquire_fn (child_s);
       }
+    }
 
   release_kernel_dispatch (shadow);
 
