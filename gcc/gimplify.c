@@ -59,6 +59,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-walk.h"
 #include "langhooks-def.h"	/* FIXME: for lhd_set_decl_assembler_name */
 #include "builtins.h"
+#include "params.h"
+#include "asan.h"
+
+/* Hash set of poisoned variables in a bind expr.  */
+static hash_set <tree> asan_poisoned_variables (13);
 
 enum gimplify_omp_var_data
 {
@@ -1075,6 +1080,29 @@ build_stack_save_restore (gcall **save, gcall **restore)
 			 1, tmp_var);
 }
 
+/* Generate IFN_ASAN_MARK internal call that depending on POISON flag
+   either poisons or unpoisons a DECL.  Created statement is appended
+   to SEQ_P gimple sequence.  */
+
+static void
+asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
+{
+  /* When within an OMP context, do not emit ASAN_MARK internal fns.  */
+  if (gimplify_omp_ctxp)
+    return;
+
+  tree unit_size = DECL_SIZE_UNIT (decl);
+  tree base = build_fold_addr_expr (decl);
+
+  HOST_WIDE_INT flags = poison ? ASAN_MARK_CLOBBER : ASAN_MARK_UNCLOBBER;
+
+  gimplify_seq_add_stmt
+    (seq_p, gimple_build_call_internal (IFN_ASAN_MARK, 3,
+					build_int_cst (integer_type_node,
+						       flags),
+					base, unit_size));
+}
+
 /* Gimplify a BIND_EXPR.  Just voidify and recurse.  */
 
 static enum gimplify_status
@@ -1177,6 +1205,10 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
   /* Add clobbers for all variables that go out of scope.  */
   for (t = BIND_EXPR_VARS (bind_expr); t ; t = DECL_CHAIN (t))
     {
+      if (asan_sanitize_use_after_scope ()
+	  && asan_poisoned_variables.contains (t))
+	asan_poisoned_variables.remove (t);
+
       if (TREE_CODE (t) == VAR_DECL
 	  && !is_global_var (t)
 	  && DECL_CONTEXT (t) == current_function_decl
@@ -1185,17 +1217,25 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  && !DECL_HAS_VALUE_EXPR_P (t)
 	  /* Only care for variables that have to be in memory.  Others
 	     will be rewritten into SSA names, hence moved to the top-level.  */
-	  && !is_gimple_reg (t)
-	  && flag_stack_reuse != SR_NONE)
+	  && !is_gimple_reg (t))
 	{
-	  tree clobber = build_constructor (TREE_TYPE (t), NULL);
-	  gimple *clobber_stmt;
-	  TREE_THIS_VOLATILE (clobber) = 1;
-	  clobber_stmt = gimple_build_assign (t, clobber);
-	  gimple_set_location (clobber_stmt, end_locus);
-	  gimplify_seq_add_stmt (&cleanup, clobber_stmt);
+	  if (flag_stack_reuse != SR_NONE)
+	    {
+	      tree clobber = build_constructor (TREE_TYPE (t), NULL);
+	      gimple *clobber_stmt;
+	      TREE_THIS_VOLATILE (clobber) = 1;
+	      clobber_stmt = gimple_build_assign (t, clobber);
+	      gimple_set_location (clobber_stmt, end_locus);
+	      gimplify_seq_add_stmt (&cleanup, clobber_stmt);
+	    }
 
-	  if (flag_openacc && oacc_declare_returns != NULL)
+	  if (asan_sanitize_use_after_scope ()
+	      && !asan_no_sanitize_address_p ())
+	      asan_poison_variable (t, true, &cleanup);
+
+	  if (flag_stack_reuse != SR_NONE
+	      && flag_openacc
+	      && oacc_declare_returns != NULL)
 	    {
 	      tree *c = oacc_declare_returns->get (t);
 	      if (c != NULL)
@@ -1466,6 +1506,21 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 	      && compare_tree_int (DECL_SIZE_UNIT (decl),
 				   STACK_CHECK_MAX_VAR_SIZE) > 0))
 	gimplify_vla_decl (decl, seq_p);
+
+      tree unit_size = DECL_SIZE_UNIT (decl);
+      if (asan_sanitize_use_after_scope ()
+	  && !asan_no_sanitize_address_p ()
+	  && TREE_CODE (unit_size) == INTEGER_CST
+	  && DECL_NAME (decl) != NULL
+	  && IDENTIFIER_POINTER (DECL_NAME (decl)) != NULL
+	  && !TREE_STATIC (decl))
+	{
+	  TREE_ADDRESSABLE (decl) = 1;
+	  DECL_GIMPLE_REG_P (decl) = 0;
+
+	  asan_poisoned_variables.add (decl);
+	  asan_poison_variable (decl, false, seq_p);
+	}
 
       /* Some front ends do not explicitly declare all anonymous
 	 artificial variables.  We compensate here by declaring the
@@ -10526,6 +10581,14 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 		      == current_function_decl);
 	  gimplify_seq_add_stmt (pre_p,
 			  gimple_build_label (LABEL_EXPR_LABEL (*expr_p)));
+
+	  /* TODO: make a stable sorting of the hash table.  */
+	  if (asan_sanitize_use_after_scope ()
+	      && !asan_no_sanitize_address_p ())
+	    for (hash_set <tree>::iterator it
+		 = asan_poisoned_variables.begin ();
+		 it != asan_poisoned_variables.end (); ++it)
+	      asan_poison_variable (*it, false, pre_p);
 	  break;
 
 	case CASE_LABEL_EXPR:
@@ -11586,7 +11649,11 @@ gimplify_function_tree (tree fndecl)
       && !needs_to_live_in_memory (ret))
     DECL_GIMPLE_REG_P (ret) = 1;
 
+  gcc_checking_assert (!asan_sanitize_use_after_scope ()
+		       || asan_poisoned_variables.elements () == 0);
   bind = gimplify_body (fndecl, true);
+  gcc_checking_assert (!asan_sanitize_use_after_scope ()
+		       || asan_poisoned_variables.elements () == 0);
 
   /* The tree body of the function is no longer needed, replace it
      with the new GIMPLE body.  */

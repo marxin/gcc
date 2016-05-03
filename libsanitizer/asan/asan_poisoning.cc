@@ -292,8 +292,9 @@ uptr __asan_load_cxx_array_cookie(uptr *p) {
 static void PoisonAlignedStackMemory(uptr addr, uptr size, bool do_poison) {
   if (size == 0) return;
   uptr aligned_size = size & ~(SHADOW_GRANULARITY - 1);
-  PoisonShadow(addr, aligned_size,
-               do_poison ? kAsanStackUseAfterScopeMagic : 0);
+  if (aligned_size != 0)
+    PoisonShadow(addr, aligned_size,
+		 do_poison ? kAsanStackUseAfterScopeMagic : 0);
   if (size == aligned_size)
     return;
   s8 end_offset = (s8)(size - aligned_size);

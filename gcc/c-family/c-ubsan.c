@@ -25,6 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "c-family/c-common.h"
 #include "ubsan.h"
 #include "c-family/c-ubsan.h"
+#include "params.h"
 #include "asan.h"
 #include "stor-layout.h"
 #include "builtins.h"

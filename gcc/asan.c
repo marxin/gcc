@@ -45,6 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "stor-layout.h"
 #include "tree-iterator.h"
+#include "params.h"
 #include "asan.h"
 #include "dojump.h"
 #include "explow.h"
@@ -54,7 +55,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "gimple-builder.h"
 #include "ubsan.h"
-#include "params.h"
 #include "builtins.h"
 #include "fnmatch.h"
 
@@ -313,21 +313,14 @@ asan_shadow_offset ()
 
 alias_set_type asan_shadow_set = -1;
 
+hash_set <tree> asan_inlined_variables;
+
 /* Pointer types to 1 resp. 2 byte integers in shadow memory.  A separate
    alias set is used for all shadow memory accesses.  */
 static GTY(()) tree shadow_ptr_types[2];
 
 /* Decl for __asan_option_detect_stack_use_after_return.  */
 static GTY(()) tree asan_detect_stack_use_after_return;
-
-/* Various flags for Asan builtins.  */
-enum asan_check_flags
-{
-  ASAN_CHECK_STORE = 1 << 0,
-  ASAN_CHECK_SCALAR_ACCESS = 1 << 1,
-  ASAN_CHECK_NON_ZERO_LEN = 1 << 2,
-  ASAN_CHECK_LAST = 1 << 3
-};
 
 /* Hashtable support for memory references used by gimple
    statements.  */
@@ -1020,6 +1013,45 @@ asan_function_start (void)
 			 current_function_funcdef_no);
 }
 
+/* Depending on POISON flag, emit a call to poison (or unpoison) stack memory
+   allocated for local variables, localted in OFFSETS.  LENGTH is number
+   of OFFSETS, BASE is the register holding the stack base,
+   against which OFFSETS array offsets are relative to.  BASE_OFFSET represents
+   an offset requested by alignment and similar stuff.  */
+
+static void
+asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
+			     HOST_WIDE_INT *offsets, int length,
+			     tree *decls, bool poison)
+{
+  if (asan_sanitize_use_after_scope ())
+    for (int l = length - 2; l > 0; l -= 2)
+      {
+	tree decl = decls[l / 2 - 1];
+	if (asan_inlined_variables.contains (decl))
+	  {
+	    gcc_assert (DECL_ABSTRACT_ORIGIN (decl));
+	    continue;
+	  }
+
+	HOST_WIDE_INT var_offset = offsets[l];
+	HOST_WIDE_INT var_end_offset = offsets[l - 1];
+
+	rtx source = expand_binop (Pmode, add_optab, base,
+				   gen_int_mode
+				    (var_offset - base_offset, Pmode),
+				   NULL_RTX, 1, OPTAB_DIRECT);
+
+	rtx size = GEN_INT (var_end_offset - var_offset);
+	const char *fname = poison ?  "__asan_poison_stack_memory"
+	  :"__asan_unpoison_stack_memory";
+	rtx ret = init_one_libfunc (fname);
+	emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
+			   size, TYPE_MODE (pointer_sized_int_node));
+      }
+}
+
+
 /* Insert code to protect stack vars.  The prologue sequence should be emitted
    directly, epilogue sequence returned.  BASE is the register holding the
    stack base, against which OFFSETS array offsets are relative to, OFFSETS
@@ -1228,6 +1260,11 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 	}
       cur_shadow_byte = ASAN_STACK_MAGIC_MIDDLE;
     }
+
+  /* Poison stack variables at the very beginning of a function.  */
+  asan_poison_stack_variables (base, base_offset, offsets, length,
+			       decls, true);
+
   do_pending_stack_adjust ();
 
   /* Construct epilogue sequence.  */
@@ -1308,6 +1345,11 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 				   >> ASAN_SHADOW_SHIFT);
       asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
     }
+
+  /* Unpoison stack variables at the end of a function.  As the former
+     stack memory can be reused, we have to unpoison the memory.  */
+  asan_poison_stack_variables (base, base_offset, offsets, length, decls,
+			       false);
 
   do_pending_stack_adjust ();
   if (lab)
@@ -2571,6 +2613,44 @@ asan_finish_file (void)
   if (asan_ctor_statements)
     cgraph_build_static_cdtor ('I', asan_ctor_statements, priority);
   flag_sanitize |= SANITIZE_ADDRESS;
+}
+
+/* Expand the ASAN_MARK builtins.  */
+
+bool
+asan_expand_mark_ifn (gimple_stmt_iterator *iter)
+{
+  gimple *g = gsi_stmt (*iter);
+  location_t loc = gimple_location (g);
+  HOST_WIDE_INT flags = tree_to_shwi (gimple_call_arg (g, 0));
+  gcc_assert (flags < ASAN_MARK_LAST);
+  bool is_clobber = (flags & ASAN_MARK_CLOBBER) != 0;
+
+  tree base = gimple_call_arg (g, 1);
+  tree len = gimple_call_arg (g, 2);
+
+  HOST_WIDE_INT size_in_bytes
+    = tree_fits_shwi_p (len) ? tree_to_shwi (len) : -1;
+  gcc_assert (size_in_bytes);
+
+  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+				  NOP_EXPR, base);
+  gimple_set_location (g, loc);
+  gsi_insert_before (iter, g, GSI_SAME_STMT);
+  tree base_addr = gimple_assign_lhs (g);
+
+  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			   NOP_EXPR, len);
+  gimple_set_location (g, loc);
+  gsi_insert_before (iter, g, GSI_SAME_STMT);
+  tree sz_arg = gimple_assign_lhs (g);
+
+  tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
+				    : BUILT_IN_ASAN_UNCLOBBER_N);
+  g = gimple_build_call (fun, 2, base_addr, sz_arg);
+  gimple_set_location (g, loc);
+  gsi_replace (iter, g, false);
+  return false;
 }
 
 /* Expand the ASAN_{LOAD,STORE} builtins.  */
