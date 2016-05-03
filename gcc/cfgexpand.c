@@ -868,18 +868,6 @@ union_stack_vars (size_t a, size_t b)
     }
 }
 
-/* Return true if the current function should have its stack frame
-   protected by address sanitizer.  */
-
-static inline bool
-asan_sanitize_stack_p (void)
-{
-  return ((flag_sanitize & SANITIZE_ADDRESS)
-	  && ASAN_STACK
-	  && !lookup_attribute ("no_sanitize_address",
-				DECL_ATTRIBUTES (current_function_decl)));
-}
-
 /* A subroutine of expand_used_vars.  Binpack the variables into
    partitions constrained by the interference graph.  The overall
    algorithm used is as follows:
