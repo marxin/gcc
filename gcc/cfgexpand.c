@@ -876,8 +876,7 @@ asan_sanitize_stack_p (void)
 {
   return ((flag_sanitize & SANITIZE_ADDRESS)
 	  && ASAN_STACK
-	  && !lookup_attribute ("no_sanitize_address",
-				DECL_ATTRIBUTES (current_function_decl)));
+	  && !asan_no_sanitize_address_p ());
 }
 
 /* A subroutine of expand_used_vars.  Binpack the variables into

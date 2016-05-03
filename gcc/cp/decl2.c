@@ -46,6 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dumpfile.h"
 #include "intl.h"
 #include "c-family/c-ada-spec.h"
+#include "params.h"
 #include "asan.h"
 
 extern cpp_reader *parse_in;

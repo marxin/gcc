@@ -65,6 +65,13 @@ public:
       m_table.remove_elt_with_hash (k, Traits::hash (k));
     }
 
+  /* Clear all elements of the hash set.  */
+
+  void empty ()
+    {
+      m_table.empty ();
+    }
+
   /* Call the call back on each pair of key and value with the passed in
      arg.  */
 

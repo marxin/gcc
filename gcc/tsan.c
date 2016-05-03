@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-iterator.h"
 #include "tree-ssa-propagate.h"
 #include "tree-ssa-loop-ivopts.h"
+#include "params.h"
 #include "tsan.h"
 #include "asan.h"
 #include "builtins.h"
