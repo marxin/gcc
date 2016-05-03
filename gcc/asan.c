@@ -244,6 +244,11 @@ static unsigned HOST_WIDE_INT asan_shadow_offset_value;
 static bool asan_shadow_offset_computed;
 static vec<char *> sanitized_sections;
 
+/* Set of variable declarations that are going to be guarded by
+   use-after-scope sanitizer.  */
+
+static hash_set<tree> asan_handled_variables (13);
+
 /* Sets shadow offset to value in string VAL.  */
 
 bool
@@ -314,21 +319,12 @@ asan_shadow_offset ()
 
 alias_set_type asan_shadow_set = -1;
 
-/* Pointer types to 1 resp. 2 byte integers in shadow memory.  A separate
+/* Pointer types to 1, 2 or 4 byte integers in shadow memory.  A separate
    alias set is used for all shadow memory accesses.  */
-static GTY(()) tree shadow_ptr_types[2];
+static GTY(()) tree shadow_ptr_types[3];
 
 /* Decl for __asan_option_detect_stack_use_after_return.  */
 static GTY(()) tree asan_detect_stack_use_after_return;
-
-/* Various flags for Asan builtins.  */
-enum asan_check_flags
-{
-  ASAN_CHECK_STORE = 1 << 0,
-  ASAN_CHECK_SCALAR_ACCESS = 1 << 1,
-  ASAN_CHECK_NON_ZERO_LEN = 1 << 2,
-  ASAN_CHECK_LAST = 1 << 3
-};
 
 /* Hashtable support for memory references used by gimple
    statements.  */
@@ -343,7 +339,7 @@ struct asan_mem_ref
   HOST_WIDE_INT access_size;
 };
 
-object_allocator <asan_mem_ref> asan_mem_ref_pool ("asan_mem_ref");
+object_allocator<asan_mem_ref> asan_mem_ref_pool ("asan_mem_ref");
 
 /* Initializes an instance of asan_mem_ref.  */
 
@@ -932,12 +928,16 @@ static void
 asan_init_shadow_ptr_types (void)
 {
   asan_shadow_set = new_alias_set ();
-  shadow_ptr_types[0] = build_distinct_type_copy (signed_char_type_node);
-  TYPE_ALIAS_SET (shadow_ptr_types[0]) = asan_shadow_set;
-  shadow_ptr_types[0] = build_pointer_type (shadow_ptr_types[0]);
-  shadow_ptr_types[1] = build_distinct_type_copy (short_integer_type_node);
-  TYPE_ALIAS_SET (shadow_ptr_types[1]) = asan_shadow_set;
-  shadow_ptr_types[1] = build_pointer_type (shadow_ptr_types[1]);
+  tree types[3] = { signed_char_type_node, short_integer_type_node,
+		    integer_type_node };
+
+  for (unsigned i = 0; i < 3; i++)
+    {
+      shadow_ptr_types[i] = build_distinct_type_copy (types[i]);
+      TYPE_ALIAS_SET (shadow_ptr_types[i]) = asan_shadow_set;
+      shadow_ptr_types[i] = build_pointer_type (shadow_ptr_types[i]);
+    }
+
   initialize_sanitizer_builtins ();
 }
 
@@ -1020,6 +1020,86 @@ asan_function_start (void)
   ASM_OUTPUT_DEBUG_LABEL (asm_out_file, "LASANPC",
 			 current_function_funcdef_no);
 }
+
+/* Return number of shadow bytes that are occupied by a local variable
+   of SIZE bytes.  */
+
+static unsigned HOST_WIDE_INT
+get_shadow_memory_size (unsigned HOST_WIDE_INT size)
+{
+  return ROUND_UP (size, BITS_PER_UNIT) / BITS_PER_UNIT;
+}
+
+/* Depending on POISON flag, emit a call to poison (or unpoison) stack memory
+   allocated for local variables, localted in OFFSETS.  LENGTH is number
+   of OFFSETS, BASE is the register holding the stack base,
+   against which OFFSETS array offsets are relative to.  BASE_OFFSET represents
+   an offset requested by alignment and similar stuff.  */
+
+static void
+asan_poison_stack_variables (rtx shadow_base, rtx base,
+			     HOST_WIDE_INT base_offset,
+			     HOST_WIDE_INT *offsets, int length,
+			     tree *decls, bool poison)
+{
+  if (asan_sanitize_use_after_scope ())
+    for (int l = length - 2; l > 0; l -= 2)
+      {
+	tree decl = decls[l / 2 - 1];
+	HOST_WIDE_INT var_offset = offsets[l];
+	HOST_WIDE_INT var_end_offset = offsets[l - 1];
+	if (!asan_handled_variables.contains (decl))
+	  {
+	    if (dump_file && (dump_flags & TDF_DETAILS))
+	      fprintf (dump_file, "Skipping stack emission for variable: %s "
+		       "(%ldB)\n",
+		       IDENTIFIER_POINTER (DECL_NAME (decl)),
+		       var_end_offset - var_offset);
+	    continue;
+	  }
+
+	rtx source = expand_binop (Pmode, add_optab, base,
+				   gen_int_mode
+				    (var_offset - base_offset, Pmode),
+				   NULL_RTX, 1, OPTAB_DIRECT);
+
+	HOST_WIDE_INT size = var_end_offset - var_offset;
+	if (size <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD)
+	  {
+	    unsigned HOST_WIDE_INT shadow_size
+	      = get_shadow_memory_size (size);
+
+	    rtx shadow_mem = gen_rtx_MEM (SImode, shadow_base);
+	    rtx var_mem = adjust_address (shadow_mem, QImode,
+					  (var_offset - base_offset)
+					  >> ASAN_SHADOW_SHIFT);
+
+	    char c = poison ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
+	    for (unsigned i = 0; i < shadow_size; ++i)
+	      {
+		emit_move_insn (var_mem, gen_int_mode (c, QImode));
+		var_mem = adjust_address (var_mem, QImode, 1);
+	      }
+	  }
+	else
+	  {
+	    rtx size_rtx = GEN_INT (size);
+	    const char *fname = poison ?  "__asan_poison_stack_memory"
+	      :"__asan_unpoison_stack_memory";
+	    rtx ret = init_one_libfunc (fname);
+	    emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
+			       size_rtx, TYPE_MODE (pointer_sized_int_node));
+	  }
+
+	if (dump_file && (dump_flags & TDF_DETAILS))
+	  fprintf (dump_file, "Emitting stack %s for variable: %s"
+		   "(%ldB)\n",
+		   poison ? "poisoning" : "unpoisoning",
+		   IDENTIFIER_POINTER (DECL_NAME (decl)),
+		   var_end_offset - var_offset);
+      }
+}
+
 
 /* Insert code to protect stack vars.  The prologue sequence should be emitted
    directly, epilogue sequence returned.  BASE is the register holding the
@@ -1229,6 +1309,11 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 	}
       cur_shadow_byte = ASAN_STACK_MAGIC_MIDDLE;
     }
+
+  /* Poison stack variables at the very beginning of a function.  */
+  asan_poison_stack_variables (shadow_base, base, base_offset, offsets, length,
+			       decls, true);
+
   do_pending_stack_adjust ();
 
   /* Construct epilogue sequence.  */
@@ -1309,6 +1394,14 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 				   >> ASAN_SHADOW_SHIFT);
       asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
     }
+
+  /* Unpoison stack variables at the end of a function.  As the former
+     stack memory can be reused, we have to unpoison the memory.  */
+  asan_poison_stack_variables (shadow_base, base, base_offset, offsets, length,
+			       decls, false);
+
+  /* Clean-up set with instrumented stack variables.  */
+  asan_handled_variables.empty ();
 
   do_pending_stack_adjust ();
   if (lab)
@@ -1594,7 +1687,8 @@ insert_if_then_before_iter (gcond *cond,
 
 static tree
 build_shadow_mem_access (gimple_stmt_iterator *gsi, location_t location,
-			 tree base_addr, tree shadow_ptr_type)
+			 tree base_addr, tree shadow_ptr_type,
+			 bool return_ptr = false)
 {
   tree t, uintptr_type = TREE_TYPE (base_addr);
   tree shadow_type = TREE_TYPE (shadow_ptr_type);
@@ -1617,11 +1711,15 @@ build_shadow_mem_access (gimple_stmt_iterator *gsi, location_t location,
   gimple_set_location (g, location);
   gsi_insert_after (gsi, g, GSI_NEW_STMT);
 
-  t = build2 (MEM_REF, shadow_type, gimple_assign_lhs (g),
-	      build_int_cst (shadow_ptr_type, 0));
-  g = gimple_build_assign (make_ssa_name (shadow_type), MEM_REF, t);
-  gimple_set_location (g, location);
-  gsi_insert_after (gsi, g, GSI_NEW_STMT);
+  if (!return_ptr)
+    {
+      t = build2 (MEM_REF, shadow_type, gimple_assign_lhs (g),
+		  build_int_cst (shadow_ptr_type, 0));
+      g = gimple_build_assign (make_ssa_name (shadow_type), MEM_REF, t);
+      gimple_set_location (g, location);
+      gsi_insert_after (gsi, g, GSI_NEW_STMT);
+    }
+
   return gimple_assign_lhs (g);
 }
 
@@ -1825,7 +1923,8 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
 	{
 	  /* Automatic vars in the current function will be always
 	     accessible.  */
-	  if (decl_function_context (inner) == current_function_decl)
+	  if (decl_function_context (inner) == current_function_decl
+	      && !asan_sanitize_use_after_scope ())
 	    return;
 	}
       /* Always instrument external vars, they might be dynamically
@@ -2573,6 +2672,115 @@ asan_finish_file (void)
   if (asan_ctor_statements)
     cgraph_build_static_cdtor ('I', asan_ctor_statements, priority);
   flag_sanitize |= SANITIZE_ADDRESS;
+}
+
+static void
+asan_store_shadow_bytes (gimple_stmt_iterator *iter, location_t loc,
+			 tree shadow,
+			 unsigned HOST_WIDE_INT base_addr_offset,
+			 unsigned char value, unsigned bytes)
+{
+  tree shadow_ptr_type;
+
+  switch (bytes)
+    {
+    case 1:
+      shadow_ptr_type = shadow_ptr_types[0];
+      break;
+    case 2:
+      shadow_ptr_type = shadow_ptr_types[1];
+      break;
+    case 4:
+      shadow_ptr_type = shadow_ptr_types[2];
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  unsigned HOST_WIDE_INT val = 0;
+  for (unsigned i = 0; i < bytes; ++i)
+    val |= (unsigned HOST_WIDE_INT) value << (BITS_PER_UNIT * i);
+
+  tree magic = build_int_cst (TREE_TYPE (shadow_ptr_type), val);
+
+  tree dest = build2 (MEM_REF, TREE_TYPE (shadow_ptr_type), shadow,
+		      build_int_cst (shadow_ptr_type, base_addr_offset));
+
+  gimple *g = gimple_build_assign (dest, magic);
+  gimple_set_location (g, loc);
+  gsi_insert_after (iter, g, GSI_NEW_STMT);
+}
+
+/* Expand the ASAN_MARK builtins.  */
+
+bool
+asan_expand_mark_ifn (gimple_stmt_iterator *iter)
+{
+  gimple *g = gsi_stmt (*iter);
+  location_t loc = gimple_location (g);
+  HOST_WIDE_INT flags = tree_to_shwi (gimple_call_arg (g, 0));
+  gcc_assert (flags < ASAN_MARK_LAST);
+  bool is_clobber = (flags & ASAN_MARK_CLOBBER) != 0;
+
+  tree base = gimple_call_arg (g, 1);
+  gcc_checking_assert (TREE_CODE (base) == ADDR_EXPR);
+  tree decl = TREE_OPERAND (base, 0);
+  gcc_checking_assert (TREE_CODE (decl) == VAR_DECL);
+  asan_handled_variables.add (decl);
+  tree len = gimple_call_arg (g, 2);
+
+  gcc_assert (tree_fits_shwi_p (len));
+  HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
+  HOST_WIDE_INT aligned_size_in_bytes
+    = size_in_bytes & ~((1 << ASAN_SHADOW_SHIFT) - 1);
+  gcc_assert (size_in_bytes);
+
+  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+				  NOP_EXPR, base);
+  gimple_set_location (g, loc);
+  gsi_replace (iter, g, false);
+  tree base_addr = gimple_assign_lhs (g);
+
+  /* Generate direct emission if size_in_bytes is small and aligned size
+     is equal to size which should be poisoned/unpoisoned.  */
+  if (size_in_bytes <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD
+      && size_in_bytes == aligned_size_in_bytes)
+    {
+      unsigned HOST_WIDE_INT shadow_size
+	= get_shadow_memory_size (size_in_bytes);
+      char c = (char) is_clobber ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
+
+      tree shadow = build_shadow_mem_access (iter, loc, base_addr,
+					     shadow_ptr_types[0], true);
+
+      for (unsigned HOST_WIDE_INT offset = 0; offset < shadow_size;)
+	{
+	  unsigned size = 1;
+	  if (shadow_size - offset >= 4)
+	    size = 4;
+	  else if (shadow_size - offset >= 2)
+	    size = 2;
+
+	  asan_store_shadow_bytes (iter, loc, shadow, offset, c, size);
+	  offset += size;
+	}
+    }
+  else
+    {
+      g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			       NOP_EXPR, len);
+      gimple_set_location (g, loc);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      tree sz_arg = gimple_assign_lhs (g);
+
+      tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
+					: BUILT_IN_ASAN_UNCLOBBER_N);
+      g = gimple_build_call (fun, 2, base_addr, sz_arg);
+      gimple_set_location (g, loc);
+      gsi_insert_after (iter, g, GSI_NEW_STMT);
+    }
+
+  return false;
 }
 
 /* Expand the ASAN_{LOAD,STORE} builtins.  */
