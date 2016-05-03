@@ -31,11 +31,11 @@ bool CanPoisonMemory() {
 
 void PoisonShadow(uptr addr, uptr size, u8 value) {
   if (!CanPoisonMemory()) return;
-  CHECK(AddrIsAlignedByGranularity(addr));
-  CHECK(AddrIsInMem(addr));
-  CHECK(AddrIsAlignedByGranularity(addr + size));
-  CHECK(AddrIsInMem(addr + size - SHADOW_GRANULARITY));
-  CHECK(REAL(memset));
+  DCHECK(AddrIsAlignedByGranularity(addr));
+  DCHECK(AddrIsInMem(addr));
+  DCHECK(AddrIsAlignedByGranularity(addr + size));
+  DCHECK(AddrIsInMem(addr + size - SHADOW_GRANULARITY));
+  DCHECK(REAL(memset));
   FastPoisonShadow(addr, size, value);
 }
 
@@ -294,6 +294,7 @@ static void PoisonAlignedStackMemory(uptr addr, uptr size, bool do_poison) {
   uptr aligned_size = size & ~(SHADOW_GRANULARITY - 1);
   PoisonShadow(addr, aligned_size,
                do_poison ? kAsanStackUseAfterScopeMagic : 0);
+  return;
   if (size == aligned_size)
     return;
   s8 end_offset = (s8)(size - aligned_size);
@@ -312,13 +313,17 @@ static void PoisonAlignedStackMemory(uptr addr, uptr size, bool do_poison) {
   }
 }
 
-void __asan_poison_stack_memory(uptr addr, uptr size) {
-  VReport(1, "poisoning: %p %zx\n", (void *)addr, size);
+void
+__attribute__ ((flatten))
+__asan_poison_stack_memory(uptr addr, uptr size) {
+//  VReport(1, "poisoning: %p %zx\n", (void *)addr, size);
   PoisonAlignedStackMemory(addr, size, true);
 }
 
-void __asan_unpoison_stack_memory(uptr addr, uptr size) {
-  VReport(1, "unpoisoning: %p %zx\n", (void *)addr, size);
+void
+__attribute__ ((flatten))
+__asan_unpoison_stack_memory(uptr addr, uptr size) {
+//  VReport(1, "unpoisoning: %p %zx\n", (void *)addr, size);
   PoisonAlignedStackMemory(addr, size, false);
 }
 
