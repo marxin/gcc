@@ -29,6 +29,7 @@ extern bool asan_protect_global (tree);
 extern void initialize_sanitizer_builtins (void);
 extern tree asan_dynamic_init_call (bool);
 extern bool asan_expand_check_ifn (gimple_stmt_iterator *, bool);
+extern bool asan_expand_mark_ifn (gimple_stmt_iterator *);
 
 extern gimple_stmt_iterator create_cond_insert_point
      (gimple_stmt_iterator *, bool, bool, bool, basic_block *, basic_block *);
@@ -67,9 +68,15 @@ enum asan_check_flags
   ASAN_CHECK_STORE = 1 << 0,
   ASAN_CHECK_SCALAR_ACCESS = 1 << 1,
   ASAN_CHECK_NON_ZERO_LEN = 1 << 2,
-  ASAN_CHECK_CLOBBER = 1 << 3,
-  ASAN_CHECK_UNCLOBBER = 1 << 4,
-  ASAN_CHECK_LAST = 1 << 5
+  ASAN_CHECK_LAST = 1 << 3
+};
+
+/* Flags for Asan check builtins.  */
+enum asan_mark_flags
+{
+  ASAN_MARK_CLOBBER = 1 << 0,
+  ASAN_MARK_UNCLOBBER = 1 << 1,
+  ASAN_MARK_LAST = 1 << 2
 };
 
 /* Return true if DECL should be guarded on the stack.  */

@@ -2615,6 +2615,44 @@ asan_finish_file (void)
   flag_sanitize |= SANITIZE_ADDRESS;
 }
 
+/* Expand the ASAN_MARK builtins.  */
+
+bool
+asan_expand_mark_ifn (gimple_stmt_iterator *iter)
+{
+  gimple *g = gsi_stmt (*iter);
+  location_t loc = gimple_location (g);
+  HOST_WIDE_INT flags = tree_to_shwi (gimple_call_arg (g, 0));
+  gcc_assert (flags < ASAN_MARK_LAST);
+  bool is_clobber = (flags & ASAN_MARK_CLOBBER) != 0;
+
+  tree base = gimple_call_arg (g, 1);
+  tree len = gimple_call_arg (g, 2);
+
+  HOST_WIDE_INT size_in_bytes
+    = tree_fits_shwi_p (len) ? tree_to_shwi (len) : -1;
+  gcc_assert (size_in_bytes);
+
+  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+				  NOP_EXPR, base);
+  gimple_set_location (g, loc);
+  gsi_insert_before (iter, g, GSI_SAME_STMT);
+  tree base_addr = gimple_assign_lhs (g);
+
+  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			   NOP_EXPR, len);
+  gimple_set_location (g, loc);
+  gsi_insert_before (iter, g, GSI_SAME_STMT);
+  tree sz_arg = gimple_assign_lhs (g);
+
+  tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
+				    : BUILT_IN_ASAN_UNCLOBBER_N);
+  g = gimple_build_call (fun, 2, base_addr, sz_arg);
+  gimple_set_location (g, loc);
+  gsi_replace (iter, g, false);
+  return false;
+}
+
 /* Expand the ASAN_{LOAD,STORE} builtins.  */
 
 bool
@@ -2633,8 +2671,6 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
   bool is_scalar_access = (flags & ASAN_CHECK_SCALAR_ACCESS) != 0;
   bool is_store = (flags & ASAN_CHECK_STORE) != 0;
   bool is_non_zero_len = (flags & ASAN_CHECK_NON_ZERO_LEN) != 0;
-  bool is_clobber = (flags & ASAN_CHECK_CLOBBER) != 0;
-  bool is_unclobber = (flags & ASAN_CHECK_UNCLOBBER) != 0;
 
   tree base = gimple_call_arg (g, 1);
   tree len = gimple_call_arg (g, 2);
@@ -2642,30 +2678,6 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
 
   HOST_WIDE_INT size_in_bytes
     = is_scalar_access && tree_fits_shwi_p (len) ? tree_to_shwi (len) : -1;
-
-  if (is_clobber || is_unclobber)
-    {
-      gcc_assert (size_in_bytes);
-
-      gimple *g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
-				      NOP_EXPR, base);
-      gimple_set_location (g, loc);
-      gsi_insert_before (iter, g, GSI_SAME_STMT);
-      tree base_addr = gimple_assign_lhs (g);
-
-      g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
-			       NOP_EXPR, len);
-      gimple_set_location (g, loc);
-      gsi_insert_before (iter, g, GSI_SAME_STMT);
-      tree sz_arg = gimple_assign_lhs (g);
-
-      tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
-					: BUILT_IN_ASAN_UNCLOBBER_N);
-      g = gimple_build_call (fun, 2, base_addr, sz_arg);
-      gimple_set_location (g, loc);
-      gsi_replace (iter, g, false);
-      return false;
-    }
 
   if (use_calls)
     {

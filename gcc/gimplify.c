@@ -1083,17 +1083,14 @@ asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
 {
   tree unit_size = DECL_SIZE_UNIT (decl);
   tree base = build_fold_addr_expr (decl);
-  unsigned int align = get_object_alignment (base);
 
-  HOST_WIDE_INT flags = poison ? ASAN_CHECK_CLOBBER : ASAN_CHECK_UNCLOBBER;
+  HOST_WIDE_INT flags = poison ? ASAN_MARK_CLOBBER : ASAN_MARK_UNCLOBBER;
 
   gimplify_seq_add_stmt
-    (seq_p, gimple_build_call_internal (IFN_ASAN_CHECK, 4,
+    (seq_p, gimple_build_call_internal (IFN_ASAN_MARK, 3,
 					build_int_cst (integer_type_node,
 						       flags),
-					base, unit_size,
-					build_int_cst (integer_type_node,
-						       align / BITS_PER_UNIT)));
+					base, unit_size));
 }
 
 /* Gimplify a BIND_EXPR.  Just voidify and recurse.  */
