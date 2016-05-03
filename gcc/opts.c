@@ -975,6 +975,19 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
       opts->x_flag_aggressive_loop_optimizations = 0;
       opts->x_flag_strict_overflow = 0;
     }
+
+  /* Force -fstack-reuse=none in case -fsanitize-address-use-after-scope
+     is enabled.  */
+  if (opts->x_flag_sanitize & SANITIZE_USE_AFTER_SCOPE)
+    {
+      if (opts->x_flag_stack_reuse != SR_NONE
+	  && opts_set->x_flag_stack_reuse != SR_NONE)
+	error_at (loc,
+		  "-fsanitize-address-use-after-scope requires "
+		  "-fstack-reuse=none option");
+
+      opts->x_flag_stack_reuse = SR_NONE;
+    }
 }
 
 #define LEFT_COLUMN	27
@@ -1765,6 +1778,17 @@ common_handle_option (struct gcc_options *opts,
     case OPT_fasan_shadow_offset_:
       /* Deferred.  */
       break;
+
+    case OPT_fsanitize_address_use_after_scope:
+	{
+	  unsigned int mask
+	    = SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS | SANITIZE_USE_AFTER_SCOPE;
+	  if (value)
+	    opts->x_flag_sanitize |= mask;
+	  else
+	    opts->x_flag_sanitize &= ~mask;
+	  break;
+	}
 
     case OPT_fsanitize_recover:
       if (value)
