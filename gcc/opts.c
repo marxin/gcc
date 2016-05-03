@@ -976,6 +976,19 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
       opts->x_flag_aggressive_loop_optimizations = 0;
       opts->x_flag_strict_overflow = 0;
     }
+
+  /* Force -fstack-reuse=none in case -fsanitize-address-use-after-scope
+     is enabled.  */
+  if (opts->x_flag_sanitize & SANITIZE_USE_AFTER_SCOPE)
+    {
+      if (opts->x_flag_stack_reuse != SR_NONE
+	  && opts_set->x_flag_stack_reuse != SR_NONE)
+	error_at (loc,
+		  "-fsanitize-address-use-after-scope requires "
+		  "-fstack-reuse=none option");
+
+      opts->x_flag_stack_reuse = SR_NONE;
+    }
 }
 
 #define LEFT_COLUMN	27
@@ -1449,7 +1462,8 @@ enable_fdo_optimizations (struct gcc_options *opts,
 const struct sanitizer_opts_s sanitizer_opts[] =
 {
 #define SANITIZER_OPT(name, flags) { #name, flags, sizeof #name - 1 }
-  SANITIZER_OPT (address, SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS),
+  SANITIZER_OPT (address, SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS
+		 | SANITIZE_USE_AFTER_SCOPE),
   SANITIZER_OPT (kernel-address, SANITIZE_ADDRESS | SANITIZE_KERNEL_ADDRESS),
   SANITIZER_OPT (thread, SANITIZE_THREAD),
   SANITIZER_OPT (leak, SANITIZE_LEAK),
@@ -1766,6 +1780,16 @@ common_handle_option (struct gcc_options *opts,
     case OPT_fasan_shadow_offset_:
       /* Deferred.  */
       break;
+
+    case OPT_fsanitize_address_use_after_scope:
+	{
+	  if (value)
+	    opts->x_flag_sanitize |= SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS
+	      | SANITIZE_USE_AFTER_SCOPE;
+	  else
+	    opts->x_flag_sanitize &= ~SANITIZE_USE_AFTER_SCOPE;
+	  break;
+	}
 
     case OPT_fsanitize_recover:
       if (value)
