@@ -46,6 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "stor-layout.h"
 #include "tree-iterator.h"
+#include "params.h"
 #include "asan.h"
 #include "dojump.h"
 #include "explow.h"
@@ -244,6 +245,13 @@ static unsigned HOST_WIDE_INT asan_shadow_offset_value;
 static bool asan_shadow_offset_computed;
 static vec<char *> sanitized_sections;
 
+/* Set of variable declarations that are going to be guarded by
+   use-after-scope sanitizer.  */
+
+static hash_set<tree> *asan_handled_variables = NULL;
+
+hash_set <tree> *asan_used_labels = NULL;
+
 /* Sets shadow offset to value in string VAL.  */
 
 bool
@@ -314,21 +322,12 @@ asan_shadow_offset ()
 
 alias_set_type asan_shadow_set = -1;
 
-/* Pointer types to 1 resp. 2 byte integers in shadow memory.  A separate
+/* Pointer types to 1, 2 or 4 byte integers in shadow memory.  A separate
    alias set is used for all shadow memory accesses.  */
-static GTY(()) tree shadow_ptr_types[2];
+static GTY(()) tree shadow_ptr_types[3];
 
 /* Decl for __asan_option_detect_stack_use_after_return.  */
 static GTY(()) tree asan_detect_stack_use_after_return;
-
-/* Various flags for Asan builtins.  */
-enum asan_check_flags
-{
-  ASAN_CHECK_STORE = 1 << 0,
-  ASAN_CHECK_SCALAR_ACCESS = 1 << 1,
-  ASAN_CHECK_NON_ZERO_LEN = 1 << 2,
-  ASAN_CHECK_LAST = 1 << 3
-};
 
 /* Hashtable support for memory references used by gimple
    statements.  */
@@ -932,12 +931,16 @@ static void
 asan_init_shadow_ptr_types (void)
 {
   asan_shadow_set = new_alias_set ();
-  shadow_ptr_types[0] = build_distinct_type_copy (signed_char_type_node);
-  TYPE_ALIAS_SET (shadow_ptr_types[0]) = asan_shadow_set;
-  shadow_ptr_types[0] = build_pointer_type (shadow_ptr_types[0]);
-  shadow_ptr_types[1] = build_distinct_type_copy (short_integer_type_node);
-  TYPE_ALIAS_SET (shadow_ptr_types[1]) = asan_shadow_set;
-  shadow_ptr_types[1] = build_pointer_type (shadow_ptr_types[1]);
+  tree types[3] = { signed_char_type_node, short_integer_type_node,
+		    integer_type_node };
+
+  for (unsigned i = 0; i < 3; i++)
+    {
+      shadow_ptr_types[i] = build_distinct_type_copy (types[i]);
+      TYPE_ALIAS_SET (shadow_ptr_types[i]) = asan_shadow_set;
+      shadow_ptr_types[i] = build_pointer_type (shadow_ptr_types[i]);
+    }
+
   initialize_sanitizer_builtins ();
 }
 
@@ -1021,6 +1024,15 @@ asan_function_start (void)
 			 current_function_funcdef_no);
 }
 
+/* Return number of shadow bytes that are occupied by a local variable
+   of SIZE bytes.  */
+
+static unsigned HOST_WIDE_INT
+shadow_mem_size (unsigned HOST_WIDE_INT size)
+{
+  return ROUND_UP (size, ASAN_SHADOW_GRANULARITY) / ASAN_SHADOW_GRANULARITY;
+}
+
 /* Insert code to protect stack vars.  The prologue sequence should be emitted
    directly, epilogue sequence returned.  BASE is the register holding the
    stack base, against which OFFSETS array offsets are relative to, OFFSETS
@@ -1046,7 +1058,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   HOST_WIDE_INT base_offset = offsets[length - 1];
   HOST_WIDE_INT base_align_bias = 0, offset, prev_offset;
   HOST_WIDE_INT asan_frame_size = offsets[0] - base_offset;
-  HOST_WIDE_INT last_offset, last_size;
+  HOST_WIDE_INT last_offset;
   int l;
   unsigned char cur_shadow_byte = ASAN_STACK_MAGIC_LEFT;
   tree str_cst, decl, id;
@@ -1204,10 +1216,10 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 				       (aoff - prev_offset)
 				       >> ASAN_SHADOW_SHIFT);
 	  prev_offset = aoff;
-	  for (i = 0; i < 4; i++, aoff += (1 << ASAN_SHADOW_SHIFT))
+	  for (i = 0; i < 4; i++, aoff += ASAN_SHADOW_GRANULARITY)
 	    if (aoff < offset)
 	      {
-		if (aoff < offset - (1 << ASAN_SHADOW_SHIFT) + 1)
+		if (aoff < offset - (HOST_WIDE_INT)ASAN_SHADOW_GRANULARITY + 1)
 		  shadow_bytes[i] = 0;
 		else
 		  shadow_bytes[i] = offset - aoff;
@@ -1281,34 +1293,61 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   if (STRICT_ALIGNMENT)
     set_mem_align (shadow_mem, (GET_MODE_ALIGNMENT (SImode)));
 
-  prev_offset = base_offset;
+  /* Unpoison shadow memory of a stack at the very end of a function.
+     As we're poisoning stack variables at the end of their scope,
+     shadow memory must be properly unpoisoned here.  The easiest approach
+     would be to collect all variables that should not be unpoisoned and
+     we unpoison shadow memory of the whole stack except ranges
+     occupied by these variables.  */
   last_offset = base_offset;
-  last_size = 0;
-  for (l = length; l; l -= 2)
+  HOST_WIDE_INT current_offset = last_offset;
+  if (length)
     {
-      offset = base_offset + ((offsets[l - 1] - base_offset)
-			     & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1));
-      if (last_offset + last_size != offset)
+      HOST_WIDE_INT var_end_offset = 0;
+      HOST_WIDE_INT stack_start = offsets[length - 1];
+      gcc_assert (last_offset == stack_start);
+
+      for (int l = length - 2; l > 0; l -= 2)
 	{
-	  shadow_mem = adjust_address (shadow_mem, VOIDmode,
-				       (last_offset - prev_offset)
-				       >> ASAN_SHADOW_SHIFT);
-	  prev_offset = last_offset;
-	  asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
-	  last_offset = offset;
-	  last_size = 0;
+	  HOST_WIDE_INT var_offset = offsets[l];
+	  current_offset = var_offset;
+	  var_end_offset = offsets[l - 1];
+	  HOST_WIDE_INT rounded_size = ROUND_UP (var_end_offset - var_offset,
+					     BITS_PER_UNIT);
+
+	  /* Should we unpoison the variable?  */
+	  if (asan_handled_variables != NULL
+	      && asan_handled_variables->contains (decl))
+	    {
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		fprintf (dump_file, "Skipping stack emission for variable: %s "
+			 "(%" PRId64 "B)\n",
+			 IDENTIFIER_POINTER (DECL_NAME (decl)),
+			 var_end_offset - var_offset);
+
+	      unsigned HOST_WIDE_INT s
+		= shadow_mem_size (current_offset - last_offset);
+	      asan_clear_shadow (shadow_mem, s);
+	      HOST_WIDE_INT shift
+		= shadow_mem_size (current_offset - last_offset + rounded_size);
+	      shadow_mem = adjust_address (shadow_mem, VOIDmode, shift);
+	      last_offset = var_offset + rounded_size;
+	      current_offset = last_offset;
+	    }
+
 	}
-      last_size += base_offset + ((offsets[l - 2] - base_offset)
-				  & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1))
-		   - offset;
+
+      /* Handle last redzone.  */
+      current_offset = offsets[0];
+      asan_clear_shadow (shadow_mem,
+			 shadow_mem_size (current_offset - last_offset));
     }
-  if (last_size)
-    {
-      shadow_mem = adjust_address (shadow_mem, VOIDmode,
-				   (last_offset - prev_offset)
-				   >> ASAN_SHADOW_SHIFT);
-      asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
-    }
+
+  /* Clean-up set with instrumented stack variables.  */
+  delete asan_handled_variables;
+  asan_handled_variables = NULL;
+  delete asan_used_labels;
+  asan_used_labels = NULL;
 
   do_pending_stack_adjust ();
   if (lab)
@@ -1589,12 +1628,14 @@ insert_if_then_before_iter (gcond *cond,
   gsi_insert_after (&cond_insert_point, cond, GSI_NEW_STMT);
 }
 
-/* Build
-   (base_addr >> ASAN_SHADOW_SHIFT) + asan_shadow_offset ().  */
+/* Build (base_addr >> ASAN_SHADOW_SHIFT) + asan_shadow_offset ().
+   If RETURN_ADDRESS is set to true, return memory location instread
+   of a value in the shadow memory.  */
 
 static tree
 build_shadow_mem_access (gimple_stmt_iterator *gsi, location_t location,
-			 tree base_addr, tree shadow_ptr_type)
+			 tree base_addr, tree shadow_ptr_type,
+			 bool return_address = false)
 {
   tree t, uintptr_type = TREE_TYPE (base_addr);
   tree shadow_type = TREE_TYPE (shadow_ptr_type);
@@ -1617,11 +1658,15 @@ build_shadow_mem_access (gimple_stmt_iterator *gsi, location_t location,
   gimple_set_location (g, location);
   gsi_insert_after (gsi, g, GSI_NEW_STMT);
 
-  t = build2 (MEM_REF, shadow_type, gimple_assign_lhs (g),
-	      build_int_cst (shadow_ptr_type, 0));
-  g = gimple_build_assign (make_ssa_name (shadow_type), MEM_REF, t);
-  gimple_set_location (g, location);
-  gsi_insert_after (gsi, g, GSI_NEW_STMT);
+  if (!return_address)
+    {
+      t = build2 (MEM_REF, shadow_type, gimple_assign_lhs (g),
+		  build_int_cst (shadow_ptr_type, 0));
+      g = gimple_build_assign (make_ssa_name (shadow_type), MEM_REF, t);
+      gimple_set_location (g, location);
+      gsi_insert_after (gsi, g, GSI_NEW_STMT);
+    }
+
   return gimple_assign_lhs (g);
 }
 
@@ -1825,7 +1870,9 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
 	{
 	  /* Automatic vars in the current function will be always
 	     accessible.  */
-	  if (decl_function_context (inner) == current_function_decl)
+	  if (decl_function_context (inner) == current_function_decl
+	      && (!asan_sanitize_use_after_scope ()
+		  || !TREE_ADDRESSABLE (inner)))
 	    return;
 	}
       /* Always instrument external vars, they might be dynamically
@@ -2573,6 +2620,131 @@ asan_finish_file (void)
   if (asan_ctor_statements)
     cgraph_build_static_cdtor ('I', asan_ctor_statements, priority);
   flag_sanitize |= SANITIZE_ADDRESS;
+}
+
+/* Poison or unpoison (depending on IS_CLOBBER variable) shadow memory based
+   on SHADOW address.  Newly added statements will be added to ITER with
+   given location LOC.  We mark SIZE bytes in shadow memory, where
+   LAST_CHUNK_SIZE is greater than zero in situation where we are at the
+   end of a variable.  */
+
+static void
+asan_store_shadow_bytes (gimple_stmt_iterator *iter, location_t loc,
+			 tree shadow,
+			 unsigned HOST_WIDE_INT base_addr_offset,
+			 bool is_clobber, unsigned size,
+			 unsigned last_chunk_size)
+{
+  tree shadow_ptr_type;
+
+  switch (size)
+    {
+    case 1:
+      shadow_ptr_type = shadow_ptr_types[0];
+      break;
+    case 2:
+      shadow_ptr_type = shadow_ptr_types[1];
+      break;
+    case 4:
+      shadow_ptr_type = shadow_ptr_types[2];
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  unsigned char c = (char) is_clobber ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
+  unsigned HOST_WIDE_INT val = 0;
+  for (unsigned i = 0; i < size; ++i)
+    {
+      unsigned char shadow_c = c;
+      if (i == size- 1 && last_chunk_size && !is_clobber)
+	shadow_c = last_chunk_size;
+      val |= (unsigned HOST_WIDE_INT) shadow_c << (BITS_PER_UNIT * i);
+    }
+
+  /* Handle last chunk in unpoisoning.  */
+  tree magic = build_int_cst (TREE_TYPE (shadow_ptr_type), val);
+
+  tree dest = build2 (MEM_REF, TREE_TYPE (shadow_ptr_type), shadow,
+		      build_int_cst (shadow_ptr_type, base_addr_offset));
+
+  gimple *g = gimple_build_assign (dest, magic);
+  gimple_set_location (g, loc);
+  gsi_insert_after (iter, g, GSI_NEW_STMT);
+}
+
+/* Expand the ASAN_MARK builtins.  */
+
+bool
+asan_expand_mark_ifn (gimple_stmt_iterator *iter)
+{
+  gimple *g = gsi_stmt (*iter);
+  location_t loc = gimple_location (g);
+  HOST_WIDE_INT flags = tree_to_shwi (gimple_call_arg (g, 0));
+  gcc_assert (flags < ASAN_MARK_LAST);
+  bool is_clobber = (flags & ASAN_MARK_CLOBBER) != 0;
+
+  tree base = gimple_call_arg (g, 1);
+  gcc_checking_assert (TREE_CODE (base) == ADDR_EXPR);
+  tree decl = TREE_OPERAND (base, 0);
+  gcc_checking_assert (TREE_CODE (decl) == VAR_DECL);
+  if (asan_handled_variables == NULL)
+    asan_handled_variables = new hash_set<tree> (16);
+  asan_handled_variables->add (decl);
+  tree len = gimple_call_arg (g, 2);
+
+  gcc_assert (tree_fits_shwi_p (len));
+  unsigned HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
+  gcc_assert (size_in_bytes);
+
+  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+				  NOP_EXPR, base);
+  gimple_set_location (g, loc);
+  gsi_replace (iter, g, false);
+  tree base_addr = gimple_assign_lhs (g);
+
+  /* Generate direct emission if size_in_bytes is small.  */
+  if (size_in_bytes <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD)
+    {
+      unsigned HOST_WIDE_INT shadow_size = shadow_mem_size (size_in_bytes);
+
+      tree shadow = build_shadow_mem_access (iter, loc, base_addr,
+					     shadow_ptr_types[0], true);
+
+      for (unsigned HOST_WIDE_INT offset = 0; offset < shadow_size;)
+	{
+	  unsigned size = 1;
+	  if (shadow_size - offset >= 4)
+	    size = 4;
+	  else if (shadow_size - offset >= 2)
+	    size = 2;
+
+	  unsigned HOST_WIDE_INT last_chunk_size = 0;
+	  unsigned HOST_WIDE_INT s = (offset + size) * ASAN_SHADOW_GRANULARITY;
+	  if (s > size_in_bytes)
+	    last_chunk_size = ASAN_SHADOW_GRANULARITY - (s - size_in_bytes);
+
+	  asan_store_shadow_bytes (iter, loc, shadow, offset, is_clobber,
+				   size, last_chunk_size);
+	  offset += size;
+	}
+    }
+  else
+    {
+      g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			       NOP_EXPR, len);
+      gimple_set_location (g, loc);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      tree sz_arg = gimple_assign_lhs (g);
+
+      tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
+					: BUILT_IN_ASAN_UNCLOBBER_N);
+      g = gimple_build_call (fun, 2, base_addr, sz_arg);
+      gimple_set_location (g, loc);
+      gsi_insert_after (iter, g, GSI_NEW_STMT);
+    }
+
+  return false;
 }
 
 /* Expand the ASAN_{LOAD,STORE} builtins.  */

@@ -29,9 +29,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 #include "fold-const.h"
 #include "gimple-iterator.h"
+#include "params.h"
 #include "asan.h"
 #include "ubsan.h"
-#include "params.h"
 #include "tree-hash-traits.h"
 #include "gimple-ssa.h"
 #include "tree-phinodes.h"
@@ -727,6 +727,9 @@ pass_sanopt::execute (function *fun)
 		  break;
 		case IFN_ASAN_CHECK:
 		  no_next = asan_expand_check_ifn (&gsi, use_calls);
+		  break;
+		case IFN_ASAN_MARK:
+		  no_next = asan_expand_mark_ifn (&gsi);
 		  break;
 		default:
 		  break;
