@@ -1217,8 +1217,9 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
   /* Add clobbers for all variables that go out of scope.  */
   for (t = BIND_EXPR_VARS (bind_expr); t ; t = DECL_CHAIN (t))
     {
+      bool unpoison_var = asan_poisoned_variables.contains (t);
       if (asan_sanitize_use_after_scope ()
-	  && asan_poisoned_variables.contains (t))
+	  && unpoison_var)
 	asan_poisoned_variables.remove (t);
 
       if (TREE_CODE (t) == VAR_DECL
@@ -1242,8 +1243,9 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	    }
 
 	  if (asan_sanitize_use_after_scope ()
-	      && !asan_no_sanitize_address_p ())
-	      asan_poison_variable (t, true, &cleanup);
+	      && !asan_no_sanitize_address_p ()
+	      && unpoison_var)
+	    asan_poison_variable (t, true, &cleanup);
 
 	  if (flag_stack_reuse != SR_NONE
 	      && flag_openacc
@@ -1523,6 +1525,7 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
       if (asan_sanitize_use_after_scope ()
 	  && !asan_no_sanitize_address_p ()
 	  && TREE_CODE (unit_size) == INTEGER_CST
+	  && needs_to_live_in_memory (decl)
 	  && DECL_NAME (decl) != NULL
 	  && IDENTIFIER_POINTER (DECL_NAME (decl)) != NULL
 	  && !TREE_STATIC (decl))

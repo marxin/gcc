@@ -972,6 +972,18 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
       opts->x_flag_aggressive_loop_optimizations = 0;
       opts->x_flag_strict_overflow = 0;
     }
+
+  /* Force -fstack-reuse=none in case -fsanitize=use-after-scope is enabled.  */
+  if (opts->x_flag_sanitize & SANITIZE_USE_AFTER_SCOPE)
+    {
+      if (opts->x_flag_stack_reuse != SR_NONE
+	  && opts_set->x_flag_stack_reuse != SR_NONE)
+	error_at (loc,
+		  "-fsanitize=use-after-scope requires "
+		  "-fstack-reuse=none option");
+
+      opts->x_flag_stack_reuse = SR_NONE;
+    }
 }
 
 #define LEFT_COLUMN	27
