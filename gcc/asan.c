@@ -1635,7 +1635,8 @@ insert_if_then_before_iter (gcond *cond,
 
 static tree
 build_shadow_mem_access (gimple_stmt_iterator *gsi, location_t location,
-			 tree base_addr, tree shadow_ptr_type)
+			 tree base_addr, tree shadow_ptr_type,
+			 bool return_ptr = false)
 {
   tree t, uintptr_type = TREE_TYPE (base_addr);
   tree shadow_type = TREE_TYPE (shadow_ptr_type);
@@ -1658,11 +1659,15 @@ build_shadow_mem_access (gimple_stmt_iterator *gsi, location_t location,
   gimple_set_location (g, location);
   gsi_insert_after (gsi, g, GSI_NEW_STMT);
 
-  t = build2 (MEM_REF, shadow_type, gimple_assign_lhs (g),
-	      build_int_cst (shadow_ptr_type, 0));
-  g = gimple_build_assign (make_ssa_name (shadow_type), MEM_REF, t);
-  gimple_set_location (g, location);
-  gsi_insert_after (gsi, g, GSI_NEW_STMT);
+  if (!return_ptr)
+    {
+      t = build2 (MEM_REF, shadow_type, gimple_assign_lhs (g),
+		  build_int_cst (shadow_ptr_type, 0));
+      g = gimple_build_assign (make_ssa_name (shadow_type), MEM_REF, t);
+      gimple_set_location (g, location);
+      gsi_insert_after (gsi, g, GSI_NEW_STMT);
+    }
+
   return gimple_assign_lhs (g);
 }
 
@@ -2636,20 +2641,48 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
 				  NOP_EXPR, base);
   gimple_set_location (g, loc);
-  gsi_insert_before (iter, g, GSI_SAME_STMT);
+  gsi_replace (iter, g, false);
   tree base_addr = gimple_assign_lhs (g);
 
-  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
-			   NOP_EXPR, len);
-  gimple_set_location (g, loc);
-  gsi_insert_before (iter, g, GSI_SAME_STMT);
-  tree sz_arg = gimple_assign_lhs (g);
+  if (size_in_bytes <= 64)
+    {
+      /* Round up size of object.  */
+      HOST_WIDE_INT r;
+      if ((r = size_in_bytes % 8) != 0)
+	size_in_bytes += 8 - r;
 
-  tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
-				    : BUILT_IN_ASAN_UNCLOBBER_N);
-  g = gimple_build_call (fun, 2, base_addr, sz_arg);
-  gimple_set_location (g, loc);
-  gsi_replace (iter, g, false);
+      tree shadow_ptr_type = shadow_ptr_types[0];
+      char c = (char) is_clobber ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
+      tree magic = build_int_cst (TREE_TYPE (shadow_ptr_type), c);
+
+      tree shadow = build_shadow_mem_access (iter, loc, base_addr,
+					     shadow_ptr_type, true);
+
+      for (HOST_WIDE_INT i = 0; i < size_in_bytes / 8; ++i)
+	{
+	  tree dest = build2 (MEM_REF, TREE_TYPE (shadow_ptr_type), shadow,
+			      build_int_cst (TREE_TYPE (shadow), i));
+
+	  g = gimple_build_assign (dest, magic);
+	  gimple_set_location (g, loc);
+	  gsi_insert_after (iter, g, GSI_NEW_STMT);
+	}
+    }
+  else
+    {
+      g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			       NOP_EXPR, len);
+      gimple_set_location (g, loc);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      tree sz_arg = gimple_assign_lhs (g);
+
+      tree fun = builtin_decl_implicit (is_clobber ? BUILT_IN_ASAN_CLOBBER_N
+					: BUILT_IN_ASAN_UNCLOBBER_N);
+      g = gimple_build_call (fun, 2, base_addr, sz_arg);
+      gimple_set_location (g, loc);
+      gsi_insert_after (iter, g, GSI_NEW_STMT);
+    }
+
   return false;
 }
 

@@ -1104,7 +1104,7 @@ asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
     return;
 
   tree unit_size = DECL_SIZE_UNIT (decl);
-  tree base = build_fold_addr_expr (decl);
+  tree base = build_fold_addr_expr (decl);  
 
   HOST_WIDE_INT flags = poison ? ASAN_MARK_CLOBBER : ASAN_MARK_UNCLOBBER;
 
