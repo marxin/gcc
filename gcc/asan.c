@@ -1022,7 +1022,8 @@ asan_function_start (void)
    an offset requested by alignment and similar stuff.  */
 
 static void
-asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
+asan_poison_stack_variables (rtx shadow_base, rtx base,
+			     HOST_WIDE_INT base_offset,
 			     HOST_WIDE_INT *offsets, int length,
 			     tree *decls, bool poison)
 {
@@ -1047,12 +1048,36 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
 				    (var_offset - base_offset, Pmode),
 				   NULL_RTX, 1, OPTAB_DIRECT);
 
-	rtx size = GEN_INT (var_end_offset - var_offset);
-	const char *fname = poison ?  "__asan_poison_stack_memory"
-	  :"__asan_unpoison_stack_memory";
-	rtx ret = init_one_libfunc (fname);
-	emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
-			   size, TYPE_MODE (pointer_sized_int_node));
+	HOST_WIDE_INT size = var_end_offset - var_offset;
+	if (size <= 64)
+	  {
+	    unsigned HOST_WIDE_INT r;
+	    if ((r = size % BITS_PER_UNIT) != 0)
+	      size += BITS_PER_UNIT - r;
+
+	    size /= BITS_PER_UNIT;
+
+	    rtx shadow_mem = gen_rtx_MEM (SImode, shadow_base);
+	    rtx var_mem = adjust_address (shadow_mem, QImode,
+					  (var_offset - base_offset)
+					  >> ASAN_SHADOW_SHIFT);
+
+	    char c = poison ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
+	    for (unsigned i = 0; i < size; ++i)
+	      {
+		emit_move_insn (var_mem, gen_int_mode (c, QImode));
+		var_mem = adjust_address (var_mem, QImode, 1);
+	      }
+	  }
+	else
+	  {
+	    rtx size_rtx = GEN_INT (size);
+	    const char *fname = poison ?  "__asan_poison_stack_memory"
+	      :"__asan_unpoison_stack_memory";
+	    rtx ret = init_one_libfunc (fname);
+	    emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
+			       size_rtx, TYPE_MODE (pointer_sized_int_node));
+	  }
 
 	if (dump_file && (dump_flags & TDF_DETAILS))
 	  fprintf (dump_file, "Emitting stack %s for variable: %s"
@@ -1274,7 +1299,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
     }
 
   /* Poison stack variables at the very beginning of a function.  */
-  asan_poison_stack_variables (base, base_offset, offsets, length,
+  asan_poison_stack_variables (shadow_base, base, base_offset, offsets, length,
 			       decls, true);
 
   do_pending_stack_adjust ();
@@ -1360,8 +1385,8 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 
   /* Unpoison stack variables at the end of a function.  As the former
      stack memory can be reused, we have to unpoison the memory.  */
-  asan_poison_stack_variables (base, base_offset, offsets, length, decls,
-			       false);
+  asan_poison_stack_variables (shadow_base, base, base_offset, offsets, length,
+			       decls, false);
 
   do_pending_stack_adjust ();
   if (lab)
