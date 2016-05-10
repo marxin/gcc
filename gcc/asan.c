@@ -313,9 +313,9 @@ asan_shadow_offset ()
 
 alias_set_type asan_shadow_set = -1;
 
-/* Pointer types to 1 resp. 2 byte integers in shadow memory.  A separate
+/* Pointer types to 1, 2 or 4 byte integers in shadow memory.  A separate
    alias set is used for all shadow memory accesses.  */
-static GTY(()) tree shadow_ptr_types[2];
+static GTY(()) tree shadow_ptr_types[3];
 
 /* Decl for __asan_option_detect_stack_use_after_return.  */
 static GTY(()) tree asan_detect_stack_use_after_return;
@@ -922,12 +922,16 @@ static void
 asan_init_shadow_ptr_types (void)
 {
   asan_shadow_set = new_alias_set ();
-  shadow_ptr_types[0] = build_distinct_type_copy (signed_char_type_node);
-  TYPE_ALIAS_SET (shadow_ptr_types[0]) = asan_shadow_set;
-  shadow_ptr_types[0] = build_pointer_type (shadow_ptr_types[0]);
-  shadow_ptr_types[1] = build_distinct_type_copy (short_integer_type_node);
-  TYPE_ALIAS_SET (shadow_ptr_types[1]) = asan_shadow_set;
-  shadow_ptr_types[1] = build_pointer_type (shadow_ptr_types[1]);
+  tree types[3] = { signed_char_type_node, short_integer_type_node,
+		    integer_type_node };
+
+  for (unsigned i = 0; i < 3; i++)
+    {
+      shadow_ptr_types[i] = build_distinct_type_copy (types[i]);
+      TYPE_ALIAS_SET (shadow_ptr_types[i]) = asan_shadow_set;
+      shadow_ptr_types[i] = build_pointer_type (shadow_ptr_types[i]);
+    }
+
   initialize_sanitizer_builtins ();
 }
 
@@ -1035,7 +1039,6 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
 		       "(%ldB)\n",
 		       IDENTIFIER_POINTER (DECL_NAME (decl)),
 		       var_end_offset - var_offset);
-	    gcc_assert (DECL_ABSTRACT_ORIGIN (decl));
 	    continue;
 	  }
 
@@ -2629,6 +2632,45 @@ asan_finish_file (void)
   flag_sanitize |= SANITIZE_ADDRESS;
 }
 
+static void
+asan_store_shadow_bytes (gimple_stmt_iterator *iter, location_t loc,
+			 tree base_addr,
+			 unsigned HOST_WIDE_INT base_addr_offset,
+			 unsigned char value, unsigned bytes)
+{
+  tree shadow_ptr_type;
+
+  switch (bytes)
+    {
+    case 1:
+      shadow_ptr_type = shadow_ptr_types[0];
+      break;
+    case 2:
+      shadow_ptr_type = shadow_ptr_types[1];
+      break;
+    case 4:
+      shadow_ptr_type = shadow_ptr_types[2];
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  unsigned HOST_WIDE_INT val = 0;
+  for (unsigned i = 0; i < bytes; ++i)
+    val |= (unsigned HOST_WIDE_INT) value << (BITS_PER_UNIT * i);
+
+  tree magic = build_int_cst (TREE_TYPE (shadow_ptr_type), val);
+  tree shadow = build_shadow_mem_access (iter, loc, base_addr,
+					 shadow_ptr_type, true);
+
+  tree dest = build2 (MEM_REF, TREE_TYPE (shadow_ptr_type), shadow,
+		      build_int_cst (shadow_ptr_type, base_addr_offset));
+
+  gimple *g = gimple_build_assign (dest, magic);
+  gimple_set_location (g, loc);
+  gsi_insert_after (iter, g, GSI_NEW_STMT);
+}
+
 /* Expand the ASAN_MARK builtins.  */
 
 bool
@@ -2657,28 +2699,26 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   gsi_replace (iter, g, false);
   tree base_addr = gimple_assign_lhs (g);
 
-  if (false)//size_in_bytes <= 64)
+  if (size_in_bytes <= 64)
     {
       /* Round up size of object.  */
-      HOST_WIDE_INT r;
-      if ((r = size_in_bytes % 8) != 0)
-	size_in_bytes += 8 - r;
+      unsigned HOST_WIDE_INT r;
+      if ((r = size_in_bytes % BITS_PER_UNIT) != 0)
+	size_in_bytes += BITS_PER_UNIT - r;
 
-      tree shadow_ptr_type = shadow_ptr_types[0];
+      unsigned HOST_WIDE_INT shadow_byte_size = size_in_bytes / BITS_PER_UNIT;
       char c = (char) is_clobber ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
-      tree magic = build_int_cst (TREE_TYPE (shadow_ptr_type), c);
 
-      tree shadow = build_shadow_mem_access (iter, loc, base_addr,
-					     shadow_ptr_type, true);
-
-      for (HOST_WIDE_INT i = 0; i < size_in_bytes / 8; ++i)
+      for (unsigned HOST_WIDE_INT offset = 0; offset < shadow_byte_size;)
 	{
-	  tree dest = build2 (MEM_REF, TREE_TYPE (shadow_ptr_type), shadow,
-			      build_int_cst (TREE_TYPE (shadow), i));
+	  unsigned size = 1;
+	  if (shadow_byte_size >= 4)
+	    size = 4;
+	  else if (shadow_byte_size >= 2)
+	    size = 2;
 
-	  g = gimple_build_assign (dest, magic);
-	  gimple_set_location (g, loc);
-	  gsi_insert_after (iter, g, GSI_NEW_STMT);
+	  asan_store_shadow_bytes (iter, loc, base_addr, offset, c, size);
+	  offset += size;
 	}
     }
   else
