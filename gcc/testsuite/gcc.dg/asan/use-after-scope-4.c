@@ -1,5 +1,5 @@
 // { dg-do run }
-// { dg-additional-options "-fsanitize=use-after-scope -fstack-reuse=none" }
+// { dg-additional-options "-fsanitize=use-after-scope" }
 
 int
 __attribute__((no_sanitize_address))

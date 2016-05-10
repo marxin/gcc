@@ -1,5 +1,5 @@
 // { dg-do run }
-// { dg-additional-options "-fsanitize=use-after-scope -fstack-reuse=none" }
+// { dg-additional-options "-fsanitize=use-after-scope" }
 // { dg-shouldfail "asan" }
 
 int *bar (int *x, int *y) { return y; }

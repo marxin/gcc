@@ -1,5 +1,5 @@
 // { dg-do run }
-// { dg-additional-options "-fsanitize=use-after-scope -fstack-reuse=none" }
+// { dg-additional-options "-fsanitize=use-after-scope" }
 
 int main(int argc, char **argv)
 {
