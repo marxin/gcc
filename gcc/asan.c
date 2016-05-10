@@ -313,8 +313,6 @@ asan_shadow_offset ()
 
 alias_set_type asan_shadow_set = -1;
 
-hash_set <tree> asan_inlined_variables;
-
 /* Pointer types to 1 resp. 2 byte integers in shadow memory.  A separate
    alias set is used for all shadow memory accesses.  */
 static GTY(()) tree shadow_ptr_types[2];
@@ -1028,14 +1026,18 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
     for (int l = length - 2; l > 0; l -= 2)
       {
 	tree decl = decls[l / 2 - 1];
-	if (asan_inlined_variables.contains (decl))
+	HOST_WIDE_INT var_offset = offsets[l];
+	HOST_WIDE_INT var_end_offset = offsets[l - 1];
+	if (!asan_handled_variables.contains (decl))
 	  {
+	    if (dump_file && (dump_flags & TDF_DETAILS))
+	      fprintf (dump_file, "Skipping stack emission for variable: %s "
+		       "(%ldB)\n",
+		       IDENTIFIER_POINTER (DECL_NAME (decl)),
+		       var_end_offset - var_offset);
 	    gcc_assert (DECL_ABSTRACT_ORIGIN (decl));
 	    continue;
 	  }
-
-	HOST_WIDE_INT var_offset = offsets[l];
-	HOST_WIDE_INT var_end_offset = offsets[l - 1];
 
 	rtx source = expand_binop (Pmode, add_optab, base,
 				   gen_int_mode
@@ -1048,6 +1050,13 @@ asan_poison_stack_variables (rtx base, HOST_WIDE_INT base_offset,
 	rtx ret = init_one_libfunc (fname);
 	emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
 			   size, TYPE_MODE (pointer_sized_int_node));
+
+	if (dump_file && (dump_flags & TDF_DETAILS))
+	  fprintf (dump_file, "Emitting stack %s for variable: %s"
+		   "(%ldB)\n",
+		   poison ? "poisoning" : "unpoisoning",
+		   IDENTIFIER_POINTER (DECL_NAME (decl)),
+		   var_end_offset - var_offset);
       }
 }
 
@@ -2632,10 +2641,14 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   bool is_clobber = (flags & ASAN_MARK_CLOBBER) != 0;
 
   tree base = gimple_call_arg (g, 1);
+  gcc_checking_assert (TREE_CODE (base) == ADDR_EXPR);
+  tree decl = TREE_OPERAND (base, 0);
+  gcc_checking_assert (TREE_CODE (decl) == VAR_DECL);
+  gcc_checking_assert (asan_handled_variables.contains (decl));
   tree len = gimple_call_arg (g, 2);
 
-  HOST_WIDE_INT size_in_bytes
-    = tree_fits_shwi_p (len) ? tree_to_shwi (len) : -1;
+  gcc_assert (tree_fits_shwi_p (len));
+  HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
   gcc_assert (size_in_bytes);
 
   g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
@@ -2644,7 +2657,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   gsi_replace (iter, g, false);
   tree base_addr = gimple_assign_lhs (g);
 
-  if (size_in_bytes <= 64)
+  if (false)//size_in_bytes <= 64)
     {
       /* Round up size of object.  */
       HOST_WIDE_INT r;
