@@ -11,9 +11,9 @@ main (void)
     ptr = &my_char[0];
   }
 
-  *(ptr+8) = 'c';
+  return *(ptr+8);
 }
 
 // { dg-output "ERROR: AddressSanitizer: stack-use-after-scope on address.*(\n|\r\n|\r)" }
-// { dg-output "WRITE of size 1 at.*" }
-// { dg-output ".*'my_char' <== Memory access at offset \[0-9\]* overflows this variable.*" }
+// { dg-output "READ of size 1 at.*" }
+// { dg-output ".*'my_char' <== Memory access at offset \[0-9\]* is inside this variable.*" }

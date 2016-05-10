@@ -1916,7 +1916,8 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
 	{
 	  /* Automatic vars in the current function will be always
 	     accessible.  */
-	  if (decl_function_context (inner) == current_function_decl)
+	  if (decl_function_context (inner) == current_function_decl
+	      && !asan_sanitize_use_after_scope ())
 	    return;
 	}
       /* Always instrument external vars, they might be dynamically
