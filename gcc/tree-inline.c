@@ -5459,11 +5459,6 @@ copy_decl_no_change (tree decl, copy_body_data *id)
 
   copy = copy_node (decl);
 
-  if (TREE_CODE (decl) == VAR_DECL
-      && asan_handled_variables.contains (decl)
-      && asan_sanitize_use_after_scope ())
-    asan_handled_variables.add (copy);
-
   /* The COPY is not abstract; it will be generated in DST_FN.  */
   DECL_ABSTRACT_P (copy) = false;
   lang_hooks.dup_lang_specific_decl (copy);

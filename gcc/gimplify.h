@@ -104,9 +104,4 @@ is_gimple_sizepos (tree expr)
 	  || CONTAINS_PLACEHOLDER_P (expr));
 }                                        
 
-/* Set of variable declarations that are going to be guarded by
-   use-after-scope sanitizer.  */
-
-extern hash_set <tree> asan_handled_variables;
-
 #endif /* GCC_GIMPLIFY_H */

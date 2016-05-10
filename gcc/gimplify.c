@@ -65,8 +65,6 @@ along with GCC; see the file COPYING3.  If not see
 /* Hash set of poisoned variables in a bind expr.  */
 static hash_set <tree> asan_poisoned_variables (13);
 
-hash_set <tree> asan_handled_variables(13);
-
 enum gimplify_omp_var_data
 {
   GOVD_SEEN = 1,
@@ -1104,8 +1102,6 @@ asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
   /* When within an OMP context, do not emit ASAN_MARK internal fns.  */
   if (gimplify_omp_ctxp)
     return;
-
-  asan_handled_variables.add (decl);
 
   tree unit_size = DECL_SIZE_UNIT (decl);
   tree base = build_fold_addr_expr (decl);  

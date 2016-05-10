@@ -243,6 +243,11 @@ static unsigned HOST_WIDE_INT asan_shadow_offset_value;
 static bool asan_shadow_offset_computed;
 static vec<char *> sanitized_sections;
 
+/* Set of variable declarations that are going to be guarded by
+   use-after-scope sanitizer.  */
+
+static hash_set <tree> asan_handled_variables(13);
+
 /* Sets shadow offset to value in string VAL.  */
 
 bool
@@ -2718,7 +2723,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   gcc_checking_assert (TREE_CODE (base) == ADDR_EXPR);
   tree decl = TREE_OPERAND (base, 0);
   gcc_checking_assert (TREE_CODE (decl) == VAR_DECL);
-  gcc_checking_assert (asan_handled_variables.contains (decl));
+  asan_handled_variables.add (decl);
   tree len = gimple_call_arg (g, 2);
 
   gcc_assert (tree_fits_shwi_p (len));
