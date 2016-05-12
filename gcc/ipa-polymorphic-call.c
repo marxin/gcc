@@ -177,6 +177,8 @@ ipa_polymorphic_call_context::restrict_to_inner_class (tree otr_type,
       && tree_fits_shwi_p (TYPE_SIZE (otr_type)))
     otr_type_size = tree_to_uhwi (TYPE_SIZE (otr_type));
 
+  unsigned HOST_WIDE_INT pos = 0, size;
+
   if (!type || offset < 0)
     goto no_useful_type_info;
 
@@ -187,7 +189,6 @@ ipa_polymorphic_call_context::restrict_to_inner_class (tree otr_type,
      for speculative_outer_type.  The second run has SPECULATIVE set.  */
   while (true)
     {
-      unsigned HOST_WIDE_INT pos, size;
       tree fld;
 
       /* If we do not know size of TYPE, we need to be more conservative

@@ -12588,7 +12588,7 @@ get_binfo_at_offset (tree binfo, HOST_WIDE_INT offset, tree expected_type)
 
   while (true)
     {
-      HOST_WIDE_INT pos, size;
+      HOST_WIDE_INT pos = 0, size;
       tree fld;
       int i;
 
