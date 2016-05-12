@@ -1461,7 +1461,8 @@ enable_fdo_optimizations (struct gcc_options *opts,
 const struct sanitizer_opts_s sanitizer_opts[] =
 {
 #define SANITIZER_OPT(name, flags) { #name, flags, sizeof #name - 1 }
-  SANITIZER_OPT (address, SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS),
+  SANITIZER_OPT (address, SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS
+		 | SANITIZE_USE_AFTER_SCOPE),
   SANITIZER_OPT (kernel-address, SANITIZE_ADDRESS | SANITIZE_KERNEL_ADDRESS),
   SANITIZER_OPT (thread, SANITIZE_THREAD),
   SANITIZER_OPT (leak, SANITIZE_LEAK),
