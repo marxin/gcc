@@ -51,7 +51,11 @@ struct pol_item
 
 struct address_t
 {
-  vec<struct pol_item> pol;
+  address_t (): pol (0)
+  {
+  }
+
+  auto_vec<struct pol_item> pol;
 };
 
 /* Structure to hold check informtation.  */
@@ -70,7 +74,7 @@ struct check_info
 /* Structure to hold checks information for BB.  */
 struct bb_checks
 {
-  vec<struct check_info, va_heap, vl_ptr> checks;
+  vec<struct check_info *, va_heap, vl_ptr> checks;
 };
 
 static void chkp_collect_value (tree ssa_name, address_t &res);
@@ -290,19 +294,19 @@ chkp_collect_addr_value (tree ptr, address_t &res)
 
     case MEM_REF:
       chkp_collect_value (TREE_OPERAND (obj, 0), res);
-      addr.pol.create (0);
+      addr.pol.truncate (0);
       chkp_collect_value (TREE_OPERAND (obj, 1), addr);
       chkp_add_addr_addr (res, addr);
-      addr.pol.release ();
+      addr.pol.truncate (0);
       break;
 
     case ARRAY_REF:
       chkp_collect_value (build_fold_addr_expr (TREE_OPERAND (obj, 0)), res);
-      addr.pol.create (0);
+      addr.pol.truncate (0);
       chkp_collect_value (TREE_OPERAND (obj, 1), addr);
       chkp_mult_addr (addr, array_ref_element_size (obj));
       chkp_add_addr_addr (res, addr);
-      addr.pol.release ();
+      addr.pol.truncate (0);
       break;
 
     case COMPONENT_REF:
@@ -310,19 +314,19 @@ chkp_collect_addr_value (tree ptr, address_t &res)
 	tree str = TREE_OPERAND (obj, 0);
 	tree field = TREE_OPERAND (obj, 1);
 	chkp_collect_value (build_fold_addr_expr (str), res);
-	addr.pol.create (0);
+	addr.pol.truncate (0);
 	chkp_collect_value (component_ref_field_offset (obj), addr);
 	chkp_add_addr_addr (res, addr);
-	addr.pol.release ();
+	addr.pol.truncate (0);
 	if (DECL_FIELD_BIT_OFFSET (field))
 	  {
-	    addr.pol.create (0);
+	    addr.pol.truncate (0);
 	    chkp_collect_value (fold_build2 (TRUNC_DIV_EXPR, size_type_node,
 					     DECL_FIELD_BIT_OFFSET (field),
 					     size_int (BITS_PER_UNIT)),
 			   addr);
 	    chkp_add_addr_addr (res, addr);
-	    addr.pol.release ();
+	    addr.pol.truncate (0);
 	  }
       }
       break;
@@ -386,18 +390,18 @@ chkp_collect_value (tree ptr, address_t &res)
     case PLUS_EXPR:
     case POINTER_PLUS_EXPR:
       chkp_collect_value (rhs1, res);
-      addr.pol.create (0);
+      addr.pol.truncate (0);
       chkp_collect_value (gimple_assign_rhs2 (def_stmt), addr);
       chkp_add_addr_addr (res, addr);
-      addr.pol.release ();
+      addr.pol.truncate (0);
       break;
 
     case MINUS_EXPR:
       chkp_collect_value (rhs1, res);
-      addr.pol.create (0);
+      addr.pol.truncate (0);
       chkp_collect_value (gimple_assign_rhs2 (def_stmt), addr);
       chkp_sub_addr_addr (res, addr);
-      addr.pol.release ();
+      addr.pol.truncate (0);
       break;
 
     case MULT_EXPR:
@@ -428,7 +432,6 @@ chkp_collect_value (tree ptr, address_t &res)
 static void
 chkp_fill_check_info (gimple *stmt, struct check_info *ci)
 {
-  ci->addr.pol.create (0);
   ci->bounds = gimple_call_arg (stmt, 1);
   chkp_collect_value (gimple_call_arg (stmt, 0), ci->addr);
   ci->type = (gimple_call_fndecl (stmt) == chkp_checkl_fndecl
@@ -449,8 +452,7 @@ chkp_release_check_info (void)
       for (n = 0; n < check_infos.length (); n++)
 	{
 	  for (m = 0; m < check_infos[n].checks.length (); m++)
-	    if (check_infos[n].checks[m].addr.pol.exists ())
-	      check_infos[n].checks[m].addr.pol.release ();
+	    delete check_infos[n].checks[m];
 	  check_infos[n].checks.release ();
 	}
       check_infos.release ();
@@ -473,7 +475,7 @@ chkp_init_check_info (void)
   for (n = 0; n < last_basic_block_for_fn (cfun); n++)
     {
       check_infos.safe_push (empty_bbc);
-      check_infos.last ().checks.create (0);
+      check_infos.last ().checks.truncate (0);
     }
 }
 
@@ -507,18 +509,18 @@ chkp_gather_checks_info (void)
 	  if (gimple_call_fndecl (stmt) == chkp_checkl_fndecl
 	      || gimple_call_fndecl (stmt) == chkp_checku_fndecl)
 	    {
-	      struct check_info ci;
+	      check_info *ci = new check_info ();
 
-	      chkp_fill_check_info (stmt, &ci);
+	      chkp_fill_check_info (stmt, ci);
 	      bbc->checks.safe_push (ci);
 
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		{
 		  fprintf (dump_file, "Adding check information:\n");
 		  fprintf (dump_file, "  bounds: ");
-		  print_generic_expr (dump_file, ci.bounds, 0);
+		  print_generic_expr (dump_file, ci->bounds, 0);
 		  fprintf (dump_file, "\n  address: ");
-		  chkp_print_addr (ci.addr);
+		  chkp_print_addr (ci->addr);
 		  fprintf (dump_file, "\n  check: ");
 		  print_gimple_stmt (dump_file, stmt, 0, 0);
 		}
@@ -562,15 +564,15 @@ chkp_get_check_result (struct check_info *ci, tree bounds)
   if (gimple_code (bnd_def) == GIMPLE_CALL
       && gimple_call_fndecl (bnd_def) == chkp_bndmk_fndecl)
     {
-      bound_val.pol.create (0);
+      bound_val.pol.truncate (0);
       chkp_collect_value (gimple_call_arg (bnd_def, 0), bound_val);
       if (ci->type == CHECK_UPPER_BOUND)
 	{
 	  address_t size_val;
-	  size_val.pol.create (0);
+	  size_val.pol.truncate (0);
 	  chkp_collect_value (gimple_call_arg (bnd_def, 1), size_val);
 	  chkp_add_addr_addr (bound_val, size_val);
-	  size_val.pol.release ();
+	  size_val.pol.truncate (0);
 	  chkp_add_addr_item (bound_val, integer_minus_one_node, NULL);
 	}
     }
@@ -606,7 +608,7 @@ chkp_get_check_result (struct check_info *ci, tree bounds)
       gcc_assert (TREE_CODE (DECL_INITIAL (bnd_var)) == ADDR_EXPR);
       var = TREE_OPERAND (DECL_INITIAL (bnd_var), 0);
 
-      bound_val.pol.create (0);
+      bound_val.pol.truncate (0);
       chkp_collect_value (DECL_INITIAL (bnd_var), bound_val);
       if (ci->type == CHECK_UPPER_BOUND)
 	{
@@ -630,11 +632,12 @@ chkp_get_check_result (struct check_info *ci, tree bounds)
 	    }
 
 	  address_t size_val;
-	  size_val.pol.create (0);
+	  size_val.pol.truncate (0);
 	  chkp_collect_value (size, size_val);
 	  chkp_add_addr_addr (bound_val, size_val);
-	  size_val.pol.release ();
+	  size_val.pol.truncate (0);
 	  chkp_add_addr_item (bound_val, integer_minus_one_node, NULL);
+	  size_val.pol.truncate (0);
 	}
     }
   else
@@ -677,7 +680,7 @@ chkp_get_check_result (struct check_info *ci, tree bounds)
       res = -1;
     }
 
-  bound_val.pol.release ();
+  bound_val.pol.truncate (0);
 
   return res;
 }
@@ -804,8 +807,8 @@ chkp_remove_excess_intersections (void)
 
       /* Iterate through all found checks in BB.  */
       for (no = 0; no < bbc->checks.length (); no++)
-	if (bbc->checks[no].stmt)
-	  chkp_use_outer_bounds_if_possible (&bbc->checks[no]);
+	if (bbc->checks[no]->stmt)
+	  chkp_use_outer_bounds_if_possible (bbc->checks[no]);
     }
 }
 
@@ -825,8 +828,8 @@ chkp_remove_constant_checks (void)
 
       /* Iterate through all found checks in BB.  */
       for (no = 0; no < bbc->checks.length (); no++)
-	if (bbc->checks[no].stmt)
-	  chkp_remove_check_if_pass (&bbc->checks[no]);
+	if (bbc->checks[no]->stmt)
+	  chkp_remove_check_if_pass (bbc->checks[no]);
     }
 }
 
@@ -1035,10 +1038,10 @@ chkp_optimize_string_function_calls (void)
 
 	      /* If size passed to call is known and > 0
 		 then we may insert checks unconditionally.  */
-	      size_val.pol.create (0);
+	      size_val.pol.truncate (0);
 	      chkp_collect_value (size, size_val);
 	      known = chkp_is_constant_addr (size_val, &sign);
-	      size_val.pol.release ();
+	      size_val.pol.truncate (0);
 
 	      /* If we are not sure size is not zero then we have
 		 to perform runtime check for size and perform
@@ -1248,7 +1251,7 @@ chkp_reduce_bounds_lifetime (void)
 static void
 chkp_opt_init (void)
 {
-  check_infos.create (0);
+  check_infos.truncate (0);
 
   calculate_dominance_info (CDI_DOMINATORS);
   calculate_dominance_info (CDI_POST_DOMINATORS);
