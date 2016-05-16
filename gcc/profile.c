@@ -1328,6 +1328,10 @@ branch_prob (void)
 
   free_aux_for_edges ();
 
+  /* Free all histogram_values allocated in gimple_alloc_histogram_value.  */
+  for (unsigned i = 0; i < values.length (); i++)
+    free (values[i]);
+
   values.release ();
   free_edge_list (el);
   coverage_end_function (lineno_checksum, cfg_checksum);
