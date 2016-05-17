@@ -4995,18 +4995,21 @@ get_computation_cost_at (struct ivopts_data *data,
      (symbol/var1/const parts may be omitted).  If we are looking for an
      address, find the cost of addressing this.  */
   if (address_p)
-    return cost + get_address_cost (symbol_present, var_present,
-				    offset, ratio, cstepi,
-				    mem_mode,
-				    TYPE_ADDR_SPACE (TREE_TYPE (utype)),
-				    speed, stmt_is_after_inc, can_autoinc);
+    {
+      cost += get_address_cost (symbol_present, var_present,
+				offset, ratio, cstepi,
+				mem_mode,
+				TYPE_ADDR_SPACE (TREE_TYPE (utype)),
+				speed, stmt_is_after_inc, can_autoinc);
+      goto ret;
+    }
 
   /* Otherwise estimate the costs for computing the expression.  */
   if (!symbol_present && !var_present && !offset)
     {
       if (ratio != 1)
 	cost += mult_by_coeff_cost (ratio, TYPE_MODE (ctype), speed);
-      return cost;
+      goto ret;
     }
 
   /* Symbol + offset should be compile-time computable so consider that they
@@ -5025,7 +5028,7 @@ get_computation_cost_at (struct ivopts_data *data,
   aratio = ratio > 0 ? ratio : -ratio;
   if (aratio != 1)
     cost += mult_by_coeff_cost (aratio, TYPE_MODE (ctype), speed);
-  return cost;
+  goto ret;
 
 fallback:
   if (can_autoinc)
@@ -5041,8 +5044,31 @@ fallback:
     if (address_p)
       comp = build_simple_mem_ref (comp);
 
-    return comp_cost (computation_cost (comp, speed), 0);
+    cost = comp_cost (computation_cost (comp, speed), 0);
   }
+
+ret:
+  /* Scale (multiply) the computed cost (except scratch part that should be
+     hoisted out a loop) by header->frequency / at->frequency,
+     which makes expected cost more accurate.  */
+   int loop_freq = data->current_loop->header->frequency;
+   int bb_freq = at->bb->frequency;
+   if (loop_freq != 0)
+     {
+       gcc_assert (cost.scratch <= cost.cost);
+       int scaled_cost
+	 = cost.scratch + (cost.cost - cost.scratch) * bb_freq / loop_freq;
+
+       if (dump_file && (dump_flags & TDF_DETAILS))
+	 fprintf (dump_file, "Scaling iv_use based on cand %d "
+		  "by %2.2f: %d (scratch: %d) -> %d (%d/%d)\n",
+		  cand->id, 1.0f * bb_freq / loop_freq, cost.cost,
+		  cost.scratch, scaled_cost, bb_freq, loop_freq);
+
+       cost.cost = scaled_cost;
+     }
+
+   return cost;
 }
 
 /* Determines the cost of the computation by that USE is expressed
