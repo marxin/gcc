@@ -3813,7 +3813,8 @@ rewrite_expr_tree (gimple *stmt, unsigned int opindex,
 	     some redundant operations, so unless we are just swapping the
 	     arguments or unless there is no change at all (then we just
 	     return lhs), force creation of a new SSA_NAME.  */
-	  if (changed || ((rhs1 != oe2->op || rhs2 != oe1->op) && opindex))
+	  if (changed || ((rhs1 != oe2->op || rhs2 != oe1->op) && opindex)
+	      || find_insert_point (stmt, oe1->op, oe2->op) != stmt)
 	    {
 	      gimple *insert_point
 		= find_insert_point (stmt, oe1->op, oe2->op);
@@ -3830,8 +3831,6 @@ rewrite_expr_tree (gimple *stmt, unsigned int opindex,
 	    }
 	  else
 	    {
-	      gcc_checking_assert (find_insert_point (stmt, oe1->op, oe2->op)
-				   == stmt);
 	      gimple_assign_set_rhs1 (stmt, oe1->op);
 	      gimple_assign_set_rhs2 (stmt, oe2->op);
 	      update_stmt (stmt);
@@ -3876,7 +3875,7 @@ rewrite_expr_tree (gimple *stmt, unsigned int opindex,
 	 Otherwise ensure the old lhs SSA_NAME is not reused and
 	 create a new stmt as well, so that any debug stmts will be
 	 properly adjusted.  */
-      if (changed)
+      if (changed || find_insert_point (stmt, new_rhs1, oe->op) != stmt)
 	{
 	  gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
 	  unsigned int uid = gimple_uid (stmt);
@@ -3894,8 +3893,6 @@ rewrite_expr_tree (gimple *stmt, unsigned int opindex,
 	}
       else
 	{
-	  gcc_checking_assert (find_insert_point (stmt, new_rhs1, oe->op)
-			       == stmt);
 	  gimple_assign_set_rhs1 (stmt, new_rhs1);
 	  gimple_assign_set_rhs2 (stmt, oe->op);
 	  update_stmt (stmt);
