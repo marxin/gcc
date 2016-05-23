@@ -469,6 +469,9 @@ single_likely_exit (struct loop *loop)
       if (profile_status_for_fn (cfun) != PROFILE_ABSENT
 	  && ex->probability < 5 && !ex->count)
 	continue;
+      if (ex->dest && EDGE_COUNT (ex->dest->succs) == 1
+	  && EDGE_SUCC (ex->dest, 0)->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
+	continue;
       if (!found)
 	found = ex;
       else

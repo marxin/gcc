@@ -591,6 +591,70 @@ remove_redundant_iv_tests (struct loop *loop)
   return changed;
 }
 
+static void
+simplify_loop_exit_condition (struct loop *loop)
+{
+  edge exit = single_likely_exit (loop);
+
+  if (loop->nb_iterations_upper_bound == 0)
+    return;
+
+  gcond *cond = dyn_cast <gcond *> (last_stmt (exit->src));
+  if (cond == NULL)
+    return;
+
+  tree iv = gimple_cond_lhs (cond);
+  tree bound = gimple_cond_rhs (cond);
+
+  gimple_stmt_iterator it = gsi_last_bb (exit->src);
+  gsi_prev (&it);
+
+  if (gsi_end_p (it))
+    return;
+
+  gimple *inc_stmt = gsi_stmt (it);
+  if (!is_a <gassign *> (inc_stmt))
+    return;
+
+  tree new_iv = gimple_assign_lhs (inc_stmt);
+  if (gimple_assign_rhs1 (inc_stmt) != iv)
+    return;
+
+  if (gimple_num_ops (inc_stmt) != 3
+      || TREE_CODE (gimple_assign_rhs2 (inc_stmt)) != INTEGER_CST)
+    return;
+
+  tree step = gimple_assign_rhs2 (inc_stmt);
+  if (!integer_onep (step) && !integer_minus_onep (step))
+    return;
+
+  bool positive = integer_onep (step);
+  tree type = TREE_TYPE (iv);
+  if (positive
+      && operand_equal_p (TYPE_MAX_VALUE (type), bound, OEP_ONLY_CONST))
+    return;
+  else if (!positive
+	   && operand_equal_p (TYPE_MIN_VALUE (type), bound, OEP_ONLY_CONST))
+    return;
+
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "Simplified exit condition that used an old IV: ");
+      print_gimple_stmt (dump_file, cond, 0, TDF_SLIM);
+    }
+
+  gimple_cond_set_code (cond, positive ? GT_EXPR : LT_EXPR);
+  gimple_cond_set_lhs (cond, new_iv);
+  update_stmt (cond);
+
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "New condition: ");
+      print_gimple_stmt (dump_file, cond, 0, TDF_SLIM);
+      fprintf (dump_file, "\n");
+    }
+}
+
 /* Stores loops that will be unlooped after we process whole loop tree. */
 static vec<loop_p> loops_to_unloop;
 static vec<int> loops_to_unloop_nunroll;
@@ -1108,6 +1172,22 @@ canonicalize_loop_induction_variables (struct loop *loop,
 	       (int)maxiter);
     }
 
+  /* If we know that an Fortran induction variable cannot reach INT_MAX
+     (INT_MIN) value, then we can simplify lopp exit test from:
+
+     old_i = i;
+     i += 1;
+     if (old_i == upper_bound)
+       goto exit_loop;
+
+     to:
+
+     i += 1;
+     if (i > upper_bound)
+       goto exit;
+
+     */
+
   /* Remove exits that are known to be never taken based on loop bound.
      Needs to be called after compilation of max_loop_iterations_int that
      populates the loop bounds.  */
@@ -1115,6 +1195,10 @@ canonicalize_loop_induction_variables (struct loop *loop,
 
   if (try_unroll_loop_completely (loop, exit, niter, ul, maxiter, locus))
     return true;
+
+  if (niter && !chrec_contains_undetermined (niter)
+      && single_likely_exit (loop))
+    simplify_loop_exit_condition (loop);
 
   if (create_iv
       && niter && !chrec_contains_undetermined (niter)
