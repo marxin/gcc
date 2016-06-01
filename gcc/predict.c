@@ -1025,6 +1025,16 @@ prune_predictions_for_bb (basic_block bb)
     }
 }
 
+static sreal
+get_edge_probability (edge_prediction *pred, edge e, unsigned nedges)
+{
+  sreal p = sreal (pred->ep_probability) / REG_BR_PROB_BASE;
+  if (pred->ep_edge != e)
+    p = (sreal::one - p) / (nedges - 1);
+
+  return p;
+}
+
 /* Combine predictions into single probability and store them into CFG.
    Remove now useless prediction entries.
    If DRY_RUN is set, only produce dumps and do not modify profile.  */
@@ -1085,8 +1095,7 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
 	  enum br_predictor predictor = pred->ep_predictor;
 	  sreal probability = sreal (pred->ep_probability) / REG_BR_PROB_BASE;
 
-	  if (pred->ep_edge != first)
-	    probability = sreal::one - probability;
+	  probability = get_edge_probability (pred, first, nedges);
 
 	  found = true;
 	  /* First match heuristics would be widly confused if we predicted
@@ -1100,11 +1109,8 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
 		   pred2; pred2 = pred2->ep_next)
 	       if (pred2 != pred && pred2->ep_predictor == pred->ep_predictor)
 	         {
-	           sreal probability2
-		     = sreal (pred->ep_probability) / REG_BR_PROB_BASE;
-
-		   if (pred2->ep_edge != first)
-		     probability2 = sreal::one - probability2;
+		   sreal probability2 = get_edge_probability (pred, first,
+							      nedges);
 
 		   if ((probability < sreal::half) !=
 		       (probability2 < sreal::half))
