@@ -115,6 +115,9 @@ public:
     return max;
   }
 
+  static sreal one;
+  static sreal half;
+
 private:
   inline void normalize ();
   inline void normalize_up ();

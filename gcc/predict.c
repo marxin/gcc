@@ -1032,10 +1032,9 @@ prune_predictions_for_bb (basic_block bb)
 static void
 combine_predictions_for_bb (basic_block bb, bool dry_run)
 {
-  int best_probability = PROB_EVEN;
+  sreal best_probability = PROB_EVEN;
   enum br_predictor best_predictor = END_PREDICTORS;
-  int combined_probability = REG_BR_PROB_BASE / 2;
-  int d;
+  sreal combined_probability = sreal::half;
   bool first_match = false;
   bool found = false;
   struct edge_prediction *pred;
@@ -1084,10 +1083,10 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
       for (pred = *preds; pred; pred = pred->ep_next)
 	{
 	  enum br_predictor predictor = pred->ep_predictor;
-	  int probability = pred->ep_probability;
+	  sreal probability = sreal (pred->ep_probability) / REG_BR_PROB_BASE;
 
 	  if (pred->ep_edge != first)
-	    probability = REG_BR_PROB_BASE - probability;
+	    probability = sreal::one - probability;
 
 	  found = true;
 	  /* First match heuristics would be widly confused if we predicted
@@ -1095,44 +1094,49 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
 	  if (best_predictor > predictor)
 	    {
               struct edge_prediction *pred2;
-	      int prob = probability;
+	      sreal prob = probability;
 
 	      for (pred2 = (struct edge_prediction *) *preds;
 		   pred2; pred2 = pred2->ep_next)
 	       if (pred2 != pred && pred2->ep_predictor == pred->ep_predictor)
 	         {
-	           int probability2 = pred->ep_probability;
+	           sreal probability2
+		     = sreal (pred->ep_probability) / REG_BR_PROB_BASE;
 
 		   if (pred2->ep_edge != first)
-		     probability2 = REG_BR_PROB_BASE - probability2;
+		     probability2 = sreal::one - probability2;
 
-		   if ((probability < REG_BR_PROB_BASE / 2) !=
-		       (probability2 < REG_BR_PROB_BASE / 2))
+		   if ((probability < sreal::half) !=
+		       (probability2 < sreal::half))
 		     break;
 
 		   /* If the same predictor later gave better result, go for it! */
-		   if ((probability >= REG_BR_PROB_BASE / 2 && (probability2 > probability))
-		       || (probability <= REG_BR_PROB_BASE / 2 && (probability2 < probability)))
+		   if ((probability >= sreal::half
+			&& (probability2 > probability))
+		       || (probability <= sreal::half
+			   && (probability2 < probability)))
 		     prob = probability2;
 		 }
 	      if (!pred2)
 	        best_probability = prob, best_predictor = predictor;
 	    }
 
-	  d = (combined_probability * probability
-	       + (REG_BR_PROB_BASE - combined_probability)
-	       * (REG_BR_PROB_BASE - probability));
+	  sreal d = (combined_probability * probability
+		     + (sreal::one - combined_probability)
+		     * (sreal::one - probability));
 
 	  /* Use FP math to avoid overflows of 32bit integers.  */
 	  if (d == 0)
 	    /* If one probability is 0% and one 100%, avoid division by zero.  */
-	    combined_probability = REG_BR_PROB_BASE / 2;
+	    combined_probability = sreal::half;
 	  else
-	    combined_probability = (((double) combined_probability)
-				    * probability
-		    		    * REG_BR_PROB_BASE / d + 0.5);
+	    combined_probability = combined_probability * probability / d;
 	}
     }
+
+  int combined_probability_int = (combined_probability *
+				  REG_BR_PROB_BASE).to_int ();
+  int best_probability_int = (best_probability * REG_BR_PROB_BASE).to_int ();
 
   /* Decide which heuristic to use.  In case we didn't match anything,
      use no_prediction heuristic, in case we did match, use either
@@ -1142,18 +1146,19 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
     first_match = true;
 
   if (!found)
-    dump_prediction (dump_file, PRED_NO_PREDICTION, combined_probability, bb);
+    dump_prediction (dump_file, PRED_NO_PREDICTION, combined_probability_int,
+		     bb);
   else
     {
-      dump_prediction (dump_file, PRED_DS_THEORY, combined_probability, bb,
+      dump_prediction (dump_file, PRED_DS_THEORY, combined_probability_int, bb,
 		       !first_match ? NONE : IGNORED);
-      dump_prediction (dump_file, PRED_FIRST_MATCH, best_probability, bb,
+      dump_prediction (dump_file, PRED_FIRST_MATCH, best_probability_int, bb,
 		       first_match ? NONE : IGNORED);
     }
 
   if (first_match)
-    combined_probability = best_probability;
-  dump_prediction (dump_file, PRED_COMBINED, combined_probability, bb);
+    combined_probability_int = best_probability_int;
+  dump_prediction (dump_file, PRED_COMBINED, combined_probability_int, bb);
 
   if (preds)
     {
@@ -1171,8 +1176,8 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
 
   if (!bb->count && !dry_run)
     {
-      first->probability = combined_probability;
-      second->probability = REG_BR_PROB_BASE - combined_probability;
+      first->probability = combined_probability_int;
+      second->probability = REG_BR_PROB_BASE - combined_probability_int;
     }
 }
 

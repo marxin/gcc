@@ -233,3 +233,6 @@ sreal::operator/ (const sreal &other) const
   r.normalize ();
   return r;
 }
+
+sreal sreal::one (1);
+sreal sreal::half (1, -1);
