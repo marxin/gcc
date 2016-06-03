@@ -2474,8 +2474,10 @@ add_string_csts (constant_descriptor_tree **slot,
       && TREE_ASM_WRITTEN (desc->value)
       && asan_protect_global (desc->value))
     {
-      asan_add_global (SYMBOL_REF_DECL (XEXP (desc->rtl, 0)),
-		       aascd->type, aascd->v);
+      tree symbol = SYMBOL_REF_DECL (XEXP (desc->rtl, 0));
+
+      if (tree_fits_uhwi_p (DECL_SIZE_UNIT (symbol)))
+	asan_add_global (symbol, aascd->type, aascd->v);
     }
   return 1;
 }
