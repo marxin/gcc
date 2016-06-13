@@ -59,7 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 
 enum predictor_reason
 {
-  NONE,
+  VALID,
   IGNORED,
   SINGLE_EDGE_DUPLICATE,
   EDGE_PAIR_DUPLICATE
@@ -739,7 +739,7 @@ invert_br_probabilities (rtx insn)
 
 static void
 dump_prediction (FILE *file, enum br_predictor predictor, int probability,
-		 basic_block bb, enum predictor_reason reason = NONE,
+		 basic_block bb, enum predictor_reason reason = VALID,
 		 edge ep_edge = NULL)
 {
   edge e = ep_edge;
@@ -864,9 +864,9 @@ combine_predictions_for_insn (rtx_insn *insn, basic_block bb)
   else
     {
       dump_prediction (dump_file, PRED_DS_THEORY, combined_probability,
-		       bb, !first_match ? NONE : IGNORED);
+		       bb, !first_match ? VALID : IGNORED);
       dump_prediction (dump_file, PRED_FIRST_MATCH, best_probability,
-		       bb, first_match ? NONE: IGNORED);
+		       bb, first_match ? VALID : IGNORED);
     }
 
   if (first_match)
@@ -883,7 +883,7 @@ combine_predictions_for_insn (rtx_insn *insn, basic_block bb)
 
 	  dump_prediction (dump_file, predictor, probability, bb,
 			   (!first_match || best_predictor == predictor)
-			   ? NONE : IGNORED);
+			   ? VALID : IGNORED);
 	  *pnote = XEXP (*pnote, 1);
 	}
       else
@@ -1150,9 +1150,9 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
   else
     {
       dump_prediction (dump_file, PRED_DS_THEORY, combined_probability, bb,
-		       !first_match ? NONE : IGNORED);
+		       !first_match ? VALID : IGNORED);
       dump_prediction (dump_file, PRED_FIRST_MATCH, best_probability, bb,
-		       first_match ? NONE : IGNORED);
+		       first_match ? VALID : IGNORED);
     }
 
   if (first_match)
@@ -1168,7 +1168,7 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
 
 	  dump_prediction (dump_file, predictor, probability, bb,
 			   (!first_match || best_predictor == predictor)
-			   ? NONE : IGNORED, pred->ep_edge);
+			   ? VALID : IGNORED, pred->ep_edge);
 	}
     }
   clear_bb_predictions (bb);
