@@ -97,6 +97,9 @@ DEF_PREDICTOR (PRED_LOOP_EXIT, "loop exit", HITRATE (92),
 DEF_PREDICTOR (PRED_LOOP_EXTRA_EXIT, "extra loop exit", HITRATE (83),
 	       PRED_FLAG_FIRST_MATCH)
 
+DEF_PREDICTOR (PRED_LOOP_NEST_GUARD, "loop nest guard",
+	       HITRATE (95), PRED_FLAG_FIRST_MATCH)
+
 /* Pointers are usually not NULL.  */
 DEF_PREDICTOR (PRED_POINTER, "pointer", HITRATE (70), 0)
 DEF_PREDICTOR (PRED_TREE_POINTER, "pointer (on trees)", HITRATE (70), 0)

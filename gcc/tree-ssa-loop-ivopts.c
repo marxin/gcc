@@ -7171,6 +7171,7 @@ create_new_ivs (struct ivopts_data *data, struct iv_ca *set)
       fprintf (dump_file, ", " HOST_WIDE_INT_PRINT_UNSIGNED " expressions",
 	       (unsigned HOST_WIDE_INT) set->used_inv_exprs->elements ());
       fprintf (dump_file, ", %lu IVs:\n", bitmap_count_bits (set->cands));
+      dump_bb (dump_file, data->current_loop->header, 0, 0);
       EXECUTE_IF_SET_IN_BITMAP (set->cands, 0, i, bi)
 	{
 	  cand = data->vcands[i];

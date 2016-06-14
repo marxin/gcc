@@ -1669,12 +1669,87 @@ predict_extra_loop_exits (edge exit_edge)
 }
 
 
+/* Find simple induction variables.  */
+
+static void
+find_simple_ivs (struct loop *loop, auto_vec <gphi *> *ivs)
+{
+  gphi_iterator psi;
+  affine_iv iv;
+
+  for (psi = gsi_start_phis (loop->header); !gsi_end_p (psi); gsi_next (&psi))
+    {
+      gphi *phi = psi.phi ();
+
+      if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (PHI_RESULT (phi)))
+	continue;
+
+      if (virtual_operand_p (PHI_RESULT (phi)))
+	continue;
+
+      if (!simple_iv (loop, loop, PHI_RESULT (phi), &iv, true))
+	continue;
+
+      if (integer_zerop (iv.step))
+	continue;
+
+      ivs->safe_push (phi);
+    }
+}
+
+// TODO: add comment
+
+static basic_block
+find_loop_preheader (struct loop *loop)
+{
+  auto_vec <gphi *> ivs;
+  find_simple_ivs (loop, &ivs);
+
+  if (ivs.length () != 1)
+    return loop->header;
+
+  gphi *phi = ivs[0];
+
+  tree def = gimple_phi_arg_def (phi, 0);
+  if (TREE_CODE (def) != SSA_NAME)
+    return loop->header;
+
+  gimple *d = SSA_NAME_DEF_STMT (def);
+  for (;;)
+    {
+      if (is_a <gphi *> (d) && gimple_phi_num_args (d) == 1
+	  && TREE_CODE (gimple_phi_arg_def (d, 0)) == SSA_NAME)
+	d = SSA_NAME_DEF_STMT (gimple_phi_arg_def (d, 0));
+      else if (is_a <gassign *> (d)
+	       && gimple_assign_single_p (d)
+	       && TREE_CODE (gimple_assign_rhs1 (d)) == SSA_NAME)
+	d = SSA_NAME_DEF_STMT (gimple_assign_rhs1 (d));
+      else
+	break;
+    }
+
+  basic_block def_bb = d->bb;
+  if (!is_a <gassign *> (d) || !gimple_assign_single_p (d))
+    return loop->header;
+
+  def = gimple_assign_lhs (d);
+
+  gimple *stmt = gsi_stmt (gsi_last_bb (def_bb));
+  if (is_a <gcond *> (stmt)
+      && (gimple_cond_lhs (stmt) == def || gimple_cond_rhs (stmt) == def))
+    return def_bb;
+  else
+    return loop->header;
+}
+
 /* Predict edge probabilities by exploiting loop structure.  */
 
 static void
 predict_loops (void)
 {
   struct loop *loop;
+
+  hash_set <struct loop *> deep_loop_nest_set;
 
   /* Try to predict out blocks in a loop that are not part of a
      natural loop.  */
@@ -1840,6 +1915,87 @@ predict_loops (void)
 	    predict_iv_comparison (loop, bb, loop_bound_var, loop_iv_base,
 				   loop_bound_code,
 				   tree_to_shwi (loop_bound_step));
+	}
+
+      /* Consider following situation in a loop nest:
+
+	 for (loop1)
+	   ...
+	   if (cond)
+	     for (loop2)
+	   else
+	     goto latch
+
+	 guess that cond is unlikely.  */
+      struct loop *outer_loop = loop_outer (loop);
+      basic_block header = outer_loop->header;
+
+      bool is_deep_loop = loop_depth (loop) >= 8;
+
+      if ((is_deep_loop || deep_loop_nest_set.contains (loop))
+	  && !dominated_by_p (CDI_POST_DOMINATORS, header, loop->header))
+	{
+	  deep_loop_nest_set.add (loop_outer (loop));
+
+	  /* Find a basic block with a condition that breaks postdominance.  */
+	  basic_block cond_block = outer_loop->header;
+	  while (EDGE_COUNT (cond_block->succs) == 1)
+	    cond_block = EDGE_SUCC (cond_block, 0)->dest;
+
+	  /* Find simple IVs for outer loop.  */
+	  auto_vec <gphi *> ivs;
+	  find_simple_ivs (outer_loop, &ivs);
+
+	  /* A valid cond BB.  */
+	  if (EDGE_COUNT (cond_block->succs) == 2)
+	    {
+	      gimple *cond = gsi_stmt (gsi_last_bb (cond_block));
+	      /* Verify that outer loop condition does not compare directly
+		 an IV.  */
+	      bool cond_pattern = true;
+
+	      for (unsigned i = 0; i < ivs.length (); i++)
+		if (gimple_cond_lhs (cond) == PHI_RESULT (ivs[i])
+		    || gimple_cond_rhs (cond) == PHI_RESULT (ivs[i]))
+		  cond_pattern = false;
+
+	      if (cond_pattern)
+		{
+		  basic_block inner_header = find_loop_preheader (loop);
+		  if (inner_header)
+		    {
+		      edge e1 = EDGE_SUCC (cond_block, 0);
+		      edge e2 = EDGE_SUCC (cond_block, 1);
+
+		      if (dominated_by_p (CDI_POST_DOMINATORS, e1->dest,
+					  inner_header))
+			std::swap (e1, e2);
+
+		      /* If inner loop preheader is dominated by E2, then the
+			 identified condition is really LOOP GUARD.  */
+		      if (dominated_by_p (CDI_POST_DOMINATORS, e2->dest,
+					  inner_header)
+			  && !dominated_by_p (CDI_POST_DOMINATORS, cond_block,
+					      inner_header)
+			  && !edge_predicted_by_p (e2, PRED_LOOP_NEST_GUARD,
+						   NOT_TAKEN))
+			{
+			  if (dump_file)
+			    {
+			      fprintf (dump_file, "LOOP guard for loop: %d"
+				       " (depth: %d)\n", loop->num,
+				       loop_depth (loop));
+			      dump_bb (dump_file, outer_loop->header, 0,
+				       TDF_SLIM);
+			      dump_bb (dump_file, loop->header, 0,
+				       TDF_SLIM);
+			    }
+			    predict_edge_def (e2, PRED_LOOP_NEST_GUARD,
+					      NOT_TAKEN);
+			}
+		    }
+		}
+	    }
 	}
 
       /* Free basic blocks from get_loop_body.  */
