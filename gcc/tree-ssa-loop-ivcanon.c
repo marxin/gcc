@@ -63,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-inline.h"
 #include "tree-cfgcleanup.h"
 #include "builtins.h"
+#include "sreal.h"
 
 /* Specifies types of loops that may be unrolled.  */
 
@@ -152,6 +153,21 @@ struct loop_size
   int num_branches_on_hot_path;
 };
 
+/* Describe time of loop as detected by tree_estimate_loop_size.  */
+struct loop_time
+{
+  /* Expected time per iteration.  */
+  sreal iteration_time;
+
+  /* Time likely optimized out in peeled iterations of loop.  */
+  sreal eliminated_by_peeling;
+
+  /* Same statistics for last iteration of loop: it is smaller because
+     instructions after exit are not executed.  */
+  sreal last_iteration;
+  sreal last_iteration_eliminated_by_peeling;
+};
+
 /* Return true if OP in STMT will be constant after peeling LOOP.  */
 
 static bool
@@ -208,13 +224,15 @@ constant_after_peeling (tree op, gimple *stmt, struct loop *loop)
 
 static bool
 tree_estimate_loop_size (struct loop *loop, edge exit, edge edge_to_cancel,
-			 struct loop_size *size, int upper_bound)
+			 struct loop_size *size, int upper_bound,
+			 struct loop_time *time)
 {
   basic_block *body = get_loop_body (loop);
   gimple_stmt_iterator gsi;
   unsigned int i;
   bool after_exit;
   vec<basic_block> path = get_loop_hot_path (loop);
+  sreal div = 0;
 
   size->overall = 0;
   size->eliminated_by_peeling = 0;
@@ -225,6 +243,19 @@ tree_estimate_loop_size (struct loop *loop, edge exit, edge edge_to_cancel,
   size->non_call_stmts_on_hot_path = 0;
   size->num_branches_on_hot_path = 0;
   size->constant_iv = 0;
+  if (time)
+    {
+      time->iteration_time = 0;
+      time->eliminated_by_peeling = 0;
+      time->last_iteration = 0;
+      time->last_iteration_eliminated_by_peeling = 0;
+      if (loop->header->count)
+	div = loop->header->count;
+      if (loop->header->frequency)
+	div = loop->header->frequency;
+      else
+	div = 1;
+    }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file, "Estimating sizes for loop %i\n", loop->num);
@@ -243,13 +274,29 @@ tree_estimate_loop_size (struct loop *loop, edge exit, edge edge_to_cancel,
 	{
 	  gimple *stmt = gsi_stmt (gsi);
 	  int num = estimate_num_insns (stmt, &eni_size_weights);
+	  sreal stmt_time = num;
 	  bool likely_eliminated = false;
 	  bool likely_eliminated_last = false;
 	  bool likely_eliminated_peeled = false;
 
+	  sreal scale = 1;
+	  if (time && div != 0)
+	    {
+	      if (loop->header->count)
+		scale =  sreal (body[i]->count) / div;
+	      else if (loop->header->frequency)
+		scale = sreal (body[i]->frequency) / div;
+	    }
+
+	  stmt_time *= scale;
+
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
-	      fprintf (dump_file, "  size: %3i ", num);
+	      if (time)
+		fprintf (dump_file, "  size: %3i time:%6.3f scale:%6.3f ", num,
+			 stmt_time.to_double (), scale.to_double ());
+	      else
+		fprintf (dump_file, "  size: %3i ", num);
 	      print_gimple_stmt (dump_file, gsi_stmt (gsi), 0, 0);
 	    }
 
@@ -325,15 +372,27 @@ tree_estimate_loop_size (struct loop *loop, edge exit, edge edge_to_cancel,
 	    }
 
 	  size->overall += num;
+	  if (time)
+	    time->iteration_time += stmt_time;
 	  if (likely_eliminated || likely_eliminated_peeled)
-	    size->eliminated_by_peeling += num;
+	    {
+	      size->eliminated_by_peeling += num;
+	      if (time)
+		time->eliminated_by_peeling += stmt_time;
+	    }
 	  if (!after_exit)
 	    {
 	      size->last_iteration += num;
+	      if (time)
+		time->last_iteration += stmt_time;
 	      if (likely_eliminated || likely_eliminated_last)
-		size->last_iteration_eliminated_by_peeling += num;
+		{
+		  size->last_iteration_eliminated_by_peeling += num;
+		  if (time)
+		    time->last_iteration_eliminated_by_peeling += stmt_time;
+		}
 	    }
-	  if ((size->overall * 3 / 2 - size->eliminated_by_peeling
+	  if ((size->overall - size->eliminated_by_peeling
 	      - size->last_iteration_eliminated_by_peeling) > upper_bound)
 	    {
               free (body);
@@ -376,9 +435,17 @@ tree_estimate_loop_size (struct loop *loop, edge exit, edge edge_to_cancel,
     }
   path.release ();
   if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, "size: %i-%i, last_iteration: %i-%i\n", size->overall,
-    	     size->eliminated_by_peeling, size->last_iteration,
-	     size->last_iteration_eliminated_by_peeling);
+    {
+      fprintf (dump_file, "size: %i-%i, last_iteration: %i-%i\n", size->overall,
+	       size->eliminated_by_peeling, size->last_iteration,
+	       size->last_iteration_eliminated_by_peeling);
+      if (time)
+	fprintf (dump_file, "time: %f-%f, last_iteration: %f-%f\n",
+		 time->iteration_time.to_double (),
+		 time->eliminated_by_peeling.to_double (),
+		 time->last_iteration.to_double (),
+		 time->last_iteration_eliminated_by_peeling.to_double ());
+    }
 
   free (body);
   return false;
@@ -409,6 +476,23 @@ estimated_unrolled_size (struct loop_size *size,
     unr_insns = 1;
 
   return unr_insns;
+}
+
+/* Return expected speedup for full unrolling.  */
+
+static sreal
+estimated_unrolled_speedup (struct loop_time *time,
+			    unsigned HOST_WIDE_INT nunroll)
+{
+  sreal unr_time = ((time->iteration_time - time->eliminated_by_peeling)
+		    * nunroll);
+  unr_time += time->last_iteration - time->last_iteration_eliminated_by_peeling;
+  if (unr_time == 0)
+    return 1;
+
+  sreal orig_time = time->iteration_time * (nunroll + 1);
+
+  return orig_time / unr_time;
 }
 
 /* Loop LOOP is known to not loop.  See if there is an edge in the loop
@@ -686,6 +770,7 @@ try_unroll_loop_completely (struct loop *loop,
 {
   unsigned HOST_WIDE_INT n_unroll = 0, ninsns, unr_insns;
   struct loop_size size;
+  struct loop_time time;
   bool n_unroll_found = false;
   edge edge_to_cancel = NULL;
   int report_flags = MSG_OPTIMIZED_LOCATIONS | TDF_RTL | TDF_DETAILS;
@@ -756,7 +841,7 @@ try_unroll_loop_completely (struct loop *loop,
 
       large = tree_estimate_loop_size
 		 (loop, remove_exit ? exit : NULL, edge_to_cancel, &size,
-		  PARAM_VALUE (PARAM_MAX_COMPLETELY_PEELED_INSNS));
+		  PARAM_VALUE (PARAM_MAX_COMPLETELY_PEELED_INSNS), &time);
       ninsns = size.overall;
       if (large)
 	{
@@ -767,11 +852,14 @@ try_unroll_loop_completely (struct loop *loop,
 	}
 
       unr_insns = estimated_unrolled_size (&size, n_unroll);
+      sreal speedup = estimated_unrolled_speedup (&time, n_unroll);
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "  Loop size: %d\n", (int) ninsns);
 	  fprintf (dump_file, "  Estimated size after unrolling: %d\n",
 		   (int) unr_insns);
+	  fprintf (dump_file, "  Estimated speedup by unrolling: %f\n",
+		   speedup.to_double ());
 	}
 
       /* If the code is going to shrink, we don't need to be extra cautious
@@ -782,6 +870,11 @@ try_unroll_loop_completely (struct loop *loop,
 	     otherwise.  */
 	  <= ninsns + (size.constant_iv != false))
 	;
+      else if (speedup >= sreal (23) / 10)
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "unrolling due to profitable speedup\n");
+	}
       /* We unroll only inner loops, because we do not consider it profitable
 	 otheriwse.  We still can cancel loopback edge of not rolling loop;
 	 this is always a good idea.  */
@@ -1030,7 +1123,7 @@ try_peel_loop (struct loop *loop,
 
   /* Check peeled loops size.  */
   tree_estimate_loop_size (loop, exit, NULL, &size,
-			   PARAM_VALUE (PARAM_MAX_PEELED_INSNS));
+			   PARAM_VALUE (PARAM_MAX_PEELED_INSNS), NULL);
   if ((peeled_size = estimated_peeled_sequence_size (&size, (int) npeel))
       > PARAM_VALUE (PARAM_MAX_PEELED_INSNS))
     {
