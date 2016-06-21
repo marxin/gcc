@@ -231,12 +231,15 @@ average_num_loop_insns (const struct loop *loop)
    value.  */
 
 gcov_type
-expected_loop_iterations_unbounded (struct loop *loop)
+expected_loop_iterations_unbounded (const struct loop *loop,
+				    bool *read_profile_p)
 {
   edge e;
   edge_iterator ei;
   gcov_type expected;
   
+  if (read_profile_p)
+    *read_profile_p = false;
 
   /* If we have no profile at all, use AVG_LOOP_NITER.  */
   if (profile_status_for_fn (cfun) == PROFILE_ABSENT)
@@ -257,7 +260,11 @@ expected_loop_iterations_unbounded (struct loop *loop)
       if (count_in == 0)
 	expected = count_latch * 2;
       else
-	expected = (count_latch + count_in - 1) / count_in;
+	{
+	  expected = (count_latch + count_in - 1) / count_in;
+	  if (read_profile_p)
+	    *read_profile_p = true;
+	}
     }
   else
     {
