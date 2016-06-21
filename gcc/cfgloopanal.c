@@ -238,10 +238,9 @@ expected_loop_iterations_unbounded (struct loop *loop)
   gcov_type expected;
   
 
-  /* Average loop rolls about 3 times. If we have no profile at all, it is
-     best we can do.  */
+  /* If we have no profile at all, use AVG_LOOP_NITER.  */
   if (profile_status_for_fn (cfun) == PROFILE_ABSENT)
-    expected = 3;
+    expected = PARAM_VALUE (PARAM_AVG_LOOP_NITER);
   else if (loop->latch->count || loop->header->count)
     {
       gcov_type count_in, count_latch;
@@ -275,9 +274,9 @@ expected_loop_iterations_unbounded (struct loop *loop)
 
       if (freq_in == 0)
 	{
-	  /* If we have no profile at all, expect 3 iterations.  */
+	  /* If we have no profile at all, use AVG_LOOP_NITER iterations.  */
 	  if (!freq_latch)
-	    expected = 3;
+	    expected = PARAM_VALUE (PARAM_AVG_LOOP_NITER);
 	  else
 	    expected = freq_latch * 2;
 	}
