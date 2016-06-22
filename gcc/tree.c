@@ -3340,6 +3340,9 @@ save_expr (tree expr)
   tree t = fold (expr);
   tree inner;
 
+  if (TREE_CODE (expr) == SSA_NAME && SSA_NAME_DEF_STMT (expr))
+    return t;
+
   /* If the tree evaluates to a constant, then we don't want to hide that
      fact (i.e. this allows further folding, and direct checks for constants).
      However, a read-only object that has side effects cannot be bypassed.
