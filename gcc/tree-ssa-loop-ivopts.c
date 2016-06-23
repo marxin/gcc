@@ -1154,7 +1154,7 @@ contain_complex_addr_expr (tree expr)
 
 static struct iv *
 alloc_iv (struct ivopts_data *data, tree base, tree step,
-	  bool no_overflow = false)
+	  bool no_overflow)
 {
   tree expr = base;
   struct iv *iv = (struct iv*) obstack_alloc (&data->iv_obstack,
@@ -2314,7 +2314,7 @@ find_interesting_uses_address (struct ivopts_data *data, gimple *stmt,
 	}
     }
 
-  civ = alloc_iv (data, base, step);
+  civ = alloc_iv (data, base, step, true);
   record_group_use (data, op_p, civ, stmt, USE_ADDRESS);
   return;
 
@@ -2970,7 +2970,7 @@ add_candidate_1 (struct ivopts_data *data,
     {
       cand = XCNEW (struct iv_cand);
       cand->id = i;
-      cand->iv = alloc_iv (data, base, step);
+      cand->iv = alloc_iv (data, base, step, true);
       cand->pos = pos;
       if (pos != IP_ORIGINAL)
 	{
@@ -3860,7 +3860,7 @@ adjust_setup_cost (struct ivopts_data *data, unsigned cost)
 {
   if (cost == INFTY)
     return cost;
-  else if (optimize_loop_for_speed_p (data->current_loop))
+  else if (optimize_loop_nest_for_speed_p (data->current_loop))
     return cost / avg_loop_niter (data->current_loop);
   else
     return cost;
@@ -7764,7 +7764,7 @@ tree_ssa_iv_optimize_loop (struct ivopts_data *data, struct loop *loop)
   gcc_assert (!data->niters);
   data->current_loop = loop;
   data->loop_loc = find_loop_location (loop);
-  data->speed = optimize_loop_for_speed_p (loop);
+  data->speed = optimize_loop_nest_for_speed_p (loop);
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
