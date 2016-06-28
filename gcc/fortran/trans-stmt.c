@@ -1808,6 +1808,128 @@ gfc_trans_block_construct (gfc_code* code)
   return gfc_finish_wrapped_block (&block);
 }
 
+/*
+
+   [Evaluate loop bounds and step]
+    dovar = from;
+    for (;;)
+      {
+	if (dovar > to)
+	  goto end_label;
+	body;
+	cycle_label:
+	dovar += step;
+      }
+    end_label:
+
+   */
+
+static tree
+gfc_trans_simple_do_c_style (gfc_code * code, stmtblock_t *pblock, tree dovar,
+			     tree from, tree to, tree step, tree exit_cond)
+{
+  stmtblock_t body;
+  tree type;
+  tree cond;
+  tree tmp;
+  tree cycle_label;
+  tree exit_label;
+  location_t loc;
+  tree saved_dovar = NULL;
+
+  bool is_step_positive = tree_int_cst_sgn (step) > 0;
+  type = TREE_TYPE (dovar);
+
+  loc = code->ext.iterator->start->where.lb->location;
+
+  /* Initialize the DO variable: dovar = from.  */
+  gfc_add_modify_loc (loc, pblock, dovar, fold_convert (type, from));
+
+  /* Save value for do-tinkering checking.  */
+  if (gfc_option.rtcheck & GFC_RTCHECK_DO)
+      saved_dovar = gfc_create_var (type, ".saved_dovar");
+
+  /* Cycle and exit statements are implemented with gotos.  */
+  cycle_label = gfc_build_label_decl (NULL_TREE);
+  exit_label = gfc_build_label_decl (NULL_TREE);
+
+  /* Put the labels where they can be found later.  See gfc_trans_do().  */
+  code->cycle_label = cycle_label;
+  code->exit_label = exit_label;
+
+  /* Loop body.  */
+  gfc_start_block (&body);
+
+  /* Exit the loop if there is an I/O result condition or error.  */
+  if (exit_cond)
+    {
+      tmp = build1_v (GOTO_EXPR, exit_label);
+      tmp = fold_build3_loc (loc, COND_EXPR, void_type_node,
+			     exit_cond, tmp,
+			     build_empty_stmt (loc));
+      gfc_add_expr_to_block (&body, tmp);
+    }
+
+  /* Evaluate the loop condition.  */
+  if (is_step_positive)
+    cond = fold_build2_loc (loc, GT_EXPR, boolean_type_node, dovar,
+			    fold_convert (type, to));
+  else
+    cond = fold_build2_loc (loc, LT_EXPR, boolean_type_node, dovar,
+			    fold_convert (type, to));
+
+  cond = gfc_evaluate_now_loc (loc, cond, &body);
+
+  /* The loop exit.  */
+  tmp = fold_build1_loc (loc, GOTO_EXPR, void_type_node, exit_label);
+  TREE_USED (exit_label) = 1;
+  tmp = fold_build3_loc (loc, COND_EXPR, void_type_node,
+			 cond, tmp, build_empty_stmt (loc));
+  gfc_add_expr_to_block (&body, tmp);
+
+  /* Update saved_dovar.  */
+  if (gfc_option.rtcheck & GFC_RTCHECK_DO)
+    gfc_add_modify_loc (loc, &body, saved_dovar, dovar);
+
+  /* Main loop body.  */
+  tmp = gfc_trans_code_cond (code->block->next, NULL_TREE);
+  gfc_add_expr_to_block (&body, tmp);
+
+  /* Label for cycle statements (if needed).  */
+  if (TREE_USED (cycle_label))
+    {
+      tmp = build1_v (LABEL_EXPR, cycle_label);
+      gfc_add_expr_to_block (&body, tmp);
+    }
+
+  /* Check whether someone has modified the loop variable.  */
+  if (gfc_option.rtcheck & GFC_RTCHECK_DO)
+    {
+      tmp = fold_build2_loc (loc, NE_EXPR, boolean_type_node,
+			     dovar, saved_dovar);
+      gfc_trans_runtime_check (true, false, tmp, &body, &code->loc,
+			       "Loop variable has been modified");
+    }
+
+  /* Increment the loop variable.  */
+  tmp = fold_build2_loc (loc, PLUS_EXPR, type, dovar,
+			 fold_convert (type, step));
+  gfc_add_modify_loc (loc, &body, dovar, tmp);
+
+  /* Finish the loop body.  */
+  tmp = gfc_finish_block (&body);
+  tmp = fold_build1_loc (loc, LOOP_EXPR, void_type_node, tmp);
+
+  gfc_add_expr_to_block (pblock, tmp);
+
+  /* Add the exit label.  */
+  tmp = build1_v (LABEL_EXPR, exit_label);
+  gfc_add_expr_to_block (pblock, tmp);
+
+  return gfc_finish_block (pblock);
+}
+
+
 
 /* Translate the simple DO construct.  This is where the loop variable has
    integer type and step +-1.  We can't use this in the general case
@@ -1851,14 +1973,18 @@ gfc_trans_simple_do (gfc_code * code, stmtblock_t *pblock, tree dovar,
   tree cycle_label;
   tree exit_label;
   location_t loc;
-
   type = TREE_TYPE (dovar);
+
+  tree ret = gfc_trans_simple_do_c_style (code, pblock, dovar, from, to, step,
+					  exit_cond);
+  if (ret)
+    return ret;
 
   loc = code->ext.iterator->start->where.lb->location;
 
   /* Initialize the DO variable: dovar = from.  */
   gfc_add_modify_loc (loc, pblock, dovar,
-		      fold_convert (TREE_TYPE(dovar), from));
+		      fold_convert (TREE_TYPE (dovar), from));
 
   /* Save value for do-tinkering checking.  */
   if (gfc_option.rtcheck & GFC_RTCHECK_DO)
