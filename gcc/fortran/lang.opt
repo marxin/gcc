@@ -309,6 +309,10 @@ Wtabs
 Fortran Warning Var(warn_tabs) LangEnabledBy(Fortran,Wall || Wpedantic)
 Permit nonconforming uses of the tab character.
 
+Wundefined-do-loop
+Fortran Warning Var(warn_undefined_do_loop) LangEnabledBy(Fortran,Wall)
+Warn about an invalid DO loops.
+
 Wunderflow
 Fortran Warning Var(warn_underflow) Init(1)
 Warn about underflow of numerical constant expressions.
@@ -463,6 +467,10 @@ Specify that an external BLAS library should be used for matmul calls on large-s
 ff2c
 Fortran Var(flag_f2c)
 Use f2c calling convention.
+
+ffast-do-loop Init(1)
+Fortran Var(flag_fast_do_loop)
+Use C style code generation of loops.
 
 ffixed-form
 Fortran RejectNegative
