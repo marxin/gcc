@@ -1903,6 +1903,19 @@ gfc_trans_simple_do_fast (gfc_code * code, stmtblock_t *pblock, tree dovar,
 			 cond, tmp, build_empty_stmt (loc));
   gfc_add_expr_to_block (&body, tmp);
 
+  /* Check whether the induction variable is equal to INT_MAX
+     (respectively to INT_MIN).  */
+  if (gfc_option.rtcheck & GFC_RTCHECK_DO)
+    {
+      tree boundary = is_step_positive ? TYPE_MAX_VALUE (type)
+	: TYPE_MIN_VALUE (type);
+
+      tmp = fold_build2_loc (loc, EQ_EXPR, boolean_type_node,
+			     dovar, boundary);
+      gfc_trans_runtime_check (true, false, tmp, &body, &code->loc,
+			       "Loop iterates infinitely");
+    }
+
   /* Main loop body.  */
   tmp = gfc_trans_code_cond (code->block->next, exit_cond);
   gfc_add_expr_to_block (&body, tmp);

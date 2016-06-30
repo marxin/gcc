@@ -468,8 +468,8 @@ ff2c
 Fortran Var(flag_f2c)
 Use f2c calling convention.
 
-ffast-do-loop Init(1)
-Fortran Var(flag_fast_do_loop)
+ffast-do-loop
+Fortran Var(flag_fast_do_loop) Init(1)
 Use C style code generation of loops.
 
 ffixed-form
