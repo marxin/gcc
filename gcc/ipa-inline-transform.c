@@ -172,9 +172,7 @@ clone_inlined_nodes (struct cgraph_edge *e, bool duplicate,
 	  cgraph_redirect_edge_callee (e, n);
 	}
 
-      cgraph_node *inlined_to = e->caller->global.inlined_to
-	? e->caller->global.inlined_to : e->caller;
-      dump_callgraph_transformation (e->callee, inlined_to, "inlining to");
+      dump_callgraph_transformation (e->callee, e->caller, "inlining to");
     }
   else
     symtab_dissolve_same_comdat_group_list ((symtab_node) e->callee);
