@@ -998,6 +998,19 @@ ix86_handle_option (struct gcc_options *opts,
 	}
       return true;
 
+    case OPT_mmpx:
+      if (value)
+	{
+	  opts->x_ix86_isa_flags |= OPTION_MASK_ISA_MPX;
+	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_MPX;
+	}
+      else
+	{
+	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_MPX;
+	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_MPX;
+	}
+      return true;
+
 
   /* Comes from final.c -- no real reason to change it.  */
 #define MAX_CODE_ALIGN 16
