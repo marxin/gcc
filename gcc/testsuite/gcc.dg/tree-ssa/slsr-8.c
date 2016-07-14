@@ -1,7 +1,7 @@
 /* Verify straight-line strength reduction for simple pointer subtraction.  */
 
 /* { dg-do compile } */
-/* { dg-options "-O3 -fdump-tree-optimized" } */
+/* { dg-options "-O3 -fno-tree-sink -fdump-tree-optimized" } */
 
 int*
 f (int s, int *c)
