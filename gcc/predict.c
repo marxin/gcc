@@ -2376,6 +2376,24 @@ tree_predict_by_opcode (basic_block bb)
 	predict_edge_def (then_edge, predictor,
 			  integer_zerop (val) ? NOT_TAKEN : TAKEN);
     }
+
+  /* Enumeral type comparison is well defined.  */
+  if (TREE_CODE (type) == ENUMERAL_TYPE
+      && (cmp == EQ_EXPR || cmp == NE_EXPR))
+    {
+      unsigned num_values = tree_chain_num_values (TYPE_VALUES (type));
+      if (num_values != 2)
+	{
+	  int probability = RDIV (REG_BR_PROB_BASE, num_values);
+	  if (cmp == NE_EXPR)
+	    probability = REG_BR_PROB_BASE - probability;
+
+	  predict_edge (then_edge, PRED_OPCODE_ENUM_NONEQUAL, probability);
+	}
+
+      return;
+    }
+
   /* Try "pointer heuristic."
      A comparison ptr == 0 is predicted as false.
      Similarly, a comparison ptr1 == ptr2 is predicted as false.  */

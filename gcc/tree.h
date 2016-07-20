@@ -5474,4 +5474,16 @@ desired_pro_or_demotion_p (const_tree to_type, const_tree from_type)
   return to_type_precision <= TYPE_PRECISION (from_type);
 }
 
+/* Return number of values in a TREE_LIST T.  */
+
+inline unsigned
+tree_chain_num_values (tree t)
+{
+  unsigned count;
+  for (count = 0; t; t = TREE_CHAIN (t), count++)
+    ;
+
+  return count;
+}
+
 #endif  /* GCC_TREE_H  */
