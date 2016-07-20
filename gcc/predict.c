@@ -1038,6 +1038,23 @@ prune_predictions_for_bb (basic_block bb)
     }
 }
 
+/* Combine probabilities PROB1 and PROB2 using DS theory.  */
+
+static int
+ds_combine_probs (int prob1, int prob2)
+{
+  int d = (prob1 * prob2
+	   + (REG_BR_PROB_BASE - prob1) * (REG_BR_PROB_BASE - prob2));
+
+  /* Use FP math to avoid overflows of 32bit integers.  */
+  if (d == 0)
+    /* If one probability is 0% and one 100%, avoid division by zero.  */
+    prob1 = REG_BR_PROB_BASE / 2;
+  else
+    prob1 = (((double) prob1) * prob2 * REG_BR_PROB_BASE / d + 0.5);
+  return prob1;
+}
+
 /* Combine predictions into single probability and store them into CFG.
    Remove now useless prediction entries.
    If DRY_RUN is set, only produce dumps and do not modify profile.  */
@@ -1048,7 +1065,6 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
   int best_probability = PROB_EVEN;
   enum br_predictor best_predictor = END_PREDICTORS;
   int combined_probability = REG_BR_PROB_BASE / 2;
-  int d;
   bool first_match = false;
   bool found = false;
   struct edge_prediction *pred;
@@ -1066,6 +1082,7 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
 	  first = e;
       }
 
+  edge_prediction **preds = bb_predictions->get (bb);
   /* When there is no successor or only one choice, prediction is easy.
 
      We are lazy for now and predict only basic blocks with two outgoing
@@ -1074,21 +1091,55 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
      this later.  */
   if (nedges != 2)
     {
+      if (nedges > 2)
+	{
+	  /* Calculate combined probability for each edge separately.  */
+	  FOR_EACH_EDGE (e, ei, bb->succs)
+	    {
+	      for (pred = *preds; pred; pred = pred->ep_next)
+		{
+		  int probability = pred->ep_probability;
+
+		  if (pred->ep_edge != e)
+		    probability = RDIV (REG_BR_PROB_BASE - probability,
+					nedges - 1);
+
+		  combined_probability = ds_combine_probs (combined_probability,
+							   probability);
+		}
+	    }
+	}
+#if 0
+	  bool has_a_predictor = preds && *preds;
+	  fprintf (dump_file,
+		   "%i edges in bb %i predicted to even probabilities (%d)\n",
+		   nedges, bb->index, has_a_predictor);
+
+	  fprintf (dump_file, "Predictions for bb %i\n", bb->index);
+	  if (preds)
+	    {
+	      for (pred = (struct edge_prediction *) *preds; pred; pred = pred->ep_next)
+		{
+		  enum br_predictor predictor = pred->ep_predictor;
+		  int probability = pred->ep_probability;
+
+		  dump_prediction (dump_file, predictor, probability, bb,
+				   REASON_NONE, pred->ep_edge);
+		}
+	    }
+	}
+#endif      
+
       if (!bb->count && !dry_run)
 	set_even_probabilities (bb);
       clear_bb_predictions (bb);
-      if (dump_file)
-	fprintf (dump_file, "%i edges in bb %i predicted to even probabilities\n",
-		 nedges, bb->index);
       return;
     }
 
-  if (dump_file)
-    fprintf (dump_file, "Predictions for bb %i\n", bb->index);
-
   prune_predictions_for_bb (bb);
 
-  edge_prediction **preds = bb_predictions->get (bb);
+  if (dump_file)
+    fprintf (dump_file, "Predictions for bb %i\n", bb->index);
 
   if (preds)
     {
@@ -1133,18 +1184,8 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
 	        best_probability = prob, best_predictor = predictor;
 	    }
 
-	  d = (combined_probability * probability
-	       + (REG_BR_PROB_BASE - combined_probability)
-	       * (REG_BR_PROB_BASE - probability));
-
-	  /* Use FP math to avoid overflows of 32bit integers.  */
-	  if (d == 0)
-	    /* If one probability is 0% and one 100%, avoid division by zero.  */
-	    combined_probability = REG_BR_PROB_BASE / 2;
-	  else
-	    combined_probability = (((double) combined_probability)
-				    * probability
-		    		    * REG_BR_PROB_BASE / d + 0.5);
+	  combined_probability = ds_combine_probs (combined_probability,
+						   probability);
 	}
     }
 
