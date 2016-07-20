@@ -116,6 +116,8 @@ DEF_PREDICTOR (PRED_TREE_OPCODE_NONEQUAL, "opcode values nonequal (on trees)",
 DEF_PREDICTOR (PRED_TREE_FPOPCODE, "fp_opcode (on trees)", HITRATE (90), 0)
 DEF_PREDICTOR (PRED_OPCODE_ENUM_NONEQUAL, "enum values nonqual",
 	       HITRATE (80), 0)
+DEF_PREDICTOR (PRED_OPCODE_ENUM_SWITCH, "enum in switch",
+	       HITRATE (80), 0)
 
 /* Branch guarding call is probably taken.  */
 DEF_PREDICTOR (PRED_CALL, "call", HITRATE (67), 0)

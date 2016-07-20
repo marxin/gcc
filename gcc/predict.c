@@ -2334,6 +2334,63 @@ expr_expected_value (tree expr, bitmap visited,
 				op0, code, op1, visited, predictor);
 }
 
+static void
+tree_predict_switch (gswitch *s)
+{
+  tree type = TREE_TYPE (gimple_switch_index (s));
+  if (TREE_CODE (type) == ENUMERAL_TYPE)
+    {
+      unsigned num_values = tree_chain_num_values (TYPE_VALUES (type));
+      unsigned labels = gimple_switch_num_labels (s);
+
+      unsigned non_default = 0;
+      for (unsigned i = 1; i < labels; i++)
+	{
+	  tree label = gimple_switch_label (s, i);
+	  basic_block bb = label_to_block_fn (cfun, CASE_LABEL (label));
+
+	  HOST_WIDE_INT low = tree_to_shwi (CASE_LOW (label));
+	  tree high = CASE_HIGH (label);
+
+	  unsigned values_in_range = 0;
+	  for (tree t = TYPE_VALUES (type); t; t = TREE_CHAIN (t))
+	    {
+	      tree value = TREE_VALUE (t);
+	      if (TREE_CODE (value) != INTEGER_CST)
+		value = DECL_INITIAL  (value);
+	      HOST_WIDE_INT enum_int_value = tree_to_shwi (value);
+
+	      if (high)
+		{
+		  if (low <= enum_int_value
+		      && enum_int_value <= tree_to_shwi (high))
+		    values_in_range++;
+		}
+	      else if (enum_int_value == low)
+		values_in_range++;
+	    }
+
+	  edge e = find_edge (s->bb, bb);
+	  int probability = RDIV (REG_BR_PROB_BASE * values_in_range,
+				  num_values);
+
+	  predict_edge (e, PRED_OPCODE_ENUM_SWITCH, probability);
+	  non_default += values_in_range;
+	}
+
+      /* Predict default label.  */
+      tree def_label = gimple_switch_label (s, 0);
+      basic_block def_bb = label_to_block_fn (cfun, CASE_LABEL (def_label));
+
+      gcc_assert (non_default <= num_values);
+
+      edge e = find_edge (s->bb, def_bb);
+      int probability = RDIV (REG_BR_PROB_BASE * (num_values - non_default),
+			      num_values);
+      predict_edge (e, PRED_OPCODE_ENUM_SWITCH, probability);
+    }
+}
+
 /* Predict using opcode of the last statement in basic block.  */
 static void
 tree_predict_by_opcode (basic_block bb)
@@ -2347,6 +2404,12 @@ tree_predict_by_opcode (basic_block bb)
   bitmap visited;
   edge_iterator ei;
   enum br_predictor predictor;
+
+  if (stmt && gimple_code (stmt) == GIMPLE_SWITCH)
+    {
+      tree_predict_switch ((gswitch *)stmt);
+      return;
+    }
 
   if (!stmt || gimple_code (stmt) != GIMPLE_COND)
     return;
