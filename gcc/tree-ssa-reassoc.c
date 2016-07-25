@@ -3519,7 +3519,8 @@ maybe_optimize_range_tests (gimple *stmt)
 	     (or &, corresponding to 1/0 in the phi arguments,
 	     push into ops the individual range test arguments
 	     of the bitwise or resp. and, recursively.  */
-	  if (!get_ops (rhs, code, &ops,
+	  if (TREE_CODE (rhs) == SSA_NAME
+	      && !get_ops (rhs, code, &ops,
 			loop_containing_stmt (stmt))
 	      && (TREE_CODE_CLASS (gimple_assign_rhs_code (stmt))
 		  != tcc_comparison)
@@ -3537,11 +3538,12 @@ maybe_optimize_range_tests (gimple *stmt)
 	      bb_ent.last_idx++;
 	      bb_ent.op = rhs;
 	    }
-	  else if (is_gimple_assign (stmt)
+	  else if (TREE_CODE (lhs) == SSA_NAME
+		   && is_gimple_assign (stmt)
 		   && (TREE_CODE_CLASS (gimple_assign_rhs_code (stmt))
 		       == tcc_comparison)
-		   &&!get_ops (lhs, code, &ops,
-			       loop_containing_stmt (stmt))
+		   && !get_ops (lhs, code, &ops,
+				loop_containing_stmt (stmt))
 		   && has_single_use (lhs))
 	    {
 	      operand_entry *oe = operand_entry_pool.allocate ();
