@@ -169,6 +169,19 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 typedef unsigned gcov_unsigned_t;
 typedef unsigned gcov_position_t;
+
+#if LONG_LONG_TYPE_SIZE > 32
+#define GCOV_TYPE_ATOMIC_FETCH_ADD_FN __atomic_fetch_add_8
+#define GCOV_TYPE_ATOMIC_FETCH_ADD BUILT_IN_ATOMIC_FETCH_ADD_8
+#else
+#define GCOV_TYPE_ATOMIC_FETCH_ADD_FN __atomic_fetch_add_4
+#define GCOV_TYPE_ATOMIC_FETCH_ADD BUILT_IN_ATOMIC_FETCH_ADD_4
+#endif
+#define PROFILE_GEN_EDGE_ATOMIC (flag_profile_gen_atomic == 1 || \
+				 flag_profile_gen_atomic == 3)
+#define PROFILE_GEN_VALUE_ATOMIC (flag_profile_gen_atomic == 2 || \
+				  flag_profile_gen_atomic == 3)
+
 /* gcov_type is typedef'd elsewhere for the compiler */
 #if IN_GCOV
 #define GCOV_LINKAGE static
@@ -196,6 +209,15 @@ typedef uint64_t gcov_type_unsigned;
 #endif
 
 #if IN_LIBGCOV
+
+#if LONG_LONG_TYPE_SIZE > 32
+#define GCOV_TYPE_ATOMIC_FETCH_ADD_FN __atomic_fetch_add_8
+#define GCOV_TYPE_ATOMIC_FETCH_ADD BUILT_IN_ATOMIC_FETCH_ADD_8
+#else
+#define GCOV_TYPE_ATOMIC_FETCH_ADD_FN __atomic_fetch_add_4
+#define GCOV_TYPE_ATOMIC_FETCH_ADD BUILT_IN_ATOMIC_FETCH_ADD_4
+#endif
+
 #define gcov_nonruntime_assert(EXPR) ((void)(0 && (EXPR)))
 #else
 #define gcov_nonruntime_assert(EXPR) gcc_assert (EXPR)

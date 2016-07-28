@@ -93,6 +93,31 @@ __gcov_one_value_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
+/* Atomic update version of __gcov_one_value_profile_body().  */
+
+static inline void
+__gcov_one_value_profiler_body_atomic (gcov_type *counters, gcov_type value)
+{
+  if (value == counters[0])
+    GCOV_TYPE_ATOMIC_FETCH_ADD_FN (&counters[1], 1, MEMMODEL_RELAXED);
+  else if (counters[1] == 0)
+    {
+      counters[1] = 1;
+      counters[0] = value;
+    }
+  else
+    GCOV_TYPE_ATOMIC_FETCH_ADD_FN (&counters[1], -1, MEMMODEL_RELAXED);
+  GCOV_TYPE_ATOMIC_FETCH_ADD_FN (&counters[2], 1, MEMMODEL_RELAXED);
+}
+
+#ifdef L_gcov_one_value_profiler_atomic
+void
+__gcov_one_value_profiler_atomic (gcov_type *counters, gcov_type value)
+{
+  __gcov_one_value_profiler_body_atomic (counters, value);
+}
+#endif
+
 #ifdef L_gcov_indirect_call_topn_profiler
 /* Tries to keep track the most frequent N values in the counters where
    N is specified by parameter TOPN_VAL. To track top N values, 2*N counter
@@ -229,6 +254,7 @@ __gcov_indirect_call_topn_profiler (gcov_type value, void* cur_func)
 	  && *(void **) cur_func == *(void **) callee_func))
     __gcov_topn_value_profiler_body (__gcov_indirect_call_topn_counters, value);
 }
+
 #endif
 
 #ifdef L_gcov_indirect_call_profiler
@@ -291,8 +317,22 @@ __gcov_indirect_call_profiler_v2 (gcov_type value, void* cur_func)
      the descriptors to see if they point to the same function.  */
   if (cur_func == __gcov_indirect_call_callee
       || (__LIBGCC_VTABLE_USES_DESCRIPTORS__ && __gcov_indirect_call_callee
-          && *(void **) cur_func == *(void **) __gcov_indirect_call_callee))
+	  && *(void **) cur_func == *(void **) __gcov_indirect_call_callee))
     __gcov_one_value_profiler_body (__gcov_indirect_call_counters, value);
+}
+
+/* Atomic update version of __gcov_indirect_call_profiler_v2().  */
+void
+__gcov_indirect_call_profiler_v2_atomic (gcov_type value, void* cur_func)
+{
+  /* If the C++ virtual tables contain function descriptors then one
+     function may have multiple descriptors and we need to dereference
+     the descriptors to see if they point to the same function.  */
+  if (cur_func == __gcov_indirect_call_callee
+      || (__LIBGCC_VTABLE_USES_DESCRIPTORS__ && __gcov_indirect_call_callee
+	  && *(void **) cur_func == *(void **) __gcov_indirect_call_callee))
+    __gcov_one_value_profiler_body_atomic (__gcov_indirect_call_counters,
+					   value);
 }
 #endif
 
