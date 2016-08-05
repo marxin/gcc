@@ -643,6 +643,11 @@ coverage_begin_function (unsigned lineno_checksum, unsigned cfg_checksum)
   if (no_coverage || !bbg_file_name)
     return 0;
 
+  /* Do not output any abstract origin function.  */
+  tree abstract = DECL_ABSTRACT_ORIGIN (current_function_decl);
+  if (abstract)
+    return 0;
+
   xloc = expand_location (DECL_SOURCE_LOCATION (current_function_decl));
 
   /* Announce function */
