@@ -1792,6 +1792,14 @@ gimple_has_location (const gimple *g)
   return LOCATION_LOCUS (gimple_location (g)) != UNKNOWN_LOCATION;
 }
 
+/* Return true if G has a location that is any from reserved.  */
+
+static inline bool
+gimple_has_reserved_location (const gimple *g)
+{
+  return RESERVED_LOCATION_P (gimple_location (g));
+}
+
 
 /* Return the file name of the location of STMT.  */
 
