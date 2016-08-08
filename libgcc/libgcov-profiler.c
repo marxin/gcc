@@ -46,6 +46,26 @@ __gcov_interval_profiler (gcov_type *counters, gcov_type value,
 }
 #endif
 
+#ifdef L_gcov_interval_profiler_atomic
+/* If VALUE is in interval <START, START + STEPS - 1>, then increases the
+   corresponding counter in COUNTERS.  If the VALUE is above or below
+   the interval, COUNTERS[STEPS] or COUNTERS[STEPS + 1] is increased
+   instead.  Function is thread-safe.  */
+
+void
+__gcov_interval_profiler_atomic (gcov_type *counters, gcov_type value,
+				 int start, unsigned steps)
+{
+  gcov_type delta = value - start;
+  if (delta < 0)
+    __atomic_fetch_add (&counters[steps + 1], 1, MEMMODEL_RELAXED);
+  else if (delta >= steps)
+    __atomic_fetch_add (&counters[steps], 1, MEMMODEL_RELAXED);
+  else
+    __atomic_fetch_add (&counters[delta], 1, MEMMODEL_RELAXED);
+}
+#endif
+
 #ifdef L_gcov_pow2_profiler
 /* If VALUE is a power of two, COUNTERS[1] is incremented.  Otherwise
    COUNTERS[0] is incremented.  */
@@ -60,6 +80,21 @@ __gcov_pow2_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
+#ifdef L_gcov_pow2_profiler_atomic
+/* If VALUE is a power of two, COUNTERS[1] is incremented.  Otherwise
+   COUNTERS[0] is incremented.  Function is thread-safe.  */
+
+void
+__gcov_pow2_profiler_atomic (gcov_type *counters, gcov_type value)
+{
+  if (value & (value - 1))
+    __atomic_fetch_add (&counters[0], 1, MEMMODEL_RELAXED);
+  else
+    __atomic_fetch_add (&counters[1], 1, MEMMODEL_RELAXED);
+}
+#endif
+
+
 /* Tries to determine the most common value among its inputs.  Checks if the
    value stored in COUNTERS[0] matches VALUE.  If this is the case, COUNTERS[1]
    is incremented.  If this is not the case and COUNTERS[1] is not zero,
@@ -68,10 +103,12 @@ __gcov_pow2_profiler (gcov_type *counters, gcov_type value)
    function is called more than 50% of the time with one value, this value
    will be in COUNTERS[0] in the end.
 
-   In any case, COUNTERS[2] is incremented.  */
+   In any case, COUNTERS[2] is incremented.  If USE_ATOMIC is set to 1,
+   COUNTERS[2] is updated with an atomic instruction.  */
 
 static inline void
-__gcov_one_value_profiler_body (gcov_type *counters, gcov_type value)
+__gcov_one_value_profiler_body (gcov_type *counters, gcov_type value,
+				int use_atomic)
 {
   if (value == counters[0])
     counters[1]++;
@@ -82,14 +119,26 @@ __gcov_one_value_profiler_body (gcov_type *counters, gcov_type value)
     }
   else
     counters[1]--;
-  counters[2]++;
+
+  if (use_atomic)
+    __atomic_fetch_add (&counters[2], 1, MEMMODEL_RELAXED);
+  else
+    counters[2]++;
 }
 
 #ifdef L_gcov_one_value_profiler
 void
 __gcov_one_value_profiler (gcov_type *counters, gcov_type value)
 {
-  __gcov_one_value_profiler_body (counters, value);
+  __gcov_one_value_profiler_body (counters, value, 0);
+}
+#endif
+
+#ifdef L_gcov_one_value_profiler_atomic
+void
+__gcov_one_value_profiler_atomic (gcov_type *counters, gcov_type value)
+{
+  __gcov_one_value_profiler_body (counters, value, 1);
 }
 #endif
 
@@ -265,14 +314,14 @@ __gcov_indirect_call_profiler_v2 (gcov_type value, void* cur_func)
   if (cur_func == __gcov_indirect_call_callee
       || (__LIBGCC_VTABLE_USES_DESCRIPTORS__ && __gcov_indirect_call_callee
           && *(void **) cur_func == *(void **) __gcov_indirect_call_callee))
-    __gcov_one_value_profiler_body (__gcov_indirect_call_counters, value);
+    __gcov_one_value_profiler_body (__gcov_indirect_call_counters, value, 0);
 }
 #endif
 
 #ifdef L_gcov_time_profiler
 
 /* Counter for first visit of each function.  */
-static gcov_type function_counter;
+gcov_type function_counter;
 
 /* Sets corresponding COUNTERS if there is no value.  */
 
@@ -283,6 +332,19 @@ __gcov_time_profiler (gcov_type* counters)
     counters[0] = ++function_counter;
 }
 #endif
+
+/* Sets corresponding COUNTERS if there is no value.
+   Function is thread-safe.  */
+
+#ifdef L_gcov_time_profiler_atomic
+void
+__gcov_time_profiler_atomic (gcov_type* counters)
+{
+  if (!counters[0])
+    counters[0] = __atomic_add_fetch (&function_counter, 1, MEMMODEL_RELAXED);
+}
+#endif
+
 
 #ifdef L_gcov_average_profiler
 /* Increase corresponding COUNTER by VALUE.  FIXME: Perhaps we want
@@ -296,6 +358,18 @@ __gcov_average_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
+#ifdef L_gcov_average_profiler_atomic
+/* Increase corresponding COUNTER by VALUE.  FIXME: Perhaps we want
+   to saturate up.  Function is thread-safe.  */
+
+void
+__gcov_average_profiler_atomic (gcov_type *counters, gcov_type value)
+{
+  __atomic_fetch_add (&counters[0], value, MEMMODEL_RELAXED);
+  __atomic_fetch_add (&counters[1], 1, MEMMODEL_RELAXED);
+}
+#endif
+
 #ifdef L_gcov_ior_profiler
 /* Bitwise-OR VALUE into COUNTER.  */
 
@@ -305,5 +379,16 @@ __gcov_ior_profiler (gcov_type *counters, gcov_type value)
   *counters |= value;
 }
 #endif
+
+#ifdef L_gcov_ior_profiler_atomic
+/* Bitwise-OR VALUE into COUNTER.  Function is thread-safe.  */
+
+void
+__gcov_ior_profiler_atomic (gcov_type *counters, gcov_type value)
+{
+  __atomic_fetch_or (&counters[0], value, MEMMODEL_RELAXED);
+}
+#endif
+
 
 #endif /* inhibit_libc */
