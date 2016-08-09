@@ -1141,7 +1141,8 @@ static const char *cc1_options =
  %{-help=*:--help=%*}\
  %{!fsyntax-only:%{S:%W{o*}%{!o*:-o %b.s}}}\
  %{fsyntax-only:-o %j} %{-param*}\
- %{coverage:-fprofile-arcs -ftest-coverage}";
+ %{coverage:-fprofile-arcs -ftest-coverage}\
+ %{pthread:-fprofile-update=atomic}";
 
 static const char *asm_options =
 "%{-target-help:%:print-asm-header()} "
