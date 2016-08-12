@@ -6476,6 +6476,19 @@ get_atomic_op_for_code (struct atomic_op_functions *op, enum rtx_code code)
     }
 }
 
+bool
+can_generate_atomic_builtin (enum rtx_code code, machine_mode mode)
+{
+  struct atomic_op_functions optab;
+  get_atomic_op_for_code (&optab, code);
+  enum insn_code icode = direct_optab_handler (optab.mem_no_result, mode);
+  if (icode != CODE_FOR_nothing)
+    return true;
+
+  return can_compare_and_swap_p (mode, false)
+    || can_compare_and_swap_p (mode, true);
+}
+
 /* See if there is a more optimal way to implement the operation "*MEM CODE VAL"
    using memory order MODEL.  If AFTER is true the operation needs to return
    the value of *MEM after the operation, otherwise the previous value.  

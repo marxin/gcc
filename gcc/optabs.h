@@ -348,4 +348,9 @@ extern void expand_jump_insn (enum insn_code icode, unsigned int nops,
 
 extern enum rtx_code get_rtx_code (enum tree_code tcode, bool unsignedp);
 
+/* Return true when a target is capable of expansion of an atomic builtin
+   with CODE of a specified machine MODE.  */
+
+extern bool can_generate_atomic_builtin (enum rtx_code code, machine_mode mode);
+
 #endif /* GCC_OPTABS_H */
