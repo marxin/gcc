@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+# Script is used by maintainers to modify bugzilla entries in a batch mode.
+# Currently, the scripts can remove and add a release from/to PRs that are
+# prefixed with '[x Regression]'. Apart from that, the script can also
+# change a target milestone and optionally enhance list of known-to-fail
+# versions.
+#
+# The script utilizes the Bugzilla API, as documented here:
+# http://bugzilla.readthedocs.io/en/latest/api/index.html
+
 # The script requires simplejson, requests, semantic_version packages, in case
 # of openSUSE:
 # zypper in python3-simplejson python3-requests
