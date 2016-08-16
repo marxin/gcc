@@ -7267,8 +7267,12 @@ fold_builtin_memchr (location_t loc, tree arg1, tree arg2, tree len, tree type)
 	  || !tree_fits_uhwi_p (len))
 	return NULL_TREE;
 
+      /* If the LEN parameter is zero, return zero.  */
+      if (integer_zerop (len))
+	return build_int_cst (TREE_TYPE (arg1), 0);
+
       p1 = c_getstr (arg1);
-      if (p1 && compare_tree_int (len, strlen (p1) + 1) <= 0)
+      if (p1)
 	{
 	  char c;
 	  const char *r;
@@ -7281,9 +7285,17 @@ fold_builtin_memchr (location_t loc, tree arg1, tree arg2, tree len, tree type)
 
 	  if (r == NULL)
 	    return build_int_cst (TREE_TYPE (arg1), 0);
-
-	  tem = fold_build_pointer_plus_hwi_loc (loc, arg1, r - p1);
-	  return fold_convert_loc (loc, type, tem);
+	  else
+	    {
+	      size_t offset = r - p1;
+	      if (compare_tree_int (len, offset) <= 0)
+		return build_int_cst (TREE_TYPE (arg1), 0);
+	      else
+		{
+		  tem = fold_build_pointer_plus_hwi_loc (loc, arg1, offset);
+		  return fold_convert_loc (loc, type, tem);
+		}
+	    }
 	}
       return NULL_TREE;
     }
