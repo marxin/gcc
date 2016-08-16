@@ -2321,10 +2321,6 @@ case "${host}" in
 	;;
     i[34567]86-*-mingw* | x86_64-*-mingw*)
 	;;
-    i[34567]86-*-interix[3-9]*)
-	# Interix 3.x gcc -fpic/-fPIC options generate broken code.
-	# Instead, we relocate shared libraries at runtime.
-	;;
     i[34567]86-*-nto-qnx*)
 	# QNX uses GNU C++, but need to define -shared option too, otherwise
 	# it will coredump.
@@ -5080,6 +5076,180 @@ esac
 
 
 
+# Check out sync builtins support.
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the target supports atomic operations for 32B" >&5
+$as_echo_n "checking whether the target supports atomic operations for 32B... " >&6; }
+if test "${libgcc_cv_have_atomic_operations_32+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  libgcc_cv_have_atomic_operations_32=no
+
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+int foovar = 0;
+int
+main ()
+{
+__atomic_fetch_add_32 (&foovar, 1, 0);
+  __atomic_fetch_or_32 (&foovar, 1, 0)
+  ;
+  return 0;
+}
+_ACEOF
+  if { ac_try='${CC-cc} -Werror -S -o conftest.s conftest.c 1>&5'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; }; then
+      if grep __atomic_fetch_add_32 conftest.s > /dev/null; then
+	:
+      else
+	libgcc_cv_have_atomic_operations_32=yes
+      fi
+    fi
+    rm -f conftest.*
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_have_atomic_operations_32" >&5
+$as_echo "$libgcc_cv_have_atomic_operations_32" >&6; }
+  if test $libgcc_cv_have_atomic_operations_32 = yes; then
+
+$as_echo "#define HAVE_ATOMIC_OPERATIONS_32 1" >>confdefs.h
+
+  fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the target supports atomic operations for 16B" >&5
+$as_echo_n "checking whether the target supports atomic operations for 16B... " >&6; }
+if test "${libgcc_cv_have_atomic_operations_16+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  libgcc_cv_have_atomic_operations_16=no
+
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+int foovar = 0;
+int
+main ()
+{
+__atomic_fetch_add_16 (&foovar, 1, 0);
+  __atomic_fetch_or_16 (&foovar, 1, 0)
+  ;
+  return 0;
+}
+_ACEOF
+  if { ac_try='${CC-cc} -Werror -S -o conftest.s conftest.c 1>&5'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; }; then
+      if grep __atomic_fetch_add_16 conftest.s > /dev/null; then
+	:
+      else
+	libgcc_cv_have_atomic_operations_16=yes
+      fi
+    fi
+    rm -f conftest.*
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_have_atomic_operations_16" >&5
+$as_echo "$libgcc_cv_have_atomic_operations_16" >&6; }
+  if test $libgcc_cv_have_atomic_operations_16 = yes; then
+
+$as_echo "#define HAVE_ATOMIC_OPERATIONS_16 1" >>confdefs.h
+
+  fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the target supports atomic operations for 8B" >&5
+$as_echo_n "checking whether the target supports atomic operations for 8B... " >&6; }
+if test "${libgcc_cv_have_atomic_operations_8+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  libgcc_cv_have_atomic_operations_8=no
+
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+int foovar = 0;
+int
+main ()
+{
+__atomic_fetch_add_8 (&foovar, 1, 0);
+  __atomic_fetch_or_8 (&foovar, 1, 0)
+  ;
+  return 0;
+}
+_ACEOF
+  if { ac_try='${CC-cc} -Werror -S -o conftest.s conftest.c 1>&5'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; }; then
+      if grep __atomic_fetch_add_8 conftest.s > /dev/null; then
+	:
+      else
+	libgcc_cv_have_atomic_operations_8=yes
+      fi
+    fi
+    rm -f conftest.*
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_have_atomic_operations_8" >&5
+$as_echo "$libgcc_cv_have_atomic_operations_8" >&6; }
+  if test $libgcc_cv_have_atomic_operations_8 = yes; then
+
+$as_echo "#define HAVE_ATOMIC_OPERATIONS_8 1" >>confdefs.h
+
+  fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the target supports atomic operations for 4B" >&5
+$as_echo_n "checking whether the target supports atomic operations for 4B... " >&6; }
+if test "${libgcc_cv_have_atomic_operations_4+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  libgcc_cv_have_atomic_operations_4=no
+
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+int foovar = 0;
+int
+main ()
+{
+__atomic_fetch_add_4 (&foovar, 1, 0);
+  __atomic_fetch_or_4 (&foovar, 1, 0)
+  ;
+  return 0;
+}
+_ACEOF
+  if { ac_try='${CC-cc} -Werror -S -o conftest.s conftest.c 1>&5'
+  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; }; then
+      if grep __atomic_fetch_add_4 conftest.s > /dev/null; then
+	:
+      else
+	libgcc_cv_have_atomic_operations_4=yes
+      fi
+    fi
+    rm -f conftest.*
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $libgcc_cv_have_atomic_operations_4" >&5
+$as_echo "$libgcc_cv_have_atomic_operations_4" >&6; }
+  if test $libgcc_cv_have_atomic_operations_4 = yes; then
+
+$as_echo "#define HAVE_ATOMIC_OPERATIONS_4 1" >>confdefs.h
+
+  fi
+
 # Substitute configuration variables
 
 
@@ -5099,6 +5269,7 @@ ac_config_links="$ac_config_links gthr-default.h:$thread_header"
 ac_config_files="$ac_config_files Makefile"
 
 ac_config_commands="$ac_config_commands default"
+
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure

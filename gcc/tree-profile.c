@@ -49,6 +49,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "profile.h"
 #include "tree-cfgcleanup.h"
 #include "params.h"
+#include "rtl.h"
+#include "optabs.h"
 
 static GTY(()) tree gcov_type_node;
 static GTY(()) tree tree_interval_profiler_fn;
@@ -534,6 +536,22 @@ static unsigned int
 tree_profiling (void)
 {
   struct cgraph_node *node;
+
+  /* Verify whether we can utilize atomic update operations.  */
+  if (flag_profile_update == PROFILE_UPDATE_ATOMIC)
+    {
+      machine_mode mode = mode_for_size (LONG_LONG_TYPE_SIZE > 32 ? 64: 32,
+					 MODE_INT, 1);
+      bool r = can_generate_atomic_builtin (PLUS, mode)
+	&& can_generate_atomic_builtin (IOR, mode);
+
+      if (!r)
+	{
+	  warning (0, "target does not support atomic profile update, "
+		   "single mode is selected");
+	  flag_profile_update = PROFILE_UPDATE_SINGLE;
+	}
+    }
 
   /* This is a small-ipa pass that gets called only once, from
      cgraphunit.c:ipa_passes().  */

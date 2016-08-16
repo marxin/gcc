@@ -24,7 +24,19 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
 #include "libgcov.h"
+#include "auto-target.h"
 #if !defined(inhibit_libc)
+
+/* Detect whether target can support atomic update of profilers.  */
+#if LONG_LONG_TYPE_SIZE <= 32 && HAVE_ATOMIC_OPERATIONS_4
+#define GCOV_SUPPORTS_ATOMIC 1
+#else
+#if LONG_LONG_TYPE_SIZE > 32 && HAVE_ATOMIC_OPERATIONS_8
+#define GCOV_SUPPORTS_ATOMIC 1
+#else
+#define GCOV_SUPPORTS_ATOMIC 0
+#endif
+#endif
 
 #ifdef L_gcov_interval_profiler
 /* If VALUE is in interval <START, START + STEPS - 1>, then increases the
@@ -46,7 +58,7 @@ __gcov_interval_profiler (gcov_type *counters, gcov_type value,
 }
 #endif
 
-#ifdef L_gcov_interval_profiler_atomic
+#if defined(L_gcov_interval_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
 /* If VALUE is in interval <START, START + STEPS - 1>, then increases the
    corresponding counter in COUNTERS.  If the VALUE is above or below
    the interval, COUNTERS[STEPS] or COUNTERS[STEPS + 1] is increased
@@ -80,7 +92,7 @@ __gcov_pow2_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#ifdef L_gcov_pow2_profiler_atomic
+#if defined(L_gcov_pow2_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
 /* If VALUE is a power of two, COUNTERS[1] is incremented.  Otherwise
    COUNTERS[0] is incremented.  Function is thread-safe.  */
 
@@ -134,7 +146,7 @@ __gcov_one_value_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#ifdef L_gcov_one_value_profiler_atomic
+#if defined(L_gcov_one_value_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
 
 /* Update one value profilers (COUNTERS) for a given VALUE.
 
@@ -342,6 +354,7 @@ __gcov_time_profiler (gcov_type* counters)
     counters[0] = ++function_counter;
 }
 
+#if GCOV_SUPPORTS_ATOMIC
 /* Sets corresponding COUNTERS if there is no value.
    Function is thread-safe.  */
 
@@ -351,6 +364,7 @@ __gcov_time_profiler_atomic (gcov_type* counters)
   if (!counters[0])
     counters[0] = __atomic_add_fetch (&function_counter, 1, MEMMODEL_RELAXED);
 }
+#endif
 #endif
 
 
@@ -366,7 +380,7 @@ __gcov_average_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#ifdef L_gcov_average_profiler_atomic
+#if defined(L_gcov_average_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
 /* Increase corresponding COUNTER by VALUE.  FIXME: Perhaps we want
    to saturate up.  Function is thread-safe.  */
 
@@ -388,7 +402,7 @@ __gcov_ior_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#ifdef L_gcov_ior_profiler_atomic
+#if defined(L_gcov_ior_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
 /* Bitwise-OR VALUE into COUNTER.  Function is thread-safe.  */
 
 void

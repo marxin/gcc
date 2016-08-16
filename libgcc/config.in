@@ -1,5 +1,17 @@
 /* config.in.  Generated from configure.ac by autoheader.  */
 
+/* Define to 1 if the target supports atomic operations for 16B */
+#undef HAVE_ATOMIC_OPERATIONS_16
+
+/* Define to 1 if the target supports atomic operations for 32B */
+#undef HAVE_ATOMIC_OPERATIONS_32
+
+/* Define to 1 if the target supports atomic operations for 4B */
+#undef HAVE_ATOMIC_OPERATIONS_4
+
+/* Define to 1 if the target supports atomic operations for 8B */
+#undef HAVE_ATOMIC_OPERATIONS_8
+
 /* Define to 1 if the target assembler supports thread-local storage. */
 #undef HAVE_CC_TLS
 
@@ -17,9 +29,6 @@
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
-
-/* Define if the system-provided CRTs are present on Solaris. */
-#undef HAVE_SOLARIS_CRTS
 
 /* Define if the system-provided CRTs are present on Solaris. */
 #undef HAVE_SOLARIS_CRTS

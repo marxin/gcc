@@ -11,6 +11,7 @@ sinclude(../config/dfp.m4)
 sinclude(../config/unwind_ipinfo.m4)
 sinclude(../config/gthr.m4)
 sinclude(../config/sjlj.m4)
+sinclude(acinclude.m4)
 
 AC_PREREQ(2.64)
 AC_INIT([GNU C Runtime Library], 1.0,,[libgcc])
@@ -544,6 +545,12 @@ AC_SUBST(tm_defines)
 # Map from thread model to thread header.
 GCC_AC_THREAD_HEADER([$target_thread_file])
 
+# Check out sync builtins support.
+LIBGCC_CHECK_ATOMIC_OPERATION(32)
+LIBGCC_CHECK_ATOMIC_OPERATION(16)
+LIBGCC_CHECK_ATOMIC_OPERATION(8)
+LIBGCC_CHECK_ATOMIC_OPERATION(4)
+
 # Substitute configuration variables
 AC_SUBST(cpu_type)
 AC_SUBST(extra_parts)
@@ -572,4 +579,5 @@ CONFIG_SHELL=${CONFIG_SHELL-/bin/sh}
 libgcc_topdir=${libgcc_topdir}
 CC="${CC}"
 ]])
+
 AC_OUTPUT
