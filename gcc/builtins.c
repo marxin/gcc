@@ -150,7 +150,8 @@ static tree fold_builtin_strchr (location_t, tree, tree, tree);
 static tree fold_builtin_memchr (location_t, tree, tree, tree, tree);
 static tree fold_builtin_memcmp (location_t, tree, tree, tree);
 static tree fold_builtin_strcmp (location_t, tree, tree);
-static tree fold_builtin_strncmp (location_t, tree, tree, tree);
+static tree fold_builtin_strncmp_strncasecmp (location_t, tree, tree, tree,
+					      bool);
 static tree fold_builtin_isascii (location_t, tree);
 static tree fold_builtin_toascii (location_t, tree);
 static tree fold_builtin_isdigit (location_t, tree);
@@ -7383,11 +7384,13 @@ fold_builtin_strcmp (location_t loc, tree arg1, tree arg2)
   return NULL_TREE;
 }
 
-/* Fold function call to builtin strncmp with arguments ARG1, ARG2, and LEN.
-   Return NULL_TREE if no simplification can be made.  */
+/* Fold function call to builtin strncmp (or strncasecmp) with arguments ARG1,
+   ARG2, and LEN.  Return NULL_TREE if no simplification can be made.
+   IS_STRNCASECMP is true for strncasecmp, false otherwise.  */
 
 static tree
-fold_builtin_strncmp (location_t loc, tree arg1, tree arg2, tree len)
+fold_builtin_strncmp_strncasecmp (location_t loc, tree arg1, tree arg2,
+				  tree len, bool is_strncasecmp)
 {
   if (!validate_arg (arg1, POINTER_TYPE)
       || !validate_arg (arg2, POINTER_TYPE)
@@ -7442,7 +7445,8 @@ fold_builtin_strncmp (location_t loc, tree arg1, tree arg2, tree len)
 
   /* If len parameter is one, return an expression corresponding to
      (*(const unsigned char*)arg1 - (const unsigned char*)arg2).  */
-  if (tree_fits_uhwi_p (len) && tree_to_uhwi (len) == 1)
+  if (is_strncasecmp
+      && tree_fits_uhwi_p (len) && tree_to_uhwi (len) == 1)
     {
       tree cst_uchar_node = build_type_variant (unsigned_char_type_node, 1, 0);
       tree cst_uchar_ptr_node
@@ -8483,7 +8487,10 @@ fold_builtin_3 (location_t loc, tree fndecl,
     break;
 
     case BUILT_IN_STRNCMP:
-      return fold_builtin_strncmp (loc, arg0, arg1, arg2);
+      return fold_builtin_strncmp_strncasecmp (loc, arg0, arg1, arg2, false);
+
+    case BUILT_IN_STRNCASECMP:
+      return fold_builtin_strncmp_strncasecmp (loc, arg0, arg1, arg2, true);
 
     case BUILT_IN_MEMCHR:
       return fold_builtin_memchr (loc, arg0, arg1, arg2, type);
