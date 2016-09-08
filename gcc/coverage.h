@@ -58,4 +58,8 @@ extern gcov_type *get_coverage_counts (unsigned /*counter*/,
 extern tree get_gcov_type (void);
 extern bool coverage_node_map_initialized_p (void);
 
+extern bool is_arc_counter (tree ref);
+
+extern hash_set<tree> arc_counter_variables;
+
 #endif

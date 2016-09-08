@@ -248,6 +248,8 @@ gimple_init_edge_profiler (void)
    execution count, and insert them on E.  We rely on
    gsi_insert_on_edge to preserve the order.  */
 
+#include "tree-pretty-print.h"
+
 void
 gimple_gen_edge_profiler (int edgeno, edge e)
 {
@@ -255,7 +257,10 @@ gimple_gen_edge_profiler (int edgeno, edge e)
 
   one = build_int_cst (gcov_type_node, 1);
 
-  if (flag_profile_update == PROFILE_UPDATE_ATOMIC)
+  bool is_atomic = flag_profile_update == PROFILE_UPDATE_ATOMIC;
+
+#if 0
+  if ()
     {
       /* __atomic_fetch_add (&counter, 1, MEMMODEL_RELAXED); */
       tree addr = tree_coverage_counter_addr (GCOV_COUNTER_ARCS, edgeno);
@@ -267,6 +272,7 @@ gimple_gen_edge_profiler (int edgeno, edge e)
       gsi_insert_on_edge (e, stmt);
     }
   else
+#endif
     {
       tree ref = tree_coverage_counter_ref (GCOV_COUNTER_ARCS, edgeno);
       tree gcov_type_tmp_var = make_temp_ssa_name (gcov_type_node,
@@ -276,8 +282,10 @@ gimple_gen_edge_profiler (int edgeno, edge e)
 					      NULL, "PROF_edge_counter");
       gassign *stmt2 = gimple_build_assign (gcov_type_tmp_var, PLUS_EXPR,
 					    gimple_assign_lhs (stmt1), one);
-      gassign *stmt3 = gimple_build_assign (unshare_expr (ref),
+      tree ref2 = unshare_expr (ref);
+      gassign *stmt3 = gimple_build_assign (ref2,
 					    gimple_assign_lhs (stmt2));
+      debug_generic_expr (ref);
       gsi_insert_on_edge (e, stmt1);
       gsi_insert_on_edge (e, stmt2);
       gsi_insert_on_edge (e, stmt3);

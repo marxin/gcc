@@ -559,9 +559,49 @@ make_pass_iv_optimize (gcc::context *ctxt)
 
 /* Loop optimizer finalization.  */
 
+#include "coverage.h"
+#include "value-prof.h"
+#include "gimple.h"
+#include "gimple-ssa.h"
+#include "gimple-pretty-print.h"
+#include "tree-cfg.h"
+
 static unsigned int
 tree_ssa_loop_done (void)
 {
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
+	{
+	  gassign *assign = dyn_cast<gassign *> (gsi_stmt (gsi));
+	  if (!assign)
+	    continue;
+
+	  tree t = gimple_assign_rhs1 (assign);
+	  if (is_arc_counter (t))
+	  {
+	    gimple_assign_set_rhs1 (assign, build_int_cst (get_gcov_type (), 0));
+	    update_stmt (assign);
+	  }
+
+	  t = gimple_assign_lhs (assign);
+	  if (is_arc_counter (t))
+	  {
+	    tree v = gimple_assign_rhs1 (assign);
+	    gcall *stmt
+	      = gimple_build_call (builtin_decl_explicit (GCOV_TYPE_ATOMIC_FETCH_ADD),
+				   3, build_fold_addr_expr (t), v,
+				   build_int_cst (integer_type_node,
+						  MEMMODEL_RELAXED));
+	    gsi_replace (&gsi, stmt, false);
+	  }
+	}
+    }
+
+  return 0;
+
   free_numbers_of_iterations_estimates (cfun);
   scev_finalize ();
   loop_optimizer_finalize ();
@@ -580,7 +620,7 @@ const pass_data pass_data_tree_loop_done =
   0, /* properties_provided */
   0, /* properties_destroyed */
   0, /* todo_flags_start */
-  TODO_cleanup_cfg, /* todo_flags_finish */
+  TODO_update_ssa | TODO_cleanup_cfg, /* todo_flags_finish */
 };
 
 class pass_tree_loop_done : public gimple_opt_pass

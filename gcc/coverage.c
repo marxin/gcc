@@ -98,6 +98,16 @@ static GTY(()) tree gcov_info_var;
 static GTY(()) tree gcov_fn_info_type;
 static GTY(()) tree gcov_fn_info_ptr_type;
 
+bool
+is_arc_counter (tree ref)
+{
+  if (TREE_CODE (ref) != ARRAY_REF)
+    return false;
+
+  tree v = TREE_OPERAND (ref, 0);
+  return arc_counter_variables.contains (v);
+}
+
 /* Name of the notes (gcno) output file.  The "bbg" prefix is for
    historical reasons, when the notes file contained only the
    basic block graph notes.
@@ -423,6 +433,8 @@ get_coverage_counts (unsigned counter, unsigned expected,
   return entry->counts;
 }
 
+hash_set<tree> arc_counter_variables;
+
 /* Allocate NUM counters of type COUNTER. Returns nonzero if the
    allocation succeeded.  */
 
@@ -441,6 +453,9 @@ coverage_counter_alloc (unsigned counter, unsigned num)
 
       fn_v_ctrs[counter]
 	= build_var (current_function_decl, array_type, counter);
+
+      if (counter == GCOV_COUNTER_ARCS)
+       arc_counter_variables.add (fn_v_ctrs[counter]); 
     }
 
   fn_b_ctrs[counter] = fn_n_ctrs[counter];
