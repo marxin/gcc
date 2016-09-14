@@ -455,7 +455,7 @@ coverage_counter_alloc (unsigned counter, unsigned num)
 /* Generate a tree to access COUNTER NO.  */
 
 tree
-tree_coverage_counter_ref (unsigned counter, unsigned no)
+tree_coverage_counter (unsigned counter, unsigned no, coverage_usage_type type)
 {
   tree gcov_type_node = get_gcov_type ();
 
@@ -464,25 +464,13 @@ tree_coverage_counter_ref (unsigned counter, unsigned no)
   no += fn_b_ctrs[counter];
   
   /* "no" here is an array index, scaled to bytes later.  */
-  return build4 (ARRAY_REF, gcov_type_node, fn_v_ctrs[counter],
-		 build_int_cst (integer_type_node, no), NULL, NULL);
-}
+  tree v = build4 (ARRAY_REF, gcov_type_node, fn_v_ctrs[counter],
+		   build_int_cst (integer_type_node, no), NULL, NULL);
 
-/* Generate a tree to access the address of COUNTER NO.  */
+  if (type == COVERAGE_ADDR)
+    v = build_fold_addr_expr (v);
 
-tree
-tree_coverage_counter_addr (unsigned counter, unsigned no)
-{
-  tree gcov_type_node = get_gcov_type ();
-
-  gcc_assert (no < fn_n_ctrs[counter] - fn_b_ctrs[counter]);
-  no += fn_b_ctrs[counter];
-
-  /* "no" here is an array index, scaled to bytes later.  */
-  return build_fold_addr_expr (build4 (ARRAY_REF, gcov_type_node,
-				       fn_v_ctrs[counter],
-				       build_int_cst (integer_type_node, no),
-				       NULL, NULL));
+  return v;
 }
 
 

@@ -259,7 +259,8 @@ gimple_gen_edge_profiler (int edgeno, edge e)
   if (flag_profile_update == PROFILE_UPDATE_ATOMIC)
     {
       /* __atomic_fetch_add (&counter, 1, MEMMODEL_RELAXED); */
-      tree addr = tree_coverage_counter_addr (GCOV_COUNTER_ARCS, edgeno);
+      tree addr = tree_coverage_counter (GCOV_COUNTER_ARCS, edgeno,
+					 COVERAGE_ADDR);
       tree f = builtin_decl_explicit (LONG_LONG_TYPE_SIZE > 32
 				      ? BUILT_IN_ATOMIC_FETCH_ADD_8:
 				      BUILT_IN_ATOMIC_FETCH_ADD_4);
@@ -270,7 +271,8 @@ gimple_gen_edge_profiler (int edgeno, edge e)
     }
   else
     {
-      tree ref = tree_coverage_counter_ref (GCOV_COUNTER_ARCS, edgeno);
+      tree ref = tree_coverage_counter (GCOV_COUNTER_ARCS, edgeno,
+					COVERAGE_REF);
       tree gcov_type_tmp_var = make_temp_ssa_name (gcov_type_node,
 						   NULL, "PROF_edge_counter");
       gassign *stmt1 = gimple_build_assign (gcov_type_tmp_var, ref);
@@ -309,7 +311,7 @@ gimple_gen_interval_profiler (histogram_value value, unsigned tag, unsigned base
 {
   gimple *stmt = value->hvalue.stmt;
   gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-  tree ref = tree_coverage_counter_ref (tag, base), ref_ptr;
+  tree ref = tree_coverage_counter (tag, base, COVERAGE_REF), ref_ptr;
   gcall *call;
   tree val;
   tree start = build_int_cst_type (integer_type_node,
@@ -335,7 +337,7 @@ gimple_gen_pow2_profiler (histogram_value value, unsigned tag, unsigned base)
 {
   gimple *stmt = value->hvalue.stmt;
   gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  tree ref_ptr = tree_coverage_counter (tag, base, COVERAGE_ADDR);
   gcall *call;
   tree val;
 
@@ -355,7 +357,7 @@ gimple_gen_one_value_profiler (histogram_value value, unsigned tag, unsigned bas
 {
   gimple *stmt = value->hvalue.stmt;
   gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  tree ref_ptr = tree_coverage_counter (tag, base, COVERAGE_ADDR);
   gcall *call;
   tree val;
 
@@ -380,7 +382,7 @@ gimple_gen_ic_profiler (histogram_value value, unsigned tag, unsigned base)
   gassign *stmt1, *stmt2, *stmt3;
   gimple *stmt = value->hvalue.stmt;
   gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  tree ref_ptr = tree_coverage_counter (tag, base, COVERAGE_ADDR);
 
   if ( (PARAM_VALUE (PARAM_INDIR_CALL_TOPN_PROFILE) &&
         tag == GCOV_COUNTER_V_INDIR) ||
@@ -463,7 +465,7 @@ void
 gimple_gen_time_profiler (unsigned tag, unsigned base,
                           gimple_stmt_iterator &gsi)
 {
-  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  tree ref_ptr = tree_coverage_counter (tag, base, COVERAGE_ADDR);
   gcall *call;
 
   ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
@@ -481,7 +483,7 @@ gimple_gen_average_profiler (histogram_value value, unsigned tag, unsigned base)
 {
   gimple *stmt = value->hvalue.stmt;
   gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  tree ref_ptr = tree_coverage_counter (tag, base, COVERAGE_ADDR);
   gcall *call;
   tree val;
 
@@ -502,7 +504,7 @@ gimple_gen_ior_profiler (histogram_value value, unsigned tag, unsigned base)
 {
   gimple *stmt = value->hvalue.stmt;
   gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  tree ref_ptr = tree_coverage_counter (tag, base, COVERAGE_ADDR);
   gcall *call;
   tree val;
 

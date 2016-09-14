@@ -43,10 +43,17 @@ extern unsigned coverage_compute_lineno_checksum (void);
 
 /* Allocate some counters. Repeatable per function.  */
 extern int coverage_counter_alloc (unsigned /*counter*/, unsigned/*num*/);
+
+/* Coverage usage type.  */
+
+enum coverage_usage_type
+{
+  COVERAGE_REF,
+  COVERAGE_ADDR
+};
+
 /* Use a counter from the most recent allocation.  */
-extern tree tree_coverage_counter_ref (unsigned /*counter*/, unsigned/*num*/);
-/* Use a counter address from the most recent allocation.  */
-extern tree tree_coverage_counter_addr (unsigned /*counter*/, unsigned/*num*/);
+extern tree tree_coverage_counter (unsigned, unsigned, coverage_usage_type);
 
 /* Get all the counters for the current function.  */
 extern gcov_type *get_coverage_counts (unsigned /*counter*/,
