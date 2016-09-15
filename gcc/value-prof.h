@@ -97,7 +97,7 @@ bool check_ic_target (gcall *, struct cgraph_node *);
 
 /* In tree-profile.c.  */
 extern void gimple_init_edge_profiler (void);
-extern void gimple_gen_edge_profiler (int, edge);
+extern void gimple_gen_edge_profiler (int, edge, bitmap *);
 extern void gimple_gen_interval_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_pow2_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_one_value_profiler (histogram_value, unsigned, unsigned);

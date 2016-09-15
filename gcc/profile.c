@@ -121,6 +121,7 @@ instrument_edges (struct edge_list *el)
   unsigned num_instr_edges = 0;
   int num_edges = NUM_EDGES (el);
   basic_block bb;
+  bitmap arcs_local_edges = BITMAP_ALLOC (NULL);
 
   FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR_FOR_FN (cfun), NULL, next_bb)
     {
@@ -138,10 +139,14 @@ instrument_edges (struct edge_list *el)
 		fprintf (dump_file, "Edge %d to %d instrumented%s\n",
 			 e->src->index, e->dest->index,
 			 EDGE_CRITICAL_P (e) ? " (and split)" : "");
-	      gimple_gen_edge_profiler (num_instr_edges++, e);
+	      gimple_gen_edge_profiler (num_instr_edges++, e,
+					&arcs_local_edges);
 	    }
 	}
     }
+
+  generate_arcs_global_update (&arcs_local_edges);
+  BITMAP_FREE (arcs_local_edges);
 
   total_num_blocks_created += num_edges;
   if (dump_file)

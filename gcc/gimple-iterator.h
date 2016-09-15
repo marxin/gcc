@@ -84,6 +84,7 @@ extern void gsi_move_after (gimple_stmt_iterator *, gimple_stmt_iterator *);
 extern void gsi_move_before (gimple_stmt_iterator *, gimple_stmt_iterator *);
 extern void gsi_move_to_bb_end (gimple_stmt_iterator *, basic_block);
 extern void gsi_insert_on_edge (edge, gimple *);
+extern void gsi_insert_on_edge_as_first (edge, gimple *);
 extern void gsi_insert_seq_on_edge (edge, gimple_seq);
 extern basic_block gsi_insert_on_edge_immediate (edge, gimple *);
 extern basic_block gsi_insert_seq_on_edge_immediate (edge, gimple_seq);

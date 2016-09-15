@@ -53,8 +53,10 @@ enum coverage_usage_type
 };
 
 /* Use a counter from the most recent allocation.  */
-extern tree tree_coverage_counter (unsigned, unsigned, coverage_usage_type);
-
+extern tree tree_coverage_counter (unsigned counter, unsigned no,
+				   coverage_usage_type type,
+				   bool is_local = false);
+extern void generate_arcs_global_update (bitmap *);
 /* Get all the counters for the current function.  */
 extern gcov_type *get_coverage_counts (unsigned /*counter*/,
 				       unsigned /*expected*/,

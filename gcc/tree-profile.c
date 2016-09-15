@@ -50,6 +50,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "profile.h"
 #include "tree-cfgcleanup.h"
 #include "params.h"
+#include "calls.h"
 
 static GTY(()) tree gcov_type_node;
 static GTY(()) tree tree_interval_profiler_fn;
@@ -250,41 +251,44 @@ gimple_init_edge_profiler (void)
    gsi_insert_on_edge to preserve the order.  */
 
 void
-gimple_gen_edge_profiler (int edgeno, edge e)
+gimple_gen_edge_profiler (int edgeno, edge e, bitmap *arcs_local_edges)
 {
   tree one;
 
   one = build_int_cst (gcov_type_node, 1);
 
-  if (flag_profile_update == PROFILE_UPDATE_ATOMIC)
+  if ((flag_profile_update == PROFILE_UPDATE_ATOMIC && !maybe_hot_edge_p (e))
+      || flags_from_decl_or_type (cfun->decl) & ECF_NORETURN)
     {
       /* __atomic_fetch_add (&counter, 1, MEMMODEL_RELAXED); */
       tree addr = tree_coverage_counter (GCOV_COUNTER_ARCS, edgeno,
-					 COVERAGE_ADDR);
+                                        COVERAGE_ADDR);
       tree f = builtin_decl_explicit (LONG_LONG_TYPE_SIZE > 32
-				      ? BUILT_IN_ATOMIC_FETCH_ADD_8:
-				      BUILT_IN_ATOMIC_FETCH_ADD_4);
+                                     ? BUILT_IN_ATOMIC_FETCH_ADD_8:
+                                     BUILT_IN_ATOMIC_FETCH_ADD_4);
       gcall *stmt = gimple_build_call (f, 3, addr, one,
-				       build_int_cst (integer_type_node,
-						      MEMMODEL_RELAXED));
+                                      build_int_cst (integer_type_node,
+                                                     MEMMODEL_RELAXED));
       gsi_insert_on_edge (e, stmt);
     }
   else
     {
       tree ref = tree_coverage_counter (GCOV_COUNTER_ARCS, edgeno,
-					COVERAGE_REF);
+                                       COVERAGE_REF, true);
       tree gcov_type_tmp_var = make_temp_ssa_name (gcov_type_node,
-						   NULL, "PROF_edge_counter");
+                                                  NULL, "PROF_edge_counter");
       gassign *stmt1 = gimple_build_assign (gcov_type_tmp_var, ref);
       gcov_type_tmp_var = make_temp_ssa_name (gcov_type_node,
-					      NULL, "PROF_edge_counter");
+                                             NULL, "PROF_edge_counter");
       gassign *stmt2 = gimple_build_assign (gcov_type_tmp_var, PLUS_EXPR,
-					    gimple_assign_lhs (stmt1), one);
+                                           gimple_assign_lhs (stmt1), one);
       gassign *stmt3 = gimple_build_assign (unshare_expr (ref),
-					    gimple_assign_lhs (stmt2));
+                                           gimple_assign_lhs (stmt2));
       gsi_insert_on_edge (e, stmt1);
       gsi_insert_on_edge (e, stmt2);
       gsi_insert_on_edge (e, stmt3);
+
+      bitmap_set_bit (*arcs_local_edges, edgeno);
     }
 }
 

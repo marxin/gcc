@@ -679,7 +679,6 @@ gsi_move_to_bb_end (gimple_stmt_iterator *from, basic_block bb)
     gsi_move_after (from, &last);
 }
 
-
 /* Add STMT to the pending list of edge E.  No actual insertion is
    made until a call to gsi_commit_edge_inserts () is made.  */
 
@@ -688,6 +687,14 @@ gsi_insert_on_edge (edge e, gimple *stmt)
 {
   gimple_seq_add_stmt (&PENDING_STMT (e), stmt);
 }
+
+void
+gsi_insert_on_edge_as_first (edge e, gimple *stmt)
+{
+  gimple_stmt_iterator it = gsi_start (PENDING_STMT (e));
+  gsi_insert_before (&it, stmt, GSI_SAME_STMT);
+}
+
 
 /* Add the sequence of statements SEQ to the pending list of edge E.
    No actual insertion is made until a call to gsi_commit_edge_inserts

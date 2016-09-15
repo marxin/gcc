@@ -49,6 +49,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "intl.h"
 #include "params.h"
 #include "auto-profile.h"
+#include "varasm.h"
+#include "gimple.h"
+#include "gimple-iterator.h"
+#include "tree-vrp.h"
+#include "tree-ssanames.h"
 
 #include "gcov-io.c"
 
@@ -94,6 +99,9 @@ static GTY(()) tree fn_v_ctrs[GCOV_COUNTERS];   /* counter variables.  */
 static unsigned fn_n_ctrs[GCOV_COUNTERS]; /* Counters allocated.  */
 static unsigned fn_b_ctrs[GCOV_COUNTERS]; /* Allocation base.  */
 
+/* Local storage variable of ARCS counters.  */
+static GTY(()) tree arcs_local_ctr;
+
 /* Coverage info VAR_DECL and function info type nodes.  */
 static GTY(()) tree gcov_info_var;
 static GTY(()) tree gcov_fn_info_type;
@@ -128,7 +136,7 @@ static const char *const ctr_names[GCOV_COUNTERS] = {
 
 /* Forward declarations.  */
 static void read_counts_file (void);
-static tree build_var (tree, tree, int);
+static tree build_var (tree fn_decl, tree type, int counter);
 static void build_fn_info_type (tree, unsigned, tree);
 static void build_info_type (tree, tree);
 static tree build_fn_info (const struct coverage_data *, tree, tree);
@@ -443,6 +451,14 @@ coverage_counter_alloc (unsigned counter, unsigned num)
 
       fn_v_ctrs[counter]
 	= build_var (current_function_decl, array_type, counter);
+
+      if (counter == GCOV_COUNTER_ARCS)
+	{
+	  tree array_type = build_index_type (size_int (num));
+	  array_type = build_array_type (get_gcov_type (), array_type);
+	  arcs_local_ctr = create_tmp_var (array_type,
+					   "PROF_edge_counter_local");
+	}
     }
 
   fn_b_ctrs[counter] = fn_n_ctrs[counter];
@@ -455,7 +471,8 @@ coverage_counter_alloc (unsigned counter, unsigned num)
 /* Generate a tree to access COUNTER NO.  */
 
 tree
-tree_coverage_counter (unsigned counter, unsigned no, coverage_usage_type type)
+tree_coverage_counter (unsigned counter, unsigned no, coverage_usage_type type,
+		       bool is_local)
 {
   tree gcov_type_node = get_gcov_type ();
 
@@ -464,13 +481,70 @@ tree_coverage_counter (unsigned counter, unsigned no, coverage_usage_type type)
   no += fn_b_ctrs[counter];
   
   /* "no" here is an array index, scaled to bytes later.  */
-  tree v = build4 (ARRAY_REF, gcov_type_node, fn_v_ctrs[counter],
+  tree array = is_local ? arcs_local_ctr : fn_v_ctrs[counter];
+  tree v = build4 (ARRAY_REF, gcov_type_node, array,
 		   build_int_cst (integer_type_node, no), NULL, NULL);
 
   if (type == COVERAGE_ADDR)
     v = build_fold_addr_expr (v);
 
   return v;
+}
+
+/* Generate profile counter update code emission at the end of a function.  */
+
+void
+generate_arcs_global_update (bitmap *arcs_local_edges)
+{
+  edge_iterator ei;
+  edge e;
+
+  if (flag_profile_update != PROFILE_UPDATE_ATOMIC)
+    return;
+
+  unsigned counter_count = fn_n_ctrs[GCOV_COUNTER_ARCS];
+  size_t mode_size = LONG_LONG_TYPE_SIZE > 32 ? 8 : 4;
+
+  tree atomic_add_fn = builtin_decl_explicit (mode_size == 8
+					      ? BUILT_IN_ATOMIC_FETCH_ADD_8:
+					      BUILT_IN_ATOMIC_FETCH_ADD_4);
+  /* Zero the local ARCS counters.  */
+  basic_block entry_bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
+  FOR_EACH_EDGE (e, ei, entry_bb->succs)
+    {
+      size_t size = counter_count * mode_size;
+      tree fn = builtin_decl_explicit (BUILT_IN_BZERO);
+      tree addr = build1 (ADDR_EXPR, ptr_type_node, arcs_local_ctr);
+      gcall *call = gimple_build_call (fn, 2, addr,
+				       build_int_cst (integer_type_node, size));
+      gsi_insert_on_edge_as_first (e, call);
+    }
+
+  /* Update global counters with the values stored in the local counters.  */
+  basic_block exit_bb = EXIT_BLOCK_PTR_FOR_FN (cfun);
+  FOR_EACH_EDGE (e, ei, exit_bb->preds)
+    {
+      for (unsigned i = 0; i < counter_count; i++)
+	{
+	  if (!bitmap_bit_p (*arcs_local_edges, i))
+	    continue;
+
+	  tree ref = tree_coverage_counter (GCOV_COUNTER_ARCS, i, COVERAGE_REF,
+					    true);
+	  tree gcov_tmp_var = make_temp_ssa_name (get_gcov_type (),
+						  NULL, "PROF_edge_counter");
+	  gassign *stmt = gimple_build_assign (gcov_tmp_var, ref);
+	  gsi_insert_on_edge (e, stmt);
+	  tree addr = tree_coverage_counter (GCOV_COUNTER_ARCS, i,
+					     COVERAGE_ADDR);
+
+	  /* __atomic_fetch_add (&counter, 1, MEMMODEL_RELAXED); */
+	  gcall *call = gimple_build_call (atomic_add_fn, 3, addr, gcov_tmp_var,
+					   build_int_cst (integer_type_node,
+							  MEMMODEL_RELAXED));
+	  gsi_insert_on_edge (e, call);
+	}
+    }
 }
 
 
