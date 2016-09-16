@@ -1093,6 +1093,22 @@ build_stack_save_restore (gcall **save, gcall **restore)
 }
 
 /* Generate IFN_ASAN_MARK internal call that depending on POISON flag
+   either poisons or unpoisons a DECL.  */
+
+static tree
+build_asan_poison_call_expr (tree decl, bool poison)
+{
+  tree unit_size = DECL_SIZE_UNIT (decl);
+  tree base = build_fold_addr_expr (decl);
+  HOST_WIDE_INT flags = poison ? ASAN_MARK_CLOBBER : ASAN_MARK_UNCLOBBER;
+
+  return build_call_expr_internal_loc (UNKNOWN_LOCATION, IFN_ASAN_MARK,
+				       void_type_node, 3,
+				       build_int_cst (integer_type_node, flags),
+				       base, unit_size);
+}
+
+/* Generate IFN_ASAN_MARK internal call that depending on POISON flag
    either poisons or unpoisons a DECL.  Created statement is appended
    to SEQ_P gimple sequence.  */
 
@@ -1105,7 +1121,6 @@ asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
 
   tree unit_size = DECL_SIZE_UNIT (decl);
   tree base = build_fold_addr_expr (decl);
-
   HOST_WIDE_INT flags = poison ? ASAN_MARK_CLOBBER : ASAN_MARK_UNCLOBBER;
 
   gimple *g
@@ -5781,7 +5796,17 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	  gimplify_vla_decl (temp, pre_p);
 	}
       else
-	gimple_add_tmp_var (temp);
+	{
+	  if (asan_sanitize_use_after_scope ())
+	    {
+	      TREE_ADDRESSABLE (temp) = 1;
+	      DECL_GIMPLE_REG_P (temp) = 0;
+
+	      asan_poison_variable (temp, false, pre_p);
+	    }
+
+	  gimple_add_tmp_var (temp);
+	}
 
       /* If TARGET_EXPR_INITIAL is void, then the mere evaluation of the
 	 expression is supposed to initialize the slot.  */
@@ -5817,20 +5842,23 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       /* Add a clobber for the temporary going out of scope, like
 	 gimplify_bind_expr.  */
       if (gimplify_ctxp->in_cleanup_point_expr
-	  && needs_to_live_in_memory (temp)
-	  && flag_stack_reuse == SR_ALL)
+	  && needs_to_live_in_memory (temp))
 	{
-	  tree clobber = build_constructor (TREE_TYPE (temp),
-					    NULL);
-	  TREE_THIS_VOLATILE (clobber) = true;
-	  clobber = build2 (MODIFY_EXPR, TREE_TYPE (temp), temp, clobber);
-	  if (cleanup)
-	    cleanup = build2 (COMPOUND_EXPR, void_type_node, cleanup,
-			      clobber);
-	  else
-	    cleanup = clobber;
+	  if (flag_stack_reuse == SR_ALL)
+	    {
+	      tree clobber = build_constructor (TREE_TYPE (temp),
+						NULL);
+	      TREE_THIS_VOLATILE (clobber) = true;
+	      clobber = build2 (MODIFY_EXPR, TREE_TYPE (temp), temp, clobber);
+	      if (cleanup)
+		cleanup = build2 (COMPOUND_EXPR, void_type_node, cleanup,
+				  clobber);
+	      else
+		cleanup = clobber;
+	    }
+	  else if (asan_sanitize_use_after_scope ())
+	    cleanup = build_asan_poison_call_expr (temp, true);
 	}
-
       if (cleanup)
 	gimple_push_cleanup (temp, cleanup, false, pre_p);
 
