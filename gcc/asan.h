@@ -133,7 +133,8 @@ static inline bool
 asan_sanitize_use_after_scope (void)
 {
   return ((flag_sanitize & SANITIZE_ADDRESS_USE_AFTER_SCOPE)
-	  == SANITIZE_ADDRESS_USE_AFTER_SCOPE);
+	  == SANITIZE_ADDRESS_USE_AFTER_SCOPE
+	  && ASAN_STACK);
 }
 
 static inline bool

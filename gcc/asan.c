@@ -46,6 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "stor-layout.h"
 #include "tree-iterator.h"
+#include "params.h"
 #include "asan.h"
 #include "dojump.h"
 #include "explow.h"
