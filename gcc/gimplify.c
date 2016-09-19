@@ -1096,7 +1096,7 @@ build_stack_save_restore (gcall **save, gcall **restore)
    either poisons or unpoisons a DECL.  */
 
 static tree
-build_asan_unpoison_call_expr (tree decl)
+build_asan_poison_call_expr (tree decl)
 {
   /* Do not poison variables that have size equal to zero.  */
   tree unit_size = DECL_SIZE_UNIT (decl);
@@ -1108,7 +1108,7 @@ build_asan_unpoison_call_expr (tree decl)
   return build_call_expr_internal_loc (UNKNOWN_LOCATION, IFN_ASAN_MARK,
 				       void_type_node, 3,
 				       build_int_cst (integer_type_node,
-						      ASAN_MARK_UNCLOBBER),
+						      ASAN_MARK_CLOBBER),
 				       base, unit_size);
 }
 
