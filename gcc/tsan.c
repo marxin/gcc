@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-propagate.h"
 #include "tree-ssa-loop-ivopts.h"
 #include "tsan.h"
+#include "params.h"
 #include "asan.h"
 #include "builtins.h"
 #include "target.h"
