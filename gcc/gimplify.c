@@ -1553,6 +1553,7 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 	  && !asan_no_sanitize_address_p ()
 	  && !is_vla
 	  && needs_to_live_in_memory (decl)
+	  && TREE_ADDRESSABLE (decl)
 	  && DECL_NAME (decl) != NULL
 	  && IDENTIFIER_POINTER (DECL_NAME (decl)) != NULL
 	  && !TREE_STATIC (decl))
@@ -5862,7 +5863,7 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	      else
 		cleanup = clobber;
 	    }
-	  if (asan_sanitize_use_after_scope ())
+	  if (asan_sanitize_use_after_scope () && TREE_ADDRESSABLE (temp))
 	    {
 	      tree asan_cleanup = build_asan_poison_call_expr (temp, true);
 	      gimple_push_cleanup (temp, asan_cleanup, false, pre_p);

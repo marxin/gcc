@@ -252,8 +252,6 @@ static hash_set<tree> *asan_handled_variables = NULL;
 
 hash_set <tree> *asan_used_labels = NULL;
 
-hash_set <tree> *asan_used_labels;
-
 /* Sets shadow offset to value in string VAL.  */
 
 bool
@@ -1053,8 +1051,8 @@ asan_poison_stack_variables (rtx shadow_base, rtx base,
 	tree decl = decls[l / 2 - 1];
 	HOST_WIDE_INT var_offset = offsets[l];
 	HOST_WIDE_INT var_end_offset = offsets[l - 1];
-	if (asan_handled_variables != NULL
-	    && asan_handled_variables->contains (decl))
+	if (asan_handled_variables == NULL
+	    || !asan_handled_variables->contains (decl))
 	  {
 	    if (dump_file && (dump_flags & TDF_DETAILS))
 	      fprintf (dump_file, "Skipping stack emission for variable: %s "
