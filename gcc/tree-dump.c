@@ -420,8 +420,6 @@ dequeue_and_dump (dump_info_p di)
   /* Now handle the various kinds of nodes.  */
   switch (code)
     {
-      int i;
-
     case IDENTIFIER_NODE:
       dump_string_field (di, "strg", IDENTIFIER_POINTER (t));
       dump_int (di, "lngt", IDENTIFIER_LENGTH (t));
@@ -435,6 +433,7 @@ dequeue_and_dump (dump_info_p di)
 
     case STATEMENT_LIST:
       {
+	int i;
 	tree_stmt_iterator it;
 	for (i = 0, it = tsi_start (t); !tsi_end_p (it); tsi_next (&it), i++)
 	  {
@@ -447,7 +446,7 @@ dequeue_and_dump (dump_info_p di)
 
     case TREE_VEC:
       dump_int (di, "lngt", TREE_VEC_LENGTH (t));
-      for (i = 0; i < TREE_VEC_LENGTH (t); ++i)
+      for (int i = 0; i < TREE_VEC_LENGTH (t); ++i)
 	{
 	  char buffer[32];
 	  sprintf (buffer, "%u", i);
@@ -708,9 +707,8 @@ dequeue_and_dump (dump_info_p di)
       break;
     case OMP_CLAUSE:
       {
-	int i;
 	fprintf (di->stream, "%s\n", omp_clause_code_name[OMP_CLAUSE_CODE (t)]);
-	for (i = 0; i < omp_clause_num_ops[OMP_CLAUSE_CODE (t)]; i++)
+	for (int i = 0; i < omp_clause_num_ops[OMP_CLAUSE_CODE (t)]; i++)
 	  dump_child ("op: ", OMP_CLAUSE_OPERAND (t, i));
       }
       break;

@@ -242,9 +242,9 @@ mangle_member_name (tree name)
 static void
 mangle_type (tree type)
 {
+  char code;
   switch (TREE_CODE (type))
     {
-      char code;
     case BOOLEAN_TYPE: code = 'b';  goto primitive;
     case VOID_TYPE:    code = 'v';  goto primitive;
     case INTEGER_TYPE:
