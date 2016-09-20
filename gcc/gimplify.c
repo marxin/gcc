@@ -10477,6 +10477,7 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
   location_t saved_location;
   enum gimplify_status ret;
   gimple_stmt_iterator pre_last_gsi, post_last_gsi;
+  tree label;
 
   save_expr = *expr_p;
   if (save_expr == NULL_TREE)
@@ -10892,10 +10893,9 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 
 	case LABEL_EXPR:
 	  ret = GS_ALL_DONE;
-	  gcc_assert (decl_function_context (LABEL_EXPR_LABEL (*expr_p))
-		      == current_function_decl);
-	  gimplify_seq_add_stmt (pre_p,
-			  gimple_build_label (LABEL_EXPR_LABEL (*expr_p)));
+	  label = LABEL_EXPR_LABEL (*expr_p);
+	  gcc_assert (decl_function_context (label) == current_function_decl);
+	  gimplify_seq_add_stmt (pre_p, gimple_build_label (label));
 
 	  if (asan_sanitize_use_after_scope ()
 	      && !asan_no_sanitize_address_p ())

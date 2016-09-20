@@ -252,6 +252,8 @@ static hash_set<tree> *asan_handled_variables = NULL;
 
 hash_set <tree> *asan_used_labels = NULL;
 
+hash_set <tree> *asan_used_labels;
+
 /* Sets shadow offset to value in string VAL.  */
 
 bool
