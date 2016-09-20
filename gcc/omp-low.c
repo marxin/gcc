@@ -15802,11 +15802,10 @@ lower_omp_target (gimple_stmt_iterator *gsi_p, omp_context *ctx)
   push_gimplify_context ();
   fplist = NULL;
 
+  tree var, x;
   for (c = clauses; c ; c = OMP_CLAUSE_CHAIN (c))
     switch (OMP_CLAUSE_CODE (c))
       {
-	tree var, x;
-
       default:
 	break;
       case OMP_CLAUSE_MAP:
@@ -16065,12 +16064,11 @@ lower_omp_target (gimple_stmt_iterator *gsi_p, omp_context *ctx)
       vec_alloc (vkind, map_cnt);
       unsigned int map_idx = 0;
 
+      tree ovar, nc, s, purpose, var, x, type;
+      unsigned int talign;
       for (c = clauses; c ; c = OMP_CLAUSE_CHAIN (c))
 	switch (OMP_CLAUSE_CODE (c))
 	  {
-	    tree ovar, nc, s, purpose, var, x, type;
-	    unsigned int talign;
-
 	  default:
 	    break;
 
@@ -16441,10 +16439,10 @@ lower_omp_target (gimple_stmt_iterator *gsi_p, omp_context *ctx)
   if (offloaded || data_region)
     {
       tree prev = NULL_TREE;
+      tree var, x;
       for (c = clauses; c ; c = OMP_CLAUSE_CHAIN (c))
 	switch (OMP_CLAUSE_CODE (c))
 	  {
-	    tree var, x;
 	  default:
 	    break;
 	  case OMP_CLAUSE_FIRSTPRIVATE:
@@ -16593,7 +16591,6 @@ lower_omp_target (gimple_stmt_iterator *gsi_p, omp_context *ctx)
       for (c = clauses; c; c = OMP_CLAUSE_CHAIN (c))
 	switch (OMP_CLAUSE_CODE (c))
 	  {
-	    tree var;
 	  default:
 	    break;
 	  case OMP_CLAUSE_MAP:
