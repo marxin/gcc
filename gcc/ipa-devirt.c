@@ -2862,7 +2862,7 @@ record_targets_from_bases (tree otr_type,
 {
   while (true)
     {
-      HOST_WIDE_INT pos, size;
+      HOST_WIDE_INT pos = 0, size;
       tree base_binfo;
       tree fld;
 
