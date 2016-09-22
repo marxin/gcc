@@ -2677,7 +2677,8 @@ static void
 asan_store_shadow_bytes (gimple_stmt_iterator *iter, location_t loc,
 			 tree shadow,
 			 unsigned HOST_WIDE_INT base_addr_offset,
-			 unsigned char value, unsigned bytes)
+			 bool is_clobber, unsigned bytes,
+			 unsigned last_chunk_size)
 {
   tree shadow_ptr_type;
 
@@ -2696,9 +2697,17 @@ asan_store_shadow_bytes (gimple_stmt_iterator *iter, location_t loc,
       gcc_unreachable ();
     }
 
+  unsigned char c = (char) is_clobber ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
   unsigned HOST_WIDE_INT val = 0;
   for (unsigned i = 0; i < bytes; ++i)
-    val |= (unsigned HOST_WIDE_INT) value << (BITS_PER_UNIT * i);
+    {
+      unsigned char shadow_c = c;
+      if (i == bytes - 1 && last_chunk_size && !is_clobber)
+	shadow_c = last_chunk_size;
+      val |= (unsigned HOST_WIDE_INT) shadow_c << (BITS_PER_UNIT * i);
+    }
+
+  /* Handle last chunk in unpoisoning.  */
 
   tree magic = build_int_cst (TREE_TYPE (shadow_ptr_type), val);
 
@@ -2731,9 +2740,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   tree len = gimple_call_arg (g, 2);
 
   gcc_assert (tree_fits_shwi_p (len));
-  HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
-  HOST_WIDE_INT aligned_size_in_bytes
-    = size_in_bytes & ~((1 << ASAN_SHADOW_SHIFT) - 1);
+  unsigned HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
   gcc_assert (size_in_bytes);
 
   g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
@@ -2744,12 +2751,10 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
 
   /* Generate direct emission if size_in_bytes is small and aligned size
      is equal to size which should be poisoned/unpoisoned.  */
-  if (size_in_bytes <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD
-      && size_in_bytes == aligned_size_in_bytes)
+  if (size_in_bytes <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD)
     {
       unsigned HOST_WIDE_INT shadow_size
 	= get_shadow_memory_size (size_in_bytes);
-      char c = (char) is_clobber ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
 
       tree shadow = build_shadow_mem_access (iter, loc, base_addr,
 					     shadow_ptr_types[0], true);
@@ -2762,7 +2767,13 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
 	  else if (shadow_size - offset >= 2)
 	    size = 2;
 
-	  asan_store_shadow_bytes (iter, loc, shadow, offset, c, size);
+	  unsigned HOST_WIDE_INT last_chunk_size = 0;
+	  unsigned HOST_WIDE_INT s = (offset + size) * ASAN_SHADOW_GRANULARITY;
+	  if (s > size_in_bytes)
+	    last_chunk_size = ASAN_SHADOW_GRANULARITY - (s - size_in_bytes);
+
+	  asan_store_shadow_bytes (iter, loc, shadow, offset, is_clobber,
+				   size, last_chunk_size);
 	  offset += size;
 	}
     }

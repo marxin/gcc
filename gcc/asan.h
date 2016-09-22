@@ -44,6 +44,7 @@ extern hash_set <tree> *asan_used_labels;
 /* Shadow memory is found at
    (address >> ASAN_SHADOW_SHIFT) + asan_shadow_offset ().  */
 #define ASAN_SHADOW_SHIFT	3
+#define ASAN_SHADOW_GRANULARITY (1UL << ASAN_SHADOW_SHIFT)
 
 /* Red zone size, stack and global variables are padded by ASAN_RED_ZONE_SIZE
    up to 2 * ASAN_RED_ZONE_SIZE - 1 bytes.  */
