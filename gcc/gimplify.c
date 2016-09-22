@@ -1112,12 +1112,9 @@ build_asan_poison_call_expr (tree decl)
 				       base, unit_size);
 }
 
-/* Generate IFN_ASAN_MARK internal call that depending on POISON flag
-   either poisons or unpoisons a DECL.  Created statement is appended
-   to SEQ_P gimple sequence.  */
-
 static void
-asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
+asan_poison_variable (tree decl, bool poison, gimple_stmt_iterator *it,
+		      bool before)
 {
   /* When within an OMP context, do not emit ASAN_MARK internal fns.  */
   if (gimplify_omp_ctxp)
@@ -1142,7 +1139,27 @@ asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
     = gimple_build_call_internal (IFN_ASAN_MARK, 3,
 				  build_int_cst (integer_type_node, flags),
 				  base, unit_size);
-  gimplify_seq_add_stmt (seq_p, g);
+
+  if (before)
+    gsi_insert_before (it, g, GSI_NEW_STMT);
+  else
+    gsi_insert_after (it, g, GSI_NEW_STMT);
+}
+
+/* Generate IFN_ASAN_MARK internal call that depending on POISON flag
+   either poisons or unpoisons a DECL.  Created statement is appended
+   to SEQ_P gimple sequence.  */
+
+static void
+asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
+{
+  gimple_stmt_iterator it = gsi_last (*seq_p);
+  bool before = false;
+
+  if (gsi_end_p (it))
+    before = true;
+
+  asan_poison_variable (decl, poison, &it, before);
 }
 
 /* Gimplify a BIND_EXPR.  Just voidify and recurse.  */
@@ -5796,6 +5813,9 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
   tree init = TARGET_EXPR_INITIAL (targ);
   enum gimplify_status ret;
 
+  bool unpoison_empty_seq = false;
+  gimple_stmt_iterator unpoison_it;
+
   if (init)
     {
       tree cleanup = NULL_TREE;
@@ -5810,10 +5830,10 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	}
       else
 	{
-	  if (asan_sanitize_use_after_scope ()
-	      && needs_to_live_in_memory (temp)
-	      && TREE_ADDRESSABLE (temp))
-	    asan_poison_variable (temp, false, pre_p);
+	  /* Save location where we need to place unpoisoning.  It's possible
+	     that a variable will be converted to needs_to_live_in_memory.  */
+	  unpoison_it = gsi_last (*pre_p);
+	  unpoison_empty_seq = gsi_end_p (unpoison_it);
 
 	  gimple_add_tmp_var (temp);
 	}
@@ -5866,11 +5886,19 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	      else
 		cleanup = clobber;
 	    }
-	  if (asan_sanitize_use_after_scope () && TREE_ADDRESSABLE (temp))
+	  if (asan_sanitize_use_after_scope ()
+	      && TREE_ADDRESSABLE (temp))
 	    {
 	      tree asan_cleanup = build_asan_poison_call_expr (temp);
 	      if (asan_cleanup)
-		gimple_push_cleanup (temp, asan_cleanup, false, pre_p);
+		{
+		  if (unpoison_empty_seq)
+		    unpoison_it = gsi_start (*pre_p);
+
+		  asan_poison_variable (temp, false, &unpoison_it,
+					unpoison_empty_seq);
+		  gimple_push_cleanup (temp, asan_cleanup, false, pre_p);
+		}
 	    }
 	}
       if (cleanup)
