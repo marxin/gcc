@@ -1040,7 +1040,7 @@ public abstract class CubicCurve2D implements Shape, Cloneable
    * Detailed in an article on Eric Haines' page:
    * http://www.acm.org/tog/editors/erich/ptinpoly/
    *
-   * A special-case not adressed in this code is self-intersections
+   * A special-case not addressed in this code is self-intersections
    * of the curve, e.g. if the axis intersects the self-itersection,
    * the degenerate roots of the polynomial will erroneously count as
    * a single intersection of the curve, and not two.

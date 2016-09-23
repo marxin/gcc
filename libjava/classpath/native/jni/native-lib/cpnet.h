@@ -98,7 +98,7 @@ JNIEXPORT jint cpnet_addMembership (JNIEnv *env, jint fd, cpnet_address *addr);
 JNIEXPORT jint cpnet_dropMembership (JNIEnv *env, jint fd, cpnet_address *addr);
 JNIEXPORT jint cpnet_getAvailableBytes (JNIEnv *env, jint fd, jint *availableBytes);
 JNIEXPORT jint cpnet_getHostname (JNIEnv *env, char *hostname, jint hostname_len);
-JNIEXPORT jint cpnet_getHostByName (JNIEnv *env, const char *hostname, cpnet_address ***adresses, jint *addresses_count);
+JNIEXPORT jint cpnet_getHostByName (JNIEnv *env, const char *hostname, cpnet_address ***addresses, jint *addresses_count);
 JNIEXPORT jint cpnet_getHostByAddr (JNIEnv *env, cpnet_address *addr, char *hostname, jint hostname_len);
 JNIEXPORT jint cpnet_aton (JNIEnv *env, const char *hostname, cpnet_address **addr);
 JNIEXPORT void cpnet_freeAddresses(JNIEnv * env, cpnet_address **addr, jint addresses_count);

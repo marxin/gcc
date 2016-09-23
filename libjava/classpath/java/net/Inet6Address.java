@@ -299,7 +299,7 @@ public final class Inet6Address extends InetAddress
   }
 
   /**
-   * Returns the scope ID of the address scope if it is a scoped adress using
+   * Returns the scope ID of the address scope if it is a scoped address using
    * an integer to identify the scope.
    *
    * Otherwise this method returns 0.
