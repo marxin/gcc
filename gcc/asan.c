@@ -1028,78 +1028,10 @@ asan_function_start (void)
    of SIZE bytes.  */
 
 static unsigned HOST_WIDE_INT
-get_shadow_memory_size (unsigned HOST_WIDE_INT size)
+shadow_mem_size (unsigned HOST_WIDE_INT size)
 {
-  return ROUND_UP (size, BITS_PER_UNIT) / BITS_PER_UNIT;
+  return ROUND_UP (size, ASAN_SHADOW_GRANULARITY) / ASAN_SHADOW_GRANULARITY;
 }
-
-/* Emit a call to unpoison stack memory allocated for local variables,
-   located in OFFSETS.  LENGTH is number of OFFSETS, BASE is the register
-   holding the stack base,
-   against which OFFSETS array offsets are relative to.  BASE_OFFSET represents
-   an offset requested by alignment and similar stuff.  */
-
-static void
-asan_unpoison_stack_variables (rtx shadow_base, rtx base,
-			     HOST_WIDE_INT base_offset,
-			     HOST_WIDE_INT *offsets, int length,
-			     tree *decls)
-{
-  if (asan_sanitize_use_after_scope ())
-    for (int l = length - 2; l > 0; l -= 2)
-      {
-	tree decl = decls[l / 2 - 1];
-	HOST_WIDE_INT var_offset = offsets[l];
-	HOST_WIDE_INT var_end_offset = offsets[l - 1];
-	if (asan_handled_variables == NULL
-	    || !asan_handled_variables->contains (decl))
-	  {
-	    if (dump_file && (dump_flags & TDF_DETAILS))
-	      fprintf (dump_file, "Skipping stack emission for variable: %s "
-		       "(%ldB)\n",
-		       IDENTIFIER_POINTER (DECL_NAME (decl)),
-		       var_end_offset - var_offset);
-	    continue;
-	  }
-
-	rtx source = expand_binop (Pmode, add_optab, base,
-				   gen_int_mode
-				    (var_offset - base_offset, Pmode),
-				   NULL_RTX, 1, OPTAB_DIRECT);
-
-	HOST_WIDE_INT size = var_end_offset - var_offset;
-	if (size <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD)
-	  {
-	    unsigned HOST_WIDE_INT shadow_size
-	      = get_shadow_memory_size (size);
-
-	    rtx shadow_mem = gen_rtx_MEM (SImode, shadow_base);
-	    rtx var_mem = adjust_address (shadow_mem, QImode,
-					  (var_offset - base_offset)
-					  >> ASAN_SHADOW_SHIFT);
-
-	    for (unsigned i = 0; i < shadow_size; ++i)
-	      {
-		emit_move_insn (var_mem, gen_int_mode (0, QImode));
-		var_mem = adjust_address (var_mem, QImode, 1);
-	      }
-	  }
-	else
-	  {
-	    rtx size_rtx = GEN_INT (size);
-	    rtx ret = init_one_libfunc ("__asan_unpoison_stack_memory");
-	    emit_library_call (ret, LCT_NORMAL, VOIDmode, 2, source, ptr_mode,
-			       size_rtx, TYPE_MODE (pointer_sized_int_node));
-	  }
-
-	if (dump_file && (dump_flags & TDF_DETAILS))
-	  fprintf (dump_file, "Emitting stack unpoisoning for variable: %s"
-		   "(%ldB)\n",
-		   IDENTIFIER_POINTER (DECL_NAME (decl)),
-		   var_end_offset - var_offset);
-      }
-}
-
 
 /* Insert code to protect stack vars.  The prologue sequence should be emitted
    directly, epilogue sequence returned.  BASE is the register holding the
@@ -1126,7 +1058,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   HOST_WIDE_INT base_offset = offsets[length - 1];
   HOST_WIDE_INT base_align_bias = 0, offset, prev_offset;
   HOST_WIDE_INT asan_frame_size = offsets[0] - base_offset;
-  HOST_WIDE_INT last_offset, last_size;
+  HOST_WIDE_INT last_offset;
   int l;
   unsigned char cur_shadow_byte = ASAN_STACK_MAGIC_LEFT;
   tree str_cst, decl, id;
@@ -1362,39 +1294,55 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   if (STRICT_ALIGNMENT)
     set_mem_align (shadow_mem, (GET_MODE_ALIGNMENT (SImode)));
 
-  prev_offset = base_offset;
+  /* Unpoison shadow memory of a stack at the very end of a function.
+     As we're poisoning stack variables at the end of their scope,
+     shadow memory must be properly unpoisoned here.  The easiest approach
+     would be to collect all variables that should not be unpoisoned and
+     we unpoison shadow memory of the whole stack except ranges
+     occupied by these variables.  */
   last_offset = base_offset;
-  last_size = 0;
-  for (l = length; l; l -= 2)
+  HOST_WIDE_INT current_offset = last_offset;
+  if (length)
     {
-      offset = base_offset + ((offsets[l - 1] - base_offset)
-			     & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1));
-      if (last_offset + last_size != offset)
-	{
-	  shadow_mem = adjust_address (shadow_mem, VOIDmode,
-				       (last_offset - prev_offset)
-				       >> ASAN_SHADOW_SHIFT);
-	  prev_offset = last_offset;
-	  asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
-	  last_offset = offset;
-	  last_size = 0;
-	}
-      last_size += base_offset + ((offsets[l - 2] - base_offset)
-				  & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1))
-		   - offset;
-    }
-  if (last_size)
-    {
-      shadow_mem = adjust_address (shadow_mem, VOIDmode,
-				   (last_offset - prev_offset)
-				   >> ASAN_SHADOW_SHIFT);
-      asan_clear_shadow (shadow_mem, last_size >> ASAN_SHADOW_SHIFT);
-    }
+      HOST_WIDE_INT var_end_offset = 0;
+      HOST_WIDE_INT stack_start = offsets[length - 1];
+      gcc_assert (last_offset == stack_start);
 
-  /* Unpoison stack variables at the end of a function.  As the former
-     stack memory can be reused, we have to unpoison the memory.  */
-  asan_unpoison_stack_variables (shadow_base, base, base_offset, offsets,
-				 length, decls);
+      for (int l = length - 2; l > 0; l -= 2)
+	{
+	  HOST_WIDE_INT var_offset = offsets[l];
+	  current_offset = var_offset;
+	  var_end_offset = offsets[l - 1];
+	  HOST_WIDE_INT rounded_size = ROUND_UP (var_end_offset - var_offset,
+					     BITS_PER_UNIT);
+
+	  /* Should we unpoison the variable?  */
+	  if (asan_handled_variables != NULL
+	      && asan_handled_variables->contains (decl))
+	    {
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		fprintf (dump_file, "Skipping stack emission for variable: %s "
+			 "(%ldB)\n",
+			 IDENTIFIER_POINTER (DECL_NAME (decl)),
+			 var_end_offset - var_offset);
+
+	      unsigned HOST_WIDE_INT s
+		= shadow_mem_size (current_offset - last_offset);
+	      asan_clear_shadow (shadow_mem, s);
+	      HOST_WIDE_INT shift
+		= shadow_mem_size (current_offset - last_offset + rounded_size);
+	      shadow_mem = adjust_address (shadow_mem, VOIDmode, shift);
+	      last_offset = var_offset + rounded_size;
+	      current_offset = last_offset;
+	    }
+
+	}
+
+      /* Handle last redzone.  */
+      current_offset = offsets[0];
+      asan_clear_shadow (shadow_mem,
+			 shadow_mem_size (current_offset - last_offset));
+    }
 
   /* Clean-up set with instrumented stack variables.  */
   delete asan_handled_variables;
@@ -2753,8 +2701,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
      is equal to size which should be poisoned/unpoisoned.  */
   if (size_in_bytes <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD)
     {
-      unsigned HOST_WIDE_INT shadow_size
-	= get_shadow_memory_size (size_in_bytes);
+      unsigned HOST_WIDE_INT shadow_size = shadow_mem_size (size_in_bytes);
 
       tree shadow = build_shadow_mem_access (iter, loc, base_addr,
 					     shadow_ptr_types[0], true);
