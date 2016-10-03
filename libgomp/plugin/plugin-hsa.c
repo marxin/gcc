@@ -270,6 +270,9 @@ init_enviroment_variables (void)
 
 #define HSA_WARNING(...) HSA_LOG ("HSA warning: ", __VA_ARGS__)
 
+#define FN(function) \
+  hsa_fns.function##_fn
+
 /* Print HSA warning STR with an HSA STATUS code.  */
 
 static void
@@ -279,7 +282,7 @@ hsa_warn (const char *str, hsa_status_t status)
     return;
 
   const char *hsa_error_msg;
-  hsa_fns.hsa_status_string_fn (status, &hsa_error_msg);
+  FN (hsa_status_string) (status, &hsa_error_msg);
 
   fprintf (stderr, "HSA warning: %s\nRuntime message: %s", str, hsa_error_msg);
 }
@@ -291,7 +294,7 @@ static void
 hsa_fatal (const char *str, hsa_status_t status)
 {
   const char *hsa_error_msg;
-  hsa_fns.hsa_status_string_fn (status, &hsa_error_msg);
+  FN (hsa_status_string) (status, &hsa_error_msg);
   GOMP_PLUGIN_fatal ("HSA fatal error: %s\nRuntime message: %s", str,
 		     hsa_error_msg);
 }
@@ -303,7 +306,7 @@ static bool
 hsa_error (const char *str, hsa_status_t status)
 {
   const char *hsa_error_msg;
-  hsa_fns.hsa_status_string_fn (status, &hsa_error_msg);
+  FN (hsa_status_string) (status, &hsa_error_msg);
   GOMP_PLUGIN_error ("HSA fatal error: %s\nRuntime message: %s", str,
 		     hsa_error_msg);
   return false;
@@ -532,9 +535,8 @@ static bool
 suitable_hsa_agent_p (hsa_agent_t agent)
 {
   hsa_device_type_t device_type;
-  hsa_status_t status
-    = hsa_fns.hsa_agent_get_info_fn (agent, HSA_AGENT_INFO_DEVICE,
-				     &device_type);
+  hsa_status_t status = FN (hsa_agent_get_info) (agent, HSA_AGENT_INFO_DEVICE,
+						 &device_type);
   if (status != HSA_STATUS_SUCCESS)
     return false;
 
@@ -551,14 +553,13 @@ suitable_hsa_agent_p (hsa_agent_t agent)
     }
 
   uint32_t features = 0;
-  status = hsa_fns.hsa_agent_get_info_fn (agent, HSA_AGENT_INFO_FEATURE,
-					  &features);
+  status = FN (hsa_agent_get_info) (agent, HSA_AGENT_INFO_FEATURE, &features);
   if (status != HSA_STATUS_SUCCESS
       || !(features & HSA_AGENT_FEATURE_KERNEL_DISPATCH))
     return false;
   hsa_queue_type_t queue_type;
-  status = hsa_fns.hsa_agent_get_info_fn (agent, HSA_AGENT_INFO_QUEUE_TYPE,
-					  &queue_type);
+  status = FN (hsa_agent_get_info) (agent, HSA_AGENT_INFO_QUEUE_TYPE,
+				    &queue_type);
   if (status != HSA_STATUS_SUCCESS
       || (queue_type != HSA_QUEUE_TYPE_MULTI))
     return false;
@@ -610,11 +611,11 @@ init_hsa_context (void)
       HSA_DEBUG ("Run-time could not be dynamically opened\n");
       return false;
     }
-  status = hsa_fns.hsa_init_fn ();
+  status = FN (hsa_init) ();
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Run-time could not be initialized", status);
   HSA_DEBUG ("HSA run-time initialized\n");
-  status = hsa_fns.hsa_iterate_agents_fn (count_gpu_agents, NULL);
+  status = FN (hsa_iterate_agents) (count_gpu_agents, NULL);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("HSA GPU devices could not be enumerated", status);
   HSA_DEBUG ("There are %i HSA GPU devices.\n", hsa_context.agent_count);
@@ -622,7 +623,7 @@ init_hsa_context (void)
   hsa_context.agents
     = GOMP_PLUGIN_malloc_cleared (hsa_context.agent_count
 				  * sizeof (struct agent_info));
-  status = hsa_fns.hsa_iterate_agents_fn (assign_agent_ids, &agent_index);
+  status = FN (hsa_iterate_agents) (assign_agent_ids, &agent_index);
   if (agent_index != hsa_context.agent_count)
     {
       GOMP_PLUGIN_error ("Failed to assign IDs to all HSA agents");
@@ -652,16 +653,15 @@ get_kernarg_memory_region (hsa_region_t region, void *data)
   hsa_status_t status;
   hsa_region_segment_t segment;
 
-  status = hsa_fns.hsa_region_get_info_fn (region, HSA_REGION_INFO_SEGMENT,
-					   &segment);
+  status = FN (hsa_region_get_info) (region, HSA_REGION_INFO_SEGMENT, &segment);
   if (status != HSA_STATUS_SUCCESS)
     return status;
   if (segment != HSA_REGION_SEGMENT_GLOBAL)
     return HSA_STATUS_SUCCESS;
 
   uint32_t flags;
-  status = hsa_fns.hsa_region_get_info_fn (region, HSA_REGION_INFO_GLOBAL_FLAGS,
-					   &flags);
+  status = FN (hsa_region_get_info) (region, HSA_REGION_INFO_GLOBAL_FLAGS,
+				     &flags);
   if (status != HSA_STATUS_SUCCESS)
     return status;
   if (flags & HSA_REGION_GLOBAL_FLAG_KERNARG)
@@ -715,36 +715,29 @@ GOMP_OFFLOAD_init_device (int n)
 
   uint32_t queue_size;
   hsa_status_t status;
-  status = hsa_fns.hsa_agent_get_info_fn (agent->id,
-					  HSA_AGENT_INFO_QUEUE_MAX_SIZE,
-					  &queue_size);
+  status = FN (hsa_agent_get_info) (agent->id, HSA_AGENT_INFO_QUEUE_MAX_SIZE,
+				    &queue_size);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Error requesting maximum queue size of the HSA agent",
     	   	      status);
-  status = hsa_fns.hsa_agent_get_info_fn (agent->id, HSA_AGENT_INFO_ISA,
-					  &agent->isa);
+  status = FN (hsa_agent_get_info) (agent->id, HSA_AGENT_INFO_ISA, &agent->isa);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Error querying the ISA of the agent", status);
-  status = hsa_fns.hsa_queue_create_fn (agent->id, queue_size,
-					HSA_QUEUE_TYPE_MULTI,
-					queue_callback, NULL, UINT32_MAX,
-					UINT32_MAX,
-					&agent->command_q);
+  status = FN (hsa_queue_create) (agent->id, queue_size, HSA_QUEUE_TYPE_MULTI,
+				  queue_callback, NULL, UINT32_MAX, UINT32_MAX,
+				  &agent->command_q);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Error creating command queue", status);
 
-  status = hsa_fns.hsa_queue_create_fn (agent->id, queue_size,
-					HSA_QUEUE_TYPE_MULTI,
-					queue_callback, NULL, UINT32_MAX,
-					UINT32_MAX,
-					&agent->kernel_dispatch_command_q);
+  status = FN (hsa_queue_create) (agent->id, queue_size, HSA_QUEUE_TYPE_MULTI,
+				  queue_callback, NULL, UINT32_MAX, UINT32_MAX,
+				  &agent->kernel_dispatch_command_q);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Error creating kernel dispatch command queue", status);
 
   agent->kernarg_region.handle = (uint64_t) -1;
-  status = hsa_fns.hsa_agent_iterate_regions_fn (agent->id,
-						 get_kernarg_memory_region,
-						 &agent->kernarg_region);
+  status = FN (hsa_agent_iterate_regions) (agent->id, get_kernarg_memory_region,
+					   &agent->kernarg_region);
   if (agent->kernarg_region.handle == (uint64_t) -1)
     {
       GOMP_PLUGIN_error ("Could not find suitable memory region for kernel "
@@ -822,7 +815,7 @@ destroy_hsa_program (struct agent_info *agent)
 
   HSA_DEBUG ("Destroying the current HSA program.\n");
 
-  status = hsa_fns.hsa_executable_destroy_fn (agent->executable);
+  status = FN (hsa_executable_destroy) (agent->executable);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Could not destroy HSA executable", status);
 
@@ -987,10 +980,10 @@ create_and_finalize_hsa_program (struct agent_info *agent)
   if (agent->prog_finalized)
     goto final;
 
-  status = hsa_fns.hsa_ext_program_create_fn
-    (HSA_MACHINE_MODEL_LARGE, HSA_PROFILE_FULL,
-     HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT,
-     NULL, &prog_handle);
+  status
+    = FN (hsa_ext_program_create) (HSA_MACHINE_MODEL_LARGE, HSA_PROFILE_FULL,
+				   HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT,
+				   NULL, &prog_handle);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not create an HSA program", status);
 
@@ -999,8 +992,9 @@ create_and_finalize_hsa_program (struct agent_info *agent)
   struct module_info *module = agent->first_module;
   while (module)
     {
-      status = hsa_fns.hsa_ext_program_add_module_fn
-	(prog_handle, module->image_desc->brig_module);
+      status
+	= FN (hsa_ext_program_add_module) (prog_handle,
+					   module->image_desc->brig_module);
       if (status != HSA_STATUS_SUCCESS)
 	hsa_fatal ("Could not add a module to the HSA program", status);
       module = module->next;
@@ -1026,8 +1020,7 @@ create_and_finalize_hsa_program (struct agent_info *agent)
 	  continue;
 	}
 
-      status = hsa_fns.hsa_ext_program_add_module_fn (prog_handle,
-						      library->image);
+      status = FN (hsa_ext_program_add_module) (prog_handle, library->image);
       if (status != HSA_STATUS_SUCCESS)
 	hsa_warn ("Could not add a shared BRIG library the HSA program",
 		  status);
@@ -1039,7 +1032,8 @@ create_and_finalize_hsa_program (struct agent_info *agent)
   hsa_ext_control_directives_t control_directives;
   memset (&control_directives, 0, sizeof (control_directives));
   hsa_code_object_t code_object;
-  status = hsa_fns.hsa_ext_program_finalize_fn
+  status
+    = FN (hsa_ext_program_finalize)
     (prog_handle, agent->isa,HSA_EXT_FINALIZER_CALL_CONVENTION_AUTO,
      control_directives, "", HSA_CODE_OBJECT_TYPE_PROGRAM, &code_object);
   if (status != HSA_STATUS_SUCCESS)
@@ -1049,12 +1043,11 @@ create_and_finalize_hsa_program (struct agent_info *agent)
     }
 
   HSA_DEBUG ("Finalization done\n");
-  hsa_fns.hsa_ext_program_destroy_fn (prog_handle);
+  FN (hsa_ext_program_destroy) (prog_handle);
 
-  status
-    = hsa_fns.hsa_executable_create_fn (HSA_PROFILE_FULL,
-					HSA_EXECUTABLE_STATE_UNFROZEN,
-					"", &agent->executable);
+  status = FN (hsa_executable_create) (HSA_PROFILE_FULL,
+				       HSA_EXECUTABLE_STATE_UNFROZEN,
+				       "", &agent->executable);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not create HSA executable", status);
 
@@ -1066,8 +1059,10 @@ create_and_finalize_hsa_program (struct agent_info *agent)
 	{
 	  struct global_var_info *var;
 	  var = &module->image_desc->global_variables[i];
-	  status = hsa_fns.hsa_executable_global_variable_define_fn
-	    (agent->executable, var->name, var->address);
+	  status
+	    = FN (hsa_executable_global_variable_define) (agent->executable,
+							  var->name,
+							  var->address);
 
 	  HSA_DEBUG ("Defining global variable: %s, address: %p\n", var->name,
 		     var->address);
@@ -1080,12 +1075,11 @@ create_and_finalize_hsa_program (struct agent_info *agent)
       module = module->next;
     }
 
-  status = hsa_fns.hsa_executable_load_code_object_fn (agent->executable,
-						       agent->id,
-						       code_object, "");
+  status = FN (hsa_executable_load_code_object) (agent->executable, agent->id,
+						 code_object, "");
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not add a code object to the HSA executable", status);
-  status = hsa_fns.hsa_executable_freeze_fn (agent->executable, "");
+  status = FN (hsa_executable_freeze) (agent->executable, "");
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not freeze the HSA executable", status);
 
@@ -1126,7 +1120,7 @@ create_single_kernel_dispatch (struct kernel_info *kernel,
   shadow->object = kernel->object;
 
   hsa_signal_t sync_signal;
-  hsa_status_t status = hsa_fns.hsa_signal_create_fn (1, 0, NULL, &sync_signal);
+  hsa_status_t status = FN (hsa_signal_create) (1, 0, NULL, &sync_signal);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Error creating the HSA sync signal", status);
 
@@ -1134,10 +1128,9 @@ create_single_kernel_dispatch (struct kernel_info *kernel,
   shadow->private_segment_size = kernel->private_segment_size;
   shadow->group_segment_size = kernel->group_segment_size;
 
-  status
-    = hsa_fns.hsa_memory_allocate_fn (agent->kernarg_region,
-				      kernel->kernarg_segment_size,
-				      &shadow->kernarg_address);
+  status = FN (hsa_memory_allocate) (agent->kernarg_region,
+				     kernel->kernarg_segment_size,
+				     &shadow->kernarg_address);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not allocate memory for HSA kernel arguments", status);
 
@@ -1152,11 +1145,11 @@ release_kernel_dispatch (struct GOMP_hsa_kernel_dispatch *shadow)
   HSA_DEBUG ("Released kernel dispatch: %p has value: %lu (%p)\n", shadow,
 	     shadow->debug, (void *) shadow->debug);
 
-  hsa_fns.hsa_memory_free_fn (shadow->kernarg_address);
+  FN (hsa_memory_free) (shadow->kernarg_address);
 
   hsa_signal_t s;
   s.handle = shadow->signal;
-  hsa_fns.hsa_signal_destroy_fn (s);
+  FN (hsa_signal_destroy) (s);
 
   free (shadow->omp_data_memory);
 
@@ -1176,30 +1169,30 @@ init_single_kernel (struct kernel_info *kernel, unsigned *max_omp_data_size)
   hsa_status_t status;
   struct agent_info *agent = kernel->agent;
   hsa_executable_symbol_t kernel_symbol;
-  status = hsa_fns.hsa_executable_get_symbol_fn (agent->executable, NULL,
-						 kernel->name, agent->id,
-						 0, &kernel_symbol);
+  status = FN (hsa_executable_get_symbol) (agent->executable, NULL,
+					   kernel->name, agent->id,
+					   0, &kernel_symbol);
   if (status != HSA_STATUS_SUCCESS)
     {
       hsa_warn ("Could not find symbol for kernel in the code object", status);
       goto failure;
     }
   HSA_DEBUG ("Located kernel %s\n", kernel->name);
-  status = hsa_fns.hsa_executable_symbol_get_info_fn
+  status = FN (hsa_executable_symbol_get_info)
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_OBJECT, &kernel->object);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not extract a kernel object from its symbol", status);
-  status = hsa_fns.hsa_executable_symbol_get_info_fn
+  status = FN (hsa_executable_symbol_get_info)
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_KERNARG_SEGMENT_SIZE,
      &kernel->kernarg_segment_size);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not get info about kernel argument size", status);
-  status = hsa_fns.hsa_executable_symbol_get_info_fn
+  status = FN (hsa_executable_symbol_get_info)
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_GROUP_SEGMENT_SIZE,
      &kernel->group_segment_size);
   if (status != HSA_STATUS_SUCCESS)
     hsa_fatal ("Could not get info about kernel group segment size", status);
-  status = hsa_fns.hsa_executable_symbol_get_info_fn
+  status = FN (hsa_executable_symbol_get_info)
     (kernel_symbol, HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_PRIVATE_SEGMENT_SIZE,
      &kernel->private_segment_size);
   if (status != HSA_STATUS_SUCCESS)
@@ -1494,12 +1487,11 @@ run_kernel (struct kernel_info *kernel, void *vars,
       print_kernel_dispatch (shadow, 2);
     }
 
-  uint64_t index
-    = hsa_fns.hsa_queue_add_write_index_release_fn (agent->command_q, 1);
+  uint64_t index = FN (hsa_queue_add_write_index_release) (agent->command_q, 1);
   HSA_DEBUG ("Got AQL index %llu\n", (long long int) index);
 
   /* Wait until the queue is not full before writing the packet.   */
-  while (index - hsa_fns.hsa_queue_load_read_index_acquire_fn (agent->command_q)
+  while (index - FN (hsa_queue_load_read_index_acquire) (agent->command_q)
 	 >= agent->command_q->size)
     ;
 
@@ -1543,7 +1535,7 @@ run_kernel (struct kernel_info *kernel, void *vars,
   hsa_signal_t s;
   s.handle = shadow->signal;
   packet->completion_signal = s;
-  hsa_fns.hsa_signal_store_relaxed_fn (s, 1);
+  FN (hsa_signal_store_relaxed) (s, 1);
   memcpy (shadow->kernarg_address, &vars, sizeof (vars));
 
   /* PR hsa/70337.  */
@@ -1566,11 +1558,10 @@ run_kernel (struct kernel_info *kernel, void *vars,
 
   HSA_DEBUG ("Going to dispatch kernel %s\n", kernel->name);
 
-  packet_store_release ((uint32_t *) packet, header,
-			(uint16_t) kla->ndim << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS);
+  uint16_t dim = kla->ndim << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
+  packet_store_release ((uint32_t *) packet, header, dim);
 
-  hsa_fns.hsa_signal_store_release_fn (agent->command_q->doorbell_signal,
-				       index);
+  FN (hsa_signal_store_release) (agent->command_q->doorbell_signal, index);
 
   /* TODO: GPU agents in Carrizo APUs cannot properly update L2 cache for
      signal wait and signal load operations on their own and we need to
@@ -1581,9 +1572,9 @@ run_kernel (struct kernel_info *kernel, void *vars,
   HSA_DEBUG ("Kernel dispatched, waiting for completion\n");
 
   /* Root signal waits with 1ms timeout.  */
-  while (hsa_fns.hsa_signal_wait_acquire_fn (s, HSA_SIGNAL_CONDITION_LT, 1,
-					     1000 * 1000,
-					     HSA_WAIT_STATE_BLOCKED) != 0)
+  while (FN (hsa_signal_wait_acquire) (s, HSA_SIGNAL_CONDITION_LT, 1,
+				       1000 * 1000,
+				       HSA_WAIT_STATE_BLOCKED) != 0)
     for (unsigned i = 0; i < shadow->kernel_dispatch_count; i++)
       {
 	hsa_signal_t child_s;
@@ -1591,7 +1582,7 @@ run_kernel (struct kernel_info *kernel, void *vars,
 
 	HSA_DEBUG ("Waiting for children completion signal: %lu\n",
 		   shadow->children_dispatches[i]->signal);
-	hsa_fns.hsa_signal_load_acquire_fn (child_s);
+	FN (hsa_signal_load_acquire) (child_s);
       }
 
   release_kernel_dispatch (shadow);
@@ -1779,10 +1770,10 @@ GOMP_OFFLOAD_fini_device (int n)
 
   release_agent_shared_libraries (agent);
 
-  hsa_status_t status = hsa_fns.hsa_queue_destroy_fn (agent->command_q);
+  hsa_status_t status = FN (hsa_queue_destroy) (agent->command_q);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Error destroying command queue", status);
-  status = hsa_fns.hsa_queue_destroy_fn (agent->kernel_dispatch_command_q);
+  status = FN (hsa_queue_destroy) (agent->kernel_dispatch_command_q);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error ("Error destroying kernel dispatch command queue", status);
   if (pthread_mutex_destroy (&agent->prog_mutex))
@@ -1853,3 +1844,5 @@ GOMP_OFFLOAD_dev2dev (int ord, void *dst, const void *src, size_t n)
 		     "it should never be called");
   return false;
 }
+
+#undef FN
