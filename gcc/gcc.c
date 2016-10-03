@@ -233,6 +233,16 @@ static int print_subprocess_help;
 /* Linker suffix passed to -fuse-ld=... */
 static const char *use_ld;
 
+/* Flag indicating whether pthread is provided as a command line option.  */
+static bool pthread_set = false;
+
+/* Flag indicating whether profiling is enabled by an option  */
+static bool profiling_enabled = false;
+
+/* Flag indicating whether profile-update=atomic is provided as a command
+   line option.  */
+static bool profile_update_atomic = false;
+
 /* Whether we should report subprocess execution times to a file.  */
 
 FILE *report_times_to_file = NULL;
@@ -4112,6 +4122,22 @@ driver_handle_option (struct gcc_options *opts,
       handle_foffload_option (arg);
       break;
 
+    case OPT_fprofile_update_:
+      if ((profile_update)value == PROFILE_UPDATE_ATOMIC)
+	profile_update_atomic = true;
+      break;
+
+    case OPT_pthread:
+      pthread_set = true;
+      break;
+
+    case OPT_fprofile_generate:
+    case OPT_fprofile_generate_:
+    case OPT_fprofile_arcs:
+    case OPT_coverage:
+      profiling_enabled = true;
+      break;
+
     default:
       /* Various driver options need no special processing at this
 	 point, having been handled in a prescan above or being
@@ -4579,6 +4605,11 @@ process_command (unsigned int decoded_options_count,
 	 the help option on to the various sub-processes.  */
       add_infile ("help-dummy", "c");
     }
+
+  /* Warn about multi-threaded program that do not use -profile=atomic.  */
+  if (profiling_enabled && pthread_set && !profile_update_atomic)
+    warning (0, "-profile-update=atomic should be used to generate a valid"
+	     " profile for a multi-threaded application");
 
   /* Decide if undefined variable references are allowed in specs.  */
 

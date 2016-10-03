@@ -1920,7 +1920,7 @@ Common Report Var(profile_flag)
 Enable basic program profiling code.
 
 fprofile-arcs
-Common Report Var(profile_arc_flag)
+Common Driver Report Var(profile_arc_flag)
 Insert arc-based program profiling code.
 
 fprofile-dir=
@@ -1933,7 +1933,7 @@ Common Report Var(flag_profile_correction)
 Enable correction of flow inconsistent profile data input.
 
 fprofile-update=
-Common Joined RejectNegative Enum(profile_update) Var(flag_profile_update) Init(PROFILE_UPDATE_SINGLE)
+Common Driver Joined RejectNegative Enum(profile_update) Var(flag_profile_update) Init(PROFILE_UPDATE_SINGLE)
 -fprofile-update=[single|atomic]	Set the profile update method.
 
 Enum
@@ -1946,11 +1946,11 @@ EnumValue
 Enum(profile_update) String(atomic) Value(PROFILE_UPDATE_ATOMIC)
 
 fprofile-generate
-Common
+Common Driver
 Enable common options for generating profile info for profile feedback directed optimizations.
 
 fprofile-generate=
-Common Joined RejectNegative
+Common Driver Joined RejectNegative
 Enable common options for generating profile info for profile feedback directed optimizations, and set -fprofile-dir=.
 
 fprofile-use
