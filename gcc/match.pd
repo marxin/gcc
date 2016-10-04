@@ -3463,3 +3463,62 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	 { CONSTRUCTOR_ELT (ctor, idx / k)->value; })
 	(BIT_FIELD_REF { CONSTRUCTOR_ELT (ctor, idx / k)->value; }
 		       @1 { bitsize_int ((idx % k) * width); })))))))))
+
+/* Simplify STRCMP operation.  */
+(simplify
+  (BUILT_IN_STRCMP @0 @1)
+    (with
+     {
+       const char *p1 = c_getstr (@0);
+       const char *p2 = c_getstr (@1);
+     }
+     (switch
+      /* When both arguments are constants, we call strcmp to get result.  */
+      (if (p1 && p2)
+       { build_cmp_result (type, strcmp (p1, p2)); })
+       /* Equal operands result in 0.  */
+       (if (GENERIC && operand_equal_p (@0, @1, 0))
+        { integer_zero_node; })
+       (if ((p1 && *p1 == '\0') || (p2 && *p2 == '\0'))
+        /* Simplify when one of arguments is equal to "".  */
+        { fold_builtin_strcmp_with_zero_argument (UNKNOWN_LOCATION, @0, @1); }
+       ))))
+
+/* Simplify STRCMP operation.  */
+#if GENERIC
+(simplify
+  (BUILT_IN_STRNCMP @0 @1 @2)
+   (switch
+    (if (integer_zerop (@2))
+     { integer_zero_node })
+     (if (operand_equal_p (@0, @1, 0))
+      { integer_zero_node; })
+     (if (integer_onep (@2))
+      (with
+       {
+         const char *p1 = c_getstr (@0);
+         const char *p2 = c_getstr (@1);
+       }
+       (if ((p1 && *p1 == '\0') || (p2 && *p2 == '\0'))
+        { fold_builtin_strcmp_with_zero_argument (loc, @0, @1); }
+       {
+	/* If len parameter is one, return an expression corresponding to
+	   (*(const unsigned char*)arg1 - (const unsigned char*)arg2).  */
+	tree cst_uchar_node = build_type_variant (unsigned_char_type_node, 1, 0);
+	tree cst_uchar_ptr_node
+	  = build_pointer_type_for_mode (cst_uchar_node, ptr_mode, true);
+
+	tree ind1 = fold_convert_loc (loc, integer_type_node,
+				      build1 (INDIRECT_REF, cst_uchar_node,
+					      fold_convert_loc (loc,
+								cst_uchar_ptr_node,
+								@0)));
+	tree ind2 = fold_convert_loc (loc, integer_type_node,
+				      build1 (INDIRECT_REF, cst_uchar_node,
+					      fold_convert_loc (loc,
+								cst_uchar_ptr_node,
+								@1)));
+	fold_build2_loc (loc, MINUS_EXPR, integer_type_node, ind1, ind2);
+       }
+       )))))
+#endif

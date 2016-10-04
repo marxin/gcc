@@ -69,7 +69,7 @@ host_size_t_cst_p (tree t, size_t *size_out)
    "equal" and > 0 means "more".  Canonicalize it to -1, 0 or 1 and
    return it in type TYPE.  */
 
-static inline tree
+tree
 build_cmp_result (tree type, int res)
 {
   return build_int_cst (type, res < 0 ? -1 : res > 0 ? 1 : 0);
@@ -1390,11 +1390,6 @@ fold_const_call (combined_fn fn, tree type, tree arg0, tree arg1)
     case CFN_BUILT_IN_STRCSPN:
       if ((p0 = c_getstr (arg0)) && (p1 = c_getstr (arg1)))
 	return build_int_cst (type, strcspn (p0, p1));
-      return NULL_TREE;
-
-    case CFN_BUILT_IN_STRCMP:
-      if ((p0 = c_getstr (arg0)) && (p1 = c_getstr (arg1)))
-	return build_cmp_result (type, strcmp (p0, p1));
       return NULL_TREE;
 
     default:

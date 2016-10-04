@@ -151,7 +151,6 @@ static rtx expand_builtin_signbit (tree, rtx);
 static tree fold_builtin_strchr (location_t, tree, tree, tree);
 static tree fold_builtin_memchr (location_t, tree, tree, tree, tree);
 static tree fold_builtin_memcmp (location_t, tree, tree, tree);
-static tree fold_builtin_strcmp (location_t, tree, tree);
 static tree fold_builtin_strncmp (location_t, tree, tree, tree);
 static tree fold_builtin_isascii (location_t, tree);
 static tree fold_builtin_toascii (location_t, tree);
@@ -7337,21 +7336,14 @@ fold_builtin_memcmp (location_t loc, tree arg1, tree arg2, tree len)
   return NULL_TREE;
 }
 
-/* Fold function call to builtin strcmp with arguments ARG1 and ARG2.
-   Return NULL_TREE if no simplification can be made.  */
-
-static tree
-fold_builtin_strcmp (location_t loc, tree arg1, tree arg2)
+tree
+fold_builtin_strcmp_with_zero_argument (location_t loc, tree arg1, tree arg2)
 {
   if (!validate_arg (arg1, POINTER_TYPE)
       || !validate_arg (arg2, POINTER_TYPE))
     return NULL_TREE;
 
-  /* If ARG1 and ARG2 are the same (and not volatile), return zero.  */
-  if (operand_equal_p (arg1, arg2, 0))
-    return integer_zero_node;
-
-  /* If the second arg is "", return *(const unsigned char*)arg1.  */
+  /* If the second arg is "" return *(const unsigned char*)arg1.  */
   const char *p2 = c_getstr (arg2);
   if (p2 && *p2 == '\0')
     {
@@ -7366,7 +7358,7 @@ fold_builtin_strcmp (location_t loc, tree arg1, tree arg2)
 							 arg1)));
     }
 
-  /* If the first arg is "", return -*(const unsigned char*)arg2.  */
+  /* If the first arg is "" return -*(const unsigned char*)arg2.  */
   const char *p1 = c_getstr (arg1);
   if (p1 && *p1 == '\0')
     {
@@ -7374,12 +7366,11 @@ fold_builtin_strcmp (location_t loc, tree arg1, tree arg2)
       tree cst_uchar_ptr_node
 	= build_pointer_type_for_mode (cst_uchar_node, ptr_mode, true);
 
-      tree temp
-	= fold_convert_loc (loc, integer_type_node,
-			    build1 (INDIRECT_REF, cst_uchar_node,
-				    fold_convert_loc (loc,
-						      cst_uchar_ptr_node,
-						      arg2)));
+      tree temp = fold_convert_loc (loc, integer_type_node,
+				    build1 (INDIRECT_REF, cst_uchar_node,
+					    fold_convert_loc (loc,
+							      cst_uchar_ptr_node,
+							      arg2)));
       return fold_build1_loc (loc, NEGATE_EXPR, integer_type_node, temp);
     }
 
@@ -8402,9 +8393,6 @@ fold_builtin_2 (location_t loc, tree fndecl, tree arg0, tree arg1)
     case BUILT_IN_STRRCHR:
     case BUILT_IN_RINDEX:
       return fold_builtin_strrchr (loc, arg0, arg1, type);
-
-    case BUILT_IN_STRCMP:
-      return fold_builtin_strcmp (loc, arg0, arg1);
 
     case BUILT_IN_STRPBRK:
       return fold_builtin_strpbrk (loc, arg0, arg1, type);

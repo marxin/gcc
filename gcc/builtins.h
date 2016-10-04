@@ -86,6 +86,8 @@ extern rtx default_expand_builtin (tree, rtx, rtx, machine_mode, int);
 extern bool fold_builtin_next_arg (tree, bool);
 extern tree do_mpc_arg2 (tree, tree, tree, int, int (*)(mpc_ptr, mpc_srcptr, mpc_srcptr, mpc_rnd_t));
 extern tree fold_call_stmt (gcall *, bool);
+extern tree fold_builtin_strcmp_with_zero_argument (location_t loc, tree arg1,
+						    tree arg2);
 extern void set_builtin_user_assembler_name (tree decl, const char *asmspec);
 extern bool is_simple_builtin (tree);
 extern bool is_inexpensive_builtin (tree);
