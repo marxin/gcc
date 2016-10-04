@@ -4305,7 +4305,7 @@ parser::parse_result (operand *result, predicate_id *matcher)
       eat_token (CPP_CLOSE_PAREN);
       if (peek ()->type != CPP_OPEN_PAREN
 	  || !peek_ident ("if", 2))
-	fatal_at (token, "switch can be implemented with a single if");
+	fatal_at (token, "switch cannot be implemented with a single if");
       while  (peek ()->type != CPP_CLOSE_PAREN)
 	{
 	  if (peek ()->type == CPP_OPEN_PAREN)
