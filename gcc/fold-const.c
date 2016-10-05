@@ -14462,12 +14462,11 @@ c_getstr (tree src, HOST_WIDE_INT req_length, unsigned HOST_WIDE_INT *strlen)
   unsigned HOST_WIDE_INT string_length = TREE_STRING_LENGTH (src);
   const char *string = TREE_STRING_POINTER (src);
 
-  if (offset_node != NULL_TREE
-      || !tree_fits_shwi_p (offset_node))
+  if (offset_node == NULL_TREE
+      || !tree_fits_uhwi_p (offset_node))
     return NULL;
 
   unsigned HOST_WIDE_INT offset = tree_to_uhwi (offset_node);
-
   if (offset > string_length)
     return NULL;
 
