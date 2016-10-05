@@ -55,7 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "omp-low.h"
 #include "ipa-chkp.h"
 #include "tree-cfg.h"
-
+#include "fold-const-call.h"
 
 /* Return true if T is a constant and the value cast to a target char
    can be represented by a host char.
@@ -1784,6 +1784,143 @@ gimple_fold_builtin_strncat_chk (gimple_stmt_iterator *gsi)
   return true;
 }
 
+/* Fold a call to the str{n}{case}cmp builtin pointed by GSI iterator.
+   FCODE is the name of the builtin.  */
+
+static bool
+gimple_fold_builtin_string_compare (gimple_stmt_iterator *gsi)
+{
+  gimple *stmt = gsi_stmt (*gsi);
+  tree callee = gimple_call_fndecl (stmt);
+  enum built_in_function fcode = DECL_FUNCTION_CODE (callee);
+
+  tree type = integer_type_node;
+  tree str1 = gimple_call_arg (stmt, 0);
+  tree str2 = gimple_call_arg (stmt, 1);
+  HOST_WIDE_INT length = -1;
+
+  /* Handle strncmp and strncasecmp functions.  */
+  if (gimple_call_num_args (stmt) == 3)
+    {
+      tree len = gimple_call_arg (stmt, 2);
+      if (tree_fits_uhwi_p (len))
+	length = tree_to_uhwi (len);
+    }
+
+  const char *p1 = c_getstr (str1);
+  const char *p2 = c_getstr (str2);
+
+  /* If the LEN parameter is zero, return zero.  */
+  if (length == 0)
+    {
+      replace_call_with_value (gsi, integer_zero_node);
+      return true;
+    }
+
+  /* If ARG1 and ARG2 are the same (and not volatile), return zero.  */
+  if (operand_equal_p (str1, str2, 0))
+    {
+      replace_call_with_value (gsi, integer_zero_node);
+      return true;
+    }
+
+  /* For known strings, return an immediate value.  */
+  if (p1 && p2)
+    {
+      int r = 0;
+      bool known_result = false;
+
+      switch (fcode)
+	{
+	case BUILT_IN_STRNCASECMP:
+	  {
+	    r = strncmp (p1, p2, length);
+	    if (r == 0)
+	      known_result = true;
+	    break;;
+	  }
+	case BUILT_IN_STRCMP:
+	  {
+	    r = strcmp (p1, p2);
+	    known_result = true;
+	    break;
+	  }
+	case BUILT_IN_STRNCMP:
+	  {
+	    r = strncmp (p1, p2, length);
+	    known_result = true;
+	    break;
+	  }
+	default:
+	  break;
+	}
+
+      if (known_result)
+	{
+	  replace_call_with_value (gsi, build_cmp_result (type, r));
+	  return true;
+	}
+    }
+
+  location_t loc = gimple_location (stmt);
+  tree cst_uchar_node = build_type_variant (unsigned_char_type_node, 1, 0);
+  tree cst_uchar_ptr_node
+    = build_pointer_type_for_mode (cst_uchar_node, ptr_mode, true);
+  tree off0 = build_int_cst (cst_uchar_ptr_node, 0);
+
+  /* If the second arg is "", return *(const unsigned char*)arg1.  */
+  if (p2 && *p2 == '\0' && length != 0)
+    {
+      gimple_seq stmts = NULL;
+
+      tree temp = fold_build2_loc (loc, MEM_REF, cst_uchar_node, str1,
+				   off0);
+      temp = gimple_build (&stmts, loc, NOP_EXPR, cst_uchar_node, temp);
+      gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+
+      replace_call_with_value (gsi, fold_convert_loc (loc, type, temp));
+      return true;
+    }
+
+  /* If the first arg is "", return -*(const unsigned char*)arg2.  */
+  if (p1 && *p1 == '\0' && length != 0)
+    {
+      gimple_seq stmts = NULL;
+
+      tree temp = fold_build2_loc (loc, MEM_REF, cst_uchar_node, str2,
+				   off0);
+      temp = gimple_build (&stmts, loc, NOP_EXPR, cst_uchar_node, temp);
+      temp = gimple_convert (&stmts, loc, type, temp);
+      gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+      replace_call_with_value (gsi, fold_build1_loc (loc, NEGATE_EXPR,
+						     type, temp));
+      return true;
+    }
+
+  /* If len parameter is one, return an expression corresponding to
+     (*(const unsigned char*)arg2 - *(const unsigned char*)arg1).  */
+  if (fcode == BUILT_IN_STRNCMP && length == 1)
+    {
+      gimple_seq stmts = NULL;
+
+      tree temp1 = fold_build2_loc (loc, MEM_REF, cst_uchar_node, str1,
+				    off0);
+      temp1 = gimple_build (&stmts, loc, NOP_EXPR, cst_uchar_node, temp1);
+      temp1 = gimple_convert (&stmts, loc, type, temp1);
+      tree temp2 = fold_build2_loc (loc, MEM_REF, cst_uchar_node, str2,
+				    off0);
+      temp2 = gimple_build (&stmts, loc, NOP_EXPR, cst_uchar_node, temp2);
+      temp2 = gimple_convert (&stmts, loc, type, temp2);
+      tree temp = gimple_build (&stmts, loc, MINUS_EXPR, type, temp1, temp2);
+      gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+      replace_call_with_value (gsi, temp);
+      return true;
+    }
+
+  return false;
+}
+
+
 /* Fold a call to the fputs builtin.  ARG0 and ARG1 are the arguments
    to the call.  IGNORE is true if the value returned
    by the builtin will be ignored.  UNLOCKED is true is true if this
@@ -3005,6 +3142,14 @@ gimple_fold_builtin (gimple_stmt_iterator *gsi)
     case BUILT_IN_RINDEX:
     case BUILT_IN_STRRCHR:
       return gimple_fold_builtin_strchr (gsi, true);
+    case BUILT_IN_STRCMP:
+      return gimple_fold_builtin_string_compare (gsi);
+    case BUILT_IN_STRCASECMP:
+      return gimple_fold_builtin_string_compare (gsi);
+    case BUILT_IN_STRNCMP:
+      return gimple_fold_builtin_string_compare (gsi);
+    case BUILT_IN_STRNCASECMP:
+      return gimple_fold_builtin_string_compare (gsi);
     case BUILT_IN_FPUTS:
       return gimple_fold_builtin_fputs (gsi, gimple_call_arg (stmt, 0),
 					gimple_call_arg (stmt, 1), false);
