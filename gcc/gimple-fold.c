@@ -57,20 +57,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "fold-const-call.h"
 
-/* Return true if T is a constant and the value cast to a target char
-   can be represented by a host char.
-   Store the casted char constant in *P if so.  */
-
-static bool
-target_char_cst_p (tree t, char *p)
-{
-  if (!tree_fits_uhwi_p (t) || CHAR_TYPE_SIZE != HOST_BITS_PER_CHAR)
-    return false;
-
-  *p = (char)tree_to_uhwi (t);
-  return true;
-}
-
 /* Return true when DECL can be referenced from current unit.
    FROM_DECL (if non-null) specify constructor of variable DECL was taken from.
    We can get declarations that are not possible to reference for various
@@ -1951,6 +1937,65 @@ gimple_fold_builtin_string_compare (gimple_stmt_iterator *gsi)
   return false;
 }
 
+/* Fold a call to the str{n}{case}cmp builtin pointed by GSI iterator.
+   FCODE is the name of the builtin.  */
+
+static bool
+gimple_fold_builtin_memchr (gimple_stmt_iterator *gsi)
+{
+  gimple *stmt = gsi_stmt (*gsi);
+  tree arg1 = gimple_call_arg (stmt, 0);
+  tree type = TREE_TYPE (arg1);
+  tree arg2 = gimple_call_arg (stmt, 1);
+  tree len = gimple_call_arg (stmt, 2);
+  location_t loc = gimple_location (stmt);
+
+  /* If the LEN parameter is zero, return zero.  */
+  if (integer_zerop (len))
+    {
+      replace_call_with_value (gsi, build_int_cst (type, 0));
+      return true;
+    }
+
+  if (TREE_CODE (arg2) != INTEGER_CST
+      || !tree_fits_uhwi_p (len))
+    return false;
+
+  const char *p1 = c_getstr (arg1);
+  if (p1)
+    {
+      char c;
+      const char *r;
+
+      if (!target_char_cst_p (arg2, &c))
+	return false;
+
+      r = (const char *) memchr (p1, c, tree_to_uhwi (len));
+
+      if (r == NULL)
+	{
+	  replace_call_with_value (gsi, build_int_cst (type, 0));
+	  return true;
+	}
+      else
+	{
+	  HOST_WIDE_INT offset = r - p1;
+	  if (compare_tree_int (len, offset) <= 0)
+	    {
+	      replace_call_with_value (gsi, build_int_cst (type, 0));
+	      return true;
+	    }
+	  else
+	    {
+	      tree temp = fold_build_pointer_plus_hwi_loc (loc, arg1, offset);
+	      replace_call_with_value (gsi, temp);
+	      return true;
+	    }
+	}
+    }
+
+  return false;
+}
 
 /* Fold a call to the fputs builtin.  ARG0 and ARG1 are the arguments
    to the call.  IGNORE is true if the value returned
@@ -3178,6 +3223,8 @@ gimple_fold_builtin (gimple_stmt_iterator *gsi)
     case BUILT_IN_STRNCMP:
     case BUILT_IN_STRNCASECMP:
       return gimple_fold_builtin_string_compare (gsi);
+    case BUILT_IN_MEMCHR:
+      return gimple_fold_builtin_memchr (gsi);
     case BUILT_IN_FPUTS:
       return gimple_fold_builtin_fputs (gsi, gimple_call_arg (stmt, 0),
 					gimple_call_arg (stmt, 1), false);
