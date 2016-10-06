@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "fold-const-call.h"
 #include "case-cfn-macros.h"
 #include "tm.h" /* For C[LT]Z_DEFINED_AT_ZERO.  */
+#include "builtins.h"
 
 /* Functions that test for certain constant types, abstracting away the
    decision about whether to check for overflow.  */
@@ -1461,6 +1462,35 @@ fold_const_call_1 (combined_fn fn, tree type, tree arg0, tree arg1, tree arg2)
 	    return build_real (type, result);
 	}
       return NULL_TREE;
+    }
+
+  switch (fn)
+    {
+    case CFN_BUILT_IN_MEMCHR:
+      {
+	char c;
+	const char *r;
+	if (integer_zerop (arg2))
+	  return build_int_cst (type, 0);
+
+	const char *p1 = c_getstr (arg0);
+	if (!tree_fits_uhwi_p (arg2) || !p1 || !target_char_cst_p (arg1, &c))
+	  return NULL_TREE;
+
+	r = (const char *)strchr (p1, c);
+
+	if (r == NULL)
+	  return build_int_cst (type, 0);
+	else
+	  {
+	    HOST_WIDE_INT offset = r - p1;
+	    if (compare_tree_int (arg2, offset) <= 0)
+	      return build_int_cst (type, 0);
+	  }
+	break;
+      }
+    default:
+      break;
     }
 
   return NULL_TREE;
