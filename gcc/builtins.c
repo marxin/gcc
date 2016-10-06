@@ -92,7 +92,6 @@ builtin_info_type builtin_info[(int)END_BUILTINS];
 bool force_folding_builtin_constant_p;
 
 static rtx c_readstr (const char *, machine_mode);
-static int target_char_cast (tree, char *);
 static rtx get_memory_rtx (tree, tree);
 static int apply_args_size (void);
 static int apply_result_size (void);
@@ -148,7 +147,6 @@ static tree rewrite_call_expr (location_t, tree, int, tree, int, ...);
 static bool validate_arg (const_tree, enum tree_code code);
 static rtx expand_builtin_fabs (tree, rtx, rtx);
 static rtx expand_builtin_signbit (tree, rtx);
-static tree fold_builtin_memchr (location_t, tree, tree, tree, tree);
 static tree fold_builtin_memcmp (location_t, tree, tree, tree);
 static tree fold_builtin_isascii (location_t, tree);
 static tree fold_builtin_toascii (location_t, tree);
@@ -653,7 +651,7 @@ c_readstr (const char *str, machine_mode mode)
    host char type, return zero and put that value into variable pointed to by
    P.  */
 
-static int
+int
 target_char_cast (tree cst, char *p)
 {
   unsigned HOST_WIDE_INT val, hostval;
@@ -7246,47 +7244,6 @@ fold_builtin_sincos (location_t loc,
 			 fold_build1_loc (loc, REALPART_EXPR, type, call)));
 }
 
-/* Fold function call to builtin memchr.  ARG1, ARG2 and LEN are the
-   arguments to the call, and TYPE is its return type.
-   Return NULL_TREE if no simplification can be made.  */
-
-static tree
-fold_builtin_memchr (location_t loc, tree arg1, tree arg2, tree len, tree type)
-{
-  if (!validate_arg (arg1, POINTER_TYPE)
-      || !validate_arg (arg2, INTEGER_TYPE)
-      || !validate_arg (len, INTEGER_TYPE))
-    return NULL_TREE;
-  else
-    {
-      const char *p1;
-
-      if (TREE_CODE (arg2) != INTEGER_CST
-	  || !tree_fits_uhwi_p (len))
-	return NULL_TREE;
-
-      p1 = c_getstr (arg1);
-      if (p1 && compare_tree_int (len, strlen (p1) + 1) <= 0)
-	{
-	  char c;
-	  const char *r;
-	  tree tem;
-
-	  if (target_char_cast (arg2, &c))
-	    return NULL_TREE;
-
-	  r = (const char *) memchr (p1, c, tree_to_uhwi (len));
-
-	  if (r == NULL)
-	    return build_int_cst (TREE_TYPE (arg1), 0);
-
-	  tem = fold_build_pointer_plus_hwi_loc (loc, arg1, r - p1);
-	  return fold_convert_loc (loc, type, tem);
-	}
-      return NULL_TREE;
-    }
-}
-
 /* Fold function call to builtin memcmp with arguments ARG1 and ARG2.
    Return NULL_TREE if no simplification can be made.  */
 
@@ -8341,9 +8298,6 @@ fold_builtin_3 (location_t loc, tree fndecl,
 	  && validate_arg (arg2, POINTER_TYPE))
 	return do_mpfr_remquo (arg0, arg1, arg2);
     break;
-
-    case BUILT_IN_MEMCHR:
-      return fold_builtin_memchr (loc, arg0, arg1, arg2, type);
 
     case BUILT_IN_BCMP:
     case BUILT_IN_MEMCMP:

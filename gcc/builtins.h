@@ -100,5 +100,6 @@ extern char target_percent_s_newline[4];
 
 extern internal_fn associated_internal_fn (tree);
 extern internal_fn replacement_internal_fn (gcall *);
+extern int target_char_cast (tree, char *);
 
 #endif
