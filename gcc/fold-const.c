@@ -14451,13 +14451,17 @@ c_getstr (tree src)
   if (src == 0)
     return 0;
 
+  unsigned HOST_WIDE_INT string_length = TREE_STRING_LENGTH (src) - 1;
+  const char *string = TREE_STRING_POINTER (src);
+  gcc_assert (string[string_length] == 0);
+
   if (offset_node == 0)
-    return TREE_STRING_POINTER (src);
+    return string;
   else if (!tree_fits_uhwi_p (offset_node)
-	   || compare_tree_int (offset_node, TREE_STRING_LENGTH (src) - 1) > 0)
+	   || compare_tree_int (offset_node, string_length) > 0)
     return 0;
 
-  return TREE_STRING_POINTER (src) + tree_to_uhwi (offset_node);
+  return string + tree_to_uhwi (offset_node);
 }
 
 #if CHECKING_P
