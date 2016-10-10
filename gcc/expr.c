@@ -11090,7 +11090,7 @@ is_aligning_offset (const_tree offset, const_tree exp)
    offset will be `sizetype'.  */
 
 tree
-string_constant (tree arg, tree *ptr_offset)
+string_constant (tree arg, tree *ptr_offset, HOST_WIDE_INT length_limit)
 {
   tree array, offset, lower_bound;
   STRIP_NOPS (arg);
@@ -11189,7 +11189,10 @@ string_constant (tree arg, tree *ptr_offset)
       if (DECL_SIZE_UNIT (array) == NULL_TREE
 	  || TREE_CODE (DECL_SIZE_UNIT (array)) != INTEGER_CST
 	  || (length = TREE_STRING_LENGTH (init)) <= 0
-	  || compare_tree_int (DECL_SIZE_UNIT (array), length) < 0)
+	  || (compare_tree_int (DECL_SIZE_UNIT (array), length) < 0
+	      && (length_limit == -1
+		  || compare_tree_int (DECL_SIZE_UNIT (array),
+				       length_limit) < 0)))
 	return 0;
 
       /* If variable is bigger than the string literal, OFFSET must be constant
