@@ -11087,10 +11087,13 @@ is_aligning_offset (const_tree offset, const_tree exp)
 /* Return the tree node if an ARG corresponds to a string constant or zero
    if it doesn't.  If we return nonzero, set *PTR_OFFSET to the offset
    in bytes within the string that ARG is accessing.  The type of the
-   offset will be `sizetype'.  */
+   offset will be `sizetype'.
+   If the string constant is properly zero-terminated, the constant is returned.
+   Otherwise, if REQ_LENGTH is a non-negative number, the constant
+   is returned if the string length is greater or equal to REQ_LENGTH.  */
 
 tree
-string_constant (tree arg, tree *ptr_offset)
+string_constant (tree arg, tree *ptr_offset, HOST_WIDE_INT req_limit)
 {
   tree array, offset, lower_bound;
   STRIP_NOPS (arg);
@@ -11189,7 +11192,10 @@ string_constant (tree arg, tree *ptr_offset)
       if (DECL_SIZE_UNIT (array) == NULL_TREE
 	  || TREE_CODE (DECL_SIZE_UNIT (array)) != INTEGER_CST
 	  || (length = TREE_STRING_LENGTH (init)) <= 0
-	  || compare_tree_int (DECL_SIZE_UNIT (array), length) < 0)
+	  || (compare_tree_int (DECL_SIZE_UNIT (array), length) < 0
+	      && (req_limit == -1
+		  || compare_tree_int (DECL_SIZE_UNIT (array),
+				       req_limit) < 0)))
 	return 0;
 
       /* If variable is bigger than the string literal, OFFSET must be constant

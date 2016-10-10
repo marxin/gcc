@@ -14440,24 +14440,48 @@ fold_build_pointer_plus_hwi_loc (location_t loc, tree ptr, HOST_WIDE_INT off)
 }
 
 /* Return a char pointer for a C string if it is a string constant
-   or sum of string constant and integer constant.  */
+   or sum of string constant and integer constant.
+   If the string constant is properly zero-terminated, the constant is returned.
+   Otherwise, if REQ_LENGTH is a non-negative number, the constant
+   is returned if the string length is greater or equal to REQ_LENGTH.
+   If STRLEN is a valid pointer, length (including terminatinch character)
+   of returned string is stored to the argument.  */
 
 const char *
-c_getstr (tree src)
+c_getstr (tree src, HOST_WIDE_INT req_length, unsigned HOST_WIDE_INT *strlen)
 {
   tree offset_node;
 
-  src = string_constant (src, &offset_node);
+  if (strlen)
+    *strlen = 0;
+
+  src = string_constant (src, &offset_node, req_length);
   if (src == 0)
-    return 0;
+    return NULL;
 
-  if (offset_node == 0)
-    return TREE_STRING_POINTER (src);
-  else if (!tree_fits_uhwi_p (offset_node)
-	   || compare_tree_int (offset_node, TREE_STRING_LENGTH (src) - 1) > 0)
-    return 0;
+  unsigned HOST_WIDE_INT string_length = TREE_STRING_LENGTH (src);
+  const char *string = TREE_STRING_POINTER (src);
 
-  return TREE_STRING_POINTER (src) + tree_to_uhwi (offset_node);
+  if (offset_node != NULL_TREE
+      || !tree_fits_shwi_p (offset_node))
+    return NULL;
+
+  unsigned HOST_WIDE_INT offset = tree_to_uhwi (offset_node);
+
+  if (offset > string_length)
+    return NULL;
+
+  /* If the string is properly '\0' character terminated, return it.  */
+  if ((string_length > 0 && string[string_length - 1] == 0)
+      || (req_length != -1
+	  && (unsigned HOST_WIDE_INT)req_length <= string_length - offset))
+    {
+      if (strlen)
+	*strlen = string_length - offset;
+      return string + offset;
+    }
+  else
+    return NULL;
 }
 
 #if CHECKING_P
