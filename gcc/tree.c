@@ -11326,7 +11326,7 @@ maybe_build_call_expr_loc (location_t loc, combined_fn fn, tree type,
 /* Create a new constant string literal and return a char* pointer to it.
    The STRING_CST value is the LEN characters at STR.  */
 tree
-build_string_literal (int len, const char *str)
+build_string_literal (int len, const char *str, bool build_addr_expr)
 {
   tree t, elem, index, type;
 
@@ -11339,10 +11339,13 @@ build_string_literal (int len, const char *str)
   TREE_READONLY (t) = 1;
   TREE_STATIC (t) = 1;
 
-  type = build_pointer_type (elem);
-  t = build1 (ADDR_EXPR, type,
-	      build4 (ARRAY_REF, elem,
-		      t, integer_zero_node, NULL_TREE, NULL_TREE));
+  if (build_addr_expr)
+    {
+      type = build_pointer_type (elem);
+      t = build1 (ADDR_EXPR, type,
+		  build4 (ARRAY_REF, elem,
+			  t, integer_zero_node, NULL_TREE, NULL_TREE));
+    }
   return t;
 }
 

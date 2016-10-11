@@ -4008,7 +4008,8 @@ extern tree build_call_expr_internal_loc_array (location_t, enum internal_fn,
 						tree, int, const tree *);
 extern tree maybe_build_call_expr_loc (location_t, combined_fn, tree,
 				       int, ...);
-extern tree build_string_literal (int, const char *);
+extern tree build_string_literal (int len, const char *str,
+				  bool build_addr_expr = true);
 
 /* Construct various nodes representing data types.  */
 
