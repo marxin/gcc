@@ -11181,9 +11181,25 @@ string_constant (tree arg, tree *ptr_offset)
 
       /* Variables initialized to string literals can be handled too.  */
       if (init == error_mark_node
-	  || !init
-	  || TREE_CODE (init) != STRING_CST)
+	  || !init)
 	return 0;
+
+      if (TREE_CODE (init) != STRING_CST
+	  && TREE_CODE (init) == CONSTRUCTOR)
+	{
+	  unsigned HOST_WIDE_INT cnt;
+	  tree cfield, cval;
+	  int size = CONSTRUCTOR_NELTS (init);
+	  char *str = XNEWVEC (char, size + 1);
+
+	  unsigned index = 0;
+	  FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (init), cnt, cfield, cval)
+	    str[cnt] = (char)tree_to_uhwi (cval);
+
+	  init = build_string_literal (size, ggc_alloc_string (str, size),
+				       false);
+	  free (str);
+	}
 
       /* Avoid const char foo[4] = "abcde";  */
       if (DECL_SIZE_UNIT (array) == NULL_TREE
