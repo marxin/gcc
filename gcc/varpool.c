@@ -416,7 +416,7 @@ ctor_for_folding (tree decl)
   if (!TREE_STATIC (decl) && !DECL_EXTERNAL (decl))
     {
       gcc_assert (!TREE_PUBLIC (decl));
-      return error_mark_node;
+      return DECL_INITIAL (decl);
     }
 
   gcc_assert (VAR_P (decl));

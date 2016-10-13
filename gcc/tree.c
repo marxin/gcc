@@ -1784,6 +1784,23 @@ build_vector_from_val (tree vectype, tree sc)
     }
 }
 
+tree
+build_string_cst_from_ctor (vec<constructor_elt, va_gc> *v)
+{
+  unsigned HOST_WIDE_INT idx;
+  tree value;
+  char *str = XNEWVEC (char, v->length ());
+
+  FOR_EACH_CONSTRUCTOR_VALUE (v, idx, value)
+    str[idx] = (char)tree_to_uhwi (value);
+
+  tree init = build_string_literal (v->length (),
+				    ggc_alloc_string (str, v->length ()),
+				    false);
+  free (str);
+  return init;
+}
+
 /* Something has messed with the elements of CONSTRUCTOR C after it was built;
    calculate TREE_CONSTANT and TREE_SIDE_EFFECTS.  */
 
@@ -11332,7 +11349,7 @@ maybe_build_call_expr_loc (location_t loc, combined_fn fn, tree type,
 /* Create a new constant string literal and return a char* pointer to it.
    The STRING_CST value is the LEN characters at STR.  */
 tree
-build_string_literal (int len, const char *str)
+build_string_literal (int len, const char *str, bool build_addr_expr)
 {
   tree t, elem, index, type;
 
@@ -11345,10 +11362,14 @@ build_string_literal (int len, const char *str)
   TREE_READONLY (t) = 1;
   TREE_STATIC (t) = 1;
 
-  type = build_pointer_type (elem);
-  t = build1 (ADDR_EXPR, type,
-	      build4 (ARRAY_REF, elem,
-		      t, integer_zero_node, NULL_TREE, NULL_TREE));
+  if (build_addr_expr)
+    {
+      type = build_pointer_type (elem);
+      t = build1 (ADDR_EXPR, type,
+		  build4 (ARRAY_REF, elem,
+			  t, integer_zero_node, NULL_TREE, NULL_TREE));
+    }
+
   return t;
 }
 

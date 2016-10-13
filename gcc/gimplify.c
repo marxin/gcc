@@ -4376,6 +4376,35 @@ optimize_compound_literals_in_ctor (tree orig_ctor)
   return ctor;
 }
 
+static bool
+can_convert_ctor_to_string_cst (tree ctor)
+{
+  unsigned HOST_WIDE_INT idx;
+  tree value, key;
+
+  if (TREE_CODE (TREE_TYPE (ctor)) != ARRAY_TYPE)
+    return false;
+
+  tree t = TREE_TYPE (TREE_TYPE (ctor));
+  if (TREE_CODE (TYPE_SIZE (t)) != INTEGER_CST
+      || tree_to_uhwi (TYPE_SIZE (t)) != BITS_PER_UNIT)
+    return false;
+
+  unsigned HOST_WIDE_INT elements = CONSTRUCTOR_NELTS (ctor);
+  FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (ctor), idx, key, value)
+    {
+      if (TREE_CODE (key) != INTEGER_CST
+	  || TREE_CODE (value) != INTEGER_CST)
+	return false;
+
+      /* Allow zero character just at the end of a string.  */
+      if (integer_zerop (value))
+	return idx == elements - 1;
+    }
+
+  return true;
+}
+
 /* A subroutine of gimplify_modify_expr.  Break out elements of a
    CONSTRUCTOR used as an initializer into separate MODIFY_EXPRs.
 
@@ -4432,6 +4461,17 @@ gimplify_init_constructor (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  {
 	    if (notify_temp_creation)
 	      return GS_OK;
+	    break;
+	  }
+
+	/* Replace a ctor with a string constant with possible.  */
+	if (TREE_READONLY (object)
+	    && VAR_P (object)
+	    && can_convert_ctor_to_string_cst (ctor))
+	  {
+	    ctor = build_string_cst_from_ctor (elts);
+	    TREE_OPERAND (*expr_p, 1) = ctor;
+	    DECL_INITIAL (object) = ctor;
 	    break;
 	  }
 
