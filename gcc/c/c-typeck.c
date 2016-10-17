@@ -6879,6 +6879,9 @@ store_init_value (location_t init_loc, tree decl, tree init, tree origtype)
 	    }
 	}
     }
+
+  if (can_convert_ctor_to_string_cst (value))
+    DECL_INITIAL (decl) = build_string_cst_from_ctor (value);
 }
 
 /* Methods for storing and printing names for error messages.  */
