@@ -412,11 +412,15 @@ ctor_for_folding (tree decl)
     return error_mark_node;
 
   /* Do not care about automatic variables.  Those are never initialized
-     anyway, because gimplifier exapnds the code.  */
+     anyway, because gimplifier expands the code.  */
   if (!TREE_STATIC (decl) && !DECL_EXTERNAL (decl))
     {
       gcc_assert (!TREE_PUBLIC (decl));
-      return error_mark_node;
+      if (!TREE_READONLY (decl) || TREE_THIS_VOLATILE (decl))
+	return error_mark_node;
+
+      tree ctor = DECL_INITIAL (decl);
+      return ctor == NULL_TREE ? error_mark_node : ctor;
     }
 
   gcc_assert (VAR_P (decl));
