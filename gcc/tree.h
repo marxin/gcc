@@ -3975,6 +3975,8 @@ extern tree build_vector_stat (tree, tree * MEM_STAT_DECL);
 #define build_vector(t,v) build_vector_stat (t, v MEM_STAT_INFO)
 extern tree build_vector_from_ctor (tree, vec<constructor_elt, va_gc> *);
 extern tree build_vector_from_val (tree, tree);
+extern tree convert_ctor_to_string_cst (tree);
+extern tree build_vector_from_val (tree, tree);
 extern void recompute_constructor_flags (tree);
 extern void verify_constructor_flags (tree);
 extern tree build_constructor (tree, vec<constructor_elt, va_gc> *);
@@ -4022,7 +4024,8 @@ extern tree build_call_expr_internal_loc_array (location_t, enum internal_fn,
 						tree, int, const tree *);
 extern tree maybe_build_call_expr_loc (location_t, combined_fn, tree,
 				       int, ...);
-extern tree build_string_literal (int, const char *);
+extern tree build_string_literal (int len, const char *str,
+				  bool build_addr_expr = true);
 
 /* Construct various nodes representing data types.  */
 

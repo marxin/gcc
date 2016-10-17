@@ -1495,7 +1495,8 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 	{
 	  if (!TREE_STATIC (decl))
 	    {
-	      DECL_INITIAL (decl) = NULL_TREE;
+	      if (!TREE_READONLY (decl) || TREE_CODE (init) != STRING_CST)
+		DECL_INITIAL (decl) = NULL_TREE;
 	      init = build2 (INIT_EXPR, void_type_node, decl, init);
 	      gimplify_and_add (init, seq_p);
 	      ggc_free (init);
@@ -4436,6 +4437,19 @@ gimplify_init_constructor (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	    if (notify_temp_creation)
 	      return GS_OK;
 	    break;
+	  }
+
+	/* Replace a ctor with a string constant with possible.  */
+	if (TREE_READONLY (object)
+	    && VAR_P (object))
+	  {
+	    tree string_ctor = convert_ctor_to_string_cst (ctor);
+	    if (string_ctor)
+	      {
+		TREE_OPERAND (*expr_p, 1) = string_ctor;
+		DECL_INITIAL (object) = string_ctor;
+		break;
+	      }
 	  }
 
 	/* Fetch information about the constructor to direct later processing.

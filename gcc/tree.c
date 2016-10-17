@@ -1784,6 +1784,70 @@ build_vector_from_val (tree vectype, tree sc)
     }
 }
 
+/* Return TRUE if CTOR can be converted to a string constant.  */
+
+static bool
+can_convert_ctor_to_string_cst (tree ctor)
+{
+  unsigned HOST_WIDE_INT idx;
+  tree value, key;
+
+  tree type = TREE_TYPE (ctor);
+  if (TREE_CODE (ctor) != CONSTRUCTOR
+      || TREE_CODE (type) != ARRAY_TYPE
+      || !tree_fits_uhwi_p (TYPE_SIZE_UNIT (type)))
+    return false;
+
+  tree subtype = TREE_TYPE (type);
+  if (TYPE_MAIN_VARIANT (subtype) != char_type_node)
+    return false;
+
+  unsigned HOST_WIDE_INT ctor_length = tree_to_uhwi (TYPE_SIZE_UNIT (type));
+
+  /* Skip constructors with a hole.  */
+  if (CONSTRUCTOR_NELTS (ctor) != ctor_length)
+    return false;
+
+  FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (ctor), idx, key, value)
+    {
+      if (key == NULL_TREE
+	  || !tree_fits_uhwi_p (key)
+	  || !tree_fits_uhwi_p (value))
+	return false;
+
+      /* Allow zero character only at the end of a string.  */
+      if (integer_zerop (value))
+	return idx == ctor_length - 1;
+      else if (!ISPRINT ((char)tree_to_uhwi (value)))
+	return false;
+    }
+
+  return false;
+}
+
+/* Build string constant from a constructor CTOR.  */
+
+tree
+convert_ctor_to_string_cst (tree ctor)
+{
+  if (!can_convert_ctor_to_string_cst (ctor))
+    return NULL_TREE;
+
+  unsigned HOST_WIDE_INT idx;
+  tree value;
+  vec<constructor_elt, va_gc> *elts = CONSTRUCTOR_ELTS (ctor);
+  char *str = XNEWVEC (char, elts->length ());
+
+  FOR_EACH_CONSTRUCTOR_VALUE (elts, idx, value)
+    str[idx] = (char)tree_to_uhwi (value);
+
+  tree init = build_string_literal (elts->length (),
+				    ggc_alloc_string (str, elts->length ()),
+				    false);
+  free (str);
+  return init;
+}
+
 /* Something has messed with the elements of CONSTRUCTOR C after it was built;
    calculate TREE_CONSTANT and TREE_SIDE_EFFECTS.  */
 
@@ -11359,9 +11423,12 @@ maybe_build_call_expr_loc (location_t loc, combined_fn fn, tree type,
 }
 
 /* Create a new constant string literal and return a char* pointer to it.
-   The STRING_CST value is the LEN characters at STR.  */
+   The STRING_CST value is the LEN characters at STR.  If BUILD_ADDR_EXPR
+   is set to true, ADDR_EXPR of the newly created string constant is
+   returned.  */
+
 tree
-build_string_literal (int len, const char *str)
+build_string_literal (int len, const char *str, bool build_addr_expr)
 {
   tree t, elem, index, type;
 
@@ -11374,10 +11441,14 @@ build_string_literal (int len, const char *str)
   TREE_READONLY (t) = 1;
   TREE_STATIC (t) = 1;
 
-  type = build_pointer_type (elem);
-  t = build1 (ADDR_EXPR, type,
-	      build4 (ARRAY_REF, elem,
-		      t, integer_zero_node, NULL_TREE, NULL_TREE));
+  if (build_addr_expr)
+    {
+      type = build_pointer_type (elem);
+      t = build1 (ADDR_EXPR, type,
+		  build4 (ARRAY_REF, elem,
+			  t, integer_zero_node, NULL_TREE, NULL_TREE));
+    }
+
   return t;
 }
 
