@@ -1784,6 +1784,26 @@ build_vector_from_val (tree vectype, tree sc)
     }
 }
 
+/* Build string constant from a constructor CTOR.  */
+
+tree
+build_string_cst_from_ctor (tree ctor)
+{
+  unsigned HOST_WIDE_INT idx;
+  tree value;
+  vec<constructor_elt, va_gc> *elts = CONSTRUCTOR_ELTS (ctor);
+  char *str = XNEWVEC (char, elts->length ());
+
+  FOR_EACH_CONSTRUCTOR_VALUE (elts, idx, value)
+    str[idx] = (char)tree_to_uhwi (value);
+
+  tree init = build_string_literal (elts->length (),
+				    ggc_alloc_string (str, elts->length ()),
+				    false);
+  free (str);
+  return init;
+}
+
 /* Something has messed with the elements of CONSTRUCTOR C after it was built;
    calculate TREE_CONSTANT and TREE_SIDE_EFFECTS.  */
 
@@ -11344,7 +11364,7 @@ maybe_build_call_expr_loc (location_t loc, combined_fn fn, tree type,
 /* Create a new constant string literal and return a char* pointer to it.
    The STRING_CST value is the LEN characters at STR.  */
 tree
-build_string_literal (int len, const char *str)
+build_string_literal (int len, const char *str, bool build_addr_expr)
 {
   tree t, elem, index, type;
 
@@ -11357,10 +11377,14 @@ build_string_literal (int len, const char *str)
   TREE_READONLY (t) = 1;
   TREE_STATIC (t) = 1;
 
-  type = build_pointer_type (elem);
-  t = build1 (ADDR_EXPR, type,
-	      build4 (ARRAY_REF, elem,
-		      t, integer_zero_node, NULL_TREE, NULL_TREE));
+  if (build_addr_expr)
+    {
+      type = build_pointer_type (elem);
+      t = build1 (ADDR_EXPR, type,
+		  build4 (ARRAY_REF, elem,
+			  t, integer_zero_node, NULL_TREE, NULL_TREE));
+    }
+
   return t;
 }
 
@@ -14215,6 +14239,40 @@ combined_fn_name (combined_fn fn)
     }
   else
     return internal_fn_name (as_internal_fn (fn));
+}
+
+/* Return TRUE when CTOR can be converted to a string constant.  */
+
+bool
+can_convert_ctor_to_string_cst (tree ctor)
+{
+  unsigned HOST_WIDE_INT idx;
+  tree value, key;
+
+  if (TREE_CODE (ctor) != CONSTRUCTOR
+      || TREE_CODE (TREE_TYPE (ctor)) != ARRAY_TYPE)
+    return false;
+
+  tree t = TREE_TYPE (TREE_TYPE (ctor));
+  if (TREE_CODE (TYPE_SIZE (t)) != INTEGER_CST
+      || tree_to_uhwi (TYPE_SIZE (t)) != BITS_PER_UNIT)
+    return false;
+
+  unsigned HOST_WIDE_INT elements = CONSTRUCTOR_NELTS (ctor);
+  FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (ctor), idx, key, value)
+    {
+      if (key == NULL_TREE
+	  || TREE_CODE (key) != INTEGER_CST
+	  || !tree_fits_uhwi_p (value)
+	  || !useless_type_conversion_p (TREE_TYPE (value), char_type_node))
+	return false;
+
+      /* Allow zero character just at the end of a string.  */
+      if (integer_zerop (value))
+	return idx == elements - 1;
+    }
+
+  return false;
 }
 
 #if CHECKING_P

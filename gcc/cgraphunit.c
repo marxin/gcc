@@ -791,6 +791,12 @@ process_function_and_variable_attributes (cgraph_node *first,
 void
 varpool_node::finalize_decl (tree decl)
 {
+  tree init = DECL_INITIAL (decl);
+  if (init
+      && TREE_READONLY (decl)
+      && can_convert_ctor_to_string_cst (init))
+    DECL_INITIAL (decl) = build_string_cst_from_ctor (init);
+
   varpool_node *node = varpool_node::get_create (decl);
 
   gcc_assert (TREE_STATIC (decl) || DECL_EXTERNAL (decl));
