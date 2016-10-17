@@ -477,7 +477,7 @@ build_string_from_id (tree identifier)
   gcc_assert (TREE_CODE (identifier) == IDENTIFIER_NODE);
 
   len = IDENTIFIER_LENGTH (identifier);
-  return build_string_literal (len + 1, IDENTIFIER_POINTER (identifier));
+  return build_string_literal_addr (IDENTIFIER_POINTER (identifier), len + 1);
 }
 
 /* A class may contain secondary vtables in it, for various reasons.
@@ -749,8 +749,8 @@ build_key_buffer_arg (tree base_ptr_var_decl)
 
   /* ... and build a string literal from it. This will make a copy
      so the key_bufffer is not needed anymore after this.  */
-  ret_value = build_string_literal (len1 + key_type_fixed_size,
-                                    (char *) key_buffer);
+  ret_value = build_string_literal_addr ((char *) key_buffer,
+					 len1 + key_type_fixed_size);
   free (key_buffer);
   return ret_value;
 }
@@ -1009,8 +1009,7 @@ register_all_pairs (tree body)
       arg2 = build_key_buffer_arg (base_ptr_var_decl);
 
       if (str2 == NULL_TREE)
-        str2 = build_string_literal (strlen ("unknown") + 1,
-                                     "unknown");
+        str2 = build_string_literal_addr ("unknown");
 
       if (flag_vtv_debug)
         output_set_info (current->class_info->class_type,

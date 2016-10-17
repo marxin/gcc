@@ -412,11 +412,15 @@ ctor_for_folding (tree decl)
     return error_mark_node;
 
   /* Do not care about automatic variables.  Those are never initialized
-     anyway, because gimplifier exapnds the code.  */
+     anyway, because gimplifier expands the code.  */
   if (!TREE_STATIC (decl) && !DECL_EXTERNAL (decl))
     {
       gcc_assert (!TREE_PUBLIC (decl));
-      return error_mark_node;
+      if (!TREE_READONLY (decl) || TREE_THIS_VOLATILE (decl))
+	return error_mark_node;
+
+      tree ctor = DECL_INITIAL (decl);
+      return ctor == NULL_TREE ? error_mark_node : ctor;
     }
 
   gcc_assert (VAR_P (decl));
@@ -525,6 +529,12 @@ varpool_node::analyze (void)
       /* Compute the alignment early so function body expanders are
 	 already informed about increased alignment.  */
       align_variable (decl, 0);
+
+      tree init = DECL_INITIAL (decl);
+      if (init && TREE_READONLY (decl))
+	init = convert_ctor_to_string_cst (init);
+      if (init)
+	DECL_INITIAL (decl) = init;
     }
   if (alias)
     resolve_alias (varpool_node::get (alias_target));

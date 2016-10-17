@@ -1784,6 +1784,149 @@ build_vector_from_val (tree vectype, tree sc)
     }
 }
 
+/* Return TRUE if CTOR can be converted to a string constant.  */
+
+static bool
+can_convert_ctor_to_string_cst (tree ctor)
+{
+  unsigned HOST_WIDE_INT idx;
+  tree value, key;
+
+  tree type = TREE_TYPE (ctor);
+  if (TREE_CODE (ctor) != CONSTRUCTOR
+      || TREE_CODE (type) != ARRAY_TYPE
+      || !tree_fits_uhwi_p (TYPE_SIZE_UNIT (type)))
+    return false;
+
+  tree subtype = TREE_TYPE (type);
+  if (TYPE_MAIN_VARIANT (subtype) != char_type_node)
+    return false;
+
+  unsigned HOST_WIDE_INT ctor_length = tree_to_uhwi (TYPE_SIZE_UNIT (type));
+
+  /* Skip constructors with a hole.  */
+  if (CONSTRUCTOR_NELTS (ctor) != ctor_length)
+    return false;
+
+  FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (ctor), idx, key, value)
+    {
+      if (key == NULL_TREE
+	  || !tree_fits_uhwi_p (key)
+	  || !tree_fits_uhwi_p (value))
+	return false;
+
+      /* Allow zero character only at the end of a string.  */
+      if (integer_zerop (value))
+	return idx == ctor_length - 1;
+      else if (!ISPRINT ((char)tree_to_uhwi (value)))
+	return false;
+    }
+
+  return false;
+}
+
+/* Return a newly constructed STRING_CST node with reserved LEN characters.
+   Note that for a C string literal, LEN should include the trailing NUL.
+   The TREE_TYPE is not initialized.  */
+
+static tree
+build_string_raw (int len)
+{
+  tree s;
+  size_t length;
+
+  /* Do not waste bytes provided by padding of struct tree_string.  */
+  length = len + offsetof (struct tree_string, str) + 1;
+
+  record_node_allocation_statistics (STRING_CST, length);
+
+  s = (tree) ggc_internal_alloc (length);
+
+  memset (s, 0, sizeof (struct tree_typed));
+  TREE_SET_CODE (s, STRING_CST);
+  TREE_CONSTANT (s) = 1;
+  TREE_STRING_LENGTH (s) = len;
+  s->string.str[len] = '\0';
+
+  return s;
+}
+
+/* Return a newly constructed STRING_CST node whose value is
+   the LEN characters at STR.
+   Note that for a C string literal, LEN should include the trailing NUL.
+   The TREE_TYPE is not initialized.  */
+
+tree
+build_string (int len, const char *str)
+{
+  tree s = build_string_raw (len);
+  memcpy (s->string.str, str, len);
+
+  return s;
+}
+
+/* Create a new constant string literal from a STRING_CST STR.  */
+
+static tree
+build_string_literal (tree str)
+{
+  tree elem = build_type_variant (char_type_node, 1, 0);
+
+  tree index = build_index_type (size_int (TREE_STRING_LENGTH (str) - 1));
+  tree type = build_array_type (elem, index);
+  TREE_TYPE (str) = type;
+  TREE_CONSTANT (str) = 1;
+  TREE_READONLY (str) = 1;
+  TREE_STATIC (str) = 1;
+
+  return str;
+}
+
+/* Create a new constant string literal from a STRING_CST which
+   value is the LEN characters at STR.  */
+
+static tree
+build_string_literal (const char *str, int len)
+{
+  if (len == -1)
+    len = strlen (str);
+
+  return build_string_literal (build_string (len, str));
+}
+
+/* Create a new constant string literal and return ADDR_EXPR to the literal.
+   The STRING_CST value is the LEN characters at STR.  */
+
+tree
+build_string_literal_addr (const char *str, int len)
+{
+  tree string = build_string_literal (str, len);
+  tree elem = TREE_TYPE (TREE_TYPE (string));
+  tree type = build_pointer_type (elem);
+  return build1 (ADDR_EXPR, type,
+		 build4 (ARRAY_REF, elem,
+			 string, integer_zero_node, NULL_TREE, NULL_TREE));
+}
+
+/* Build string constant from a constructor CTOR.  */
+
+tree
+convert_ctor_to_string_cst (tree ctor)
+{
+  if (!can_convert_ctor_to_string_cst (ctor))
+    return NULL_TREE;
+
+  unsigned HOST_WIDE_INT idx;
+  tree value;
+  vec<constructor_elt, va_gc> *elts = CONSTRUCTOR_ELTS (ctor);
+
+  tree string = build_string_raw (elts->length ());
+  FOR_EACH_CONSTRUCTOR_VALUE (elts, idx, value)
+    SET_TREE_STRING_CHAR(string, idx, (char)tree_to_uhwi (value));
+
+  return build_string_literal (string);
+}
+
 /* Something has messed with the elements of CONSTRUCTOR C after it was built;
    calculate TREE_CONSTANT and TREE_SIDE_EFFECTS.  */
 
@@ -1979,34 +2122,6 @@ build_real_from_int_cst (tree type, const_tree i)
 
   TREE_OVERFLOW (v) |= overflow;
   return v;
-}
-
-/* Return a newly constructed STRING_CST node whose value is
-   the LEN characters at STR.
-   Note that for a C string literal, LEN should include the trailing NUL.
-   The TREE_TYPE is not initialized.  */
-
-tree
-build_string (int len, const char *str)
-{
-  tree s;
-  size_t length;
-
-  /* Do not waste bytes provided by padding of struct tree_string.  */
-  length = len + offsetof (struct tree_string, str) + 1;
-
-  record_node_allocation_statistics (STRING_CST, length);
-
-  s = (tree) ggc_internal_alloc (length);
-
-  memset (s, 0, sizeof (struct tree_typed));
-  TREE_SET_CODE (s, STRING_CST);
-  TREE_CONSTANT (s) = 1;
-  TREE_STRING_LENGTH (s) = len;
-  memcpy (s->string.str, str, len);
-  s->string.str[len] = '\0';
-
-  return s;
 }
 
 /* Return a newly constructed COMPLEX_CST node whose value is
@@ -11357,31 +11472,6 @@ maybe_build_call_expr_loc (location_t loc, combined_fn fn, tree type,
       return build_call_expr_loc_array (loc, fndecl, n, argarray);
     }
 }
-
-/* Create a new constant string literal and return a char* pointer to it.
-   The STRING_CST value is the LEN characters at STR.  */
-tree
-build_string_literal (int len, const char *str)
-{
-  tree t, elem, index, type;
-
-  t = build_string (len, str);
-  elem = build_type_variant (char_type_node, 1, 0);
-  index = build_index_type (size_int (len - 1));
-  type = build_array_type (elem, index);
-  TREE_TYPE (t) = type;
-  TREE_CONSTANT (t) = 1;
-  TREE_READONLY (t) = 1;
-  TREE_STATIC (t) = 1;
-
-  type = build_pointer_type (elem);
-  t = build1 (ADDR_EXPR, type,
-	      build4 (ARRAY_REF, elem,
-		      t, integer_zero_node, NULL_TREE, NULL_TREE));
-  return t;
-}
-
-
 
 /* Return true if T (assumed to be a DECL) must be assigned a memory
    location.  */

@@ -4,12 +4,15 @@
 char *buffer1;
 char *buffer2;
 
+const char global[] = {'a', 'b', 'c', 'd', '\0'};
+
 #define SIZE 1000
 
 int
 main (void)
 {
   const char* const foo1 = "hello world";
+  const char local[] = "abcd";
 
   buffer1 = __builtin_malloc (SIZE);
   __builtin_strcpy (buffer1, foo1);
@@ -44,6 +47,10 @@ main (void)
   if (__builtin_memchr (foo1, null, 11))
     __builtin_abort ();
   if (__builtin_memchr (foo1, null, 12) != foo1 + 11)
+    __builtin_abort ();
+  if (__builtin_memchr (global, null, 5) == 0)
+    __builtin_abort ();
+  if (__builtin_memchr (local, null, 5) == 0)
     __builtin_abort ();
 
   __builtin_memchr (foo1, x, 11);

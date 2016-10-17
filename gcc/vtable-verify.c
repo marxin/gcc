@@ -727,7 +727,6 @@ verify_bb_vtables (basic_block bb)
                     {
                       int len1 = IDENTIFIER_LENGTH
                                                  (DECL_NAME (vtbl_var_decl));
-                      int len2 = strlen (vtable_name);
 
                       call_stmt = gimple_build_call
                                      (verify_vtbl_ptr_fndecl, 4,
@@ -736,13 +735,12 @@ verify_bb_vtables (basic_block bb)
                                                   (TREE_TYPE (vtbl_var_decl)),
                                               vtbl_var_decl),
                                       lhs,
-                                      build_string_literal
-                                                  (len1 + 1,
-                                                   IDENTIFIER_POINTER
+                                      build_string_literal_addr
+                                                   (IDENTIFIER_POINTER
                                                        (DECL_NAME
-                                                            (vtbl_var_decl))),
-                                      build_string_literal (len2 + 1,
-                                                            vtable_name));
+                                                            (vtbl_var_decl)),
+						   len1 + 1),
+                                      build_string_literal_addr (vtable_name));
                     }
                   else
                     call_stmt = gimple_build_call

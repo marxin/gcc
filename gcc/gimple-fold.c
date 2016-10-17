@@ -3051,7 +3051,7 @@ gimple_fold_builtin_printf (gimple_stmt_iterator *gsi, tree fmt,
 
 	      /* Create a NUL-terminated string that's one char shorter
 		 than the original, stripping off the trailing '\n'.  */
-	      newarg = build_string_literal (len, str);
+	      newarg = build_string_literal_addr (str, len);
 	      string_cst = string_constant (newarg, &offset_node);
 	      gcc_checking_assert (string_cst
 				   && (TREE_STRING_LENGTH (string_cst)
@@ -3060,7 +3060,7 @@ gimple_fold_builtin_printf (gimple_stmt_iterator *gsi, tree fmt,
 				   && (unsigned char)
 				      TREE_STRING_POINTER (string_cst)[len - 1]
 				      == target_newline);
-	      /* build_string_literal creates a new STRING_CST,
+	      /* build_string_literal_addr creates a new STRING_CST,
 		 modify it in place to avoid double copying.  */
 	      newstr = CONST_CAST (char *, TREE_STRING_POINTER (string_cst));
 	      newstr[len - 1] = '\0';

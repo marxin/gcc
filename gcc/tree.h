@@ -1017,6 +1017,8 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 #define TREE_STRING_LENGTH(NODE) (STRING_CST_CHECK (NODE)->string.length)
 #define TREE_STRING_POINTER(NODE) \
   ((const char *)(STRING_CST_CHECK (NODE)->string.str))
+#define SET_TREE_STRING_CHAR(NODE, INDEX, VALUE) \
+  (STRING_CST_CHECK (NODE)->string.str)[INDEX] = VALUE
 
 /* In a COMPLEX_CST node.  */
 #define TREE_REALPART(NODE) (COMPLEX_CST_CHECK (NODE)->complex.real)
@@ -3975,6 +3977,8 @@ extern tree build_vector_stat (tree, tree * MEM_STAT_DECL);
 #define build_vector(t,v) build_vector_stat (t, v MEM_STAT_INFO)
 extern tree build_vector_from_ctor (tree, vec<constructor_elt, va_gc> *);
 extern tree build_vector_from_val (tree, tree);
+extern tree convert_ctor_to_string_cst (tree);
+extern tree build_vector_from_val (tree, tree);
 extern void recompute_constructor_flags (tree);
 extern void verify_constructor_flags (tree);
 extern tree build_constructor (tree, vec<constructor_elt, va_gc> *);
@@ -3990,6 +3994,7 @@ extern tree build_minus_one_cst (tree);
 extern tree build_all_ones_cst (tree);
 extern tree build_zero_cst (tree);
 extern tree build_string (int, const char *);
+extern tree build_string_literal_addr (const char *str, int len = -1);
 extern tree build_tree_list_stat (tree, tree MEM_STAT_DECL);
 #define build_tree_list(t, q) build_tree_list_stat (t, q MEM_STAT_INFO)
 extern tree build_tree_list_vec_stat (const vec<tree, va_gc> *MEM_STAT_DECL);
@@ -4022,7 +4027,6 @@ extern tree build_call_expr_internal_loc_array (location_t, enum internal_fn,
 						tree, int, const tree *);
 extern tree maybe_build_call_expr_loc (location_t, combined_fn, tree,
 				       int, ...);
-extern tree build_string_literal (int, const char *);
 
 /* Construct various nodes representing data types.  */
 

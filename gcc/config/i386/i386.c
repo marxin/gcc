@@ -32245,7 +32245,7 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 	{
           predicate_decl = ix86_builtins [(int) IX86_BUILTIN_CPU_IS];
           /* For a C string literal the length includes the trailing NULL.  */
-          predicate_arg = build_string_literal (strlen (arg_str) + 1, arg_str);
+	  predicate_arg = build_string_literal_addr (arg_str);
           predicate_chain = tree_cons (predicate_decl, predicate_arg,
 				       predicate_chain);
 	}
@@ -32271,9 +32271,8 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 	    {
 	      if (predicate_list)
 		{
-		  predicate_arg = build_string_literal (
-				  strlen (feature_list[i].name) + 1,
-				  feature_list[i].name);
+		  predicate_arg
+		    = build_string_literal_addr (feature_list[i].name);
 		  predicate_chain = tree_cons (predicate_decl, predicate_arg,
 					       predicate_chain);
 		}

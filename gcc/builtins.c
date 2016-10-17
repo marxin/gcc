@@ -8087,9 +8087,9 @@ static inline tree
 fold_builtin_FILE (location_t loc)
 {
   if (const char *fname = LOCATION_FILE (loc))
-    return build_string_literal (strlen (fname) + 1, fname);
+    return build_string_literal_addr (fname);
 
-  return build_string_literal (1, "");
+  return build_string_literal_addr ("");
 }
 
 /* Fold a call to __builtin_FUNCTION to a constant string.  */
@@ -8100,10 +8100,10 @@ fold_builtin_FUNCTION ()
   if (current_function_decl)
     {
       const char *name = IDENTIFIER_POINTER (DECL_NAME (current_function_decl));
-      return build_string_literal (strlen (name) + 1, name);
+      return build_string_literal_addr (name);
     }
 
-  return build_string_literal (1, "");
+  return build_string_literal_addr ("");
 }
 
 /* Fold a call to __builtin_LINE to an integer constant.  */
