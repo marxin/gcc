@@ -1404,6 +1404,7 @@ OBJS = \
 	print-rtl-function.o \
 	print-tree.o \
 	profile.o \
+	profile-expand.o \
 	real.o \
 	realmpfr.o \
 	recog.o \
