@@ -14252,7 +14252,8 @@ can_convert_ctor_to_string_cst (tree ctor)
   unsigned HOST_WIDE_INT elements = CONSTRUCTOR_NELTS (ctor);
   FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (ctor), idx, key, value)
     {
-      if (TREE_CODE (key) != INTEGER_CST
+      if (key == NULL_TREE
+	  || TREE_CODE (key) != INTEGER_CST
 	  || TREE_CODE (value) != INTEGER_CST)
 	return false;
 
