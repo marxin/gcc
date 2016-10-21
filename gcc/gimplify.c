@@ -1491,7 +1491,7 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
       if (init && init != error_mark_node)
 	{
 	  if (!TREE_STATIC (decl)
-	      && TREE_CODE (init) != STRING_CST)
+	      && (!TREE_READONLY (decl) || TREE_CODE (init) != STRING_CST))
 	    {
 	      DECL_INITIAL (decl) = NULL_TREE;
 	      init = build2 (INIT_EXPR, void_type_node, decl, init);
