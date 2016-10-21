@@ -2566,6 +2566,9 @@ move_coverage_counter_update (gimple_stmt_iterator *gsi, struct loop *loop)
 	}
     }
 
+  if (exits.is_empty ())
+    return;
+
   edge preheader = loop_preheader_edge (loop);
   if (!single_succ_p (preheader->src)
       || preheader->dest != call->bb)
@@ -2632,12 +2635,15 @@ process_sm_for_coverage_counter (void)
       for (unsigned i = 0; i < loop->num_nodes; i++)
 	{
 	  gimple_stmt_iterator gsi;
-	  for (gsi = gsi_start_bb (body[i]); !gsi_end_p (gsi);
-	       gsi_next (&gsi))
+	  for (gsi = gsi_start_bb (body[i]); !gsi_end_p (gsi);)
 	    {
 	      gimple *stmt = gsi_stmt (gsi);
-	      if (gimple_call_internal_p (stmt, IFN_UPDATE_COVERAGE_COUNTER))
+	      if (gimple_call_internal_p (stmt, IFN_UPDATE_COVERAGE_COUNTER)
+		  && integer_onep (gimple_call_arg (stmt, 1)))
 		move_coverage_counter_update (&gsi, loop);
+
+	      if (!gsi_end_p (gsi))
+		gsi_next (&gsi);
 	    }
 	}
     }
