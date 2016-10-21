@@ -848,9 +848,6 @@ store_init_value (tree decl, tree init, vec<tree, va_gc>** cleanups, int flags)
      dynamic initialization later.  */
   DECL_INITIAL (decl) = value;
 
-  if (can_convert_ctor_to_string_cst (value))
-    DECL_INITIAL (decl) = build_string_cst_from_ctor (value);
-
   return NULL_TREE;
 }
 
