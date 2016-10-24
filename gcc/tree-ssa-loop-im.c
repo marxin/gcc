@@ -2600,10 +2600,16 @@ move_coverage_counter_update (gimple_stmt_iterator *gsi, struct loop *loop)
   for (unsigned i = 0; i < exits.length (); i++)
     {
       edge exit = exits[i];
-      basic_block new_bb = split_edge (exit);
-      set_immediate_dominator (CDI_DOMINATORS, new_bb, exit->src);
-      e = single_pred_edge (new_bb);
+      if (!dominated_by_p (CDI_DOMINATORS, exit->dest, exit->src))
+	{
+	  basic_block new_bb = split_edge (exit);
+	  set_immediate_dominator (CDI_DOMINATORS, new_bb, exit->src);
+	  e = single_pred_edge (new_bb);
+	}
+      else
+	e = exit;
 
+      basic_block bb = e->dest;
       phi = create_phi_node (updated_value, e->dest);
       add_phi_arg (phi, loop_var2, e, UNKNOWN_LOCATION);
 
@@ -2611,7 +2617,7 @@ move_coverage_counter_update (gimple_stmt_iterator *gsi, struct loop *loop)
       call = gimple_build_call_internal (IFN_UPDATE_COVERAGE_COUNTER,
 					 2, addr, gimple_phi_result (phi));
 
-      it = gsi_start_bb (new_bb);
+      it = gsi_start_bb (bb);
       gsi_insert_before (&it, call, GSI_NEW_STMT);
     }
 
