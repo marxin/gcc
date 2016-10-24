@@ -14254,7 +14254,8 @@ can_convert_ctor_to_string_cst (tree ctor)
     {
       if (key == NULL_TREE
 	  || TREE_CODE (key) != INTEGER_CST
-	  || TREE_CODE (value) != INTEGER_CST)
+	  || TREE_CODE (value) != INTEGER_CST
+	  || !tree_fits_uhwi_p (value))
 	return false;
 
       /* Allow zero character just at the end of a string.  */
