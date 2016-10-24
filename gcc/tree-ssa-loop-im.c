@@ -2574,6 +2574,13 @@ move_coverage_counter_update (gimple_stmt_iterator *gsi, struct loop *loop)
       || preheader->dest != call->bb)
     return;
 
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "Executing store motion of ");
+      print_generic_expr (dump_file, gimple_call_arg (call, 0), 0);
+      fprintf (dump_file, " from loop %d\n", loop->num);
+    }
+
   tree preheader_var = make_temp_ssa_name (type, NULL, "PROF_edge_counter");
   gimple *stmt = gimple_build_assign (preheader_var, build_int_cst (type, 0));
   gimple_stmt_iterator it = gsi_last_bb (preheader->src);
