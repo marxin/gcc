@@ -58,7 +58,8 @@ static inline bool
 host_size_t_cst_p (tree t, size_t *size_out)
 {
   if (integer_cst_p (t)
-      && wi::min_precision (t, UNSIGNED) <= sizeof (size_t) * CHAR_BIT)
+      && wi::min_precision (t, UNSIGNED) <= sizeof (size_t) * CHAR_BIT
+      && tree_fits_uhwi_p (t))
     {
       *size_out = tree_to_uhwi (t);
       return true;
