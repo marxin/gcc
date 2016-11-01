@@ -53,6 +53,7 @@ extern tree tree_ssa_strip_useless_type_conversions (tree);
 extern bool ssa_undefined_value_p (tree, bool = true);
 extern bool gimple_uses_undefined_value_p (gimple *);
 extern void execute_update_addresses_taken (void);
+extern void execute_update_addresses_taken_asan_sanitize (void);
 
 /* Given an edge_var_map V, return the PHI arg definition.  */
 

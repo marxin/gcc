@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgexpand.h"
 #include "tree-cfg.h"
 #include "tree-dfa.h"
+#include "asan.h"
 
 /* Pointer map of variable mappings, keyed by edge.  */
 static hash_map<edge, auto_vec<edge_var_map> > *edge_var_maps;
@@ -1504,7 +1505,7 @@ non_rewritable_lvalue_p (tree lhs)
 
 static void
 maybe_optimize_var (tree var, bitmap addresses_taken, bitmap not_reg_needs,
-		    bitmap suitable_for_renaming)
+		    bitmap suitable_for_renaming, bitmap marked_nonaddressable)
 {
   /* Global Variables, result decls cannot be changed.  */
   if (is_global_var (var)
@@ -1522,6 +1523,7 @@ maybe_optimize_var (tree var, bitmap addresses_taken, bitmap not_reg_needs,
 	  || !bitmap_bit_p (not_reg_needs, DECL_UID (var))))
     {
       TREE_ADDRESSABLE (var) = 0;
+      bitmap_set_bit (marked_nonaddressable, DECL_UID (var));
       if (is_gimple_reg (var))
 	bitmap_set_bit (suitable_for_renaming, DECL_UID (var));
       if (dump_file)
@@ -1550,19 +1552,42 @@ maybe_optimize_var (tree var, bitmap addresses_taken, bitmap not_reg_needs,
     }
 }
 
-/* Compute TREE_ADDRESSABLE and DECL_GIMPLE_REG_P for local variables.  */
+/* Return true when STMT is ASAN mark where second argument is an address
+   of a local variable.  */
 
-void
-execute_update_addresses_taken (void)
+static bool
+is_asan_mark_p (gimple *stmt)
+{
+  if (!gimple_call_internal_p (stmt, IFN_ASAN_MARK))
+    return false;
+
+  tree addr = get_base_address (gimple_call_arg (stmt, 1));
+  if (TREE_CODE (addr) == ADDR_EXPR
+      && TREE_CODE (TREE_OPERAND (addr, 0)) == VAR_DECL)
+    return true;
+
+  return false;
+}
+
+/* Compute TREE_ADDRESSABLE and DECL_GIMPLE_REG_P for local variables.
+   If SANITIZE_ASAN_MARK is set to true, sanitize also ASAN_MARK built-ins.  */
+
+
+static void
+execute_update_addresses_taken (bool sanitize_asan_mark = false)
 {
   basic_block bb;
   bitmap addresses_taken = BITMAP_ALLOC (NULL);
   bitmap not_reg_needs = BITMAP_ALLOC (NULL);
   bitmap suitable_for_renaming = BITMAP_ALLOC (NULL);
+  bitmap marked_nonaddressable = BITMAP_ALLOC (NULL);
   tree var;
   unsigned i;
 
   timevar_push (TV_ADDRESS_TAKEN);
+
+  if (dump_file)
+    fprintf (dump_file, "call execute_update_addresses_taken\n");
 
   /* Collect into ADDRESSES_TAKEN all variables whose address is taken within
      the function body.  */
@@ -1575,17 +1600,23 @@ execute_update_addresses_taken (void)
 	  enum gimple_code code = gimple_code (stmt);
 	  tree decl;
 
-	  if (code == GIMPLE_CALL
-	      && optimize_atomic_compare_exchange_p (stmt))
+	  if (code == GIMPLE_CALL)
 	    {
-	      /* For __atomic_compare_exchange_N if the second argument
-		 is &var, don't mark var addressable;
-		 if it becomes non-addressable, we'll rewrite it into
-		 ATOMIC_COMPARE_EXCHANGE call.  */
-	      tree arg = gimple_call_arg (stmt, 1);
-	      gimple_call_set_arg (stmt, 1, null_pointer_node);
-	      gimple_ior_addresses_taken (addresses_taken, stmt);
-	      gimple_call_set_arg (stmt, 1, arg);
+	      if (optimize_atomic_compare_exchange_p (stmt))
+		{
+		  /* For __atomic_compare_exchange_N if the second argument
+		     is &var, don't mark var addressable;
+		     if it becomes non-addressable, we'll rewrite it into
+		     ATOMIC_COMPARE_EXCHANGE call.  */
+		  tree arg = gimple_call_arg (stmt, 1);
+		  gimple_call_set_arg (stmt, 1, null_pointer_node);
+		  gimple_ior_addresses_taken (addresses_taken, stmt);
+		  gimple_call_set_arg (stmt, 1, arg);
+		}
+	      else if (sanitize_asan_mark && is_asan_mark_p (stmt))
+		;
+	      else
+		gimple_ior_addresses_taken (addresses_taken, stmt);
 	    }
 	  else
 	    /* Note all addresses taken by the stmt.  */
@@ -1675,15 +1706,17 @@ execute_update_addresses_taken (void)
      for -g vs. -g0.  */
   for (var = DECL_ARGUMENTS (cfun->decl); var; var = DECL_CHAIN (var))
     maybe_optimize_var (var, addresses_taken, not_reg_needs,
-			suitable_for_renaming);
+			suitable_for_renaming, marked_nonaddressable);
 
   FOR_EACH_VEC_SAFE_ELT (cfun->local_decls, i, var)
     maybe_optimize_var (var, addresses_taken, not_reg_needs,
-			suitable_for_renaming);
+			suitable_for_renaming, marked_nonaddressable);
 
   /* Operand caches need to be recomputed for operands referencing the updated
      variables and operands need to be rewritten to expose bare symbols.  */
-  if (!bitmap_empty_p (suitable_for_renaming))
+  if (!bitmap_empty_p (suitable_for_renaming)
+      || (asan_sanitize_use_after_scope ()
+	  && !bitmap_empty_p (marked_nonaddressable)))
     {
       FOR_EACH_BB_FN (bb, cfun)
 	for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);)
@@ -1841,6 +1874,17 @@ execute_update_addresses_taken (void)
 			continue;
 		      }
 		  }
+		else if (sanitize_asan_mark && is_asan_mark_p (stmt))
+		  {
+		    tree var = TREE_OPERAND (gimple_call_arg (stmt, 1), 0);
+		    if (bitmap_bit_p (suitable_for_renaming, DECL_UID (var))
+			|| bitmap_bit_p (marked_nonaddressable, DECL_UID (var)))
+		      {
+			unlink_stmt_vdef (stmt);
+			gsi_remove (&gsi, true);
+			continue;
+		      }
+		  }
 		for (i = 0; i < gimple_call_num_args (stmt); ++i)
 		  {
 		    tree *argp = gimple_call_arg_ptr (stmt, i);
@@ -1896,7 +1940,25 @@ execute_update_addresses_taken (void)
   BITMAP_FREE (not_reg_needs);
   BITMAP_FREE (addresses_taken);
   BITMAP_FREE (suitable_for_renaming);
+  BITMAP_FREE (marked_nonaddressable);
   timevar_pop (TV_ADDRESS_TAKEN);
+}
+
+/* Compute TREE_ADDRESSABLE and DECL_GIMPLE_REG_P for local variables.  */
+
+void
+execute_update_addresses_taken (void)
+{
+  execute_update_addresses_taken (false);
+}
+
+/* Compute TREE_ADDRESSABLE and DECL_GIMPLE_REG_P for local variables
+   and sanitize ASAN_MARK built-ins.  */
+
+void
+execute_update_addresses_taken_asan_sanitize (void)
+{
+  execute_update_addresses_taken (true);
 }
 
 namespace {

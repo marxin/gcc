@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "builtins.h"
 #include "fnmatch.h"
+#include "tree-ssa.h"
 
 /* AddressSanitizer finds out-of-bounds and use-after-free bugs
    with <2x slowdown on average.
@@ -2973,6 +2974,9 @@ asan_instrument (void)
   if (shadow_ptr_types[0] == NULL_TREE)
     asan_init_shadow_ptr_types ();
   transform_statements ();
+
+  if (optimize)
+    execute_update_addresses_taken_asan_sanitize ();
   return 0;
 }
 
