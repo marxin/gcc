@@ -222,6 +222,7 @@ protected:
 						   of math functions; the
 						   current choices have
 						   been optimized.  */
+#define PROP_asan_check_done	(1 << 16)	/* ASAN check is emitted */
 
 #define PROP_trees \
   (PROP_gimple_any | PROP_gimple_lcf | PROP_gimple_leh | PROP_gimple_lomp)

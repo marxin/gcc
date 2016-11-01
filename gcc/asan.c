@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "builtins.h"
 #include "fnmatch.h"
+#include "tree-ssa.h"
 
 /* AddressSanitizer finds out-of-bounds and use-after-free bugs
    with <2x slowdown on average.
@@ -2993,10 +2994,10 @@ const pass_data pass_data_asan =
   OPTGROUP_NONE, /* optinfo_flags */
   TV_NONE, /* tv_id */
   ( PROP_ssa | PROP_cfg | PROP_gimple_leh ), /* properties_required */
-  0, /* properties_provided */
+  PROP_asan_check_done, /* properties_provided */
   0, /* properties_destroyed */
   0, /* todo_flags_start */
-  TODO_update_ssa, /* todo_flags_finish */
+  TODO_update_ssa | TODO_update_address_taken, /* todo_flags_finish */
 };
 
 class pass_asan : public gimple_opt_pass

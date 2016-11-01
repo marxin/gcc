@@ -289,7 +289,7 @@ struct GTY(()) function {
   location_t function_end_locus;
 
   /* Properties used by the pass manager.  */
-  unsigned int curr_properties;
+  unsigned long curr_properties;
   unsigned int last_verified;
 
   /* Non-null if the function does something that would prevent it from
