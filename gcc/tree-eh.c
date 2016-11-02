@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "cfgloop.h"
 #include "gimple-low.h"
+#include "asan.h"
 
 /* In some instances a tree and a gimple need to be stored in a same table,
    i.e. in hash tables. This is a structure to do this. */
@@ -704,6 +705,9 @@ verify_norecord_switch_expr (struct leh_state *state,
   size_t i, n;
 
   if (!tf)
+    return;
+
+  if (asan_sanitize_use_after_scope ())
     return;
 
   n = gimple_switch_num_labels (switch_expr);
