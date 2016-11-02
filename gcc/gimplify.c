@@ -1678,7 +1678,9 @@ warn_switch_unreachable_r (gimple_stmt_iterator *gsi_p, bool *handled_ops_p,
 	 worse location info.  */
       if (gimple_try_eval (stmt) == NULL)
 	{
-	  wi->info = stmt;
+	  gimple_stmt_iterator *it = XNEW (gimple_stmt_iterator);
+	  memcpy (it, gsi_p, sizeof (gimple_stmt_iterator));
+	  wi->info = it;
 	  return integer_zero_node;
 	}
       /* Fall through.  */
@@ -1689,9 +1691,18 @@ warn_switch_unreachable_r (gimple_stmt_iterator *gsi_p, bool *handled_ops_p,
       /* Walk the sub-statements.  */
       *handled_ops_p = false;
       break;
+    case GIMPLE_CALL:
+      if (gimple_call_internal_p (stmt, IFN_ASAN_MARK))
+	{
+	  *handled_ops_p = false;
+	  break;
+	}
+      /* Fall through.  */
     default:
       /* Save the first "real" statement (not a decl/lexical scope/...).  */
-      wi->info = stmt;
+      gimple_stmt_iterator *it = XNEW (gimple_stmt_iterator);
+      memcpy (it, gsi_p, sizeof (gimple_stmt_iterator));
+      wi->info = it;
       return integer_zero_node;
     }
   return NULL_TREE;
@@ -1713,7 +1724,11 @@ maybe_warn_switch_unreachable (gimple_seq seq)
   struct walk_stmt_info wi;
   memset (&wi, 0, sizeof (wi));
   walk_gimple_seq (seq, warn_switch_unreachable_r, NULL, &wi);
-  gimple *stmt = (gimple *) wi.info;
+  gimple *stmt = NULL;
+  gimple_stmt_iterator *gsi = (gimple_stmt_iterator *) wi.info;
+  if (gsi)
+    stmt = gsi_stmt (*gsi);
+  free (wi.info);
 
   if (stmt && gimple_code (stmt) != GIMPLE_LABEL)
     {
@@ -2224,7 +2239,17 @@ gimplify_switch_expr (tree *expr_p, gimple_seq *pre_p)
 
       switch_stmt = gimple_build_switch (SWITCH_COND (switch_expr),
 					   default_case, labels);
-      gimplify_seq_add_stmt (pre_p, switch_stmt);
+
+      struct walk_stmt_info wi;
+      memset (&wi, 0, sizeof (wi));
+      walk_gimple_seq (switch_body_seq, warn_switch_unreachable_r, NULL, &wi);
+      gimple_stmt_iterator *it = (gimple_stmt_iterator *)wi.info;
+      if (gsi_stmt (*it) == switch_body_seq)
+	gimplify_seq_add_stmt (pre_p, switch_stmt);
+      else
+	gsi_insert_before_without_update (it, switch_stmt, GSI_SAME_STMT);
+      free (it);
+
       gimplify_seq_add_seq (pre_p, switch_body_seq);
       labels.release ();
     }
