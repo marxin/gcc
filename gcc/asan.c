@@ -245,6 +245,15 @@ static unsigned HOST_WIDE_INT asan_shadow_offset_value;
 static bool asan_shadow_offset_computed;
 static vec<char *> sanitized_sections;
 
+/* Return true if STMT is ASAN_MARK poisoning internal function call.  */
+static inline bool
+asan_mark_poison_p (gimple *stmt)
+{
+  return (gimple_call_internal_p (stmt, IFN_ASAN_MARK)
+	  && tree_to_uhwi (gimple_call_arg (stmt, 0)) == ASAN_MARK_CLOBBER);
+
+}
+
 /* Set of variable declarations that are going to be guarded by
    use-after-scope sanitizer.  */
 
@@ -2199,8 +2208,10 @@ transform_statements (void)
 		 If the current instruction is a function call that
 		 might free something, let's forget about the memory
 		 references that got instrumented.  Otherwise we might
-		 miss some instrumentation opportunities.  */
-	      if (is_gimple_call (s) && !nonfreeing_call_p (s))
+		 miss some instrumentation opportunities.  Do the same
+		 for a ASAN_MARK poisoning internal function.  */
+	      if (is_gimple_call (s)
+		  && (!nonfreeing_call_p (s) || asan_mark_poison_p (s)))
 		empty_mem_ref_hash_table ();
 
 	      gsi_next (&i);

@@ -155,6 +155,7 @@ struct gimplify_ctx
   tree return_temp;
 
   vec<tree> case_labels;
+  hash_set<tree> *live_switch_vars;
   /* The formal temporary table.  Should this be persistent?  */
   hash_table<gimplify_hasher> *temp_htab;
 
@@ -1165,6 +1166,48 @@ asan_poison_variable (tree decl, bool poison, gimple_seq *seq_p)
   asan_poison_variable (decl, poison, &it, before);
 }
 
+/* Sort pair of VAR_DECLs A and B by DECL_UID.  */
+
+static int
+sort_by_decl_uid (const void *a, const void *b)
+{
+  const tree *t1 = (const tree *)a;
+  const tree *t2 = (const tree *)b;
+
+  int uid1 = DECL_UID (*t1);
+  int uid2 = DECL_UID (*t2);
+
+  if (uid1 < uid2)
+    return -1;
+  else if (uid1 > uid2)
+    return 1;
+  else
+    return 0;
+}
+
+/* Generate IFN_ASAN_MARK internal call for all VARIABLES
+   depending on POISON flag.  Created statement is appended
+   to SEQ_P gimple sequence.  */
+
+static void
+asan_poison_variables (hash_set<tree> *variables, bool poison, gimple_seq *seq_p)
+{
+  unsigned c = variables->elements ();
+  if (c == 0)
+    return;
+
+  auto_vec<tree> sorted_variables (c);
+
+  for (hash_set<tree>::iterator it = variables->begin ();
+       it != variables->end (); ++it)
+    sorted_variables.safe_push (*it);
+
+  sorted_variables.qsort (sort_by_decl_uid);
+
+  for (unsigned i = 0; i < sorted_variables.length (); i++)
+    asan_poison_variable (sorted_variables[i], poison, seq_p);
+}
+
 /* Gimplify a BIND_EXPR.  Just voidify and recurse.  */
 
 static enum gimplify_status
@@ -1315,6 +1358,10 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  asan_poisoned_variables->remove (t);
 	  asan_poison_variable (t, true, &cleanup);
 	}
+
+      if (gimplify_ctxp->live_switch_vars != NULL
+	  && gimplify_ctxp->live_switch_vars->contains (t))
+	gimplify_ctxp->live_switch_vars->remove (t);
     }
 
   if (ret_clauses)
@@ -1579,6 +1626,8 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 	{
 	  asan_poisoned_variables->add (decl);
 	  asan_poison_variable (decl, false, seq_p);
+	  if (gimplify_ctxp->live_switch_vars)
+	    gimplify_ctxp->live_switch_vars->add (decl);
 	}
 
       /* Some front ends do not explicitly declare all anonymous
@@ -1689,6 +1738,13 @@ warn_switch_unreachable_r (gimple_stmt_iterator *gsi_p, bool *handled_ops_p,
       /* Walk the sub-statements.  */
       *handled_ops_p = false;
       break;
+    case GIMPLE_CALL:
+      if (gimple_call_internal_p (stmt, IFN_ASAN_MARK))
+	{
+	  *handled_ops_p = false;
+	  break;
+	}
+      /* Fall through.  */
     default:
       /* Save the first "real" statement (not a decl/lexical scope/...).  */
       wi->info = stmt;
@@ -2182,6 +2238,7 @@ gimplify_switch_expr (tree *expr_p, gimple_seq *pre_p)
     {
       vec<tree> labels;
       vec<tree> saved_labels;
+      hash_set<tree> *saved_live_switch_vars;
       tree default_case = NULL_TREE;
       gswitch *switch_stmt;
 
@@ -2193,6 +2250,8 @@ gimplify_switch_expr (tree *expr_p, gimple_seq *pre_p)
          labels.  Save all the things from the switch body to append after.  */
       saved_labels = gimplify_ctxp->case_labels;
       gimplify_ctxp->case_labels.create (8);
+      saved_live_switch_vars = gimplify_ctxp->live_switch_vars;
+      gimplify_ctxp->live_switch_vars = new hash_set<tree> (4);
       bool old_in_switch_expr = gimplify_ctxp->in_switch_expr;
       gimplify_ctxp->in_switch_expr = true;
 
@@ -2207,6 +2266,9 @@ gimplify_switch_expr (tree *expr_p, gimple_seq *pre_p)
 
       labels = gimplify_ctxp->case_labels;
       gimplify_ctxp->case_labels = saved_labels;
+      gcc_assert (gimplify_ctxp->live_switch_vars->elements () == 0);
+      delete gimplify_ctxp->live_switch_vars;
+      gimplify_ctxp->live_switch_vars = saved_live_switch_vars;
 
       preprocess_case_label_vec_for_gimple (labels, index_type,
 					    &default_case);
@@ -10857,25 +10919,6 @@ gimplify_omp_ordered (tree expr, gimple_seq body)
   return gimple_build_omp_ordered (body, OMP_ORDERED_CLAUSES (expr));
 }
 
-/* Sort pair of VAR_DECLs A and B by DECL_UID.  */
-
-static int
-sort_by_decl_uid (const void *a, const void *b)
-{
-  const tree *t1 = (const tree *)a;
-  const tree *t2 = (const tree *)b;
-
-  int uid1 = DECL_UID (*t1);
-  int uid2 = DECL_UID (*t2);
-
-  if (uid1 < uid2)
-    return -1;
-  else if (uid1 > uid2)
-    return 1;
-  else
-    return 0;
-}
-
 /* Convert the GENERIC expression tree *EXPR_P to GIMPLE.  If the
    expression produces a value to be used as an operand inside a GIMPLE
    statement, the value will be stored back in *EXPR_P.  This value will
@@ -11392,24 +11435,15 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  if (asan_sanitize_use_after_scope ()
 	      && asan_used_labels != NULL
 	      && asan_used_labels->contains (label))
-	    {
-	      unsigned c = asan_poisoned_variables->elements ();
-	      auto_vec<tree> sorted_variables (c);
-
-	      for (hash_set<tree>::iterator it
-		   = asan_poisoned_variables->begin ();
-		   it != asan_poisoned_variables->end (); ++it)
-		sorted_variables.safe_push (*it);
-
-	      sorted_variables.qsort (sort_by_decl_uid);
-
-	      for (unsigned i = 0; i < sorted_variables.length (); ++i)
-		asan_poison_variable (sorted_variables[i], false, pre_p);
-	    }
+	    asan_poison_variables (asan_poisoned_variables, false, pre_p);
 	  break;
 
 	case CASE_LABEL_EXPR:
 	  ret = gimplify_case_label_expr (expr_p, pre_p);
+
+	  if (gimplify_ctxp->live_switch_vars)
+	    asan_poison_variables (gimplify_ctxp->live_switch_vars, false,
+				   pre_p);
 	  break;
 
 	case RETURN_EXPR:
