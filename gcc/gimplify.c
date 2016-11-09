@@ -2266,7 +2266,6 @@ gimplify_switch_expr (tree *expr_p, gimple_seq *pre_p)
 
       labels = gimplify_ctxp->case_labels;
       gimplify_ctxp->case_labels = saved_labels;
-      gcc_assert (gimplify_ctxp->live_switch_vars->elements () == 0);
       delete gimplify_ctxp->live_switch_vars;
       gimplify_ctxp->live_switch_vars = saved_live_switch_vars;
 
