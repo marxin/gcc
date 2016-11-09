@@ -85,6 +85,7 @@ enum tree_dump_index
 #define MSG_OPTIMIZED_LOCATIONS  (1 << 26)  /* -fopt-info optimized sources */
 #define MSG_MISSED_OPTIMIZATION  (1 << 27)  /* missed opportunities */
 #define MSG_NOTE                 (1 << 28)  /* general optimization info */
+#define TDF_PROFILE		 (1 << 29)
 #define MSG_ALL         (MSG_OPTIMIZED_LOCATIONS | MSG_MISSED_OPTIMIZATION \
                          | MSG_NOTE)
 

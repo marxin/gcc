@@ -108,6 +108,7 @@ static const struct dump_option_value_info dump_options[] =
   {"nouid", TDF_NOUID},
   {"enumerate_locals", TDF_ENUMERATE_LOCALS},
   {"scev", TDF_SCEV},
+  {"profile", TDF_PROFILE},
   {"optimized", MSG_OPTIMIZED_LOCATIONS},
   {"missed", MSG_MISSED_OPTIMIZATION},
   {"note", MSG_NOTE},
