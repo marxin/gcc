@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-dfa.h"
 #include "domwalk.h"
 #include "tree-cfgcleanup.h"
+#include "diagnostic.h"
 
 /* This file implements dead store elimination.
 
@@ -186,6 +187,19 @@ dse_possible_dead_store_p (ao_ref *ref, gimple *stmt, gimple **use_stmt)
   return true;
 }
 
+static void
+warn_lifetime_dse (gimple *stmt, gimple *use_stmt)
+{
+  gassign *use_assign = dyn_cast<gassign *> (use_stmt);
+  tree ctor;
+  if (use_assign
+      && (ctor = gimple_assign_rhs1 (use_assign))
+      && TREE_CODE (ctor) == CONSTRUCTOR
+      && TREE_THIS_VOLATILE (ctor)
+      && TREE_DEPRECATED (ctor))
+    warning_at (gimple_location (stmt), OPT_Wlifetime_dse,
+		"statement is removed by dead-store elimination");
+}
 
 /* Attempt to eliminate dead stores in the statement referenced by BSI.
 
@@ -234,13 +248,14 @@ dse_optimize_stmt (gimple_stmt_iterator *gsi)
 	      if (!dse_possible_dead_store_p (&ref, stmt, &use_stmt))
 		return;
 
+	      warn_lifetime_dse (stmt, use_stmt);
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		{
 		  fprintf (dump_file, "  Deleted dead call '");
 		  print_gimple_stmt (dump_file, gsi_stmt (*gsi), dump_flags, 0);
 		  fprintf (dump_file, "'\n");
 		}
-
+	      
 	      tree lhs = gimple_call_lhs (stmt);
 	      if (lhs)
 		{
@@ -290,6 +305,7 @@ dse_optimize_stmt (gimple_stmt_iterator *gsi)
 	  && !gimple_clobber_p (use_stmt))
 	return;
 
+      warn_lifetime_dse (stmt, use_stmt);
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "  Deleted dead store '");
