@@ -237,7 +237,8 @@ dse_optimize_stmt (gimple_stmt_iterator *gsi)
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		{
 		  fprintf (dump_file, "  Deleted dead call '");
-		  print_gimple_stmt (dump_file, gsi_stmt (*gsi), dump_flags, 0);
+		  print_gimple_stmt (dump_file, gsi_stmt (*gsi), dump_flags, 0,
+				     false);
 		  fprintf (dump_file, "'\n");
 		}
 
@@ -293,7 +294,7 @@ dse_optimize_stmt (gimple_stmt_iterator *gsi)
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "  Deleted dead store '");
-	  print_gimple_stmt (dump_file, gsi_stmt (*gsi), dump_flags, 0);
+	  print_gimple_stmt (dump_file, gsi_stmt (*gsi), dump_flags, 0, false);
 	  fprintf (dump_file, "'\n");
 	}
 

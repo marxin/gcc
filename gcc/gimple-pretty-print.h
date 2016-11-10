@@ -27,7 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 extern void debug_gimple_stmt (gimple *);
 extern void debug_gimple_seq (gimple_seq);
 extern void print_gimple_seq (FILE *, gimple_seq, int, int);
-extern void print_gimple_stmt (FILE *, gimple *, int, int);
+extern void print_gimple_stmt (FILE *, gimple *, int, int, bool newline = true);
 extern void debug (gimple &ref);
 extern void debug (gimple *ptr);
 extern void print_gimple_expr (FILE *, gimple *, int, int);
