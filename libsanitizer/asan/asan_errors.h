@@ -294,6 +294,24 @@ struct ErrorInvalidPointerPair : ErrorBase {
   void Print();
 };
 
+struct ErrorUseAfterScope : ErrorBase {
+  uptr pc, bp, sp;
+  const char *variable_name;
+  uptr variable_size;
+  // VS2013 doesn't implement unrestricted unions, so we need a trivial default
+  // constructor
+  ErrorUseAfterScope() = default;
+  ErrorUseAfterScope(u32 tid, uptr pc_, uptr bp_, uptr sp_,
+                     const char *variable_name_, uptr variable_size_)
+      : ErrorBase(tid),
+        pc(pc_),
+        bp(bp_),
+        sp(sp_),
+        variable_name(variable_name_),
+        variable_size(variable_size_) {}
+  void Print();
+};
+
 struct ErrorGeneric : ErrorBase {
   AddressDescription addr_description;
   uptr pc, bp, sp;
@@ -324,7 +342,8 @@ struct ErrorGeneric : ErrorBase {
   macro(BadParamsToAnnotateContiguousContainer) \
   macro(ODRViolation)                           \
   macro(InvalidPointerPair)                     \
-  macro(Generic)
+  macro(Generic)				\
+  macro(UseAfterScope)
 // clang-format on
 
 #define ASAN_DEFINE_ERROR_KIND(name) kErrorKind##name,

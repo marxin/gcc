@@ -353,6 +353,16 @@ static INLINE void CheckForInvalidPointerPair(void *p1, void *p2) {
     return ReportInvalidPointerPair(pc, bp, sp, a1, a2);
   }
 }
+
+void ReportUseAfterScope(const char *variable_name, uptr variable_size,
+                         bool fatal) {
+  ScopedInErrorReport in_report (fatal);
+  GET_CALLER_PC_BP_SP;
+  ErrorUseAfterScope error(GetCurrentTidOrInvalid(), pc, bp, sp, variable_name,
+                           variable_size);
+  in_report.ReportError(error);
+}
+
 // ----------------------- Mac-specific reports ----------------- {{{1
 
 void ReportMacMzReallocUnknown(uptr addr, uptr zone_ptr, const char *zone_name,

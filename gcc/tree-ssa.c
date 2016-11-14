@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgexpand.h"
 #include "tree-cfg.h"
 #include "tree-dfa.h"
+#include "asan.h"
 
 /* Pointer map of variable mappings, keyed by edge.  */
 static hash_map<edge, auto_vec<edge_var_map> > *edge_var_maps;
@@ -1550,6 +1551,30 @@ maybe_optimize_var (tree var, bitmap addresses_taken, bitmap not_reg_needs,
     }
 }
 
+/* Return true when STMT is ASAN mark where second argument is an address
+   of a local variable.  */
+
+static bool
+is_asan_mark_p (gimple *stmt)
+{
+  if (!gimple_call_internal_p (stmt, IFN_ASAN_MARK))
+    return false;
+
+  tree addr = get_base_address (gimple_call_arg (stmt, 1));
+  if (TREE_CODE (addr) == ADDR_EXPR
+      && VAR_P (TREE_OPERAND (addr, 0)))
+    {
+      tree var = TREE_OPERAND (addr, 0);
+      unsigned addressable = TREE_ADDRESSABLE (var);
+      TREE_ADDRESSABLE (var) = 0;
+      bool r = is_gimple_reg (var);
+      TREE_ADDRESSABLE (var) = addressable;
+      return r;
+    }
+
+  return false;
+}
+
 /* Compute TREE_ADDRESSABLE and DECL_GIMPLE_REG_P for local variables.  */
 
 void
@@ -1575,17 +1600,23 @@ execute_update_addresses_taken (void)
 	  enum gimple_code code = gimple_code (stmt);
 	  tree decl;
 
-	  if (code == GIMPLE_CALL
-	      && optimize_atomic_compare_exchange_p (stmt))
+	  if (code == GIMPLE_CALL)
 	    {
-	      /* For __atomic_compare_exchange_N if the second argument
-		 is &var, don't mark var addressable;
-		 if it becomes non-addressable, we'll rewrite it into
-		 ATOMIC_COMPARE_EXCHANGE call.  */
-	      tree arg = gimple_call_arg (stmt, 1);
-	      gimple_call_set_arg (stmt, 1, null_pointer_node);
-	      gimple_ior_addresses_taken (addresses_taken, stmt);
-	      gimple_call_set_arg (stmt, 1, arg);
+	      if (optimize_atomic_compare_exchange_p (stmt))
+		{
+		  /* For __atomic_compare_exchange_N if the second argument
+		     is &var, don't mark var addressable;
+		     if it becomes non-addressable, we'll rewrite it into
+		     ATOMIC_COMPARE_EXCHANGE call.  */
+		  tree arg = gimple_call_arg (stmt, 1);
+		  gimple_call_set_arg (stmt, 1, null_pointer_node);
+		  gimple_ior_addresses_taken (addresses_taken, stmt);
+		  gimple_call_set_arg (stmt, 1, arg);
+		}
+	      else if (is_asan_mark_p (stmt))
+		;
+	      else
+		gimple_ior_addresses_taken (addresses_taken, stmt);
 	    }
 	  else
 	    /* Note all addresses taken by the stmt.  */
@@ -1838,6 +1869,26 @@ execute_update_addresses_taken (void)
 				      DECL_UID (TREE_OPERAND (expected, 0))))
 		      {
 			fold_builtin_atomic_compare_exchange (&gsi);
+			continue;
+		      }
+		  }
+		else if (is_asan_mark_p (stmt))
+		  {
+		    tree var = TREE_OPERAND (gimple_call_arg (stmt, 1), 0);
+		    if (bitmap_bit_p (suitable_for_renaming, DECL_UID (var)))
+		      {
+			HOST_WIDE_INT flags
+			  = tree_to_shwi (gimple_call_arg (stmt, 0));
+			unlink_stmt_vdef (stmt);
+			if (flags & ASAN_MARK_CLOBBER)
+			  {
+			    gcall *call
+			      = gimple_build_call_internal (IFN_ASAN_POISON, 0);
+			    gimple_call_set_lhs (call, var);
+			    gsi_replace (&gsi, call, GSI_SAME_STMT);
+			  }
+			else
+			  gsi_remove (&gsi, true);
 			continue;
 		      }
 		  }

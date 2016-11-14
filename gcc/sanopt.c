@@ -698,6 +698,7 @@ pass_sanopt::execute (function *fun)
   bool use_calls = ASAN_INSTRUMENTATION_WITH_CALL_THRESHOLD < INT_MAX
     && asan_num_accesses >= ASAN_INSTRUMENTATION_WITH_CALL_THRESHOLD;
 
+  bool need_commit_edge_insert = false;
   FOR_EACH_BB_FN (bb, fun)
     {
       gimple_stmt_iterator gsi;
@@ -735,6 +736,10 @@ pass_sanopt::execute (function *fun)
 		case IFN_ASAN_MARK:
 		  no_next = asan_expand_mark_ifn (&gsi);
 		  break;
+		case IFN_ASAN_POISON:
+		  no_next = asan_expand_poison_ifn (&gsi,
+						    &need_commit_edge_insert);
+		  break;
 		default:
 		  break;
 		}
@@ -766,6 +771,10 @@ pass_sanopt::execute (function *fun)
 	    gsi_next (&gsi);
 	}
     }
+
+  if (need_commit_edge_insert)
+    gsi_commit_edge_inserts ();
+
   return 0;
 }
 

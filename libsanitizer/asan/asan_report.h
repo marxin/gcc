@@ -68,6 +68,9 @@ void ReportBadParamsToAnnotateContiguousContainer(uptr beg, uptr end,
 void ReportODRViolation(const __asan_global *g1, u32 stack_id1,
                         const __asan_global *g2, u32 stack_id2);
 
+void ReportUseAfterScope(const char *variable_name, uptr variable_size,
+                         bool fatal);
+
 // Mac-specific errors and warnings.
 void ReportMacMzReallocUnknown(uptr addr, uptr zone_ptr,
                                const char *zone_name,

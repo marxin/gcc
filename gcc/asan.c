@@ -32,8 +32,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "memmodel.h"
 #include "tm_p.h"
+#include "ssa.h"
 #include "stringpool.h"
-#include "tree-vrp.h"
 #include "tree-ssanames.h"
 #include "optabs.h"
 #include "emit-rtl.h"
@@ -2975,6 +2975,81 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
 
   gsi_remove (iter, true);
   *iter = gsi_start_bb (else_bb);
+
+  return true;
+}
+
+
+/* Expand the ASAN_POISON builtins.  */
+
+bool
+asan_expand_poison_ifn (gimple_stmt_iterator *iter,
+			bool *need_commit_edge_insert)
+{
+  gimple *g = gsi_stmt (*iter);
+  tree poisoned_var = gimple_call_lhs (g);
+  if (!poisoned_var)
+    {
+      gsi_remove (iter, true);
+      return true;
+    }
+
+  tree var_decl = SSA_NAME_VAR (poisoned_var);
+
+  bool recover_p;
+  if (flag_sanitize & SANITIZE_USER_ADDRESS)
+    recover_p = (flag_sanitize_recover & SANITIZE_USER_ADDRESS) != 0;
+  else
+    recover_p = (flag_sanitize_recover & SANITIZE_KERNEL_ADDRESS) != 0;
+
+  use_operand_p use_p;
+  imm_use_iterator imm_iter;
+  FOR_EACH_IMM_USE_FAST (use_p, imm_iter, poisoned_var)
+    {
+      gimple *use = USE_STMT (use_p);
+      if (is_gimple_debug (use))
+	continue;
+
+      built_in_function b = (recover_p
+			     ? BUILT_IN_ASAN_REPORT_USE_AFTER_SCOPE_NOABORT
+			     : BUILT_IN_ASAN_REPORT_USE_AFTER_SCOPE);
+      tree fun = builtin_decl_implicit (b);
+      pretty_printer pp;
+      pp_tree_identifier (&pp, DECL_NAME (var_decl));
+
+      gcall *call = gimple_build_call (fun, 2, asan_pp_string (&pp),
+				       DECL_SIZE_UNIT (var_decl));
+      gimple_set_location (call, gimple_location (use));
+      gimple *call_to_insert = call;
+
+      /* The USE can be a gimple PHI node.  If so, insert the call on
+	 all edges leading to the PHI node.  */
+      if (is_a <gphi *> (use))
+	{
+	  gphi *phi = dyn_cast<gphi *> (use);
+	  for (unsigned i = 0; i < gimple_phi_num_args (phi); ++i)
+	    if (gimple_phi_arg_def (phi, i) == poisoned_var)
+	      {
+		edge e = gimple_phi_arg_edge (phi, i);
+
+		if (call_to_insert == NULL)
+		  call_to_insert = gimple_copy (call);
+
+		gsi_insert_seq_on_edge (e, call_to_insert);
+		*need_commit_edge_insert = true;
+		call_to_insert = NULL;
+	      }
+	}
+      else
+	{
+	  gimple_stmt_iterator gsi = gsi_for_stmt (use);
+	  gsi_insert_before (&gsi, call, GSI_NEW_STMT);
+	}
+    }
+
+  SSA_NAME_IS_DEFAULT_DEF (poisoned_var) = true;
+  SSA_NAME_DEF_STMT (poisoned_var) = gimple_build_nop ();
+  gsi_remove (iter, true);
 
   return true;
 }

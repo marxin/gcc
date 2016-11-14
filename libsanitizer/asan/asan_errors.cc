@@ -279,6 +279,27 @@ void ErrorInvalidPointerPair::Print() {
   ReportErrorSummary(bug_type, &stack);
 }
 
+void ErrorUseAfterScope::Print() {
+  const char *bug_type = "stack-use-after-scope";
+  Decorator d;
+  Printf("%s", d.Warning());
+
+  Report(
+      "ERROR: AddressSanitizer: stack-use-after-scope at pc %p bp %p sp %p\n",
+      variable_name, variable_size, pc, bp, sp);
+  Printf("%s", d.EndWarning());
+  scariness.Print();
+
+  char tname[128];
+  Printf("ACCESS of size %zu for variable '%s' thread T%d%s%s\n", variable_size,
+         variable_name, tid,
+         ThreadNameWithParenthesis(tid, tname, sizeof(tname)), d.EndAccess());
+
+  GET_STACK_TRACE_FATAL(pc, bp);
+  stack.Print();
+  ReportErrorSummary(bug_type, &stack);
+}
+
 static bool AdjacentShadowValuesAreFullyPoisoned(u8 *s) {
   return s[-1] > 127 && s[1] > 127;
 }

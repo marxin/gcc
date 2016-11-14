@@ -253,6 +253,20 @@ void __asan_storeN_noabort(uptr addr, uptr size) {
   }
 }
 
+extern "C"
+NOINLINE INTERFACE_ATTRIBUTE
+void __asan_report_use_after_scope(const char *variable_name,
+                                   uptr variable_size) {
+  ReportUseAfterScope(variable_name, variable_size, true);
+}
+
+extern "C"
+NOINLINE INTERFACE_ATTRIBUTE
+void __asan_report_use_after_scope_noabort(const char *variable_name,
+                                           uptr variable_size) {
+  ReportUseAfterScope(variable_name, variable_size, false);
+}
+
 // Force the linker to keep the symbols for various ASan interface functions.
 // We want to keep those in the executable in order to let the instrumented
 // dynamic libraries access the symbol even if it is not used by the executable
