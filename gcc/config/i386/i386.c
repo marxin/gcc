@@ -38218,9 +38218,9 @@ rdseed_step:
       && fcode <= IX86_BUILTIN__BDESC_ARGS2_LAST)
     {
       i = fcode - IX86_BUILTIN__BDESC_ARGS2_FIRST;
-      rtx (*fcn) (rtx, rtx, rtx, rtx);
-      rtx (*fcn_mask) (rtx, rtx, rtx, rtx, rtx);
-      rtx (*fcn_maskz) (rtx, rtx, rtx, rtx, rtx, rtx);
+      rtx (*fcn) (rtx, rtx, rtx, rtx) = NULL;
+      rtx (*fcn_mask) (rtx, rtx, rtx, rtx, rtx) = NULL;
+      rtx (*fcn_maskz) (rtx, rtx, rtx, rtx, rtx, rtx) = NULL;
       int masked = 1;
       machine_mode mode, wide_mode, nar_mode;
 
