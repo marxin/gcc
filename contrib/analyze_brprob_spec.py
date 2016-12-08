@@ -26,7 +26,8 @@ script_location = os.path.realpath(__file__)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('location', metavar = 'dump_file', help = 'Location with SPEC benchmarks')
-parser.add_argument('-s', '--sorting', dest = 'sorting', choices = ['branches', 'hitrate', 'coverage'], default = 'branches')
+parser.add_argument('-s', '--sorting', dest = 'sorting',
+        choices = ['branches', 'hitrate', 'coverage', 'name'], default = 'branches')
 
 args = parser.parse_args()
 
