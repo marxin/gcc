@@ -6152,8 +6152,7 @@ store_constructor (tree exp, rtx target, int cleared, HOST_WIDE_INT size,
 {
   tree type = TREE_TYPE (exp);
   HOST_WIDE_INT exp_size = int_size_in_bytes (type);
-  HOST_WIDE_INT bitregion_end
-    = exp_size == -1 ? 0 : exp_size * BITS_PER_UNIT - 1;
+  HOST_WIDE_INT bitregion_end = size > 0 ? size * BITS_PER_UNIT - 1 : 0;
 
   switch (TREE_CODE (type))
     {
@@ -6231,7 +6230,10 @@ store_constructor (tree exp, rtx target, int cleared, HOST_WIDE_INT size,
 	    if (tree_fits_uhwi_p (DECL_SIZE (field)))
 	      bitsize = tree_to_uhwi (DECL_SIZE (field));
 	    else
-	      bitsize = -1;
+	      {
+		bitsize = -1;
+		gcc_unreachable ();
+	      }
 
 	    mode = DECL_MODE (field);
 	    if (DECL_BIT_FIELD (field))
@@ -6266,6 +6268,7 @@ store_constructor (tree exp, rtx target, int cleared, HOST_WIDE_INT size,
 
 		to_rtx = offset_address (to_rtx, offset_rtx,
 					 highest_pow2_factor (offset));
+		gcc_unreachable ();
 	      }
 
 	    /* If this initializes a field that is smaller than a
