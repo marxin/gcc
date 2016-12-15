@@ -1619,12 +1619,17 @@ gimplify_decl_expr (tree *stmt_p, gimple_seq *seq_p)
 	  is_vla = true;
 	}
 
+      /* If gimplify_decl_expr is called from lower_omp_target context, then
+	 asan_poisoned_varibles will be NULL and we do not want to sanitize
+	 in such case.  */
+
       if (asan_sanitize_use_after_scope ()
 	  && !asan_no_sanitize_address_p ()
 	  && !is_vla
 	  && TREE_ADDRESSABLE (decl)
 	  && !TREE_STATIC (decl)
 	  && !DECL_HAS_VALUE_EXPR_P (decl)
+	  && asan_poisoned_variables
 	  && dbg_cnt (asan_use_after_scope))
 	{
 	  asan_poisoned_variables->add (decl);
