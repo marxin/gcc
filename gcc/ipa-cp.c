@@ -3472,7 +3472,8 @@ create_specialized_node (struct cgraph_node *node,
 					 args_to_skip, "constprop");
   ipa_set_node_agg_value_chain (new_node, aggvals);
   for (av = aggvals; av; av = av->next)
-    new_node->maybe_create_reference (av->value, IPA_REF_ADDR, NULL);
+    if (TREE_CODE (av->value) == ADDR_EXPR)
+      new_node->maybe_create_reference (av->value, IPA_REF_ADDR, NULL);
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {

@@ -599,8 +599,6 @@ symtab_node::maybe_create_reference (tree val, enum ipa_ref_use use_type,
 				     gimple *stmt)
 {
   STRIP_NOPS (val);
-  if (TREE_CODE (val) != ADDR_EXPR)
-    return NULL;
   val = get_base_var (val);
   if (val && (TREE_CODE (val) == FUNCTION_DECL
 	       || TREE_CODE (val) == VAR_DECL))
