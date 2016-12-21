@@ -305,9 +305,7 @@ asan_mark_p (gimple *stmt, enum asan_mark_flags flag)
 bool
 asan_sanitize_stack_p (void)
 {
-  return ((flag_sanitize & SANITIZE_ADDRESS)
-	  && ASAN_STACK
-	  && !asan_no_sanitize_address_p ());
+  return (sanitize_flags_p (SANITIZE_ADDRESS) && ASAN_STACK);
 }
 
 /* Checks whether section SEC should be sanitized.  */
@@ -3192,11 +3190,9 @@ asan_instrument (void)
 }
 
 static bool
-gate_asan (void)
+gate_asan (function *fn)
 {
-  return (flag_sanitize & SANITIZE_ADDRESS) != 0
-	  && !lookup_attribute ("no_sanitize_address",
-				DECL_ATTRIBUTES (current_function_decl));
+  return sanitize_flags_p (SANITIZE_ADDRESS, fn->decl);
 }
 
 namespace {
@@ -3223,7 +3219,7 @@ public:
 
   /* opt_pass methods: */
   opt_pass * clone () { return new pass_asan (m_ctxt); }
-  virtual bool gate (function *) { return gate_asan (); }
+  virtual bool gate (function *fn) { return gate_asan (fn); }
   virtual unsigned int execute (function *) { return asan_instrument (); }
 
 }; // class pass_asan
@@ -3259,7 +3255,7 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return !optimize && gate_asan (); }
+  virtual bool gate (function *fn) { return !optimize && gate_asan (fn); }
   virtual unsigned int execute (function *) { return asan_instrument (); }
 
 }; // class pass_asan_O0
