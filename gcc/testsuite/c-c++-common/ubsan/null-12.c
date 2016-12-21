@@ -15,6 +15,7 @@ struct R
 } r;
 
 int
+__attribute__((no_sanitize(("shift,shift-base,shift-exponent,integer-divide-by-zero,unreachable,vla-bound,return,signed-integer-overflow,bool,enum,float-divide-by-zero,float-cast-overflow,bounds,bounds-strict,nonnull-attribute,returns-nonnull-attribute,object-size,vptr"))))
 main ()
 {
   struct S *s = 0;

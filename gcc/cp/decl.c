@@ -9528,8 +9528,7 @@ compute_array_index_type (tree name, tree size, tsubst_flags_t complain)
 
 	  stabilize_vla_size (itype);
 
-	  if (flag_sanitize & SANITIZE_VLA
-	      && do_ubsan_in_current_function ())
+	  if (sanitize_flags_p (SANITIZE_VLA))
 	    {
 	      /* We have to add 1 -- in the ubsan routine we generate
 		 LE_EXPR rather than LT_EXPR.  */
@@ -15114,7 +15113,7 @@ start_preparsed_function (tree decl1, tree attrs, int flags)
 
   if (!processing_template_decl
       && DECL_CONSTRUCTOR_P (decl1)
-      && (flag_sanitize & SANITIZE_VPTR)
+      && sanitize_flags_p (SANITIZE_VPTR)
       && !DECL_CLONED_FUNCTION_P (decl1)
       && !implicit_default_ctor_p (decl1))
     cp_ubsan_maybe_initialize_vtbl_ptrs (current_class_ptr);

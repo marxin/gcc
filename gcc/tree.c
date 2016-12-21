@@ -14442,6 +14442,12 @@ nonnull_arg_p (const_tree arg)
   return false;
 }
 
+bool
+sanitize_flags_p (unsigned int flag)
+{
+  return flag_sanitize_local & flag;
+}
+
 /* Combine LOC and BLOCK to a combined adhoc loc, retaining any range
    information.  */
 
