@@ -1166,6 +1166,33 @@ gimple_fold_builtin_memset (gimple_stmt_iterator *gsi, tree c, tree len)
   return true;
 }
 
+/* Fold function call to builtin malloc at *GSI allocation memory.
+   Return whether a simplification was made.  */
+
+static bool
+gimple_fold_builtin_malloc (gimple_stmt_iterator *gsi)
+{
+  gimple *stmt = gsi_stmt (*gsi);
+  tree lhs = gimple_call_lhs (stmt);
+
+  /* If there's no LHS, replace it with NOP.  */
+  if (lhs == NULL_TREE)
+    {
+      unlink_stmt_vdef (stmt);
+      gsi_replace (gsi, gimple_build_nop (), false);
+      return true;
+    }
+
+  /* If the LEN parameter is zero, replace it with NULL.  */
+  tree arg0 = gimple_call_arg (stmt, 0);
+  if (integer_zerop (arg0))
+    {
+      replace_call_with_value (gsi, build_int_cst (TREE_TYPE (lhs), 0));
+      return true;
+    }
+
+  return false;
+}
 
 /* Obtain the minimum and maximum string length or minimum and maximum
    value of ARG in LENGTH[0] and LENGTH[1], respectively.
@@ -3250,6 +3277,8 @@ gimple_fold_builtin (gimple_stmt_iterator *gsi)
   enum built_in_function fcode = DECL_FUNCTION_CODE (callee);
   switch (fcode)
     {
+    case BUILT_IN_MALLOC:
+      return gimple_fold_builtin_malloc (gsi);
     case BUILT_IN_BZERO:
       return gimple_fold_builtin_memset (gsi, integer_zero_node,
 					 gimple_call_arg (stmt, 1));
