@@ -97,7 +97,7 @@ struct def
 
 /* The data stored for each invariant.  */
 
-struct invariant
+struct loop_invariant
 {
   /* The number of the invariant.  */
   unsigned invno;
@@ -148,14 +148,14 @@ static struct loop *curr_loop;
 /* Table of invariants indexed by the df_ref uid field.  */
 
 static unsigned int invariant_table_size = 0;
-static struct invariant ** invariant_table;
+static loop_invariant ** invariant_table;
 
 /* Entry for hash table of invariant expressions.  */
 
 struct invariant_expr_entry
 {
   /* The invariant.  */
-  struct invariant *inv;
+  loop_invariant *inv;
 
   /* Its value.  */
   rtx expr;
@@ -172,7 +172,7 @@ struct invariant_expr_entry
 
 static unsigned actual_stamp;
 
-typedef struct invariant *invariant_p;
+typedef loop_invariant *invariant_p;
 
 
 /* The invariants.  */
@@ -186,10 +186,12 @@ check_invariant_table_size (void)
 {
   if (invariant_table_size < DF_DEFS_TABLE_SIZE ())
     {
-      unsigned int new_size = DF_DEFS_TABLE_SIZE () + (DF_DEFS_TABLE_SIZE () / 4);
-      invariant_table = XRESIZEVEC (struct invariant *, invariant_table, new_size);
+      unsigned int new_size
+	= DF_DEFS_TABLE_SIZE () + (DF_DEFS_TABLE_SIZE () / 4);
+      invariant_table = XRESIZEVEC (loop_invariant *,
+				    invariant_table, new_size);
       memset (&invariant_table[invariant_table_size], 0,
-	      (new_size - invariant_table_size) * sizeof (struct invariant *));
+	      (new_size - invariant_table_size) * sizeof (loop_invariant *));
       invariant_table_size = new_size;
     }
 }
@@ -263,7 +265,7 @@ check_maybe_invariant (rtx x)
 /* Returns the invariant definition for USE, or NULL if USE is not
    invariant.  */
 
-static struct invariant *
+static loop_invariant *
 invariant_for_use (df_ref use)
 {
   struct df_link *defs;
@@ -298,7 +300,7 @@ hash_invariant_expr_1 (rtx_insn *insn, rtx x)
   hashval_t val = code;
   int do_not_record_p;
   df_ref use;
-  struct invariant *inv;
+  loop_invariant *inv;
 
   switch (code)
     {
@@ -350,7 +352,7 @@ invariant_expr_equal_p (rtx_insn *insn1, rtx e1, rtx_insn *insn2, rtx e2)
   int i, j;
   const char *fmt;
   df_ref use1, use2;
-  struct invariant *inv1 = NULL, *inv2 = NULL;
+  loop_invariant *inv1 = NULL, *inv2 = NULL;
   rtx sub1, sub2;
 
   /* If mode of only one of the operands is VOIDmode, it is not equivalent to
@@ -462,9 +464,9 @@ typedef hash_table<invariant_expr_hasher> invariant_htab_type;
    recorded in EQ.  If this is the case, return the invariant.  Otherwise
    insert INV to the table for this expression and return INV.  */
 
-static struct invariant *
+static loop_invariant *
 find_or_insert_inv (invariant_htab_type *eq, rtx expr, machine_mode mode,
-		    struct invariant *inv)
+		    loop_invariant *inv)
 {
   hashval_t hash = hash_invariant_expr_1 (inv->insn, expr);
   struct invariant_expr_entry *entry;
@@ -494,14 +496,14 @@ find_or_insert_inv (invariant_htab_type *eq, rtx expr, machine_mode mode,
    hash table of the invariants.  */
 
 static void
-find_identical_invariants (invariant_htab_type *eq, struct invariant *inv)
+find_identical_invariants (invariant_htab_type *eq, loop_invariant *inv)
 {
   unsigned depno;
   bitmap_iterator bi;
-  struct invariant *dep;
+  loop_invariant *dep;
   rtx expr, set;
   machine_mode mode;
-  struct invariant *tmp;
+  loop_invariant *tmp;
 
   if (inv->eqto != ~0u)
     return;
@@ -536,7 +538,7 @@ static void
 merge_identical_invariants (void)
 {
   unsigned i;
-  struct invariant *inv;
+  loop_invariant *inv;
   invariant_htab_type eq (invariants.length ());
 
   FOR_EACH_VEC_ELT (invariants, i, inv)
@@ -694,11 +696,11 @@ find_defs (struct loop *loop)
    unless the program ends due to a function call.  The newly created invariant
    is returned.  */
 
-static struct invariant *
+static loop_invariant *
 create_new_invariant (struct def *def, rtx_insn *insn, bitmap depends_on,
 		      bool always_executed)
 {
-  struct invariant *inv = XNEW (struct invariant);
+  loop_invariant *inv = XNEW (loop_invariant);
   rtx set = single_set (insn);
   bool speed = optimize_bb_for_speed_p (BLOCK_FOR_INSN (insn));
 
@@ -890,7 +892,7 @@ canonicalize_address (rtx x)
 static bool
 inv_can_prop_to_addr_use (struct def *def, df_ref use)
 {
-  struct invariant *inv;
+  loop_invariant *inv;
   rtx *pos = DF_REF_REAL_LOC (use), def_set, use_set;
   rtx_insn *use_insn = DF_REF_INSN (use);
   rtx_insn *def_insn;
@@ -973,7 +975,7 @@ check_dependency (basic_block bb, df_ref use, bitmap depends_on)
   basic_block def_bb;
   struct df_link *defs;
   struct def *def_data;
-  struct invariant *inv;
+  loop_invariant *inv;
 
   if (DF_REF_FLAGS (use) & DF_REF_READ_WRITE)
     return false;
@@ -1087,7 +1089,7 @@ find_invariant_insn (rtx_insn *insn, bool always_reached, bool always_executed)
   bitmap depends_on;
   rtx set, dest;
   bool simple = true;
-  struct invariant *inv;
+  loop_invariant *inv;
 
   /* We can't move a CC0 setter without the user.  */
   if (HAVE_cc0 && sets_cc0_p (insn))
@@ -1145,7 +1147,7 @@ record_uses (rtx_insn *insn)
 {
   struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
   df_ref use;
-  struct invariant *inv;
+  loop_invariant *inv;
 
   FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
@@ -1298,13 +1300,13 @@ get_pressure_class_and_nregs (rtx_insn *insn, int *nregs)
       1: if INV and its depends_on have different reg_classes.  */
 
 static int
-get_inv_cost (struct invariant *inv, int *comp_cost, unsigned *regs_needed,
+get_inv_cost (loop_invariant *inv, int *comp_cost, unsigned *regs_needed,
 	      enum reg_class *cl)
 {
   int i, acomp_cost;
   unsigned aregs_needed[N_REG_CLASSES];
   unsigned depno;
-  struct invariant *dep;
+  loop_invariant *dep;
   bitmap_iterator bi;
   int ret = 1;
 
@@ -1447,7 +1449,7 @@ get_inv_cost (struct invariant *inv, int *comp_cost, unsigned *regs_needed,
    through to estimate_reg_pressure_cost. */
 
 static int
-gain_for_invariant (struct invariant *inv, unsigned *regs_needed,
+gain_for_invariant (loop_invariant *inv, unsigned *regs_needed,
 		    unsigned *new_regs, unsigned regs_used,
 		    bool speed, bool call_p)
 {
@@ -1529,11 +1531,11 @@ gain_for_invariant (struct invariant *inv, unsigned *regs_needed,
    motion.  */
 
 static int
-best_gain_for_invariant (struct invariant **best, unsigned *regs_needed,
+best_gain_for_invariant (loop_invariant **best, unsigned *regs_needed,
 			 unsigned *new_regs, unsigned regs_used,
 			 bool speed, bool call_p)
 {
-  struct invariant *inv;
+  loop_invariant *inv;
   int i, gain = 0, again;
   unsigned aregs_needed[N_REG_CLASSES], invno;
 
@@ -1571,7 +1573,7 @@ best_gain_for_invariant (struct invariant **best, unsigned *regs_needed,
 static void
 set_move_mark (unsigned invno, int gain)
 {
-  struct invariant *inv = invariants[invno];
+  loop_invariant *inv = invariants[invno];
   bitmap_iterator bi;
 
   /* Find the representative of the class of the equivalent invariants.  */
@@ -1604,7 +1606,7 @@ find_invariants_to_move (bool speed, bool call_p)
 {
   int gain;
   unsigned i, regs_used, regs_needed[N_REG_CLASSES], new_regs[N_REG_CLASSES];
-  struct invariant *inv = NULL;
+  loop_invariant *inv = NULL;
 
   if (!invariants.length ())
     return;
@@ -1661,7 +1663,7 @@ find_invariants_to_move (bool speed, bool call_p)
    function `apply_change_group' will validate and apply the changes.  */
 
 static int
-replace_uses (struct invariant *inv, rtx reg, bool in_group)
+replace_uses (loop_invariant *inv, rtx reg, bool in_group)
 {
   /* Replace the uses we know to be dominated.  It saves work for copy
      propagation, and also it is necessary so that dependent invariants
@@ -1684,7 +1686,7 @@ replace_uses (struct invariant *inv, rtx reg, bool in_group)
    the block preceding its header.  */
 
 static bool
-can_move_invariant_reg (struct loop *loop, struct invariant *inv, rtx reg)
+can_move_invariant_reg (struct loop *loop, loop_invariant *inv, rtx reg)
 {
   df_ref def, use;
   unsigned int dest_regno, defs_in_loop_count = 0;
@@ -1759,8 +1761,8 @@ can_move_invariant_reg (struct loop *loop, struct invariant *inv, rtx reg)
 static bool
 move_invariant_reg (struct loop *loop, unsigned invno)
 {
-  struct invariant *inv = invariants[invno];
-  struct invariant *repr = invariants[inv->eqto];
+  loop_invariant *inv = invariants[invno];
+  loop_invariant *repr = invariants[inv->eqto];
   unsigned i;
   basic_block preheader = loop_preheader_edge (loop)->src;
   rtx reg, set, dest, note;
@@ -1865,7 +1867,7 @@ fail:
 static void
 move_invariants (struct loop *loop)
 {
-  struct invariant *inv;
+  loop_invariant *inv;
   unsigned i;
 
   FOR_EACH_VEC_ELT (invariants, i, inv)
@@ -1904,7 +1906,7 @@ free_inv_motion_data (void)
 {
   unsigned i;
   struct def *def;
-  struct invariant *inv;
+  loop_invariant *inv;
 
   check_invariant_table_size ();
   for (i = 0; i < DF_DEFS_TABLE_SIZE (); i++)
