@@ -8325,7 +8325,19 @@ lookup_compiler (const char *name, size_t length, const char *language)
     {
       for (cp = compilers + n_compilers - 1; cp >= compilers; cp--)
 	if (cp->suffix[0] == '@' && !strcmp (cp->suffix + 1, language))
-	  return cp;
+	  {
+	    if (name != NULL && strcmp (name, "-") == 0
+		&& (strcmp (cp->suffix, "@c-header") == 0
+		    || strcmp (cp->suffix, "@c++-header") == 0))
+	      {
+		fatal_error (input_location,
+			     "can%'t use '-' as input filename for a "
+			     "precompiled header");
+		return 0;
+	      }
+
+	    return cp;
+	  }
 
       error ("language %s not recognized", language);
       return 0;
