@@ -302,6 +302,17 @@ sem_function::get_hash (void)
   return m_hash;
 }
 
+bool
+sem_item::not_supported_attr_p (const attribute_spec *as)
+{
+  /* Do not allow optimization or (and) target options.  */
+  if (strcmp (as->name, "optimize") == 0
+      || strcmp (as->name, "target") == 0)
+    return true;
+
+  return false;
+}
+
 /* Return ture if A1 and A2 represent equivalent function attribute lists.
    Based on comp_type_attributes.  */
 
@@ -327,6 +338,9 @@ sem_item::compare_attributes (const_tree a1, const_tree a2)
       if (!as)
         continue;
 
+      if (not_supported_attr_p (as))
+	return false;
+
       attr = lookup_attribute (as->name, CONST_CAST_TREE (a2));
       if (!attr || !attribute_value_equal (a, attr))
         break;
@@ -340,6 +354,9 @@ sem_item::compare_attributes (const_tree a1, const_tree a2)
 	  as = lookup_attribute_spec (get_attribute_name (a));
 	  if (!as)
 	    continue;
+
+	  if (not_supported_attr_p (as))
+	    return false;
 
 	  if (!lookup_attribute (as->name, CONST_CAST_TREE (a1)))
 	    break;
@@ -652,7 +669,7 @@ sem_function::equals_wpa (sem_item *item,
 	  cl_target_option_print_diff (dump_file, 2, tar1, tar2);
 	}
 
-      return return_false_with_msg ("Target flags are different");
+      return return_false_with_msg ("target flags are different");
     }
 
   cl_optimization *opt1 = opts_for_fn (decl);

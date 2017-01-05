@@ -253,6 +253,9 @@ protected:
 					            symtab_node *n2,
 					            bool address);
 
+  /* Return true when attribute specification AC prevent function merging.  */
+  static bool not_supported_attr_p (const attribute_spec *as);
+
   /* Compare two attribute lists.  */
   static bool compare_attributes (const_tree list1, const_tree list2);
 
