@@ -308,49 +308,55 @@ sem_function::get_hash (void)
 bool
 sem_item::compare_attributes (const_tree a1, const_tree a2)
 {
-  const_tree a;
   if (a1 == a2)
     return true;
-  for (a = a1; a != NULL_TREE; a = TREE_CHAIN (a))
+
+  /* TODO: We can introduce as->affects_decl_identity
+     and as->affects_decl_reference_identity if attribute mismatch
+     gets a common reason to give up on merging.  It may not be worth
+     the effort.
+     For example returns_nonnull affects only references, while
+     optimize attribute can be ignored because it is already lowered
+     into flags representation and compared separately.  */
+
+  auto_vec<const_tree> attributes[2];
+  const_tree attrs[] = {a1, a2};
+
+  /* Filter options.  */
+  for (unsigned i = 0; i < 2; i++)
+    for (const_tree a = attrs[i]; a != NULL_TREE; a = TREE_CHAIN (a))
+      {
+	const attribute_spec *as
+	  = lookup_attribute_spec (get_attribute_name (a));
+
+	if (!as)
+	  continue;
+
+	/* Do not allow optimization or (and) target options.  */
+	if (strcmp (as->name, "optimize") == 0
+	    || strcmp (as->name, "target") == 0)
+	  return false;
+
+	attributes[i].safe_push (a);
+      }
+
+  if (attributes[0].length () != attributes[1].length ())
+    return false;
+
+  /* Compare options.  */
+  for (unsigned i = 0; i < attributes[0].length (); i++)
     {
-      const struct attribute_spec *as;
-      const_tree attr;
+      const_tree a1 = attributes[0][i];
 
-      as = lookup_attribute_spec (get_attribute_name (a));
-      /* TODO: We can introduce as->affects_decl_identity
-	 and as->affects_decl_reference_identity if attribute mismatch
-	 gets a common reason to give up on merging.  It may not be worth
-	 the effort.
-	 For example returns_nonnull affects only references, while
-	 optimize attribute can be ignored because it is already lowered
-	 into flags representation and compared separately.  */
-      if (!as)
-        continue;
-
-      attr = lookup_attribute (as->name, CONST_CAST_TREE (a2));
-      if (!attr || !attribute_value_equal (a, attr))
-        break;
+      const attribute_spec *as
+	= lookup_attribute_spec (get_attribute_name (a1));
+      const_tree attr = lookup_attribute (as->name, CONST_CAST_TREE (a2));
+      if (!attr || !attribute_value_equal (a1, attr))
+	return false;
     }
-  if (!a)
-    {
-      for (a = a2; a != NULL_TREE; a = TREE_CHAIN (a))
-	{
-	  const struct attribute_spec *as;
 
-	  as = lookup_attribute_spec (get_attribute_name (a));
-	  if (!as)
-	    continue;
-
-	  if (!lookup_attribute (as->name, CONST_CAST_TREE (a1)))
-	    break;
-	  /* We don't need to compare trees again, as we did this
-	     already in first loop.  */
-	}
-      if (!a)
-        return true;
-    }
   /* TODO: As in comp_type_attributes we may want to introduce target hook.  */
-  return false;
+  return true;
 }
 
 /* Compare properties of symbols N1 and N2 that does not affect semantics of
@@ -652,7 +658,7 @@ sem_function::equals_wpa (sem_item *item,
 	  cl_target_option_print_diff (dump_file, 2, tar1, tar2);
 	}
 
-      return return_false_with_msg ("Target flags are different");
+      return return_false_with_msg ("target flags are different");
     }
 
   cl_optimization *opt1 = opts_for_fn (decl);
