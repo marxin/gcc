@@ -136,7 +136,6 @@ n_opt_char = 3;
 n_opt_short = 0;
 n_opt_int = 0;
 n_opt_enum = 0;
-n_opt_other = 0;
 var_opt_char[0] = "unsigned char x_optimize";
 var_opt_char[1] = "unsigned char x_optimize_size";
 var_opt_char[2] = "unsigned char x_optimize_debug";
@@ -164,13 +163,7 @@ for (i = 0; i < n_opts; i++) {
 		else if (otype ~ ("^enum +[_" alnum "]+ *$"))
 			var_opt_enum[n_opt_enum++] = otype "x_" name;
 
-		else
-			var_opt_other[n_opt_other++] = otype "x_" name;
 	}
-}
-
-for (i = 0; i < n_opt_other; i++) {
-	print "  " var_opt_other[i] ";";
 }
 
 for (i = 0; i < n_opt_int; i++) {
@@ -306,7 +299,10 @@ print "/* Hash option variables from a structure.  */";
 print "extern hashval_t cl_target_option_hash (const struct cl_target_option *);";
 print "";
 print "/* Hash optimization from a structure.  */";
-print "extern hashval_t cl_optimization_hash (const struct cl_optimization *);";
+print "extern hashval_t cl_optimization_hash (const struct cl_optimization *, unsigned int ignored_flags = 0);";
+print "";
+print "/* Compare two optimization option variables from a structure.  */";
+print "extern bool cl_optimization_eq (const struct cl_optimization *, const struct cl_optimization *, unsigned int ignored_flags = 0);";
 print "";
 print "/* Generator files may not have access to location_t, and don't need these.  */"
 print "#if defined(UNKNOWN_LOCATION)"
@@ -332,7 +328,7 @@ for (i = 0; i < n_langs; i++) {
 print "void cpp_handle_option_auto (const struct gcc_options * opts, size_t scode,"
 print "                             struct cpp_options * cpp_opts);"
 print "void init_global_opts_from_cpp(struct gcc_options * opts,      "
-print "                               const struct cpp_options * cpp_opts);"    
+print "                               const struct cpp_options * cpp_opts);"
 print "#endif";
 print "#endif";
 print "";
@@ -436,7 +432,7 @@ print "#define CL_LANG_ALL   ((1U << " n_langs ") - 1)"
 print ""
 print "enum opt_code"
 print "{"
-	
+
 for (i = 0; i < n_opts; i++)
 	back_chain[i] = "N_OPTS";
 

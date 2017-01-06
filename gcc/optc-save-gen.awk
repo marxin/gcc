@@ -127,7 +127,7 @@ for (i = 0; i < n_opts; i++) {
 				var_opt_range[name] = "-128, 127"
 		}
 		else
-			var_opt_other[n_opt_other++] = name;
+			n_opt_other++;
 	}
 }
 
@@ -137,10 +137,8 @@ for (i = 0; i < n_opt_char; i++) {
 		print "  gcc_assert (IN_RANGE (opts->x_" name ", " var_opt_range[name] "));";
 }
 
-print "";
-for (i = 0; i < n_opt_other; i++) {
-	print "  ptr->x_" var_opt_other[i] " = opts->x_" var_opt_other[i] ";";
-}
+if (n_opt_other > 0)
+  print "#error Unsupported type of optimization node";
 
 for (i = 0; i < n_opt_int; i++) {
 	print "  ptr->x_" var_opt_int[i] " = opts->x_" var_opt_int[i] ";";
@@ -165,10 +163,6 @@ print "/* Restore optimization options from a structure.  */";
 print "void";
 print "cl_optimization_restore (struct gcc_options *opts, struct cl_optimization *ptr)";
 print "{";
-
-for (i = 0; i < n_opt_other; i++) {
-	print "  opts->x_" var_opt_other[i] " = ptr->x_" var_opt_other[i] ";";
-}
 
 for (i = 0; i < n_opt_int; i++) {
 	print "  opts->x_" var_opt_int[i] " = ptr->x_" var_opt_int[i] ";";
@@ -198,15 +192,6 @@ print "                       struct cl_optimization *ptr)";
 print "{";
 
 print "  fputs (\"\\n\", file);";
-for (i = 0; i < n_opt_other; i++) {
-	print "  if (ptr->x_" var_opt_other[i] ")";
-	print "    fprintf (file, \"%*s%s (%#lx)\\n\",";
-	print "             indent_to, \"\",";
-	print "             \"" var_opt_other[i] "\",";
-	print "             (unsigned long)ptr->x_" var_opt_other[i] ");";
-	print "";
-}
-
 for (i = 0; i < n_opt_int; i++) {
 	print "  if (ptr->x_" var_opt_int[i] ")";
 	print "    fprintf (file, \"%*s%s (%#x)\\n\",";
@@ -254,16 +239,6 @@ print "                            struct cl_optimization *ptr2)";
 print "{";
 
 print "  fputs (\"\\n\", file);";
-for (i = 0; i < n_opt_other; i++) {
-	print "  if (ptr1->x_" var_opt_other[i] " != ptr2->x_" var_opt_other[i] ")";
-	print "    fprintf (file, \"%*s%s (%#lx/%#lx)\\n\",";
-	print "             indent_to, \"\",";
-	print "             \"" var_opt_other[i] "\",";
-	print "             (unsigned long)ptr1->x_" var_opt_other[i] ",";
-	print "             (unsigned long)ptr2->x_" var_opt_other[i] ");";
-	print "";
-}
-
 for (i = 0; i < n_opt_int; i++) {
 	print "  if (ptr1->x_" var_opt_int[i] " != ptr2->x_" var_opt_int[i] ")";
 	print "    fprintf (file, \"%*s%s (%#x/%#x)\\n\",";
@@ -305,7 +280,6 @@ for (i = 0; i < n_opt_char; i++) {
 }
 
 print "}";
-
 
 print "";
 print "/* Save selected option variables into a structure.  */"
@@ -738,10 +712,13 @@ print "}";
 n_opt_val = 3;
 var_opt_val[0] = "x_optimize"
 var_opt_val_type[0] = "char "
+var_opt_type_flags[0] = "0"
 var_opt_val[1] = "x_optimize_size"
-var_opt_val[2] = "x_optimize_debug"
 var_opt_val_type[1] = "char "
+var_opt_type_flags[1] = "0"
+var_opt_val[2] = "x_optimize_debug"
 var_opt_val_type[2] = "char "
+var_opt_type_flags[2] = 0""
 for (i = 0; i < n_opts; i++) {
 	if (flag_set_p("Optimization", flags[i])) {
 		name = var_name(flags[i])
@@ -755,18 +732,29 @@ for (i = 0; i < n_opts; i++) {
 
 		otype = var_type_struct(flags[i])
 		var_opt_val_type[n_opt_val] = otype;
-		var_opt_val[n_opt_val++] = "x_" name;
+		var_opt_val[n_opt_val] = "x_" name;
+		var_opt_type_flags[n_opt_val++] = switch_opts_type_flags(flags[i])
 	}
 }
+
 print "";
-print "/* Hash optimization options  */";
+print "/* Hash optimization options, ignore flags having a flag in IGNORED flags.  */";
+print "";
 print "hashval_t";
-print "cl_optimization_hash (struct cl_optimization const *ptr ATTRIBUTE_UNUSED)";
+print "cl_optimization_hash (struct cl_optimization const *ptr ATTRIBUTE_UNUSED,";
+print "                      unsigned int ignored_flags ATTRIBUTE_UNUSED)";
 print "{";
 print "  inchash::hash hstate;";
 for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
-	print "  hstate.add_wide_int (ptr->" name");";
+	f = var_opt_type_flags[i];
+	padding = "";
+	if (f != "0") {
+	  print "  if (!(ignored_flags & (" f ")))"
+	  padding = "  "
+	}
+
+	print padding "  hstate.add_wide_int (ptr->" name");";
 }
 print "  return hstate.end ();";
 print "}";
@@ -794,4 +782,27 @@ for (i = 0; i < n_opt_val; i++) {
 	print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_value (bp, 64);";
 }
 print "}";
+
+print "";
+print "/* Compare two target options  */";
+print "bool";
+print "cl_optimization_eq (struct cl_optimization const *ptr1 ATTRIBUTE_UNUSED,";
+print "                    struct cl_optimization const *ptr2 ATTRIBUTE_UNUSED,";
+print "                    unsigned int ignored_flags ATTRIBUTE_UNUSED)";
+print "{";
+
+for (i = 0; i < n_opt_val; i++) {
+	name = var_opt_val[i]
+	f = var_opt_type_flags[i];
+	printf "  if (ptr1->" name" != ptr2->" name;
+	if (f != "0")
+		print "\n      && !(ignored_flags & (" f ")))";
+	else
+		print(")")
+	print "    return false;";
+}
+
+print "  return true;";
+print "}";
+
 }

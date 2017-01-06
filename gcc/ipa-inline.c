@@ -448,13 +448,6 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
       /* gcc.dg/pr43564.c.  Apply user-forced inline even at -O0.  */
       else if (always_inline)
 	;
-      /* When user added an attribute to the callee honor it.  */
-      else if (lookup_attribute ("optimize", DECL_ATTRIBUTES (callee->decl))
-	       && opts_for_fn (caller->decl) != opts_for_fn (callee->decl))
-	{
-	  e->inline_failed = CIF_OPTIMIZATION_MISMATCH;
-	  inlinable = false;
-	}
       /* If explicit optimize attribute are not used, the mismatch is caused
 	 by different command line options used to build different units.
 	 Do not care about COMDAT functions - those are intended to be

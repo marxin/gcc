@@ -105,7 +105,17 @@ function switch_flags (flags)
 	  test_flag("Undocumented", flags,  " | CL_UNDOCUMENTED") \
 	  test_flag("NoDWARFRecord", flags,  " | CL_NO_DWARF_RECORD") \
 	  test_flag("Warning", flags,  " | CL_WARNING") \
-	  test_flag("Optimization", flags,  " | CL_OPTIMIZATION")
+	  test_flag("Optimization", flags,  " | CL_OPTIMIZATION") \
+	  test_flag("Debug", flags,  " | CL_DEBUG")
+	sub( "^0 \\| ", "", result )
+	return result
+}
+
+function switch_opts_type_flags (flags)
+{
+	result = "0"
+	result = result \
+	  test_flag("Debug", flags,  " | CL_DEBUG")
 	sub( "^0 \\| ", "", result )
 	return result
 }

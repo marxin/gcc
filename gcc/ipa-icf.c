@@ -83,6 +83,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-icf.h"
 #include "stor-layout.h"
 #include "dbgcnt.h"
+#include "opts.h"
 
 using namespace ipa_icf_gimple;
 
@@ -289,10 +290,7 @@ sem_function::get_hash (void)
         hstate.add_wide_int
 	 (cl_target_option_hash
 	   (TREE_TARGET_OPTION (DECL_FUNCTION_SPECIFIC_TARGET (decl))));
-      if (DECL_FUNCTION_SPECIFIC_OPTIMIZATION (decl))
-	hstate.add_wide_int
-	 (cl_optimization_hash
-	   (TREE_OPTIMIZATION (DECL_FUNCTION_SPECIFIC_OPTIMIZATION (decl))));
+      hstate.add_wide_int (cl_optimization_hash (opts_for_fn (decl), CL_DEBUG));
       hstate.add_flag (DECL_CXX_CONSTRUCTOR_P (decl));
       hstate.add_flag (DECL_CXX_DESTRUCTOR_P (decl));
 
@@ -300,6 +298,17 @@ sem_function::get_hash (void)
     }
 
   return m_hash;
+}
+
+bool
+sem_item::ignore_attr_p (const attribute_spec *as)
+{
+  /* Do not allow optimization or (and) target options.  */
+  if (strcmp (as->name, "optimize") == 0
+      || strcmp (as->name, "target") == 0)
+    return true;
+
+  return false;
 }
 
 /* Return ture if A1 and A2 represent equivalent function attribute lists.
@@ -324,7 +333,7 @@ sem_item::compare_attributes (const_tree a1, const_tree a2)
 	 For example returns_nonnull affects only references, while
 	 optimize attribute can be ignored because it is already lowered
 	 into flags representation and compared separately.  */
-      if (!as)
+      if (!as || ignore_attr_p (as))
         continue;
 
       attr = lookup_attribute (as->name, CONST_CAST_TREE (a2));
@@ -338,7 +347,7 @@ sem_item::compare_attributes (const_tree a1, const_tree a2)
 	  const struct attribute_spec *as;
 
 	  as = lookup_attribute_spec (get_attribute_name (a));
-	  if (!as)
+	  if (!as || ignore_attr_p (as))
 	    continue;
 
 	  if (!lookup_attribute (as->name, CONST_CAST_TREE (a1)))
@@ -652,13 +661,13 @@ sem_function::equals_wpa (sem_item *item,
 	  cl_target_option_print_diff (dump_file, 2, tar1, tar2);
 	}
 
-      return return_false_with_msg ("Target flags are different");
+      return return_false_with_msg ("target flags are different");
     }
 
   cl_optimization *opt1 = opts_for_fn (decl);
   cl_optimization *opt2 = opts_for_fn (item->decl);
 
-  if (opt1 != opt2 && memcmp (opt1, opt2, sizeof(cl_optimization)))
+  if (opt1 != opt2 && !cl_optimization_eq (opt1, opt2, CL_DEBUG))
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
