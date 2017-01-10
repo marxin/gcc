@@ -45,6 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "tree-scalar-evolution.h"
 #include "tree-ssa-loop-niter.h"
+#include "coverage.h"
 
 /* TODO:  Support for predicated code motion.  I.e.
 
@@ -2282,24 +2283,6 @@ find_refs_for_sm (struct loop *loop, bitmap sm_executed, bitmap refs_to_sm)
     }
 }
 
-/* Checks whether LOOP (with exits stored in EXITS array) is suitable
-   for a store motion optimization (i.e. whether we can insert statement
-   on its exits).  */
-
-static bool
-loop_suitable_for_sm (struct loop *loop ATTRIBUTE_UNUSED,
-		      vec<edge> exits)
-{
-  unsigned i;
-  edge ex;
-
-  FOR_EACH_VEC_ELT (exits, i, ex)
-    if (ex->flags & (EDGE_ABNORMAL | EDGE_EH))
-      return false;
-
-  return true;
-}
-
 /* Try to perform store motion for all memory references modified inside
    LOOP.  SM_EXECUTED is the bitmap of the memory references for that
    store motion was executed in one of the outer loops.  */
@@ -2565,6 +2548,122 @@ tree_ssa_lim (void)
   return todo;
 }
 
+/* Move coverage counter update internal function, pointed by GSI iterator,
+   out of a loop LOOP.  */
+
+static void
+move_coverage_counter_update (gimple_stmt_iterator *gsi, struct loop *loop)
+{
+  gimple *call = gsi_stmt (*gsi);
+  tree type = get_gcov_type ();
+
+  vec<edge> exits = get_loop_exit_edges (loop);
+  if (!loop_suitable_for_sm (loop, exits))
+    {
+      exits.release ();
+      return;
+    }
+
+  /* Verify that BB of the CALL statement post-dominates all exits.  */
+  for (unsigned i = 0; i < exits.length (); i++)
+    {
+      edge exit = exits[i];
+      if (!dominated_by_p (CDI_POST_DOMINATORS, call->bb, exit->src))
+	{
+	  exits.release ();
+	  return;
+	}
+    }
+
+  if (exits.is_empty ())
+    return;
+
+  edge preheader = loop_preheader_edge (loop);
+  if (!single_succ_p (preheader->src)
+      || preheader->dest != call->bb)
+    return;
+
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "Executing store motion of ");
+      print_generic_expr (dump_file, gimple_call_arg (call, 0), 0);
+      fprintf (dump_file, " from loop %d\n", loop->num);
+    }
+
+  tree init = build_int_cst (type, 0);
+  tree step = build_int_cst (type, 1);
+  gimple_stmt_iterator incr_gsi = gsi_for_stmt (call);
+  tree indx_before_incr, indx_after_incr;
+  bool insert_after = false;
+
+  create_iv (init, step, NULL_TREE, loop,
+             &incr_gsi, insert_after, &indx_before_incr, &indx_after_incr);
+
+  tree updated_value = gimple_assign_rhs1 (gsi_stmt (incr_gsi));
+
+  for (unsigned i = 0; i < exits.length (); i++)
+    {
+      edge e;
+      edge exit = exits[i];
+
+      /* We must be sure that post loop update statement will occure just
+	 only from loop exits.  */
+      if (!dominated_by_p (CDI_DOMINATORS, exit->dest, exit->src))
+	{
+	  basic_block new_bb = split_edge (exit);
+	  set_immediate_dominator (CDI_DOMINATORS, new_bb, exit->src);
+	  e = single_pred_edge (new_bb);
+	}
+      else
+	e = exit;
+
+      basic_block bb = e->dest;
+      tree addr = unshare_expr (gimple_call_arg (call, 0));
+      call = gimple_build_call_internal (IFN_UPDATE_COVERAGE_COUNTER,
+					 2, addr, updated_value);
+
+      gimple_stmt_iterator it = gsi_start_bb (bb);
+      gsi_insert_before (&it, call, GSI_NEW_STMT);
+    }
+
+  exits.release ();
+  gsi_remove (gsi, true);
+  debug_function (cfun->decl, 0);
+}
+
+/* Process store motion for coverage counter update internal function.  */
+
+static void
+process_sm_for_coverage_counter (void)
+{
+  bool has_dom_info = dom_info_available_p (CDI_POST_DOMINATORS);
+  if (!has_dom_info)
+    calculate_dominance_info (CDI_POST_DOMINATORS);
+
+  struct loop *loop;
+  FOR_EACH_LOOP (loop, LI_FROM_INNERMOST)
+    {
+      basic_block *body = get_loop_body (loop);
+      for (unsigned i = 0; i < loop->num_nodes; i++)
+	{
+	  gimple_stmt_iterator gsi;
+	  for (gsi = gsi_start_bb (body[i]); !gsi_end_p (gsi);)
+	    {
+	      gimple *stmt = gsi_stmt (gsi);
+	      if (gimple_call_internal_p (stmt, IFN_UPDATE_COVERAGE_COUNTER)
+		  && integer_onep (gimple_call_arg (stmt, 1)))
+		move_coverage_counter_update (&gsi, loop);
+
+	      if (!gsi_end_p (gsi))
+		gsi_next (&gsi);
+	    }
+	}
+    }
+
+  if (!has_dom_info)
+    free_dominance_info (CDI_POST_DOMINATORS);
+}
+
 /* Loop invariant motion pass.  */
 
 namespace {
@@ -2601,11 +2700,15 @@ pass_lim::execute (function *fun)
 {
   bool in_loop_pipeline = scev_initialized_p ();
   if (!in_loop_pipeline)
-    loop_optimizer_init (LOOPS_NORMAL | LOOPS_HAVE_RECORDED_EXITS);
+    loop_optimizer_init (LOOPS_NORMAL | LOOPS_HAVE_RECORDED_EXITS
+			 | LOOPS_HAVE_PREHEADERS);
 
-  if (number_of_loops (fun) <= 1)
-    return 0;
-  unsigned int todo = tree_ssa_lim ();
+  unsigned int todo = 0;
+  if (number_of_loops (fun) > 1)
+    todo = tree_ssa_lim ();
+
+  process_sm_for_coverage_counter ();
+  todo |= TODO_update_ssa;
 
   if (!in_loop_pipeline)
     loop_optimizer_finalize ();

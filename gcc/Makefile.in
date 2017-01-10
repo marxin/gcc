@@ -1420,6 +1420,7 @@ OBJS = \
 	print-rtl-function.o \
 	print-tree.o \
 	profile.o \
+	profile-expand.o \
 	read-md.o \
 	read-rtl.o \
 	read-rtl-function.o \

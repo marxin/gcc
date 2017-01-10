@@ -79,4 +79,22 @@ loop_containing_stmt (gimple *stmt)
   return bb->loop_father;
 }
 
+/* Checks whether LOOP (with exits stored in EXITS array) is suitable
+   for a store motion optimization (i.e. whether we can insert statement
+   on its exits).  */
+
+static inline bool
+loop_suitable_for_sm (struct loop *loop ATTRIBUTE_UNUSED,
+		      vec<edge> exits)
+{
+  unsigned i;
+  edge ex;
+
+  FOR_EACH_VEC_ELT (exits, i, ex)
+    if (ex->flags & (EDGE_ABNORMAL | EDGE_EH))
+      return false;
+
+  return true;
+}
+
 #endif /* GCC_TREE_SSA_LOOP_H */

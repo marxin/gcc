@@ -398,6 +398,12 @@ expand_FALLTHROUGH (internal_fn, gcall *call)
 	    "invalid use of attribute %<fallthrough%>");
 }
 
+static void
+expand_UPDATE_COVERAGE_COUNTER (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
 /* Helper function for expand_addsub_overflow.  Return 1
    if ARG interpreted as signed in its precision is known to be always
    positive or 2 if ARG is known to be always negative, or 3 if ARG may
