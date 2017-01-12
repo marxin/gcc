@@ -446,15 +446,15 @@ no_useful_type_info:
     }
 }
 
-/* Return true if OUTER_TYPE contains OTR_TYPE at OFFSET.
-   CONSIDER_PLACEMENT_NEW makes function to accept cases where OTR_TYPE can
+/* Return true if OUTER_TYPE contains INNER_TYPE at OFFSET.
+   CONSIDER_PLACEMENT_NEW makes function to accept cases where INNER_TYPE can
    be built within OUTER_TYPE by means of placement new.  CONSIDER_BASES makes
-   function to accept cases where OTR_TYPE appears as base of OUTER_TYPE or as
+   function to accept cases where INNER_TYPE appears as base of OUTER_TYPE or as
    base of one of fields of OUTER_TYPE.  */
 
 static bool
 contains_type_p (tree outer_type, HOST_WIDE_INT offset,
-		 tree otr_type,
+		 tree inner_type,
 		 bool consider_placement_new,
 		 bool consider_bases)
 {
@@ -463,18 +463,18 @@ contains_type_p (tree outer_type, HOST_WIDE_INT offset,
   /* Check that type is within range.  */
   if (offset < 0)
     return false;
-  if (TYPE_SIZE (outer_type) && TYPE_SIZE (otr_type)
-      && TREE_CODE (TYPE_SIZE (outer_type)) == INTEGER_CST
-      && TREE_CODE (TYPE_SIZE (otr_type)) == INTEGER_CST
-      && wi::ltu_p (wi::to_offset (TYPE_SIZE (outer_type)),
-		    (wi::to_offset (TYPE_SIZE (otr_type)) + offset)))
-    return false;
+
+  /* PR ipa/71207
+     As OUTER_TYPE can be a type which has a diamond virtual inheritance,
+     it's not necessary that INNER_TYPE will fit within OUTER_TYPE with
+     a given offset.  It can happen that INNER_TYPE also contains a base object,
+     however it would point to the same instance in the OUTER_TYPE.  */
 
   context.offset = offset;
   context.outer_type = TYPE_MAIN_VARIANT (outer_type);
   context.maybe_derived_type = false;
   context.dynamic = false;
-  return context.restrict_to_inner_class (otr_type, consider_placement_new,
+  return context.restrict_to_inner_class (inner_type, consider_placement_new,
 					  consider_bases);
 }
 
