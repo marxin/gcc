@@ -2323,6 +2323,16 @@ combine_chains (chain_p ch1, chain_p ch2)
   root_stmt = get_chain_root (new_chain)->stmt;
   for (i = 1; new_chain->refs.iterate (i, &nw); i++)
     {
+      /* PR tree-optimization/70754
+	 For a combined chain with length equal to zero, we have to guarantee
+	 that ROOT_STMT dominates all references.  */
+      if (new_chain->length == 0
+	  && !stmt_dominates_stmt_p (root_stmt, nw->stmt))
+	{
+	  release_chain (new_chain);
+	  return NULL;
+	}
+
       if (nw->distance == new_chain->length
 	  && !stmt_dominates_stmt_p (nw->stmt, root_stmt))
 	{
