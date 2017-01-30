@@ -2843,6 +2843,15 @@ translate_pending_phi_nodes ()
       init_back_edge_pair_t ibp_old_bb = get_edges (old_bb);
       init_back_edge_pair_t ibp_new_bb = get_edges (new_bb);
 
+      /* PR graphite/77362
+	 It can happen that both incoming edges of the old PHI node live
+	 in a single loop.  */
+      if (ibp_old_bb.first == NULL || ibp_old_bb.second == NULL)
+	{
+	  codegen_error = true;
+	  return;
+	}
+
       if (dump_file)
 	{
 	  fprintf (dump_file, "[codegen] translating pending old-phi: ");
