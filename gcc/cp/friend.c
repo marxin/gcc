@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "cp-tree.h"
 
 /* Friend data structures are described in cp-tree.h.  */

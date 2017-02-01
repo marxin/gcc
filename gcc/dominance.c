@@ -35,6 +35,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "timevar.h"
 #include "diagnostic-core.h"

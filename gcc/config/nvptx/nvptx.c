@@ -22,6 +22,7 @@
 #include <sstream>
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "target.h"
 #include "rtl.h"

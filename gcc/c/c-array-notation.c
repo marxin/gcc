@@ -68,6 +68,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "c-tree.h"
 #include "gimple-expr.h"
 #include "tree-iterator.h"

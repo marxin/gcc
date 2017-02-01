@@ -19,6 +19,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "c-common.h"		/* For flags.  */
 #include "../libcpp/internal.h"
 #include "c-pragma.h"		/* For parse_in.  */

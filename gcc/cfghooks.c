@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "rtl.h"
 #include "cfghooks.h"
@@ -269,7 +270,7 @@ verify_flow_info (void)
    representation-specific information.  */
 
 void
-dump_bb (FILE *outf, basic_block bb, int indent, int flags)
+dump_bb (FILE *outf, basic_block bb, int indent, dump_flags_t flags)
 {
   if (flags & TDF_BLOCKS)
     dump_bb_info (outf, bb, indent, flags, true, false);
@@ -319,7 +320,7 @@ dump_bb_for_graph (pretty_printer *pp, basic_block bb)
 
 /* Dump the complete CFG to FILE.  FLAGS are the TDF_* flags in dumpfile.h.  */
 void
-dump_flow_info (FILE *file, int flags)
+dump_flow_info (FILE *file, dump_flags_t flags)
 {
   basic_block bb;
 

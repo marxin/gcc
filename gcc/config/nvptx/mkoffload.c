@@ -30,6 +30,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "obstack.h"
 #include "diagnostic.h"
 #include "intl.h"

@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "cp/cp-tree.h" /* This is why we're a separate module.  */
 #include "stringpool.h"
 #include "attribs.h"

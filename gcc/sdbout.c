@@ -42,6 +42,7 @@ AT&T C compiler.  From the example below I would conclude the following:
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "gsyms.h"
 #include "tm.h"
 #include "debug.h"

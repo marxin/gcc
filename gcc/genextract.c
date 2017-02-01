@@ -346,6 +346,7 @@ print_header (void)
 #include \"config.h\"\n\
 #include \"system.h\"\n\
 #include \"coretypes.h\"\n\
+#include \"dumpfile.h\"\n\
 #include \"tm.h\"\n\
 #include \"rtl.h\"\n\
 #include \"insn-config.h\"\n\

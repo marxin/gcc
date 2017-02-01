@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "rtl.h"
 #include "tree.h"
@@ -39,8 +40,8 @@ static const char *op_symbol (const_tree);
 static void pretty_print_string (pretty_printer *, const char*);
 static void newline_and_indent (pretty_printer *, int);
 static void maybe_init_pretty_print (FILE *);
-static void print_struct_decl (pretty_printer *, const_tree, int, int);
-static void do_niy (pretty_printer *, const_tree, int);
+static void print_struct_decl (pretty_printer *, const_tree, int, dump_flags_t);
+static void do_niy (pretty_printer *, const_tree, dump_flags_t);
 
 #define INDENT(SPACE) do { \
   int i; for (i = 0; i<SPACE; i++) pp_space (pp); } while (0)
@@ -52,7 +53,7 @@ static pretty_printer *tree_pp;
 /* Try to print something for an unknown tree code.  */
 
 static void
-do_niy (pretty_printer *pp, const_tree node, int flags)
+do_niy (pretty_printer *pp, const_tree node, dump_flags_t flags)
 {
   int i, len;
 
@@ -115,7 +116,7 @@ debug_tree_chain (tree t)
 
 /* Prints declaration DECL to the FILE with details specified by FLAGS.  */
 void
-print_generic_decl (FILE *file, tree decl, int flags)
+print_generic_decl (FILE *file, tree decl, dump_flags_t flags)
 {
   maybe_init_pretty_print (file);
   print_declaration (tree_pp, decl, 2, flags);
@@ -126,7 +127,7 @@ print_generic_decl (FILE *file, tree decl, int flags)
    to show in the dump.  See TDF_* in dumpfile.h.  */
 
 void
-print_generic_stmt (FILE *file, tree t, int flags)
+print_generic_stmt (FILE *file, tree t, dump_flags_t flags)
 {
   maybe_init_pretty_print (file);
   dump_generic_node (tree_pp, t, 0, flags, true);
@@ -138,7 +139,7 @@ print_generic_stmt (FILE *file, tree t, int flags)
    INDENT spaces.  */
 
 void
-print_generic_stmt_indented (FILE *file, tree t, int flags, int indent)
+print_generic_stmt_indented (FILE *file, tree t, dump_flags_t flags, int indent)
 {
   int i;
 
@@ -154,7 +155,7 @@ print_generic_stmt_indented (FILE *file, tree t, int flags, int indent)
    in the dump.  See TDF_* in dumpfile.h.  */
 
 void
-print_generic_expr (FILE *file, tree t, int flags)
+print_generic_expr (FILE *file, tree t, dump_flags_t flags)
 {
   maybe_init_pretty_print (file);
   dump_generic_node (tree_pp, t, 0, flags, false);
@@ -1051,7 +1052,7 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, int flags)
    dump_generic_node.  */
 
 void
-dump_omp_clauses (pretty_printer *pp, tree clause, int spc, int flags)
+dump_omp_clauses (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
 {
   if (clause == NULL)
     return;
@@ -1205,7 +1206,7 @@ dump_block_node (pretty_printer *pp, tree block, int spc, int flags)
    to be a statement and it is terminated by ';' if appropriate.  */
 
 int
-dump_generic_node (pretty_printer *pp, tree node, int spc, int flags,
+dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 		   bool is_stmt)
 {
   tree type;
@@ -3313,7 +3314,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, int flags,
 /* Print the declaration of a variable.  */
 
 void
-print_declaration (pretty_printer *pp, tree t, int spc, int flags)
+print_declaration (pretty_printer *pp, tree t, int spc, dump_flags_t flags)
 {
   INDENT (spc);
 
@@ -3414,7 +3415,8 @@ print_declaration (pretty_printer *pp, tree t, int spc, int flags)
    FIXME: Still incomplete.  */
 
 static void
-print_struct_decl (pretty_printer *pp, const_tree node, int spc, int flags)
+print_struct_decl (pretty_printer *pp, const_tree node, int spc,
+		   dump_flags_t flags)
 {
   /* Print the name of the structure.  */
   if (TYPE_NAME (node))

@@ -19,6 +19,7 @@ along with Gcov; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 #include "version.h"
 #include "intl.h"

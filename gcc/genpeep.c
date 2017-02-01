@@ -358,6 +358,7 @@ from the machine description file `md'.  */\n\n");
   printf ("#include \"config.h\"\n");
   printf ("#include \"system.h\"\n");
   printf ("#include \"coretypes.h\"\n");
+  printf ("#include \"dumpfile.h\"\n");
   printf ("#include \"backend.h\"\n");
   printf ("#include \"tree.h\"\n");
   printf ("#include \"rtl.h\"\n");

@@ -30,6 +30,7 @@ compilation is specified by a string called a "spec".  */
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "multilib.h" /* before tm.h */
 #include "tm.h"
 #include "xregex.h"

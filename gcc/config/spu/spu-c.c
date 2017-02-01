@@ -17,6 +17,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "target.h"
 #include "c-family/c-common.h"
 #include "stringpool.h"

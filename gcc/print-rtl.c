@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 /* These headers all define things which are not available in
    generator programs.  */
 #ifndef GENERATOR_FILE
+#include "dumpfile.h"	/* for dump_flags */
 #include "alias.h"
 #include "tree.h"
 #include "cfg.h"
@@ -45,7 +46,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pretty-print.h"
 #include "alloc-pool.h"
 #include "cselib.h"
-#include "dumpfile.h"	/* for dump_flags */
 #include "dwarf2out.h"
 #include "pretty-print.h"
 #endif

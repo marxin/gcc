@@ -23,6 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "cp-tree.h"
 #include "varasm.h"
 #include "c-family/c-objc.h"

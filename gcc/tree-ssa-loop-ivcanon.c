@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "tree.h"
 #include "gimple.h"
@@ -686,7 +687,7 @@ try_unroll_loop_completely (struct loop *loop,
   struct loop_size size;
   bool n_unroll_found = false;
   edge edge_to_cancel = NULL;
-  int report_flags = MSG_OPTIMIZED_LOCATIONS | TDF_RTL | TDF_DETAILS;
+  dump_flags_t report_flags = MSG_OPTIMIZED_LOCATIONS | TDF_RTL | TDF_DETAILS;
 
   /* See if we proved number of iterations to be low constant.
 

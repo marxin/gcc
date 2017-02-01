@@ -22,6 +22,7 @@ See dbgcnt.def for usage information.  */
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "diagnostic-core.h"
 #include "dumpfile.h"
 

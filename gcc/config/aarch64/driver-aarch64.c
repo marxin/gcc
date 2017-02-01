@@ -21,6 +21,7 @@
 #define INCLUDE_STRING
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 
 /* Defined in common/config/aarch64/aarch64-common.c.  */

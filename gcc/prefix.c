@@ -66,6 +66,7 @@ License along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #if defined(_WIN32) && defined(ENABLE_WIN32_REGISTRY)
 #include <windows.h>
 #endif

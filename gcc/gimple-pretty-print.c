@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "tree.h"
 #include "gimple.h"
@@ -108,7 +109,7 @@ dump_edge_probability (pretty_printer *buffer, edge e)
    FLAGS as in pp_gimple_stmt_1.  */
 
 void
-print_gimple_stmt (FILE *file, gimple *g, int spc, int flags)
+print_gimple_stmt (FILE *file, gimple *g, int spc, dump_flags_t flags)
 {
   pretty_printer buffer;
   pp_needs_newline (&buffer) = true;
@@ -138,7 +139,7 @@ debug (gimple *ptr)
    of the statement.  */
 
 void
-print_gimple_expr (FILE *file, gimple *g, int spc, int flags)
+print_gimple_expr (FILE *file, gimple *g, int spc, dump_flags_t flags)
 {
   flags |= TDF_RHS_ONLY;
   pretty_printer buffer;
@@ -174,7 +175,7 @@ dump_gimple_seq (pretty_printer *buffer, gimple_seq seq, int spc, int flags)
    FLAGS as in pp_gimple_stmt_1.  */
 
 void
-print_gimple_seq (FILE *file, gimple_seq seq, int spc, int flags)
+print_gimple_seq (FILE *file, gimple_seq seq, int spc, dump_flags_t flags)
 {
   pretty_printer buffer;
   pp_needs_newline (&buffer) = true;
@@ -2401,7 +2402,8 @@ dump_gimple_mem_ops (pretty_printer *buffer, gimple *gs, int spc, int flags)
    pp_flush on BUFFER to finalize the pretty printer.  */
 
 void
-pp_gimple_stmt_1 (pretty_printer *buffer, gimple *gs, int spc, int flags)
+pp_gimple_stmt_1 (pretty_printer *buffer, gimple *gs, int spc,
+		  dump_flags_t flags)
 {
   if (!gs)
     return;
@@ -2776,7 +2778,7 @@ dump_implicit_edges (pretty_printer *buffer, basic_block bb, int indent,
 
 static void
 gimple_dump_bb_buff (pretty_printer *buffer, basic_block bb, int indent,
-		     int flags)
+		     dump_flags_t flags)
 {
   gimple_stmt_iterator gsi;
   gimple *stmt;
@@ -2812,7 +2814,7 @@ gimple_dump_bb_buff (pretty_printer *buffer, basic_block bb, int indent,
    indented by INDENT spaces.  */
 
 void
-gimple_dump_bb (FILE *file, basic_block bb, int indent, int flags)
+gimple_dump_bb (FILE *file, basic_block bb, int indent, dump_flags_t flags)
 {
   dump_gimple_bb_header (file, bb, indent, flags);
   if (bb->index >= NUM_FIXED_BLOCKS)

@@ -4204,6 +4204,7 @@ write_header (void)
 #include \"config.h\"\n\
 #include \"system.h\"\n\
 #include \"coretypes.h\"\n\
+#include \"dumpfile.h\"\n\
 #include \"backend.h\"\n\
 #include \"predict.h\"\n\
 #include \"rtl.h\"\n\

@@ -26,6 +26,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 #include "intl.h"
 #include "diagnostic.h"

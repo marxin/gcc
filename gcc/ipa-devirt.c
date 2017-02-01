@@ -108,6 +108,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "rtl.h"
 #include "tree.h"
@@ -2259,7 +2260,7 @@ build_type_inheritance_graph (void)
 {
   struct symtab_node *n;
   FILE *inheritance_dump_file;
-  int flags;
+  dump_flags_t flags;
 
   if (odr_hash)
     return;

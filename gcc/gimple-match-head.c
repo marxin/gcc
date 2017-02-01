@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "target.h"
 #include "rtl.h"
@@ -39,7 +40,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "internal-fn.h"
 #include "case-cfn-macros.h"
 #include "gimplify.h"
-
 
 /* Forward declarations of the private auto-generated matchers.
    They expect valueized operands in canonical order and do not

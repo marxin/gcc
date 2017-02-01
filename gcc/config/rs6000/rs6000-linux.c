@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 
 /* Implement TARGET_FLOAT_EXCEPTIONS_ROUNDING_SUPPORTED_P.  */

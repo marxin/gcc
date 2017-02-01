@@ -206,6 +206,7 @@ output_prologue (void)
   printf ("#include \"config.h\"\n");
   printf ("#include \"system.h\"\n");
   printf ("#include \"coretypes.h\"\n");
+  printf ("#include \"dumpfile.h\"\n");
   printf ("#include \"backend.h\"\n");
   printf ("#include \"predict.h\"\n");
   printf ("#include \"tree.h\"\n");

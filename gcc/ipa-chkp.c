@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #define INCLUDE_STRING
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "tree.h"
 #include "gimple.h"

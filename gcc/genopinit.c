@@ -249,6 +249,7 @@ main (int argc, const char **argv)
 	   "#include \"config.h\"\n"
 	   "#include \"system.h\"\n"
 	   "#include \"coretypes.h\"\n"
+	   "#include \"dumpfile.h\"\n"
 	   "#include \"backend.h\"\n"
 	   "#include \"predict.h\"\n"
 	   "#include \"tree.h\"\n"

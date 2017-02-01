@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tree.h"
 #include "diagnostic.h"
 #include "tree-pretty-print.h"

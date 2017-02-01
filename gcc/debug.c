@@ -18,6 +18,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tree.h"
 #include "debug.h"
 

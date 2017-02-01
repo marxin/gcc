@@ -24,6 +24,7 @@
 #include <libgen.h>
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "obstack.h"
 #include "intl.h"
 #include "diagnostic.h"

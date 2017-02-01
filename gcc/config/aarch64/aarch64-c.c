@@ -20,6 +20,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 #include "input.h"
 #include "memmodel.h"

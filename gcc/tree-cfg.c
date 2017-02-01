@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "target.h"
 #include "rtl.h"
@@ -7520,7 +7521,7 @@ dump_default_def (FILE *file, tree def, int spc, int flags)
    */
 
 void
-dump_function_to_file (tree fndecl, FILE *file, int flags)
+dump_function_to_file (tree fndecl, FILE *file, dump_flags_t flags)
 {
   tree arg, var, old_current_fndecl = current_function_decl;
   struct function *dsf;

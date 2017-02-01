@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "realmpfr.h"
 #include "tree.h"
 #include "stor-layout.h"

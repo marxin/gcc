@@ -5075,6 +5075,7 @@ write_header (FILE *outf)
   fprintf (outf, "#include \"config.h\"\n");
   fprintf (outf, "#include \"system.h\"\n");
   fprintf (outf, "#include \"coretypes.h\"\n");
+  fprintf (outf, "#include \"dumpfile.h\"\n");
   fprintf (outf, "#include \"backend.h\"\n");
   fprintf (outf, "#include \"predict.h\"\n");
   fprintf (outf, "#include \"tree.h\"\n");

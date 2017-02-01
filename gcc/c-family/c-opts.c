@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 #include "c-target.h"
 #include "c-common.h"
@@ -101,9 +102,9 @@ static size_t include_cursor;
 
 /* Dump files/flags to use during parsing.  */
 static FILE *original_dump_file = NULL;
-static int original_dump_flags;
+static dump_flags_t original_dump_flags;
 static FILE *class_dump_file = NULL;
-static int class_dump_flags;
+static dump_flags_t class_dump_flags;
 
 /* Whether any standard preincluded header has been preincluded.  */
 static bool done_preinclude;
@@ -1136,7 +1137,7 @@ c_common_parse_file (void)
 
 /* Returns the appropriate dump file for PHASE to dump with FLAGS.  */
 FILE *
-get_dump_info (int phase, int *flags)
+get_dump_info (int phase, dump_flags_t *flags)
 {
   gcc_assert (phase == TDI_original || phase == TDI_class);
   if (phase == TDI_original)

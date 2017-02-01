@@ -26,6 +26,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "target.h"
 #include "rtl.h"
@@ -3652,7 +3653,7 @@ cgraph_node::get_body (void)
       opt_pass *saved_current_pass = current_pass;
       FILE *saved_dump_file = dump_file;
       const char *saved_dump_file_name = dump_file_name;
-      int saved_dump_flags = dump_flags;
+      dump_flags_t saved_dump_flags = dump_flags;
       dump_file_name = NULL;
       dump_file = NULL;
 

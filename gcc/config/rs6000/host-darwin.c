@@ -20,6 +20,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "diagnostic.h"
 #include <sys/ucontext.h>
 #include "hosthooks.h"

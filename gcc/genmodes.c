@@ -1230,6 +1230,7 @@ emit_insn_modes_c_header (void)
 #include \"config.h\"\n\
 #include \"system.h\"\n\
 #include \"coretypes.h\"\n\
+#include \"dumpfile.h\"\n\
 #include \"tm.h\"\n\
 #include \"machmode.h\"\n\
 #include \"real.h\"");

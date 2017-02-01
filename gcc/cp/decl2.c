@@ -29,6 +29,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "memmodel.h"
 #include "target.h"
 #include "cp-tree.h"
@@ -4369,7 +4370,7 @@ generate_mangling_aliases ()
 static void
 dump_tu (void)
 {
-  int flags;
+  dump_flags_t flags;
   FILE *stream = dump_begin (TDI_tu, &flags);
 
   if (stream)

@@ -25,6 +25,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "insn-codes.h"
 #include "rtl.h"

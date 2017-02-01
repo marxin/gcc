@@ -22,6 +22,7 @@
 #include "system.h"
 #include "intl.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "target.h"
 #include "rtl.h"

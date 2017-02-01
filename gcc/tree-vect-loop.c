@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "target.h"
 #include "rtl.h"
@@ -2432,7 +2433,7 @@ reduction_code_for_scalar_code (enum tree_code code,
    STMT is printed with a message MSG. */
 
 static void
-report_vect_op (int msg_type, gimple *stmt, const char *msg)
+report_vect_op (dump_flags_t msg_type, gimple *stmt, const char *msg)
 {
   dump_printf_loc (msg_type, vect_location, "%s", msg);
   dump_gimple_stmt (msg_type, TDF_SLIM, stmt, 0);

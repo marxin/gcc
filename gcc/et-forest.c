@@ -25,6 +25,7 @@ License along with libiberty; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "alloc-pool.h"
 #include "et-forest.h"
 #include "selftest.h"

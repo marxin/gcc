@@ -36,6 +36,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "rtl.h"
 #include "tree.h"

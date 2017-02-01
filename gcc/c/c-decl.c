@@ -27,6 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "target.h"
 #include "function.h"
 #include "c-tree.h"
@@ -11243,7 +11244,7 @@ c_parse_final_cleanups (void)
   if (ext_block)
     {
       tree tmp = BLOCK_VARS (ext_block);
-      int flags;
+      dump_flags_t flags;
       FILE * stream = dump_begin (TDI_tu, &flags);
       if (stream && tmp)
 	{

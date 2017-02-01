@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "intl.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "opts.h"
 #include "tm.h"
 #include "flags.h"

@@ -20,6 +20,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tree.h"
 #include "realmpfr.h"
 #include "stor-layout.h"

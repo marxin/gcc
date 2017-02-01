@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "target.h"
 #include "cp-tree.h"
 #include "stringpool.h"
@@ -174,7 +175,7 @@ static tree get_primary_binfo (tree);
 static int maybe_indent_hierarchy (FILE *, int, int);
 static tree dump_class_hierarchy_r (FILE *, int, tree, tree, int);
 static void dump_class_hierarchy (tree);
-static void dump_class_hierarchy_1 (FILE *, int, tree);
+static void dump_class_hierarchy_1 (FILE *, dump_flags_t, tree);
 static void dump_array (FILE *, tree);
 static void dump_vtable (tree, tree, tree);
 static void dump_vtt (tree, tree);
@@ -8943,7 +8944,7 @@ dump_class_hierarchy_r (FILE *stream,
 /* Dump the BINFO hierarchy for T.  */
 
 static void
-dump_class_hierarchy_1 (FILE *stream, int flags, tree t)
+dump_class_hierarchy_1 (FILE *stream, dump_flags_t flags, tree t)
 {
   fprintf (stream, "Class %s\n", type_as_string (t, TFF_PLAIN_IDENTIFIER));
   fprintf (stream, "   size=%lu align=%lu\n",
@@ -8969,7 +8970,7 @@ debug_class (tree t)
 static void
 dump_class_hierarchy (tree t)
 {
-  int flags;
+  dump_flags_t flags;
   FILE *stream = get_dump_info (TDI_class, &flags);
 
   if (stream)
@@ -9003,7 +9004,7 @@ dump_array (FILE * stream, tree decl)
 static void
 dump_vtable (tree t, tree binfo, tree vtable)
 {
-  int flags;
+  dump_flags_t flags;
   FILE *stream = get_dump_info (TDI_class, &flags);
 
   if (!stream)
@@ -9032,7 +9033,7 @@ dump_vtable (tree t, tree binfo, tree vtable)
 static void
 dump_vtt (tree t, tree vtt)
 {
-  int flags;
+  dump_flags_t flags;
   FILE *stream = get_dump_info (TDI_class, &flags);
 
   if (!stream)

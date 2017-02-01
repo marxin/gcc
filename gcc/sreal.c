@@ -51,6 +51,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include <math.h>
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "sreal.h"
 #include "selftest.h"
 #include "backend.h"

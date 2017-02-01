@@ -20,6 +20,7 @@ Boston, MA 02110-1301, USA.  */
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tree.h"
 #include "objc-map.h"
 

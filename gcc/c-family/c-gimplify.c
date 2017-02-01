@@ -26,6 +26,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 #include "function.h"
 #include "basic-block.h"
@@ -115,7 +116,7 @@ void
 c_genericize (tree fndecl)
 {
   FILE *dump_orig;
-  int local_dump_flags;
+  dump_flags_t local_dump_flags;
   struct cgraph_node *cgn;
 
   if (flag_sanitize & SANITIZE_BOUNDS)

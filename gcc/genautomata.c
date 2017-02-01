@@ -9644,6 +9644,7 @@ main (int argc, const char **argv)
 		"#include \"config.h\"\n"
 		"#include \"system.h\"\n"
 		"#include \"coretypes.h\"\n"
+		"#include \"dumpfile.h\"\n"
 		"#include \"tm.h\"\n"
 		"#include \"alias.h\"\n"
 		"#include \"tree.h\"\n"

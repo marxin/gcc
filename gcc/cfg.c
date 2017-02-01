@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "backend.h"
 #include "hard-reg-set.h"
 #include "tree.h"
@@ -56,7 +57,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "df.h"
 #include "cfganal.h"
 #include "cfgloop.h" /* FIXME: For struct loop.  */
-#include "dumpfile.h"
 
 
 #define RDIV(X,Y) (((X) + (Y) / 2) / (Y))
@@ -474,7 +474,7 @@ check_bb_profile (basic_block bb, FILE * file, int indent, int flags)
 }
 
 void
-dump_edge_info (FILE *file, edge e, int flags, int do_succ)
+dump_edge_info (FILE *file, edge e, dump_flags_t flags, int do_succ)
 {
   basic_block side = (do_succ ? e->dest : e->src);
   bool do_details = false;
@@ -713,7 +713,7 @@ debug_bb_n (int n)
    that maybe_hot_bb_p and probably_never_executed_bb_p don't ICE.  */
 
 void
-dump_bb_info (FILE *outf, basic_block bb, int indent, int flags,
+dump_bb_info (FILE *outf, basic_block bb, int indent, dump_flags_t flags,
 	      bool do_header, bool do_footer)
 {
   edge_iterator ei;

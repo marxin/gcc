@@ -20,6 +20,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "diagnostic-core.h"
 #include "config/host-darwin.h"
 

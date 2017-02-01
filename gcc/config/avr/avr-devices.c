@@ -21,6 +21,7 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "dumpfile.h"
 #include "tm.h"
 #include "diagnostic.h"
 #endif /* IN_GEN_AVR_MMCU_TEXI */
