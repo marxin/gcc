@@ -2259,7 +2259,7 @@ build_type_inheritance_graph (void)
 {
   struct symtab_node *n;
   FILE *inheritance_dump_file;
-  int flags;
+  dump_flags_t flags;
 
   if (odr_hash)
     return;
