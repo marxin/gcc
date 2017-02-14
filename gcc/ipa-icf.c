@@ -1191,7 +1191,7 @@ sem_function::merge (sem_item *alias_item)
 		     "can not create wrapper of stdarg function.\n");
 	}
       else if (inline_summaries
-	       && inline_summaries->get (alias)->self_size <= 2)
+	       && inline_summaries->get_or_insert (alias)->self_size <= 2)
 	{
 	  if (dump_file)
 	    fprintf (dump_file, "Wrapper creation is not "

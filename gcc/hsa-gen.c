@@ -943,8 +943,11 @@ tree
 hsa_get_host_function (tree decl)
 {
   hsa_function_summary *s
-    = hsa_summaries->get (cgraph_node::get_create (decl));
-  gcc_assert (s->m_kind != HSA_NONE);
+    = hsa_summaries->get2 (cgraph_node::get_create (decl));
+
+  if (s == NULL)
+    return NULL;
+
   gcc_assert (s->m_gpu_implementation_p);
 
   return s->m_bound_function ? s->m_bound_function->decl : NULL;
@@ -957,8 +960,8 @@ get_brig_function_name (tree decl)
 {
   tree d = decl;
 
-  hsa_function_summary *s = hsa_summaries->get (cgraph_node::get_create (d));
-  if (s->m_kind != HSA_NONE
+  hsa_function_summary *s = hsa_summaries->get2 (cgraph_node::get_create (d));
+  if (s
       && s->m_gpu_implementation_p
       && s->m_bound_function)
     d = s->m_bound_function->decl;
@@ -6438,7 +6441,7 @@ generate_hsa (bool kernel)
   if (hsa_cfun->m_kern_p)
     {
       hsa_function_summary *s
-	= hsa_summaries->get (cgraph_node::get (hsa_cfun->m_decl));
+	= hsa_summaries->get2 (cgraph_node::get (hsa_cfun->m_decl));
       hsa_add_kern_decl_mapping (current_function_decl, hsa_cfun->m_name,
 				 hsa_cfun->m_maximum_omp_data_size,
 				 s->m_gridified_kernel_p);
@@ -6509,7 +6512,7 @@ unsigned int
 pass_gen_hsail::execute (function *)
 {
   hsa_function_summary *s
-    = hsa_summaries->get (cgraph_node::get_create (current_function_decl));
+    = hsa_summaries->get2 (cgraph_node::get_create (current_function_decl));
 
   expand_builtins ();
   generate_hsa (s->m_kind == HSA_KERNEL);

@@ -87,10 +87,16 @@ public:
   void release (T *item);
 
   /* Getter for summary callgraph node pointer.  */
-  T* get (cgraph_node *node)
+  T* get2 (cgraph_node *node)
   {
-    gcc_checking_assert (node->summary_uid);
-    return get (node->summary_uid);
+    return get (node->summary_uid, false);
+  }
+
+  /* Getter of edge summary.  If a summary for an edge does not exist,
+     it will be created.  */
+  T* get_or_insert (cgraph_node *node)
+  {
+    return get (node->summary_uid, true);
   }
 
   /* Return number of elements handled by data structure.  */
@@ -128,8 +134,9 @@ protected:
 private:
   typedef int_hash <int, 0, -1> map_hash;
 
-  /* Getter for summary callgraph ID.  */
-  T* get (int uid);
+  /* Getter of callgraph summary.  If LAZY_INSERT is set to true,
+     insert new summary, abort otherwise.  */
+  T* get (int uid, bool lazy_insert);
 
   /* Main summary store, where summary ID is used as key.  */
   hash_map <map_hash, T *> m_map;
@@ -208,7 +215,7 @@ function_summary<T *>::symtab_insertion (cgraph_node *node, void *data)
   function_summary *summary = (function_summary <T *> *) (data);
 
   if (summary->m_insertion_enabled)
-    summary->insert (node, summary->get (node));
+    summary->insert (node, summary->get2 (node));
 }
 
 template <typename T>
@@ -239,30 +246,39 @@ function_summary<T *>::symtab_duplication (cgraph_node *node,
 						   void *data)
 {
   function_summary *summary = (function_summary <T *> *) (data);
-  T **v = summary->m_map.get (node->summary_uid);
-
-  gcc_checking_assert (node2->summary_uid > 0);
+  T *v = summary->get2 (node);
 
   if (v)
     {
+      gcc_checking_assert (node2->summary_uid > 0);
+
       /* This load is necessary, because we insert a new value!  */
-      T *data = *v;
       T *duplicate = summary->allocate_new ();
       summary->m_map.put (node2->summary_uid, duplicate);
-      summary->duplicate (node, node2, data, duplicate);
+      summary->duplicate (node, node2, v, duplicate);
     }
 }
 
 template <typename T>
 T*
-function_summary<T *>::get (int uid)
+function_summary<T *>::get (int uid, bool lazy_insert)
 {
-  bool existed;
-  T **v = &m_map.get_or_insert (uid, &existed);
-  if (!existed)
-    *v = allocate_new ();
+  gcc_checking_assert (uid > 0);
 
-  return *v;
+  if (lazy_insert)
+    {
+      bool existed;
+      T **v = &m_map.get_or_insert (uid, &existed);
+      if (!existed)
+	*v = allocate_new ();
+
+      return *v;
+    }
+  else
+    {
+      T **v = m_map.get (uid);
+      return v == NULL ? NULL : *v;
+    }
 }
 
 template <typename T>

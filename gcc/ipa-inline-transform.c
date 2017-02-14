@@ -203,7 +203,11 @@ clone_inlined_nodes (struct cgraph_edge *e, bool duplicate,
 	    {
 	      gcc_assert (!e->callee->alias);
 	      if (overall_size)
-	        *overall_size -= inline_summaries->get (e->callee)->size;
+		{
+		  inline_summary *s
+		    = inline_summaries->get_or_insert (e->callee);
+		  *overall_size -= s->size;
+		}
 	      nfunctions_inlined++;
 	    }
 	  duplicate = false;
@@ -357,8 +361,8 @@ inline_call (struct cgraph_edge *e, bool update_original,
       reload_optimization_node = true;
     }
 
-  inline_summary *caller_info = inline_summaries->get (to);
-  inline_summary *callee_info = inline_summaries->get (callee);
+  inline_summary *caller_info = inline_summaries->get2 (to);
+  inline_summary *callee_info = inline_summaries->get2 (callee);
   if (!caller_info->fp_expressions && callee_info->fp_expressions)
     {
       caller_info->fp_expressions = true;
@@ -450,7 +454,7 @@ inline_call (struct cgraph_edge *e, bool update_original,
 
   gcc_assert (curr->callee->global.inlined_to == to);
 
-  old_size = inline_summaries->get (to)->size;
+  old_size = caller_info->size;
   inline_merge_summary (e);
   if (e->in_polymorphic_cdtor)
     mark_all_inlined_calls_cdtor (e->callee);
@@ -464,8 +468,8 @@ inline_call (struct cgraph_edge *e, bool update_original,
        work for further inlining into this function.  Before inlining
        the function we inlined to again we expect the caller to update
        the overall summary.  */
-    inline_summaries->get (to)->size += estimated_growth;
-  new_size = inline_summaries->get (to)->size;
+    caller_info->size += estimated_growth;
+  new_size = caller_info->size;
 
   if (callee->calls_comdat_local)
     to->calls_comdat_local = true;

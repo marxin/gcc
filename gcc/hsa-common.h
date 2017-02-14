@@ -1205,7 +1205,7 @@ public:
 
 enum hsa_function_kind
 {
-  HSA_NONE,
+  HSA_INVALID,
   HSA_KERNEL,
   HSA_FUNCTION
 };
@@ -1231,7 +1231,7 @@ struct hsa_function_summary
 };
 
 inline
-hsa_function_summary::hsa_function_summary (): m_kind (HSA_NONE),
+hsa_function_summary::hsa_function_summary (): m_kind (HSA_INVALID),
   m_bound_function (NULL), m_gpu_implementation_p (false)
 {
 }
@@ -1404,9 +1404,10 @@ hsa_gpu_implementation_p (tree decl)
   if (hsa_summaries == NULL)
     return false;
 
-  hsa_function_summary *s = hsa_summaries->get (cgraph_node::get_create (decl));
+  hsa_function_summary *s
+    = hsa_summaries->get2 (cgraph_node::get_create (decl));
 
-  return s->m_gpu_implementation_p;
+  return s != NULL && s->m_gpu_implementation_p;
 }
 
 #endif /* HSA_H */
