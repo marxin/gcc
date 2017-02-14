@@ -1201,7 +1201,7 @@ is_pass_explicitly_enabled_or_disabled (opt_pass *pass,
   if (!slot)
     return false;
 
-  cgraph_uid = func ? cgraph_node::get (func)->uid : 0;
+  cgraph_uid = func ? cgraph_node::get (func)->summary_uid : 0;
   if (func && DECL_ASSEMBLER_NAME_SET_P (func))
     aname = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (func));
 
@@ -1665,21 +1665,13 @@ static int nnodes;
 static GTY ((length ("nnodes"))) cgraph_node **order;
 
 /* Hook called when NODE is removed and therefore should be
-   excluded from order vector.  DATA is an array of integers.
-   DATA[0] holds max index it may be accessed by.  For cgraph
-   node DATA[node->uid + 1] holds index of this node in order
-   vector.  */
+   excluded from order vector.  DATA is a hash set with removed nodes.  */
+
 static void
 remove_cgraph_node_from_order (cgraph_node *node, void *data)
 {
-  int *order_idx = (int *)data;
-
-  if (node->uid >= order_idx[0])
-    return;
-
-  int idx = order_idx[node->uid + 1];
-  if (idx >= 0 && idx < nnodes && order[idx] == node)
-    order[idx] = NULL;
+  hash_set<cgraph_node *> *removed_nodes = (hash_set<cgraph_node *> *)data;
+  removed_nodes->add (node);
 }
 
 /* If we are in IPA mode (i.e., current_function_decl is NULL), call
@@ -1696,29 +1688,22 @@ do_per_function_toporder (void (*callback) (function *, void *data), void *data)
   else
     {
       cgraph_node_hook_list *hook;
-      int *order_idx;
+      hash_set<cgraph_node *> removed_nodes;
       gcc_assert (!order);
       order = ggc_vec_alloc<cgraph_node *> (symtab->cgraph_count);
 
-      order_idx = XALLOCAVEC (int, symtab->cgraph_max_uid + 1);
-      memset (order_idx + 1, -1, sizeof (int) * symtab->cgraph_max_uid);
-      order_idx[0] = symtab->cgraph_max_uid;
-
       nnodes = ipa_reverse_postorder (order);
       for (i = nnodes - 1; i >= 0; i--)
-	{
-	  order[i]->process = 1;
-	  order_idx[order[i]->uid + 1] = i;
-	}
+	order[i]->process = 1;
       hook = symtab->add_cgraph_removal_hook (remove_cgraph_node_from_order,
-					      order_idx);
+					      &removed_nodes);
       for (i = nnodes - 1; i >= 0; i--)
 	{
-	  /* Function could be inlined and removed as unreachable.  */
-	  if (!order[i])
-	    continue;
+	  cgraph_node *node = order[i];
 
-	  struct cgraph_node *node = order[i];
+	  /* Function could be inlined and removed as unreachable.  */
+	  if (node == NULL || removed_nodes.contains (node))
+	    continue;
 
 	  /* Allow possibly removed nodes to be garbage collected.  */
 	  order[i] = NULL;

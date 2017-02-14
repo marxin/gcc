@@ -1333,7 +1333,7 @@ update_caller_keys (edge_heap_t *heap, struct cgraph_node *node,
   if ((!node->alias && !inline_summaries->get_or_insert (node)->inlinable)
       || node->global.inlined_to)
     return;
-  if (!bitmap_set_bit (updated_nodes, node->uid))
+  if (!bitmap_set_bit (updated_nodes, node->summary_uid))
     return;
 
   FOR_EACH_ALIAS (node, ref)
@@ -1390,7 +1390,7 @@ update_callee_keys (edge_heap_t *heap, struct cgraph_node *node,
 	    && (callee = e->callee->ultimate_alias_target (&avail, e->caller))
 	    && inline_summaries->get_or_insert (callee)->inlinable
 	    && avail >= AVAIL_AVAILABLE
-	    && !bitmap_bit_p (updated_nodes, callee->uid))
+	    && !bitmap_bit_p (updated_nodes, callee->summary_uid))
 	  {
 	    if (can_inline_edge_p (e, false)
 		&& want_inline_small_function_p (e, false))

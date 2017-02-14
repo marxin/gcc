@@ -118,7 +118,7 @@ static GTY(()) hash_table<function_version_hasher> *cgraph_fnver_htab = NULL;
 hashval_t
 function_version_hasher::hash (cgraph_function_version_info *ptr)
 {
-  int uid = ptr->this_node->uid;
+  int uid = ptr->this_node->summary_uid;
   return (hashval_t)(uid);
 }
 
@@ -127,7 +127,7 @@ bool
 function_version_hasher::equal (cgraph_function_version_info *n1,
 			       	cgraph_function_version_info *n2)
 {
-  return n1->this_node->uid == n2->this_node->uid;
+  return n1->this_node->summary_uid == n2->this_node->summary_uid;
 }
 
 /* Mark as GC root all allocated nodes.  */
@@ -1816,7 +1816,6 @@ void
 cgraph_node::remove (void)
 {
   cgraph_node *n;
-  int uid = this->uid;
 
   if (symtab->ipa_clones_dump_file && symtab->cloned_nodes.contains (this))
     fprintf (symtab->ipa_clones_dump_file,
@@ -1917,7 +1916,7 @@ cgraph_node::remove (void)
       instrumented_version = NULL;
     }
 
-  symtab->release_symbol (this, uid);
+  symtab->release_symbol (this);
 }
 
 /* Likewise indicate that a node is having address taken.  */

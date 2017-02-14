@@ -5106,7 +5106,7 @@ convert_callers_for_node (struct cgraph_node *node,
     }
 
   for (cs = node->callers; cs; cs = cs->next_caller)
-    if (bitmap_set_bit (recomputed_callers, cs->caller->uid)
+    if (bitmap_set_bit (recomputed_callers, cs->caller->summary_uid)
 	&& gimple_in_ssa_p (DECL_STRUCT_FUNCTION (cs->caller->decl)))
       compute_inline_parameters (cs->caller, true);
   BITMAP_FREE (recomputed_callers);
