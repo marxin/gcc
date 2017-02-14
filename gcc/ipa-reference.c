@@ -1088,7 +1088,12 @@ ipa_reference_read_optimization_summary (void)
 	  unsigned int f_count = streamer_read_uhwi (ib);
 	  int b_count;
 	  if (!f_count)
-	    continue;
+	    {
+	      lto_destroy_simple_input_block (file_data,
+					      LTO_section_ipa_reference,
+					      ib, data, len);
+	      continue;
+	    }
 	  b_count = streamer_read_hwi (ib);
 	  if (dump_file)
 	    fprintf (dump_file, "all module statics:");
