@@ -58,12 +58,9 @@ ipa_node_params_t *ipa_node_params_sum = NULL;
 
 function_summary <ipcp_transformation *> *ipcp_transformation_sum = NULL;
 
-/* Vector where the parameter infos are actually stored. */
-vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
+edge_summary <ipa_edge_args *> *ipa_edge_args_sum = NULL;
 
 /* Holders of ipa cgraph hooks: */
-static struct cgraph_edge_hook_list *edge_removal_hook_holder;
-static struct cgraph_2edge_hook_list *edge_duplication_hook_holder;
 static struct cgraph_node_hook_list *function_insertion_hook_holder;
 
 /* Description of a reference to an IPA constant.  */
@@ -336,9 +333,6 @@ ipa_print_node_jump_functions (FILE *f, struct cgraph_node *node)
 	   node->order);
   for (cs = node->callees; cs; cs = cs->next_callee)
     {
-      if (!ipa_edge_args_info_available_for_edge_p (cs))
-	continue;
-
       fprintf (f, "    callsite  %s/%i -> %s/%i : \n",
 	       xstrdup_for_dump (node->name ()), node->order,
 	       xstrdup_for_dump (cs->callee->name ()),
@@ -349,8 +343,6 @@ ipa_print_node_jump_functions (FILE *f, struct cgraph_node *node)
   for (cs = node->indirect_calls; cs; cs = cs->next_callee)
     {
       struct cgraph_indirect_call_info *ii;
-      if (!ipa_edge_args_info_available_for_edge_p (cs))
-	continue;
 
       ii = cs->indirect_info;
       if (ii->agg_contents)
@@ -2670,7 +2662,7 @@ ipa_make_edge_direct_to_target (struct cgraph_edge *ie, tree target,
 				bool speculative)
 {
   struct cgraph_node *callee;
-  struct inline_edge_summary *es = inline_edge_summary (ie);
+  struct inline_edge_summary *es = get_inline_edge_summary (ie);
   bool unreachable = false;
 
   if (TREE_CODE (target) == ADDR_EXPR)
@@ -2819,7 +2811,7 @@ ipa_make_edge_direct_to_target (struct cgraph_edge *ie, tree target,
 	 for direct call (adjusted by inline_edge_duplication_hook).  */
       if (ie == orig)
 	{
-	  es = inline_edge_summary (ie);
+	  es = get_inline_edge_summary (ie);
 	  es->call_stmt_size -= (eni_size_weights.indirect_call_cost
 				 - eni_size_weights.call_cost);
 	  es->call_stmt_time -= (eni_time_weights.indirect_call_cost
@@ -3538,7 +3530,7 @@ ipa_propagate_indirect_call_infos (struct cgraph_edge *cs,
      (i.e. during early inlining).  */
   if (!ipa_node_params_sum)
     return false;
-  gcc_assert (ipa_edge_args_vector);
+  gcc_assert (ipa_edge_args_sum);
 
   propagate_controlled_uses (cs);
   changed = propagate_info_to_inlined_callees (cs, cs->callee, new_edges);
@@ -3546,31 +3538,16 @@ ipa_propagate_indirect_call_infos (struct cgraph_edge *cs,
   return changed;
 }
 
-/* Frees all dynamically allocated structures that the argument info points
-   to.  */
-
-void
-ipa_free_edge_args_substructures (struct ipa_edge_args *args)
-{
-  vec_free (args->jump_functions);
-  memset (args, 0, sizeof (*args));
-}
-
 /* Free all ipa_edge structures.  */
 
 void
 ipa_free_all_edge_args (void)
 {
-  int i;
-  struct ipa_edge_args *args;
-
-  if (!ipa_edge_args_vector)
+  if (!ipa_edge_args_sum)
     return;
 
-  FOR_EACH_VEC_ELT (*ipa_edge_args_vector, i, args)
-    ipa_free_edge_args_substructures (args);
-
-  vec_free (ipa_edge_args_vector);
+  ipa_edge_args_sum->release ();
+  ipa_edge_args_sum = NULL;
 }
 
 /* Free all ipa_node_params structures.  */
@@ -3600,18 +3577,17 @@ ipa_set_node_agg_value_chain (struct cgraph_node *node,
   s->agg_values = aggvals;
 }
 
-/* Hook that is called by cgraph.c when an edge is removed.  */
-
-static void
-ipa_edge_removal_hook (struct cgraph_edge *cs, void *data ATTRIBUTE_UNUSED)
+ipa_edge_args_t *
+ipa_edge_args_t::create_ggc (symbol_table *symtab)
 {
-  struct ipa_edge_args *args;
+  ipa_edge_args_t *summary = new (ggc_cleared_alloc <ipa_edge_args_t> ())
+    ipa_edge_args_t (symtab);
+  return summary;
+}
 
-  /* During IPA-CP updating we can be called on not-yet analyzed clones.  */
-  if (vec_safe_length (ipa_edge_args_vector) <= (unsigned)cs->uid)
-    return;
-
-  args = IPA_EDGE_REF (cs);
+void
+ipa_edge_args_t::remove (cgraph_edge *edge, ipa_edge_args *args)
+{
   if (args->jump_functions)
     {
       struct ipa_jump_func *jf;
@@ -3622,27 +3598,18 @@ ipa_edge_removal_hook (struct cgraph_edge *cs, void *data ATTRIBUTE_UNUSED)
 	  try_decrement_rdesc_refcount (jf);
 	  if (jf->type == IPA_JF_CONST
 	      && (rdesc = ipa_get_jf_constant_rdesc (jf))
-	      && rdesc->cs == cs)
+	      && rdesc->cs == edge)
 	    rdesc->cs = NULL;
 	}
     }
-
-  ipa_free_edge_args_substructures (IPA_EDGE_REF (cs));
 }
 
-/* Hook that is called by cgraph.c when an edge is duplicated.  */
-
-static void
-ipa_edge_duplication_hook (struct cgraph_edge *src, struct cgraph_edge *dst,
-			   void *)
+void
+ipa_edge_args_t::duplicate (cgraph_edge *src, cgraph_edge *dst,
+			  ipa_edge_args *old_args, ipa_edge_args *new_args)
 {
-  struct ipa_edge_args *old_args, *new_args;
   unsigned int i;
-
   ipa_check_create_edge_args ();
-
-  old_args = IPA_EDGE_REF (src);
-  new_args = IPA_EDGE_REF (dst);
 
   new_args->jump_functions = vec_safe_copy (old_args->jump_functions);
   if (old_args->polymorphic_call_contexts)
@@ -3811,12 +3778,6 @@ ipa_register_cgraph_hooks (void)
 {
   ipa_check_create_node_params ();
 
-  if (!edge_removal_hook_holder)
-    edge_removal_hook_holder =
-      symtab->add_edge_removal_hook (&ipa_edge_removal_hook, NULL);
-  if (!edge_duplication_hook_holder)
-    edge_duplication_hook_holder =
-      symtab->add_edge_duplication_hook (&ipa_edge_duplication_hook, NULL);
   function_insertion_hook_holder =
       symtab->add_cgraph_insertion_hook (&ipa_add_new_function, NULL);
 }
@@ -3826,10 +3787,6 @@ ipa_register_cgraph_hooks (void)
 static void
 ipa_unregister_cgraph_hooks (void)
 {
-  symtab->remove_edge_removal_hook (edge_removal_hook_holder);
-  edge_removal_hook_holder = NULL;
-  symtab->remove_edge_duplication_hook (edge_duplication_hook_holder);
-  edge_duplication_hook_holder = NULL;
   symtab->remove_cgraph_insertion_hook (function_insertion_hook_holder);
   function_insertion_hook_holder = NULL;
 }

@@ -837,6 +837,8 @@ symbol_table::create_edge (cgraph_node *caller, cgraph_node *callee,
       edge->uid = edges_max_uid++;
     }
 
+  edge->summary_uid = edge_max_summary_uid++;
+
   edges_count++;
 
   edge->aux = NULL;

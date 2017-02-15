@@ -636,13 +636,31 @@ public:
 /* Function summary where the IPA CP transformations are actually stored. */
 extern GTY(()) function_summary <ipcp_transformation *> *ipcp_transformation_sum;
 
-/* Vector where the parameter infos are actually stored. */
-extern GTY(()) vec<ipa_edge_args, va_gc> *ipa_edge_args_vector;
+/* Edge summary for ipa_node_params.  */
+class GTY((user)) ipa_edge_args_t: public edge_summary <ipa_edge_args *>
+{
+public:
+  ipa_edge_args_t (symbol_table *symtab):
+    edge_summary <ipa_edge_args*> (symtab, true) { }
+
+  static ipa_edge_args_t *create_ggc (symbol_table *symtab);
+
+  /* Hook that is called by summary when a node is duplicated.  */
+  virtual void duplicate (cgraph_edge *edge,
+			  cgraph_edge *edge2,
+			  ipa_edge_args *data,
+			  ipa_edge_args *data2);
+
+  virtual void remove (cgraph_edge *edge, ipa_edge_args *data);
+};
+
+extern GTY(()) edge_summary <ipa_edge_args *> *ipa_edge_args_sum;
 
 /* Return the associated parameter/argument info corresponding to the given
    node/edge.  */
 #define IPA_NODE_REF(NODE) (ipa_node_params_sum->get_or_insert (NODE))
-#define IPA_EDGE_REF(EDGE) (&(*ipa_edge_args_vector)[(EDGE)->uid])
+#define IPA_EDGE_REF(EDGE) (ipa_edge_args_sum->get_or_insert (EDGE))
+
 /* This macro checks validity of index returned by
    ipa_get_param_decl_index function.  */
 #define IS_VALID_JUMP_FUNC_INDEX(I) ((I) != -1)
@@ -677,19 +695,8 @@ ipa_check_create_node_params (void)
 static inline void
 ipa_check_create_edge_args (void)
 {
-  if (vec_safe_length (ipa_edge_args_vector)
-      <= (unsigned) symtab->edges_max_uid)
-    vec_safe_grow_cleared (ipa_edge_args_vector, symtab->edges_max_uid + 1);
-}
-
-/* Returns true if the array of edge infos is large enough to accommodate an
-   info for EDGE.  The main purpose of this function is that debug dumping
-   function can check info availability without causing reallocations.  */
-
-static inline bool
-ipa_edge_args_info_available_for_edge_p (struct cgraph_edge *edge)
-{
-  return ((unsigned) edge->uid < vec_safe_length (ipa_edge_args_vector));
+  if (ipa_edge_args_sum == NULL)
+    ipa_edge_args_sum = ipa_edge_args_t::create_ggc (symtab);
 }
 
 static inline ipcp_transformation *

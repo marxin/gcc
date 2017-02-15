@@ -223,10 +223,20 @@ struct inline_edge_summary
   vec<inline_param_summary> param;
 };
 
-/* Need a typedef for inline_edge_summary because of inline function
-   'inline_edge_summary' below.  */
-typedef struct inline_edge_summary inline_edge_summary_t;
-extern vec<inline_edge_summary_t> inline_edge_summary_vec;
+class GTY((user)) inline_edge_summary_t:
+  public edge_summary <inline_edge_summary *>
+{
+public:
+  inline_edge_summary_t (symbol_table *symtab):
+    edge_summary <inline_edge_summary *> (symtab) {}
+
+  virtual void remove (cgraph_edge *edge, inline_edge_summary *s);
+  virtual void duplicate (cgraph_edge *src_edge, cgraph_edge *dst_edge,
+			  inline_edge_summary *src_data,
+			  inline_edge_summary *dst_data);
+};
+
+extern inline_edge_summary_t *inline_edge_summaries;
 
 struct edge_growth_cache_entry
 {
@@ -279,10 +289,10 @@ void clone_inlined_nodes (struct cgraph_edge *e, bool, bool, int *,
 extern int ncalls_inlined;
 extern int nfunctions_inlined;
 
-static inline struct inline_edge_summary *
-inline_edge_summary (struct cgraph_edge *edge)
+static inline inline_edge_summary *
+get_inline_edge_summary (cgraph_edge *edge)
 {
-  return &inline_edge_summary_vec[edge->uid];
+  return inline_edge_summaries->get_or_insert (edge);
 }
 
 
@@ -303,10 +313,10 @@ estimate_edge_size (struct cgraph_edge *edge)
 static inline int
 estimate_edge_growth (struct cgraph_edge *edge)
 {
-  gcc_checking_assert (inline_edge_summary (edge)->call_stmt_size
+  gcc_checking_assert (get_inline_edge_summary (edge)->call_stmt_size
 		       || !edge->callee->analyzed);
   return (estimate_edge_size (edge)
-	  - inline_edge_summary (edge)->call_stmt_size);
+	  - get_inline_edge_summary (edge)->call_stmt_size);
 }
 
 /* Return estimated callee runtime increase after inlning

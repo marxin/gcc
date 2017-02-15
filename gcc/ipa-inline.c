@@ -501,7 +501,7 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
 		   > opt_for_fn (caller->decl, optimize)))
 	{
 	  if (estimate_edge_time (e)
-	      >= 20 + inline_edge_summary (e)->call_stmt_time)
+	      >= 20 + get_inline_edge_summary (e)->call_stmt_time)
 	    {
 	      e->inline_failed = CIF_OPTIMIZATION_MISMATCH;
 	      inlinable = false;
@@ -683,7 +683,7 @@ compute_inlined_call_time (struct cgraph_edge *edge,
      FIXME: Once ipa-inline-analysis is converted to sreal this can be
      simplified.  */
   time -= (sreal) ((gcov_type) edge->frequency
-		   * inline_edge_summary (edge)->call_stmt_time
+		   * get_inline_edge_summary (edge)->call_stmt_time
 	           * (INLINE_TIME_SCALE / CGRAPH_FREQ_BASE)) / INLINE_TIME_SCALE;
   time += caller_time;
   if (time <= 0)
@@ -734,7 +734,7 @@ want_inline_small_function_p (struct cgraph_edge *e, bool report)
   else if ((!DECL_DECLARED_INLINE_P (callee->decl)
 	   && (!e->count || !e->maybe_hot_p ()))
 	   && inline_summaries->get_or_insert (callee)->min_size
-		- inline_edge_summary (e)->call_stmt_size
+		- get_inline_edge_summary (e)->call_stmt_size
 	      > MAX (MAX_INLINE_INSNS_SINGLE, MAX_INLINE_INSNS_AUTO))
     {
       e->inline_failed = CIF_MAX_INLINE_INSNS_AUTO_LIMIT;
@@ -742,7 +742,7 @@ want_inline_small_function_p (struct cgraph_edge *e, bool report)
     }
   else if ((DECL_DECLARED_INLINE_P (callee->decl) || e->count)
 	   && inline_summaries->get_or_insert (callee)->min_size
-		- inline_edge_summary (e)->call_stmt_size
+		- get_inline_edge_summary (e)->call_stmt_size
 	      > 16 * MAX_INLINE_INSNS_SINGLE)
     {
       e->inline_failed = (DECL_DECLARED_INLINE_P (callee->decl)
@@ -872,8 +872,8 @@ want_inline_self_recursive_call_p (struct cgraph_edge *edge,
 
   if (!want_inline)
     ;
-  /* Inlining of self recursive function into copy of itself within other function
-     is transformation similar to loop peeling.
+  /* Inlining of self recursive function into copy of itself within other
+     function is transformation similar to loop peeling.
 
      Peeling is profitable if we can inline enough copies to make probability
      of actual call to the self recursive function very small.  Be sure that
@@ -903,9 +903,9 @@ want_inline_self_recursive_call_p (struct cgraph_edge *edge,
 	  want_inline = false;
 	}
     }
-  /* Recursive inlining, i.e. equivalent of unrolling, is profitable if recursion
-     depth is large.  We reduce function call overhead and increase chances that
-     things fit in hardware return predictor.
+  /* Recursive inlining, i.e. equivalent of unrolling, is profitable if
+     recursion depth is large.  We reduce function call overhead and increase
+     chances that things fit in hardware return predictor.
 
      Recursive inlining might however increase cost of stack frame setup
      actually slowing down functions whose recursion tree is wide rather than
@@ -915,10 +915,10 @@ want_inline_self_recursive_call_p (struct cgraph_edge *edge,
      is tricky.  For now we disable recursive inlining when probability of self
      recursion is low. 
 
-     Recursive inlining of self recursive call within loop also results in large loop
-     depths that generally optimize badly.  We may want to throttle down inlining
-     in those cases.  In particular this seems to happen in one of libstdc++ rb tree
-     methods.  */
+     Recursive inlining of self recursive call within loop also results in large
+     loop depths that generally optimize badly.  We may want to throttle down
+     inlining in those cases.  In particular this seems to happen in one
+     of libstdc++ rb tree methods.  */
   else
     {
       if (max_count
@@ -1182,7 +1182,7 @@ edge_badness (struct cgraph_edge *edge, bool dump)
      of functions fully inlined in program.  */
   else
     {
-      int nest = MIN (inline_edge_summary (edge)->loop_depth, 8);
+      int nest = MIN (get_inline_edge_summary (edge)->loop_depth, 8);
       badness = growth;
 
       /* Decrease badness if call is nested.  */
@@ -1761,10 +1761,11 @@ inline_small_functions (void)
 	    && (node->has_gimple_body_p () || node->thunk.thunk_p))
 	  {
 	    inline_summary *info = inline_summaries->get_or_insert (node);
-	    struct ipa_dfs_info *dfs = (struct ipa_dfs_info *) node->aux;
+	    ipa_dfs_info *dfs = (struct ipa_dfs_info *) node->aux;
 
 	    /* Do not account external functions, they will be optimized out
-	       if not inlined.  Also only count the non-cold portion of program.  */
+	       if not inlined.  Also only count the non-cold portion
+	       of program.  */
 	    if (inline_account_function_p (node))
 	      initial_size += info->size;
 	    info->growth = estimate_growth (node);
@@ -1799,8 +1800,8 @@ inline_small_functions (void)
 
   if (dump_file)
     fprintf (dump_file,
-	     "\nDeciding on inlining of small functions.  Starting with size %i.\n",
-	     initial_size);
+	     "\nDeciding on inlining of small functions.  "
+	     "Starting with size %i.\n", initial_size);
 
   overall_size = initial_size;
   max_size = compute_max_insns (overall_size);
@@ -2706,9 +2707,9 @@ early_inliner (function *fun)
 	     statements that don't have inline parameters computed.  */
 	  for (edge = node->callees; edge; edge = edge->next_callee)
 	    {
-	      if (inline_edge_summary_vec.length () > (unsigned) edge->uid)
+	      if (inline_edge_summaries)
 		{
-		  struct inline_edge_summary *es = inline_edge_summary (edge);
+		  inline_edge_summary *es = get_inline_edge_summary (edge);
 		  es->call_stmt_size
 		    = estimate_num_insns (edge->call_stmt, &eni_size_weights);
 		  es->call_stmt_time
@@ -2734,9 +2735,9 @@ early_inliner (function *fun)
 	  for (edge = node->callees; edge; edge = edge->next_callee)
 	    {
 	      /* We have no summary for new bound store calls yet.  */
-	      if (inline_edge_summary_vec.length () > (unsigned)edge->uid)
+	      if (inline_edge_summaries)
 		{
-		  struct inline_edge_summary *es = inline_edge_summary (edge);
+		  inline_edge_summary *es = get_inline_edge_summary (edge);
 		  es->call_stmt_size
 		    = estimate_num_insns (edge->call_stmt, &eni_size_weights);
 		  es->call_stmt_time
