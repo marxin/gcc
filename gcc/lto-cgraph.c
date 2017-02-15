@@ -1291,7 +1291,7 @@ input_node (struct lto_file_decl_data *file_data,
      functions, they are expected to be read more than once.  */
   if (node->aux && !DECL_BUILT_IN (node->decl))
     internal_error ("bytecode stream: found multiple instances of cgraph "
-		    "node with uid %d", node->summary_uid);
+		    "node with uid %d", node->uid);
 
   node->tp_first_run = streamer_read_uhwi (ib);
 

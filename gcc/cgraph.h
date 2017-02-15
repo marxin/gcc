@@ -1360,8 +1360,8 @@ public:
   /* How to scale counts at materialization time; used to merge
      LTO units with different number of profile runs.  */
   int count_materialization_scale;
-  /* Summary unique id of the node.  */
-  int summary_uid;
+  /* Unique id of the node.  */
+  int uid;
   /* ID assigned by the profiling.  */
   unsigned int profile_id;
   /* Time profiler: first run of function.  */
@@ -1981,7 +1981,7 @@ public:
   friend class cgraph_node;
   friend class cgraph_edge;
 
-  symbol_table (): cgraph_max_summary_uid (1)
+  symbol_table (): cgraph_max_uid (1)
   {
   }
 
@@ -2183,7 +2183,7 @@ public:
   static bool assembler_names_equal_p (const char *name1, const char *name2);
 
   int cgraph_count;
-  int cgraph_max_summary_uid;
+  int cgraph_max_uid;
 
   int edges_count;
   int edges_max_uid;
@@ -2572,7 +2572,7 @@ symbol_table::allocate_cgraph_symbol (void)
   else
     node = ggc_cleared_alloc<cgraph_node> ();
 
-  node->summary_uid = cgraph_max_summary_uid++;
+  node->uid = cgraph_max_uid++;
   return node;
 }
 

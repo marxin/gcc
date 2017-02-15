@@ -118,7 +118,7 @@ static GTY(()) hash_table<function_version_hasher> *cgraph_fnver_htab = NULL;
 hashval_t
 function_version_hasher::hash (cgraph_function_version_info *ptr)
 {
-  int uid = ptr->this_node->summary_uid;
+  int uid = ptr->this_node->uid;
   return (hashval_t)(uid);
 }
 
@@ -127,7 +127,7 @@ bool
 function_version_hasher::equal (cgraph_function_version_info *n1,
 			       	cgraph_function_version_info *n2)
 {
-  return n1->this_node->summary_uid == n2->this_node->summary_uid;
+  return n1->this_node->uid == n2->this_node->uid;
 }
 
 /* Mark as GC root all allocated nodes.  */

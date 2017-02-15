@@ -89,14 +89,14 @@ public:
   /* Getter for summary callgraph node pointer.  */
   T* get2 (cgraph_node *node)
   {
-    return get (node->summary_uid, false);
+    return get (node->uid, false);
   }
 
   /* Getter of edge summary.  If a summary for an edge does not exist,
      it will be created.  */
   T* get_or_insert (cgraph_node *node)
   {
-    return get (node->summary_uid, true);
+    return get (node->uid, true);
   }
 
   /* Return number of elements handled by data structure.  */
@@ -211,7 +211,7 @@ template <typename T>
 void
 function_summary<T *>::symtab_insertion (cgraph_node *node, void *data)
 {
-  gcc_checking_assert (node->summary_uid);
+  gcc_checking_assert (node->uid);
   function_summary *summary = (function_summary <T *> *) (data);
 
   if (summary->m_insertion_enabled)
@@ -222,11 +222,11 @@ template <typename T>
 void
 function_summary<T *>::symtab_removal (cgraph_node *node, void *data)
 {
-  gcc_checking_assert (node->summary_uid);
+  gcc_checking_assert (node->uid);
   function_summary *summary = (function_summary <T *> *) (data);
 
-  int summary_uid = node->summary_uid;
-  T **v = summary->m_map.get (summary_uid);
+  int uid = node->uid;
+  T **v = summary->m_map.get (uid);
 
   if (v)
     {
@@ -235,7 +235,7 @@ function_summary<T *>::symtab_removal (cgraph_node *node, void *data)
       if (!summary->m_ggc)
 	delete (*v);
 
-      summary->m_map.remove (summary_uid);
+      summary->m_map.remove (uid);
     }
 }
 
@@ -250,11 +250,11 @@ function_summary<T *>::symtab_duplication (cgraph_node *node,
 
   if (v)
     {
-      gcc_checking_assert (node2->summary_uid > 0);
+      gcc_checking_assert (node2->uid > 0);
 
       /* This load is necessary, because we insert a new value!  */
       T *duplicate = summary->allocate_new ();
-      summary->m_map.put (node2->summary_uid, duplicate);
+      summary->m_map.put (node2->uid, duplicate);
       summary->duplicate (node, node2, v, duplicate);
     }
 }
