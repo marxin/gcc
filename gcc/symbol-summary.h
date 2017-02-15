@@ -480,7 +480,7 @@ edge_summary<T *>::get (cgraph_edge *edge, bool lazy_insert)
   if (lazy_insert)
     {
       bool existed;
-      T **v = &m_map.get_or_insert (edge->summary_uid, &existed);
+      T **v = &m_map.get_or_insert (edge->uid, &existed);
       if (!existed)
 	*v = allocate_new (edge);
 
@@ -488,7 +488,7 @@ edge_summary<T *>::get (cgraph_edge *edge, bool lazy_insert)
     }
   else
     {
-      T **v = m_map.get (edge->summary_uid);
+      T **v = m_map.get (edge->uid);
       return v == NULL ? NULL : *v;
     }
 }
@@ -518,11 +518,11 @@ template <typename T>
 void
 edge_summary<T *>::symtab_removal (cgraph_edge *edge, void *data)
 {
-  gcc_checking_assert (edge->summary_uid);
+  gcc_checking_assert (edge->uid);
   edge_summary *summary = (edge_summary <T *> *) (data);
 
-  int summary_uid = edge->summary_uid;
-  T **v = summary->m_map.get (summary_uid);
+  int uid = edge->uid;
+  T **v = summary->m_map.get (uid);
 
   if (v)
     {
@@ -531,7 +531,7 @@ edge_summary<T *>::symtab_removal (cgraph_edge *edge, void *data)
       if (!summary->m_ggc)
 	delete (*v);
 
-      summary->m_map.remove (summary_uid);
+      summary->m_map.remove (uid);
     }
 }
 
@@ -544,10 +544,10 @@ edge_summary<T *>::symtab_duplication (cgraph_edge *edge, cgraph_edge *edge2,
   T *s = summary->get_or_insert (edge);
 
   gcc_checking_assert (s);
-  gcc_checking_assert (edge2->summary_uid > 0);
+  gcc_checking_assert (edge2->uid > 0);
 
   T *duplicate = summary->allocate_new (edge2);
-  summary->m_map.put (edge2->summary_uid, duplicate);
+  summary->m_map.put (edge2->uid, duplicate);
   summary->duplicate (edge, edge2, s, duplicate);
 }
 
