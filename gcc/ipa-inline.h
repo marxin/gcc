@@ -244,7 +244,7 @@ struct edge_growth_cache_entry
   inline_hints hints;
 };
 
-extern vec<edge_growth_cache_entry> edge_growth_cache;
+extern hash_map<cgraph_edge *, edge_growth_cache_entry> *edge_growth_cache;
 
 /* In ipa-inline-analysis.c  */
 void debug_inline_summary (struct cgraph_node *);
@@ -301,11 +301,12 @@ get_inline_edge_summary (cgraph_edge *edge)
 static inline int
 estimate_edge_size (struct cgraph_edge *edge)
 {
-  int ret;
-  if ((int)edge_growth_cache.length () <= edge->uid
-      || !(ret = edge_growth_cache[edge->uid].size))
+  edge_growth_cache_entry *entry;
+  if (edge_growth_cache == NULL
+      || (entry = edge_growth_cache->get (edge)) == NULL
+      || entry->size == 0)
     return do_estimate_edge_size (edge);
-  return ret - (ret > 0);
+  return entry->size - (entry->size > 0);
 }
 
 /* Return estimated callee growth after inlining EDGE.  */
@@ -325,11 +326,12 @@ estimate_edge_growth (struct cgraph_edge *edge)
 static inline int
 estimate_edge_time (struct cgraph_edge *edge)
 {
-  int ret;
-  if ((int)edge_growth_cache.length () <= edge->uid
-      || !(ret =  edge_growth_cache[edge->uid].time))
+  edge_growth_cache_entry *entry;
+  if (edge_growth_cache == NULL
+      || (entry = edge_growth_cache->get (edge)) == NULL
+      || entry->time == 0)
     return do_estimate_edge_time (edge);
-  return ret - (ret > 0);
+  return entry->time - (entry->time > 0);
 }
 
 
@@ -339,11 +341,12 @@ estimate_edge_time (struct cgraph_edge *edge)
 static inline inline_hints
 estimate_edge_hints (struct cgraph_edge *edge)
 {
-  inline_hints ret;
-  if ((int)edge_growth_cache.length () <= edge->uid
-      || !(ret = edge_growth_cache[edge->uid].hints))
+  edge_growth_cache_entry *entry;
+  if (edge_growth_cache == NULL
+      || (entry = edge_growth_cache->get (edge)) == NULL
+      || entry->hints == 0)
     return do_estimate_edge_hints (edge);
-  return ret - 1;
+  return entry->hints - 1;
 }
 
 /* Reset cached value for EDGE.  */
@@ -351,11 +354,14 @@ estimate_edge_hints (struct cgraph_edge *edge)
 static inline void
 reset_edge_growth_cache (struct cgraph_edge *edge)
 {
-  if ((int)edge_growth_cache.length () > edge->uid)
-    {
-      struct edge_growth_cache_entry zero = {0, 0, 0};
-      edge_growth_cache[edge->uid] = zero;
-    }
+  if (edge_growth_cache == NULL)
+    return;
+
+  edge_growth_cache_entry *entry = edge_growth_cache->get (edge);
+  if (entry != NULL)
+    memset (entry, 0, sizeof (edge_growth_cache_entry));
+  else
+    edge_growth_cache->put (edge, edge_growth_cache_entry ());
 }
 
 #endif /* GCC_IPA_INLINE_H */

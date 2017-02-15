@@ -1896,7 +1896,7 @@ inline_small_functions (void)
 	 for given invocation but that will be better done once whole
 	 code is converted to sreals.  Disable for now and revert to "wrong"
 	 value so enable/disable checking paths agree.  */
-      edge_growth_cache[edge->uid].hints = old_hints_est + 1;
+      edge_growth_cache->get (edge)->hints = old_hints_est + 1;
 
       /* When updating the edge costs, we only decrease badness in the keys.
 	 Increases of badness are handled lazilly; when we see key with out

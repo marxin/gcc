@@ -127,7 +127,7 @@ function_summary <inline_summary *> *inline_summaries;
 inline_edge_summary_t *inline_edge_summaries;
 
 /* Cached node/edge growths.  */
-vec<edge_growth_cache_entry> edge_growth_cache;
+hash_map<cgraph_edge *, edge_growth_cache_entry> *edge_growth_cache = NULL;
 
 /* Edge predicates goes here.  */
 static object_allocator<predicate> edge_predicate_pool ("edge predicates");
@@ -1299,7 +1299,7 @@ void
 inline_edge_summary_t::remove (cgraph_edge *edge,
 			       inline_edge_summary *)
 {
-  if (edge_growth_cache.exists ())
+  if (edge_growth_cache != NULL)
     reset_edge_growth_cache (edge);
   reset_inline_edge_summary (edge);
 }
@@ -1311,7 +1311,7 @@ void
 initialize_growth_caches (void)
 {
   if (symtab->edges_max_uid)
-    edge_growth_cache.safe_grow_cleared (symtab->edges_max_uid);
+    edge_growth_cache = new hash_map<cgraph_edge *, edge_growth_cache_entry> ();
 }
 
 
@@ -1320,7 +1320,8 @@ initialize_growth_caches (void)
 void
 free_growth_caches (void)
 {
-  edge_growth_cache.release ();
+  delete edge_growth_cache;
+  edge_growth_cache = NULL;
 }
 
 
@@ -3857,16 +3858,17 @@ do_estimate_edge_time (struct cgraph_edge *edge)
   gcc_checking_assert (time >= 0);
 
   /* When caching, update the cache entry.  */
-  if (edge_growth_cache.exists ())
+  if (edge_growth_cache != NULL)
     {
       inline_summaries->get_or_insert (edge->callee)->min_size = min_size;
-      if ((int) edge_growth_cache.length () <= edge->uid)
-	edge_growth_cache.safe_grow_cleared (symtab->edges_max_uid);
-      edge_growth_cache[edge->uid].time = time + (time >= 0);
+      if (!edge_growth_cache->get (edge))
+	edge_growth_cache->put (edge, edge_growth_cache_entry ());
 
-      edge_growth_cache[edge->uid].size = size + (size >= 0);
+      edge_growth_cache_entry *entry = edge_growth_cache->get (edge);
+      entry->time = time + (time >= 0);
+      entry->size = size + (size >= 0);
       hints |= simple_edge_hints (edge);
-      edge_growth_cache[edge->uid].hints = hints + 1;
+      entry->hints = hints + 1;
     }
   return time;
 }
@@ -3887,10 +3889,10 @@ do_estimate_edge_size (struct cgraph_edge *edge)
 
   /* When we do caching, use do_estimate_edge_time to populate the entry.  */
 
-  if (edge_growth_cache.exists ())
+  if (edge_growth_cache != NULL)
     {
       do_estimate_edge_time (edge);
-      size = edge_growth_cache[edge->uid].size;
+      size = edge_growth_cache->get (edge)->size;
       gcc_checking_assert (size);
       return size - (size > 0);
     }
@@ -3926,10 +3928,10 @@ do_estimate_edge_hints (struct cgraph_edge *edge)
 
   /* When we do caching, use do_estimate_edge_time to populate the entry.  */
 
-  if (edge_growth_cache.exists ())
+  if (edge_growth_cache != NULL)
     {
       do_estimate_edge_time (edge);
-      hints = edge_growth_cache[edge->uid].hints;
+      hints = edge_growth_cache->get (edge)->hints;
       gcc_checking_assert (hints);
       return hints - 1;
     }
