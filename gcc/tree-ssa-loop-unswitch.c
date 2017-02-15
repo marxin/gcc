@@ -141,6 +141,9 @@ is_maybe_undefined (const tree name, gimple *stmt, struct loop *loop)
 
       gimple *def = SSA_NAME_DEF_STMT (t);
 
+      if (!def || gimple_nop_p (def))
+	return true;
+
       /* Check that all the PHI args are fully defined.  */
       if (gphi *phi = dyn_cast <gphi *> (def))
 	{
