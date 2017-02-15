@@ -3337,54 +3337,79 @@ ipcp_discover_new_direct_edges (struct cgraph_node *node,
     inline_update_overall_summary (node);
 }
 
-/* Vector of pointers which for linked lists of clones of an original crgaph
-   edge. */
+/* Edge clone summary.  */
 
-static vec<cgraph_edge *> next_edge_clone;
-static vec<cgraph_edge *> prev_edge_clone;
-
-static inline void
-grow_edge_clone_vectors (void)
+struct edge_clone_summary
 {
-  if (next_edge_clone.length ()
-      <=  (unsigned) symtab->edges_max_uid)
-    next_edge_clone.safe_grow_cleared (symtab->edges_max_uid + 1);
-  if (prev_edge_clone.length ()
-      <=  (unsigned) symtab->edges_max_uid)
-    prev_edge_clone.safe_grow_cleared (symtab->edges_max_uid + 1);
+  /* Default constructor.  */
+  edge_clone_summary (): edge_set (NULL), edge (NULL) {}
+
+  /* Default destructor.  */
+  ~edge_clone_summary ()
+  {
+    gcc_assert (edge_set != NULL);
+
+    if (edge != NULL)
+      {
+	gcc_checking_assert (edge_set->contains (edge));
+	edge_set->remove (edge);
+      }
+
+    /* Release memory for an empty set.  */
+    if (edge_set->elements () == 0)
+      delete edge_set;
+  }
+
+  hash_set <cgraph_edge *> *edge_set;
+  cgraph_edge *edge;
+};
+
+class edge_clone_summary_t:
+  public edge_summary <edge_clone_summary *>
+{
+public:
+  edge_clone_summary_t (symbol_table *symtab):
+    edge_summary <edge_clone_summary *> (symtab) {}
+
+  virtual void initialize (cgraph_edge *edge, edge_clone_summary *data);
+  virtual void duplicate (cgraph_edge *src_edge, cgraph_edge *dst_edge,
+			  edge_clone_summary *src_data,
+			  edge_clone_summary *dst_data);
+};
+
+static edge_summary <edge_clone_summary *> *edge_clone_summaries = NULL;
+
+void
+edge_clone_summary_t::initialize (cgraph_edge *edge, edge_clone_summary *data)
+{
+  gcc_checking_assert (data->edge_set == NULL);
+
+  data->edge_set = new hash_set <cgraph_edge *> ();
+  data->edge_set->add (edge);
+  data->edge = edge;
 }
 
-/* Edge duplication hook to grow the appropriate linked list in
-   next_edge_clone. */
+/* Edge duplication hook.  */
 
-static void
-ipcp_edge_duplication_hook (struct cgraph_edge *src, struct cgraph_edge *dst,
-			    void *)
+void
+edge_clone_summary_t::duplicate (cgraph_edge *src_edge, cgraph_edge *dst_edge,
+				 edge_clone_summary *src_data,
+				 edge_clone_summary *dst_data)
 {
-  grow_edge_clone_vectors ();
+  dst_data->edge = dst_edge;
+  if (src_data->edge_set == NULL)
+    {
+      src_data->edge_set = new hash_set <cgraph_edge *> ();
+      src_data->edge_set->add (src_edge);
+    }
 
-  struct cgraph_edge *old_next = next_edge_clone[src->uid];
-  if (old_next)
-    prev_edge_clone[old_next->uid] = dst;
-  prev_edge_clone[dst->uid] = src;
+  src_data->edge_set->add (dst_edge);
 
-  next_edge_clone[dst->uid] = old_next;
-  next_edge_clone[src->uid] = dst;
-}
+  /* As ::initialize processes an allocation, we have to release previous
+     edge_set.   */
+  delete dst_data->edge_set;
 
-/* Hook that is called by cgraph.c when an edge is removed.  */
-
-static void
-ipcp_edge_removal_hook (struct cgraph_edge *cs, void *)
-{
-  grow_edge_clone_vectors ();
-
-  struct cgraph_edge *prev = prev_edge_clone[cs->uid];
-  struct cgraph_edge *next = next_edge_clone[cs->uid];
-  if (prev)
-    next_edge_clone[prev->uid] = next;
-  if (next)
-    prev_edge_clone[next->uid] = prev;
+  dst_data->edge_set = src_data->edge_set;
 }
 
 /* See if NODE is a clone with a known aggregate value at a given OFFSET of a
@@ -3499,14 +3524,6 @@ cgraph_edge_brings_value_p (cgraph_edge *cs,
 				plats->ctxlat.values->value);
 }
 
-/* Get the next clone in the linked list of clones of an edge.  */
-
-static inline struct cgraph_edge *
-get_next_cgraph_edge_clone (struct cgraph_edge *cs)
-{
-  return next_edge_clone[cs->uid];
-}
-
 /* Given VAL that is intended for DEST, iterate over all its sources and if
    they still hold, add their edge frequency and their number into *FREQUENCY
    and *CALLER_COUNT respectively.  */
@@ -3524,18 +3541,23 @@ get_info_about_necessary_edges (ipcp_value<valtype> *val, cgraph_node *dest,
 
   for (src = val->sources; src; src = src->next)
     {
-      struct cgraph_edge *cs = src->cs;
-      while (cs)
-	{
-	  if (cgraph_edge_brings_value_p (cs, src, dest))
+      cgraph_edge *cs = src->cs;
+
+      edge_clone_summary *s = edge_clone_summaries->get (cs);
+      if (s && s->edge_set != NULL)
+	for (hash_set <cgraph_edge *>::iterator it = s->edge_set->begin ();
+	     it != s->edge_set->end (); ++it)
+	  {
+	    cs = *it;
+
+	    if (cgraph_edge_brings_value_p (cs, src, dest))
 	    {
 	      count++;
 	      freq += cs->frequency;
 	      cnt += cs->count;
 	      hot |= cs->maybe_hot_p ();
 	    }
-	  cs = get_next_cgraph_edge_clone (cs);
-	}
+	  }
     }
 
   *freq_sum = freq;
@@ -3558,13 +3580,16 @@ gather_edges_for_value (ipcp_value<valtype> *val, cgraph_node *dest,
   ret.create (caller_count);
   for (src = val->sources; src; src = src->next)
     {
-      struct cgraph_edge *cs = src->cs;
-      while (cs)
-	{
-	  if (cgraph_edge_brings_value_p (cs, src, dest))
-	    ret.quick_push (cs);
-	  cs = get_next_cgraph_edge_clone (cs);
-	}
+      cgraph_edge *cs = src->cs;
+      edge_clone_summary *s = edge_clone_summaries->get (cs);
+      if (s->edge_set != NULL)
+	for (hash_set <cgraph_edge *>::iterator it = s->edge_set->begin ();
+	     it != s->edge_set->end (); ++it)
+	  {
+	    cs = *it;
+	    if (cgraph_edge_brings_value_p (cs, src, dest))
+	      ret.quick_push (cs);
+	  }
     }
 
   return ret;
@@ -4424,25 +4449,35 @@ perhaps_add_new_callers (cgraph_node *node, ipcp_value<valtype> *val)
   for (src = val->sources; src; src = src->next)
     {
       struct cgraph_edge *cs = src->cs;
-      while (cs)
-	{
-	  if (cgraph_edge_brings_value_p (cs, src, node)
-	      && cgraph_edge_brings_all_scalars_for_node (cs, val->spec_node)
-	      && cgraph_edge_brings_all_agg_vals_for_node (cs, val->spec_node))
-	    {
-	      if (dump_file)
-		fprintf (dump_file, " - adding an extra caller %s/%i"
-			 " of %s/%i\n",
-			 xstrdup_for_dump (cs->caller->name ()),
-			 cs->caller->order,
-			 xstrdup_for_dump (val->spec_node->name ()),
-			 val->spec_node->order);
 
-	      cs->redirect_callee_duplicating_thunks (val->spec_node);
-	      val->spec_node->expand_all_artificial_thunks ();
-	      redirected_sum += cs->count;
+      edge_clone_summary *s = edge_clone_summaries->get (cs);
+      if (s->edge_set != NULL)
+	{
+	  for (hash_set <cgraph_edge *>::iterator it = s->edge_set->begin ();
+	       it != s->edge_set->end (); ++it)
+	    {
+	      cgraph_edge *cs = *it;
+
+	      if (cgraph_edge_brings_value_p (cs, src, node)
+		  && cgraph_edge_brings_all_scalars_for_node (cs,
+							      val->spec_node)
+		  && cgraph_edge_brings_all_agg_vals_for_node (cs,
+							       val->spec_node))
+		{
+		  if (dump_file)
+		    fprintf (dump_file, " - adding an extra caller %s/%i"
+			     " of %s/%i\n",
+			     xstrdup_for_dump (cs->caller->name ()),
+			     cs->caller->order,
+			     xstrdup_for_dump (val->spec_node->name ()),
+			     val->spec_node->order);
+
+		  cs->redirect_callee_duplicating_thunks (val->spec_node);
+		  val->spec_node->expand_all_artificial_thunks ();
+		  redirected_sum += cs->count;
+
+		}
 	    }
-	  cs = get_next_cgraph_edge_clone (cs);
 	}
     }
 
@@ -4971,17 +5006,13 @@ ipcp_store_vr_results (void)
 static unsigned int
 ipcp_driver (void)
 {
-  struct cgraph_2edge_hook_list *edge_duplication_hook_holder;
-  struct cgraph_edge_hook_list *edge_removal_hook_holder;
   struct ipa_topo_info topo;
+
+  if (edge_clone_summaries == NULL)
+    edge_clone_summaries = new edge_clone_summary_t (symtab);
 
   ipa_check_create_node_params ();
   ipa_check_create_edge_args ();
-  grow_edge_clone_vectors ();
-  edge_duplication_hook_holder
-    = symtab->add_edge_duplication_hook (&ipcp_edge_duplication_hook, NULL);
-  edge_removal_hook_holder
-    = symtab->add_edge_removal_hook (&ipcp_edge_removal_hook, NULL);
 
   if (dump_file)
     {
@@ -5004,10 +5035,7 @@ ipcp_driver (void)
 
   /* Free all IPCP structures.  */
   free_toporder_info (&topo);
-  next_edge_clone.release ();
-  prev_edge_clone.release ();
-  symtab->remove_edge_removal_hook (edge_removal_hook_holder);
-  symtab->remove_edge_duplication_hook (edge_duplication_hook_holder);
+  delete edge_clone_summaries;
   ipa_free_all_structures_after_ipa_cp ();
   if (dump_file)
     fprintf (dump_file, "\nIPA constant propagation end\n");
