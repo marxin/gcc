@@ -30,6 +30,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "calls.h"
 #include "gimple-iterator.h"
 #include "gimple-low.h"
+#include "predict.h"
+#include "gimple-predict.h"
 
 /* The differences between High GIMPLE and Low GIMPLE are the
    following:
@@ -684,6 +686,9 @@ lower_gimple_return (gimple_stmt_iterator *gsi, struct lower_data *data)
   /* When not optimizing, make sure user returns are preserved.  */
   if (!optimize && gimple_has_location (stmt))
     DECL_ARTIFICIAL (tmp_rs.label) = 0;
+
+  gsi_insert_before (gsi, gimple_build_predict (PRED_TREE_EARLY_RETURN, TAKEN),
+		     GSI_SAME_STMT);
   t = gimple_build_goto (tmp_rs.label);
   gimple_set_location (t, gimple_location (stmt));
   gimple_set_block (t, gimple_block (stmt));

@@ -534,8 +534,10 @@ test_building_cfg ()
   gimple *stmt_a = gimple_seq_first_stmt (bb_seq (bb2));
   ASSERT_EQ (GIMPLE_ASSIGN, gimple_code (stmt_a));
   gimple *stmt_b = stmt_a->next;
-  ASSERT_EQ (GIMPLE_RETURN, gimple_code (stmt_b));
-  ASSERT_EQ (NULL, stmt_b->next);
+  ASSERT_EQ (GIMPLE_PREDICT, gimple_code (stmt_b));
+  gimple *stmt_c = stmt_b->next;
+  ASSERT_EQ (GIMPLE_RETURN, gimple_code (stmt_c));
+  ASSERT_EQ (NULL, stmt_c->next);
 }
 
 /* Test of conversion of gimple to SSA form.  */
@@ -567,10 +569,11 @@ test_conversion_to_ssa ()
   ASSERT_EQ (GIMPLE_ASSIGN, gimple_code (stmt_a));
 
   gimple *stmt_b = stmt_a->next;
-  ASSERT_EQ (GIMPLE_RETURN, gimple_code (stmt_b));
-  ASSERT_EQ (NULL, stmt_b->next);
+  gimple *stmt_c = stmt_b->next;
+  ASSERT_EQ (GIMPLE_RETURN, gimple_code (stmt_c));
+  ASSERT_EQ (NULL, stmt_c->next);
 
-  greturn *return_stmt = as_a <greturn *> (stmt_b);
+  greturn *return_stmt = as_a <greturn *> (stmt_c);
   ASSERT_EQ (SSA_NAME, TREE_CODE (gimple_return_retval (return_stmt)));
 }
 
