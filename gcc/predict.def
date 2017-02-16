@@ -114,6 +114,7 @@ DEF_PREDICTOR (PRED_TREE_OPCODE_POSITIVE, "opcode values positive (on trees)",
 DEF_PREDICTOR (PRED_TREE_OPCODE_NONEQUAL, "opcode values nonequal (on trees)",
 	       HITRATE (66), 0)
 DEF_PREDICTOR (PRED_TREE_FPOPCODE, "fp_opcode (on trees)", HITRATE (90), 0)
+DEF_PREDICTOR (PRED_TREE_NONZERO, "nonzero (on trees)", HITRATE (51), 0)
 
 /* Branch guarding call is probably taken.  */
 DEF_PREDICTOR (PRED_CALL, "call", HITRATE (67), 0)

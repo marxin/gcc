@@ -2456,7 +2456,11 @@ tree_predict_by_opcode (basic_block bb)
 	/* Comparisons with 0 are often used for booleans and there is
 	   nothing useful to predict about them.  */
 	else if (integer_zerop (op0) || integer_zerop (op1))
-	  ;
+	  {
+	    gcc_assert (integer_zerop (op0) != integer_zerop (op1));
+	    if (TREE_TYPE (op0) != boolean_type_node)
+	      predict_edge_def (then_edge, PRED_TREE_NONZERO, NOT_TAKEN);
+	  }
 	else
 	  predict_edge_def (then_edge, PRED_TREE_OPCODE_NONEQUAL, NOT_TAKEN);
 	break;
@@ -2470,9 +2474,12 @@ tree_predict_by_opcode (basic_block bb)
 	  ;
 	/* Comparisons with 0 are often used for booleans and there is
 	   nothing useful to predict about them.  */
-	else if (integer_zerop (op0)
-		 || integer_zerop (op1))
-	  ;
+	else if (integer_zerop (op0) || integer_zerop (op1))
+	  {
+	    gcc_assert (integer_zerop (op0) != integer_zerop (op1));
+	    if (TREE_TYPE (op0) != boolean_type_node)
+	      predict_edge_def (then_edge, PRED_TREE_NONZERO, TAKEN);
+	  }
 	else
 	  predict_edge_def (then_edge, PRED_TREE_OPCODE_NONEQUAL, TAKEN);
 	break;
