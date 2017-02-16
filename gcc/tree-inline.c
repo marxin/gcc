@@ -1629,6 +1629,13 @@ remap_gimple_stmt (gimple *stmt, copy_body_data *id)
 	  gimple_seq_add_stmt (&stmts, copy);
 	  return stmts;
 	}
+      if (is_gimple_predict (stmt))
+	{
+	  /* Do not copy early return predictor that does not make sense
+	     after inlining.  */
+	  if (gimple_predict_predictor (stmt) == PRED_TREE_EARLY_RETURN)
+	    return stmts;
+	}
 
       /* Create a new deep copy of the statement.  */
       copy = gimple_copy (stmt);
