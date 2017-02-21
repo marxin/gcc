@@ -81,6 +81,9 @@ static void c_parser_gimple_expr_list (c_parser *, vec<tree> *);
 void
 c_parser_parse_gimple_body (c_parser *parser)
 {
+  if (flag_lto)
+    error ("%<__GIMPLE%> function cannot be compiled with %<-flto%>");
+
   gimple_seq seq = NULL;
   gimple_seq body = NULL;
   tree stmt = push_stmt_list ();
