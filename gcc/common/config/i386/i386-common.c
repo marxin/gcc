@@ -245,7 +245,7 @@ bool
 ix86_handle_option (struct gcc_options *opts,
 		    struct gcc_options *opts_set ATTRIBUTE_UNUSED,
 		    const struct cl_decoded_option *decoded,
-		    location_t loc)
+		    location_t)
 {
   size_t code = decoded->opt_index;
   int value = decoded->value;
@@ -1082,46 +1082,6 @@ ix86_handle_option (struct gcc_options *opts,
 	{
 	  opts->x_ix86_isa_flags &= ~OPTION_MASK_ISA_PKU_UNSET;
 	  opts->x_ix86_isa_flags_explicit |= OPTION_MASK_ISA_PKU_UNSET;
-	}
-      return true;
-
-
-  /* Comes from final.c -- no real reason to change it.  */
-#define MAX_CODE_ALIGN 16
-
-    case OPT_malign_loops_:
-      warning_at (loc, 0, "-malign-loops is obsolete, use -falign-loops");
-      if (value > MAX_CODE_ALIGN)
-	error_at (loc, "-malign-loops=%d is not between 0 and %d",
-		  value, MAX_CODE_ALIGN);
-      else
-	opts->x_align_loops = 1 << value;
-      return true;
-
-    case OPT_malign_jumps_:
-      warning_at (loc, 0, "-malign-jumps is obsolete, use -falign-jumps");
-      if (value > MAX_CODE_ALIGN)
-	error_at (loc, "-malign-jumps=%d is not between 0 and %d",
-		  value, MAX_CODE_ALIGN);
-      else
-	opts->x_align_jumps = 1 << value;
-      return true;
-
-    case OPT_malign_functions_:
-      warning_at (loc, 0,
-		  "-malign-functions is obsolete, use -falign-functions");
-      if (value > MAX_CODE_ALIGN)
-	error_at (loc, "-malign-functions=%d is not between 0 and %d",
-		  value, MAX_CODE_ALIGN);
-      else
-	opts->x_align_functions = 1 << value;
-      return true;
-
-    case OPT_mbranch_cost_:
-      if (value > 5)
-	{
-	  error_at (loc, "-mbranch-cost=%d is not between 0 and 5", value);
-	  opts->x_ix86_branch_cost = 5;
 	}
       return true;
 
