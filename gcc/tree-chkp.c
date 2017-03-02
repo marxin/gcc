@@ -2353,7 +2353,7 @@ chkp_get_next_bounds_parm (tree parm)
 static tree
 chkp_get_bound_for_parm (tree parm)
 {
-  tree decl = SSA_NAME_VAR (parm);
+  tree decl = TREE_CODE (parm) == PARM_DECL ? parm : SSA_NAME_VAR (parm);
   tree bounds;
 
   gcc_assert (TREE_CODE (decl) == PARM_DECL);
@@ -3602,7 +3602,6 @@ chkp_find_bounds_1 (tree ptr, tree ptr_src, gimple_stmt_iterator *iter)
       break;
 
     case PARM_DECL:
-      gcc_unreachable ();
       bounds = chkp_get_bound_for_parm (ptr_src);
       break;
 
