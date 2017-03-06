@@ -1274,22 +1274,19 @@ process_options (void)
 	  flag_check_pointer_bounds = 0;
 	}
 
-      if (flag_sanitize & SANITIZE_ADDRESS)
-	{
-	  error_at (UNKNOWN_LOCATION,
-		    "-fcheck-pointer-bounds is not supported with "
-		    "Address Sanitizer");
-	  flag_check_pointer_bounds = 0;
-	}
+      const char *sanitizer_names[] = { "Address", "Undefined Behavior",
+	"Leak", "Thread" };
+      const int sanitizer_flags[] = { SANITIZE_ADDRESS, SANITIZE_UNDEFINED,
+	SANITIZE_LEAK, SANITIZE_THREAD };
 
-      if (flag_sanitize & SANITIZE_BOUNDS)
-	{
-	  error_at (UNKNOWN_LOCATION,
-		    "-fcheck-pointer-bounds is not supported with "
-		    "-fsanitize=bounds");
-	  flag_check_pointer_bounds = 0;
-	}
-
+      for (unsigned i = 0; i < sizeof (sanitizer_flags) / sizeof (int); i++)
+	if (flag_sanitize & sanitizer_flags[i])
+	  {
+	    error_at (UNKNOWN_LOCATION,
+		      "-fcheck-pointer-bounds is not supported with "
+		      "%s Sanitizer", sanitizer_names[i]);
+	    flag_check_pointer_bounds = 0;
+	  }
     }
 
   /* One region RA really helps to decrease the code size.  */
