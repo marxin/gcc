@@ -173,6 +173,8 @@ typedef struct block_info
 
 typedef struct function_info
 {
+  int get_block_index (block_t *block);
+
   /* Name of function.  */
   char *name;
   char *demangled_name;
@@ -205,6 +207,16 @@ typedef struct function_info
   /* Next function.  */
   struct function_info *next;
 } function_t;
+
+int
+function_t::get_block_index (block_t *block)
+{
+  for (unsigned i = 0; i < num_blocks; i++)
+    if (&blocks[i] == block)
+      return i;
+
+  return -1;
+}
 
 /* Describes coverage of a file or function.  */
 
@@ -401,6 +413,10 @@ static int flag_preserve_paths = 0;
 
 static int flag_counts = 0;
 
+/* For debugging output printing.  */
+
+static int flag_debugging_output = 0;
+
 /* Forward declarations.  */
 static int process_args (int, char **);
 static void print_usage (int) ATTRIBUTE_NORETURN;
@@ -429,6 +445,7 @@ static char *make_gcov_file_name (const char *, const char *);
 static char *mangle_name (const char *, char *);
 static void release_structures (void);
 static void release_function (function_t *);
+static void dump_blocks (source_t *src);
 extern int main (int, char **);
 
 /* Cycle detection!
@@ -673,6 +690,7 @@ print_usage (int error_p)
   fnotice (file, "  -s, --source-prefix DIR         Source prefix to elide\n");
   fnotice (file, "  -u, --unconditional-branches    Show unconditional branch counts too\n");
   fnotice (file, "  -v, --version                   Print version number, then exit\n");
+  fnotice (file, "  -w, --debug                     Print debugging output\n");
   fnotice (file, "  -x, --hash-filenames            Hash long pathnames\n");
   fnotice (file, "\nFor bug reporting instructions, please see:\n%s.\n",
 	   bug_report_url);
@@ -698,6 +716,7 @@ static const struct option options[] =
 {
   { "help",                 no_argument,       NULL, 'h' },
   { "version",              no_argument,       NULL, 'v' },
+  { "debug",		    no_argument,       NULL, 'w' },
   { "all-blocks",           no_argument,       NULL, 'a' },
   { "branch-probabilities", no_argument,       NULL, 'b' },
   { "branch-counts",        no_argument,       NULL, 'c' },
@@ -724,7 +743,7 @@ process_args (int argc, char **argv)
 {
   int opt;
 
-  const char *opts = "abcdfhilmno:prs:uvx";
+  const char *opts = "abcdfhilmno:prs:uvwx";
   while ((opt = getopt_long (argc, argv, opts, options, NULL)) != -1)
     {
       switch (opt)
@@ -778,6 +797,9 @@ process_args (int argc, char **argv)
           break;
 	case 'x':
 	  flag_hash_filenames = 1;
+	  break;
+	case 'w':
+	  flag_debugging_output = 1;
 	  break;
 	case 'v':
 	  print_version ();
@@ -2382,6 +2404,9 @@ accumulate_line_counts (source_t *src)
     }
   src->functions = fn_p;
 
+  if (flag_debugging_output)
+    dump_blocks (src);
+
   for (ix = src->num_lines, line = src->lines; ix--; line++)
     {
       if (!flag_all_blocks)
@@ -2640,3 +2665,38 @@ output_lines (FILE *gcov_file, const source_t *src)
   if (source_file)
     fclose (source_file);
 }
+
+static void
+dump_blocks (source_t *src)
+{
+  function_t *fn = src->functions;
+
+  for (unsigned line_num = 1; line_num < src->num_lines; line_num++)
+    {
+      if (fn && fn->next_file_fn && fn->next_file_fn->line == line_num)
+	{
+	  fn = fn->next_file_fn;
+	  fprintf (stderr, "\n");
+	}
+
+      if (fn && fn->line == line_num)
+	fprintf (stderr, "GCOV function: %s\n", fn->name);
+
+      line_t *line = &src->lines[line_num];
+      if (line->u.blocks)
+	{
+	  fprintf (stderr, "  line %u: %ld\n", line_num, line->count);
+	  for (block_t *block = line->u.blocks; block;
+	       block = block->chain)
+	    {
+	      fprintf (stderr, "    BB %d (%p): %ld\n",
+		       fn->get_block_index (block), (void *)block,
+		       block->count);
+	      for (arc_t *arc = block->succ; arc; arc = arc->succ_next)
+		fprintf (stderr, "      arc %p->%p: %ld\n", (void *)arc->src,
+			 (void *)arc->dst, arc->count);
+	    }
+	}
+    }
+}
+
