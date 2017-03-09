@@ -1740,6 +1740,14 @@ chkp_instrument_normal_builtin (tree fndecl)
     }
 }
 
+/* Return bounds to be used as a result of operation which
+   should not create poiunter (e.g. MULT_EXPR).  */
+static tree
+chkp_get_invalid_op_bounds (void)
+{
+  return chkp_get_zero_bounds ();
+}
+
 /* Add bound arguments to call statement pointed by GSI.
    Also performs a replacement of user checker builtins calls
    with internal ones.  */
@@ -1750,10 +1758,6 @@ chkp_add_bounds_to_call_stmt (gimple_stmt_iterator *gsi)
   gcall *call = as_a <gcall *> (gsi_stmt (*gsi));
   unsigned arg_no = 0;
   tree fndecl = gimple_call_fndecl (call);
-  tree fntype;
-  tree first_formal_arg;
-  tree arg;
-  bool use_fntype = false;
   tree op;
   ssa_op_iter iter;
   gcall *new_call;
@@ -1761,8 +1765,6 @@ chkp_add_bounds_to_call_stmt (gimple_stmt_iterator *gsi)
   /* Do nothing for internal functions.  */
   if (gimple_call_internal_p (call))
     return;
-
-  fntype = TREE_TYPE (TREE_TYPE (gimple_call_fn (call)));
 
   /* Do nothing if back-end builtin is called.  */
   if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_MD)
@@ -1854,55 +1856,32 @@ chkp_add_bounds_to_call_stmt (gimple_stmt_iterator *gsi)
 	return;
     }
 
-  /* If function decl is available then use it for
-     formal arguments list.  Otherwise use function type.  */
-  if (fndecl
-      && DECL_ARGUMENTS (fndecl)
-      && gimple_call_fntype (call) == TREE_TYPE (fndecl))
-    first_formal_arg = DECL_ARGUMENTS (fndecl);
-  else
-    {
-      first_formal_arg = TYPE_ARG_TYPES (fntype);
-      use_fntype = true;
-    }
-
   /* Fill vector of new call args.  */
   vec<tree> new_args = vNULL;
   new_args.create (gimple_call_num_args (call));
-  arg = first_formal_arg;
+  tree fndecl_arg = fndecl != NULL_TREE ? DECL_ARGUMENTS (fndecl) : NULL_TREE;
+
   for (arg_no = 0; arg_no < gimple_call_num_args (call); arg_no++)
     {
       tree call_arg = gimple_call_arg (call, arg_no);
-      tree type;
-
-      /* Get arg type using formal argument description
-	 or actual argument type.  */
-      if (arg)
-	if (use_fntype)
-	  if (TREE_VALUE (arg) != void_type_node)
-	    {
-	      type = TREE_VALUE (arg);
-	      arg = TREE_CHAIN (arg);
-	    }
-	  else
-	    type = TREE_TYPE (call_arg);
-	else
-	  {
-	    type = TREE_TYPE (arg);
-	    arg = TREE_CHAIN (arg);
-	  }
-      else
-	type = TREE_TYPE (call_arg);
+      tree call_arg_type = TREE_TYPE (call_arg);
 
       new_args.safe_push (call_arg);
 
-      if (BOUNDED_TYPE_P (type)
-	  || pass_by_reference (NULL, TYPE_MODE (type), type, true))
+      if (fndecl_arg != NULL_TREE && fndecl_arg != call_arg_type)
+	{
+	  /* If formal and actual arguments does not match,
+	     use invalid bounds.  */
+	  new_args.safe_push (chkp_get_invalid_op_bounds ());
+	}
+      else if (BOUNDED_TYPE_P (call_arg_type)
+	       || pass_by_reference (NULL, TYPE_MODE (call_arg_type),
+				     call_arg_type, true))
 	new_args.safe_push (chkp_find_bounds (call_arg, gsi));
-      else if (chkp_type_has_pointer (type))
+      else if (chkp_type_has_pointer (call_arg_type))
 	{
 	  HOST_WIDE_INT max_bounds
-	    = TREE_INT_CST_LOW (TYPE_SIZE (type)) / POINTER_SIZE;
+	    = TREE_INT_CST_LOW (TYPE_SIZE (call_arg_type)) / POINTER_SIZE;
 	  tree *all_bounds = (tree *)xmalloc (sizeof (tree) * max_bounds);
 	  HOST_WIDE_INT bnd_no;
 
@@ -1910,12 +1889,21 @@ chkp_add_bounds_to_call_stmt (gimple_stmt_iterator *gsi)
 
 	  chkp_find_bounds_for_elem (call_arg, all_bounds, 0, gsi);
 
+	  int c = 0;
 	  for (bnd_no = 0; bnd_no < max_bounds; bnd_no++)
 	    if (all_bounds[bnd_no])
+	      {
 	      new_args.safe_push (all_bounds[bnd_no]);
+	      c++;
+	      }
+
+	  gcc_assert (c < 2);
 
            free (all_bounds);
 	}
+
+      if (fndecl_arg)
+	fndecl_arg = TREE_CHAIN (fndecl_arg);
     }
 
   if (new_args.length () == gimple_call_num_args (call))
@@ -2150,14 +2138,6 @@ chkp_get_none_bounds (void)
 				    false);
 
   return none_bounds;
-}
-
-/* Return bounds to be used as a result of operation which
-   should not create poiunter (e.g. MULT_EXPR).  */
-static tree
-chkp_get_invalid_op_bounds (void)
-{
-  return chkp_get_zero_bounds ();
 }
 
 /* Return bounds to be used for loads of non-pointer values.  */

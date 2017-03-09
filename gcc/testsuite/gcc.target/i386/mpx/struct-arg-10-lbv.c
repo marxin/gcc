@@ -10,11 +10,14 @@
 struct s1
 {
   int *p;
+  int *p2;
+  int c;
+  int *p3;
 } s1;
 
 int rd (int *p1, int *p2, int *p3, int *p4, int *p5, int *p6, struct s1 s, int i)
 {
-  int res = s.p[i];
+  int res = s.p[i] + s.p3[i];
   printf ("%d\n", res);
   return res;
 }
@@ -26,6 +29,7 @@ int mpx_test (int argc, const char **argv)
 {
   struct s1 s;
   s.p = buf;
+  s.p3 = buf;
 
   rd (buf1, buf1, buf1, buf1, buf1, buf1, s, -1);
 
