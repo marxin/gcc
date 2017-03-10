@@ -141,6 +141,7 @@ typedef struct block_info
 
   /* Block is a landing pad for longjmp or throw.  */
   unsigned is_nonlocal_return : 1;
+  unsigned has_line_assigned: 1;
 
   union
   {
@@ -1448,6 +1449,8 @@ read_graph_file (void)
 	      fn->num_blocks = num_blocks;
 
 	      fn->blocks = XCNEWVEC (block_t, fn->num_blocks);
+	      fn->blocks[ENTRY_BLOCK].has_line_assigned = 1;
+	      fn->blocks[EXIT_BLOCK].has_line_assigned = 1;
 	      for (ix = 0; ix != num_blocks; ix++)
 		fn->blocks[ix].flags = gcov_read_unsigned ();
 	    }
@@ -1529,6 +1532,7 @@ read_graph_file (void)
       else if (fn && tag == GCOV_TAG_LINES)
 	{
 	  unsigned blockno = gcov_read_unsigned ();
+	  fn->blocks[blockno].has_line_assigned = 1;
 	  unsigned *line_nos = XCNEWVEC (unsigned, length - 1);
 
 	  if (blockno >= fn->num_blocks || fn->blocks[blockno].u.line.encoding)
@@ -2458,9 +2462,11 @@ accumulate_line_counts (source_t *src)
 	  /* Cycle detection.  */
 	  for (block = line->u.blocks; block; block = block->chain)
 	    {
-	      for (arc_t *arc = block->pred; arc; arc = arc->pred_next)
-		if (!line->has_block (arc->src))
-		  count += arc->count;
+	      if (block->has_line_assigned)
+		for (arc_t *arc = block->pred; arc; arc = arc->pred_next)
+		  if (!line->has_block (arc->src))
+		    count += arc->count;
+
 	      for (arc_t *arc = block->succ; arc; arc = arc->succ_next)
 		arc->cs_count = arc->count;
 	    }
