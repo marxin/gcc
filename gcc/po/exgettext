@@ -119,7 +119,11 @@ function keyword_option(line) {
 	continue
     }
     format=""
-    if (args ~ /g$/)
+
+    if (name ~ /internal_error_cont$/) {
+        return
+    }
+    else if (args ~ /g$/)
     	format="gcc-internal-format"
     else if (args ~ /noc$/)
         format="no-c-format"
