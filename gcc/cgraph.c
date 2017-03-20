@@ -2981,17 +2981,17 @@ cgraph_edge::verify_count_and_frequency ()
   bool error_found = false;
   if (count < 0)
     {
-      error ("caller edge count is negative");
+      internal_error_cont ("caller edge count is negative");
       error_found = true;
     }
   if (frequency < 0)
     {
-      error ("caller edge frequency is negative");
+      internal_error_cont ("caller edge frequency is negative");
       error_found = true;
     }
   if (frequency > CGRAPH_FREQ_MAX)
     {
-      error ("caller edge frequency is too large");
+      internal_error_cont ("caller edge frequency is too large");
       error_found = true;
     }
   return error_found;
@@ -3075,55 +3075,56 @@ cgraph_node::verify_node (void)
   for (e = callees; e; e = e->next_callee)
     if (e->aux)
       {
-	error ("aux field set for edge %s->%s",
-	       identifier_to_locale (e->caller->name ()),
-	       identifier_to_locale (e->callee->name ()));
+	internal_error_cont ("aux field set for edge %s->%s",
+			     identifier_to_locale (e->caller->name ()),
+			     identifier_to_locale (e->callee->name ()));
 	error_found = true;
       }
   if (count < 0)
     {
-      error ("execution count is negative");
+      internal_error_cont ("execution count is negative");
       error_found = true;
     }
   if (global.inlined_to && same_comdat_group)
     {
-      error ("inline clone in same comdat group list");
+      internal_error_cont ("inline clone in same comdat group list");
       error_found = true;
     }
   if (!definition && !in_other_partition && local.local)
     {
-      error ("local symbols must be defined");
+      internal_error_cont ("local symbols must be defined");
       error_found = true;
     }
   if (global.inlined_to && externally_visible)
     {
-      error ("externally visible inline clone");
+      internal_error_cont ("externally visible inline clone");
       error_found = true;
     }
   if (global.inlined_to && address_taken)
     {
-      error ("inline clone with address taken");
+      internal_error_cont ("inline clone with address taken");
       error_found = true;
     }
   if (global.inlined_to && force_output)
     {
-      error ("inline clone is forced to output");
+      internal_error_cont ("inline clone is forced to output");
       error_found = true;
     }
   for (e = indirect_calls; e; e = e->next_callee)
     {
       if (e->aux)
 	{
-	  error ("aux field set for indirect edge from %s",
+	  internal_error_cont ("aux field set for indirect edge from %s",
 		 identifier_to_locale (e->caller->name ()));
 	  error_found = true;
 	}
       if (!e->indirect_unknown_callee
 	  || !e->indirect_info)
 	{
-	  error ("An indirect edge from %s is not marked as indirect or has "
-		 "associated indirect_info, the corresponding statement is: ",
-		 identifier_to_locale (e->caller->name ()));
+	  internal_error_cont ("An indirect edge from %s is not marked as "
+			       "indirect or has associated indirect_info, "
+			       "the corresponding statement is: ",
+			       identifier_to_locale (e->caller->name ()));
 	  cgraph_debug_gimple_stmt (this_cfun, e->call_stmt);
 	  error_found = true;
 	}
@@ -3136,8 +3137,9 @@ cgraph_node::verify_node (void)
       if (check_comdat
 	  && !in_same_comdat_group_p (e->caller))
 	{
-	  error ("comdat-local function called by %s outside its comdat",
-		 identifier_to_locale (e->caller->name ()));
+	  internal_error_cont ("comdat-local function called by %s outside "
+			       "its comdat",
+			       identifier_to_locale (e->caller->name ()));
 	  error_found = true;
 	}
       if (!e->inline_failed)
@@ -3146,19 +3148,20 @@ cgraph_node::verify_node (void)
 	      != (e->caller->global.inlined_to
 		  ? e->caller->global.inlined_to : e->caller))
 	    {
-	      error ("inlined_to pointer is wrong");
+	      internal_error_cont ("inlined_to pointer is wrong");
 	      error_found = true;
 	    }
 	  if (callers->next_caller)
 	    {
-	      error ("multiple inline callers");
+	      internal_error_cont ("multiple inline callers");
 	      error_found = true;
 	    }
 	}
       else
 	if (global.inlined_to)
 	  {
-	    error ("inlined_to pointer set for noninline callers");
+	    internal_error_cont ("inlined_to pointer set for noninline "
+				 "callers");
 	    error_found = true;
 	  }
     }
@@ -3178,10 +3181,10 @@ cgraph_node::verify_node (void)
 	      != compute_call_stmt_bb_frequency (e->caller->decl,
 						 gimple_bb (e->call_stmt))))
 	{
-	  error ("caller edge frequency %i does not match BB frequency %i",
-		 e->frequency,
-		 compute_call_stmt_bb_frequency (e->caller->decl,
-						 gimple_bb (e->call_stmt)));
+	  int freq = compute_call_stmt_bb_frequency (e->caller->decl,
+						     gimple_bb (e->call_stmt));
+	  internal_error_cont ("caller edge frequency %i does not match BB "
+			       "frequency %i", e->frequency, freq);
 	  error_found = true;
 	}
     }
@@ -3196,21 +3199,22 @@ cgraph_node::verify_node (void)
 	      != compute_call_stmt_bb_frequency (e->caller->decl,
 						 gimple_bb (e->call_stmt))))
 	{
-	  error ("indirect call frequency %i does not match BB frequency %i",
-		 e->frequency,
-		 compute_call_stmt_bb_frequency (e->caller->decl,
-						 gimple_bb (e->call_stmt)));
+	  int freq = compute_call_stmt_bb_frequency (e->caller->decl,
+						     gimple_bb (e->call_stmt));
+	  internal_error_cont ("indirect call frequency %i does not match BB "
+			       "frequency %i", e->frequency, freq);
 	  error_found = true;
 	}
     }
   if (!callers && global.inlined_to)
     {
-      error ("inlined_to pointer is set but no predecessors found");
+      internal_error_cont ("inlined_to pointer is set but no predecessors "
+			   "found");
       error_found = true;
     }
   if (global.inlined_to == this)
     {
-      error ("inlined_to pointer refers to itself");
+      internal_error_cont ("inlined_to pointer refers to itself");
       error_found = true;
     }
 
@@ -3222,7 +3226,7 @@ cgraph_node::verify_node (void)
 	  break;
       if (!n)
 	{
-	  error ("cgraph_node has wrong clone_of");
+	  internal_error_cont ("cgraph_node has wrong clone_of");
 	  error_found = true;
 	}
     }
@@ -3234,23 +3238,23 @@ cgraph_node::verify_node (void)
 	  break;
       if (n)
 	{
-	  error ("cgraph_node has wrong clone list");
+	  internal_error_cont ("cgraph_node has wrong clone list");
 	  error_found = true;
 	}
     }
   if ((prev_sibling_clone || next_sibling_clone) && !clone_of)
     {
-       error ("cgraph_node is in clone list but it is not clone");
+       internal_error_cont ("cgraph_node is in clone list but it is not clone");
        error_found = true;
     }
   if (!prev_sibling_clone && clone_of && clone_of->clones != this)
     {
-      error ("cgraph_node has wrong prev_clone pointer");
+      internal_error_cont ("cgraph_node has wrong prev_clone pointer");
       error_found = true;
     }
   if (prev_sibling_clone && prev_sibling_clone->next_sibling_clone != this)
     {
-      error ("double linked list of clones corrupted");
+      internal_error_cont ("double linked list of clones corrupted");
       error_found = true;
     }
 
@@ -3262,7 +3266,7 @@ cgraph_node::verify_node (void)
 
       if (callees)
 	{
-	  error ("Alias has call edges");
+	  internal_error_cont ("Alias has call edges");
           error_found = true;
 	}
       for (i = 0; iterate_reference (i, ref); i++)
@@ -3270,19 +3274,19 @@ cgraph_node::verify_node (void)
 	  ;
 	else if (ref->use != IPA_REF_ALIAS)
 	  {
-	    error ("Alias has non-alias reference");
+	    internal_error_cont ("Alias has non-alias reference");
 	    error_found = true;
 	  }
 	else if (ref_found)
 	  {
-	    error ("Alias has more than one alias reference");
+	    internal_error_cont ("Alias has more than one alias reference");
 	    error_found = true;
 	  }
 	else
 	  ref_found = true;
       if (!ref_found)
 	{
-	  error ("Analyzed alias has no reference");
+	  internal_error_cont ("Analyzed alias has no reference");
 	  error_found = true;
 	}
     }
@@ -3291,14 +3295,16 @@ cgraph_node::verify_node (void)
   if (instrumented_version
       && instrumented_version->instrumented_version != this)
     {
-      error ("Instrumentation clone does not reference original node");
+      internal_error_cont ("Instrumentation clone does not reference original "
+			   "node");
       error_found = true;
     }
 
   /* Cannot have orig_decl for not instrumented nodes.  */
   if (!instrumentation_clone && orig_decl)
     {
-      error ("Not instrumented node has non-NULL original declaration");
+      internal_error_cont ("Not instrumented node has non-NULL original "
+			   "declaration");
       error_found = true;
     }
 
@@ -3308,7 +3314,7 @@ cgraph_node::verify_node (void)
       && orig_decl
       && orig_decl != instrumented_version->decl)
     {
-      error ("Instrumented node has wrong original declaration");
+      internal_error_cont ("Instrumented node has wrong original declaration");
       error_found = true;
     }
 
@@ -3326,12 +3332,13 @@ cgraph_node::verify_node (void)
 	  {
 	    if (ref_found)
 	      {
-		error ("Node has more than one chkp reference");
+		internal_error_cont ("Node has more than one chkp reference");
 		error_found = true;
 	      }
 	    if (ref->referred != instrumented_version)
 	      {
-		error ("Wrong node is referenced with chkp reference");
+		internal_error_cont ("Wrong node is referenced with chkp "
+				     "reference");
 		error_found = true;
 	      }
 	    ref_found = true;
@@ -3339,7 +3346,8 @@ cgraph_node::verify_node (void)
 
       if (!ref_found)
 	{
-	  error ("Analyzed node has no reference to instrumented version");
+	  internal_error_cont ("Analyzed node has no reference to "
+			       "instrumented version");
 	  error_found = true;
 	}
     }
@@ -3353,7 +3361,7 @@ cgraph_node::verify_node (void)
       if (!IDENTIFIER_TRANSPARENT_ALIAS (name)
 	  || TREE_CHAIN (name) != orig_name)
 	{
-	  error ("Alias chain for instrumented node is broken");
+	  internal_error_cont ("Alias chain for instrumented node is broken");
 	  error_found = true;
 	}
     }
@@ -3362,23 +3370,23 @@ cgraph_node::verify_node (void)
     {
       if (!callees)
 	{
-	  error ("No edge out of thunk node");
+	  internal_error_cont ("No edge out of thunk node");
           error_found = true;
 	}
       else if (callees->next_callee)
 	{
-	  error ("More than one edge out of thunk node");
+	  internal_error_cont ("More than one edge out of thunk node");
           error_found = true;
 	}
       if (gimple_has_body_p (decl) && !global.inlined_to)
         {
-	  error ("Thunk is not supposed to have body");
+	  internal_error_cont ("Thunk is not supposed to have body");
           error_found = true;
         }
       if (thunk.add_pointer_bounds_args
 	  && !instrumented_version->semantically_equivalent_p (callees->callee))
 	{
-	  error ("Instrumentation thunk has wrong edge callee");
+	  internal_error_cont ("Instrumentation thunk has wrong edge callee");
           error_found = true;
 	}
     }
@@ -3414,7 +3422,7 @@ cgraph_node::verify_node (void)
 			{
 			  if (e->aux)
 			    {
-			      error ("shared call_stmt:");
+			      internal_error_cont ("shared call_stmt:");
 			      cgraph_debug_gimple_stmt (this_cfun, stmt);
 			      error_found = true;
 			    }
@@ -3422,7 +3430,8 @@ cgraph_node::verify_node (void)
 			    {
 			      if (e->verify_corresponds_to_fndecl (decl))
 				{
-				  error ("edge points to wrong declaration:");
+				  internal_error_cont ("edge points to wrong "
+						       "declaration:");
 				  debug_tree (e->callee->decl);
 				  fprintf (stderr," Instead of:");
 				  debug_tree (decl);
@@ -3431,9 +3440,11 @@ cgraph_node::verify_node (void)
 			    }
 			  else if (decl)
 			    {
-			      error ("an indirect edge with unknown callee "
-				     "corresponding to a call_stmt with "
-				     "a known declaration:");
+			      internal_error_cont ("an indirect edge with "
+						   "unknown callee "
+						   "corresponding to a "
+						   "call_stmt with a known "
+						   "declaration:");
 			      error_found = true;
 			      cgraph_debug_gimple_stmt (this_cfun, e->call_stmt);
 			    }
@@ -3441,7 +3452,8 @@ cgraph_node::verify_node (void)
 			}
 		      else if (decl)
 			{
-			  error ("missing callgraph edge for call stmt:");
+			  internal_error_cont ("missing callgraph edge for "
+					       "call stmt:");
 			  cgraph_debug_gimple_stmt (this_cfun, stmt);
 			  error_found = true;
 			}
@@ -3451,7 +3463,7 @@ cgraph_node::verify_node (void)
 	    for (i = 0; iterate_reference (i, ref); i++)
 	      if (ref->stmt && !stmts.contains (ref->stmt))
 		{
-		  error ("reference to dead statement");
+		  internal_error_cont ("reference to dead statement");
 		  cgraph_debug_gimple_stmt (this_cfun, ref->stmt);
 		  error_found = true;
 		}
@@ -3464,9 +3476,9 @@ cgraph_node::verify_node (void)
 	{
 	  if (!e->aux)
 	    {
-	      error ("edge %s->%s has no corresponding call_stmt",
-		     identifier_to_locale (e->caller->name ()),
-		     identifier_to_locale (e->callee->name ()));
+	      internal_error_cont ("edge %s->%s has no corresponding call_stmt",
+				   identifier_to_locale (e->caller->name ()),
+				   identifier_to_locale (e->callee->name ()));
 	      cgraph_debug_gimple_stmt (this_cfun, e->call_stmt);
 	      error_found = true;
 	    }
@@ -3476,8 +3488,9 @@ cgraph_node::verify_node (void)
 	{
 	  if (!e->aux && !e->speculative)
 	    {
-	      error ("an indirect edge from %s has no corresponding call_stmt",
-		     identifier_to_locale (e->caller->name ()));
+	      internal_error_cont ("an indirect edge from %s has no "
+				   "corresponding call_stmt",
+				   identifier_to_locale (e->caller->name ()));
 	      cgraph_debug_gimple_stmt (this_cfun, e->call_stmt);
 	      error_found = true;
 	    }

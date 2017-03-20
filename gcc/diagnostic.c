@@ -274,7 +274,8 @@ diagnostic_set_info (diagnostic_info *diagnostic, const char *gmsgid,
 		     diagnostic_t kind)
 {
   gcc_assert (richloc);
-  diagnostic_set_info_translated (diagnostic, _(gmsgid), args, richloc, kind);
+  const char *msg = kind != DK_INTERNAL_ERROR ? _(gmsgid) : gmsgid;
+  diagnostic_set_info_translated (diagnostic, msg, args, richloc, kind);
 }
 
 static const char *const diagnostic_kind_color[] = {
@@ -528,6 +529,9 @@ diagnostic_action_after_output (diagnostic_context *context,
       diagnostic_finish (context);
       fnotice (stderr, "compilation terminated.\n");
       exit (FATAL_EXIT_CODE);
+
+    case DK_INTERNAL_ERROR:
+      break;
 
     default:
       gcc_unreachable ();
@@ -1396,6 +1400,19 @@ internal_error (const char *gmsgid, ...)
   va_end (ap);
 
   gcc_unreachable ();
+}
+
+/* Report an internal error and continue.  The function is used to report
+   technical details which should not be localized.  */
+
+void
+internal_error_cont (const char *msg, ...)
+{
+  va_list ap;
+  va_start (ap, msg);
+  rich_location richloc (line_table, input_location);
+  diagnostic_impl (&richloc, -1, msg, &ap, DK_INTERNAL_ERROR);
+  va_end (ap);
 }
 
 /* Like internal_error, but no backtrace will be printed.  Used when

@@ -2319,25 +2319,26 @@ find_partition_fixes (bool flag_only)
     {
       bb = bbs_in_cold_partition.pop ();
       /* Any blocks dominated by a block in the cold section
-         must also be cold.  */
+	 must also be cold.  */
       basic_block son;
       for (son = first_dom_son (CDI_DOMINATORS, bb);
-           son;
-           son = next_dom_son (CDI_DOMINATORS, son))
-        {
-          /* If son is not yet cold, then mark it cold here and
-             enqueue it for further processing.  */
-          if ((BB_PARTITION (son) != BB_COLD_PARTITION))
-            {
-              if (flag_only)
-                error ("non-cold basic block %d dominated "
-                       "by a block in the cold partition (%d)", son->index, bb->index);
-              else
-                BB_SET_PARTITION (son, BB_COLD_PARTITION);
-              bbs_to_fix.safe_push (son);
-              bbs_in_cold_partition.safe_push (son);
-            }
-        }
+	   son;
+	   son = next_dom_son (CDI_DOMINATORS, son))
+	{
+	  /* If son is not yet cold, then mark it cold here and
+	     enqueue it for further processing.  */
+	  if ((BB_PARTITION (son) != BB_COLD_PARTITION))
+	    {
+	      if (flag_only)
+		internal_error_cont ("non-cold basic block %d dominated "
+				     "by a block in the cold partition (%d)",
+				     son->index, bb->index);
+	      else
+		BB_SET_PARTITION (son, BB_COLD_PARTITION);
+	      bbs_to_fix.safe_push (son);
+	      bbs_in_cold_partition.safe_push (son);
+	    }
+	}
     }
 
   if (dom_calculated_here)
@@ -2403,19 +2404,20 @@ verify_hot_cold_block_grouping (void)
   FOR_EACH_BB_FN (bb, cfun)
     {
       if (current_partition != BB_UNPARTITIONED
-          && BB_PARTITION (bb) != current_partition)
+	  && BB_PARTITION (bb) != current_partition)
 	{
 	  if (switched_sections)
 	    {
-	      error ("multiple hot/cold transitions found (bb %i)",
-		     bb->index);
+	      internal_error_cont ("multiple hot/cold transitions found "
+				   "(bb %i)", bb->index);
 	      err = 1;
 	    }
 	  else
-            switched_sections = true;
+	    switched_sections = true;
 
-          if (!crtl->has_bb_partition)
-            error ("partition found but function partition flag not set");
+	  if (!crtl->has_bb_partition)
+	    internal_error_cont ("partition found but function partition flag "
+				 "not set");
 	}
       current_partition = BB_PARTITION (bb);
     }
@@ -2453,8 +2455,9 @@ rtl_verify_edges (void)
 	  if (XINT (note, 0) != BRANCH_EDGE (bb)->probability
 	      && profile_status_for_fn (cfun) != PROFILE_ABSENT)
 	    {
-	      error ("verify_flow_info: REG_BR_PROB does not match cfg %i %i",
-		     XINT (note, 0), BRANCH_EDGE (bb)->probability);
+	      internal_error_cont ("verify_flow_info: REG_BR_PROB does not "
+				   "match cfg %i %i", XINT (note, 0),
+				   BRANCH_EDGE (bb)->probability);
 	      err = 1;
 	    }
 	}
@@ -2469,36 +2472,38 @@ rtl_verify_edges (void)
 	  is_crossing = (BB_PARTITION (e->src) != BB_PARTITION (e->dest)
 			 && e->src != ENTRY_BLOCK_PTR_FOR_FN (cfun)
 			 && e->dest != EXIT_BLOCK_PTR_FOR_FN (cfun));
-          has_crossing_edge |= is_crossing;
+	  has_crossing_edge |= is_crossing;
 	  if (e->flags & EDGE_CROSSING)
 	    {
 	      if (!is_crossing)
 		{
-		  error ("EDGE_CROSSING incorrectly set across same section");
+		  internal_error_cont ("EDGE_CROSSING incorrectly set across "
+				       "same section");
 		  err = 1;
 		}
 	      if (e->flags & EDGE_FALLTHRU)
 		{
-		  error ("fallthru edge crosses section boundary in bb %i",
-			 e->src->index);
+		  internal_error_cont ("fallthru edge crosses section "
+				       "boundary in bb %i", e->src->index);
 		  err = 1;
 		}
 	      if (e->flags & EDGE_EH)
 		{
-		  error ("EH edge crosses section boundary in bb %i",
-			 e->src->index);
+		  internal_error_cont ("EH edge crosses section boundary in "
+				       "bb %i", e->src->index);
 		  err = 1;
 		}
-              if (JUMP_P (BB_END (bb)) && !CROSSING_JUMP_P (BB_END (bb)))
+	      if (JUMP_P (BB_END (bb)) && !CROSSING_JUMP_P (BB_END (bb)))
 		{
-		  error ("No region crossing jump at section boundary in bb %i",
-			 bb->index);
+		  internal_error_cont ("No region crossing jump at section "
+				       "boundary in bb %i", bb->index);
 		  err = 1;
 		}
 	    }
 	  else if (is_crossing)
 	    {
-	      error ("EDGE_CROSSING missing across section boundary");
+	      internal_error_cont ("EDGE_CROSSING missing across section "
+				   "boundary");
 	      err = 1;
 	    }
 
@@ -2523,24 +2528,27 @@ rtl_verify_edges (void)
 	    n_abnormal++;
 	}
 
-        if (!has_crossing_edge
+      if (!has_crossing_edge
 	    && JUMP_P (BB_END (bb))
 	    && CROSSING_JUMP_P (BB_END (bb)))
-          {
-            print_rtl_with_bb (stderr, get_insns (), TDF_RTL | TDF_BLOCKS | TDF_DETAILS);
-            error ("Region crossing jump across same section in bb %i",
-                   bb->index);
-            err = 1;
-          }
+	{
+	  print_rtl_with_bb (stderr,
+			     get_insns (), TDF_RTL | TDF_BLOCKS | TDF_DETAILS);
+	  internal_error_cont ("Region crossing jump across same section "
+				 "in bb %i", bb->index);
+	  err = 1;
+	}
 
       if (n_eh && !find_reg_note (BB_END (bb), REG_EH_REGION, NULL_RTX))
 	{
-	  error ("missing REG_EH_REGION note at the end of bb %i", bb->index);
+	  internal_error_cont ("missing REG_EH_REGION note at the end of "
+			       "bb %i", bb->index);
 	  err = 1;
 	}
       if (n_eh > 1)
 	{
-	  error ("too many exception handling edges in bb %i", bb->index);
+	  internal_error_cont ("too many exception handling edges in bb %i",
+			       bb->index);
 	  err = 1;
 	}
       if (n_branch
@@ -2548,35 +2556,39 @@ rtl_verify_edges (void)
 	      || (n_branch > 1 && (any_uncondjump_p (BB_END (bb))
 				   || any_condjump_p (BB_END (bb))))))
 	{
-	  error ("too many outgoing branch edges from bb %i", bb->index);
+	  internal_error_cont ("too many outgoing branch edges from bb %i",
+			       bb->index);
 	  err = 1;
 	}
       if (n_fallthru && any_uncondjump_p (BB_END (bb)))
 	{
-	  error ("fallthru edge after unconditional jump in bb %i", bb->index);
+	  internal_error_cont ("fallthru edge after unconditional jump "
+			       "in bb %i", bb->index);
 	  err = 1;
 	}
       if (n_branch != 1 && any_uncondjump_p (BB_END (bb)))
 	{
-	  error ("wrong number of branch edges after unconditional jump"
-		 " in bb %i", bb->index);
+	  internal_error_cont ("wrong number of branch edges after "
+			       "unconditional jump in bb %i", bb->index);
 	  err = 1;
 	}
       if (n_branch != 1 && any_condjump_p (BB_END (bb))
 	  && JUMP_LABEL (BB_END (bb)) != BB_HEAD (fallthru->dest))
 	{
-	  error ("wrong amount of branch edges after conditional jump"
-		 " in bb %i", bb->index);
+	  internal_error_cont ("wrong amount of branch edges after conditional "
+			       "jump in bb %i", bb->index);
 	  err = 1;
 	}
       if (n_abnormal_call && !CALL_P (BB_END (bb)))
 	{
-	  error ("abnormal call edges for non-call insn in bb %i", bb->index);
+	  internal_error_cont ("abnormal call edges for non-call insn "
+			       "in bb %i", bb->index);
 	  err = 1;
 	}
       if (n_sibcall && !CALL_P (BB_END (bb)))
 	{
-	  error ("sibcall edges for non-call insn in bb %i", bb->index);
+	  internal_error_cont ("sibcall edges for non-call insn in bb %i",
+			       bb->index);
 	  err = 1;
 	}
       if (n_abnormal > n_eh
@@ -2586,7 +2598,8 @@ rtl_verify_edges (void)
 	      || any_condjump_p (BB_END (bb))
 	      || any_uncondjump_p (BB_END (bb))))
 	{
-	  error ("abnormal edges for no purpose in bb %i", bb->index);
+	  internal_error_cont ("abnormal edges for no purpose in bb %i",
+			       bb->index);
 	  err = 1;
 	}
     }
@@ -2624,8 +2637,8 @@ rtl_verify_bb_insns (void)
 	{
 	  if (BB_END (bb) == x)
 	    {
-	      error ("NOTE_INSN_BASIC_BLOCK is missing for block %d",
-		     bb->index);
+	      internal_error_cont ("NOTE_INSN_BASIC_BLOCK is missing for "
+				   "block %d", bb->index);
 	      err = 1;
 	    }
 
@@ -2634,8 +2647,8 @@ rtl_verify_bb_insns (void)
 
       if (!NOTE_INSN_BASIC_BLOCK_P (x) || NOTE_BASIC_BLOCK (x) != bb)
 	{
-	  error ("NOTE_INSN_BASIC_BLOCK is missing for block %d",
-		 bb->index);
+	  internal_error_cont ("NOTE_INSN_BASIC_BLOCK is missing for block %d",
+			       bb->index);
 	  err = 1;
 	}
 
@@ -2647,8 +2660,9 @@ rtl_verify_bb_insns (void)
 	  {
 	    if (NOTE_INSN_BASIC_BLOCK_P (x))
 	      {
-		error ("NOTE_INSN_BASIC_BLOCK %d in middle of basic block %d",
-		       INSN_UID (x), bb->index);
+		internal_error_cont ("NOTE_INSN_BASIC_BLOCK %d in middle of "
+				     "basic block %d", INSN_UID (x),
+				     bb->index);
 		err = 1;
 	      }
 
@@ -2657,7 +2671,7 @@ rtl_verify_bb_insns (void)
 
 	    if (control_flow_insn_p (x))
 	      {
-		error ("in basic block %d:", bb->index);
+		internal_error_cont ("in basic block %d:", bb->index);
 		fatal_insn ("flow control insn inside a basic block", x);
 	      }
 	  }
@@ -2683,17 +2697,18 @@ rtl_verify_bb_pointers (void)
 
       if (!(bb->flags & BB_RTL))
 	{
-	  error ("BB_RTL flag not set for block %d", bb->index);
+	  internal_error_cont ("BB_RTL flag not set for block %d", bb->index);
 	  err = 1;
 	}
 
       FOR_BB_INSNS (bb, insn)
 	if (BLOCK_FOR_INSN (insn) != bb)
 	  {
-	    error ("insn %d basic block pointer is %d, should be %d",
-		   INSN_UID (insn),
-		   BLOCK_FOR_INSN (insn) ? BLOCK_FOR_INSN (insn)->index : 0,
-		   bb->index);
+	    internal_error_cont ("insn %d basic block pointer is %d, "
+				 "should be %d", INSN_UID (insn),
+				 (BLOCK_FOR_INSN (insn)
+				  ? BLOCK_FOR_INSN (insn)->index : 0),
+				 bb->index);
 	    err = 1;
 	  }
 
@@ -2701,16 +2716,16 @@ rtl_verify_bb_pointers (void)
 	if (!BARRIER_P (insn)
 	    && BLOCK_FOR_INSN (insn) != NULL)
 	  {
-	    error ("insn %d in header of bb %d has non-NULL basic block",
-		   INSN_UID (insn), bb->index);
+	    internal_error_cont ("insn %d in header of bb %d has non-NULL "
+				 "basic block", INSN_UID (insn), bb->index);
 	    err = 1;
 	  }
       for (insn = BB_FOOTER (bb); insn; insn = NEXT_INSN (insn))
 	if (!BARRIER_P (insn)
 	    && BLOCK_FOR_INSN (insn) != NULL)
 	  {
-	    error ("insn %d in footer of bb %d has non-NULL basic block",
-		   INSN_UID (insn), bb->index);
+	    internal_error_cont ("insn %d in footer of bb %d has non-NULL "
+				 "basic block", INSN_UID (insn), bb->index);
 	    err = 1;
 	  }
     }
@@ -2778,20 +2793,20 @@ rtl_verify_bb_insn_chain (void)
 	  if (x == end)
 	    break;
 
-            /* And that the code outside of basic blocks has NULL bb field.  */
-          if (!BARRIER_P (x)
-              && BLOCK_FOR_INSN (x) != NULL)
-            {
-              error ("insn %d outside of basic blocks has non-NULL bb field",
-                     INSN_UID (x));
-              err = 1;
-            }
+	    /* And that the code outside of basic blocks has NULL bb field.  */
+	  if (!BARRIER_P (x)
+	      && BLOCK_FOR_INSN (x) != NULL)
+	    {
+	      internal_error_cont ("insn %d outside of basic blocks has "
+				   "non-NULL bb field", INSN_UID (x));
+	      err = 1;
+	    }
 	}
 
       if (!x)
 	{
-	  error ("end insn %d for block %d not found in the insn stream",
-		 INSN_UID (end), bb->index);
+	  internal_error_cont ("end insn %d for block %d not found in the insn "
+			       "stream", INSN_UID (end), bb->index);
 	  err = 1;
 	}
 
@@ -2803,8 +2818,9 @@ rtl_verify_bb_insn_chain (void)
 	     in only one basic block.  */
 	  if (bb_info[INSN_UID (x)] != NULL)
 	    {
-	      error ("insn %d is in multiple basic blocks (%d and %d)",
-		     INSN_UID (x), bb->index, bb_info[INSN_UID (x)]->index);
+	      internal_error_cont ("insn %d is in multiple basic blocks "
+				   "(%d and %d)", INSN_UID (x), bb->index,
+				   bb_info[INSN_UID (x)]->index);
 	      err = 1;
 	    }
 
@@ -2815,8 +2831,8 @@ rtl_verify_bb_insn_chain (void)
 	}
       if (!x)
 	{
-	  error ("head insn %d for block %d not found in the insn stream",
-		 INSN_UID (head), bb->index);
+	  internal_error_cont ("head insn %d for block %d not found in the "
+			       "insn stream", INSN_UID (head), bb->index);
 	  err = 1;
 	}
 
@@ -2830,8 +2846,8 @@ rtl_verify_bb_insn_chain (void)
       if (!BARRIER_P (x)
 	  && BLOCK_FOR_INSN (x) != NULL)
 	{
-	  error ("insn %d outside of basic blocks has non-NULL bb field",
-		 INSN_UID (x));
+	  internal_error_cont ("insn %d outside of basic blocks has non-NULL "
+			       "bb field", INSN_UID (x));
 	  err = 1;
 	}
     }
@@ -2863,7 +2879,8 @@ rtl_verify_fallthru (void)
 	    {
 	      if (!insn || NOTE_INSN_BASIC_BLOCK_P (insn))
 		{
-		  error ("missing barrier after block %i", bb->index);
+		  internal_error_cont ("missing barrier after block %i",
+				       bb->index);
 		  err = 1;
 		  break;
 		}
@@ -2878,9 +2895,9 @@ rtl_verify_fallthru (void)
 
 	  if (e->src->next_bb != e->dest)
 	    {
-	      error
-		("verify_flow_info: Incorrect blocks for fallthru %i->%i",
-		 e->src->index, e->dest->index);
+	      internal_error_cont ("verify_flow_info: Incorrect blocks for "
+				   "fallthru %i->%i", e->src->index,
+				   e->dest->index);
 	      err = 1;
 	    }
 	  else
@@ -2888,8 +2905,8 @@ rtl_verify_fallthru (void)
 		 insn = NEXT_INSN (insn))
 	      if (BARRIER_P (insn) || INSN_P (insn))
 		{
-		  error ("verify_flow_info: Incorrect fallthru %i->%i",
-			 e->src->index, e->dest->index);
+		  internal_error_cont ("verify_flow_info: Incorrect fallthru "
+				       "%i->%i", e->src->index, e->dest->index);
 		  fatal_insn ("wrong insn in the fallthru edge", insn);
 		  err = 1;
 		}
