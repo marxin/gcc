@@ -1745,8 +1745,15 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 		 address.  */
 	      if (TREE_CODE (args[i].tree_value) == SSA_NAME)
 		{
-		  gcc_assert (SSA_NAME_IS_DEFAULT_DEF (args[i].tree_value));
-		  args[i].tree_value = SSA_NAME_VAR (args[i].tree_value);
+		  if (SSA_NAME_IS_DEFAULT_DEF (args[i].tree_value))
+		    args[i].tree_value = SSA_NAME_VAR (args[i].tree_value);
+		  else
+		  {
+		    gimple *g = SSA_NAME_DEF_STMT (args[i].tree_value);
+		    if (gimple_assign_single_p (g))
+		      args[i].tree_value = gimple_assign_rhs1 (g);
+		  }
+
 		  gcc_assert (TREE_CODE (args[i].tree_value) == PARM_DECL);
 		}
 	      /* Argument setup code may have copied the value to register.  We
