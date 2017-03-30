@@ -737,23 +737,32 @@ __gcov_single_counter_op (gcov_type *counters, unsigned n_counters,
     }
 }
 
-/* Performing FN upon indirect-call profile counters.  */
+/* Performing FN upon top N counters.  */
 
 static void
-__gcov_icall_topn_counter_op (gcov_type *counters, unsigned n_counters,
-                              counter_op_fn fn, void *data1, void *data2)
+__gcov_topn_counter_op (gcov_type *counters, unsigned n_counters,
+			counter_op_fn fn, void *data1, void *data2)
 {
   unsigned i;
 
-  gcc_assert (!(n_counters % GCOV_ICALL_TOPN_NCOUNTS));
-  for (i = 0; i < n_counters; i += GCOV_ICALL_TOPN_NCOUNTS)
+  gcc_assert (!(n_counters % GCOV_TOPN_NCOUNTS));
+  for (i = 0; i < n_counters; i += GCOV_TOPN_NCOUNTS)
     {
       unsigned j;
       gcov_type *value_array = &counters[i + 1];
 
-      for (j = 0; j < GCOV_ICALL_TOPN_NCOUNTS - 1; j += 2)
+      for (j = 0; j < GCOV_TOPN_NCOUNTS - 1; j += 2)
         value_array[j + 1] = fn (value_array[j + 1], data1, data2);
     }
+}
+
+/* Performing FN upon top N indirect calls.  */
+
+static void
+__gcov_icall_topn_counter_op (gcov_type *counters, unsigned n_counters,
+			      counter_op_fn fn, void *data1, void *data2)
+{
+  __gcov_topn_counter_op (counters, n_counters, fn, data1, data2);
 }
 
 /* Scaling the counter value V by multiplying *(float*) DATA1.  */

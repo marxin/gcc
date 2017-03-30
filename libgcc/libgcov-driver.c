@@ -700,27 +700,27 @@ gcov_sort_n_vals (gcov_type *value_array, int n)
     }
 }
 
-/* Sort the profile counters for all indirect call sites. Counters
-   for each call site are allocated in array COUNTERS.  */
+/* Sort the profile counters for top N most frequently used values. Counters
+   for are allocated in array COUNTERS.  */
 
 static void
-gcov_sort_icall_topn_counter (const struct gcov_ctr_info *counters)
+gcov_sort_topn_counter (const struct gcov_ctr_info *counters)
 {
   int i;
   gcov_type *values;
   int n = counters->num;
 
-  gcc_assert (!(n % GCOV_ICALL_TOPN_NCOUNTS));
+  gcc_assert (!(n % GCOV_TOPN_NCOUNTS));
   values = counters->values;
 
-  for (i = 0; i < n; i += GCOV_ICALL_TOPN_NCOUNTS)
+  for (i = 0; i < n; i += GCOV_TOPN_NCOUNTS)
     {
-      gcov_type *value_array = &values[i + 1];
-      gcov_sort_n_vals (value_array, GCOV_ICALL_TOPN_NCOUNTS - 1);
+      gcov_type *value_array = &values[i];
+      gcov_sort_n_vals (value_array, GCOV_TOPN_NCOUNTS - 1);
     }
 }
 
-/* Sort topn indirect_call profile counters in GI_PTR.  */
+/* Sort topn profile counters in GI_PTR.  */
 
 static void
 gcov_sort_topn_counter_arrays (const struct gcov_info *gi_ptr)
@@ -730,7 +730,7 @@ gcov_sort_topn_counter_arrays (const struct gcov_info *gi_ptr)
   const struct gcov_fn_info *gfi_ptr;
   const struct gcov_ctr_info *ci_ptr;
 
-  if (!gi_ptr->merge[GCOV_COUNTER_ICALL_TOPNV]) 
+  if (!gi_ptr->merge[GCOV_COUNTER_TOPN]) 
     return;
 
   for (f_ix = 0; (unsigned)f_ix != gi_ptr->n_functions; f_ix++)
@@ -741,9 +741,9 @@ gcov_sort_topn_counter_arrays (const struct gcov_info *gi_ptr)
         {
           if (!gi_ptr->merge[i])
             continue;
-          if (i == GCOV_COUNTER_ICALL_TOPNV)
+          if (i == GCOV_COUNTER_TOPN)
             {
-              gcov_sort_icall_topn_counter (ci_ptr);
+              gcov_sort_topn_counter (ci_ptr);
               break;
             }
           ci_ptr++;

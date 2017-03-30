@@ -122,53 +122,44 @@ __gcov_merge_single (gcov_type *counters, unsigned n_counters)
 }
 #endif /* L_gcov_merge_single */
 
-#ifdef L_gcov_merge_icall_topn
-/* The profile merging function used for merging indirect call counts
+#ifdef L_gcov_merge_topn
+/* The profile merging top N mostly used values.
    This function is given array COUNTERS of N_COUNTERS old counters and it
    reads the same number of counters from the gcov file.  */
 
 void
-__gcov_merge_icall_topn (gcov_type *counters, unsigned n_counters)
+__gcov_merge_topn (gcov_type *counters, unsigned n_counters)
 {
-  unsigned i, j, k, m;
+  size_t data_size = GCOV_TOPN_NCOUNTS * sizeof (gcov_type);
+  gcov_type *tmp_array = (gcov_type *) alloca (2 * data_size);
 
-  gcc_assert (!(n_counters % GCOV_ICALL_TOPN_NCOUNTS));
-  for (i = 0; i < n_counters; i += GCOV_ICALL_TOPN_NCOUNTS)
+  gcc_assert (!(n_counters % GCOV_TOPN_NCOUNTS));
+  for (unsigned i = 0; i < n_counters; i += GCOV_TOPN_NCOUNTS)
     {
-      gcov_type *value_array = &counters[i + 1];
-      unsigned tmp_size = 2 * (GCOV_ICALL_TOPN_NCOUNTS - 1);
-      gcov_type *tmp_array 
-          = (gcov_type *) alloca (tmp_size * sizeof (gcov_type));
+      gcov_type *value_array = &counters[i];
 
-      for (j = 0; j < tmp_size; j++)
-        tmp_array[j] = 0;
+      memcpy (tmp_array, value_array, data_size);
+      memset (tmp_array + data_size, 0, data_size);
+      unsigned j = GCOV_TOPN_NCOUNTS;
 
-      for (j = 0; j < GCOV_ICALL_TOPN_NCOUNTS - 1; j += 2)
-        {
-          tmp_array[j] = value_array[j];
-          tmp_array[j + 1] = value_array [j + 1];
-        }
-
-      /* Skip the number_of_eviction entry.  */
-      gcov_get_counter ();
-      for (k = 0; k < GCOV_ICALL_TOPN_NCOUNTS - 1; k += 2)
+      for (unsigned k = 0; k < GCOV_TOPN_NCOUNTS; k += 2)
         {
           int found = 0;
-          gcov_type global_id = gcov_get_counter_target ();
-          gcov_type call_count = gcov_get_counter ();
-          for (m = 0; m < j; m += 2)
+          gcov_type value = gcov_get_counter_target ();
+          gcov_type count = gcov_get_counter ();
+          for (unsigned m = 0; m < j; m += 2)
             {
-              if (tmp_array[m] == global_id)
+              if (tmp_array[m] == value)
                 {
                   found = 1;
-                  tmp_array[m + 1] += call_count;
+                  tmp_array[m + 1] += count;
                   break;
                 }
             }
           if (!found)
             {
-              tmp_array[j] = global_id;
-              tmp_array[j + 1] = call_count;
+              tmp_array[j] = value;
+              tmp_array[j + 1] = count;
               j += 2;
             }
         }
@@ -176,12 +167,15 @@ __gcov_merge_icall_topn (gcov_type *counters, unsigned n_counters)
       gcov_sort_n_vals (tmp_array, j);
 
       /* Now copy back the top half of the temp array */
-      for (k = 0; k < GCOV_ICALL_TOPN_NCOUNTS - 1; k += 2)
-        {
-          value_array[k] = tmp_array[k];
-          value_array[k + 1] = tmp_array[k + 1];
-        }
+      memcpy (value_array, tmp_array, data_size);
     }
 }
-#endif /* L_gcov_merge_icall_topn */
+
+void
+__gcov_merge_icall_topn (gcov_type *counters, unsigned n_counters)
+{
+  __gcov_merge_topn (counters, n_counters);
+}
+
+#endif /* L_gcov_merge_topn */
 #endif /* inhibit_libc */

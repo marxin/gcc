@@ -164,102 +164,43 @@ __gcov_one_value_profiler_atomic (gcov_type *counters, gcov_type value)
 #endif
 
 #ifdef L_gcov_indirect_call_topn_profiler
+
 /* Tries to keep track the most frequent N values in the counters where
-   N is specified by parameter TOPN_VAL. To track top N values, 2*N counter
+   N is specified by parameter TOPN_VAL. To track top N values, 2 * N counter
    entries are used.
-   counter[0] --- the accumative count of the number of times one entry in
-                  in the counters gets evicted/replaced due to limited capacity.
-                  When this value reaches a threshold, the bottom N values are
-                  cleared.
-   counter[1] through counter[2*N] records the top 2*N values collected so far.
-   Each value is represented by two entries: count[2*i+1] is the ith value, and
-   count[2*i+2] is the number of times the value is seen.  */
+
+   counter[0] through counter[2 * N - 1] records the top 2 * N values collected
+   so far. Each value is represented by two entries: count[2 * i] is the ith
+   value, and count[2 * i + 1] is the number of times the value is seen.  */
 
 static void
 __gcov_topn_value_profiler_body (gcov_type *counters, gcov_type value)
 {
-   unsigned i, found = 0, have_zero_count = 0;
    gcov_type *entry;
-   gcov_type *lfu_entry = &counters[1];
-   gcov_type *value_array = &counters[1];
-   gcov_type *num_eviction = &counters[0];
-   gcov_unsigned_t topn_val = GCOV_ICALL_TOPN_VAL;
+   gcov_type *lfu_entry = &counters[0];
+   gcov_type *value_array = &counters[0];
+   gcov_unsigned_t topn_val = GCOV_TOPN_VAL;
 
-   /* There are 2*topn_val values tracked, each value takes two slots in the
+   /* There are 2 * topn_val values tracked, each value takes two slots in the
       counter array.  */
-   for (i = 0; i < (topn_val << 2); i += 2)
+   for (unsigned i = 0; i < 2 * topn_val; i += 2)
      {
        entry = &value_array[i];
        if (entry[0] == value)
          {
-           entry[1]++ ;
-           found = 1;
-           break;
-         }
-       else if (entry[1] == 0)
-         {
-           lfu_entry = entry;
-           have_zero_count = 1;
+           entry[1]++;
+	   return;
          }
       else if (entry[1] < lfu_entry[1])
         lfu_entry = entry;
      }
 
-   if (found)
-     return;
-
    /* lfu_entry is either an empty entry or an entry
       with lowest count, which will be evicted.  */
-   lfu_entry[0] = value;
-   lfu_entry[1] = 1;
-
-#define GCOV_ICALL_COUNTER_CLEAR_THRESHOLD 3000
-
-   /* Too many evictions -- time to clear bottom entries to
-      avoid hot values bumping each other out.  */
-   if (!have_zero_count
-       && ++*num_eviction >= GCOV_ICALL_COUNTER_CLEAR_THRESHOLD)
+   if (lfu_entry[1] == 0 || (--lfu_entry[1]) == 0)
      {
-       unsigned i, j;
-       gcov_type *p, minv;
-       gcov_type* tmp_cnts
-           = (gcov_type *)alloca (topn_val * sizeof (gcov_type));
-
-       *num_eviction = 0;
-
-       for (i = 0; i < topn_val; i++)
-         tmp_cnts[i] = 0;
-
-       /* Find the largest topn_val values from the group of
-          2*topn_val values and put them into tmp_cnts.  */
-
-       for (i = 0; i < 2 * topn_val; i += 2)
-         {
-           p = 0;
-           for (j = 0; j < topn_val; j++)
-             {
-               if (!p || tmp_cnts[j] < *p)
-                  p = &tmp_cnts[j];
-             }
-            if (value_array[i + 1] > *p)
-              *p = value_array[i + 1];
-         }
-
-       minv = tmp_cnts[0];
-       for (j = 1; j < topn_val; j++)
-         {
-           if (tmp_cnts[j] < minv)
-             minv = tmp_cnts[j];
-         }
-       /* Zero out low value entries.  */
-       for (i = 0; i < 2 * topn_val; i += 2)
-         {
-           if (value_array[i + 1] < minv)
-             {
-               value_array[i] = 0;
-               value_array[i + 1] = 0;
-             }
-         }
+       lfu_entry[0] = value;
+       lfu_entry[1] = 1;
      }
 }
 
@@ -284,7 +225,7 @@ void *__gcov_indirect_call_topn_callee ATTRIBUTE_HIDDEN;
 #define VTABLE_USES_DESCRIPTORS 0
 #endif
 
-/* This fucntion is instrumented at function entry to track topn indirect
+/* This function is instrumented at function entry to track topn indirect
    calls to CUR_FUNC.  */
  
 void
@@ -299,6 +240,21 @@ __gcov_indirect_call_topn_profiler (gcov_type value, void* cur_func)
 	  && *(void **) cur_func == *(void **) callee_func))
     __gcov_topn_value_profiler_body (__gcov_indirect_call_topn_counters, value);
 }
+
+/* This function is instrumented to track top N most commontly used values.  */
+
+void
+__gcov_topn_profiler (gcov_type *counters, gcov_type value)
+{
+  __gcov_topn_value_profiler_body (counters, value);
+}
+
+void
+__gcov_topn_profiler_atomic (gcov_type *counters, gcov_type value)
+{
+  __gcov_topn_value_profiler_body (counters, value);
+}
+
 #endif
 
 #ifdef L_gcov_indirect_call_profiler_v2

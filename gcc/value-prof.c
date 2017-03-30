@@ -300,19 +300,6 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
       fprintf (dump_file, ".\n");
       break;
 
-    case HIST_TYPE_INDIR_CALL:
-      fprintf (dump_file, "Indirect call ");
-      if (hist->hvalue.counters)
-	{
-	   fprintf (dump_file, "value:%" PRId64
-		    " match:%" PRId64
-		    " all:%" PRId64,
-		    (int64_t) hist->hvalue.counters[0],
-		    (int64_t) hist->hvalue.counters[1],
-		    (int64_t) hist->hvalue.counters[2]);
-	}
-      fprintf (dump_file, ".\n");
-      break;
     case HIST_TYPE_TIME_PROFILE:
       fprintf (dump_file, "Time profile ");
       if (hist->hvalue.counters)
@@ -322,20 +309,14 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
       }
       fprintf (dump_file, ".\n");
       break;
-    case HIST_TYPE_INDIR_CALL_TOPN:
-      fprintf (dump_file, "Indirect call topn ");
+    case HIST_TYPE_TOPN:
+      fprintf (dump_file, "Top N");
       if (hist->hvalue.counters)
-	{
-           int i;
-
-           fprintf (dump_file, "accu:%" PRId64, hist->hvalue.counters[0]);
-           for (i = 1; i < (GCOV_ICALL_TOPN_VAL << 2); i += 2)
-             {
-               fprintf (dump_file, " target:%" PRId64 " value:%" PRId64,
-                       (int64_t) hist->hvalue.counters[i],
-                       (int64_t) hist->hvalue.counters[i+1]);
-             }
-        }
+       for (int i = 0; i < GCOV_TOPN_NCOUNTS; i += 2)
+	 if (hist->hvalue.counters[i + 1])
+	   fprintf (dump_file, " {%" PRId64 ": %" PRId64 "}",
+		    (int64_t) hist->hvalue.counters[i],
+		    (int64_t) hist->hvalue.counters[i + 1]);
       fprintf (dump_file, ".\n");
       break;
     case HIST_TYPE_MAX:
@@ -406,26 +387,20 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple *stmt)
 	  new_val->hdata.intvl.steps = streamer_read_uhwi (ib);
 	  ncounters = new_val->hdata.intvl.steps + 2;
 	  break;
-
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
 	  ncounters = 2;
 	  break;
-
 	case HIST_TYPE_SINGLE_VALUE:
-	case HIST_TYPE_INDIR_CALL:
 	  ncounters = 3;
 	  break;
-
 	case HIST_TYPE_IOR:
         case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 1;
 	  break;
-
-        case HIST_TYPE_INDIR_CALL_TOPN:
-          ncounters = (GCOV_ICALL_TOPN_VAL << 2) + 1;
+        case HIST_TYPE_TOPN:
+          ncounters = GCOV_TOPN_NCOUNTS;
           break;
-
 	case HIST_TYPE_MAX:
 	  gcc_unreachable ();
 	}
@@ -1527,7 +1502,6 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
 {
   gcall *stmt;
   histogram_value histogram;
-  gcov_type val, count, all, bb_all;
   struct cgraph_node *direct_call;
 
   stmt = dyn_cast <gcall *> (gsi_stmt (*gsi));
@@ -1540,39 +1514,35 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
   if (gimple_call_internal_p (stmt))
     return false;
 
-  histogram = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_INDIR_CALL);
+  gcov_type bb_all = gimple_bb (stmt)->count;
+
+  histogram = gimple_histogram_value_of_type (cfun, stmt,
+					      HIST_TYPE_TOPN);
   if (!histogram)
     return false;
 
-  val = histogram->hvalue.counters [0];
-  count = histogram->hvalue.counters [1];
-  all = histogram->hvalue.counters [2];
+  /* TOP N values are sorted by number of occurrences.  */
+  gcov_type function_count = histogram->hvalue.counters[0];
+  gcov_type function_id = histogram->hvalue.counters[1];
 
-  bb_all = gimple_bb (stmt)->count;
-  /* The order of CHECK_COUNTER calls is important -
-     since check_counter can correct the third parameter
-     and we want to make count <= all <= bb_all. */
-  if ( check_counter (stmt, "ic", &all, &bb_all, bb_all)
-      || check_counter (stmt, "ic", &count, &all, all))
+  if (7 * function_count < 4 * bb_all)
     {
       gimple_remove_histogram_value (cfun, stmt, histogram);
       return false;
     }
 
-  if (4 * count <= 3 * all)
-    return false;
-
-  direct_call = find_func_by_profile_id ((int)val);
+  direct_call = find_func_by_profile_id ((int)function_id);
 
   if (direct_call == NULL)
     {
-      if (val)
+      if (function_id)
 	{
 	  if (dump_file)
 	    {
 	      fprintf (dump_file, "Indirect call -> direct call from other module");
 	      print_generic_expr (dump_file, gimple_call_fn (stmt), TDF_SLIM);
-	      fprintf (dump_file, "=> %i (will resolve only with LTO)\n", (int)val);
+	      fprintf (dump_file, "=> %i (will resolve only with LTO)\n",
+		       (int)function_id);
 	    }
 	}
       return false;
@@ -1597,12 +1567,10 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
     {
       fprintf (dump_file, "Indirect call -> direct call ");
       print_generic_expr (dump_file, gimple_call_fn (stmt), TDF_SLIM);
-      fprintf (dump_file, "=> ");
+      fprintf (dump_file, " => ");
       print_generic_expr (dump_file, direct_call->decl, TDF_SLIM);
-      fprintf (dump_file, " transformation on insn postponned to ipa-profile");
+      fprintf (dump_file, " transformation on insn postponed to ipa-profile");
       print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
-      fprintf (dump_file, "hist->count %" PRId64
-	       " hist->all %" PRId64"\n", count, all);
     }
 
   return true;
@@ -1776,13 +1744,13 @@ gimple_stringops_transform (gimple_stmt_iterator *gsi)
   if (TREE_CODE (blck_size) == INTEGER_CST)
     return false;
 
-  histogram = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_SINGLE_VALUE);
+  histogram = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_TOPN);
   if (!histogram)
     return false;
 
   val = histogram->hvalue.counters[0];
   count = histogram->hvalue.counters[1];
-  all = histogram->hvalue.counters[2];
+  all = gimple_bb (stmt)->count;
   gimple_remove_histogram_value (cfun, stmt, histogram);
 
   /* We require that count is at least half of all; this means
@@ -1961,6 +1929,17 @@ gimple_divmod_values_to_profile (gimple *stmt, histogram_values *values)
     }
 }
 
+bool
+instrument_indirect_call_p  (gimple *stmt)
+{
+  if (gimple_code (stmt) != GIMPLE_CALL
+      || gimple_call_internal_p (stmt)
+      || gimple_call_fndecl (stmt) != NULL_TREE)
+    return false;
+
+  return true;
+}
+
 /* Find calls inside STMT for that we want to measure histograms for
    indirect/virtual call optimization. */
 
@@ -1969,22 +1948,15 @@ gimple_indirect_call_to_profile (gimple *stmt, histogram_values *values)
 {
   tree callee;
 
-  if (gimple_code (stmt) != GIMPLE_CALL
-      || gimple_call_internal_p (stmt)
-      || gimple_call_fndecl (stmt) != NULL_TREE)
+  if (!instrument_indirect_call_p (stmt))
     return;
 
   callee = gimple_call_fn (stmt);
 
   values->reserve (3);
 
-  values->quick_push (gimple_alloc_histogram_value (
-                        cfun,
-                        PARAM_VALUE (PARAM_INDIR_CALL_TOPN_PROFILE) ?
-                          HIST_TYPE_INDIR_CALL_TOPN :
-                          HIST_TYPE_INDIR_CALL,
-			stmt, callee));
-
+  values->quick_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TOPN,
+						    stmt, callee));
   return;
 }
 
@@ -2015,7 +1987,7 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
   if (TREE_CODE (blck_size) != INTEGER_CST)
     {
       values->safe_push (gimple_alloc_histogram_value (cfun,
-						       HIST_TYPE_SINGLE_VALUE,
+						       HIST_TYPE_TOPN,
 						       stmt, blck_size));
       values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_AVERAGE,
 						       stmt, blck_size));
@@ -2050,7 +2022,8 @@ gimple_find_values_to_profile (histogram_values *values)
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
       gimple_values_to_profile (gsi_stmt (gsi), values);
 
-  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE, 0, 0));
+  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE,
+						   0, 0));
 
   FOR_EACH_VEC_ELT (*values, i, hist)
     {
@@ -2068,10 +2041,6 @@ gimple_find_values_to_profile (histogram_values *values)
 	  hist->n_counters = 3;
 	  break;
 
- 	case HIST_TYPE_INDIR_CALL:
- 	  hist->n_counters = 3;
-	  break;
-
         case HIST_TYPE_TIME_PROFILE:
           hist->n_counters = 1;
           break;
@@ -2084,8 +2053,8 @@ gimple_find_values_to_profile (histogram_values *values)
 	  hist->n_counters = 1;
 	  break;
 
-        case HIST_TYPE_INDIR_CALL_TOPN:
-          hist->n_counters = GCOV_ICALL_TOPN_NCOUNTS;
+        case HIST_TYPE_TOPN:
+          hist->n_counters = GCOV_TOPN_NCOUNTS;
           break;
 
 	default:

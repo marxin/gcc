@@ -179,10 +179,12 @@ instrument_values (histogram_values values)
 	  gimple_gen_one_value_profiler (hist, t, 0);
 	  break;
 
- 	case HIST_TYPE_INDIR_CALL:
- 	case HIST_TYPE_INDIR_CALL_TOPN:
- 	  gimple_gen_ic_profiler (hist, t, 0);
-  	  break;
+	case HIST_TYPE_TOPN:
+	  if (instrument_indirect_call_p (hist->hvalue.stmt))
+	    gimple_gen_ic_profiler (hist, t, 0);
+	  else
+	    gimple_gen_topn_profiler (hist, t, 0);
+	  break;
 
 	case HIST_TYPE_AVERAGE:
 	  gimple_gen_average_profiler (hist, t, 0);

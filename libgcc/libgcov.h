@@ -128,7 +128,7 @@ typedef unsigned gcov_position_t;
 #define L_gcov_merge_single 1
 #define L_gcov_merge_ior 1
 #define L_gcov_merge_time_profile 1
-#define L_gcov_merge_icall_topn 1
+#define L_gcov_merge_topn 1
 
 extern gcov_type gcov_read_counter_mem ();
 extern unsigned gcov_get_merge_weight ();
@@ -261,7 +261,11 @@ extern void __gcov_merge_single (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
 /* The merge function that just ors the counters together.  */
 extern void __gcov_merge_ior (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
 
-/* The merge function is used for topn indirect call counters.  */
+/* The merge function is used for top N mostly frequently used values.  */
+extern void __gcov_merge_topn (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
+
+/* The merge function is used for top N mostly frequently used indirect
+   call targets.  */
 extern void __gcov_merge_icall_topn (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
 
 /* The profiler functions.  */
@@ -280,6 +284,8 @@ extern void __gcov_average_profiler_atomic (gcov_type *, gcov_type);
 extern void __gcov_ior_profiler (gcov_type *, gcov_type);
 extern void __gcov_ior_profiler_atomic (gcov_type *, gcov_type);
 extern void __gcov_indirect_call_topn_profiler (gcov_type, void *);
+extern void __gcov_topn_profiler (gcov_type *, gcov_type);
+extern void __gcov_topn_profiler_atomic (gcov_type *, gcov_type);
 extern void gcov_sort_n_vals (gcov_type *, int);
 
 #ifndef inhibit_libc
