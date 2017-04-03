@@ -756,15 +756,6 @@ __gcov_topn_counter_op (gcov_type *counters, unsigned n_counters,
     }
 }
 
-/* Performing FN upon top N indirect calls.  */
-
-static void
-__gcov_icall_topn_counter_op (gcov_type *counters, unsigned n_counters,
-			      counter_op_fn fn, void *data1, void *data2)
-{
-  __gcov_topn_counter_op (counters, n_counters, fn, data1, data2);
-}
-
 /* Scaling the counter value V by multiplying *(float*) DATA1.  */
 
 static gcov_type

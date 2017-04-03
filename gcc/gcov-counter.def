@@ -49,6 +49,3 @@ DEF_GCOV_COUNTER(GCOV_TIME_PROFILER, "time_profiler", _time_profile)
 
 /* Top N most commonly used values tracking.  */
 DEF_GCOV_COUNTER(GCOV_COUNTER_TOPN, "topn", _topn)
-
-/* The most common indirect address.  */
-DEF_GCOV_COUNTER(GCOV_COUNTER_ICALL_TOPN, "indirect_call", _icall_topn)

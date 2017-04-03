@@ -119,12 +119,14 @@ static bool gimple_ic_transform (gimple_stmt_iterator *);
 
 histogram_value
 gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, gimple *stmt, tree value)
+			      enum hist_type type, gimple *stmt, tree value,
+			      enum topn_hist_type topn_type)
 {
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = stmt;
    hist->type = type;
+   hist->topn_type = topn_type;
    return hist;
 }
 
@@ -310,7 +312,20 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
       fprintf (dump_file, ".\n");
       break;
     case HIST_TYPE_TOPN:
-      fprintf (dump_file, "Top N");
+      const char *prefix;
+      switch (hist->topn_type)
+	{
+	case INDIRECT_CALL:
+	  prefix = "Indirect call";
+	  break;
+	case STRING_OPERATION:
+	  prefix = "String operation";
+	  break;
+	default:
+	  gcc_unreachable ();
+	}
+
+      fprintf (dump_file, "%s Top N", prefix);
       if (hist->hvalue.counters)
        for (int i = 0; i < GCOV_TOPN_NCOUNTS; i += 2)
 	 if (hist->hvalue.counters[i + 1])
@@ -1756,7 +1771,7 @@ gimple_stringops_transform (gimple_stmt_iterator *gsi)
   /* We require that count is at least half of all; this means
      that for the transformation to fire the value must be constant
      at least 80% of time.  */
-  if ((6 * count / 5) < all || optimize_bb_for_size_p (gimple_bb (stmt)))
+  if ((10 * count / 6) < all || optimize_bb_for_size_p (gimple_bb (stmt)))
     return false;
   if (check_counter (stmt, "value", &count, &all, gimple_bb (stmt)->count))
     return false;
@@ -1956,7 +1971,8 @@ gimple_indirect_call_to_profile (gimple *stmt, histogram_values *values)
   values->reserve (3);
 
   values->quick_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TOPN,
-						    stmt, callee));
+						    stmt, callee,
+						    INDIRECT_CALL));
   return;
 }
 
@@ -1988,7 +2004,8 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
     {
       values->safe_push (gimple_alloc_histogram_value (cfun,
 						       HIST_TYPE_TOPN,
-						       stmt, blck_size));
+						       stmt, blck_size,
+						       STRING_OPERATION));
       values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_AVERAGE,
 						       stmt, blck_size));
     }

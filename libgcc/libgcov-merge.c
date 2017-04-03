@@ -139,7 +139,7 @@ __gcov_merge_topn (gcov_type *counters, unsigned n_counters)
       gcov_type *value_array = &counters[i];
 
       memcpy (tmp_array, value_array, data_size);
-      memset (tmp_array + data_size, 0, data_size);
+      memset (tmp_array + GCOV_TOPN_NCOUNTS, 0, data_size);
       unsigned j = GCOV_TOPN_NCOUNTS;
 
       for (unsigned k = 0; k < GCOV_TOPN_NCOUNTS; k += 2)
@@ -170,12 +170,5 @@ __gcov_merge_topn (gcov_type *counters, unsigned n_counters)
       memcpy (value_array, tmp_array, data_size);
     }
 }
-
-void
-__gcov_merge_icall_topn (gcov_type *counters, unsigned n_counters)
-{
-  __gcov_merge_topn (counters, n_counters);
-}
-
 #endif /* L_gcov_merge_topn */
 #endif /* inhibit_libc */

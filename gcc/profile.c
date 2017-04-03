@@ -180,10 +180,17 @@ instrument_values (histogram_values values)
 	  break;
 
 	case HIST_TYPE_TOPN:
-	  if (instrument_indirect_call_p (hist->hvalue.stmt))
-	    gimple_gen_ic_profiler (hist, t, 0);
-	  else
-	    gimple_gen_topn_profiler (hist, t, 0);
+	  switch (hist->topn_type)
+	    {
+	    case INDIRECT_CALL:
+	      gimple_gen_ic_profiler (hist, t, 0);
+	      break;
+	    case STRING_OPERATION:
+	      gimple_gen_topn_profiler (hist, t, 0);
+	      break;
+	    default:
+	      gcc_unreachable ();
+	    }
 	  break;
 
 	case HIST_TYPE_AVERAGE:

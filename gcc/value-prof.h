@@ -37,6 +37,13 @@ enum hist_type
   HIST_TYPE_MAX
 };
 
+enum topn_hist_type
+{
+  INVALID,
+  INDIRECT_CALL,
+  STRING_OPERATION
+};
+
 #define COUNTER_FOR_HIST_TYPE(TYPE) ((int) (TYPE) + GCOV_FIRST_VALUE_COUNTER)
 #define HIST_TYPE_FOR_COUNTER(COUNTER) \
   ((enum hist_type) ((COUNTER) - GCOV_FIRST_VALUE_COUNTER))
@@ -53,6 +60,7 @@ struct histogram_value_t
       struct histogram_value_t *next;		/* Linked list pointer.  */
     } hvalue;
   enum hist_type type;			/* Type of information to measure.  */
+  enum topn_hist_type topn_type;	/* Type of Top N histogram.  */
   unsigned n_counters;			/* Number of required counters.  */
   struct function *fun;
   union
@@ -74,8 +82,9 @@ typedef vec<histogram_value> histogram_values;
 extern void gimple_find_values_to_profile (histogram_values *);
 extern bool gimple_value_profile_transformations (void);
 
-histogram_value gimple_alloc_histogram_value (struct function *, enum hist_type,
-					      gimple *stmt, tree);
+histogram_value gimple_alloc_histogram_value
+  (struct function *, enum hist_type, gimple *stmt, tree,
+   enum topn_hist_type hist_type = INVALID);
 histogram_value gimple_histogram_value (struct function *, gimple *);
 histogram_value gimple_histogram_value_of_type (struct function *, gimple *,
 						enum hist_type);

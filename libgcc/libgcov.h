@@ -264,10 +264,6 @@ extern void __gcov_merge_ior (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
 /* The merge function is used for top N mostly frequently used values.  */
 extern void __gcov_merge_topn (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
 
-/* The merge function is used for top N mostly frequently used indirect
-   call targets.  */
-extern void __gcov_merge_icall_topn (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
-
 /* The profiler functions.  */
 extern void __gcov_interval_profiler (gcov_type *, gcov_type, int, unsigned);
 extern void __gcov_interval_profiler_atomic (gcov_type *, gcov_type, int,
