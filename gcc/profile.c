@@ -923,6 +923,12 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
           if (dump_file)
             fprintf (dump_file, "Read tp_first_run: %d\n", node->tp_first_run);
         }
+
+      /* Top N (and Indirect call Top N) counter types must be sorted in
+	 decreasing order.  Sorting is done during execution just when
+	 a merging operation is processed.  */
+      if (hist->type == HIST_TYPE_TOPN || hist->type == HIST_TYPE_ICALL_TOPN)
+	gcov_sort_n_vals (hist->hvalue.counters, GCOV_TOPN_NCOUNTS);
     }
 
   for (t = 0; t < GCOV_N_VALUE_COUNTERS; t++)

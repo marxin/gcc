@@ -382,6 +382,8 @@ GCOV_LINKAGE void gcov_sync (gcov_position_t /*base*/,
 #if !IN_GCOV
 /* Available outside gcov */
 GCOV_LINKAGE void gcov_write_unsigned (gcov_unsigned_t) ATTRIBUTE_HIDDEN;
+GCOV_LINKAGE void gcov_sort_n_vals (gcov_type *value_array, int n)
+    ATTRIBUTE_HIDDEN;
 #endif
 
 #if !IN_GCOV && !IN_LIBGCOV

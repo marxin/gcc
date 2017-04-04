@@ -1542,9 +1542,25 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
   gcov_type bb_all = gimple_bb (stmt)->count;
 
   histogram = gimple_histogram_value_of_type (cfun, stmt,
-					      HIST_TYPE_TOPN);
+					      HIST_TYPE_ICALL_TOPN);
   if (!histogram)
     return false;
+
+  gcov_type max = -1;
+  for (unsigned i = 0; i < GCOV_TOPN_VAL; i++)
+    {
+      gcov_type value = histogram->hvalue.counters[2 * i + 1];
+      if (max == -1)
+	{
+	  max = value;
+	  continue;
+	}
+
+      if (value > max)
+	gcc_unreachable ();
+      else
+	max = value;
+    }
 
   /* TOP N values are sorted by number of occurrences.  */
   gcov_type function_count = histogram->hvalue.counters[0];

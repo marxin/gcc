@@ -282,7 +282,6 @@ extern void __gcov_ior_profiler_atomic (gcov_type *, gcov_type);
 extern void __gcov_indirect_call_topn_profiler (gcov_type, void *);
 extern void __gcov_topn_profiler (gcov_type *, gcov_type);
 extern void __gcov_topn_profiler_atomic (gcov_type *, gcov_type);
-extern void gcov_sort_n_vals (gcov_type *, int);
 
 #ifndef inhibit_libc
 /* The wrappers around some library functions..  */

@@ -310,6 +310,33 @@ gcov_write_unsigned (gcov_unsigned_t value)
   buffer[0] = value;
 }
 
+/* Sort N entries in VALUE_ARRAY in descending order.
+   Each entry in VALUE_ARRAY has two values. The sorting
+   is based on the second value.  */
+
+GCOV_LINKAGE void
+gcov_sort_n_vals (gcov_type *value_array, int n)
+{
+  int j, k;
+
+  for (j = 2; j < n; j += 2)
+    {
+      gcov_type cur_ent[2];
+
+      cur_ent[0] = value_array[j];
+      cur_ent[1] = value_array[j + 1];
+      k = j - 2;
+      while (k >= 0 && value_array[k + 1] < cur_ent[1])
+        {
+          value_array[k + 2] = value_array[k];
+          value_array[k + 3] = value_array[k + 1];
+          k -= 2;
+        }
+      value_array[k + 2] = cur_ent[0];
+      value_array[k + 3] = cur_ent[1];
+    }
+}
+
 /* Write counter VALUE to coverage file.  Sets error flag
    appropriately.  */
 
