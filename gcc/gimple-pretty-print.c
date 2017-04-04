@@ -114,7 +114,7 @@ print_gimple_stmt (FILE *file, gimple *g, int spc, int flags)
   pp_needs_newline (&buffer) = true;
   buffer.buffer->stream = file;
   pp_gimple_stmt_1 (&buffer, g, spc, flags);
-  pp_newline_and_flush (&buffer);
+  pp_flush (&buffer);
 }
 
 DEBUG_FUNCTION void

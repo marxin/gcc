@@ -327,12 +327,22 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 
       fprintf (dump_file, "%s Top N", prefix);
       if (hist->hvalue.counters)
-       for (int i = 0; i < GCOV_TOPN_NCOUNTS; i += 2)
-	 if (hist->hvalue.counters[i + 1])
-	   fprintf (dump_file, " {%" PRId64 ": %" PRId64 "}",
-		    (int64_t) hist->hvalue.counters[i],
-		    (int64_t) hist->hvalue.counters[i + 1]);
-      fprintf (dump_file, ".\n");
+	{
+	  gcov_type sum = 0;
+	   for (int i = 0; i < GCOV_TOPN_NCOUNTS; i += 2)
+	     sum += hist->hvalue.counters[i + 1];
+
+	   if (sum)
+	     fprintf (dump_file, " %.2f%% ",
+		      100.0f * hist->hvalue.counters[1] / sum);
+
+	   for (int i = 0; i < GCOV_TOPN_NCOUNTS; i += 2)
+	     if (hist->hvalue.counters[i + 1])
+	       fprintf (dump_file, " {%" PRId64 ": %" PRId64 "}",
+			(int64_t) hist->hvalue.counters[i],
+			(int64_t) hist->hvalue.counters[i + 1]);
+	}
+	fprintf (dump_file, ".\n");
       break;
     case HIST_TYPE_MAX:
       gcc_unreachable ();
@@ -1597,31 +1607,30 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
 static bool
 interesting_stringop_to_profile_p (gcall *call, int *size_arg)
 {
-  enum built_in_function fcode;
-
-  fcode = DECL_FUNCTION_CODE (gimple_call_fndecl (call));
-  if (fcode != BUILT_IN_MEMCPY && fcode != BUILT_IN_MEMPCPY
-      && fcode != BUILT_IN_MEMSET && fcode != BUILT_IN_BZERO)
-    return false;
-
-  switch (fcode)
+  switch (DECL_FUNCTION_CODE (gimple_call_fndecl (call)))
     {
      case BUILT_IN_MEMCPY:
      case BUILT_IN_MEMPCPY:
+     case BUILT_IN_MEMCMP:
+     case BUILT_IN_MEMMOVE:
+     case BUILT_IN_MEMCHR:
+     case BUILT_IN_STRNCPY:
+     case BUILT_IN_STRNCMP:
+     case BUILT_IN_STRNCASECMP:
        *size_arg = 2;
-       return validate_gimple_arglist (call, POINTER_TYPE, POINTER_TYPE,
-				       INTEGER_TYPE, VOID_TYPE);
+       break;
      case BUILT_IN_MEMSET:
        *size_arg = 2;
-       return validate_gimple_arglist (call, POINTER_TYPE, INTEGER_TYPE,
-				      INTEGER_TYPE, VOID_TYPE);
+       break;
      case BUILT_IN_BZERO:
+     case BUILT_IN_STRNDUP:
        *size_arg = 1;
-       return validate_gimple_arglist (call, POINTER_TYPE, INTEGER_TYPE,
-				       VOID_TYPE);
+       break;
      default:
-       gcc_unreachable ();
+       return false;
     }
+
+  return true;
 }
 
 /* Convert stringop (..., vcall_size)
@@ -1768,6 +1777,14 @@ gimple_stringops_transform (gimple_stmt_iterator *gsi)
   all = gimple_bb (stmt)->count;
   gimple_remove_histogram_value (cfun, stmt, histogram);
 
+  if (dump_file)
+    {
+      fprintf (dump_file, "String transformations on stmt has probability %.2f%% ", 100.0f * count / all);
+      print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
+      fprintf (dump_file, " top value %ld optimize_for_size: %d\n", val, 
+	       optimize_bb_for_size_p (gimple_bb (stmt)));
+    }
+
   /* We require that count is at least half of all; this means
      that for the transformation to fire the value must be constant
      at least 80% of time.  */
@@ -1805,7 +1822,7 @@ gimple_stringops_transform (gimple_stmt_iterator *gsi)
 	return false;
       break;
     default:
-      gcc_unreachable ();
+      return false;
     }
 
   if (sizeof (gcov_type) == sizeof (HOST_WIDE_INT))
