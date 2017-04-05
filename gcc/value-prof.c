@@ -654,6 +654,7 @@ gimple_value_profile_transformations (void)
 	    {
 	      fprintf (dump_file, "Trying transformations on stmt ");
 	      print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
+	      fprintf (dump_file, "\n");
 	      dump_histograms_for_stmt (cfun, dump_file, stmt);
 	    }
 
@@ -2130,6 +2131,7 @@ gimple_find_values_to_profile (histogram_values *values)
         {
 	  fprintf (dump_file, "Stmt ");
           print_gimple_stmt (dump_file, hist->hvalue.stmt, 0, TDF_SLIM);
+	  fprintf (dump_file, "\n");
 	  dump_histogram_value (dump_file, hist);
         }
     }
