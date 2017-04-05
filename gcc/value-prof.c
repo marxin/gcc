@@ -321,6 +321,9 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	case STRING_OPERATION:
 	  prefix = "String operation";
 	  break;
+	case SWITCH:
+	  prefix = "Switch";
+	  break;
 	default:
 	  gcc_unreachable ();
 	}
@@ -1542,7 +1545,7 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
   gcov_type bb_all = gimple_bb (stmt)->count;
 
   histogram = gimple_histogram_value_of_type (cfun, stmt,
-					      HIST_TYPE_ICALL_TOPN);
+					      HIST_TYPE_TOPN);
   if (!histogram)
     return false;
 
@@ -2006,7 +2009,19 @@ gimple_indirect_call_to_profile (gimple *stmt, histogram_values *values)
   values->quick_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TOPN,
 						    stmt, callee,
 						    INDIRECT_CALL));
-  return;
+}
+
+static void
+gimple_switch_to_profile (gimple *stmt, histogram_values *values)
+{
+  gswitch *s = dyn_cast <gswitch *> (stmt);
+  if (s == NULL)
+    return;
+
+  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TOPN,
+						   stmt,
+						   gimple_switch_index (s),
+						   SWITCH));
 }
 
 /* Find values inside STMT for that we want to measure histograms for
@@ -2057,6 +2072,7 @@ gimple_values_to_profile (gimple *stmt, histogram_values *values)
   gimple_divmod_values_to_profile (stmt, values);
   gimple_stringops_values_to_profile (stmt, values);
   gimple_indirect_call_to_profile (stmt, values);
+  gimple_switch_to_profile (stmt, values);
 }
 
 void
