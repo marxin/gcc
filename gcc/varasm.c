@@ -760,7 +760,12 @@ default_no_function_rodata_section (tree decl ATTRIBUTE_UNUSED)
 static const char *
 function_mergeable_rodata_prefix (void)
 {
-  section *s = targetm.asm_out.function_rodata_section (current_function_decl);
+  tree decl = current_function_decl;
+  if (decl && DECL_CONTEXT (decl)
+      && TREE_CODE (DECL_CONTEXT (decl)) == FUNCTION_DECL)
+    decl = DECL_CONTEXT (decl);
+
+  section *s = targetm.asm_out.function_rodata_section (decl);
   if (SECTION_STYLE (s) == SECTION_NAMED)
     return s->named.name;
   else
