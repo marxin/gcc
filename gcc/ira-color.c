@@ -4324,7 +4324,7 @@ allocno_reload_assign (ira_allocno_t a, HARD_REG_SET forbidden_regs)
   int hard_regno;
   enum reg_class aclass;
   int regno = ALLOCNO_REGNO (a);
-  HARD_REG_SET saved[2];
+  HARD_REG_SET saved[2] = {0};
   int i, n;
 
   n = ALLOCNO_NUM_OBJECTS (a);
