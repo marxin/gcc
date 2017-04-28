@@ -2133,7 +2133,7 @@ vectorizable_mask_load_store (gimple *stmt, gimple_stmt_iterator *gsi,
     }
   gcc_assert (memory_access_type == STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info));
 
-  /** Transform.  **/
+  /* Transform.  */
 
   if (memory_access_type == VMAT_GATHER_SCATTER)
     {
@@ -2814,7 +2814,7 @@ vectorizable_call (gimple *gs, gimple_stmt_iterator *gsi, gimple **vec_stmt,
       return true;
     }
 
-  /** Transform.  **/
+  /* Transform.  */
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location, "transform call.\n");
@@ -3458,7 +3458,7 @@ vectorizable_simd_clone_call (gimple *stmt, gimple_stmt_iterator *gsi,
       return true;
     }
 
-  /** Transform.  **/
+  /* Transform.  */
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location, "transform call.\n");
@@ -4319,7 +4319,7 @@ vectorizable_conversion (gimple *stmt, gimple_stmt_iterator *gsi,
       return true;
     }
 
-  /** Transform.  **/
+  /* Transform.  */
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,
                      "transform conversion. ncopies = %d.\n", ncopies);
@@ -4716,7 +4716,7 @@ vectorizable_assignment (gimple *stmt, gimple_stmt_iterator *gsi,
       return true;
     }
 
-  /** Transform.  **/
+  /* Transform.  */
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location, "transform assignment.\n");
 
@@ -5086,7 +5086,7 @@ vectorizable_shift (gimple *stmt, gimple_stmt_iterator *gsi,
       return true;
     }
 
-  /** Transform.  **/
+  /* Transform.  */
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,
@@ -5413,7 +5413,7 @@ vectorizable_operation (gimple *stmt, gimple_stmt_iterator *gsi,
       return true;
     }
 
-  /** Transform.  **/
+  /* Transform.  */
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,
@@ -5748,7 +5748,7 @@ vectorizable_store (gimple *stmt, gimple_stmt_iterator *gsi, gimple **vec_stmt,
     }
   gcc_assert (memory_access_type == STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info));
 
-  /** Transform.  **/
+  /* Transform.  */
 
   ensure_base_align (stmt_info, dr);
 
@@ -6735,7 +6735,7 @@ vectorizable_load (gimple *stmt, gimple_stmt_iterator *gsi, gimple **vec_stmt,
     dump_printf_loc (MSG_NOTE, vect_location,
                      "transform load. ncopies = %d\n", ncopies);
 
-  /** Transform.  **/
+  /* Transform.  */
 
   ensure_base_align (stmt_info, dr);
 
