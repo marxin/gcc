@@ -615,13 +615,13 @@ streamer_alloc_tree (struct lto_input_block *ib, struct data_in *data_in,
   else if (code == CALL_EXPR)
     {
       unsigned HOST_WIDE_INT nargs = streamer_read_uhwi (ib);
-      return build_vl_exp (CALL_EXPR, nargs + 3);
+      result = build_vl_exp (CALL_EXPR, nargs + 3);
     }
   else if (code == OMP_CLAUSE)
     {
       enum omp_clause_code subcode
 	= (enum omp_clause_code) streamer_read_uhwi (ib);
-      return build_omp_clause (UNKNOWN_LOCATION, subcode);
+      result = build_omp_clause (UNKNOWN_LOCATION, subcode);
     }
   else
     {
