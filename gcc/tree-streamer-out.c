@@ -31,7 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "alias.h"
 #include "stor-layout.h"
 #include "gomp-constants.h"
-
+#include "params.h"
 
 /* Output the STRING constant to the string
    table in OB.  Then put the index onto the INDEX_STREAM.  */
@@ -953,14 +953,15 @@ streamer_write_tree_header (struct output_block *ob, tree expr)
   streamer_write_record_start (ob, tag);
 
   /* The following will cause bootstrap miscomparisons.  Enable with care.  */
-#ifdef LTO_STREAMER_DEBUG
-  /* This is used mainly for debugging purposes.  When the reader
-     and the writer do not agree on a streamed node, the pointer
-     value for EXPR can be used to track down the differences in
-     the debugger.  */
-  gcc_assert ((HOST_WIDE_INT) (intptr_t) expr == (intptr_t) expr);
-  streamer_write_hwi (ob, (HOST_WIDE_INT) (intptr_t) expr);
-#endif
+  if (PARAM_VALUE (LTO_STREAMER_CHECKING))
+    {
+      /* This is used mainly for debugging purposes.  When the reader
+	 and the writer do not agree on a streamed node, the pointer
+	 value for EXPR can be used to track down the differences in
+	 the debugger.  */
+      gcc_assert ((HOST_WIDE_INT) (intptr_t) expr == (intptr_t) expr);
+      streamer_write_hwi (ob, (HOST_WIDE_INT) (intptr_t) expr);
+    }
 
   /* The text in strings and identifiers are completely emitted in
      the header.  */

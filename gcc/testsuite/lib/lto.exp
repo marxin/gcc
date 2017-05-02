@@ -68,21 +68,21 @@ proc lto_init { args } {
     if ![info exists LTO_OPTIONS] {
         if [check_linker_plugin_available] {
 	  set LTO_OPTIONS [list	\
-	      {-O0 -flto -flto-partition=none -fuse-linker-plugin} \
-	      {-O2 -flto -flto-partition=none -fuse-linker-plugin -fno-fat-lto-objects } \
-	      {-O0 -flto -flto-partition=1to1 -fno-use-linker-plugin } \
-	      {-O2 -flto -flto-partition=1to1 -fno-use-linker-plugin } \
-	      {-O0 -flto -fuse-linker-plugin -fno-fat-lto-objects }	\
-	      {-O2 -flto -fuse-linker-plugin}	\
+	      {-O0 -flto -flto-partition=none -fuse-linker-plugin --param lto-streamer-checking=1 } \
+	      {-O2 -flto -flto-partition=none -fuse-linker-plugin -fno-fat-lto-objects --param lto-streamer-checking=1 } \
+	      {-O0 -flto -flto-partition=1to1 -fno-use-linker-plugin --param lto-streamer-checking=1 } \
+	      {-O2 -flto -flto-partition=1to1 -fno-use-linker-plugin --param lto-streamer-checking=1 } \
+	      {-O0 -flto -fuse-linker-plugin -fno-fat-lto-objects --param lto-streamer-checking=1 }	\
+	      {-O2 -flto -fuse-linker-plugin --param lto-streamer-checking=1 }	\
 	  ]
  	} else {
 	  set LTO_OPTIONS [list	\
-	      {-O0 -flto -flto-partition=none } \
-	      {-O2 -flto -flto-partition=none } \
-	      {-O0 -flto -flto-partition=1to1 } \
-	      {-O2 -flto -flto-partition=1to1 } \
-	      {-O0 -flto }	\
-	      {-O2 -flto}		\
+	      {-O0 -flto -flto-partition=none --param lto-streamer-checking=1 } \
+	      {-O2 -flto -flto-partition=none --param lto-streamer-checking=1 } \
+	      {-O0 -flto -flto-partition=1to1 --param lto-streamer-checking=1 } \
+	      {-O2 -flto -flto-partition=1to1 --param lto-streamer-checking=1 } \
+	      {-O0 -flto --param lto-streamer-checking=1 }	\
+	      {-O2 -flto --param lto-streamer-checking=1 }		\
 	  ]
 	}
     }

@@ -1057,6 +1057,11 @@ DEFPARAM (MAX_PARTITION_SIZE,
 	  "Maximal size of a partition for LTO (in estimated instructions).",
 	  1000000, 0, INT_MAX)
 
+DEFPARAM (LTO_STREAMER_CHECKING,
+	  "lto-streamer-checking",
+	  "Perform LTO streamer checking.",
+	  0, 0, 1)
+
 /* Diagnostic parameters.  */
 
 DEFPARAM (CXX_MAX_NAMESPACES_FOR_DIAGNOSTIC_HELP,

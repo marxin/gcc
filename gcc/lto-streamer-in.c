@@ -41,7 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "except.h"
 #include "cgraph.h"
 #include "cfgloop.h"
-
+#include "params.h"
 
 struct freeing_string_slot_hasher : string_slot_hasher
 {
@@ -1338,11 +1338,12 @@ lto_read_tree_1 (struct lto_input_block *ib, struct data_in *data_in, tree expr)
       && TREE_CODE (expr) != TRANSLATION_UNIT_DECL)
     DECL_INITIAL (expr) = stream_read_tree (ib, data_in);
 
-#ifdef LTO_STREAMER_DEBUG
-  /* Remove the mapping to RESULT's original address set by
-     streamer_alloc_tree.  */
-  lto_orig_address_remove (expr);
-#endif
+  if (PARAM_VALUE (LTO_STREAMER_CHECKING))
+    {
+      /* Remove the mapping to RESULT's original address set by
+	 streamer_alloc_tree.  */
+      lto_orig_address_remove (expr);
+    }
 }
 
 /* Read the physical representation of a tree node with tag TAG from

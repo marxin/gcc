@@ -33,7 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-chkp.h"
 #include "gomp-constants.h"
 #include "asan.h"
-
+#include "params.h"
 
 /* Read a STRING_CST from the string table in DATA_IN using input
    block IB.  */
@@ -566,19 +566,18 @@ streamer_alloc_tree (struct lto_input_block *ib, struct data_in *data_in,
 {
   enum tree_code code;
   tree result;
-#ifdef LTO_STREAMER_DEBUG
-  HOST_WIDE_INT orig_address_in_writer;
-#endif
+  HOST_WIDE_INT orig_address_in_writer = -1;
 
   result = NULL_TREE;
 
-#ifdef LTO_STREAMER_DEBUG
-  /* Read the word representing the memory address for the tree
-     as it was written by the writer.  This is useful when
-     debugging differences between the writer and reader.  */
-  orig_address_in_writer = streamer_read_hwi (ib);
-  gcc_assert ((intptr_t) orig_address_in_writer == orig_address_in_writer);
-#endif
+  if (PARAM_VALUE (LTO_STREAMER_CHECKING))
+    {
+      /* Read the word representing the memory address for the tree
+	 as it was written by the writer.  This is useful when
+	 debugging differences between the writer and reader.  */
+      orig_address_in_writer = streamer_read_hwi (ib);
+      gcc_assert ((intptr_t) orig_address_in_writer == orig_address_in_writer);
+    }
 
   code = lto_tag_to_tree_code (tag);
 
@@ -630,14 +629,13 @@ streamer_alloc_tree (struct lto_input_block *ib, struct data_in *data_in,
       result = make_node (code);
     }
 
-#ifdef LTO_STREAMER_DEBUG
   /* Store the original address of the tree as seen by the writer
      in RESULT's aux field.  This is useful when debugging streaming
      problems.  This way, a debugging session can be started on
      both writer and reader with a breakpoint using this address
      value in both.  */
-  lto_orig_address_map (result, (intptr_t) orig_address_in_writer);
-#endif
+  if (PARAM_VALUE (LTO_STREAMER_CHECKING))
+    lto_orig_address_map (result, (intptr_t) orig_address_in_writer);
 
   return result;
 }

@@ -31,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-streamer.h"
 #include "toplev.h"
 #include "lto-section-names.h"
+#include "params.h"
 
 /* Statistics gathered during LTO, WPA and LTRANS.  */
 struct lto_stats_d lto_stats;
@@ -258,7 +259,6 @@ print_lto_report (const char *s)
 }
 
 
-#ifdef LTO_STREAMER_DEBUG
 struct tree_hash_entry
 {
   tree key;
@@ -284,7 +284,6 @@ tree_entry_hasher::equal (const tree_hash_entry *e1, const tree_hash_entry *e2)
 }
 
 static hash_table<tree_entry_hasher> *tree_htab;
-#endif
 
 /* Initialization common to the LTO reader and writer.  */
 
@@ -298,9 +297,8 @@ lto_streamer_init (void)
   if (flag_checking)
     streamer_check_handled_ts_structures ();
 
-#ifdef LTO_STREAMER_DEBUG
-  tree_htab = new hash_table<tree_entry_hasher> (31);
-#endif
+  if (PARAM_VALUE (LTO_STREAMER_CHECKING))
+    tree_htab = new hash_table<tree_entry_hasher> (31);
 }
 
 
@@ -315,7 +313,6 @@ gate_lto_out (void)
 }
 
 
-#ifdef LTO_STREAMER_DEBUG
 /* Add a mapping between T and ORIG_T, which is the numeric value of
    the original address of T as it was seen by the LTO writer.  This
    mapping is useful when debugging streaming problems.  A debugging
@@ -370,7 +367,6 @@ lto_orig_address_remove (tree t)
   free (*slot);
   tree_htab->clear_slot (slot);
 }
-#endif
 
 
 /* Check that the version MAJOR.MINOR is the correct version number.  */
