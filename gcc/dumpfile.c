@@ -134,17 +134,78 @@ static const struct dump_option_value_info optinfo_verbosity_options[] =
   {NULL, 0}
 };
 
-/* Flags used for -fopt-info groups.  */
-static const struct dump_option_value_info optgroup_options[] =
+template <typename E>
+dump_option_node<E>::dump_option_node (const char *name, E enum_value):
+  m_name (name), m_enum_value (enum_value), m_children (), m_mask (0)
 {
-  {"ipa", OPTGROUP_IPA},
-  {"loop", OPTGROUP_LOOP},
-  {"inline", OPTGROUP_INLINE},
-  {"omp", OPTGROUP_OMP},
-  {"vec", OPTGROUP_VEC},
-  {"optall", OPTGROUP_ALL},
-  {NULL, 0}
-};
+}
+
+template <typename E>
+void
+dump_option_node<E>::initialize (uint64_t *mask_translation)
+{
+  memset (mask_translation, 0, sizeof (uint64_t) * OPT_MASK_SIZE);
+  unsigned current = 0;
+  initialize_masks (&current, mask_translation);
+}
+
+template <typename E>
+uint64_t
+dump_option_node<E>::initialize_masks (unsigned *current,
+				       uint64_t *mask_translation)
+{
+  if (m_children.is_empty ())
+    {
+      gcc_assert (*current < OPT_MASK_SIZE);
+      m_mask = 1 << *current;
+      *current += 1;
+    }
+  else
+    {
+      uint64_t combined = 0;
+      for (unsigned i = 0; i < m_children.length (); i++)
+	combined |= m_children[i]->initialize_masks (current, mask_translation);
+
+      m_mask = combined;
+    }
+
+  mask_translation[m_enum_value] = m_mask;
+  return m_mask;
+}
+
+template <typename E>
+uint64_t
+dump_option_node<E>::parse (const char *token)
+{
+  char *s = xstrdup (token);
+  uint64_t r = parse (s);
+  free (s);
+
+  return r;
+}
+
+template <typename E>
+uint64_t
+dump_option_node<E>::parse (char *token)
+{
+  if (token == NULL)
+    return m_mask;
+
+  if (strcmp (token, "all") == 0)
+  {
+    token = strtok (NULL, "-");
+    return token == NULL ? m_mask : 0;
+  }
+
+  for (unsigned i = 0; i < m_children.length (); i++)
+    if (strcmp (m_children[i]->m_name, token) == 0)
+    {
+      token = strtok (NULL, "-");
+      return m_children[i]->parse (token);
+    }
+
+  return 0;
+}
 
 gcc::dump_manager::dump_manager ():
   m_next_dump (FIRST_AUTO_NUMBERED_DUMP),
@@ -152,6 +213,7 @@ gcc::dump_manager::dump_manager ():
   m_extra_dump_files_in_use (0),
   m_extra_dump_files_alloced (0)
 {
+  initialize_options ();
 }
 
 gcc::dump_manager::~dump_manager ()
@@ -173,12 +235,14 @@ gcc::dump_manager::~dump_manager ()
       XDELETEVEC (const_cast <char *> (dfi->alt_filename));
     }
   XDELETEVEC (m_extra_dump_files);
+
+  delete (optgroup_options);
 }
 
 unsigned int
 gcc::dump_manager::
 dump_register (const char *suffix, const char *swtch, const char *glob,
-	       dump_flags_t flags, int optgroup_flags,
+	       dump_flags_t flags, optgroup_dump_flags_t  optgroup_flags,
 	       bool take_ownership)
 {
   int num = m_next_dump++;
@@ -715,8 +779,8 @@ dump_enable_all (dump_flags_t flags, const char *filename)
 
 int
 gcc::dump_manager::
-opt_info_enable_passes (int optgroup_flags, dump_flags_t flags,
-			const char *filename)
+opt_info_enable_passes (optgroup_dump_flags_t optgroup_flags,
+			dump_flags_t flags, const char *filename)
 {
   int n = 0;
   size_t i;
@@ -807,7 +871,7 @@ dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
 	if (strlen (option_ptr->name) == length
 	    && !memcmp (option_ptr->name, ptr, length))
           {
-            flags |= option_ptr->value;
+	    flags |= option_ptr->value;
 	    goto found;
           }
 
@@ -864,15 +928,36 @@ dump_switch_p (const char *arg)
   return any;
 }
 
+void
+gcc::dump_manager::
+initialize_options ()
+{
+  /* Initialize optgroup options.  */
+  typedef dump_option_node<optgroup_types> node;
+
+  optgroup_options = new node (NULL, OPTGROUP_NONE);
+  optgroup_options->register_suboption (new node ("ipa", OPTGROUP_IPA));
+  optgroup_options->register_suboption (new node ("loop", OPTGROUP_LOOP));
+  optgroup_options->register_suboption (new node ("inline", OPTGROUP_INLINE));
+  optgroup_options->register_suboption (new node ("omp", OPTGROUP_OMP));
+  optgroup_options->register_suboption (new node ("vec", OPTGROUP_VEC));
+  optgroup_options->register_suboption (new node ("other", OPTGROUP_OTHER));
+
+  optgroup_options->initialize (optgroup_dump_flags_t::m_mask_translation);
+}
+
 /* Parse ARG as a -fopt-info switch and store flags, optgroup_flags
    and filename.  Return non-zero if it is a recognized switch.  */
 
 static int
-opt_info_switch_p_1 (const char *arg, dump_flags_t *flags, int *optgroup_flags,
-                     char **filename)
+opt_info_switch_p_1 (const char *arg, dump_flags_t *flags,
+		     optgroup_dump_flags_t *optgroup_flags,
+		     char **filename)
 {
   const char *option_value;
   const char *ptr;
+  optgroup_dump_flags_t f;
+  gcc::dump_manager *dumps = g->get_dumps ();
 
   option_value = arg;
   ptr = option_value;
@@ -883,6 +968,7 @@ opt_info_switch_p_1 (const char *arg, dump_flags_t *flags, int *optgroup_flags,
 
   if (!ptr)
     return 1;       /* Handle '-fopt-info' without any additional options.  */
+
 
   while (*ptr)
     {
@@ -908,17 +994,16 @@ opt_info_switch_p_1 (const char *arg, dump_flags_t *flags, int *optgroup_flags,
 	if (strlen (option_ptr->name) == length
 	    && !memcmp (option_ptr->name, ptr, length))
           {
-            *flags |= option_ptr->value;
+	    *flags |= option_ptr->value;
 	    goto found;
-          }
+	  }
 
-      for (option_ptr = optgroup_options; option_ptr->name; option_ptr++)
-	if (strlen (option_ptr->name) == length
-	    && !memcmp (option_ptr->name, ptr, length))
-          {
-            *optgroup_flags |= option_ptr->value;
-	    goto found;
-          }
+      f = dumps->get_optgroup_options ()->parse (ptr);
+      if (f)
+	{
+	  *optgroup_flags |= f;
+	  goto found;
+	}
 
       if (*ptr == '=')
         {
@@ -947,7 +1032,7 @@ int
 opt_info_switch_p (const char *arg)
 {
   dump_flags_t flags;
-  int optgroup_flags;
+  optgroup_dump_flags_t optgroup_flags;
   char *filename;
   static char *file_seen = NULL;
   gcc::dump_manager *dumps = g->get_dumps ();
@@ -970,7 +1055,7 @@ opt_info_switch_p (const char *arg)
   if (!flags)
     flags = MSG_OPTIMIZED_LOCATIONS;
   if (!optgroup_flags)
-    optgroup_flags = OPTGROUP_ALL;
+    optgroup_flags = optgroup_dump_flags_t::get_all ();
 
   return dumps->opt_info_enable_passes (optgroup_flags, flags, filename);
 }
