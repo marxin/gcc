@@ -2079,7 +2079,7 @@ playback::compile_to_file::copy_file (const char *src_path,
 
   gcc_assert (total_sz_in == total_sz_out);
   if (get_logger ())
-    get_logger ()->log ("total bytes copied: %ld", total_sz_out);
+    get_logger ()->log ("total bytes copied: %" PRIu64, (uint64_t)total_sz_out);
 
   /* Set the permissions of the copy to those of the original file,
      in particular the "executable" bits.  */
