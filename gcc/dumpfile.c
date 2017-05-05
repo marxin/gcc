@@ -32,10 +32,10 @@ along with GCC; see the file COPYING3.  If not see
 #define skip_leading_substring(whole,  part) \
    (strncmp (whole, part, strlen (part)) ? NULL : whole + strlen (part))
 
-static dump_flags_t pflags;		      /* current dump_flags */
-static dump_flags_t alt_flags;		      /* current opt_info flags */
+static dump_flags_t pflags;		/* current dump_flags */
+static optgroup_dump_flags_t opt_info_flags; /* current opt_info flags */
 
-static void dump_loc (dump_flags_t, FILE *, source_location);
+static void dump_loc (optgroup_dump_flags_t, FILE *, source_location);
 static FILE *dump_open_alternate_stream (struct dump_file_info *);
 
 /* These are currently used for communicating between passes.
@@ -50,31 +50,33 @@ dump_flags_t dump_flags;
    TREE_DUMP_INDEX enumeration in dumpfile.h.  */
 static struct dump_file_info dump_files[TDI_end] =
 {
-  {NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 0, 0, 0, false, false},
+  {NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, optgroup_dump_flags_t (),
+   optgroup_dump_flags_t (), 0, 0, 0, false, false},
   {".cgraph", "ipa-cgraph", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
-   0, 0, 0, 0, 0, false, false},
-  {".type-inheritance", "ipa-type-inheritance", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
-   0, 0, 0, 0, 0, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
+  {".type-inheritance", "ipa-type-inheritance", NULL, NULL, NULL, NULL, NULL,
+    TDF_IPA, optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0,
+    false, false},
   {".ipa-clones", "ipa-clones", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
-   0, 0, 0, 0, 0, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
   {".tu", "translation-unit", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
-   0, 0, 0, 0, 1, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 1, false, false},
   {".class", "class-hierarchy", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
-   0, 0, 0, 0, 2, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 2, false, false},
   {".original", "tree-original", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
-   0, 0, 0, 0, 3, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 3, false, false},
   {".gimple", "tree-gimple", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
-   0, 0, 0, 0, 4, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 4, false, false},
   {".nested", "tree-nested", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
-   0, 0, 0, 0, 5, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 5, false, false},
 #define FIRST_AUTO_NUMBERED_DUMP 6
 
   {NULL, "tree-all", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
-   0, 0, 0, 0, 0, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
   {NULL, "rtl-all", NULL, NULL, NULL, NULL, NULL, TDF_RTL,
-   0, 0, 0, 0, 0, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
   {NULL, "ipa-all", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
-   0, 0, 0, 0, 0, false, false},
+   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
 };
 
 /* Define a name->number mapping for a dump flag value.  */
@@ -93,9 +95,7 @@ static const struct dump_option_value_info dump_options[] =
   {"slim", TDF_SLIM},
   {"raw", TDF_RAW},
   {"graph", TDF_GRAPH},
-  {"details", (TDF_DETAILS | MSG_OPTIMIZED_LOCATIONS
-               | MSG_MISSED_OPTIMIZATION
-               | MSG_NOTE)},
+  {"details", TDF_DETAILS},
   {"cselib", TDF_CSELIB},
   {"stats", TDF_STATS},
   {"blocks", TDF_BLOCKS},
@@ -111,10 +111,6 @@ static const struct dump_option_value_info dump_options[] =
   {"enumerate_locals", TDF_ENUMERATE_LOCALS},
   {"scev", TDF_SCEV},
   {"gimple", TDF_GIMPLE},
-  {"optimized", MSG_OPTIMIZED_LOCATIONS},
-  {"missed", MSG_MISSED_OPTIMIZATION},
-  {"note", MSG_NOTE},
-  {"optall", MSG_ALL},
   {"all", ~(TDF_RAW | TDF_SLIM | TDF_LINENO | TDF_TREE | TDF_RTL | TDF_IPA
 	    | TDF_STMTADDR | TDF_GRAPH | TDF_DIAGNOSTIC | TDF_VERBOSE
 	    | TDF_RHS_ONLY | TDF_NOUID | TDF_ENUMERATE_LOCALS | TDF_SCEV
@@ -122,29 +118,150 @@ static const struct dump_option_value_info dump_options[] =
   {NULL, 0}
 };
 
-/* A subset of the dump_options table which is used for -fopt-info
-   types. This must be consistent with the MSG_* flags in dumpfile.h.
- */
-static const struct dump_option_value_info optinfo_verbosity_options[] =
+template <typename E>
+dump_option_node<E>::dump_option_node (const char *name, E enum_value):
+  m_name (name), m_enum_value (enum_value), m_children (), m_mask (0)
 {
-  {"optimized", MSG_OPTIMIZED_LOCATIONS},
-  {"missed", MSG_MISSED_OPTIMIZATION},
-  {"note", MSG_NOTE},
-  {"all", MSG_ALL},
-  {NULL, 0}
-};
+}
 
-/* Flags used for -fopt-info groups.  */
-static const struct dump_option_value_info optgroup_options[] =
+template <typename E>
+void
+dump_option_node<E>::initialize (uint64_t *mask_translation)
 {
-  {"ipa", OPTGROUP_IPA},
-  {"loop", OPTGROUP_LOOP},
-  {"inline", OPTGROUP_INLINE},
-  {"omp", OPTGROUP_OMP},
-  {"vec", OPTGROUP_VEC},
-  {"optall", OPTGROUP_ALL},
-  {NULL, 0}
-};
+  memset (mask_translation, 0, sizeof (uint64_t) * OPT_MASK_SIZE);
+  unsigned current = 0;
+  initialize_masks (&current, mask_translation);
+}
+
+template <typename E>
+uint64_t
+dump_option_node<E>::initialize_masks (unsigned *current,
+				       uint64_t *mask_translation)
+{
+  if (m_children.is_empty ())
+    {
+      gcc_assert (*current < OPT_MASK_SIZE);
+      m_mask = 1 << *current;
+      *current += 1;
+    }
+  else
+    {
+      uint64_t combined = 0;
+      for (unsigned i = 0; i < m_children.length (); i++)
+	combined |= m_children[i]->initialize_masks (current, mask_translation);
+
+      m_mask = combined;
+    }
+
+  mask_translation[m_enum_value] = m_mask;
+  return m_mask;
+}
+
+template <typename E>
+uint64_t
+dump_option_node<E>::parse (const char *token)
+{
+  char *s = xstrdup (token);
+  uint64_t r = parse (strtok (s, "-"));
+  free (s);
+
+  return r;
+}
+
+template <typename E>
+uint64_t
+dump_option_node<E>::parse (char *token)
+{
+  if (token == NULL || token[0] == '\0')
+    return 0;
+
+  auto_vec<char *> tokens;
+
+  token = strtok (token, "-");
+  tokens.safe_push (token);
+  while ((token = strtok (NULL, "-")) != NULL)
+    tokens.safe_insert (0, token);
+
+  uint64_t r = parse_internal (tokens);
+  return tokens.is_empty () ? r : 0;
+}
+
+template <typename E>
+uint64_t
+dump_option_node<E>::parse_internal (vec<char *> &tokens)
+{
+  if (tokens.is_empty ())
+    return m_mask;
+
+  if (strcmp (tokens.last (), "all") == 0)
+  {
+    tokens.pop ();
+    return m_mask;
+  }
+
+  uint64_t m = 0;
+
+  while (true)
+    {
+      bool found = false;
+      for (unsigned i = 0; i < m_children.length (); i++)
+	if (strcmp (m_children[i]->m_name, tokens.last ()) == 0)
+	{
+	  found = true;
+	  tokens.pop ();
+	  m |= m_children[i]->parse_internal (tokens);
+	  break;
+	}
+
+      if (!found || tokens.is_empty () )
+	break;
+    }
+
+  return m != 0 ? m : m_mask;
+}
+
+optgroup_option_hierarchy::optgroup_option_hierarchy ()
+{
+  root = new node (NULL, OPTGROUP_NONE);
+
+  node *n = new node ("ipa", OPTGROUP_IPA);
+  n->register_suboption (new node ("optimized", OPTGROUP_IPA_OPTIMIZED));
+  n->register_suboption (new node ("missed", OPTGROUP_IPA_MISSED));
+  n->register_suboption (new node ("note", OPTGROUP_IPA_NOTE));
+  root->register_suboption (n);
+
+  n = new node ("loop", OPTGROUP_LOOP);
+  n->register_suboption (new node ("optimized", OPTGROUP_LOOP_OPTIMIZED));
+  n->register_suboption (new node ("missed", OPTGROUP_LOOP_MISSED));
+  n->register_suboption (new node ("note", OPTGROUP_LOOP_NOTE));
+  root->register_suboption (n);
+
+  n = new node ("inline", OPTGROUP_INLINE);
+  n->register_suboption (new node ("optimized", OPTGROUP_INLINE_OPTIMIZED));
+  n->register_suboption (new node ("missed", OPTGROUP_INLINE_MISSED));
+  n->register_suboption (new node ("note", OPTGROUP_INLINE_NOTE));
+  root->register_suboption (n);
+
+  n = new node ("omp", OPTGROUP_OMP);
+  n->register_suboption (new node ("optimized", OPTGROUP_OMP_OPTIMIZED));
+  n->register_suboption (new node ("missed", OPTGROUP_OMP_MISSED));
+  n->register_suboption (new node ("note", OPTGROUP_OMP_NOTE));
+  root->register_suboption (n);
+
+  n = new node ("vec", OPTGROUP_VEC);
+  n->register_suboption (new node ("optimized", OPTGROUP_VEC_OPTIMIZED));
+  n->register_suboption (new node ("missed", OPTGROUP_VEC_MISSED));
+  n->register_suboption (new node ("note", OPTGROUP_VEC_NOTE));
+  root->register_suboption (n);
+
+  n = new node ("other", OPTGROUP_OTHER);
+  n->register_suboption (new node ("optimized", OPTGROUP_OTHER_OPTIMIZED));
+  n->register_suboption (new node ("missed", OPTGROUP_OTHER_MISSED));
+  n->register_suboption (new node ("note", OPTGROUP_OTHER_NOTE));
+  root->register_suboption (n);
+
+  root->initialize (optgroup_dump_flags_t::m_mask_translation);
+}
 
 gcc::dump_manager::dump_manager ():
   m_next_dump (FIRST_AUTO_NUMBERED_DUMP),
@@ -178,7 +295,7 @@ gcc::dump_manager::~dump_manager ()
 unsigned int
 gcc::dump_manager::
 dump_register (const char *suffix, const char *swtch, const char *glob,
-	       dump_flags_t flags, int optgroup_flags,
+	       dump_flags_t flags, optgroup_dump_flags_t optgroup_flags,
 	       bool take_ownership)
 {
   int num = m_next_dump++;
@@ -201,7 +318,7 @@ dump_register (const char *suffix, const char *swtch, const char *glob,
   m_extra_dump_files[count].swtch = swtch;
   m_extra_dump_files[count].glob = glob;
   m_extra_dump_files[count].pflags = flags;
-  m_extra_dump_files[count].optgroup_flags = optgroup_flags;
+  m_extra_dump_files[count].pass_optgroup_flags = optgroup_flags;
   m_extra_dump_files[count].num = num;
   m_extra_dump_files[count].owns_strings = take_ownership;
 
@@ -328,7 +445,7 @@ dump_open_alternate_stream (struct dump_file_info *dfi)
 /* Print source location on DFILE if enabled.  */
 
 void
-dump_loc (dump_flags_t dump_kind, FILE *dfile, source_location loc)
+dump_loc (optgroup_dump_flags_t dump_kind, FILE *dfile, source_location loc)
 {
   if (dump_kind)
     {
@@ -347,29 +464,30 @@ dump_loc (dump_flags_t dump_kind, FILE *dfile, source_location loc)
    EXTRA_DUMP_FLAGS on the dump streams if DUMP_KIND is enabled.  */
 
 void
-dump_gimple_stmt (dump_flags_t dump_kind, dump_flags_t extra_dump_flags,
+dump_gimple_stmt (optgroup_dump_flags_t dump_kind,
+		  dump_flags_t extra_dump_flags,
 		  gimple *gs, int spc)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
     print_gimple_stmt (dump_file, gs, spc, dump_flags | extra_dump_flags);
 
-  if (alt_dump_file && (dump_kind & alt_flags))
+  if (alt_dump_file && (dump_kind & opt_info_flags))
     print_gimple_stmt (alt_dump_file, gs, spc, dump_flags | extra_dump_flags);
 }
 
 /* Similar to dump_gimple_stmt, except additionally print source location.  */
 
 void
-dump_gimple_stmt_loc (dump_flags_t dump_kind, source_location loc,
+dump_gimple_stmt_loc (optgroup_dump_flags_t dump_kind, source_location loc,
 		      dump_flags_t extra_dump_flags, gimple *gs, int spc)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
     {
       dump_loc (dump_kind, dump_file, loc);
       print_gimple_stmt (dump_file, gs, spc, dump_flags | extra_dump_flags);
     }
 
-  if (alt_dump_file && (dump_kind & alt_flags))
+  if (alt_dump_file && (dump_kind & opt_info_flags))
     {
       dump_loc (dump_kind, alt_dump_file, loc);
       print_gimple_stmt (alt_dump_file, gs, spc, dump_flags | extra_dump_flags);
@@ -380,13 +498,14 @@ dump_gimple_stmt_loc (dump_flags_t dump_kind, source_location loc,
    DUMP_KIND is enabled.  */
 
 void
-dump_generic_expr (dump_flags_t dump_kind, dump_flags_t extra_dump_flags,
+dump_generic_expr (optgroup_dump_flags_t dump_kind,
+		   dump_flags_t extra_dump_flags,
 		   tree t)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
       print_generic_expr (dump_file, t, dump_flags | extra_dump_flags);
 
-  if (alt_dump_file && (dump_kind & alt_flags))
+  if (alt_dump_file && (dump_kind & opt_info_flags))
       print_generic_expr (alt_dump_file, t, dump_flags | extra_dump_flags);
 }
 
@@ -395,16 +514,16 @@ dump_generic_expr (dump_flags_t dump_kind, dump_flags_t extra_dump_flags,
    location.  */
 
 void
-dump_generic_expr_loc (int dump_kind, source_location loc,
+dump_generic_expr_loc (optgroup_dump_flags_t dump_kind, source_location loc,
 		       dump_flags_t extra_dump_flags, tree t)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
     {
       dump_loc (dump_kind, dump_file, loc);
       print_generic_expr (dump_file, t, dump_flags | extra_dump_flags);
     }
 
-  if (alt_dump_file && (dump_kind & alt_flags))
+  if (alt_dump_file && (dump_kind & opt_info_flags))
     {
       dump_loc (dump_kind, alt_dump_file, loc);
       print_generic_expr (alt_dump_file, t, dump_flags | extra_dump_flags);
@@ -414,9 +533,9 @@ dump_generic_expr_loc (int dump_kind, source_location loc,
 /* Output a formatted message using FORMAT on appropriate dump streams.  */
 
 void
-dump_printf (dump_flags_t dump_kind, const char *format, ...)
+dump_printf (optgroup_dump_flags_t dump_kind, const char *format, ...)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
     {
       va_list ap;
       va_start (ap, format);
@@ -424,7 +543,7 @@ dump_printf (dump_flags_t dump_kind, const char *format, ...)
       va_end (ap);
     }
 
-  if (alt_dump_file && (dump_kind & alt_flags))
+  if (alt_dump_file && (dump_kind & opt_info_flags))
     {
       va_list ap;
       va_start (ap, format);
@@ -436,10 +555,10 @@ dump_printf (dump_flags_t dump_kind, const char *format, ...)
 /* Similar to dump_printf, except source location is also printed.  */
 
 void
-dump_printf_loc (dump_flags_t dump_kind, source_location loc,
+dump_printf_loc (optgroup_dump_flags_t dump_kind, source_location loc,
 		 const char *format, ...)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
     {
       va_list ap;
       dump_loc (dump_kind, dump_file, loc);
@@ -448,7 +567,7 @@ dump_printf_loc (dump_flags_t dump_kind, source_location loc,
       va_end (ap);
     }
 
-  if (alt_dump_file && (dump_kind & alt_flags))
+  if (alt_dump_file && (dump_kind & opt_info_flags))
     {
       va_list ap;
       dump_loc (dump_kind, alt_dump_file, loc);
@@ -505,7 +624,7 @@ dump_start (int phase, dump_flags_t *flag_ptr)
       count++;
       alt_dump_file = dfi->alt_stream;
       /* Initialize current -fopt-info flags. */
-      alt_flags = dfi->alt_flags;
+      opt_info_flags = dfi->optgroup_flags;
     }
 
   if (flag_ptr)
@@ -540,7 +659,7 @@ dump_finish (int phase)
   dump_file = NULL;
   alt_dump_file = NULL;
   dump_flags = TDI_none;
-  alt_flags = 0;
+  opt_info_flags = optgroup_dump_flags_t ();
   pflags = 0;
 }
 
@@ -715,7 +834,7 @@ dump_enable_all (dump_flags_t flags, const char *filename)
 
 int
 gcc::dump_manager::
-opt_info_enable_passes (int optgroup_flags, dump_flags_t flags,
+opt_info_enable_passes (optgroup_dump_flags_t optgroup_flags,
 			const char *filename)
 {
   int n = 0;
@@ -723,38 +842,38 @@ opt_info_enable_passes (int optgroup_flags, dump_flags_t flags,
 
   for (i = TDI_none + 1; i < (size_t) TDI_end; i++)
     {
-      if ((dump_files[i].optgroup_flags & optgroup_flags))
-        {
-          const char *old_filename = dump_files[i].alt_filename;
-          /* Since this file is shared among different passes, it
-             should be opened in append mode.  */
-          dump_files[i].alt_state = 1;
-          dump_files[i].alt_flags |= flags;
-          n++;
-          /* Override the existing filename.  */
-          if (filename)
-            dump_files[i].alt_filename = xstrdup (filename);
-          if (old_filename && filename != old_filename)
-            free (CONST_CAST (char *, old_filename));
-        }
+      if ((dump_files[i].pass_optgroup_flags & optgroup_flags))
+	{
+	  const char *old_filename = dump_files[i].alt_filename;
+	  /* Since this file is shared among different passes, it
+	     should be opened in append mode.  */
+	  dump_files[i].alt_state = 1;
+	  dump_files[i].optgroup_flags |= optgroup_flags;
+	  n++;
+	  /* Override the existing filename.  */
+	  if (filename)
+	    dump_files[i].alt_filename = xstrdup (filename);
+	  if (old_filename && filename != old_filename)
+	    free (CONST_CAST (char *, old_filename));
+	}
     }
 
   for (i = 0; i < m_extra_dump_files_in_use; i++)
     {
-      if ((m_extra_dump_files[i].optgroup_flags & optgroup_flags))
-        {
-          const char *old_filename = m_extra_dump_files[i].alt_filename;
-          /* Since this file is shared among different passes, it
-             should be opened in append mode.  */
-          m_extra_dump_files[i].alt_state = 1;
-          m_extra_dump_files[i].alt_flags |= flags;
-          n++;
-          /* Override the existing filename.  */
-          if (filename)
-            m_extra_dump_files[i].alt_filename = xstrdup (filename);
-          if (old_filename && filename != old_filename)
-            free (CONST_CAST (char *, old_filename));
-        }
+      if ((m_extra_dump_files[i].pass_optgroup_flags & optgroup_flags))
+	{
+	  const char *old_filename = m_extra_dump_files[i].alt_filename;
+	  /* Since this file is shared among different passes, it
+	     should be opened in append mode.  */
+	  m_extra_dump_files[i].alt_state = 1;
+	  m_extra_dump_files[i].optgroup_flags |= optgroup_flags;
+	  n++;
+	  /* Override the existing filename.  */
+	  if (filename)
+	    m_extra_dump_files[i].alt_filename = xstrdup (filename);
+	  if (old_filename && filename != old_filename)
+	    free (CONST_CAST (char *, old_filename));
+	}
     }
 
   return n;
@@ -781,6 +900,7 @@ dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
   if (*option_value && *option_value != '-' && *option_value != '=')
     return 0;
 
+<<<<<<< Updated upstream
   ptr = option_value;
   flags = 0;
 
@@ -807,7 +927,7 @@ dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
 	if (strlen (option_ptr->name) == length
 	    && !memcmp (option_ptr->name, ptr, length))
           {
-            flags |= option_ptr->value;
+	    flags |= option_ptr->value;
 	    goto found;
           }
 
@@ -820,12 +940,24 @@ dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
           dfi->pfilename = xstrdup (ptr + 1);
           break;
         }
+=======
+  if (option[0] == '-')
+    {
+      flags = dump_flags_t::from_mask (suboptions.root->parse (option));
+
+      if (flags.any ())
+	dfi->pflags |= flags;
+>>>>>>> Stashed changes
       else
         warning (0, "ignoring unknown option %q.*s in %<-fdump-%s%>",
                  length, ptr, dfi->swtch);
     found:;
       ptr = end_ptr;
     }
+  else if (option[0] != '\0')
+    return 0;
+
+  dfi->pstate = -1;
 
   dfi->pstate = -1;
   dfi->pflags |= flags;
@@ -864,80 +996,49 @@ dump_switch_p (const char *arg)
   return any;
 }
 
+static optgroup_option_hierarchy optgroup_options __attribute__
+((init_priority((200))));
+
 /* Parse ARG as a -fopt-info switch and store flags, optgroup_flags
    and filename.  Return non-zero if it is a recognized switch.  */
 
 static int
-opt_info_switch_p_1 (const char *arg, dump_flags_t *flags, int *optgroup_flags,
-                     char **filename)
+opt_info_switch_p_1 (const char *arg, optgroup_dump_flags_t *optgroup_flags,
+		     char **filename)
 {
-  const char *option_value;
-  const char *ptr;
-
-  option_value = arg;
-  ptr = option_value;
-
+  char *option_value;
   *filename = NULL;
-  *flags = 0;
-  *optgroup_flags = 0;
+  *optgroup_flags = optgroup_dump_flags_t ();
 
-  if (!ptr)
+  if (!arg)
     return 1;       /* Handle '-fopt-info' without any additional options.  */
 
-  while (*ptr)
+  option_value = xstrdup (arg);
+
+  char *eq_ptr = strchr (option_value, '=');
+  if (eq_ptr)
     {
-      const struct dump_option_value_info *option_ptr;
-      const char *end_ptr;
-      const char *eq_ptr;
-      unsigned length;
-
-      while (*ptr == '-')
-	ptr++;
-      end_ptr = strchr (ptr, '-');
-      eq_ptr = strchr (ptr, '=');
-
-      if (eq_ptr && !end_ptr)
-        end_ptr = eq_ptr;
-
-      if (!end_ptr)
-	end_ptr = ptr + strlen (ptr);
-      length = end_ptr - ptr;
-
-      for (option_ptr = optinfo_verbosity_options; option_ptr->name;
-           option_ptr++)
-	if (strlen (option_ptr->name) == length
-	    && !memcmp (option_ptr->name, ptr, length))
-          {
-            *flags |= option_ptr->value;
-	    goto found;
-          }
-
-      for (option_ptr = optgroup_options; option_ptr->name; option_ptr++)
-	if (strlen (option_ptr->name) == length
-	    && !memcmp (option_ptr->name, ptr, length))
-          {
-            *optgroup_flags |= option_ptr->value;
-	    goto found;
-          }
-
-      if (*ptr == '=')
-        {
-          /* Interpret rest of the argument as a dump filename.  This
-             filename overrides other command line filenames.  */
-          *filename = xstrdup (ptr + 1);
-          break;
-        }
-      else
-        {
-          warning (0, "unknown option %q.*s in %<-fopt-info-%s%>",
-                   length, ptr, arg);
-          return 0;
-        }
-    found:;
-      ptr = end_ptr;
+      *filename = xstrdup (eq_ptr + 1);
+      *eq_ptr = '\0';
     }
 
-  return 1;
+
+  optgroup_dump_flags_t f;
+  f = optgroup_dump_flags_t::from_mask
+    (optgroup_options.root->parse (option_value));
+  if (f)
+    {
+      *optgroup_flags |= f;
+      free (option_value);
+      return 1;
+    }
+  else
+    {
+      warning (0, "unknown option %s in %<-fopt-info-%s%>",
+	       option_value, option_value);
+      free (option_value);
+      return 0;
+    }
 }
 
 /* Return non-zero if ARG is a recognized switch for
@@ -946,13 +1047,12 @@ opt_info_switch_p_1 (const char *arg, dump_flags_t *flags, int *optgroup_flags,
 int
 opt_info_switch_p (const char *arg)
 {
-  dump_flags_t flags;
-  int optgroup_flags;
+  optgroup_dump_flags_t optgroup_flags;
   char *filename;
   static char *file_seen = NULL;
   gcc::dump_manager *dumps = g->get_dumps ();
 
-  if (!opt_info_switch_p_1 (arg, &flags, &optgroup_flags, &filename))
+  if (!opt_info_switch_p_1 (arg, &optgroup_flags, &filename))
     return 0;
 
   if (!filename)
@@ -967,12 +1067,10 @@ opt_info_switch_p (const char *arg)
     }
 
   file_seen = xstrdup (filename);
-  if (!flags)
-    flags = MSG_OPTIMIZED_LOCATIONS;
   if (!optgroup_flags)
-    optgroup_flags = OPTGROUP_ALL;
+    optgroup_flags = optgroup_dump_flags_t::get_all ();
 
-  return dumps->opt_info_enable_passes (optgroup_flags, flags, filename);
+  return dumps->opt_info_enable_passes (optgroup_flags, filename);
 }
 
 /* Print basic block on the dump streams.  */
@@ -982,7 +1080,7 @@ dump_basic_block (int dump_kind, basic_block bb, int indent)
 {
   if (dump_file && (dump_kind & pflags))
     dump_bb (dump_file, bb, indent, TDF_DETAILS);
-  if (alt_dump_file && (dump_kind & alt_flags))
+  if (alt_dump_file && (dump_kind & opt_info_flags))
     dump_bb (alt_dump_file, bb, indent, TDF_DETAILS);
 }
 
