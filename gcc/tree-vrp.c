@@ -6550,7 +6550,7 @@ check_array_ref (location_t location, tree ref, bool ignore_off_by_one)
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "Array bound warning for ");
-	  dump_generic_expr (MSG_NOTE, TDF_SLIM, ref);
+	  dump_generic_expr (OPTGROUP_OTHER_NOTE, TDF_SLIM, ref);
 	  fprintf (dump_file, "\n");
 	}
       warning_at (location, OPT_Warray_bounds,
@@ -6563,7 +6563,7 @@ check_array_ref (location_t location, tree ref, bool ignore_off_by_one)
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "Array bound warning for ");
-	  dump_generic_expr (MSG_NOTE, TDF_SLIM, ref);
+	  dump_generic_expr (OPTGROUP_OTHER_NOTE, TDF_SLIM, ref);
 	  fprintf (dump_file, "\n");
 	}
       warning_at (location, OPT_Warray_bounds,
@@ -6618,7 +6618,7 @@ search_for_addr_array (tree t, location_t location)
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
 	      fprintf (dump_file, "Array bound warning for ");
-	      dump_generic_expr (MSG_NOTE, TDF_SLIM, t);
+	      dump_generic_expr (OPTGROUP_OTHER_NOTE, TDF_SLIM, t);
 	      fprintf (dump_file, "\n");
 	    }
 	  warning_at (location, OPT_Warray_bounds,
@@ -6631,7 +6631,7 @@ search_for_addr_array (tree t, location_t location)
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
 	      fprintf (dump_file, "Array bound warning for ");
-	      dump_generic_expr (MSG_NOTE, TDF_SLIM, t);
+	      dump_generic_expr (OPTGROUP_OTHER_NOTE, TDF_SLIM, t);
 	      fprintf (dump_file, "\n");
 	    }
 	  warning_at (location, OPT_Warray_bounds,

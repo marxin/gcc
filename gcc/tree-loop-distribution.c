@@ -1856,7 +1856,7 @@ out:
       if (nb_generated_loops + nb_generated_calls > 0)
 	{
 	  changed = true;
-	  dump_printf_loc (MSG_OPTIMIZED_LOCATIONS,
+	  dump_printf_loc (OPTGROUP_LOOP_OPTIMIZED,
 			   loc, "Loop %d distributed: split to %d loops "
 			   "and %d library calls.\n",
 			   num, nb_generated_loops, nb_generated_calls);

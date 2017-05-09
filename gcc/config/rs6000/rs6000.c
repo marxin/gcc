@@ -5865,7 +5865,7 @@ rs6000_density_test (rs6000_cost_data *data)
     {
       data->cost[vect_body] = vec_cost * (100 + DENSITY_PENALTY) / 100;
       if (dump_enabled_p ())
-	dump_printf_loc (MSG_NOTE, vect_location,
+	dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
 			 "density %d%%, cost %d exceeds threshold, penalizing "
 			 "loop body cost by %d%%", density_pct,
 			 vec_cost + not_vec_cost, DENSITY_PENALTY);

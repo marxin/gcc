@@ -356,12 +356,12 @@ get_coverage_counts (unsigned counter, unsigned expected,
       static int warned = 0;
 
       if (!warned++ && dump_enabled_p ())
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, input_location,
-                         (flag_guess_branch_prob
-                          ? "file %s not found, execution counts estimated\n"
-                          : "file %s not found, execution counts assumed to "
-                            "be zero\n"),
-                         da_file_name);
+	dump_printf_loc (OPTGROUP_OTHER_OPTIMIZED, input_location,
+			 (flag_guess_branch_prob
+			  ? "file %s not found, execution counts estimated\n"
+			  : "file %s not found, execution counts assumed to "
+			  "be zero\n"),
+			 da_file_name);
       return NULL;
     }
   if (PARAM_VALUE (PARAM_PROFILE_FUNC_INTERNAL_ID))
@@ -392,23 +392,23 @@ get_coverage_counts (unsigned counter, unsigned expected,
 		    "its profile data (counter %qs)", id, ctr_names[counter]);
       if (warning_printed && dump_enabled_p ())
 	{
-          dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, input_location,
-                           "use -Wno-error=coverage-mismatch to tolerate "
-                           "the mismatch but performance may drop if the "
-                           "function is hot\n");
+	  dump_printf_loc (OPTGROUP_OTHER_OPTIMIZED, input_location,
+			   "use -Wno-error=coverage-mismatch to tolerate "
+			   "the mismatch but performance may drop if the "
+			   "function is hot\n");
 	  
 	  if (!seen_error ()
 	      && !warned++)
 	    {
-	      dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, input_location,
-                               "coverage mismatch ignored\n");
-	      dump_printf (MSG_OPTIMIZED_LOCATIONS,
-                           flag_guess_branch_prob
-                           ? G_("execution counts estimated\n")
-                           : G_("execution counts assumed to be zero\n"));
+	      dump_printf_loc (OPTGROUP_OTHER_OPTIMIZED, input_location,
+			       "coverage mismatch ignored\n");
+	      dump_printf (OPTGROUP_OTHER_OPTIMIZED,
+			   flag_guess_branch_prob
+			   ? G_("execution counts estimated\n")
+			   : G_("execution counts assumed to be zero\n"));
 	      if (!flag_guess_branch_prob)
-		dump_printf (MSG_OPTIMIZED_LOCATIONS,
-                             "this can result in poorly optimized code\n");
+		dump_printf (OPTGROUP_OTHER_OPTIMIZED,
+			     "this can result in poorly optimized code\n");
 	    }
 	}
 

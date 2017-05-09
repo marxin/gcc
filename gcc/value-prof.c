@@ -595,18 +595,18 @@ check_counter (gimple *stmt, const char * name,
     {
       location_t locus;
       locus = (stmt != NULL)
-              ? gimple_location (stmt)
-              : DECL_SOURCE_LOCATION (current_function_decl);
+	      ? gimple_location (stmt)
+	      : DECL_SOURCE_LOCATION (current_function_decl);
       if (flag_profile_correction)
-        {
-          if (dump_enabled_p ())
-            dump_printf_loc (MSG_MISSED_OPTIMIZATION, locus,
-                             "correcting inconsistent value profile: %s "
-                             "profiler overall count (%d) does not match BB "
-                             "count (%d)\n", name, (int)*all, (int)bb_count);
+	{
+	  if (dump_enabled_p ())
+	    dump_printf_loc (OPTGROUP_OTHER_MISSED, locus,
+			     "correcting inconsistent value profile: %s "
+			     "profiler overall count (%d) does not match BB "
+			     "count (%d)\n", name, (int)*all, (int)bb_count);
 	  *all = bb_count;
 	  if (*count > *all)
-            *count = *all;
+	    *count = *all;
 	  return false;
 	}
       else
@@ -1307,7 +1307,7 @@ check_ic_target (gcall *call_stmt, struct cgraph_node *target)
 
    locus =  gimple_location (call_stmt);
    if (dump_enabled_p ())
-     dump_printf_loc (MSG_MISSED_OPTIMIZATION, locus,
+     dump_printf_loc (OPTGROUP_OTHER_MISSED, locus,
                       "Skipping target %s with mismatching types for icall\n",
                       target->name ());
    return false;

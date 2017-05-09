@@ -381,7 +381,7 @@ const pass_data pass_data_vectorize =
 {
   GIMPLE_PASS, /* type */
   "vect", /* name */
-  OPTGROUP_LOOP | OPTGROUP_VEC, /* optinfo_flags */
+  optgroup_dump_flags_t (OPTGROUP_LOOP, OPTGROUP_VEC), /* optinfo_flags */
   TV_TREE_VECTORIZATION, /* tv_id */
   ( PROP_cfg | PROP_ssa ), /* properties_required */
   0, /* properties_provided */

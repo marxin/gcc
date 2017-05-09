@@ -192,7 +192,7 @@ static rtx get_expansion (struct var_to_expand *);
 static void
 report_unroll (struct loop *loop, location_t locus)
 {
-  dump_flags_t report_flags = MSG_OPTIMIZED_LOCATIONS | TDF_RTL | TDF_DETAILS;
+  optgroup_dump_flags_t report_flags = OPTGROUP_LOOP_OPTIMIZED;
 
   if (loop->lpt_decision.decision == LPT_NONE)
     return;
@@ -224,10 +224,10 @@ decide_unrolling (int flags)
       location_t locus = get_loop_location (loop);
 
       if (dump_enabled_p ())
-	dump_printf_loc (TDF_RTL, locus,
-                         ";; *** Considering loop %d at BB %d for "
-                         "unrolling ***\n",
-                         loop->num, loop->header->index);
+	dump_printf_loc (OPTGROUP_LOOP_NOTE, locus,
+			 ";; *** Considering loop %d at BB %d for "
+			 "unrolling ***\n",
+			 loop->num, loop->header->index);
 
       /* Do not peel cold areas.  */
       if (optimize_loop_for_size_p (loop))
