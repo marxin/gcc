@@ -332,8 +332,7 @@ graphite_transform_loops (void)
 
 	location_t loc = find_loop_location
 			   (scop->scop_info->region.entry->dest->loop_father);
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
-			 "loop nest optimized\n");
+	dump_printf_loc (OPTGROUP_LOOP_OPTIMIZED, loc, "loop nest optimized\n");
       }
 
   free_scops (scops);

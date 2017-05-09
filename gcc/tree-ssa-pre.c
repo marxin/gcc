@@ -4629,7 +4629,7 @@ eliminate_dom_walker::before_dom_children (basic_block b)
 		  if (dump_enabled_p ())
 		    {
 		      location_t loc = gimple_location_safe (stmt);
-		      dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
+		      dump_printf_loc (OPTGROUP_OTHER_OPTIMIZED, loc,
 				       "converting indirect call to "
 				       "function %s\n",
 				       lang_hooks.decl_printable_name (fn, 2));

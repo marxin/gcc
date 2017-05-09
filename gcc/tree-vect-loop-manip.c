@@ -297,9 +297,9 @@ slpeel_make_loop_iterate_ntimes (struct loop *loop, tree niters)
   if (dump_enabled_p ())
     {
       if (LOCATION_LOCUS (loop_loc) != UNKNOWN_LOCATION)
-	dump_printf (MSG_NOTE, "\nloop at %s:%d: ", LOCATION_FILE (loop_loc),
-		     LOCATION_LINE (loop_loc));
-      dump_gimple_stmt (MSG_NOTE, TDF_SLIM, cond_stmt, 0);
+	dump_printf (OPTGROUP_VEC_NOTE, "\nloop at %s:%d: ",
+		     LOCATION_FILE (loop_loc), LOCATION_LINE (loop_loc));
+      dump_gimple_stmt (OPTGROUP_VEC_NOTE, TDF_SLIM, cond_stmt, 0);
     }
 
   /* Record the number of latch iterations.  */
@@ -733,7 +733,8 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
   /* Analyze phi functions of the loop header.  */
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location, "vect_can_advance_ivs_p:\n");
+    dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
+		     "vect_can_advance_ivs_p:\n");
   for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       tree evolution_part;
@@ -741,8 +742,8 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
       gphi *phi = gsi.phi ();
       if (dump_enabled_p ())
 	{
-          dump_printf_loc (MSG_NOTE, vect_location, "Analyze phi: ");
-          dump_gimple_stmt (MSG_NOTE, TDF_SLIM, phi, 0);
+	  dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location, "Analyze phi: ");
+	  dump_gimple_stmt (OPTGROUP_VEC_NOTE, TDF_SLIM, phi, 0);
 	}
 
       /* Skip virtual phi's. The data dependences that are associated with
@@ -752,7 +753,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
       if (!iv_phi_p (phi))
 	{
 	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_NOTE, vect_location,
+	    dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
 			     "reduc or virtual phi. skip.\n");
 	  continue;
 	}
@@ -764,7 +765,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
       if (evolution_part == NULL_TREE)
         {
 	  if (dump_enabled_p ())
-	    dump_printf (MSG_MISSED_OPTIMIZATION,
+	    dump_printf (OPTGROUP_VEC_MISSED,
 			 "No access function or evolution.\n");
 	  return false;
         }
@@ -775,7 +776,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
       if (!expr_invariant_in_loop_p (loop, evolution_part))
 	{
 	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+	    dump_printf_loc (OPTGROUP_VEC_MISSED, vect_location,
 			     "evolution not invariant in loop.\n");
 	  return false;
 	}
@@ -786,7 +787,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
       if (tree_is_chrec (evolution_part))
 	{
 	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+	    dump_printf_loc (OPTGROUP_VEC_MISSED, vect_location,
 			     "evolution is chrec.\n");
 	  return false;
 	}
@@ -864,16 +865,16 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
       gphi *phi1 = gsi1.phi ();
       if (dump_enabled_p ())
 	{
-	  dump_printf_loc (MSG_NOTE, vect_location,
+	  dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
 			   "vect_update_ivs_after_vectorizer: phi: ");
-	  dump_gimple_stmt (MSG_NOTE, TDF_SLIM, phi, 0);
+	  dump_gimple_stmt (OPTGROUP_VEC_NOTE, TDF_SLIM, phi, 0);
 	}
 
       /* Skip reduction and virtual phis.  */
       if (!iv_phi_p (phi))
 	{
 	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_NOTE, vect_location,
+	    dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
 			     "reduc or virtual phi. skip.\n");
 	  continue;
 	}
@@ -965,8 +966,8 @@ vect_gen_prolog_loop_niters (loop_vec_info loop_vinfo,
       int npeel = LOOP_VINFO_PEELING_FOR_ALIGNMENT (loop_vinfo);
 
       if (dump_enabled_p ())
-        dump_printf_loc (MSG_NOTE, vect_location,
-                         "known peeling = %d.\n", npeel);
+	dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
+			 "known peeling = %d.\n", npeel);
 
       iters = build_int_cst (niters_type, npeel);
       *bound = LOOP_VINFO_PEELING_FOR_ALIGNMENT (loop_vinfo);
@@ -1009,10 +1010,10 @@ vect_gen_prolog_loop_niters (loop_vec_info loop_vinfo,
 
   if (dump_enabled_p ())
     {
-      dump_printf_loc (MSG_NOTE, vect_location,
+      dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
                        "niters for prolog loop: ");
-      dump_generic_expr (MSG_NOTE, TDF_SLIM, iters);
-      dump_printf (MSG_NOTE, "\n");
+      dump_generic_expr (OPTGROUP_VEC_NOTE, TDF_SLIM, iters);
+      dump_printf (OPTGROUP_VEC_NOTE, "\n");
     }
 
   var = create_tmp_var (niters_type, "prolog_loop_niters");
@@ -1070,7 +1071,7 @@ vect_update_inits_of_drs (loop_vec_info loop_vinfo, tree niters)
   struct data_reference *dr;
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location,
+    dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
 		     "=== vect_update_inits_of_dr ===\n");
 
   /* Adjust niters to sizetype and insert stmts on loop preheader edge.  */
@@ -1722,7 +1723,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       e = loop_preheader_edge (loop);
       if (!slpeel_can_duplicate_loop_p (loop, e))
 	{
-	  dump_printf_loc (MSG_MISSED_OPTIMIZATION, loop_loc,
+	  dump_printf_loc (OPTGROUP_VEC_MISSED, loop_loc,
 			   "loop can't be duplicated to preheader edge.\n");
 	  gcc_unreachable ();
 	}
@@ -1730,7 +1731,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       prolog = slpeel_tree_duplicate_loop_to_edge_cfg (loop, scalar_loop, e);
       if (!prolog)
 	{
-	  dump_printf_loc (MSG_MISSED_OPTIMIZATION, loop_loc,
+	  dump_printf_loc (OPTGROUP_VEC_MISSED, loop_loc,
 			   "slpeel_tree_duplicate_loop_to_edge_cfg failed.\n");
 	  gcc_unreachable ();
 	}
@@ -1786,7 +1787,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       e = single_exit (loop);
       if (!slpeel_can_duplicate_loop_p (loop, e))
 	{
-	  dump_printf_loc (MSG_MISSED_OPTIMIZATION, loop_loc,
+	  dump_printf_loc (OPTGROUP_VEC_MISSED, loop_loc,
 			   "loop can't be duplicated to exit edge.\n");
 	  gcc_unreachable ();
 	}
@@ -1794,7 +1795,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       epilog = slpeel_tree_duplicate_loop_to_edge_cfg (loop, scalar_loop, e);
       if (!epilog)
 	{
-	  dump_printf_loc (MSG_MISSED_OPTIMIZATION, loop_loc,
+	  dump_printf_loc (OPTGROUP_VEC_MISSED, loop_loc,
 			   "slpeel_tree_duplicate_loop_to_edge_cfg failed.\n");
 	  gcc_unreachable ();
 	}
@@ -2270,12 +2271,12 @@ vect_create_cond_for_alias_checks (loop_vec_info loop_vinfo, tree * cond_expr)
 
       if (dump_enabled_p ())
 	{
-	  dump_printf_loc (MSG_NOTE, vect_location,
+	  dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
 			   "create runtime check for data references ");
-	  dump_generic_expr (MSG_NOTE, TDF_SLIM, DR_REF (dr_a.dr));
-	  dump_printf (MSG_NOTE, " and ");
-	  dump_generic_expr (MSG_NOTE, TDF_SLIM, DR_REF (dr_b.dr));
-	  dump_printf (MSG_NOTE, "\n");
+	  dump_generic_expr (OPTGROUP_VEC_NOTE, TDF_SLIM, DR_REF (dr_a.dr));
+	  dump_printf (OPTGROUP_VEC_NOTE, " and ");
+	  dump_generic_expr (OPTGROUP_VEC_NOTE, TDF_SLIM, DR_REF (dr_b.dr));
+	  dump_printf (OPTGROUP_VEC_NOTE, "\n");
 	}
 
       /* Create condition expression for each pair data references.  */
@@ -2288,7 +2289,7 @@ vect_create_cond_for_alias_checks (loop_vec_info loop_vinfo, tree * cond_expr)
     }
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location,
+    dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
 		     "created %u versioning for alias checks.\n",
 		     comp_alias_ddrs.length ());
 }
@@ -2414,12 +2415,12 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
       && dump_enabled_p ())
     {
       if (version_alias)
-        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
-                         "loop versioned for vectorization because of "
+	dump_printf_loc (OPTGROUP_VEC_OPTIMIZED, vect_location,
+			 "loop versioned for vectorization because of "
 			 "possible aliasing\n");
       if (version_align)
-        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
-                         "loop versioned for vectorization to enhance "
+	dump_printf_loc (OPTGROUP_VEC_OPTIMIZED, vect_location,
+			 "loop versioned for vectorization to enhance "
 			 "alignment\n");
 
     }

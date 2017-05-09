@@ -339,7 +339,7 @@ fold_gimple_assign (gimple_stmt_iterator *si)
 		    if (dump_enabled_p ())
 		      {
 			location_t loc = gimple_location_safe (stmt);
-			dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
+			dump_printf_loc (OPTGROUP_OTHER_OPTIMIZED, loc,
 					 "resolving virtual function address "
 					 "reference to function %s\n",
 					 targets.length () == 1
@@ -3716,7 +3716,7 @@ gimple_fold_call (gimple_stmt_iterator *gsi, bool inplace)
 	      if (dump_enabled_p ())
 		{
 		  location_t loc = gimple_location_safe (stmt);
-		  dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
+		  dump_printf_loc (OPTGROUP_OTHER_OPTIMIZED, loc,
 				   "folding virtual function call to %s\n",
 		 		   targets.length () == 1
 		  		   ? targets[0]->name ()

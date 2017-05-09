@@ -604,7 +604,7 @@ vectorize_loops (void)
 	vect_location = find_loop_location (loop);
         if (LOCATION_LOCUS (vect_location) != UNKNOWN_LOCATION
 	    && dump_enabled_p ())
-	  dump_printf (MSG_NOTE, "\nAnalyzing loop at %s:%d\n",
+	  dump_printf (OPTGROUP_VEC_NOTE, "\nAnalyzing loop at %s:%d\n",
                        LOCATION_FILE (vect_location),
 		       LOCATION_LINE (vect_location));
 
@@ -647,7 +647,7 @@ vectorize_loops (void)
 		  }
 		if (! has_mask_load_store && vect_slp_bb (bb))
 		  {
-		    dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
+		    dump_printf_loc (OPTGROUP_VEC_OPTIMIZED, vect_location,
 				     "basic block vectorized\n");
 		    fold_loop_vectorized_call (loop_vectorized_call,
 					       boolean_true_node);
@@ -682,8 +682,8 @@ vectorize_loops (void)
 	  set_uid_loop_bbs (loop_vinfo, loop_vectorized_call);
         if (LOCATION_LOCUS (vect_location) != UNKNOWN_LOCATION
 	    && dump_enabled_p ())
-          dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
-                           "loop vectorized\n");
+	  dump_printf_loc (OPTGROUP_VEC_OPTIMIZED, vect_location,
+			   "loop vectorized\n");
 	new_loop = vect_transform_loop (loop_vinfo);
 	num_vectorized_loops++;
 	/* Now that the loop has been vectorized, allow it to be unrolled
@@ -723,7 +723,7 @@ vectorize_loops (void)
   statistics_counter_event (cfun, "Vectorized loops", num_vectorized_loops);
   if (dump_enabled_p ()
       || (num_vectorized_loops > 0 && dump_enabled_p ()))
-    dump_printf_loc (MSG_NOTE, vect_location,
+    dump_printf_loc (OPTGROUP_VEC_NOTE, vect_location,
                      "vectorized %u loops in function.\n",
                      num_vectorized_loops);
 
@@ -854,7 +854,7 @@ const pass_data pass_data_slp_vectorize =
 {
   GIMPLE_PASS, /* type */
   "slp", /* name */
-  OPTGROUP_LOOP | OPTGROUP_VEC, /* optinfo_flags */
+  optgroup_dump_flags_t (OPTGROUP_LOOP, OPTGROUP_VEC), /* optinfo_flags */
   TV_TREE_SLP_VECTORIZATION, /* tv_id */
   ( PROP_ssa | PROP_cfg ), /* properties_required */
   0, /* properties_provided */
@@ -906,7 +906,7 @@ pass_slp_vectorize::execute (function *fun)
   FOR_EACH_BB_FN (bb, fun)
     {
       if (vect_slp_bb (bb))
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
+	dump_printf_loc (OPTGROUP_VEC_OPTIMIZED, vect_location,
 			 "basic block vectorized\n");
     }
 
@@ -1064,12 +1064,12 @@ increase_alignment (void)
 
       alignment = get_vec_alignment_for_type (TREE_TYPE (decl));
       if (alignment && vect_can_force_dr_alignment_p (decl, alignment))
-        {
+	{
 	  vnode->increase_alignment (alignment);
-          dump_printf (MSG_NOTE, "Increasing alignment of decl: ");
-          dump_generic_expr (MSG_NOTE, TDF_SLIM, decl);
-          dump_printf (MSG_NOTE, "\n");
-        }
+	  dump_printf (OPTGROUP_VEC_NOTE, "Increasing alignment of decl: ");
+	  dump_generic_expr (OPTGROUP_VEC_NOTE, TDF_SLIM, decl);
+	  dump_printf (OPTGROUP_VEC_NOTE, "\n");
+	}
     }
 
   delete type_align_map;
@@ -1083,7 +1083,7 @@ const pass_data pass_data_ipa_increase_alignment =
 {
   SIMPLE_IPA_PASS, /* type */
   "increase_alignment", /* name */
-  OPTGROUP_LOOP | OPTGROUP_VEC, /* optinfo_flags */
+  optgroup_dump_flags_t (OPTGROUP_LOOP, OPTGROUP_VEC), /* optinfo_flags */
   TV_IPA_OPT, /* tv_id */
   0, /* properties_required */
   0, /* properties_provided */

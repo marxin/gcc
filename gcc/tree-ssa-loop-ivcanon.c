@@ -686,7 +686,6 @@ try_unroll_loop_completely (struct loop *loop,
   struct loop_size size;
   bool n_unroll_found = false;
   edge edge_to_cancel = NULL;
-  dump_flags_t report_flags = MSG_OPTIMIZED_LOCATIONS | TDF_RTL | TDF_DETAILS;
 
   /* See if we proved number of iterations to be low constant.
 
@@ -853,8 +852,8 @@ try_unroll_loop_completely (struct loop *loop,
 		     loop->num);
 	  return false;
 	}
-      dump_printf_loc (report_flags, locus,
-                       "loop turned into non-loop; it never loops.\n");
+      dump_printf_loc (OPTGROUP_LOOP_OPTIMIZED, locus,
+		       "loop turned into non-loop; it never loops.\n");
 
       initialize_original_copy_tables ();
       auto_sbitmap wont_exit (n_unroll + 1);
@@ -909,30 +908,30 @@ try_unroll_loop_completely (struct loop *loop,
   if (dump_enabled_p ())
     {
       if (!n_unroll)
-        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | TDF_DETAILS, locus,
-                         "loop turned into non-loop; it never loops\n");
+	dump_printf_loc (OPTGROUP_LOOP_OPTIMIZED, locus,
+			 "loop turned into non-loop; it never loops\n");
       else
-        {
-          dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | TDF_DETAILS, locus,
-                           "loop with %d iterations completely unrolled",
+	{
+	  dump_printf_loc (OPTGROUP_LOOP_OPTIMIZED, locus,
+			   "loop with %d iterations completely unrolled",
 			   (int) (n_unroll + 1));
-          if (profile_info)
-            dump_printf (MSG_OPTIMIZED_LOCATIONS | TDF_DETAILS,
-                         " (header execution count %d)",
-                         (int)loop->header->count);
-          dump_printf (MSG_OPTIMIZED_LOCATIONS | TDF_DETAILS, "\n");
-        }
+	  if (profile_info)
+	    dump_printf (OPTGROUP_LOOP_OPTIMIZED,
+			 " (header execution count %d)",
+			 (int)loop->header->count);
+	  dump_printf (OPTGROUP_LOOP_OPTIMIZED, "\n");
+	}
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       if (exit)
-        fprintf (dump_file, "Exit condition of peeled iterations was "
+	fprintf (dump_file, "Exit condition of peeled iterations was "
 		 "eliminated.\n");
       if (edge_to_cancel)
-        fprintf (dump_file, "Last iteration exit edge was proved true.\n");
+	fprintf (dump_file, "Last iteration exit edge was proved true.\n");
       else
-        fprintf (dump_file, "Latch of last iteration was marked by "
+	fprintf (dump_file, "Latch of last iteration was marked by "
 		 "__builtin_unreachable ().\n");
     }
 
