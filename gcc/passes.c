@@ -779,7 +779,7 @@ pass_manager::register_one_dump_file (opt_pass *pass)
   char num[11];
   dump_flags_t flags;
   int id;
-  int optgroup_flags = OPTGROUP_NONE;
+  optgroup_dump_flags_t optgroup_flags;
   gcc::dump_manager *dumps = m_ctxt->get_dumps ();
 
   /* See below in next_pass_1.  */

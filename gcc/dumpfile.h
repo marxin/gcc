@@ -84,11 +84,6 @@ enum tree_dump_index
 #define TDF_SCEV	(1 << 24)	/* Dump SCEV details.  */
 #define TDF_COMMENT	(1 << 25)	/* Dump lines with prefix ";;"  */
 #define TDF_GIMPLE	(1 << 26)	/* Dump in GIMPLE FE syntax  */
-#define MSG_OPTIMIZED_LOCATIONS  (1 << 27)  /* -fopt-info optimized sources */
-#define MSG_MISSED_OPTIMIZATION  (1 << 28)  /* missed opportunities */
-#define MSG_NOTE                 (1 << 29)  /* general optimization info */
-#define MSG_ALL         (MSG_OPTIMIZED_LOCATIONS | MSG_MISSED_OPTIMIZATION \
-                         | MSG_NOTE)
 
 /* Dump option node is a tree structure that implements
    parsing of suboptions and provides mapping between a given enum type E
@@ -106,6 +101,9 @@ struct dump_option_node
   /* Parse a given option string and return mask.  */
   uint64_t parse (const char *token);
 
+  /* Parse a given option string and return mask.  */
+  uint64_t parse (char *token);
+
   /* Register a SUBOPTION for a dump option node.  */
   void register_suboption (dump_option_node<E> *suboption)
   {
@@ -118,7 +116,7 @@ private:
   uint64_t initialize_masks (unsigned *current, uint64_t *mask_translation);
 
   /* Parse a given option string and return mask.  */
-  uint64_t parse (char *token);
+  uint64_t parse_internal (char *token);
 
   /* Name of the option.  */
   const char *m_name;
@@ -146,15 +144,21 @@ struct dump_flags_type
   dump_flags_type<E> (): m_mask (0)
   {}
 
-  /* Constructor for a MASK.  */
-  dump_flags_type<E> (uint64_t mask): m_mask (mask)
-  {}
-
   /* Constructor for a enum value E.  */
   dump_flags_type<E> (E enum_value)
   {
     gcc_checking_assert ((unsigned)enum_value <= OPT_MASK_SIZE);
     m_mask = m_mask_translation[enum_value];
+    gcc_checking_assert (m_mask != 0);
+  }
+
+  /* Constructor for two enum values.  */
+  dump_flags_type<E> (E enum_value, E enum_value2)
+  {
+    gcc_checking_assert ((unsigned)enum_value <= OPT_MASK_SIZE);
+    gcc_checking_assert ((unsigned)enum_value2 <= OPT_MASK_SIZE);
+    m_mask = m_mask_translation[enum_value] | m_mask_translation[enum_value2];
+    gcc_checking_assert (m_mask != 0);
   }
 
   /* OR operator for OTHER dump_flags_type.  */
@@ -181,6 +185,12 @@ struct dump_flags_type
     return m_mask;
   }
 
+  /* Return dump_flags_type for a computed mask.  */
+  static inline dump_flags_type from_mask (uint64_t mask)
+  {
+    return dump_flags_type (mask);
+  }
+
   /* Return mask that represents all selected options.  */
   static inline dump_flags_type get_all ()
   {
@@ -195,6 +205,12 @@ struct dump_flags_type
 
   /* Translation table between enum values and masks.  */
   static uint64_t m_mask_translation[OPT_MASK_SIZE];
+
+private:
+  /* Constructor.  */
+  dump_flags_type<E> (uint64_t mask): m_mask (mask)
+  {}
+
 };
 
 /* Flags used for -fopt-info groups.  */
@@ -203,11 +219,29 @@ enum optgroup_types
 {
   OPTGROUP_NONE,
   OPTGROUP_IPA,
+  OPTGROUP_IPA_OPTIMIZED,
+  OPTGROUP_IPA_MISSED,
+  OPTGROUP_IPA_NOTE,
   OPTGROUP_LOOP,
+  OPTGROUP_LOOP_OPTIMIZED,
+  OPTGROUP_LOOP_MISSED,
+  OPTGROUP_LOOP_NOTE,
   OPTGROUP_INLINE,
+  OPTGROUP_INLINE_OPTIMIZED,
+  OPTGROUP_INLINE_MISSED,
+  OPTGROUP_INLINE_NOTE,
   OPTGROUP_OMP,
+  OPTGROUP_OMP_OPTIMIZED,
+  OPTGROUP_OMP_MISSED,
+  OPTGROUP_OMP_NOTE,
   OPTGROUP_VEC,
+  OPTGROUP_VEC_OPTIMIZED,
+  OPTGROUP_VEC_MISSED,
+  OPTGROUP_VEC_NOTE,
   OPTGROUP_OTHER,
+  OPTGROUP_OTHER_OPTIMIZED,
+  OPTGROUP_OTHER_MISSED,
+  OPTGROUP_OTHER_NOTE,
   OPTGROUP_COUNT
 };
 
@@ -226,20 +260,21 @@ typedef uint64_t dump_flags_t;
 /* Define a tree dump switch.  */
 struct dump_file_info
 {
-  const char *suffix;           /* suffix to give output file.  */
-  const char *swtch;            /* command line dump switch */
-  const char *glob;             /* command line glob  */
-  const char *pfilename;        /* filename for the pass-specific stream  */
+  const char *suffix;		/* suffix to give output file.  */
+  const char *swtch;		/* command line dump switch */
+  const char *glob;		/* command line glob  */
+  const char *pfilename;	/* filename for the pass-specific stream  */
   const char *alt_filename;     /* filename for the -fopt-info stream  */
-  FILE *pstream;                /* pass-specific dump stream  */
-  FILE *alt_stream;             /* -fopt-info stream */
+  FILE *pstream;		/* pass-specific dump stream  */
+  FILE *alt_stream;		/* -fopt-info stream */
   dump_flags_t pflags;		/* dump flags */
-  optgroup_dump_flags_t optgroup_flags; /* optgroup flags for -fopt-info */
-  int alt_flags;                /* flags for opt-info */
-  int pstate;                   /* state of pass-specific stream */
-  int alt_state;                /* state of the -fopt-info stream */
-  int num;                      /* dump file number */
-  bool owns_strings;            /* fields "suffix", "swtch", "glob" can be
+  optgroup_dump_flags_t pass_optgroup_flags; /* a pass flags for -fopt-info */
+  optgroup_dump_flags_t optgroup_flags; /* flags for -fopt-info given
+					   by a user */
+  int pstate;			/* state of pass-specific stream */
+  int alt_state;		/* state of the -fopt-info stream */
+  int num;			/* dump file number */
+  bool owns_strings;		/* fields "suffix", "swtch", "glob" can be
 				   const strings, or can be dynamically
 				   allocated, needing free.  */
   bool graph_dump_initialized;  /* When a given dump file is being initialized,
@@ -253,15 +288,18 @@ extern FILE *dump_begin (int, dump_flags_t *);
 extern void dump_end (int, FILE *);
 extern int opt_info_switch_p (const char *);
 extern const char *dump_flag_name (int);
-extern void dump_printf (dump_flags_t, const char *, ...) ATTRIBUTE_PRINTF_2;
-extern void dump_printf_loc (dump_flags_t, source_location,
+extern void dump_printf (optgroup_dump_flags_t,
+			 const char *, ...) ATTRIBUTE_PRINTF_2;
+extern void dump_printf_loc (optgroup_dump_flags_t, source_location,
                              const char *, ...) ATTRIBUTE_PRINTF_3;
-extern void dump_basic_block (int, basic_block, int);
-extern void dump_generic_expr_loc (int, source_location, int, tree);
-extern void dump_generic_expr (dump_flags_t, dump_flags_t, tree);
-extern void dump_gimple_stmt_loc (dump_flags_t, source_location, dump_flags_t,
-				  gimple *, int);
-extern void dump_gimple_stmt (dump_flags_t, dump_flags_t, gimple *, int);
+extern void dump_basic_block (optgroup_dump_flags_t, basic_block, int);
+extern void dump_generic_expr_loc (optgroup_dump_flags_t, source_location,
+				   int, tree);
+extern void dump_generic_expr (optgroup_dump_flags_t, dump_flags_t, tree);
+extern void dump_gimple_stmt_loc (optgroup_dump_flags_t, source_location,
+				  dump_flags_t, gimple *, int);
+extern void dump_gimple_stmt (optgroup_dump_flags_t, dump_flags_t, gimple *,
+			      int);
 extern void print_combine_total_stats (void);
 extern bool enable_rtl_dump_file (void);
 
@@ -285,6 +323,20 @@ dump_enabled_p (void)
 {
   return (dump_file || alt_dump_file);
 }
+
+/* Optgroup option hierarchy.  */
+
+struct optgroup_option_hierarchy
+{
+  /* Contructor.  */
+  optgroup_option_hierarchy();
+
+  /* Initialize optgroup options.  */
+  typedef dump_option_node<optgroup_types> node;
+
+  /* Root option node.  */
+  node *root;
+};
 
 namespace gcc {
 
@@ -346,12 +398,6 @@ public:
   const char *
   dump_flag_name (int phase) const;
 
-  /* Return optgroup_types dump options.  */
-  dump_option_node<optgroup_types> *get_optgroup_options ()
-  {
-    return optgroup_options;
-  }
-
 private:
 
   int
@@ -365,9 +411,7 @@ private:
 
   int
   opt_info_enable_passes (optgroup_dump_flags_t optgroup_flags,
-			  dump_flags_t flags, const char *filename);
-
-  void initialize_options ();
+			  const char *filename);
 
 private:
 
@@ -376,9 +420,6 @@ private:
   struct dump_file_info *m_extra_dump_files;
   size_t m_extra_dump_files_in_use;
   size_t m_extra_dump_files_alloced;
-
-  /* Dump option node for optgroup_types enum.  */
-  dump_option_node<optgroup_types> *optgroup_options;
 
   /* Grant access to dump_enable_all.  */
   friend bool ::enable_rtl_dump_file (void);
