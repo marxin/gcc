@@ -3338,10 +3338,10 @@ parallelize_loops (bool oacc_kernels_p)
 
       loop_loc = find_loop_location (loop);
       if (loop->inner)
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loop_loc,
+	dump_printf_loc (OPTGROUP_LOOP_OPTIMIZED, loop_loc,
 			 "parallelizing outer loop %d\n", loop->num);
       else
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loop_loc,
+	dump_printf_loc (OPTGROUP_LOOP_OPTIMIZED, loop_loc,
 			 "parallelizing inner loop %d\n", loop->num);
 
       gen_parallel_loop (loop, &reduction_list,

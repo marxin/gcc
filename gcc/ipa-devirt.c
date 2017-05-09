@@ -3748,14 +3748,15 @@ ipa_devirt (void)
 	    else if (dbg_cnt (devirt))
 	      {
 		if (dump_enabled_p ())
-                  {
-                    location_t locus = gimple_location_safe (e->call_stmt);
-                    dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, locus,
-                                     "speculatively devirtualizing call in %s/%i to %s/%i\n",
-                                     n->name (), n->order,
-                                     likely_target->name (),
-                                     likely_target->order);
-                  }
+		  {
+		    location_t locus = gimple_location_safe (e->call_stmt);
+		    dump_printf_loc (OPTGROUP_IPA_OPTIMIZED, locus,
+				     "speculatively devirtualizing call in "
+				     "%s/%i to %s/%i\n",
+				     n->name (), n->order,
+				     likely_target->name (),
+				     likely_target->order);
+		  }
 		if (!likely_target->can_be_discarded_p ())
 		  {
 		    cgraph_node *alias;

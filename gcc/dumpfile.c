@@ -447,7 +447,7 @@ dump_open_alternate_stream (struct dump_file_info *dfi)
 void
 dump_loc (optgroup_dump_flags_t dump_kind, FILE *dfile, source_location loc)
 {
-  if (dump_kind)
+  if (dump_kind.any ())
     {
       if (LOCATION_LOCUS (loc) > BUILTINS_LOCATION)
         fprintf (dfile, "%s:%d:%d: note: ", LOCATION_FILE (loc),
@@ -1026,7 +1026,7 @@ opt_info_switch_p_1 (const char *arg, optgroup_dump_flags_t *optgroup_flags,
   optgroup_dump_flags_t f;
   f = optgroup_dump_flags_t::from_mask
     (optgroup_options.root->parse (option_value));
-  if (f)
+  if (f.any ())
     {
       *optgroup_flags |= f;
       free (option_value);
@@ -1067,7 +1067,7 @@ opt_info_switch_p (const char *arg)
     }
 
   file_seen = xstrdup (filename);
-  if (!optgroup_flags)
+  if (!optgroup_flags.any ())
     optgroup_flags = optgroup_dump_flags_t::get_all ();
 
   return dumps->opt_info_enable_passes (optgroup_flags, filename);
@@ -1076,9 +1076,9 @@ opt_info_switch_p (const char *arg)
 /* Print basic block on the dump streams.  */
 
 void
-dump_basic_block (int dump_kind, basic_block bb, int indent)
+dump_basic_block (optgroup_dump_flags_t dump_kind, basic_block bb, int indent)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
     dump_bb (dump_file, bb, indent, TDF_DETAILS);
   if (alt_dump_file && (dump_kind & opt_info_flags))
     dump_bb (alt_dump_file, bb, indent, TDF_DETAILS);
