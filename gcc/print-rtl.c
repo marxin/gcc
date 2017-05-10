@@ -198,7 +198,7 @@ rtx_writer::print_rtx_operand_code_0 (const_rtx in_rtx ATTRIBUTE_UNUSED,
 	fprintf (m_outfile, " [flags %#x]", flags);
       tree decl = SYMBOL_REF_DECL (in_rtx);
       if (decl)
-	print_node_brief (m_outfile, "", decl, dump_flags);
+	print_node_brief (m_outfile, "", decl, 0);
     }
   else if (idx == 3 && NOTE_P (in_rtx))
     {
@@ -2018,7 +2018,7 @@ extern void debug_bb_slim (basic_block);
 DEBUG_FUNCTION void
 debug_bb_slim (basic_block bb)
 {
-  dump_bb (stderr, bb, 0, TDF_SLIM | TDF_BLOCKS);
+  dump_bb (stderr, bb, 0, dump_flags_t (TDF_SLIM) | TDF_BLOCKS);
 }
 
 extern void debug_bb_n_slim (int);

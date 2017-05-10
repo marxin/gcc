@@ -1378,9 +1378,11 @@ chkp_check_lower (tree addr, tree bounds,
     {
       gimple *before = gsi_stmt (iter);
       fprintf (dump_file, "Generated lower bound check for statement ");
-      print_gimple_stmt (dump_file, before, 0, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, before, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
       fprintf (dump_file, "  ");
-      print_gimple_stmt (dump_file, check, 0, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, check, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 }
 
@@ -1425,9 +1427,11 @@ chkp_check_upper (tree addr, tree bounds,
     {
       gimple *before = gsi_stmt (iter);
       fprintf (dump_file, "Generated upper bound check for statement ");
-      print_gimple_stmt (dump_file, before, 0, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, before, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
       fprintf (dump_file, "  ");
-      print_gimple_stmt (dump_file, check, 0, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, check, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 }
 
@@ -2056,11 +2060,13 @@ chkp_make_bounds (tree lb, tree size, gimple_stmt_iterator *iter, bool after)
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "Made bounds: ");
-      print_gimple_stmt (dump_file, stmt, 0, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, stmt, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
       if (iter)
 	{
 	  fprintf (dump_file, "  inserted before statement: ");
-	  print_gimple_stmt (dump_file, gsi_stmt (*iter), 0, TDF_VOPS|TDF_MEMSYMS);
+	  print_gimple_stmt (dump_file, gsi_stmt (*iter), 0,
+			     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 	}
       else
 	fprintf (dump_file, "  at function entry\n");
@@ -2309,7 +2315,8 @@ chkp_build_returned_bound (gcall *call)
       fprintf (dump_file, "Built returned bounds (");
       print_generic_expr (dump_file, bounds);
       fprintf (dump_file, ") for call: ");
-      print_gimple_stmt (dump_file, call, 0, TDF_VOPS | TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, call, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 
   bounds = chkp_maybe_copy_and_register_bounds (lhs, bounds);
@@ -2459,7 +2466,8 @@ chkp_build_bndldx (tree addr, tree ptr, gimple_stmt_iterator *gsi)
       fprintf (dump_file, "Generated bndldx for pointer ");
       print_generic_expr (dump_file, ptr);
       fprintf (dump_file, ": ");
-      print_gimple_stmt (dump_file, stmt, 0, TDF_VOPS | TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, stmt, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 
   return bounds;
@@ -2505,8 +2513,10 @@ chkp_build_bndstx (tree addr, tree ptr, tree bounds,
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "Generated bndstx for pointer store ");
-      print_gimple_stmt (dump_file, gsi_stmt (*gsi), 0, TDF_VOPS|TDF_MEMSYMS);
-      print_gimple_stmt (dump_file, stmt, 2, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, gsi_stmt (*gsi), 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, stmt, 2,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 }
 
@@ -2587,7 +2597,8 @@ chkp_compute_bounds_for_assignment (tree node, gimple *assign)
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       fprintf (dump_file, "Computing bounds for assignment: ");
-      print_gimple_stmt (dump_file, assign, 0, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, assign, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 
   switch (rhs_code)
@@ -2816,7 +2827,8 @@ chkp_get_bounds_by_definition (tree node, gimple *def_stmt,
       print_generic_expr (dump_file, node);
 
       fprintf (dump_file, " using its definition: ");
-      print_gimple_stmt (dump_file, def_stmt, 0, TDF_VOPS | TDF_MEMSYMS);
+      print_gimple_stmt (dump_file, def_stmt, 0,
+			 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 
   switch (code)
@@ -3258,10 +3270,11 @@ chkp_intersect_bounds (tree bounds1, tree bounds2, gimple_stmt_iterator *iter)
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "Bounds intersection: ");
-	  print_gimple_stmt (dump_file, stmt, 0, TDF_VOPS|TDF_MEMSYMS);
+	  print_gimple_stmt (dump_file, stmt, 0,
+			     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 	  fprintf (dump_file, "  inserted before statement: ");
 	  print_gimple_stmt (dump_file, gsi_stmt (*iter), 0,
-			     TDF_VOPS|TDF_MEMSYMS);
+			     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 	}
 
       return bounds;

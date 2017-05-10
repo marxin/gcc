@@ -42,53 +42,6 @@ enum tree_dump_index
   TDI_end
 };
 
-/* Bit masks to control dumping. Not all values are applicable to all
-   dumps. Add new ones at the end. When you define new values, extend
-   the DUMP_OPTIONS array in dumpfile.c. The TDF_* flags coexist with
-   MSG_* flags (for -fopt-info) and the bit values must be chosen to
-   allow that.  */
-#define TDF_ADDRESS	(1 << 0)	/* dump node addresses */
-#define TDF_SLIM	(1 << 1)	/* don't go wild following links */
-#define TDF_RAW  	(1 << 2)	/* don't unparse the function */
-#define TDF_DETAILS	(1 << 3)	/* show more detailed info about
-					   each pass */
-#define TDF_STATS	(1 << 4)	/* dump various statistics about
-					   each pass */
-#define TDF_BLOCKS	(1 << 5)	/* display basic block boundaries */
-#define TDF_VOPS	(1 << 6)	/* display virtual operands */
-#define TDF_LINENO	(1 << 7)	/* display statement line numbers */
-#define TDF_UID		(1 << 8)	/* display decl UIDs */
-
-#define TDF_TREE	(1 << 9)	/* is a tree dump */
-#define TDF_RTL		(1 << 10)	/* is a RTL dump */
-#define TDF_IPA		(1 << 11)	/* is an IPA dump */
-#define TDF_STMTADDR	(1 << 12)	/* Address of stmt.  */
-
-#define TDF_GRAPH	(1 << 13)	/* a graph dump is being emitted */
-#define TDF_MEMSYMS	(1 << 14)	/* display memory symbols in expr.
-                                           Implies TDF_VOPS.  */
-
-#define TDF_DIAGNOSTIC	(1 << 15)	/* A dump to be put in a diagnostic
-					   message.  */
-#define TDF_VERBOSE     (1 << 16)       /* A dump that uses the full tree
-					   dumper to print stmts.  */
-#define TDF_RHS_ONLY	(1 << 17)	/* a flag to only print the RHS of
-					   a gimple stmt.  */
-#define TDF_ASMNAME	(1 << 18)	/* display asm names of decls  */
-#define TDF_EH		(1 << 19)	/* display EH region number
-					   holding this gimple statement.  */
-#define TDF_NOUID	(1 << 20)	/* omit UIDs from dumps.  */
-#define TDF_ALIAS	(1 << 21)	/* display alias information  */
-#define TDF_ENUMERATE_LOCALS (1 << 22)	/* Enumerate locals by uid.  */
-#define TDF_CSELIB	(1 << 23)	/* Dump cselib details.  */
-#define TDF_SCEV	(1 << 24)	/* Dump SCEV details.  */
-#define TDF_COMMENT	(1 << 25)	/* Dump lines with prefix ";;"  */
-#define TDF_GIMPLE	(1 << 26)	/* Dump in GIMPLE FE syntax  */
-
-#define TDF_NONE 0
-
-
-
 /* Dump option node is a tree structure that implements
    parsing of suboptions and provides mapping between a given enum type E
    and unsigned integer masks that are encapsulated in dump_flags_type type.  */
@@ -299,13 +252,49 @@ dump_flags_type<E>::m_mask_translation[OPT_MASK_SIZE];
 
 typedef dump_flags_type<optgroup_types> optgroup_dump_flags_t;
 
-/* Dump flags type.  */
+enum suboption_types
+{
+  TDF_ALL,
+  /* Globally used suboptions.  */
+  TDF_SLIM,
+  TDF_RAW,
+  TDF_GRAPH,
+  TDF_DETAILS,
+  TDF_STATS,
+  TDF_DIAGNOSTIC,
+  TDF_VERBOSE,
+  TDF_COMMENT,
+  TDF_LINENO,
+  TDF_BLOCKS,
+  TDF_UID,
+  TDF_NOUID,
+  TDF_ADDRESS,
+  TDF_ASMNAME,
+  TDF_STMTADDR,
+  TDF_LOCALS,
+  TDF_ENUMERATE_LOCALS,
+  /* TREE group.  */
+  TDF_TREE,
+  /* IPA group.  */
+  TDF_IPA,
+  /* GIMPLE group. */
+  TDF_GIMPLE,
+  TDF_VOPS,
+  TDF_ALIAS,
+  TDF_SCEV,
+  TDF_RHS_ONLY,
+  TDF_MEMSYMS,
+  TDF_EH,
+  /* RTL group.  */
+  TDF_RTL,
+  TDF_CSELIB,
+};
 
-typedef uint64_t dump_flags_t;
+/* Dump flags type for suboption enum type.  */
 
-/* Dump flags type.  */
+typedef dump_flags_type<suboption_types> dump_flags_t;
 
-typedef uint64_t dump_flags_t;
+#define TDF_NONE dump_flags_t ()
 
 /* Define a tree dump switch.  */
 struct dump_file_info
@@ -359,7 +348,7 @@ extern void dump_node (const_tree, dump_flags_t, FILE *);
 /* In combine.c  */
 extern void dump_combine_total_stats (FILE *);
 /* In cfghooks.c  */
-extern void dump_bb (FILE *, basic_block, int, dump_flags_t);
+extern void dump_bb (FILE *, basic_block, int, dump_flags_t = TDF_NONE);
 
 /* Global variables used to communicate with passes.  */
 extern FILE *dump_file;
@@ -373,6 +362,20 @@ dump_enabled_p (void)
 {
   return (dump_file || alt_dump_file);
 }
+
+/* Suboptions hierarchy.  */
+
+struct suboptions_hierarchy
+{
+  /* Contructor.  */
+  suboptions_hierarchy();
+
+  /* Initialize optgroup options.  */
+  typedef dump_option_node<suboption_types> node;
+
+  /* Root option node.  */
+  node *root;
+};
 
 /* Optgroup option hierarchy.  */
 

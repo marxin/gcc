@@ -77,7 +77,7 @@ do_niy (pretty_printer *pp, const_tree node, dump_flags_t flags)
 DEBUG_FUNCTION void
 debug_generic_expr (tree t)
 {
-  print_generic_expr (stderr, t, TDF_VOPS|TDF_MEMSYMS);
+  print_generic_expr (stderr, t, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
   fprintf (stderr, "\n");
 }
 
@@ -86,7 +86,7 @@ debug_generic_expr (tree t)
 DEBUG_FUNCTION void
 debug_generic_stmt (tree t)
 {
-  print_generic_stmt (stderr, t, TDF_VOPS|TDF_MEMSYMS);
+  print_generic_stmt (stderr, t, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
   fprintf (stderr, "\n");
 }
 
@@ -95,17 +95,18 @@ debug_generic_stmt (tree t)
 DEBUG_FUNCTION void
 debug_tree_chain (tree t)
 {
+  dump_flags_t flags (TDF_VOPS, TDF_MEMSYMS, TDF_UID);
   hash_set<tree> seen;
 
   while (t)
     {
-      print_generic_expr (stderr, t, TDF_VOPS|TDF_MEMSYMS|TDF_UID);
+      print_generic_expr (stderr, t, flags);
       fprintf (stderr, " ");
       t = TREE_CHAIN (t);
       if (seen.add (t))
 	{
 	  fprintf (stderr, "... [cycled back to ");
-	  print_generic_expr (stderr, t, TDF_VOPS|TDF_MEMSYMS|TDF_UID);
+	  print_generic_expr (stderr, t, flags);
 	  fprintf (stderr, "]");
 	  break;
 	}
@@ -3427,7 +3428,7 @@ print_struct_decl (pretty_printer *pp, const_tree node, int spc,
 		|| TREE_CODE (node) == QUAL_UNION_TYPE))
 	pp_string (pp, "union ");
 
-      dump_generic_node (pp, TYPE_NAME (node), spc, 0, false);
+      dump_generic_node (pp, TYPE_NAME (node), spc, TDF_NONE, false);
     }
 
   /* Print the contents of the structure.  */

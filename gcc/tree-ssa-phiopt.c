@@ -2279,8 +2279,10 @@ hoist_adjacent_loads (basic_block bb0, basic_block bb1,
 	  fprintf (dump_file,
 		   "\nHoisting adjacent loads from %d and %d into %d: \n",
 		   bb_for_def1->index, bb_for_def2->index, bb0->index);
-	  print_gimple_stmt (dump_file, def1, 0, TDF_VOPS|TDF_MEMSYMS);
-	  print_gimple_stmt (dump_file, def2, 0, TDF_VOPS|TDF_MEMSYMS);
+	  print_gimple_stmt (dump_file, def1, 0,
+			     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
+	  print_gimple_stmt (dump_file, def2, 0,
+			     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 	}
     }
 }

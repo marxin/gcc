@@ -1632,7 +1632,7 @@ perform_tree_ssa_dce (bool aggressive)
   statistics_counter_event (cfun, "PHI nodes deleted", stats.removed_phis);
 
   /* Debugging dumps.  */
-  if (dump_file && (dump_flags & (TDF_STATS|TDF_DETAILS)))
+  if (dump_file && (dump_flags & (dump_flags_t (TDF_STATS) | TDF_DETAILS)))
     print_stats ();
 
   tree_dce_done (aggressive);

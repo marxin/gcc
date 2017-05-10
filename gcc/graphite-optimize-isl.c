@@ -65,7 +65,7 @@ get_schedule_for_node_st (__isl_take isl_schedule_node *node, void *user)
 
   if (dims <= 1 || !isl_schedule_node_band_get_permutable (node))
     {
-      if (dump_file && dump_flags)
+      if (dump_file && dump_flags.any ())
 	fprintf (dump_file, "not tiled\n");
       return node;
     }
@@ -80,7 +80,7 @@ get_schedule_for_node_st (__isl_take isl_schedule_node *node, void *user)
     {
       sizes = isl_multi_val_set_val (sizes, i,
 				     isl_val_int_from_si (ctx, tile_size));
-      if (dump_file && dump_flags)
+      if (dump_file && dump_flags.any ())
 	fprintf (dump_file, "tiled by %ld\n", tile_size);
     }
 
@@ -156,7 +156,7 @@ optimize_isl (scop_p scop)
   if (!scop->transformed_schedule
       || isl_ctx_last_error (scop->isl_context) == isl_error_quota)
     {
-      if (dump_file && dump_flags)
+      if (dump_file && dump_flags.any ())
 	fprintf (dump_file, "isl timed out --param max-isl-operations=%d\n",
 		 max_operations);
       return false;

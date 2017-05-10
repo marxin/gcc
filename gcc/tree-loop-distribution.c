@@ -135,7 +135,8 @@ dump_rdg_vertex (FILE *file, struct graph *rdg, int i)
       fprintf (file, " %d", e->dest);
 
   fprintf (file, ")\n");
-  print_gimple_stmt (file, RDGV_STMT (v), 0, TDF_VOPS|TDF_MEMSYMS);
+  print_gimple_stmt (file, RDGV_STMT (v), 0,
+		     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
   fprintf (file, ")\n");
 }
 

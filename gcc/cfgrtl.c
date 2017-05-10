@@ -2173,7 +2173,7 @@ print_rtl_with_bb (FILE *outf, const rtx_insn *rtx_first, dump_flags_t flags)
 	 insns, but the CFG is not maintained so the basic block info
 	 is not reliable.  Therefore it's omitted from the dumps.  */
       if (! (cfun->curr_properties & PROP_cfg))
-        flags &= ~TDF_BLOCKS;
+	flags -= TDF_BLOCKS;
 
       if (df)
 	df_dump_start (outf);
@@ -2527,7 +2527,9 @@ rtl_verify_edges (void)
 	    && JUMP_P (BB_END (bb))
 	    && CROSSING_JUMP_P (BB_END (bb)))
           {
-            print_rtl_with_bb (stderr, get_insns (), TDF_RTL | TDF_BLOCKS | TDF_DETAILS);
+	    print_rtl_with_bb (stderr, get_insns (),
+			       (dump_flags_t (TDF_RTL)
+				| TDF_BLOCKS | TDF_DETAILS));
             error ("Region crossing jump across same section in bb %i",
                    bb->index);
             err = 1;

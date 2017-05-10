@@ -1167,12 +1167,12 @@ rewrite_out_of_ssa (struct ssaexpand *sa)
   eliminate_useless_phis ();
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    gimple_dump_cfg (dump_file, dump_flags & ~TDF_DETAILS);
+    gimple_dump_cfg (dump_file, dump_flags - TDF_DETAILS);
 
   remove_ssa_form (flag_tree_ter, sa);
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    gimple_dump_cfg (dump_file, dump_flags & ~TDF_DETAILS);
+    gimple_dump_cfg (dump_file, dump_flags - TDF_DETAILS);
 
   return 0;
 }

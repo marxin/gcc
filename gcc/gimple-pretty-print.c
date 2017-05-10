@@ -71,7 +71,7 @@ newline_and_indent (pretty_printer *buffer, int spc)
 DEBUG_FUNCTION void
 debug_gimple_stmt (gimple *gs)
 {
-  print_gimple_stmt (stderr, gs, 0, TDF_VOPS|TDF_MEMSYMS);
+  print_gimple_stmt (stderr, gs, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 }
 
 
@@ -121,7 +121,7 @@ print_gimple_stmt (FILE *file, gimple *g, int spc, dump_flags_t flags)
 DEBUG_FUNCTION void
 debug (gimple &ref)
 {
-  print_gimple_stmt (stderr, &ref, 0, 0);
+  print_gimple_stmt (stderr, &ref, 0);
 }
 
 DEBUG_FUNCTION void
@@ -191,7 +191,7 @@ print_gimple_seq (FILE *file, gimple_seq seq, int spc, dump_flags_t flags)
 DEBUG_FUNCTION void
 debug_gimple_seq (gimple_seq seq)
 {
-  print_gimple_seq (stderr, seq, 0, TDF_VOPS|TDF_MEMSYMS);
+  print_gimple_seq (stderr, seq, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 }
 
 
@@ -2444,7 +2444,7 @@ pp_gimple_stmt_1 (pretty_printer *buffer, gimple *gs, int spc,
 	pp_printf (buffer, "[MNT %d] ", -lp_nr);
     }
 
-  if ((flags & (TDF_VOPS|TDF_MEMSYMS))
+  if ((flags & (dump_flags_t (TDF_VOPS) | TDF_MEMSYMS))
       && gimple_has_mem_ops (gs))
     dump_gimple_mem_ops (buffer, gs, spc, flags);
 
@@ -2733,7 +2733,7 @@ pp_cfg_jump (pretty_printer *buffer, edge e, dump_flags_t flags)
 	  pp_string (buffer, " (");
 	  dump_generic_node (buffer,
 			     gimple_label_label (as_a <glabel *> (stmt)),
-			     0, 0, false);
+			     0, TDF_NONE, false);
 	  pp_right_paren (buffer);
 	  pp_semicolon (buffer);
 	}

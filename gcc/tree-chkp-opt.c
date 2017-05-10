@@ -1013,7 +1013,7 @@ chkp_optimize_string_function_calls (void)
 		    {
 		      fprintf (dump_file, "Replacing call: ");
 		      print_gimple_stmt (dump_file, stmt, 0,
-					 TDF_VOPS|TDF_MEMSYMS);
+					 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 		    }
 
 		  gimple_call_set_fndecl (stmt, fndecl);
@@ -1022,7 +1022,7 @@ chkp_optimize_string_function_calls (void)
 		    {
 		      fprintf (dump_file, "With a new call: ");
 		      print_gimple_stmt (dump_file, stmt, 0,
-					 TDF_VOPS|TDF_MEMSYMS);
+					 dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 		    }
 		}
 
