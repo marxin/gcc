@@ -304,28 +304,47 @@ typedef dump_flags_type<suboption_types> dump_flags_t;
 /* Define a tree dump switch.  */
 struct dump_file_info
 {
-  const char *suffix;		/* suffix to give output file.  */
-  const char *swtch;		/* command line dump switch */
-  const char *glob;		/* command line glob  */
-  const char *pfilename;	/* filename for the pass-specific stream  */
-  const char *alt_filename;     /* filename for the -fopt-info stream  */
-  FILE *pstream;		/* pass-specific dump stream  */
-  FILE *alt_stream;		/* -fopt-info stream */
-  dump_kind dkind;		/* dump kind */
-  dump_flags_t pflags;		/* dump flags */
-  optgroup_dump_flags_t pass_optgroup_flags; /* a pass flags for -fopt-info */
-  optgroup_dump_flags_t optgroup_flags; /* flags for -fopt-info given
-					   by a user */
-  int pstate;			/* state of pass-specific stream */
-  int alt_state;		/* state of the -fopt-info stream */
-  int num;			/* dump file number */
-  bool owns_strings;		/* fields "suffix", "swtch", "glob" can be
-				   const strings, or can be dynamically
-				   allocated, needing free.  */
-  bool graph_dump_initialized;  /* When a given dump file is being initialized,
-				   this flag is set to true if the corresponding
-				   TDF_graph dump file has also been
-				   initialized.  */
+  /* Constructor.  */
+  dump_file_info ();
+
+  /* Constructor.  */
+  dump_file_info (const char *_suffix, const char *_swtch, dump_kind _dkind,
+		  int _num);
+
+  /* Suffix to give output file.  */
+  const char *suffix;
+  /* Command line dump switch.  */
+  const char *swtch;
+  /* Command line glob.  */
+  const char *glob;
+  /* Filename for the pass-specific stream.  */
+  const char *pfilename;
+  /* Filename for the -fopt-info stream.  */
+  const char *alt_filename;
+  /* Pass-specific dump stream.  */
+  FILE *pstream;
+  /* -fopt-info stream.  */
+  FILE *alt_stream;
+  /* Dump kind.  */
+  dump_kind dkind;
+  /* Dump flags.  */
+  dump_flags_t pflags;
+  /* A pass flags for -fopt-info.  */
+  optgroup_dump_flags_t pass_optgroup_flags;
+  /* Flags for -fopt-info given by a user.  */
+  optgroup_dump_flags_t optgroup_flags;
+  /* State of pass-specific stream.  */
+  int pstate;
+  /* State of the -fopt-info stream.  */
+  int alt_state;
+  /* Dump file number.  */
+  int num;
+  /* Fields "suffix", "swtch", "glob" can be const strings,
+     or can be dynamically allocated, needing free.  */
+  bool owns_strings;
+  /* When a given dump file is being initialized, this flag is set to true
+     if the corresponding TDF_graph dump file has also been initialized.  */
+  bool graph_dump_initialized;
 };
 
 /* In dumpfile.c */

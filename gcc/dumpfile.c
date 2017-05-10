@@ -46,37 +46,40 @@ FILE *alt_dump_file = NULL;
 const char *dump_file_name;
 dump_flags_t dump_flags;
 
+dump_file_info::dump_file_info (): suffix (NULL), swtch (NULL), glob (NULL),
+  pfilename (NULL), alt_filename (NULL), pstream (NULL), alt_stream (NULL),
+  dkind (DK_none), pflags (), pass_optgroup_flags (), optgroup_flags (),
+  pstate (0), num (0), owns_strings (false), graph_dump_initialized (false)
+{
+}
+
+dump_file_info::dump_file_info (const char *_suffix, const char *_swtch,
+				dump_kind _dkind, int _num):
+  suffix (_suffix), swtch (_swtch), glob (NULL),
+  pfilename (NULL), alt_filename (NULL), pstream (NULL), alt_stream (NULL),
+  dkind (_dkind), pflags (), pass_optgroup_flags (), optgroup_flags (),
+  pstate (0), num (_num), owns_strings (false), graph_dump_initialized (false)
+{
+}
+
 /* Table of tree dump switches. This must be consistent with the
    TREE_DUMP_INDEX enumeration in dumpfile.h.  */
 static struct dump_file_info dump_files[TDI_end] =
 {
-  {NULL, NULL, NULL, NULL, NULL, NULL, NULL, DK_none, TDF_NONE, optgroup_dump_flags_t (),
-   optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {".cgraph", "ipa-cgraph", NULL, NULL, NULL, NULL, NULL, DK_ipa, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {".type-inheritance", "ipa-type-inheritance", NULL, NULL, NULL, NULL, NULL,
-    DK_ipa, TDF_NONE, optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0,
-    false, false},
-  {".ipa-clones", "ipa-clones", NULL, NULL, NULL, NULL, NULL, DK_ipa, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {".tu", "translation-unit", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 1, false, false},
-  {".class", "class-hierarchy", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 2, false, false},
-  {".original", "tree-original", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 3, false, false},
-  {".gimple", "tree-gimple", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 4, false, false},
-  {".nested", "tree-nested", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 5, false, false},
+  dump_file_info (),
+  dump_file_info (".cgraph", "ipa-cgraph", DK_ipa, 0),
+  dump_file_info (".type-inheritance", "ipa-type-inheritance", DK_ipa, 0),
+  dump_file_info (".ipa-clones", "ipa-clones", DK_ipa, 0),
+  dump_file_info (".tu", "translation-unit", DK_tree, 1),
+  dump_file_info (".class", "class-hierarchy", DK_tree, 2),
+  dump_file_info (".original", "tree-original", DK_tree, 3),
+  dump_file_info (".gimple", "tree-gimple", DK_tree, 4),
+  dump_file_info (".nested", "tree-nested", DK_tree, 5),
 #define FIRST_AUTO_NUMBERED_DUMP 6
 
-  {NULL, "tree-all", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {NULL, "rtl-all", NULL, NULL, NULL, NULL, NULL, DK_rtl, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {NULL, "ipa-all", NULL, NULL, NULL, NULL, NULL, DK_ipa, TDF_NONE,
-   optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
+  dump_file_info (NULL, "tree-all", DK_tree, 0),
+  dump_file_info (NULL, "rtl-all", DK_rtl, 0),
+  dump_file_info (NULL, "ipa-all", DK_ipa, 0),
 };
 
 template <typename E>
