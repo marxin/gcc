@@ -90,6 +90,7 @@ enum tree_dump_index
 #define MSG_ALL         (MSG_OPTIMIZED_LOCATIONS | MSG_MISSED_OPTIMIZATION \
                          | MSG_NOTE)
 
+#define TDF_NONE  0
 
 /* Flags to control high-level -fopt-info dumps.  Usually these flags
    define a group of passes.  An optimization pass can be part of
