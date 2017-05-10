@@ -206,8 +206,13 @@ suboptions_hierarchy::suboptions_hierarchy ()
   root->register_suboption (new node ("locals", TDF_LOCALS));
   root->register_suboption (new node ("enumerate_locals", TDF_ENUMERATE_LOCALS));
 
-  node *n = new node ("gimple", TDF_GIMPLE);
+  node *n = new node ("generic", TDF_GENERIC);
+  n->register_suboption (new node ("folding", TDF_GENERIC_FOLDING));
+  root->register_suboption (n);
+
+  n = new node ("gimple", TDF_GIMPLE);
   n->register_suboption (new node ("fe", TDF_GIMPLE_FE));
+  n->register_suboption (new node ("folding", TDF_GIMPLE_FOLDING));
   root->register_suboption (n);
 
   root->register_suboption (new node ("vops", TDF_VOPS));

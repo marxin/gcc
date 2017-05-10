@@ -3187,8 +3187,10 @@ dt_simplify::gen_1 (FILE *f, int indent, bool gimple, operand *result)
 	}
     }
 
-  fprintf_indent (f, indent, "if (dump_file && (dump_flags & TDF_DETAILS)) "
-	   "fprintf (dump_file, \"Applying pattern ");
+  fprintf_indent (f, indent,
+		  "if (dump_file && (dump_flags & TDF_%s_FOLDING)) "
+		  "fprintf (dump_file, \"Applying pattern ",
+		  gimple ? "GIMPLE" : "GENERIC");
   output_line_directive (f,
 			 result ? result->location : s->match->location, true);
   fprintf (f, ", %%s:%%d\\n\", __FILE__, __LINE__);\n");

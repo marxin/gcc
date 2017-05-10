@@ -282,10 +282,13 @@ enum suboption_types
   TDF_LOCALS,
   TDF_ENUMERATE_LOCALS,
   /* TREE group.  */
+  TDF_GENERIC,
+  TDF_GENERIC_FOLDING,
   /* IPA group.  */
   /* GIMPLE group. */
   TDF_GIMPLE,
   TDF_GIMPLE_FE,
+  TDF_GIMPLE_FOLDING,
   TDF_VOPS,
   TDF_ALIAS,
   TDF_SCEV,
