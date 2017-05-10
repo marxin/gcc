@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O -fgimple -fdump-tree-ssa-gimple" } */
+/* { dg-options "-O -fgimple -fdump-tree-ssa-gimple-fe" } */
 
 int __GIMPLE() f(int a)
 {

@@ -7556,7 +7556,7 @@ dump_function_to_file (tree fndecl, FILE *file, dump_flags_t flags)
     }
 
   current_function_decl = fndecl;
-  if (flags & TDF_GIMPLE)
+  if (flags & TDF_GIMPLE_FE)
     {
       print_generic_expr (file, TREE_TYPE (TREE_TYPE (fndecl)),
 			  dump_flags | TDF_SLIM);

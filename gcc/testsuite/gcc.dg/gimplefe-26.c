@@ -1,5 +1,5 @@
 /* { dg-do compile { target c99_runtime } } */
-/* { dg-options "-O -fgimple -fdump-tree-ssa-gimple" } */
+/* { dg-options "-O -fgimple -fdump-tree-ssa-gimple-fe" } */
 
 #define foo(type, num) \
 type __GIMPLE () foo_##num (type a, type b, type c) \

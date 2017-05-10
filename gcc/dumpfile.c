@@ -205,7 +205,11 @@ suboptions_hierarchy::suboptions_hierarchy ()
   root->register_suboption (new node ("stmtaddr", TDF_STMTADDR));
   root->register_suboption (new node ("locals", TDF_LOCALS));
   root->register_suboption (new node ("enumerate_locals", TDF_ENUMERATE_LOCALS));
-  root->register_suboption (new node ("gimple", TDF_GIMPLE));
+
+  node *n = new node ("gimple", TDF_GIMPLE);
+  n->register_suboption (new node ("fe", TDF_GIMPLE_FE));
+  root->register_suboption (n);
+
   root->register_suboption (new node ("vops", TDF_VOPS));
   root->register_suboption (new node ("alias", TDF_ALIAS));
   root->register_suboption (new node ("scev", TDF_SCEV));

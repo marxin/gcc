@@ -285,6 +285,7 @@ enum suboption_types
   /* IPA group.  */
   /* GIMPLE group. */
   TDF_GIMPLE,
+  TDF_GIMPLE_FE,
   TDF_VOPS,
   TDF_ALIAS,
   TDF_SCEV,

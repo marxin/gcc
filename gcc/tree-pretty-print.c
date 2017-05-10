@@ -258,7 +258,7 @@ dump_decl_name (pretty_printer *pp, tree node, dump_flags_t flags)
       else
 	pp_tree_identifier (pp, DECL_NAME (node));
     }
-  char uid_sep = (flags & TDF_GIMPLE) ? '_' : '.';
+  char uid_sep = (flags & TDF_GIMPLE_FE) ? '_' : '.';
   if ((flags & TDF_UID) || DECL_NAME (node) == NULL_TREE)
     {
       if (TREE_CODE (node) == LABEL_DECL && LABEL_DECL_UID (node) != -1)
@@ -1460,7 +1460,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 
     case MEM_REF:
       {
-	if (flags & TDF_GIMPLE)
+	if (flags & TDF_GIMPLE_FE)
 	  {
 	    pp_string (pp, "__MEM <");
 	    dump_generic_node (pp, TREE_TYPE (node),
@@ -1665,7 +1665,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
       break;
 
     case INTEGER_CST:
-      if (flags & TDF_GIMPLE
+      if (flags & TDF_GIMPLE_FE
 	  && (POINTER_TYPE_P (TREE_TYPE (node))
 	      || (TYPE_PRECISION (TREE_TYPE (node))
 		  < TYPE_PRECISION (integer_type_node))
@@ -1676,7 +1676,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	  pp_string (pp, ") ");
 	}
       if (TREE_CODE (TREE_TYPE (node)) == POINTER_TYPE
-	  && ! (flags & TDF_GIMPLE))
+	  && ! (flags & TDF_GIMPLE_FE))
 	{
 	  /* In the case of a pointer, one may want to divide by the
 	     size of the pointed-to type.  Unfortunately, this not
@@ -1717,7 +1717,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	  print_hex (val, pp_buffer (pp)->digit_buffer);
 	  pp_string (pp, pp_buffer (pp)->digit_buffer);
 	}
-      if ((flags & TDF_GIMPLE)
+      if ((flags & TDF_GIMPLE_FE)
 	  && ! (POINTER_TYPE_P (TREE_TYPE (node))
 		|| (TYPE_PRECISION (TREE_TYPE (node))
 		    < TYPE_PRECISION (integer_type_node))
@@ -1829,7 +1829,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	dump_decl_name (pp, node, flags);
       else if (LABEL_DECL_UID (node) != -1)
 	{
-	  if (flags & TDF_GIMPLE)
+	  if (flags & TDF_GIMPLE_FE)
 	    pp_printf (pp, "L%d", (int) LABEL_DECL_UID (node));
 	  else
 	    pp_printf (pp, "<L%d>", (int) LABEL_DECL_UID (node));
@@ -1840,7 +1840,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	    pp_string (pp, "<D.xxxx>");
 	  else
 	    {
-	      if (flags & TDF_GIMPLE)
+	      if (flags & TDF_GIMPLE_FE)
 		pp_printf (pp, "<D%u>", DECL_UID (node));
 	      else
 		pp_printf (pp, "<D.%u>", DECL_UID (node));
@@ -2512,7 +2512,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
       break;
 
     case REALPART_EXPR:
-      if (flags & TDF_GIMPLE)
+      if (flags & TDF_GIMPLE_FE)
 	{
 	  pp_string (pp, "__real ");
 	  dump_generic_node (pp, TREE_OPERAND (node, 0), spc, flags, false);
@@ -2526,7 +2526,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
       break;
 
     case IMAGPART_EXPR:
-      if (flags & TDF_GIMPLE)
+      if (flags & TDF_GIMPLE_FE)
 	{
 	  pp_string (pp, "__imag ");
 	  dump_generic_node (pp, TREE_OPERAND (node, 0), spc, flags, false);
@@ -2787,7 +2787,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	      && SSA_NAME_VAR (node)
 	      && DECL_NAMELESS (SSA_NAME_VAR (node)))
 	    dump_fancy_name (pp, SSA_NAME_IDENTIFIER (node));
-	  else if (! (flags & TDF_GIMPLE)
+	  else if (! (flags & TDF_GIMPLE_FE)
 		   || SSA_NAME_VAR (node))
 	    dump_generic_node (pp, SSA_NAME_IDENTIFIER (node),
 			       spc, flags, false);
