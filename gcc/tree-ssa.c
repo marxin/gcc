@@ -1003,7 +1003,7 @@ error:
   if (err)
     {
       fprintf (stderr, "for PHI node\n");
-      print_gimple_stmt (stderr, phi, 0, TDF_VOPS|TDF_MEMSYMS);
+      print_gimple_stmt (stderr, phi, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
 
 

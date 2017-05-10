@@ -50,7 +50,7 @@ dump_flags_t dump_flags;
    TREE_DUMP_INDEX enumeration in dumpfile.h.  */
 static struct dump_file_info dump_files[TDI_end] =
 {
-  {NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, optgroup_dump_flags_t (),
+  {NULL, NULL, NULL, NULL, NULL, NULL, NULL, TDF_NONE, optgroup_dump_flags_t (),
    optgroup_dump_flags_t (), 0, 0, 0, false, false},
   {".cgraph", "ipa-cgraph", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
@@ -79,48 +79,11 @@ static struct dump_file_info dump_files[TDI_end] =
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
 };
 
-/* Define a name->number mapping for a dump flag value.  */
-struct dump_option_value_info
-{
-  const char *const name;	/* the name of the value */
-  const dump_flags_t value;	/* the value of the name */
-};
-
-/* Table of dump options. This must be consistent with the TDF_* flags
-   in dumpfile.h and opt_info_options below. */
-static const struct dump_option_value_info dump_options[] =
-{
-  {"address", TDF_ADDRESS},
-  {"asmname", TDF_ASMNAME},
-  {"slim", TDF_SLIM},
-  {"raw", TDF_RAW},
-  {"graph", TDF_GRAPH},
-  {"details", TDF_DETAILS},
-  {"cselib", TDF_CSELIB},
-  {"stats", TDF_STATS},
-  {"blocks", TDF_BLOCKS},
-  {"vops", TDF_VOPS},
-  {"lineno", TDF_LINENO},
-  {"uid", TDF_UID},
-  {"stmtaddr", TDF_STMTADDR},
-  {"memsyms", TDF_MEMSYMS},
-  {"verbose", TDF_VERBOSE},
-  {"eh", TDF_EH},
-  {"alias", TDF_ALIAS},
-  {"nouid", TDF_NOUID},
-  {"enumerate_locals", TDF_ENUMERATE_LOCALS},
-  {"scev", TDF_SCEV},
-  {"gimple", TDF_GIMPLE},
-  {"all", ~(TDF_RAW | TDF_SLIM | TDF_LINENO | TDF_TREE | TDF_RTL | TDF_IPA
-	    | TDF_STMTADDR | TDF_GRAPH | TDF_DIAGNOSTIC | TDF_VERBOSE
-	    | TDF_RHS_ONLY | TDF_NOUID | TDF_ENUMERATE_LOCALS | TDF_SCEV
-	    | TDF_GIMPLE)},
-  {NULL, 0}
-};
-
 template <typename E>
-dump_option_node<E>::dump_option_node (const char *name, E enum_value):
-  m_name (name), m_enum_value (enum_value), m_children (), m_mask (0)
+dump_option_node<E>::dump_option_node (const char *name, E enum_value,
+				       bool accept_all):
+  m_name (name), m_enum_value (enum_value), m_children (), m_mask (0),
+  m_accept_all (accept_all)
 {
 }
 
@@ -172,6 +135,9 @@ template <typename E>
 uint64_t
 dump_option_node<E>::parse (char *token)
 {
+  if (token == NULL || token[0] == '\0')
+    return 0;
+
   return parse_internal (strtok (token, "-"));
 }
 
@@ -182,7 +148,7 @@ dump_option_node<E>::parse_internal (char *token)
   if (token == NULL)
     return m_mask;
 
-  if (strcmp (token, "all") == 0)
+  if (m_accept_all && strcmp (token, "all") == 0)
   {
     token = strtok (NULL, "-");
     return token == NULL ? m_mask : 0;
@@ -196,6 +162,44 @@ dump_option_node<E>::parse_internal (char *token)
     }
 
   return 0;
+}
+
+suboptions_hierarchy::suboptions_hierarchy ()
+{
+  root = new node (NULL, TDF_ALL);
+
+  root->register_suboption (new node ("slim", TDF_SLIM));
+  root->register_suboption (new node ("raw", TDF_RAW));
+  root->register_suboption (new node ("graph", TDF_GRAPH));
+  root->register_suboption (new node ("details", TDF_DETAILS));
+  root->register_suboption (new node ("stats", TDF_STATS));
+  root->register_suboption (new node ("diagnostic", TDF_DIAGNOSTIC));
+  root->register_suboption (new node ("verbose", TDF_VERBOSE));
+  root->register_suboption (new node ("comment", TDF_COMMENT));
+  root->register_suboption (new node ("lineno", TDF_LINENO));
+  root->register_suboption (new node ("blocks", TDF_BLOCKS));
+  root->register_suboption (new node ("uid", TDF_UID));
+  root->register_suboption (new node ("nouid", TDF_NOUID));
+  root->register_suboption (new node ("address", TDF_ADDRESS));
+  root->register_suboption (new node ("asmname", TDF_ASMNAME));
+  root->register_suboption (new node ("stmtaddr", TDF_STMTADDR));
+  root->register_suboption (new node ("locals", TDF_LOCALS));
+  root->register_suboption (new node ("enumerate_locals", TDF_ENUMERATE_LOCALS));
+  root->register_suboption (new node ("tree", TDF_TREE, false));
+  root->register_suboption (new node ("ipa", TDF_IPA, false));
+  root->register_suboption (new node ("gimple", TDF_GIMPLE));
+  root->register_suboption (new node ("vops", TDF_VOPS));
+  root->register_suboption (new node ("alias", TDF_ALIAS));
+  root->register_suboption (new node ("scev", TDF_SCEV));
+  root->register_suboption (new node ("rhs_only", TDF_RHS_ONLY));
+  root->register_suboption (new node ("memsyms", TDF_MEMSYMS));
+  root->register_suboption (new node ("eh", TDF_EH));
+  root->register_suboption (new node ("rtl", TDF_RTL, false));
+  root->register_suboption (new node ("cselib", TDF_CSELIB));
+
+  root->register_suboption (new node (NULL, TDF_NONE));
+
+  root->initialize (dump_flags_t::m_mask_translation);
 }
 
 optgroup_option_hierarchy::optgroup_option_hierarchy ()
@@ -425,7 +429,7 @@ dump_open_alternate_stream (struct dump_file_info *dfi)
 void
 dump_loc (optgroup_dump_flags_t dump_kind, FILE *dfile, source_location loc)
 {
-  if (dump_kind)
+  if (dump_kind.any ())
     {
       if (LOCATION_LOCUS (loc) > BUILTINS_LOCATION)
         fprintf (dfile, "%s:%d:%d: note: ", LOCATION_FILE (loc),
@@ -636,9 +640,9 @@ dump_finish (int phase)
   dfi->pstream = NULL;
   dump_file = NULL;
   alt_dump_file = NULL;
-  dump_flags = TDI_none;
+  dump_flags = TDF_NONE;
   opt_info_flags = optgroup_dump_flags_t ();
-  pflags = 0;
+  pflags = TDF_NONE;
 }
 
 /* Begin a tree dump for PHASE. Stores any user supplied flag in
@@ -757,7 +761,7 @@ int
 gcc::dump_manager::
 dump_enable_all (dump_flags_t flags, const char *filename)
 {
-  dump_flags_t ir_dump_type = (flags & (TDF_TREE | TDF_RTL | TDF_IPA));
+  dump_flags_t ir_dump_type = (flags - (dump_flags_t (TDF_TREE) | TDF_RTL | TDF_IPA));
   int n = 0;
   size_t i;
 
@@ -857,6 +861,12 @@ opt_info_enable_passes (optgroup_dump_flags_t optgroup_flags,
   return n;
 }
 
+static suboptions_hierarchy suboptions __attribute__
+((init_priority((200))));
+
+static optgroup_option_hierarchy optgroup_options __attribute__
+((init_priority((200))));
+
 /* Parse ARG as a dump switch. Return nonzero if it is, and store the
    relevant details in the dump_files array.  */
 
@@ -865,7 +875,6 @@ gcc::dump_manager::
 dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
 {
   const char *option_value;
-  const char *ptr;
   dump_flags_t flags;
 
   if (doglob && !dfi->glob)
@@ -875,57 +884,26 @@ dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
   if (!option_value)
     return 0;
 
-  if (*option_value && *option_value != '-' && *option_value != '=')
-    return 0;
-
-  ptr = option_value;
-  flags = 0;
-
-  while (*ptr)
+  char *option = xstrdup (option_value);
+  char *eq_ptr = strchr (option, '=');
+  if (eq_ptr)
     {
-      const struct dump_option_value_info *option_ptr;
-      const char *end_ptr;
-      const char *eq_ptr;
-      unsigned length;
-
-      while (*ptr == '-')
-	ptr++;
-      end_ptr = strchr (ptr, '-');
-      eq_ptr = strchr (ptr, '=');
-
-      if (eq_ptr && !end_ptr)
-        end_ptr = eq_ptr;
-
-      if (!end_ptr)
-	end_ptr = ptr + strlen (ptr);
-      length = end_ptr - ptr;
-
-      for (option_ptr = dump_options; option_ptr->name; option_ptr++)
-	if (strlen (option_ptr->name) == length
-	    && !memcmp (option_ptr->name, ptr, length))
-          {
-	    flags |= option_ptr->value;
-	    goto found;
-          }
-
-      if (*ptr == '=')
-        {
-          /* Interpret rest of the argument as a dump filename.  This
-             filename overrides other command line filenames.  */
-          if (dfi->pfilename)
-            free (CONST_CAST (char *, dfi->pfilename));
-          dfi->pfilename = xstrdup (ptr + 1);
-          break;
-        }
-      else
-        warning (0, "ignoring unknown option %q.*s in %<-fdump-%s%>",
-                 length, ptr, dfi->swtch);
-    found:;
-      ptr = end_ptr;
+      if (dfi->pfilename)
+	free (CONST_CAST (char *, dfi->pfilename));
+      dfi->pfilename = xstrdup (eq_ptr + 1);
+      *eq_ptr = '\0';
     }
 
-  dfi->pstate = -1;
-  dfi->pflags |= flags;
+  flags = dump_flags_t::from_mask (suboptions.root->parse (option));
+
+  if (flags.any ())
+    {
+      dfi->pstate = -1;
+      dfi->pflags |= flags;
+    }
+  else
+    warning (0, "ignoring unknown option %s in %<-fdump-%s%>",
+	     option_value, dfi->swtch);
 
   /* Process -fdump-tree-all and -fdump-rtl-all, by enabling all the
      known dumps.  */
@@ -961,9 +939,6 @@ dump_switch_p (const char *arg)
   return any;
 }
 
-static optgroup_option_hierarchy optgroup_options __attribute__
-((init_priority((200))));
-
 /* Parse ARG as a -fopt-info switch and store flags, optgroup_flags
    and filename.  Return non-zero if it is a recognized switch.  */
 
@@ -991,7 +966,7 @@ opt_info_switch_p_1 (const char *arg, optgroup_dump_flags_t *optgroup_flags,
   optgroup_dump_flags_t f;
   f = optgroup_dump_flags_t::from_mask
     (optgroup_options.root->parse (option_value));
-  if (f)
+  if (f.any ())
     {
       *optgroup_flags |= f;
       free (option_value);
@@ -1032,7 +1007,7 @@ opt_info_switch_p (const char *arg)
     }
 
   file_seen = xstrdup (filename);
-  if (!optgroup_flags)
+  if (!optgroup_flags.any ())
     optgroup_flags = optgroup_dump_flags_t::get_all ();
 
   return dumps->opt_info_enable_passes (optgroup_flags, filename);
@@ -1041,9 +1016,9 @@ opt_info_switch_p (const char *arg)
 /* Print basic block on the dump streams.  */
 
 void
-dump_basic_block (int dump_kind, basic_block bb, int indent)
+dump_basic_block (optgroup_dump_flags_t dump_kind, basic_block bb, int indent)
 {
-  if (dump_file && (dump_kind & pflags))
+  if (dump_file)
     dump_bb (dump_file, bb, indent, TDF_DETAILS);
   if (alt_dump_file && (dump_kind & opt_info_flags))
     dump_bb (alt_dump_file, bb, indent, TDF_DETAILS);
@@ -1065,6 +1040,6 @@ enable_rtl_dump_file (void)
 {
   gcc::dump_manager *dumps = g->get_dumps ();
   int num_enabled =
-    dumps->dump_enable_all (TDF_RTL | TDF_DETAILS | TDF_BLOCKS, NULL);
+    dumps->dump_enable_all (dump_flags_t (TDF_RTL) | TDF_DETAILS | TDF_BLOCKS, NULL);
   return num_enabled > 0;
 }

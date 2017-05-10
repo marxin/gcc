@@ -1372,7 +1372,8 @@ gsi_insert_earliest (gimple_seq seq)
       if (dump_file)
 	{
 	  fprintf (dump_file, "[codegen] inserting statement: ");
-	  print_gimple_stmt (dump_file, use_stmt, 0, TDF_VOPS | TDF_MEMSYMS);
+	  print_gimple_stmt (dump_file, use_stmt, 0,
+			     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 	  print_loops_bb (dump_file, gimple_bb (use_stmt), 0, 3);
 	}
     }

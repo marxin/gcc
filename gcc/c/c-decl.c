@@ -11247,7 +11247,7 @@ c_parse_final_cleanups (void)
       FILE * stream = dump_begin (TDI_tu, &flags);
       if (stream && tmp)
 	{
-	  dump_node (tmp, flags & ~TDF_SLIM, stream);
+	  dump_node (tmp, flags - TDF_SLIM, stream);
 	  dump_end (TDI_tu, stream);
 	}
     }

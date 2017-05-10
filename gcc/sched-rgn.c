@@ -407,7 +407,7 @@ debug_region (int rgn)
     {
       dump_bb (stderr,
 	       BASIC_BLOCK_FOR_FN (cfun, rgn_bb_table[current_blocks + bb]),
-	       0, TDF_SLIM | TDF_BLOCKS);
+	       0, dump_flags_t (TDF_SLIM) | TDF_BLOCKS);
       fprintf (stderr, "\n");
     }
 

@@ -2340,7 +2340,7 @@ find_case_label_for_value (gswitch *switch_stmt, tree val)
 void
 gimple_debug_bb (basic_block bb)
 {
-  dump_bb (stderr, bb, 0, TDF_VOPS|TDF_MEMSYMS|TDF_BLOCKS);
+  dump_bb (stderr, bb, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS | TDF_BLOCKS);
 }
 
 
@@ -7588,7 +7588,7 @@ dump_function_to_file (tree fndecl, FILE *file, dump_flags_t flags)
 
   if (flags & TDF_RAW && !gimple_has_body_p (fndecl))
     {
-      dump_node (fndecl, TDF_SLIM | flags, file);
+      dump_node (fndecl, flags | TDF_SLIM, file);
       current_function_decl = old_current_fndecl;
       return;
     }
@@ -7797,7 +7797,7 @@ print_loops_bb (FILE *file, basic_block bb, int indent, int verbosity)
   if (verbosity >= 3)
     {
       fprintf (file, "%s  {\n", s_indent);
-      dump_bb (file, bb, indent + 4, TDF_VOPS|TDF_MEMSYMS);
+      dump_bb (file, bb, indent + 4, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
       fprintf (file, "%s  }\n", s_indent);
     }
 }

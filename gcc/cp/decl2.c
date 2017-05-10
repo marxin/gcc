@@ -4374,7 +4374,7 @@ dump_tu (void)
 
   if (stream)
     {
-      dump_node (global_namespace, flags & ~TDF_SLIM, stream);
+      dump_node (global_namespace, flags - TDF_SLIM, stream);
       dump_end (TDI_tu, stream);
     }
 }

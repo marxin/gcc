@@ -234,7 +234,7 @@ graphite_initialize (isl_ctx *ctx)
   recompute_all_dominators ();
   initialize_original_copy_tables ();
 
-  if (dump_file && dump_flags)
+  if (dump_file && dump_flags.any ())
     {
       dump_function_to_file (current_function_decl, dump_file, dump_flags);
       print_loops (dump_file, 3);
@@ -262,7 +262,7 @@ graphite_finalize (bool need_cfg_cleanup_p)
 
   free_original_copy_tables ();
 
-  if (dump_file && dump_flags)
+  if (dump_file && dump_flags.any ())
     print_loops (dump_file, 3);
 }
 

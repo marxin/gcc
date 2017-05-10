@@ -2280,7 +2280,7 @@ maybe_dump_rtl_for_gimple_stmt (gimple *stmt, rtx_insn *since)
     {
       fprintf (dump_file, "\n;; ");
       print_gimple_stmt (dump_file, stmt, 0,
-			 TDF_SLIM | (dump_flags & TDF_LINENO));
+			 dump_flags_t (TDF_SLIM) | (dump_flags - TDF_LINENO));
       fprintf (dump_file, "\n");
 
       print_rtl (dump_file, since ? NEXT_INSN (since) : since);

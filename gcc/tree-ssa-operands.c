@@ -1230,7 +1230,8 @@ dump_immediate_uses_for (FILE *file, tree var)
         fprintf (file, "***end of stmt iterator marker***\n");
       else
 	if (!is_gimple_reg (USE_FROM_PTR (use_p)))
-	  print_gimple_stmt (file, USE_STMT (use_p), 0, TDF_VOPS|TDF_MEMSYMS);
+	  print_gimple_stmt (file, USE_STMT (use_p), 0,
+			     dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 	else
 	  print_gimple_stmt (file, USE_STMT (use_p), 0, TDF_SLIM);
     }

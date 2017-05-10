@@ -1388,7 +1388,7 @@ stmt_has_side_effects (gimple *stmt)
     {
       DEBUG_PRINT (dp << "[scop-detection-fail] "
 		      << "Statement has side-effects:\n";
-	print_gimple_stmt (dump_file, stmt, 0, TDF_VOPS | TDF_MEMSYMS));
+	print_gimple_stmt (dump_file, stmt, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS));
       return true;
     }
   return false;
@@ -1423,7 +1423,7 @@ scop_detection::graphite_can_represent_stmt (sese_l scop, gimple *stmt,
 	    DEBUG_PRINT (dp << "[scop-detection-fail] "
 			    << "Graphite cannot handle cond stmt:\n";
 			 print_gimple_stmt (dump_file, stmt, 0,
-					    TDF_VOPS | TDF_MEMSYMS));
+					    dump_flags_t (TDF_VOPS) | TDF_MEMSYMS));
 	    return false;
 	  }
 
@@ -1437,7 +1437,7 @@ scop_detection::graphite_can_represent_stmt (sese_l scop, gimple *stmt,
 		DEBUG_PRINT (dp << "[scop-detection-fail] "
 				<< "Graphite cannot represent stmt:\n";
 			     print_gimple_stmt (dump_file, stmt, 0,
-						TDF_VOPS | TDF_MEMSYMS));
+						dump_flags_t (TDF_VOPS) | TDF_MEMSYMS));
 		return false;
 	      }
 	  }
@@ -1454,7 +1454,7 @@ scop_detection::graphite_can_represent_stmt (sese_l scop, gimple *stmt,
       DEBUG_PRINT (
 	  dp << "[scop-detection-fail] "
 	     << "Gimple stmt not handled in Graphite:\n";
-	  print_gimple_stmt (dump_file, stmt, 0, TDF_VOPS | TDF_MEMSYMS));
+	  print_gimple_stmt (dump_file, stmt, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS));
       return false;
     }
 }
@@ -1481,7 +1481,7 @@ scop_detection::stmt_simple_for_scop_p (sese_l scop, gimple *stmt,
     {
       DEBUG_PRINT (dp << "[scop-detection-fail] "
 		      << "Graphite cannot handle data-refs in stmt:\n";
-	print_gimple_stmt (dump_file, stmt, 0, TDF_VOPS|TDF_MEMSYMS););
+	print_gimple_stmt (dump_file, stmt, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS););
       return false;
     }
 

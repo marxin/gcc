@@ -143,7 +143,7 @@ c_genericize (tree fndecl)
 
       if (local_dump_flags & TDF_RAW)
 	dump_node (DECL_SAVED_TREE (fndecl),
-		   TDF_SLIM | local_dump_flags, dump_orig);
+		   local_dump_flags | TDF_SLIM, dump_orig);
       else
 	print_c_tree (dump_orig, DECL_SAVED_TREE (fndecl));
       fprintf (dump_orig, "\n");

@@ -656,7 +656,7 @@ merged_store_group::apply_stores ()
 	    {
 	      fprintf (dump_file, "After writing ");
 	      print_generic_expr (dump_file,
-				  gimple_assign_rhs1 (info->stmt), 0);
+				  gimple_assign_rhs1 (info->stmt));
 	      fprintf (dump_file, " of size " HOST_WIDE_INT_PRINT_DEC
 			" at position %d the merged region contains:\n",
 			info->bitsize, pos_in_buffer);
@@ -1227,7 +1227,7 @@ imm_store_chain_info::output_merged_store (merged_store_group *group)
 	       "New sequence of %u stmts to replace old one of %u stmts\n",
 	       num_stmts, orig_num_stmts);
       if (dump_flags & TDF_DETAILS)
-	print_gimple_seq (dump_file, seq, 0, TDF_VOPS | TDF_MEMSYMS);
+	print_gimple_seq (dump_file, seq, 0, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
   gsi_insert_seq_after (&last_gsi, seq, GSI_SAME_STMT);
 

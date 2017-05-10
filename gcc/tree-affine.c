@@ -813,7 +813,7 @@ print_aff (FILE *file, aff_tree *val)
   if (POINTER_TYPE_P (val->type))
     sgn = SIGNED;
   fprintf (file, "{\n  type = ");
-  print_generic_expr (file, val->type, TDF_VOPS|TDF_MEMSYMS);
+  print_generic_expr (file, val->type, dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
   fprintf (file, "\n  offset = ");
   print_dec (val->offset, file, sgn);
   if (val->n > 0)
@@ -822,7 +822,8 @@ print_aff (FILE *file, aff_tree *val)
       for (i = 0; i < val->n; i++)
 	{
 	  fprintf (file, "    [%d] = ", i);
-	  print_generic_expr (file, val->elts[i].val, TDF_VOPS|TDF_MEMSYMS);
+	  print_generic_expr (file, val->elts[i].val,
+			      dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
 
 	  fprintf (file, " * ");
 	  print_dec (val->elts[i].coef, file, sgn);
@@ -834,7 +835,8 @@ print_aff (FILE *file, aff_tree *val)
   if (val->rest)
     {
       fprintf (file, "\n  rest = ");
-      print_generic_expr (file, val->rest, TDF_VOPS|TDF_MEMSYMS);
+      print_generic_expr (file, val->rest,
+			  dump_flags_t (TDF_VOPS) | TDF_MEMSYMS);
     }
   fprintf (file, "\n}");
 }
