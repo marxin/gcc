@@ -2528,8 +2528,7 @@ rtl_verify_edges (void)
 	    && CROSSING_JUMP_P (BB_END (bb)))
           {
 	    print_rtl_with_bb (stderr, get_insns (),
-			       (dump_flags_t (TDF_RTL)
-				| TDF_BLOCKS | TDF_DETAILS));
+			       dump_flags_t (TDF_BLOCKS) | TDF_DETAILS);
             error ("Region crossing jump across same section in bb %i",
                    bb->index);
             err = 1;

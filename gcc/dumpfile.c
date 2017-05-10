@@ -50,32 +50,32 @@ dump_flags_t dump_flags;
    TREE_DUMP_INDEX enumeration in dumpfile.h.  */
 static struct dump_file_info dump_files[TDI_end] =
 {
-  {NULL, NULL, NULL, NULL, NULL, NULL, NULL, TDF_NONE, optgroup_dump_flags_t (),
+  {NULL, NULL, NULL, NULL, NULL, NULL, NULL, DK_none, TDF_NONE, optgroup_dump_flags_t (),
    optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {".cgraph", "ipa-cgraph", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
+  {".cgraph", "ipa-cgraph", NULL, NULL, NULL, NULL, NULL, DK_ipa, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
   {".type-inheritance", "ipa-type-inheritance", NULL, NULL, NULL, NULL, NULL,
-    TDF_IPA, optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0,
+    DK_ipa, TDF_NONE, optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0,
     false, false},
-  {".ipa-clones", "ipa-clones", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
+  {".ipa-clones", "ipa-clones", NULL, NULL, NULL, NULL, NULL, DK_ipa, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {".tu", "translation-unit", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
+  {".tu", "translation-unit", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 1, false, false},
-  {".class", "class-hierarchy", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
+  {".class", "class-hierarchy", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 2, false, false},
-  {".original", "tree-original", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
+  {".original", "tree-original", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 3, false, false},
-  {".gimple", "tree-gimple", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
+  {".gimple", "tree-gimple", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 4, false, false},
-  {".nested", "tree-nested", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
+  {".nested", "tree-nested", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 5, false, false},
 #define FIRST_AUTO_NUMBERED_DUMP 6
 
-  {NULL, "tree-all", NULL, NULL, NULL, NULL, NULL, TDF_TREE,
+  {NULL, "tree-all", NULL, NULL, NULL, NULL, NULL, DK_tree, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {NULL, "rtl-all", NULL, NULL, NULL, NULL, NULL, TDF_RTL,
+  {NULL, "rtl-all", NULL, NULL, NULL, NULL, NULL, DK_rtl, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
-  {NULL, "ipa-all", NULL, NULL, NULL, NULL, NULL, TDF_IPA,
+  {NULL, "ipa-all", NULL, NULL, NULL, NULL, NULL, DK_ipa, TDF_NONE,
    optgroup_dump_flags_t (), optgroup_dump_flags_t (), 0, 0, 0, false, false},
 };
 
@@ -201,10 +201,7 @@ suboptions_hierarchy::suboptions_hierarchy ()
   root->register_suboption (new node ("asmname", TDF_ASMNAME));
   root->register_suboption (new node ("stmtaddr", TDF_STMTADDR));
   root->register_suboption (new node ("locals", TDF_LOCALS));
-  root->register_suboption (new node ("enumerate_locals",
-				      TDF_ENUMERATE_LOCALS));
-  root->register_suboption (new node ("tree", TDF_TREE));
-  root->register_suboption (new node ("ipa", TDF_IPA));
+  root->register_suboption (new node ("enumerate_locals", TDF_ENUMERATE_LOCALS));
   root->register_suboption (new node ("gimple", TDF_GIMPLE));
   root->register_suboption (new node ("vops", TDF_VOPS));
   root->register_suboption (new node ("alias", TDF_ALIAS));
@@ -212,7 +209,6 @@ suboptions_hierarchy::suboptions_hierarchy ()
   root->register_suboption (new node ("rhs_only", TDF_RHS_ONLY));
   root->register_suboption (new node ("memsyms", TDF_MEMSYMS));
   root->register_suboption (new node ("eh", TDF_EH));
-  root->register_suboption (new node ("rtl", TDF_RTL));
   root->register_suboption (new node ("cselib", TDF_CSELIB));
 
   root->initialize (dump_flags_t::m_mask_translation);
@@ -293,7 +289,7 @@ gcc::dump_manager::~dump_manager ()
 unsigned int
 gcc::dump_manager::
 dump_register (const char *suffix, const char *swtch, const char *glob,
-	       dump_flags_t flags, optgroup_dump_flags_t optgroup_flags,
+	       dump_kind dkind, optgroup_dump_flags_t optgroup_flags,
 	       bool take_ownership)
 {
   int num = m_next_dump++;
@@ -315,7 +311,7 @@ dump_register (const char *suffix, const char *swtch, const char *glob,
   m_extra_dump_files[count].suffix = suffix;
   m_extra_dump_files[count].swtch = swtch;
   m_extra_dump_files[count].glob = glob;
-  m_extra_dump_files[count].pflags = flags;
+  m_extra_dump_files[count].dkind = dkind;
   m_extra_dump_files[count].pass_optgroup_flags = optgroup_flags;
   m_extra_dump_files[count].num = num;
   m_extra_dump_files[count].owns_strings = take_ownership;
@@ -398,12 +394,14 @@ get_dump_file_name (struct dump_file_info *dfi) const
   else
     {
       char suffix;
-      if (dfi->pflags & TDF_TREE)
+      if (dfi->dkind == DK_tree)
 	suffix = 't';
-      else if (dfi->pflags & TDF_IPA)
+      else if (dfi->dkind == DK_ipa)
 	suffix = 'i';
-      else
+      else if (dfi->dkind == DK_rtl)
 	suffix = 'r';
+      else
+	gcc_unreachable ();
 
       if (snprintf (dump_id, sizeof (dump_id), ".%03d%c", dfi->num, suffix) < 0)
 	dump_id[0] = '\0';
@@ -775,16 +773,14 @@ dump_end (int phase ATTRIBUTE_UNUSED, FILE *stream)
 
 int
 gcc::dump_manager::
-dump_enable_all (dump_flags_t flags, const char *filename)
+dump_enable_all (dump_kind dkind, dump_flags_t flags, const char *filename)
 {
-  dump_flags_t ir_dump_type
-    = (flags - (dump_flags_t (TDF_TREE) | TDF_RTL | TDF_IPA));
   int n = 0;
   size_t i;
 
   for (i = TDI_none + 1; i < (size_t) TDI_end; i++)
     {
-      if ((dump_files[i].pflags & ir_dump_type))
+      if ((dump_files[i].dkind == dkind))
         {
           const char *old_filename = dump_files[i].pfilename;
           dump_files[i].pstate = -1;
@@ -805,7 +801,7 @@ dump_enable_all (dump_flags_t flags, const char *filename)
 
   for (i = 0; i < m_extra_dump_files_in_use; i++)
     {
-      if ((m_extra_dump_files[i].pflags & ir_dump_type))
+      if ((m_extra_dump_files[i].dkind == dkind))
         {
           const char *old_filename = m_extra_dump_files[i].pfilename;
           m_extra_dump_files[i].pstate = -1;
@@ -929,7 +925,7 @@ dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
   /* Process -fdump-tree-all and -fdump-rtl-all, by enabling all the
      known dumps.  */
   if (dfi->suffix == NULL)
-    dump_enable_all (dfi->pflags, dfi->pfilename);
+    dump_enable_all (dfi->dkind, dfi->pflags, dfi->pfilename);
 
   return 1;
 }
@@ -1061,7 +1057,7 @@ enable_rtl_dump_file (void)
 {
   gcc::dump_manager *dumps = g->get_dumps ();
   int num_enabled =
-    dumps->dump_enable_all (dump_flags_t (TDF_RTL) | TDF_DETAILS | TDF_BLOCKS,
+    dumps->dump_enable_all (DK_rtl, dump_flags_t (TDF_DETAILS) | TDF_BLOCKS,
 			    NULL);
   return num_enabled > 0;
 }

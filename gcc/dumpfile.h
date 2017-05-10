@@ -42,6 +42,14 @@ enum tree_dump_index
   TDI_end
 };
 
+enum dump_kind
+{
+  DK_none,
+  DK_tree,
+  DK_ipa,
+  DK_rtl
+};
+
 /* Dump option node is a tree structure that implements
    parsing of suboptions and provides mapping between a given enum type E
    and unsigned integer masks that are encapsulated in dump_flags_type type.  */
@@ -274,9 +282,7 @@ enum suboption_types
   TDF_LOCALS,
   TDF_ENUMERATE_LOCALS,
   /* TREE group.  */
-  TDF_TREE,
   /* IPA group.  */
-  TDF_IPA,
   /* GIMPLE group. */
   TDF_GIMPLE,
   TDF_VOPS,
@@ -286,7 +292,6 @@ enum suboption_types
   TDF_MEMSYMS,
   TDF_EH,
   /* RTL group.  */
-  TDF_RTL,
   TDF_CSELIB,
 };
 
@@ -306,6 +311,7 @@ struct dump_file_info
   const char *alt_filename;     /* filename for the -fopt-info stream  */
   FILE *pstream;		/* pass-specific dump stream  */
   FILE *alt_stream;		/* -fopt-info stream */
+  dump_kind dkind;		/* dump kind */
   dump_flags_t pflags;		/* dump flags */
   optgroup_dump_flags_t pass_optgroup_flags; /* a pass flags for -fopt-info */
   optgroup_dump_flags_t optgroup_flags; /* flags for -fopt-info given
@@ -406,7 +412,7 @@ public:
      SUFFIX, SWTCH, and GLOB. */
   unsigned int
   dump_register (const char *suffix, const char *swtch, const char *glob,
-		 dump_flags_t flags, optgroup_dump_flags_t  optgroup_flags,
+		 dump_kind dkind, optgroup_dump_flags_t  optgroup_flags,
 		 bool take_ownership);
 
   /* Return the dump_file_info for the given phase.  */
@@ -460,7 +466,7 @@ private:
   dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob);
 
   int
-  dump_enable_all (dump_flags_t flags, const char *filename);
+  dump_enable_all (dump_kind dkind, dump_flags_t flags, const char *filename);
 
   int
   opt_info_enable_passes (optgroup_dump_flags_t optgroup_flags,
