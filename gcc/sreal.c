@@ -372,6 +372,23 @@ sreal_verify_negative_division (void)
   ASSERT_EQ (sreal (1234567) / sreal (-1234567), sreal (-1));
 }
 
+/* Verify equal function that compares two numbers.  */
+
+static void
+sreal_verify_equal (void)
+{
+  ASSERT_TRUE (sreal (0).is_equal (sreal (0)));
+  ASSERT_TRUE (sreal (555).is_equal (sreal (555)));
+  ASSERT_TRUE (sreal (10000).is_equal (sreal (10001)));
+  ASSERT_FALSE (sreal (1000).is_equal (sreal (1000 + 2)));
+  ASSERT_FALSE (sreal (-1000).is_equal (sreal (-1000 + 2)));
+  ASSERT_TRUE (sreal (1000 * 1000).is_equal (sreal (1000 * 1000 + 1)));
+  ASSERT_TRUE (sreal (-1000 * 1000).is_equal (sreal (-1000 * 1000 - 1)));
+
+  ASSERT_TRUE (sreal (1347786301, -13).is_equal (sreal (1347789465, -13)));
+  ASSERT_TRUE (sreal (1123646592, -6).is_equal (sreal (1123695823, -6)));
+}
+
 /* Run all of the selftests within this file.  */
 
 void sreal_c_tests ()
@@ -380,6 +397,7 @@ void sreal_c_tests ()
   sreal_verify_arithmetics ();
   sreal_verify_shifting ();
   sreal_verify_negative_division ();
+  sreal_verify_equal ();
 }
 
 } // namespace selftest

@@ -1015,7 +1015,8 @@ edge_badness (struct cgraph_edge *edge, bool dump)
   hints = estimate_edge_hints (edge);
   gcc_checking_assert (edge_time >= 0);
   /* Check that inlined time is better, but tolerate some roundoff issues.  */
-  gcc_checking_assert ((edge_time - callee_info->time).to_int () <= 0);
+  gcc_checking_assert (edge_time.is_equal (callee_info->time)
+		       || edge_time < callee_info->time);
   gcc_checking_assert (growth <= callee_info->size);
 
   if (dump)

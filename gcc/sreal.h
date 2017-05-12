@@ -55,6 +55,7 @@ public:
   double to_double () const;
   void stream_out (struct output_block *);
   static sreal stream_in (struct lto_input_block *);
+
   sreal operator+ (const sreal &other) const;
   sreal operator- (const sreal &other) const;
   sreal operator* (const sreal &other) const;
@@ -108,6 +109,10 @@ public:
 
     return tmp;
   }
+
+  /* Return true whether a value is equal to B with some round off error
+     tolerance.  */
+  bool is_equal (const sreal &b);
 
   /* Global minimum sreal can hold.  */
   inline static sreal min ()
@@ -192,6 +197,21 @@ inline sreal operator<< (const sreal &a, int exp)
 inline sreal operator>> (const sreal &a, int exp)
 {
   return a.shift (-exp);
+}
+
+inline bool
+sreal::is_equal (const sreal &b)
+{
+  const sreal zero (0);
+  const sreal one (1);
+
+  if (b == zero)
+    return *this == zero;
+
+  sreal e = sreal (1) / 1000;
+    sreal f = *this / b;
+
+  return (one - e) <= f && f <= (one + e);
 }
 
 /* Make significant to be >= SREAL_MIN_SIG.

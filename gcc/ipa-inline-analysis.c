@@ -3125,7 +3125,7 @@ compute_inline_parameters (struct cgraph_node *node, bool early)
      inline_update_overall_summary but because computation happens in
      different order the roundoff errors result in slight changes.  */
   inline_update_overall_summary (node);
-  gcc_assert (!(info->time - info->self_time).to_int ()
+  gcc_assert (info->time.is_equal (info->self_time)
 	      && info->size == info->self_size);
 }
 
