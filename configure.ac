@@ -3461,15 +3461,16 @@ AC_SUBST(stage1_checking)
 # Enable -Werror in bootstrap stage2 and later.
 AC_ARG_ENABLE(werror,
 [AS_HELP_STRING([--enable-werror],
-		[enable -Werror in bootstrap stage2 and later])], [],
-[if test -d ${srcdir}/gcc && test x"`cat $srcdir/gcc/DEV-PHASE`" = xexperimental; then
-  enable_werror=yes
-else
-  enable_werror=no
-fi])
+		[enable -Werror in bootstrap stage2 and later])], [])
 case ${enable_werror} in
   yes) stage2_werror_flag="--enable-werror-always" ;;
   *) stage2_werror_flag="" ;;
+esac
+
+# Enable -Werror only for selected build configurations.
+case $BUILD_CONFIG in
+bootstrap-debug)
+    stage2_werror_flag="--enable-werror-always"
 esac
 AC_SUBST(stage2_werror_flag)
 
