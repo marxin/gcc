@@ -227,9 +227,9 @@ report_inline_failed_reason (struct cgraph_edge *e)
 {
   if (dump_file)
     {
-      fprintf (dump_file, "  not inlinable: %s/%i -> %s/%i, %s\n",
-	       xstrdup_for_dump (e->caller->name ()), e->caller->order,
-	       xstrdup_for_dump (e->callee->name ()), e->callee->order,
+      fprintf (dump_file, "  not inlinable: %s -> %s, %s\n",
+	       e->caller->dump_name (),
+	       e->callee->dump_name (),
 	       cgraph_inline_failed_string (e->inline_failed));
       if ((e->inline_failed == CIF_TARGET_OPTION_MISMATCH
 	   || e->inline_failed == CIF_OPTIMIZATION_MISMATCH)
@@ -592,22 +592,20 @@ want_early_inline_function_p (struct cgraph_edge *e)
 	       && growth > 0)
 	{
 	  if (dump_file)
-	    fprintf (dump_file, "  will not early inline: %s/%i->%s/%i, "
+	    fprintf (dump_file, "  will not early inline: %s->%s, "
 		     "call is cold and code would grow by %i\n",
-		     xstrdup_for_dump (e->caller->name ()),
-		     e->caller->order,
-		     xstrdup_for_dump (callee->name ()), callee->order,
+		     e->caller->dump_name (),
+		     callee->dump_name (),
 		     growth);
 	  want_inline = false;
 	}
       else if (growth > PARAM_VALUE (PARAM_EARLY_INLINING_INSNS))
 	{
 	  if (dump_file)
-	    fprintf (dump_file, "  will not early inline: %s/%i->%s/%i, "
+	    fprintf (dump_file, "  will not early inline: %s->%s, "
 		     "growth %i exceeds --param early-inlining-insns\n",
-		     xstrdup_for_dump (e->caller->name ()),
-		     e->caller->order,
-		     xstrdup_for_dump (callee->name ()), callee->order,
+		     e->caller->dump_name (),
+		     callee->dump_name (),
 		     growth);
 	  want_inline = false;
 	}
@@ -615,12 +613,11 @@ want_early_inline_function_p (struct cgraph_edge *e)
 	       && growth * (n + 1) > PARAM_VALUE (PARAM_EARLY_INLINING_INSNS))
 	{
 	  if (dump_file)
-	    fprintf (dump_file, "  will not early inline: %s/%i->%s/%i, "
+	    fprintf (dump_file, "  will not early inline: %s->%s, "
 		     "growth %i exceeds --param early-inlining-insns "
 		     "divided by number of calls\n",
-		     xstrdup_for_dump (e->caller->name ()),
-		     e->caller->order,
-		     xstrdup_for_dump (callee->name ()), callee->order,
+		     e->caller->dump_name (),
+		     callee->dump_name (),
 		     growth);
 	  want_inline = false;
 	}
@@ -1020,11 +1017,9 @@ edge_badness (struct cgraph_edge *edge, bool dump)
 
   if (dump)
     {
-      fprintf (dump_file, "    Badness calculation for %s/%i -> %s/%i\n",
-	       xstrdup_for_dump (edge->caller->name ()),
-	       edge->caller->order,
-	       xstrdup_for_dump (callee->name ()),
-	       edge->callee->order);
+      fprintf (dump_file, "    Badness calculation for %s -> %s\n",
+	       edge->caller->dump_name (),
+	       edge->callee->dump_name ());
       fprintf (dump_file, "      size growth %i, time %f unspec %f ",
 	       growth,
 	       edge_time.to_double (),
@@ -1229,12 +1224,9 @@ update_edge_key (edge_heap_t *heap, struct cgraph_edge *edge)
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
 	      fprintf (dump_file,
-		       "  decreasing badness %s/%i -> %s/%i, %f"
-		       " to %f\n",
-		       xstrdup_for_dump (edge->caller->name ()),
-		       edge->caller->order,
-		       xstrdup_for_dump (edge->callee->name ()),
-		       edge->callee->order,
+		       "  decreasing badness %s -> %s, %f to %f\n",
+		       edge->caller->dump_name (),
+		       edge->callee->dump_name (),
 		       n->get_key ().to_double (),
 		       badness.to_double ());
 	    }
@@ -1246,11 +1238,9 @@ update_edge_key (edge_heap_t *heap, struct cgraph_edge *edge)
        if (dump_file && (dump_flags & TDF_DETAILS))
 	 {
 	   fprintf (dump_file,
-		    "  enqueuing call %s/%i -> %s/%i, badness %f\n",
-		    xstrdup_for_dump (edge->caller->name ()),
-		    edge->caller->order,
-		    xstrdup_for_dump (edge->callee->name ()),
-		    edge->callee->order,
+		    "  enqueuing call %s -> %s, badness %f\n",
+		    edge->caller->dump_name (),
+		    edge->callee->dump_name (),
 		    badness.to_double ());
 	 }
       edge->aux = heap->insert (badness, edge);
@@ -1803,8 +1793,7 @@ inline_small_functions (void)
       bool has_speculative = false;
 
       if (dump_file)
-	fprintf (dump_file, "Enqueueing calls in %s/%i.\n",
-		 node->name (), node->order);
+	fprintf (dump_file, "Enqueueing calls in %s.\n", node->dump_name ());
 
       for (edge = node->callees; edge; edge = next)
 	{
@@ -1918,13 +1907,13 @@ inline_small_functions (void)
       if (dump_file)
 	{
 	  fprintf (dump_file,
-		   "\nConsidering %s/%i with %i size\n",
-		   callee->name (), callee->order,
+		   "\nConsidering %s with %i size\n",
+		   callee->dump_name (),
 		   inline_summaries->get (callee)->size);
 	  fprintf (dump_file,
-		   " to be inlined into %s/%i in %s:%i\n"
+		   " to be inlined into %s in %s:%i\n"
 		   " Estimated badness is %f, frequency %.2f.\n",
-		   edge->caller->name (), edge->caller->order,
+		   edge->caller->dump_name (),
 		   edge->call_stmt
 		   && (LOCATION_LOCUS (gimple_location ((const gimple *)
 							edge->call_stmt))
