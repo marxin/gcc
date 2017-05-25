@@ -559,7 +559,6 @@ compare_exclusions
 host_shared
 stage2_werror_flag
 stage1_checking
-stage1_cflags
 MAINT
 MAINTAINER_MODE_FALSE
 MAINTAINER_MODE_TRUE
@@ -652,6 +651,7 @@ isllibs
 poststage1_ldflags
 poststage1_libs
 stage1_ldflags
+stage1_cflags
 stage1_libs
 extra_isl_gmp_configure_flags
 extra_mpc_mpfr_configure_flags
@@ -771,6 +771,7 @@ with_gmp
 with_gmp_include
 with_gmp_lib
 with_stage1_libs
+with_stage1_cflags
 with_stage1_ldflags
 with_boot_libs
 with_boot_ldflags
@@ -1542,6 +1543,8 @@ Optional Packages:
   --with-gmp-include=PATH specify directory for installed GMP include files
   --with-gmp-lib=PATH     specify directory for the installed GMP library
   --with-stage1-libs=LIBS libraries for stage1
+  --with-stage1-cflags=FLAGS
+                          compiler flags for stage1
   --with-stage1-ldflags=FLAGS
                           linker flags for stage1
   --with-boot-libs=LIBS   libraries for stage2 and later
@@ -5801,6 +5804,29 @@ if test "${with_stage1_libs+set}" = set; then :
 else
   stage1_libs=
 fi
+
+
+
+# Compiler flags to use for stage1 or when not bootstrapping.
+
+# Check whether --with-stage1-cflags was given.
+if test "${with_stage1_cflags+set}" = set; then :
+  withval=$with_stage1_cflags; if test "$withval" = "no" -o "$withval" = "yes"; then
+   stage1_cflags=
+ else
+   stage1_cflags=$withval
+ fi
+else
+  stage1_cflags="-g"
+  case $build in
+    vax-*-*)
+      case ${GCC} in
+	yes) stage1_cflags="-g -Wa,-J" ;;
+	*) stage1_cflags="-g -J" ;;
+      esac ;;
+  esac
+fi
+
 
 
 
@@ -14543,18 +14569,6 @@ MAINT=$MAINTAINER_MODE_TRUE
 # ---------------------
 # GCC bootstrap support
 # ---------------------
-
-# Stage specific cflags for build.
-stage1_cflags="-g"
-case $build in
-  vax-*-*)
-    case ${GCC} in
-      yes) stage1_cflags="-g -Wa,-J" ;;
-      *) stage1_cflags="-g -J" ;;
-    esac ;;
-esac
-
-
 
 # Enable --enable-checking in stage1 of the compiler.
 # Check whether --enable-stage1-checking was given.

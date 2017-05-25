@@ -1637,6 +1637,25 @@ AC_ARG_WITH(stage1-libs,
 [stage1_libs=])
 AC_SUBST(stage1_libs)
 
+# Compiler flags to use for stage1 or when not bootstrapping.
+AC_ARG_WITH(stage1-cflags,
+[AS_HELP_STRING([--with-stage1-cflags=FLAGS], [compiler flags for stage1])],
+[if test "$withval" = "no" -o "$withval" = "yes"; then
+   stage1_cflags=
+ else
+   stage1_cflags=$withval
+ fi],
+[stage1_cflags="-g"
+  case $build in
+    vax-*-*)
+      case ${GCC} in
+	yes) stage1_cflags="-g -Wa,-J" ;;
+	*) stage1_cflags="-g -J" ;;
+      esac ;;
+  esac])
+
+AC_SUBST(stage1_cflags)
+
 # Linker flags to use for stage1 or when not bootstrapping.
 AC_ARG_WITH(stage1-ldflags,
 [AS_HELP_STRING([--with-stage1-ldflags=FLAGS], [linker flags for stage1])],
@@ -3420,18 +3439,6 @@ AC_SUBST(MAINT)dnl
 # ---------------------
 # GCC bootstrap support
 # ---------------------
-
-# Stage specific cflags for build.
-stage1_cflags="-g"
-case $build in
-  vax-*-*)
-    case ${GCC} in
-      yes) stage1_cflags="-g -Wa,-J" ;;
-      *) stage1_cflags="-g -J" ;;
-    esac ;;
-esac
-
-AC_SUBST(stage1_cflags)
 
 # Enable --enable-checking in stage1 of the compiler.
 AC_ARG_ENABLE(stage1-checking,
