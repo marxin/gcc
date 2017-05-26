@@ -12646,7 +12646,7 @@ gimplify_function_tree (tree fndecl)
       && !needs_to_live_in_memory (ret))
     DECL_GIMPLE_REG_P (ret) = 1;
 
-  if (asan_sanitize_use_after_scope () && !asan_no_sanitize_address_p ())
+  if (asan_sanitize_use_after_scope ())
     asan_poisoned_variables = new hash_set<tree> ();
   bind = gimplify_body (fndecl, true);
   if (asan_poisoned_variables)

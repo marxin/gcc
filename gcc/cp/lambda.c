@@ -1150,7 +1150,7 @@ maybe_add_lambda_conv_op (tree type)
     {
       /* Don't UBsan this function; we're deliberately calling op() with a null
 	 object argument.  */
-      add_no_sanitize_value (fn, SANITIZE_UNDEFINED);
+      add_no_sanitize_value (SANITIZE_UNDEFINED);
     }
 
   add_method (type, fn, false);

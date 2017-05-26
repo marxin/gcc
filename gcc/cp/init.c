@@ -3911,8 +3911,7 @@ finish_length_check (tree atype, tree iterator, tree obase, unsigned n)
 	}
       /* Don't check an array new when -fno-exceptions.  */
     }
-  else if (flag_sanitize & SANITIZE_BOUNDS
-	   && do_ubsan_in_current_function ())
+  else if (sanitize_flags_p (SANITIZE_BOUNDS))
     {
       /* Make sure the last element of the initializer is in bounds. */
       finish_expr_stmt

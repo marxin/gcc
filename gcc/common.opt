@@ -2676,6 +2676,10 @@ fvar-tracking-uninit
 Common Report Var(flag_var_tracking_uninit) PerFunction
 Perform variable tracking and also tag variables that are uninitialized.
 
+###
+Common RejectNegative Joined UInteger Var(flag_sanitize_local) PerFunction
+Local copy of sanitize
+
 ftree-vectorize
 Common Report Var(flag_tree_vectorize) Optimization
 Enable vectorization on trees.

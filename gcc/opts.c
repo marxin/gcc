@@ -1003,6 +1003,8 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 
       opts->x_flag_stack_reuse = SR_NONE;
     }
+
+  flag_sanitize_local = opts->x_flag_sanitize;
 }
 
 #define LEFT_COLUMN	27

@@ -553,22 +553,10 @@ handle_cold_attribute (tree *node, tree name, tree ARG_UNUSED (args),
   return NULL_TREE;
 }
 
-/* Add FLAGS for a function NODE to no_sanitize_flags in DECL_ATTRIBUTES.  */
-
 void
-add_no_sanitize_value (tree node, unsigned int flags)
+add_no_sanitize_value (unsigned int flags)
 {
-  tree attr = lookup_attribute ("no_sanitize_flags", DECL_ATTRIBUTES (node));
-  if (attr)
-    {
-      unsigned int old_value = tree_to_uhwi (TREE_VALUE (attr));
-      flags |= old_value;
-    }
-
-  DECL_ATTRIBUTES (node)
-    = tree_cons (get_identifier ("no_sanitize_flags"),
-		 build_int_cst (integer_type_node, flags),
-		 DECL_ATTRIBUTES (node));
+  flag_sanitize_local &= ~flags;
 }
 
 /* Handle a "no_sanitize" attribute; arguments as in
@@ -602,7 +590,7 @@ handle_no_sanitize_attribute (tree *node, tree name, tree args, int,
       return NULL_TREE;
     }
 
-  add_no_sanitize_value (*node, flags);
+  flag_sanitize_local &= ~flags;
 
   return NULL_TREE;
 }
@@ -620,7 +608,7 @@ handle_no_sanitize_address_attribute (tree *node, tree name, tree, int,
       *no_add_attrs = true;
     }
   else
-    add_no_sanitize_value (*node, SANITIZE_ADDRESS);
+    add_no_sanitize_value (SANITIZE_ADDRESS);
 
   return NULL_TREE;
 }
@@ -638,7 +626,7 @@ handle_no_sanitize_thread_attribute (tree *node, tree name, tree, int,
       *no_add_attrs = true;
     }
   else
-    add_no_sanitize_value (*node, SANITIZE_THREAD);
+    add_no_sanitize_value (SANITIZE_THREAD);
 
   return NULL_TREE;
 }
@@ -657,7 +645,7 @@ handle_no_address_safety_analysis_attribute (tree *node, tree name, tree, int,
       *no_add_attrs = true;
     }
   else
-    add_no_sanitize_value (*node, SANITIZE_ADDRESS);
+    add_no_sanitize_value (SANITIZE_ADDRESS);
 
   return NULL_TREE;
 }
@@ -675,8 +663,7 @@ handle_no_sanitize_undefined_attribute (tree *node, tree name, tree, int,
       *no_add_attrs = true;
     }
   else
-    add_no_sanitize_value (*node,
-			   SANITIZE_UNDEFINED | SANITIZE_UNDEFINED_NONDEFAULT);
+    add_no_sanitize_value (SANITIZE_UNDEFINED | SANITIZE_UNDEFINED_NONDEFAULT);
 
   return NULL_TREE;
 }
