@@ -57,6 +57,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-scalar-evolution.h"
 #include "ipa-utils.h"
 #include "gimple-pretty-print.h"
+#include "selftest.h"
 
 /* Enum with reasons why a predictor is ignored.  */
 
@@ -3803,3 +3804,41 @@ force_edge_cold (edge e, bool impossible)
 		 impossible ? "impossible" : "cold");
     }
 }
+
+#if CHECKING_P
+
+namespace selftest {
+
+/* Test that value range of predictor values defined in predict.def is
+   within range [51, 100].  */
+
+struct branch_predictor
+{
+  const char *name;
+  unsigned probability;
+};
+
+#define DEF_PREDICTOR(ENUM, NAME, HITRATE, FLAGS) { NAME, HITRATE },
+
+static void
+test_prediction_value_range ()
+{
+  branch_predictor predictors[] = {
+#include "predict.def"
+    {NULL, -1}
+  };
+
+  for (unsigned i = 0; predictors[i].name != NULL; i++)
+    ASSERT_TRUE (100 * predictors[i].probability / REG_BR_PROB_BASE > 50);
+}
+
+/* Run all of the selfests within this file.  */
+
+void
+predict_tests_c_tests ()
+{
+  test_prediction_value_range ();
+}
+
+} // namespace selftest
+#endif /* CHECKING_P.  */
