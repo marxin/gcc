@@ -222,6 +222,10 @@ bool flag_opts_finished
 Variable
 unsigned int flag_sanitize
 
+###
+Common RejectNegative Joined UInteger Var(flag_sanitize_local) PerFunction
+Per function local copy of flag_sanitize
+
 ; What sanitizers should recover from errors
 Variable
 unsigned int flag_sanitize_recover = (SANITIZE_UNDEFINED | SANITIZE_UNDEFINED_NONDEFAULT | SANITIZE_KERNEL_ADDRESS) & ~(SANITIZE_UNREACHABLE | SANITIZE_RETURN)
@@ -2675,10 +2679,6 @@ Toggle -fvar-tracking-assignments.
 fvar-tracking-uninit
 Common Report Var(flag_var_tracking_uninit) PerFunction
 Perform variable tracking and also tag variables that are uninitialized.
-
-###
-Common RejectNegative Joined UInteger Var(flag_sanitize_local) PerFunction
-Local copy of sanitize
 
 ftree-vectorize
 Common Report Var(flag_tree_vectorize) Optimization

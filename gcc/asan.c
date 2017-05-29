@@ -3190,7 +3190,7 @@ asan_instrument (void)
 }
 
 static bool
-gate_asan ()
+gate_asan (void)
 {
   return sanitize_flags_p (SANITIZE_ADDRESS);
 }

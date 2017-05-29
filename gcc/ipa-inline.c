@@ -252,6 +252,18 @@ report_inline_failed_reason (struct cgraph_edge *e)
     }
 }
 
+ /* Decide whether sanitizer-related attributes allow inlining. */
+
+static bool
+sanitize_attrs_match_for_inline_p (const_tree caller, const_tree callee)
+{
+  if (!caller || !callee)
+    return true;
+
+  return ((opts_for_fn (caller)->x_flag_sanitize_local & SANITIZE_ADDRESS)
+	  == (opts_for_fn (callee)->x_flag_sanitize_local & SANITIZE_ADDRESS));
+}
+
 /* Used for flags where it is safe to inline when caller's value is
    grater than callee's.  */
 #define check_maybe_up(flag) \
@@ -272,18 +284,6 @@ report_inline_failed_reason (struct cgraph_edge *e)
 #define check_match(flag) \
       (opts_for_fn (caller->decl)->x_##flag		\
        != opts_for_fn (callee->decl)->x_##flag)
-
- /* Decide whether sanitizer-related attributes allow inlining. */
-
-static bool
-sanitize_attrs_match_for_inline_p (const_tree caller, const_tree callee)
-{
-  if (!caller || !callee)
-    return true;
-
-  return ((opts_for_fn (caller)->x_flag_sanitize_local & SANITIZE_ADDRESS)
-	  == (opts_for_fn (callee)->x_flag_sanitize_local & SANITIZE_ADDRESS));
-}
 
  /* Decide if we can inline the edge and possibly update
    inline_failed reason.  
