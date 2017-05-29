@@ -553,6 +553,8 @@ handle_cold_attribute (tree *node, tree name, tree ARG_UNUSED (args),
   return NULL_TREE;
 }
 
+/* Exclude FLAGS from options enabled by -fsanitize.  */
+
 void
 add_no_sanitize_value (unsigned int flags)
 {

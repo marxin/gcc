@@ -3737,7 +3737,7 @@ one_static_initialization_or_destruction (tree decl, tree init, bool initp)
       if (init)
 	{
 	  finish_expr_stmt (init);
-	  if (sanitize_flags_p (SANITIZE_ADDRESS, decl))
+	  if (sanitize_flags_p (SANITIZE_ADDRESS))
 	    {
 	      varpool_node *vnode = varpool_node::get (decl);
 	      if (vnode)

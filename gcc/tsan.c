@@ -894,9 +894,9 @@ public:
 
   /* opt_pass methods: */
   opt_pass * clone () { return new pass_tsan (m_ctxt); }
-  virtual bool gate (function *fn)
+  virtual bool gate (function *)
 {
-  return sanitize_flags_p (SANITIZE_THREAD, fn->decl);
+  return sanitize_flags_p (SANITIZE_THREAD);
 }
 
   virtual unsigned int execute (function *) { return tsan_pass (); }
@@ -934,9 +934,9 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *fn)
+  virtual bool gate (function *)
     {
-      return (sanitize_flags_p (SANITIZE_THREAD, fn->decl) && !optimize);
+      return (sanitize_flags_p (SANITIZE_THREAD) && !optimize);
     }
 
   virtual unsigned int execute (function *) { return tsan_pass (); }

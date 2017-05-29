@@ -1949,14 +1949,14 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *fn)
+  virtual bool gate (function *)
     {
       return sanitize_flags_p ((SANITIZE_NULL | SANITIZE_SI_OVERFLOW
 				| SANITIZE_BOOL | SANITIZE_ENUM
 				| SANITIZE_ALIGNMENT
 				| SANITIZE_NONNULL_ATTRIBUTE
 				| SANITIZE_RETURNS_NONNULL_ATTRIBUTE
-				| SANITIZE_OBJECT_SIZE), fn->decl);
+				| SANITIZE_OBJECT_SIZE));
     }
 
   virtual unsigned int execute (function *);
@@ -1983,11 +1983,11 @@ pass_ubsan::execute (function *fun)
 	      continue;
 	    }
 
-	  if ((sanitize_flags_p (SANITIZE_SI_OVERFLOW, fun->decl))
+	  if ((sanitize_flags_p (SANITIZE_SI_OVERFLOW))
 	      && is_gimple_assign (stmt))
 	    instrument_si_overflow (gsi);
 
-	  if (sanitize_flags_p (SANITIZE_NULL | SANITIZE_ALIGNMENT, fun->decl))
+	  if (sanitize_flags_p (SANITIZE_NULL | SANITIZE_ALIGNMENT))
 	    {
 	      if (gimple_store_p (stmt))
 		instrument_null (gsi, true);
@@ -1995,14 +1995,14 @@ pass_ubsan::execute (function *fun)
 		instrument_null (gsi, false);
 	    }
 
-	  if (sanitize_flags_p (SANITIZE_BOOL | SANITIZE_ENUM, fun->decl)
+	  if (sanitize_flags_p (SANITIZE_BOOL | SANITIZE_ENUM)
 	      && gimple_assign_load_p (stmt))
 	    {
 	      instrument_bool_enum_load (&gsi);
 	      bb = gimple_bb (stmt);
 	    }
 
-	  if (sanitize_flags_p (SANITIZE_NONNULL_ATTRIBUTE, fun->decl)
+	  if (sanitize_flags_p (SANITIZE_NONNULL_ATTRIBUTE)
 	      && is_gimple_call (stmt)
 	      && !gimple_call_internal_p (stmt))
 	    {
@@ -2010,14 +2010,14 @@ pass_ubsan::execute (function *fun)
 	      bb = gimple_bb (stmt);
 	    }
 
-	  if (sanitize_flags_p (SANITIZE_RETURNS_NONNULL_ATTRIBUTE, fun->decl)
+	  if (sanitize_flags_p (SANITIZE_RETURNS_NONNULL_ATTRIBUTE)
 	      && gimple_code (stmt) == GIMPLE_RETURN)
 	    {
 	      instrument_nonnull_return (&gsi);
 	      bb = gimple_bb (stmt);
 	    }
 
-	  if (sanitize_flags_p (SANITIZE_OBJECT_SIZE, fun->decl))
+	  if (sanitize_flags_p (SANITIZE_OBJECT_SIZE))
 	    {
 	      if (gimple_store_p (stmt))
 		instrument_object_size (&gsi, true);

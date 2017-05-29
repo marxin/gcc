@@ -3190,9 +3190,9 @@ asan_instrument (void)
 }
 
 static bool
-gate_asan (function *fn)
+gate_asan ()
 {
-  return sanitize_flags_p (SANITIZE_ADDRESS, fn->decl);
+  return sanitize_flags_p (SANITIZE_ADDRESS);
 }
 
 namespace {
@@ -3219,7 +3219,7 @@ public:
 
   /* opt_pass methods: */
   opt_pass * clone () { return new pass_asan (m_ctxt); }
-  virtual bool gate (function *fn) { return gate_asan (fn); }
+  virtual bool gate (function *) { return gate_asan (); }
   virtual unsigned int execute (function *) { return asan_instrument (); }
 
 }; // class pass_asan
@@ -3255,7 +3255,7 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *fn) { return !optimize && gate_asan (fn); }
+  virtual bool gate (function *) { return !optimize && gate_asan (); }
   virtual unsigned int execute (function *) { return asan_instrument (); }
 
 }; // class pass_asan_O0

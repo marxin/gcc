@@ -14442,14 +14442,9 @@ nonnull_arg_p (const_tree arg)
   return false;
 }
 
-/* Return true when flag_sanitize & FLAG is non-zero.  */
-
 bool
-sanitize_flags_p (unsigned int flag, const_tree fn)
+sanitize_flags_p (unsigned int flag)
 {
-  if (fn == NULL)
-    return false;
-
   return flag_sanitize_local & flag;
 }
 
