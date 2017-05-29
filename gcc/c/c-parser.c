@@ -1931,10 +1931,15 @@ c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 		  /* A parameter is initialized, which is invalid.  Don't
 		     attempt to instrument the initializer.  */
 		  int flag_sanitize_save = flag_sanitize;
+		  int flag_sanitize_local_save = flag_sanitize_local;
 		  if (TREE_CODE (d) == PARM_DECL)
-		    flag_sanitize = 0;
+		    {
+		      flag_sanitize = 0;
+		      flag_sanitize_local = 0;
+		    }
 		  init = c_parser_initializer (parser);
 		  flag_sanitize = flag_sanitize_save;
+		  flag_sanitize_local = flag_sanitize_local_save;
 		  finish_init ();
 		}
 	      if (oacc_routine_data)

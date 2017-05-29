@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /* PR sanitizer/80797 */
 /* { dg-do run } */
 /* { dg-options "-fsanitize=undefined" } */
