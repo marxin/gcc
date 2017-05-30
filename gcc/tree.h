@@ -4248,6 +4248,10 @@ extern tree merge_dllimport_decl_attributes (tree, tree);
 /* Handle a "dllimport" or "dllexport" attribute.  */
 extern tree handle_dll_attribute (tree *, tree, tree, int, bool *);
 
+/* Return true when FLAG is enabled in -fsanitize option values.  */
+extern bool sanitize_flags_p (unsigned int flag,
+			      const_tree fn = current_function_decl);
+
 /* Returns true iff CAND and BASE have equivalent language-specific
    qualifiers.  */
 

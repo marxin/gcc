@@ -3479,7 +3479,7 @@ optimize_atomic_compare_exchange_p (gimple *stmt)
   if (gimple_call_num_args (stmt) != 6
       || !flag_inline_atomics
       || !optimize
-      || (flag_sanitize & (SANITIZE_THREAD | SANITIZE_ADDRESS)) != 0
+      || sanitize_flags_p (SANITIZE_THREAD | SANITIZE_ADDRESS)
       || !gimple_call_builtin_p (stmt, BUILT_IN_NORMAL)
       || !gimple_vdef (stmt)
       || !gimple_vuse (stmt))
