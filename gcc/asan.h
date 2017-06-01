@@ -144,13 +144,6 @@ asan_sanitize_use_after_scope (void)
   return (flag_sanitize_address_use_after_scope && asan_sanitize_stack_p ());
 }
 
-static inline bool
-asan_no_sanitize_address_p (void)
-{
-  return lookup_attribute ("no_sanitize_address",
-			   DECL_ATTRIBUTES (current_function_decl));
-}
-
 /* Return true if DECL should be guarded on the stack.  */
 
 static inline bool
