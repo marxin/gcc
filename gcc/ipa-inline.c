@@ -257,17 +257,11 @@ report_inline_failed_reason (struct cgraph_edge *e)
 static bool
 sanitize_attrs_match_for_inline_p (const_tree caller, const_tree callee)
 {
-  /* Don't care if sanitizer is disabled */
-  if (!(flag_sanitize & SANITIZE_ADDRESS))
-    return true;
-
   if (!caller || !callee)
     return true;
 
-  return !!lookup_attribute ("no_sanitize_address",
-      DECL_ATTRIBUTES (caller)) == 
-      !!lookup_attribute ("no_sanitize_address",
-      DECL_ATTRIBUTES (callee));
+  return sanitize_flags_p (SANITIZE_ADDRESS, caller)
+    == sanitize_flags_p (SANITIZE_ADDRESS, callee);
 }
 
 /* Used for flags where it is safe to inline when caller's value is
