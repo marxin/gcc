@@ -5479,8 +5479,7 @@ declare_weak (tree decl)
 
   mark_weak (decl);
   if (!lookup_attribute ("weak", DECL_ATTRIBUTES (decl)))
-    DECL_ATTRIBUTES (decl)
-      = tree_cons (get_identifier ("weak"), NULL, DECL_ATTRIBUTES (decl));
+    add_decl_attribute (decl, "weak");
 }
 
 static void

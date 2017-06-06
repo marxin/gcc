@@ -816,8 +816,8 @@ extern void check_function_arguments_recurse (void (*)
 					      unsigned HOST_WIDE_INT);
 extern bool check_builtin_function_arguments (location_t, vec<location_t>,
 					      tree, int, tree *);
-extern void check_function_format (tree, int, tree *);
-extern bool attribute_fallthrough_p (tree);
+extern void check_function_format (attribute_list *, int, tree *);
+extern bool attribute_fallthrough_p (attribute_list *);
 extern tree handle_format_attribute (tree *, tree, tree, int, bool *);
 extern tree handle_format_arg_attribute (tree *, tree, tree, int, bool *);
 extern bool c_common_handle_option (size_t, const char *, int, int, location_t,
@@ -1543,7 +1543,7 @@ extern tree do_warn_duplicated_branches_r (tree *, int *, void *);
 /* In c-attribs.c.  */
 extern bool attribute_takes_identifier_p (const_tree);
 extern tree handle_unused_attribute (tree *, tree, tree, int, bool *);
-extern int parse_tm_stmt_attr (tree, int);
+extern int parse_tm_stmt_attr (attribute_list *, int);
 extern int tm_attr_to_mask (tree);
 extern tree tm_mask_to_attr (int);
 extern tree find_tm_attribute (tree);

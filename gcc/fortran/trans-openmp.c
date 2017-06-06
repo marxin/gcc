@@ -5189,12 +5189,7 @@ gfc_trans_omp_declare_simd (gfc_namespace *ns)
   gfc_omp_declare_simd *ods;
   for (ods = ns->omp_declare_simd; ods; ods = ods->next)
     {
-      tree c = gfc_trans_omp_clauses (NULL, ods->clauses, ods->where, true);
       tree fndecl = ns->proc_name->backend_decl;
-      if (c != NULL_TREE)
-	c = tree_cons (NULL_TREE, c, NULL_TREE);
-      c = build_tree_list (get_identifier ("omp declare simd"), c);
-      TREE_CHAIN (c) = DECL_ATTRIBUTES (fndecl);
-      DECL_ATTRIBUTES (fndecl) = c;
+      add_decl_attr (fndecl, "omp declare simd");
     }
 }

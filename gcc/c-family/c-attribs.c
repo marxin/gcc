@@ -573,9 +573,7 @@ handle_no_address_safety_analysis_attribute (tree *node, tree name, tree, int,
   if (TREE_CODE (*node) != FUNCTION_DECL)
     warning (OPT_Wattributes, "%qE attribute ignored", name);
   else if (!lookup_attribute ("no_sanitize_address", DECL_ATTRIBUTES (*node)))
-    DECL_ATTRIBUTES (*node)
-      = tree_cons (get_identifier ("no_sanitize_address"),
-		   NULL_TREE, DECL_ATTRIBUTES (*node));
+    add_attribute (DECL_ATTRIBUTES (*node), "no_sanitize_address");
   *no_add_attrs = true;
   return NULL_TREE;
 }
@@ -618,9 +616,7 @@ handle_stack_protect_attribute (tree *node, tree name, tree, int,
       *no_add_attrs = true;
     }
   else
-    DECL_ATTRIBUTES (*node)
-      = tree_cons (get_identifier ("stack_protect"),
-		   NULL_TREE, DECL_ATTRIBUTES (*node));
+    add_decl_attribute (*node, "stack_protect");
 
   return NULL_TREE;
 }
@@ -1765,8 +1761,7 @@ handle_alias_ifunc_attribute (bool is_alias, tree *node, tree name, tree args,
 
       if (!is_alias)
 	/* ifuncs are also aliases, so set that attribute too.  */
-	DECL_ATTRIBUTES (decl)
-	  = tree_cons (get_identifier ("alias"), args, DECL_ATTRIBUTES (decl));
+	add_decl_attribute (decl, "alias");
     }
   else
     {
@@ -1817,8 +1812,6 @@ static tree
 handle_weakref_attribute (tree *node, tree ARG_UNUSED (name), tree args,
 			  int flags, bool *no_add_attrs)
 {
-  tree attr = NULL_TREE;
-
   /* We must ignore the attribute when it is associated with
      local-scoped decls, since attribute alias is ignored and many
      such symbols do not even have a DECL_WEAK field.  */
@@ -1844,8 +1837,9 @@ handle_weakref_attribute (tree *node, tree ARG_UNUSED (name), tree args,
 
   if (args)
     {
-      attr = tree_cons (get_identifier ("alias"), args, attr);
-      attr = tree_cons (get_identifier ("weakref"), NULL_TREE, attr);
+      attribute_list *attr = alloc_attribute_list ();
+      add_attribute (attr, "alias");
+      add_attribute (attr, "weakref");
 
       *no_add_attrs = true;
 
@@ -1945,9 +1939,9 @@ handle_visibility_attribute (tree *node, tree name, tree args,
   if (DECL_VISIBILITY_SPECIFIED (decl)
       && vis != DECL_VISIBILITY (decl))
     {
-      tree attributes = (TYPE_P (*node)
-			 ? TYPE_ATTRIBUTES (*node)
-			 : DECL_ATTRIBUTES (decl));
+      attribute_list *attributes = (TYPE_P (*node)
+				    ? TYPE_ATTRIBUTES (*node)
+				    : DECL_ATTRIBUTES (decl));
       if (lookup_attribute ("visibility", attributes))
 	error ("%qD redeclared with different visibility", decl);
       else if (TARGET_DLLIMPORT_DECL_ATTRIBUTES
@@ -2258,7 +2252,6 @@ handle_simd_attribute (tree *node, tree name, tree args, int, bool *no_add_attrs
 	}
       else
 	{
-	  tree t = get_identifier ("omp declare simd");
 	  tree attr = NULL_TREE;
 	  if (args)
 	    {
@@ -2287,10 +2280,7 @@ handle_simd_attribute (tree *node, tree name, tree args, int, bool *no_add_attrs
 		}
 	    }
 
-	  DECL_ATTRIBUTES (*node) = tree_cons (t,
-					       build_tree_list (NULL_TREE,
-								attr),
-					       DECL_ATTRIBUTES (*node));
+	  add_decl_attribute (*node, "omp declare simd", build_tree_list (NULL_TREE, attr));
 	}
     }
   else
@@ -2467,13 +2457,13 @@ tm_mask_to_attr (int mask)
 /* Return the first TM attribute seen in LIST.  */
 
 tree
-find_tm_attribute (tree list)
+find_tm_attribute (attribute_list *list)
 {
-  for (; list ; list = TREE_CHAIN (list))
+  for (unsigned i = 0; i < ATTR_LIST_NELTS (list); i++)
     {
-      tree name = TREE_PURPOSE (list);
-      if (tm_attr_to_mask (name) != 0)
-	return name;
+      tree_key_value *attr = ATTR_LIST_ELT (list, i);
+      if (tm_attr_to_mask (attr->index) != 0)
+	return attr->index;
     }
   return NULL_TREE;
 }
@@ -2485,8 +2475,8 @@ find_tm_attribute (tree list)
    complicates this function, since we can no longer rely on the extra
    processing given by function_type_required.  */
 
-static tree
-handle_tm_attribute (tree *node, tree name, tree args,
+static attribute_list * 
+handle_tm_attribute (tree *node, tree name, attribute_list *args,
 		     int flags, bool *no_add_attrs)
 {
   /* Only one path adds the attribute; others don't.  */
@@ -2525,8 +2515,7 @@ handle_tm_attribute (tree *node, tree name, tree args,
 		    "a virtual function");
 	*no_add_attrs = false;
 	decl_attributes (&TREE_TYPE (*node),
-			 build_tree_list (get_identifier ("transaction_safe"),
-					  NULL_TREE),
+			 alloc_attribute_list ("transaction_safe"),
 			 0);
 	break;
       }
@@ -2537,7 +2526,7 @@ handle_tm_attribute (tree *node, tree name, tree args,
 	if (subcode == FUNCTION_TYPE || subcode == METHOD_TYPE)
 	  {
 	    tree fn_tmp = TREE_TYPE (*node);
-	    decl_attributes (&fn_tmp, tree_cons (name, args, NULL), 0);
+	    decl_attributes (&fn_tmp, add_attribute (args->copy (), name), 0);
 	    *node = build_pointer_type (fn_tmp);
 	    break;
 	  }
@@ -2547,14 +2536,14 @@ handle_tm_attribute (tree *node, tree name, tree args,
     default:
       /* If a function is next, pass it on to be tried next.  */
       if (flags & (int) ATTR_FLAG_FUNCTION_NEXT)
-	return tree_cons (name, args, NULL);
+	return add_attribute (args->copy (), name);
 
     ignored:
       warning (OPT_Wattributes, "%qE attribute ignored", name);
       break;
     }
 
-  return NULL_TREE;
+  return NULL;
 }
 
 /* Handle the TM_WRAP attribute; arguments as in

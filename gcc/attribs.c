@@ -353,14 +353,13 @@ get_attribute_namespace (const_tree attr)
    returned to be applied at a later stage (for example, to apply
    a decl attribute to the declaration rather than to its type).  */
 
-tree
-decl_attributes (tree *node, tree attributes, int flags)
+attribute_list *
+decl_attributes (tree *node, attribute_list *attributes, int flags)
 {
-  tree a;
-  tree returned_attrs = NULL_TREE;
+  attribute_list *returned_attrs = NULL;
 
-  if (TREE_TYPE (*node) == error_mark_node || attributes == error_mark_node)
-    return NULL_TREE;
+  if (TREE_TYPE (*node) == error_mark_node || attributes == NULL)
+    return NULL;
 
   if (!attributes_initialized)
     init_attributes ();
@@ -369,14 +368,13 @@ decl_attributes (tree *node, tree attributes, int flags)
      options to the attribute((optimize(...))) list.  */
   if (TREE_CODE (*node) == FUNCTION_DECL && current_optimize_pragma)
     {
-      tree cur_attr = lookup_attribute ("optimize", attributes);
+      tree_key_value *cur_attr = lookup_attribute ("optimize", attributes);
       tree opts = copy_list (current_optimize_pragma);
 
-      if (! cur_attr)
-	attributes
-	  = tree_cons (get_identifier ("optimize"), opts, attributes);
+      if (!cur_attr)
+	add_attribute (attributes, "optimized");
       else
-	TREE_VALUE (cur_attr) = chainon (opts, TREE_VALUE (cur_attr));
+	cur_attr->value = chainon (opts, cur_attr->value);
     }
 
   if (TREE_CODE (*node) == FUNCTION_DECL
@@ -391,13 +389,13 @@ decl_attributes (tree *node, tree attributes, int flags)
       && targetm.target_option.valid_attribute_p (*node, NULL_TREE,
 						  current_target_pragma, 0))
     {
-      tree cur_attr = lookup_attribute ("target", attributes);
+      tree_key_value *cur_attr = lookup_attribute ("target", attributes);
       tree opts = copy_list (current_target_pragma);
 
-      if (! cur_attr)
-	attributes = tree_cons (get_identifier ("target"), opts, attributes);
+      if (!cur_attr)
+	add_attribute (attributes, "target");
       else
-	TREE_VALUE (cur_attr) = chainon (opts, TREE_VALUE (cur_attr));
+	cur_attr->value = chainon (opts, cur_attr->value);
     }
 
   /* A "naked" function attribute implies "noinline" and "noclone" for
@@ -408,19 +406,21 @@ decl_attributes (tree *node, tree attributes, int flags)
       && lookup_attribute ("naked", attributes) != NULL)
     {
       if (lookup_attribute ("noinline", attributes) == NULL)
-	attributes = tree_cons (get_identifier ("noinline"), NULL, attributes);
+	add_attribute (attributes, "noinline");
 
       if (lookup_attribute ("noclone", attributes) == NULL)
-	attributes = tree_cons (get_identifier ("noclone"),  NULL, attributes);
+	add_attribute (attributes, "noclone");
     }
 
-  targetm.insert_attributes (*node, &attributes);
+  // TODO
+  // targetm.insert_attributes (*node, &attributes);
 
-  for (a = attributes; a; a = TREE_CHAIN (a))
+  for (unsigned i = 0; i < attributes->length (); i++)
     {
-      tree ns = get_attribute_namespace (a);
-      tree name = get_attribute_name (a);
-      tree args = TREE_VALUE (a);
+      const tree_key_value tuple = (*attributes)[i];
+      tree ns = get_attribute_namespace (tuple.index);
+      tree name = get_attribute_name (&tuple);
+      tree args = tuple.value;
       tree *anode = node;
       const struct attribute_spec *spec =
 	lookup_scoped_attribute_spec (ns, name);
@@ -432,7 +432,7 @@ decl_attributes (tree *node, tree attributes, int flags)
 	{
 	  if (!(flags & (int) ATTR_FLAG_BUILT_IN))
 	    {
-	      if (ns == NULL_TREE || !cxx11_attribute_p (a))
+	      if (ns == NULL_TREE || !cxx11_attribute_p (tuple.index))
 		warning (OPT_Wattributes, "%qE attribute directive ignored",
 			 name);
 	      else
@@ -453,7 +453,7 @@ decl_attributes (tree *node, tree attributes, int flags)
       gcc_assert (is_attribute_p (spec->name, name));
 
       if (TYPE_P (*node)
-	  && cxx11_attribute_p (a)
+	  && cxx11_attribute_p (tuple.index)
 	  && !(flags & ATTR_FLAG_TYPE_IN_PLACE))
 	{
 	  /* This is a c++11 attribute that appertains to a
@@ -473,7 +473,9 @@ decl_attributes (tree *node, tree attributes, int flags)
 		       | (int) ATTR_FLAG_ARRAY_NEXT))
 	    {
 	      /* Pass on this attribute to be tried again.  */
-	      returned_attrs = tree_cons (name, args, returned_attrs);
+	      if (returned_attrs == NULL)
+		vec_alloc (returned_attrs, 1);
+	      returned_attrs->quick_push ({args, NULL_TREE});
 	      continue;
 	    }
 	  else
@@ -518,7 +520,9 @@ decl_attributes (tree *node, tree attributes, int flags)
 	  else if (flags & (int) ATTR_FLAG_FUNCTION_NEXT)
 	    {
 	      /* Pass on this attribute to be tried again.  */
-	      returned_attrs = tree_cons (name, args, returned_attrs);
+	      if (returned_attrs == NULL)
+		vec_alloc (returned_attrs, 1);
+	      returned_attrs->quick_push ({args, NULL_TREE});
 	      continue;
 	    }
 
@@ -543,12 +547,14 @@ decl_attributes (tree *node, tree attributes, int flags)
       if (spec->handler != NULL)
 	{
 	  int cxx11_flag =
-	    cxx11_attribute_p (a) ? ATTR_FLAG_CXX11 : 0;
+	    cxx11_attribute_p (tuple.index) ? ATTR_FLAG_CXX11 : 0;
 
-	  returned_attrs = chainon ((*spec->handler) (anode, name, args,
+	  if (returned_attrs == NULL)
+	    vec_alloc (returned_attrs, 1);
+	  returned_attrs->quick_push ({(*spec->handler) (anode, name, args,
 						      flags|cxx11_flag,
 						      &no_add_attrs),
-				    returned_attrs);
+				      NULL_TREE});
 	}
 
       /* Layout the decl in case anything changed.  */
@@ -560,30 +566,31 @@ decl_attributes (tree *node, tree attributes, int flags)
 
       if (!no_add_attrs)
 	{
-	  tree old_attrs;
-	  tree a;
+	  attribute_list *old_attrs;
 
 	  if (DECL_P (*anode))
 	    old_attrs = DECL_ATTRIBUTES (*anode);
 	  else
 	    old_attrs = TYPE_ATTRIBUTES (*anode);
 
-	  for (a = lookup_attribute (spec->name, old_attrs);
-	       a != NULL_TREE;
-	       a = lookup_attribute (spec->name, TREE_CHAIN (a)))
+
+	  tree_key_value *tuple = NULL;
+	  for (unsigned i = 0; i < old_attrs->length (); i++)
 	    {
-	      if (simple_cst_equal (TREE_VALUE (a), args) == 1)
+	      tuple = &(*old_attrs)[i];
+	      if (attribute_eq (tuple, spec->name)
+		  && simple_cst_equal (tuple->value, args) == 1)
 		break;
 	    }
 
-	  if (a == NULL_TREE)
+	  if (tuple == NULL)
 	    {
 	      /* This attribute isn't already in the list.  */
 	      if (DECL_P (*anode))
-		DECL_ATTRIBUTES (*anode) = tree_cons (name, args, old_attrs);
+		add_attribute (old_attrs, name, args);
 	      else if (flags & (int) ATTR_FLAG_TYPE_IN_PLACE)
 		{
-		  TYPE_ATTRIBUTES (*anode) = tree_cons (name, args, old_attrs);
+		  add_attribute (old_attrs, name, args);
 		  /* If this is the main variant, also push the attributes
 		     out to the other variants.  */
 		  if (*anode == TYPE_MAIN_VARIANT (*anode))
@@ -597,15 +604,17 @@ decl_attributes (tree *node, tree attributes, int flags)
 			      = TYPE_ATTRIBUTES (*anode);
 			  else if (!lookup_attribute
 				   (spec->name, TYPE_ATTRIBUTES (variant)))
-			    TYPE_ATTRIBUTES (variant) = tree_cons
-			      (name, args, TYPE_ATTRIBUTES (variant));
+			    add_attribute (TYPE_ATTRIBUTES (variant),
+					   name, args);
 			}
 		    }
 		}
 	      else
-		*anode = build_type_attribute_variant (*anode,
-						       tree_cons (name, args,
-								  old_attrs));
+		{
+		  attribute_list *new_attrs = old_attrs->copy ();
+		  add_attribute (new_attrs, name, args);
+		  *anode = build_type_attribute_variant (*anode, new_attrs);
+		}
 	    }
 	}
 
@@ -641,13 +650,12 @@ decl_attributes (tree *node, tree attributes, int flags)
    GNU attributes as well.  */
 
 bool
-cxx11_attribute_p (const_tree attr)
+cxx11_attribute_p (const tree_key_value *attr)
 {
-  if (attr == NULL_TREE
-      || TREE_CODE (attr) != TREE_LIST)
+  if (attr == NULL)
     return false;
 
-  return (TREE_CODE (TREE_PURPOSE (attr)) == TREE_LIST);
+  return (TREE_CODE (attr->index) == TREE_LIST);
 }
 
 /* Return the name of the attribute ATTR.  This accessor works on GNU
@@ -657,11 +665,11 @@ cxx11_attribute_p (const_tree attr)
    format of attributes.  */
 
 tree
-get_attribute_name (const_tree attr)
+get_attribute_name (tree_key_value *attr)
 {
   if (cxx11_attribute_p (attr))
-    return TREE_VALUE (TREE_PURPOSE (attr));
-  return TREE_PURPOSE (attr);
+    return TREE_VALUE (attr->index);
+  return attr->index;
 }
 
 /* Subroutine of set_method_tm_attributes.  Apply TM attribute ATTR
@@ -670,25 +678,9 @@ get_attribute_name (const_tree attr)
 void
 apply_tm_attr (tree fndecl, tree attr)
 {
-  decl_attributes (&TREE_TYPE (fndecl), tree_cons (attr, NULL, NULL), 0);
-}
-
-/* Makes a function attribute of the form NAME(ARG_NAME) and chains
-   it to CHAIN.  */
-
-tree
-make_attribute (const char *name, const char *arg_name, tree chain)
-{
-  tree attr_name;
-  tree attr_arg_name;
-  tree attr_args;
-  tree attr;
-
-  attr_name = get_identifier (name);
-  attr_arg_name = build_string (strlen (arg_name), arg_name);
-  attr_args = tree_cons (NULL_TREE, attr_arg_name, NULL_TREE);
-  attr = tree_cons (attr_name, attr_args, chain);
-  return attr;
+  attribute_list a;
+  a.quick_push ({attr, NULL_TREE});
+  decl_attributes (&TREE_TYPE (fndecl), &a, 0);
 }
 
 
@@ -788,7 +780,7 @@ sorted_attr_string (tree arglist)
 bool
 common_function_versions (tree fn1, tree fn2)
 {
-  tree attr1, attr2;
+  tree_key_value *attr1, *attr2;
   char *target1, *target2;
   bool result;
 
@@ -800,16 +792,16 @@ common_function_versions (tree fn1, tree fn2)
   attr2 = lookup_attribute ("target", DECL_ATTRIBUTES (fn2));
 
   /* At least one function decl should have the target attribute specified.  */
-  if (attr1 == NULL_TREE && attr2 == NULL_TREE)
+  if (attr1 == NULL && attr2 == NULL)
     return false;
 
   /* Diagnose missing target attribute if one of the decls is already
      multi-versioned.  */
-  if (attr1 == NULL_TREE || attr2 == NULL_TREE)
+  if (attr1 == NULL || attr2 == NULL)
     {
       if (DECL_FUNCTION_VERSIONED (fn1) || DECL_FUNCTION_VERSIONED (fn2))
 	{
-	  if (attr2 != NULL_TREE)
+	  if (attr2 != NULL)
 	    {
 	      std::swap (fn1, fn2);
 	      attr1 = attr2;
@@ -820,16 +812,13 @@ common_function_versions (tree fn1, tree fn2)
 	  inform (DECL_SOURCE_LOCATION (fn1),
 		  "previous declaration of %qD", fn1);
 	  /* Prevent diagnosing of the same error multiple times.  */
-	  DECL_ATTRIBUTES (fn2)
-	    = tree_cons (get_identifier ("target"),
-			 copy_node (TREE_VALUE (attr1)),
-			 DECL_ATTRIBUTES (fn2));
+	  add_decl_attribute (fn2, "target", copy_node (attr1->value));
 	}
       return false;
     }
 
-  target1 = sorted_attr_string (TREE_VALUE (attr1));
-  target2 = sorted_attr_string (TREE_VALUE (attr2));
+  target1 = sorted_attr_string (attr1->value);
+  target2 = sorted_attr_string (attr2->value);
 
   /* The sorted target strings must be different for fn1 and fn2
      to be versions.  */
@@ -923,9 +912,9 @@ is_function_default_version (const tree decl)
   if (TREE_CODE (decl) != FUNCTION_DECL
       || !DECL_FUNCTION_VERSIONED (decl))
     return false;
-  tree attr = lookup_attribute ("target", DECL_ATTRIBUTES (decl));
-  gcc_assert (attr);
-  attr = TREE_VALUE (TREE_VALUE (attr));
+  tree_key_value *a = lookup_attribute ("target", DECL_ATTRIBUTES (decl));  
+  gcc_assert (a);
+  tree attr = TREE_VALUE (a->value);
   return (TREE_CODE (attr) == STRING_CST
 	  && strcmp (TREE_STRING_POINTER (attr), "default") == 0);
 }

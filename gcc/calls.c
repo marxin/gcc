@@ -626,16 +626,15 @@ special_function_p (const_tree fndecl, int flags)
 static int
 decl_return_flags (tree fndecl)
 {
-  tree attr;
   tree type = TREE_TYPE (fndecl);
   if (!type)
     return 0;
 
-  attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
-  if (!attr)
+  tree_key_value *a = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
+  if (!a)
     return 0;
 
-  attr = TREE_VALUE (TREE_VALUE (attr));
+  tree attr = TREE_VALUE (a->value);
   if (!attr || TREE_STRING_LENGTH (attr) < 1)
     return 0;
 
@@ -1677,12 +1676,12 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
      the corresponding arguments in ALLOC_IDX, and then the actual
      argument(s) at those indices in ALLOC_ARGS.  */
   int alloc_idx[2] = { -1, -1 };
-  if (tree alloc_size
+  if (tree_key_value *alloc_size
       = (fndecl ? lookup_attribute ("alloc_size",
 				    TYPE_ATTRIBUTES (TREE_TYPE (fndecl)))
-	 : NULL_TREE))
+	 : NULL))
     {
-      tree args = TREE_VALUE (alloc_size);
+      tree args = alloc_size->value;
       alloc_idx[0] = TREE_INT_CST_LOW (TREE_VALUE (args)) - 1;
       if (TREE_CHAIN (args))
 	alloc_idx[1] = TREE_INT_CST_LOW (TREE_VALUE (TREE_CHAIN (args))) - 1;

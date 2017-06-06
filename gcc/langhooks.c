@@ -609,7 +609,7 @@ add_builtin_function_common (const char *name,
 			     int function_code,
 			     enum built_in_class cl,
 			     const char *library_name,
-			     tree attrs,
+			     attribute_list *attrs,
 			     tree (*hook) (tree))
 {
   tree   id = get_identifier (name);
@@ -636,7 +636,7 @@ add_builtin_function_common (const char *name,
   if (attrs)
     decl_attributes (&decl, attrs, ATTR_FLAG_BUILT_IN);
   else
-    decl_attributes (&decl, NULL_TREE, 0);
+    decl_attributes (&decl, NULL, 0);
 
   return hook (decl);
 
@@ -650,7 +650,7 @@ add_builtin_function (const char *name,
 		      int function_code,
 		      enum built_in_class cl,
 		      const char *library_name,
-		      tree attrs)
+		      attribute_list *attrs)
 {
   return add_builtin_function_common (name, type, function_code, cl,
 				      library_name, attrs,
@@ -670,7 +670,7 @@ add_builtin_function_ext_scope (const char *name,
 				int function_code,
 				enum built_in_class cl,
 				const char *library_name,
-				tree attrs)
+				attribute_list *attrs)
 {
   return add_builtin_function_common (name, type, function_code, cl,
 				      library_name, attrs,

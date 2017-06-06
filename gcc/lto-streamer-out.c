@@ -756,7 +756,12 @@ DFS::DFS_write_tree_body (struct output_block *ob,
       /* Note, DECL_INITIAL is not handled here.  Since DECL_INITIAL needs
 	 special handling in LTO, it must be handled by streamer hooks.  */
 
-      DFS_follow_tree_edge (DECL_ATTRIBUTES (expr));
+      attribute_list *attrs = DECL_ATTRIBUTES (expr);
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (attrs); i++)
+	{
+	  DFS_follow_tree_edge (ATTR_LIST_ELT (attrs, i)->index);
+	  DFS_follow_tree_edge (ATTR_LIST_ELT (attrs, i)->value);
+	}
 
       /* Do not follow DECL_ABSTRACT_ORIGIN.  We cannot handle debug information
 	 for early inlining so drop it on the floor instead of ICEing in
@@ -808,7 +813,12 @@ DFS::DFS_write_tree_body (struct output_block *ob,
     {
       DFS_follow_tree_edge (TYPE_SIZE (expr));
       DFS_follow_tree_edge (TYPE_SIZE_UNIT (expr));
-      DFS_follow_tree_edge (TYPE_ATTRIBUTES (expr));
+      attribute_list *attrs = TYPE_ATTRIBUTES (expr);
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (attrs); i++)
+	{
+	  DFS_follow_tree_edge (ATTR_LIST_ELT (attrs, i)->index);
+	  DFS_follow_tree_edge (ATTR_LIST_ELT (attrs, i)->value);
+	}
       DFS_follow_tree_edge (TYPE_NAME (expr));
       /* Do not follow TYPE_POINTER_TO or TYPE_REFERENCE_TO.  They will be
 	 reconstructed during fixup.  */
@@ -1203,7 +1213,12 @@ hash_tree (struct streamer_tree_cache_d *cache, hash_map<tree, hashval_t> *map, 
     {
       visit (DECL_SIZE (t));
       visit (DECL_SIZE_UNIT (t));
-      visit (DECL_ATTRIBUTES (t));
+      attribute_list *attrs = DECL_ATTRIBUTES (t);
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (attrs); i++)
+	{
+	  visit (ATTR_LIST_ELT (attrs, i)->index);
+	  visit (ATTR_LIST_ELT (attrs, i)->value);
+	}
       if ((code == VAR_DECL
 	   || code == PARM_DECL)
 	  && DECL_HAS_VALUE_EXPR_P (t))
@@ -1248,7 +1263,12 @@ hash_tree (struct streamer_tree_cache_d *cache, hash_map<tree, hashval_t> *map, 
     {
       visit (TYPE_SIZE (t));
       visit (TYPE_SIZE_UNIT (t));
-      visit (TYPE_ATTRIBUTES (t));
+      attribute_list *attrs = TYPE_ATTRIBUTES (t);
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (attrs); i++)
+	{
+	  visit (ATTR_LIST_ELT (attrs, i)->index);
+	  visit (ATTR_LIST_ELT (attrs, i)->value);
+	}
       visit (TYPE_NAME (t));
       visit (TYPE_MAIN_VARIANT (t));
       if (TYPE_FILE_SCOPE_P (t))

@@ -1564,9 +1564,11 @@ simd_clone_adjust (struct cgraph_node *node)
 static void
 expand_simd_clones (struct cgraph_node *node)
 {
-  tree attr = lookup_attribute ("omp declare simd",
-				DECL_ATTRIBUTES (node->decl));
-  if (attr == NULL_TREE
+  unsigned start = 0;
+  tree_key_value *attr = lookup_attribute ("omp declare simd",
+					   DECL_ATTRIBUTES (node->decl),
+					   &start, 0);
+  if (attr == NULL
       || node->global.inlined_to
       || lookup_attribute ("noclone", DECL_ATTRIBUTES (node->decl)))
     return;
@@ -1588,7 +1590,7 @@ expand_simd_clones (struct cgraph_node *node)
       /* Start with parsing the "omp declare simd" attribute(s).  */
       bool inbranch_clause_specified;
       struct cgraph_simd_clone *clone_info
-	= simd_clone_clauses_extract (node, TREE_VALUE (attr),
+	= simd_clone_clauses_extract (node, attr->value,
 				      &inbranch_clause_specified);
       if (clone_info == NULL)
 	continue;
@@ -1670,7 +1672,9 @@ expand_simd_clones (struct cgraph_node *node)
 	    }
 	}
     }
-  while ((attr = lookup_attribute ("omp declare simd", TREE_CHAIN (attr))));
+  while ((attr = lookup_attribute ("omp declare simd",
+				   DECL_ATTRIBUTES (node->decl),
+				   &start, start)));
 }
 
 /* Entry point for IPA simd clone creation pass.  */

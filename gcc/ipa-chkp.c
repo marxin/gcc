@@ -217,7 +217,7 @@ chkp_build_instrumented_fndecl (tree fndecl)
 
   /* We are going to modify attributes list and therefore should
      make own copy.  */
-  DECL_ATTRIBUTES (new_decl) = copy_list (DECL_ATTRIBUTES (fndecl));
+  DECL_ATTRIBUTES (new_decl) = DECL_ATTRIBUTES (fndecl)->copy ();
 
   /* Change builtin function code.  */
   if (DECL_BUILT_IN (new_decl))
@@ -239,17 +239,17 @@ chkp_build_instrumented_fndecl (tree fndecl)
    we just add DELTA.  */
 
 static void
-chkp_map_attr_arg_indexes (tree attrs, const char *attr_name,
+chkp_map_attr_arg_indexes (attribute_list *attrs, const char *attr_name,
 			   unsigned *indexes, int len, int delta)
 {
-  tree attr = lookup_attribute (attr_name, attrs);
+  tree_key_value *attr = lookup_attribute (attr_name, attrs);
   tree op;
 
   if (!attr)
     return;
 
-  TREE_VALUE (attr) = copy_list (TREE_VALUE (attr));
-  for (op = TREE_VALUE (attr); op; op = TREE_CHAIN (op))
+  attr->value = copy_list (attr->value);
+  for (op = attr->value; op; op = TREE_CHAIN (op))
     {
       int idx;
 
@@ -276,7 +276,7 @@ tree
 chkp_copy_function_type_adding_bounds (tree orig_type)
 {
   tree type;
-  tree arg_type, attrs;
+  tree arg_type;
   unsigned len = list_length (TYPE_ARG_TYPES (orig_type));
   unsigned *indexes = XALLOCAVEC (unsigned, len);
   unsigned idx = 0, new_idx = 0;
@@ -346,13 +346,13 @@ chkp_copy_function_type_adding_bounds (tree orig_type)
   /* If function type has attribute with arg indexes then
      we have to copy it fixing attribute ops.  Map for
      fixing is in indexes array.  */
-  attrs = TYPE_ATTRIBUTES (type);
+  attribute_list *attrs = TYPE_ATTRIBUTES (type);
   if (lookup_attribute ("nonnull", attrs)
       || lookup_attribute ("format", attrs)
       || lookup_attribute ("format_arg", attrs))
     {
       int delta = new_idx - len;
-      attrs = copy_list (TYPE_ATTRIBUTES (type));
+      attrs = TYPE_ATTRIBUTES (type)->copy ();
       chkp_map_attr_arg_indexes (attrs, "nonnull", indexes, len, delta);
       chkp_map_attr_arg_indexes (attrs, "format", indexes, len, delta);
       chkp_map_attr_arg_indexes (attrs, "format_arg", indexes, len, delta);
@@ -678,9 +678,7 @@ chkp_versioning (void)
 	  && !node->instrumented_version
 	  && (node->alias || node->thunk.thunk_p)
 	  && !lookup_attribute ("bnd_legacy", DECL_ATTRIBUTES (node->decl)))
-	DECL_ATTRIBUTES (node->decl)
-	  = tree_cons (get_identifier ("bnd_legacy"), NULL,
-		       DECL_ATTRIBUTES (node->decl));
+	add_decl_attribute (node->decl, "bnd_legacy");
     }
 
   bitmap_obstack_release (NULL);

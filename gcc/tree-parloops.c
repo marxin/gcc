@@ -2046,9 +2046,7 @@ create_parallel_loop (struct loop *loop, tree loop_fn, tree data,
 					     DECL_ATTRIBUTES (cfun->decl)));
       /* Indicate to later processing that this is a parallelized OpenACC
 	 kernels construct.  */
-      DECL_ATTRIBUTES (cfun->decl)
-	= tree_cons (get_identifier ("oacc kernels parallelized"),
-		     NULL_TREE, DECL_ATTRIBUTES (cfun->decl));
+      add_decl_attribute (cfun->decl, "oacc kernels parallelized");
     }
   else
     {

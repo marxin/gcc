@@ -1098,16 +1098,19 @@ check_function_format (tree attrs, int nargs, tree *argarray)
 		 for a literal or constant array.  */
 	      && !c_strlen (argarray[info.format_num - 1], 1))
 	    {
-	      tree c;
-	      for (c = TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl));
-		   c;
-		   c = TREE_CHAIN (c))
-		if (is_attribute_p ("format", TREE_PURPOSE (c))
-		    && (decode_format_type (IDENTIFIER_POINTER
-					    (TREE_VALUE (TREE_VALUE (c))))
+	      attribute_list *attrs
+		= TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl));
+	      tree_key_value *attr = NULL;
+	      for (unsigned i = 0; i < ATTR_LIST_NELTS (attrs); i++)
+		{
+		  attr = ATTR_LIST_ELT (attrs, i);
+		  if (is_attribute_p ("format", attr->index)
+		      && (decode_format_type (IDENTIFIER_POINTER
+					      (TREE_VALUE (attr->value)))
 			== info.format_type))
 		  break;
-	      if (c == NULL_TREE)
+		}
+	      if (attr == NULL)
 		{
 		  /* Check if the current function has a parameter to which
 		     the format attribute could be attached; if not, it

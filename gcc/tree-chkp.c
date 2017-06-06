@@ -420,9 +420,7 @@ chkp_function_mark_instrumented (tree fndecl)
   if (chkp_function_instrumented_p (fndecl))
     return;
 
-  DECL_ATTRIBUTES (fndecl)
-    = tree_cons (get_identifier ("chkp instrumented"), NULL,
-		 DECL_ATTRIBUTES (fndecl));
+  add_decl_attribute (fndecl, "chkp instrumented");
 }
 
 /* Return true when STMT is builtin call to instrumentation function

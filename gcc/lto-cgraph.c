@@ -1212,9 +1212,9 @@ input_overwrite_node (struct lto_file_decl_data *file_data,
 static tree
 get_alias_symbol (tree decl)
 {
-  tree alias = lookup_attribute ("alias", DECL_ATTRIBUTES (decl));
+  tree_key_value *alias = lookup_attribute ("alias", DECL_ATTRIBUTES (decl));
   return get_identifier (TREE_STRING_POINTER
-			  (TREE_VALUE (TREE_VALUE (alias))));
+			  (TREE_VALUE (alias->value)));
 }
 
 /* Read a node from input_block IB.  TAG is the node's tag just read.

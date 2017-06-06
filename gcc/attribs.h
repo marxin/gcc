@@ -31,12 +31,11 @@ extern void init_attributes (void);
    from tree.h.  Depending on these flags, some attributes may be
    returned to be applied at a later stage (for example, to apply
    a decl attribute to the declaration rather than to its type).  */
-extern tree decl_attributes (tree *, tree, int);
+extern attribute_list *decl_attributes (tree *, attribute_list *, int);
 
 extern bool cxx11_attribute_p (const_tree);
-extern tree get_attribute_name (const_tree);
+extern tree get_attribute_name (const tree_key_value *);
 extern void apply_tm_attr (tree, tree);
-extern tree make_attribute (const char *, const char *, tree);
 
 extern struct scoped_attributes* register_scoped_attributes (const struct attribute_spec *,
 							     const char *);

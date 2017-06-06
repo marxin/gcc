@@ -569,6 +569,19 @@ write_ts_decl_minimal_tree_pointers (struct output_block *ob, tree expr,
   stream_write_tree (ob, DECL_CONTEXT (expr), ref_p);
 }
 
+static void
+stream_write_attribute_list (struct output_block *ob, attribute_list *list,
+			     bool ref_p)
+{
+  streamer_write_hwi (ob, list == NULL ? 0 : ATTR_LIST_NELTS (list));
+
+  if (list)
+    for (unsigned i = 0; i < ATTR_LIST_NELTS (list); i++)
+      {	
+	stream_write_tree (ob, ATTR_LIST_ELT (list, i)->index, ref_p);
+	stream_write_tree (ob, ATTR_LIST_ELT (list, i)->value, ref_p);
+      }
+}
 
 /* Write all pointer fields in the TS_DECL_COMMON structure of EXPR to
    output block OB.  If REF_P is true, write a reference to EXPR's
@@ -584,7 +597,7 @@ write_ts_decl_common_tree_pointers (struct output_block *ob, tree expr,
   /* Note, DECL_INITIAL is not handled here.  Since DECL_INITIAL needs
      special handling in LTO, it must be handled by streamer hooks.  */
 
-  stream_write_tree (ob, DECL_ATTRIBUTES (expr), ref_p);
+  stream_write_attribute_list (ob, DECL_ATTRIBUTES (expr), ref_p);
 
   /* Do not stream DECL_ABSTRACT_ORIGIN.  We cannot handle debug information
      for early inlining so drop it on the floor instead of ICEing in
@@ -672,7 +685,7 @@ write_ts_type_common_tree_pointers (struct output_block *ob, tree expr,
 {
   stream_write_tree (ob, TYPE_SIZE (expr), ref_p);
   stream_write_tree (ob, TYPE_SIZE_UNIT (expr), ref_p);
-  stream_write_tree (ob, TYPE_ATTRIBUTES (expr), ref_p);
+  stream_write_attribute_list (ob, TYPE_ATTRIBUTES (expr), ref_p);
   stream_write_tree (ob, TYPE_NAME (expr), ref_p);
   /* Do not stream TYPE_POINTER_TO or TYPE_REFERENCE_TO.  They will be
      reconstructed during fixup.  */
@@ -839,7 +852,6 @@ write_ts_constructor_tree_pointers (struct output_block *ob, tree expr,
       stream_write_tree (ob, value, ref_p);
     }
 }
-
 
 /* Write all pointer fields in the TS_OMP_CLAUSE structure of EXPR
    to output block OB.  If REF_P is true, write a reference to EXPR's

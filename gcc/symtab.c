@@ -1263,8 +1263,7 @@ symtab_node::make_decl_local (void)
       TREE_CHAIN (DECL_ASSEMBLER_NAME (decl)) = NULL_TREE;
       symtab->change_decl_assembler_name
 	 (decl, DECL_ASSEMBLER_NAME (get_alias_target ()->decl));
-      DECL_ATTRIBUTES (decl) = remove_attribute ("weakref",
-						 DECL_ATTRIBUTES (decl));
+      remove_decl_attr ("weakref", decl);
     }
   /* Avoid clearing comdat_groups on comdat-local decls.  */
   else if (TREE_PUBLIC (decl) == 0)

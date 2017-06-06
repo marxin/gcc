@@ -3481,7 +3481,7 @@ static void def_builtin_1  (enum built_in_function fncode,
 			    enum built_in_class fnclass,
 			    tree fntype, tree libtype,
 			    bool both_p, bool fallback_p, bool nonansi_p,
-			    tree fnattrs, bool implicit_p);
+			    attribute_list *fnattrs, bool implicit_p);
 
 
 /* Apply the TYPE_QUALS to the new DECL.  */
@@ -4607,7 +4607,7 @@ def_builtin_1 (enum built_in_function fncode,
 	       enum built_in_class fnclass,
 	       tree fntype, tree libtype,
 	       bool both_p, bool fallback_p, bool nonansi_p,
-	       tree fnattrs, bool implicit_p)
+	       attribute_list *fnattrs, bool implicit_p)
 {
   tree decl;
   const char *libname;
@@ -5151,26 +5151,28 @@ struct nonnull_arg_ctx
    warned.  */
 
 static bool
-check_function_nonnull (location_t loc, tree attrs, int nargs, tree *argarray)
+check_function_nonnull (location_t loc, attribute_list *attrs,
+			int nargs, tree *argarray)
 {
-  tree a;
+  tree_key_value *a;
   int i;
+  unsigned start;
 
-  attrs = lookup_attribute ("nonnull", attrs);
-  if (attrs == NULL_TREE)
+  tree_key_value *attr = lookup_attribute ("nonnull", attrs, &start);
+  if (attr == NULL)
     return false;
 
-  a = attrs;
+  a = attr;
   /* See if any of the nonnull attributes has no arguments.  If so,
      then every pointer argument is checked (in which case the check
      for pointer type is done in check_nonnull_arg).  */
-  if (TREE_VALUE (a) != NULL_TREE)
+  if (a->value != NULL_TREE)
     do
-      a = lookup_attribute ("nonnull", TREE_CHAIN (a));
-    while (a != NULL_TREE && TREE_VALUE (a) != NULL_TREE);
+      a = lookup_attribute ("nonnull", attrs, &start, start);
+    while (a != NULL && a->value != NULL_TREE);
 
   struct nonnull_arg_ctx ctx = { loc, false };
-  if (a != NULL_TREE)
+  if (a != NULL)
     for (i = 0; i < nargs; i++)
       check_function_arguments_recurse (check_nonnull_arg, &ctx, argarray[i],
 					i + 1);
@@ -5180,14 +5182,14 @@ check_function_nonnull (location_t loc, tree attrs, int nargs, tree *argarray)
 	 should check for non-null, do it.  */
       for (i = 0; i < nargs; i++)
 	{
-	  for (a = attrs; ; a = TREE_CHAIN (a))
+	  start = 0;
+	  for (a = lookup_attribute ("nonnull", attrs, &start, start); a;)
 	    {
-	      a = lookup_attribute ("nonnull", a);
-	      if (a == NULL_TREE || nonnull_check_p (TREE_VALUE (a), i + 1))
+	      if (a == NULL || nonnull_check_p (a->value, i + 1))
 		break;
 	    }
 
-	  if (a != NULL_TREE)
+	  if (a != NULL)
 	    check_function_arguments_recurse (check_nonnull_arg, &ctx,
 					      argarray[i], i + 1);
 	}
@@ -5202,7 +5204,7 @@ check_function_nonnull (location_t loc, tree attrs, int nargs, tree *argarray)
 static void
 check_function_sentinel (const_tree fntype, int nargs, tree *argarray)
 {
-  tree attr = lookup_attribute ("sentinel", TYPE_ATTRIBUTES (fntype));
+  tree_key_value *attr = lookup_attribute ("sentinel", TYPE_ATTRIBUTES (fntype));
 
   if (attr)
     {
@@ -5220,9 +5222,9 @@ check_function_sentinel (const_tree fntype, int nargs, tree *argarray)
 	  len++;
 	}
 
-      if (TREE_VALUE (attr))
+      if (attr->value)
 	{
-	  tree p = TREE_VALUE (TREE_VALUE (attr));
+	  tree p = TREE_VALUE (attr->value);
 	  pos = TREE_INT_CST_LOW (p);
 	}
 
@@ -5503,27 +5505,31 @@ parse_optimize_options (tree args, bool attr_p)
 /* Check whether ATTR is a valid attribute fallthrough.  */
 
 bool
-attribute_fallthrough_p (tree attr)
+attribute_fallthrough_p (attribute_list *attr)
 {
-  if (attr == error_mark_node)
+  if (attr == NULL)
    return false;
-  tree t = lookup_attribute ("fallthrough", attr);
-  if (t == NULL_TREE)
+
+  unsigned start = 0;
+  tree_key_value *t = lookup_attribute ("fallthrough", attr, &start);
+  if (t == NULL)
     return false;
+
   /* This attribute shall appear at most once in each attribute-list.  */
-  if (lookup_attribute ("fallthrough", TREE_CHAIN (t)))
+  if (lookup_attribute ("fallthrough", attr, &start, start))
     warning (OPT_Wattributes, "%<fallthrough%> attribute specified multiple "
 	     "times");
   /* No attribute-argument-clause shall be present.  */
-  else if (TREE_VALUE (t) != NULL_TREE)
+  else if (t->value)
     warning (OPT_Wattributes, "%<fallthrough%> attribute specified with "
 	     "a parameter");
   /* Warn if other attributes are found.  */
-  for (t = attr; t != NULL_TREE; t = TREE_CHAIN (t))
+  while (t)
     {
+      t = lookup_attribute ("fallthrough", attr, &start, start);
       tree name = get_attribute_name (t);
       if (!is_attribute_p ("fallthrough", name))
-	warning (OPT_Wattributes, "%qE attribute ignored", name);
+	warning (OPT_Wattributes, "%qE attribute ignored", t->index);
     }
   return true;
 }
@@ -5580,41 +5586,41 @@ check_function_arguments_recurse (void (*callback)
   if (TREE_CODE (param) == CALL_EXPR)
     {
       tree type = TREE_TYPE (TREE_TYPE (CALL_EXPR_FN (param)));
-      tree attrs;
       bool found_format_arg = false;
 
       /* See if this is a call to a known internationalization function
 	 that modifies a format arg.  Such a function may have multiple
 	 format_arg attributes (for example, ngettext).  */
 
-      for (attrs = TYPE_ATTRIBUTES (type);
-	   attrs;
-	   attrs = TREE_CHAIN (attrs))
-	if (is_attribute_p ("format_arg", TREE_PURPOSE (attrs)))
-	  {
-	    tree inner_arg;
-	    tree format_num_expr;
-	    int format_num;
-	    int i;
-	    call_expr_arg_iterator iter;
+      for (unsigned i = 0; i < TYPE_ATTRIBUTES (type)->length (); i++)
+	{
+	  tree_key_value &attr = (*TYPE_ATTRIBUTES (type))[i];
+	  if (is_attribute_p ("format_arg", attr.index))
+	    {
+	      tree inner_arg;
+	      tree format_num_expr;
+	      int format_num;
+	      int i;
+	      call_expr_arg_iterator iter;
 
-	    /* Extract the argument number, which was previously checked
-	       to be valid.  */
-	    format_num_expr = TREE_VALUE (TREE_VALUE (attrs));
+	      /* Extract the argument number, which was previously checked
+		 to be valid.  */
+	      format_num_expr = TREE_VALUE (attr.value);
 
-	    format_num = tree_to_uhwi (format_num_expr);
+	      format_num = tree_to_uhwi (format_num_expr);
 
-	    for (inner_arg = first_call_expr_arg (param, &iter), i = 1;
-		 inner_arg != NULL_TREE;
-		 inner_arg = next_call_expr_arg (&iter), i++)
-	      if (i == format_num)
-		{
-		  check_function_arguments_recurse (callback, ctx,
-						    inner_arg, param_num);
-		  found_format_arg = true;
-		  break;
-		}
-	  }
+	      for (inner_arg = first_call_expr_arg (param, &iter), i = 1;
+		   inner_arg != NULL_TREE;
+		   inner_arg = next_call_expr_arg (&iter), i++)
+		if (i == format_num)
+		  {
+		    check_function_arguments_recurse (callback, ctx,
+						      inner_arg, param_num);
+		    found_format_arg = true;
+		    break;
+		  }
+	    }
+	}
 
       /* If we found a format_arg attribute and did a recursive check,
 	 we are done with checking this argument.  Otherwise, we continue
@@ -7286,21 +7292,10 @@ bool
 check_missing_format_attribute (tree ltype, tree rtype)
 {
   tree const ttr = TREE_TYPE (rtype), ttl = TREE_TYPE (ltype);
-  tree ra;
+  tree_key_value *ra = lookup_attribute ("format", TYPE_ATTRIBUTES (ttr));
+  tree_key_value *la = lookup_attribute ("format", TYPE_ATTRIBUTES (ttl));
 
-  for (ra = TYPE_ATTRIBUTES (ttr); ra; ra = TREE_CHAIN (ra))
-    if (is_attribute_p ("format", TREE_PURPOSE (ra)))
-      break;
-  if (ra)
-    {
-      tree la;
-      for (la = TYPE_ATTRIBUTES (ttl); la; la = TREE_CHAIN (la))
-	if (is_attribute_p ("format", TREE_PURPOSE (la)))
-	  break;
-      return !la;
-    }
-  else
-    return false;
+  return ra && !la;
 }
 
 /* Setup a TYPE_DECL node as a typedef representation.

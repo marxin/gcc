@@ -7551,23 +7551,21 @@ dump_function_to_file (tree fndecl, FILE *file, dump_flags_t flags)
 		  && decl_is_tm_clone (fndecl));
   struct function *fun = DECL_STRUCT_FUNCTION (fndecl);
 
-  if (DECL_ATTRIBUTES (fndecl) != NULL_TREE)
+  if (DECL_ATTRIBUTES (fndecl) != NULL)
     {
       fprintf (file, "__attribute__((");
 
-      bool first = true;
-      tree chain;
-      for (chain = DECL_ATTRIBUTES (fndecl); chain;
-	   first = false, chain = TREE_CHAIN (chain))
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (DECL_ATTRIBUTES (fndecl)); i++)
 	{
-	  if (!first)
+	  tree_key_value *attr = ATTR_LIST_ELT (DECL_ATTRIBUTES (fndecl), i);
+	  if (i > 0)
 	    fprintf (file, ", ");
 
-	  print_generic_expr (file, get_attribute_name (chain), dump_flags);
-	  if (TREE_VALUE (chain) != NULL_TREE)
+	  print_generic_expr (file, get_attribute_name (attr), dump_flags);
+	  if (attr->value != NULL_TREE)
 	    {
 	      fprintf (file, " (");
-	      print_generic_expr (file, TREE_VALUE (chain), dump_flags);
+	      print_generic_expr (file, attr->value, dump_flags);
 	      fprintf (file, ")");
 	    }
 	}

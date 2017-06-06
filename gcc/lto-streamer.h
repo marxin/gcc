@@ -850,6 +850,7 @@ extern struct data_in *lto_data_in_create (struct lto_file_decl_data *,
 extern void lto_data_in_delete (struct data_in *);
 extern void lto_input_data_block (struct lto_input_block *, void *, size_t);
 void lto_input_location (location_t *, struct bitpack_d *, struct data_in *);
+attribute_list *lto_read_attribute_list (struct bitpack_d *, struct data_in *);
 location_t stream_input_location_now (struct bitpack_d *bp,
 				      struct data_in *data);
 tree lto_input_tree_ref (struct lto_input_block *, struct data_in *,
@@ -878,6 +879,8 @@ void lto_output_decl_state_refs (struct output_block *,
 			         struct lto_output_stream *,
 			         struct lto_out_decl_state *);
 void lto_output_location (struct output_block *, struct bitpack_d *, location_t);
+void lto_write_attribute_list (struct output_block *, struct bitpack_d *,
+			       attribute_list *);
 void lto_output_init_mode_table (void);
 
 

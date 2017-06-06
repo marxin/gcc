@@ -3735,15 +3735,14 @@ function_attribute_inlinable_p (const_tree fndecl)
 {
   if (targetm.attribute_table)
     {
-      const_tree a;
-
-      for (a = DECL_ATTRIBUTES (fndecl); a; a = TREE_CHAIN (a))
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (DECL_ATTRIBUTES (fndecl)); i++)
 	{
-	  const_tree name = TREE_PURPOSE (a);
-	  int i;
+	  tree_key_value *attr = ATTR_LIST_ELT (DECL_ATTRIBUTES (fndecl), i);
+	  const_tree name = attr->index;
+	  int j;
 
-	  for (i = 0; targetm.attribute_table[i].name != NULL; i++)
-	    if (is_attribute_p (targetm.attribute_table[i].name, name))
+	  for (j = 0; targetm.attribute_table[i].name != NULL; j++)
+	    if (is_attribute_p (targetm.attribute_table[j].name, name))
 	      return targetm.function_attribute_inlinable_p (fndecl);
 	}
     }
@@ -3759,7 +3758,7 @@ tree_inlinable_function_p (tree fn)
 {
   bool inlinable = true;
   bool do_warning;
-  tree always_inline;
+  tree_key_value *always_inline;
 
   /* If we've already decided this function shouldn't be inlined,
      there's no need to check again.  */
@@ -5494,9 +5493,7 @@ copy_decl_for_dup_finish (copy_body_data *id, tree decl, tree copy)
       if (VAR_P (copy) && id->dst_simt_vars && !is_gimple_reg (copy))
 	{
 	  if (!lookup_attribute ("omp simt private", DECL_ATTRIBUTES (copy)))
-	    DECL_ATTRIBUTES (copy)
-	      = tree_cons (get_identifier ("omp simt private"), NULL,
-			   DECL_ATTRIBUTES (copy));
+	    add_decl_attribute (copy, "omp simt private");
 	  id->dst_simt_vars->safe_push (copy);
 	}
     }

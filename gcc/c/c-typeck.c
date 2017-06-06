@@ -361,7 +361,7 @@ composite_type (tree t1, tree t2)
 {
   enum tree_code code1;
   enum tree_code code2;
-  tree attributes;
+  attribute_list *attributes;
 
   /* Save time if the two types are the same.  */
 
@@ -377,7 +377,8 @@ composite_type (tree t1, tree t2)
   code2 = TREE_CODE (t2);
 
   /* Merge the attributes.  */
-  attributes = targetm.merge_type_attributes (t1, t2);
+  // TODO
+  //attributes = targetm.merge_type_attributes (t1, t2);
 
   /* If one is an enumerated type and the other is the compatible
      integer type, the composite type might be either of the two
@@ -624,7 +625,7 @@ composite_type (tree t1, tree t2)
 static tree
 common_pointer_type (tree t1, tree t2)
 {
-  tree attributes;
+  attribute_list *attributes;
   tree pointed_to_1, mv1;
   tree pointed_to_2, mv2;
   tree target;
@@ -646,7 +647,8 @@ common_pointer_type (tree t1, tree t2)
 	      && TREE_CODE (t2) == POINTER_TYPE);
 
   /* Merge the attributes.  */
-  attributes = targetm.merge_type_attributes (t1, t2);
+  // TODO
+  //attributes = targetm.merge_type_attributes (t1, t2);
 
   /* Find the composite type of the target types, and combine the
      qualifiers of the two types' targets.  Do not lose qualifiers on
@@ -711,11 +713,11 @@ c_common_type (tree t1, tree t2)
   if (TYPE_QUALS (t2) != TYPE_UNQUALIFIED)
     t2 = TYPE_MAIN_VARIANT (t2);
 
-  if (TYPE_ATTRIBUTES (t1) != NULL_TREE)
-    t1 = build_type_attribute_variant (t1, NULL_TREE);
+  if (TYPE_ATTRIBUTES (t1) != NULL)
+    t1 = build_type_attribute_variant (t1, NULL);
 
-  if (TYPE_ATTRIBUTES (t2) != NULL_TREE)
-    t2 = build_type_attribute_variant (t2, NULL_TREE);
+  if (TYPE_ATTRIBUTES (t2) != NULL)
+    t2 = build_type_attribute_variant (t2, NULL);
 
   /* Save time if the two types are the same.  */
 
@@ -1216,8 +1218,8 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
     case UNION_TYPE:
       if (val != 1 && !same_translation_unit_p (t1, t2))
 	{
-	  tree a1 = TYPE_ATTRIBUTES (t1);
-	  tree a2 = TYPE_ATTRIBUTES (t2);
+	  attribute_list *a1 = TYPE_ATTRIBUTES (t1);
+	  attribute_list *a2 = TYPE_ATTRIBUTES (t2);
 
 	  if (! attribute_list_contained (a1, a2)
 	      && ! attribute_list_contained (a2, a1))
@@ -2460,7 +2462,7 @@ build_component_ref (location_t loc, tree datum, tree component,
 	    TREE_THIS_VOLATILE (ref) = 1;
 
 	  if (TREE_DEPRECATED (subdatum))
-	    warn_deprecated_use (subdatum, NULL_TREE);
+	    warn_deprecated_use (subdatum, NULL);
 
 	  datum = ref;
 
@@ -2766,7 +2768,7 @@ build_external_ref (location_t loc, tree id, int fun, tree *type)
     return error_mark_node;
 
   if (TREE_DEPRECATED (ref))
-    warn_deprecated_use (ref, NULL_TREE);
+    warn_deprecated_use (ref, NULL);
 
   /* Recursive call does not count as usage.  */
   if (ref != current_function_decl)

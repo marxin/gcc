@@ -7089,9 +7089,7 @@ expand_omp_target (struct omp_region *region)
       /* Further down, both OpenACC kernels and OpenACC parallel constructs
 	 will be mappted to BUILT_IN_GOACC_PARALLEL, and to distinguish the
 	 two, there is an "oacc kernels" attribute set for OpenACC kernels.  */
-      DECL_ATTRIBUTES (child_fn)
-	= tree_cons (get_identifier ("oacc kernels"),
-		     NULL_TREE, DECL_ATTRIBUTES (child_fn));
+      add_decl_attribute (child_fn, "oacc kernels");
     }
 
   if (offloaded)

@@ -1221,10 +1221,7 @@ asan_poison_variables (hash_set<tree> *variables, bool poison, gimple_seq *seq_p
 	 to prevent re-written into SSA.  */
       if (!lookup_attribute (ASAN_USE_AFTER_SCOPE_ATTRIBUTE,
 			     DECL_ATTRIBUTES (var)))
-	DECL_ATTRIBUTES (var)
-	  = tree_cons (get_identifier (ASAN_USE_AFTER_SCOPE_ATTRIBUTE),
-		       integer_one_node,
-		       DECL_ATTRIBUTES (var));
+	add_decl_attribute (var, ASAN_USE_AFTER_SCOPE_ATTRIBUTE, integer_one_node);
     }
 }
 
@@ -6815,12 +6812,13 @@ omp_notice_threadprivate_variable (struct gimplify_omp_ctx *ctx, tree decl,
 static bool
 device_resident_p (tree decl)
 {
-  tree attr = lookup_attribute ("oacc declare target", DECL_ATTRIBUTES (decl));
+  tree_key_value *attr = lookup_attribute ("oacc declare target",
+					   DECL_ATTRIBUTES (decl));
 
   if (!attr)
     return false;
 
-  for (tree t = TREE_VALUE (attr); t; t = TREE_PURPOSE (t))
+  for (tree t = attr->value; t; t = TREE_PURPOSE (t))
     {
       tree c = TREE_VALUE (t);
       if (OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_DEVICE_RESIDENT)
@@ -6836,8 +6834,9 @@ static bool
 is_oacc_declared (tree decl)
 {
   tree t = TREE_CODE (decl) == MEM_REF ? TREE_OPERAND (decl, 0) : decl;
-  tree declared = lookup_attribute ("oacc declare target", DECL_ATTRIBUTES (t));
-  return declared != NULL_TREE;
+  tree_key_value *declared = lookup_attribute ("oacc declare target",
+					       DECL_ATTRIBUTES (t));
+  return declared != NULL;
 }
 
 /* Determine outer default flags for DECL mentioned in an OMP region
@@ -9336,11 +9335,7 @@ gimplify_oacc_declare (tree *expr_p, gimple_seq *pre_p)
 	decl = TREE_OPERAND (decl, 0);
 
       if (VAR_P (decl) && !is_oacc_declared (decl))
-	{
-	  tree attr = get_identifier ("oacc declare target");
-	  DECL_ATTRIBUTES (decl) = tree_cons (attr, NULL_TREE,
-					      DECL_ATTRIBUTES (decl));
-	}
+	add_decl_attribute (decl, "oacc declare target");
 
       if (VAR_P (decl)
 	  && !is_global_var (decl)

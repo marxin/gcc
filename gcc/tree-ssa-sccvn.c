@@ -4952,11 +4952,12 @@ run_scc_vn (vn_lookup_kind default_vn_walk_kind_)
 
   /* Collect pointers we know point to readonly memory.  */
   const_parms = BITMAP_ALLOC (NULL);
-  tree fnspec = lookup_attribute ("fn spec",
-				  TYPE_ATTRIBUTES (TREE_TYPE (cfun->decl)));
-  if (fnspec)
+  tree_key_value *attr
+    = lookup_attribute ("fn spec",
+			TYPE_ATTRIBUTES (TREE_TYPE (cfun->decl)));
+  if (attr)
     {
-      fnspec = TREE_VALUE (TREE_VALUE (fnspec));
+      tree fnspec = TREE_VALUE (attr->value);
       i = 1;
       for (tree arg = DECL_ARGUMENTS (cfun->decl);
 	   arg; arg = DECL_CHAIN (arg), ++i)

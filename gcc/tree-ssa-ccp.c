@@ -1609,7 +1609,8 @@ bit_value_binop (enum tree_code code, tree type, tree rhs1, tree rhs2)
    ALLOC_ALIGNED is true.  */
 
 static ccp_prop_value_t
-bit_value_assume_aligned (gimple *stmt, tree attr, ccp_prop_value_t ptrval,
+bit_value_assume_aligned (gimple *stmt, tree_key_value *attr,
+			  ccp_prop_value_t ptrval,
 			  bool alloc_aligned)
 {
   tree align, misalign = NULL_TREE, type;
@@ -1618,7 +1619,7 @@ bit_value_assume_aligned (gimple *stmt, tree attr, ccp_prop_value_t ptrval,
   widest_int value, mask;
   ccp_prop_value_t val;
 
-  if (attr == NULL_TREE)
+  if (attr == NULL)
     {
       tree ptr = gimple_call_arg (stmt, 0);
       type = TREE_TYPE (ptr);
@@ -1635,7 +1636,7 @@ bit_value_assume_aligned (gimple *stmt, tree attr, ccp_prop_value_t ptrval,
   gcc_assert ((ptrval.lattice_val == CONSTANT
 	       && TREE_CODE (ptrval.value) == INTEGER_CST)
 	      || wi::sext (ptrval.mask, TYPE_PRECISION (type)) == -1);
-  if (attr == NULL_TREE)
+  if (attr == NULL)
     {
       /* Get aligni and misaligni from __builtin_assume_aligned.  */
       align = gimple_call_arg (stmt, 1);
@@ -1654,10 +1655,10 @@ bit_value_assume_aligned (gimple *stmt, tree attr, ccp_prop_value_t ptrval,
     {
       /* Get aligni and misaligni from assume_aligned or
 	 alloc_align attributes.  */
-      if (TREE_VALUE (attr) == NULL_TREE)
+      if (attr->value == NULL_TREE)
 	return ptrval;
-      attr = TREE_VALUE (attr);
-      align = TREE_VALUE (attr);
+      tree a = attr->value;
+      align = TREE_VALUE (a);
       if (!tree_fits_uhwi_p (align))
 	return ptrval;
       aligni = tree_to_uhwi (align);
@@ -1670,9 +1671,9 @@ bit_value_assume_aligned (gimple *stmt, tree attr, ccp_prop_value_t ptrval,
 	    return ptrval;
 	  aligni = tree_to_uhwi (align);
 	}
-      else if (TREE_CHAIN (attr) && TREE_VALUE (TREE_CHAIN (attr)))
+      else if (TREE_CHAIN (a) && TREE_VALUE (TREE_CHAIN (a)))
 	{
-	  misalign = TREE_VALUE (TREE_CHAIN (attr));
+	  misalign = TREE_VALUE (TREE_CHAIN (a));
 	  if (!tree_fits_uhwi_p (misalign))
 	    return ptrval;
 	  misaligni = tree_to_uhwi (misalign);
@@ -1902,7 +1903,7 @@ evaluate_stmt (gimple *stmt)
 	      break;
 
 	    case BUILT_IN_ASSUME_ALIGNED:
-	      val = bit_value_assume_aligned (stmt, NULL_TREE, val, false);
+	      val = bit_value_assume_aligned (stmt, NULL, val, false);
 	      break;
 
 	    case BUILT_IN_ALIGNED_ALLOC:
@@ -1932,8 +1933,8 @@ evaluate_stmt (gimple *stmt)
 	  tree fntype = gimple_call_fntype (stmt);
 	  if (fntype)
 	    {
-	      tree attrs = lookup_attribute ("assume_aligned",
-					     TYPE_ATTRIBUTES (fntype));
+	      tree_key_value *attrs
+		= lookup_attribute ("assume_aligned", TYPE_ATTRIBUTES (fntype));
 	      if (attrs)
 		val = bit_value_assume_aligned (stmt, attrs, val, false);
 	      attrs = lookup_attribute ("alloc_align",

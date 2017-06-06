@@ -1273,11 +1273,10 @@ c_parser_gimple_declaration (c_parser *parser)
 				 version, ver_offset);
       else
 	{
-	  tree postfix_attrs = NULL_TREE;
-	  tree all_prefix_attrs = specs->attrs;
+	  attribute_list *all_prefix_attrs = specs->attrs;
 	  specs->attrs = NULL;
 	  tree decl = start_decl (declarator, specs, false,
-				  chainon (postfix_attrs, all_prefix_attrs));
+				  all_prefix_attrs->copy ());
 	  if (decl)
 	    finish_decl (decl, UNKNOWN_LOCATION, NULL_TREE, NULL_TREE,
 			 NULL_TREE);

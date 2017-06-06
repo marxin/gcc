@@ -835,6 +835,7 @@ enum tree_node_kind {
   binfo_kind,
   ssa_name_kind,
   constr_kind,
+  attribute_list_kind,
   x_kind,
   lang_decl,
   lang_type,
@@ -1338,18 +1339,22 @@ struct GTY(()) tree_vec {
   tree GTY ((length ("TREE_VEC_LENGTH ((tree)&%h)"))) a[1];
 };
 
-/* A single element of a CONSTRUCTOR. VALUE holds the actual value of the
-   element. INDEX can optionally design the position of VALUE: in arrays,
-   it is the index where VALUE has to be placed; in structures, it is the
-   FIELD_DECL of the member.  */
-struct GTY(()) constructor_elt {
+/* A key value pair contains information about INDEX and VALUE that
+   is provided on the INDEX.  It's used in CONSTRUCTORs and ATTRIBUTE_LIST
+   nodes.  */
+
+struct GTY(()) tree_key_value {
   tree index;
   tree value;
 };
 
+typedef vec<tree_key_value, va_gc> attribute_list;
+
+typedef tree_key_value constructor_elt;
+
 struct GTY(()) tree_constructor {
   struct tree_typed typed;
-  vec<constructor_elt, va_gc> *elts;
+  vec<tree_key_value, va_gc> *elts;
 };
 
 enum omp_clause_depend_kind
@@ -1488,7 +1493,7 @@ struct GTY(()) tree_type_common {
   struct tree_common common;
   tree size;
   tree size_unit;
-  tree attributes;
+  attribute_list *attributes;
   unsigned int uid;
 
   unsigned int precision : 10;
@@ -1631,7 +1636,7 @@ struct GTY(()) tree_decl_common {
 
   tree size_unit;
   tree initial;
-  tree attributes;
+  attribute_list *attributes;
   tree abstract_origin;
 
   /* Points to a structure whose details depend on the language in use.  */

@@ -4465,8 +4465,7 @@ handle_namespace_attrs (tree ns, tree attributes)
 	      args = build_tree_list (NULL_TREE, args);
 	    }
 	  if (check_abi_tag_args (args, name))
-	    DECL_ATTRIBUTES (ns) = tree_cons (name, args,
-					      DECL_ATTRIBUTES (ns));
+	    add_decl_attr (ns, IDENTIFIER_POINTER (name), args);
 	}
       else
 	{

@@ -290,11 +290,11 @@ struct c_declspecs {
      specifier.  */
   tree expr;
   /* The attributes from a typedef decl.  */
-  tree decl_attr;
+  attribute_list *decl_attr;
   /* When parsing, the attributes.  Outside the parser, this will be
      NULL; attributes (possibly from multiple lists) will be passed
      separately.  */
-  tree attrs;
+  attribute_list *attrs;
   /* The pass to start compiling a __GIMPLE or __RTL function with.  */
   char *gimple_or_rtl_pass;
   /* The base-2 log of the greatest alignment required by an _Alignas
@@ -440,7 +440,7 @@ struct c_declarator {
       /* The qualifiers inside [].  */
       int quals;
       /* The attributes (currently ignored) inside [].  */
-      tree attrs;
+      attribute_list *attrs;
       /* Whether [static] was used.  */
       BOOL_BITFIELD static_p : 1;
       /* Whether [*] was used.  */
@@ -449,7 +449,7 @@ struct c_declarator {
     /* For pointers, the qualifiers on the pointer type.  */
     int pointer_quals;
     /* For attributes.  */
-    tree attrs;
+    attribute_list *attrs;
   } u;
 };
 
@@ -466,7 +466,7 @@ struct c_parm {
   /* The declaration specifiers, minus any prefix attributes.  */
   struct c_declspecs *specs;
   /* The attributes.  */
-  tree attrs;
+  attribute_list *attrs;
   /* The declarator.  */
   struct c_declarator *declarator;
 };
@@ -538,14 +538,14 @@ extern void c_release_switch_bindings (struct c_spot_bindings *);
 extern bool c_check_switch_jump_warnings (struct c_spot_bindings *,
 					  location_t, location_t);
 extern void finish_decl (tree, location_t, tree, tree, tree);
-extern tree finish_enum (tree, tree, tree);
+extern tree finish_enum (tree, tree, attribute_list *);
 extern void finish_function (void);
-extern tree finish_struct (location_t, tree, tree, tree,
+extern tree finish_struct (location_t, tree, tree, attribute_list *,
 			   struct c_struct_parse_info *);
 extern struct c_arg_info *build_arg_info (void);
 extern struct c_arg_info *get_parm_info (bool, tree);
 extern tree grokfield (location_t, struct c_declarator *,
-		       struct c_declspecs *, tree, tree *);
+		       struct c_declspecs *, tree, attribute_list **);
 extern tree groktypename (struct c_type_name *, tree *, bool *);
 extern tree grokparm (const struct c_parm *, tree *);
 extern tree implicitly_declare (location_t, tree);
@@ -561,9 +561,10 @@ extern tree c_builtin_function_ext_scope (tree);
 extern void shadow_tag (const struct c_declspecs *);
 extern void shadow_tag_warned (const struct c_declspecs *, int);
 extern tree start_enum (location_t, struct c_enum_contents *, tree);
-extern bool start_function (struct c_declspecs *, struct c_declarator *, tree);
+extern bool start_function (struct c_declspecs *, struct c_declarator *,
+			    attribute_list *);
 extern tree start_decl (struct c_declarator *, struct c_declspecs *, bool,
-			tree);
+			attribute_list *);
 extern tree start_struct (location_t, enum tree_code, tree,
 			  struct c_struct_parse_info **);
 extern void store_parm_decls (void);
@@ -572,9 +573,9 @@ extern void temp_store_parm_decls (tree, tree);
 extern void temp_pop_parm_decls (void);
 extern tree xref_tag (enum tree_code, tree);
 extern struct c_typespec parser_xref_tag (location_t, enum tree_code, tree);
-extern struct c_parm *build_c_parm (struct c_declspecs *, tree,
+extern struct c_parm *build_c_parm (struct c_declspecs *, attribute_list *,
 				    struct c_declarator *);
-extern struct c_declarator *build_attrs_declarator (tree,
+extern struct c_declarator *build_attrs_declarator (attribute_list *,
 						    struct c_declarator *);
 extern struct c_declarator *build_function_declarator (struct c_arg_info *,
 						       struct c_declarator *);
@@ -590,7 +591,8 @@ extern struct c_declspecs *declspecs_add_type (location_t,
 extern struct c_declspecs *declspecs_add_scspec (source_location,
 						 struct c_declspecs *, tree);
 extern struct c_declspecs *declspecs_add_attrs (source_location,
-						struct c_declspecs *, tree);
+						struct c_declspecs *,
+						attribute_list *);
 extern struct c_declspecs *declspecs_add_addrspace (source_location,
 						    struct c_declspecs *,
 						    addr_space_t);

@@ -2120,13 +2120,14 @@ diagnose_mismatched_attributes (tree olddecl, tree newdecl)
 {
   bool warned = false;
 
-  tree a1 = lookup_attribute ("optimize", DECL_ATTRIBUTES (olddecl));
-  tree a2 = lookup_attribute ("optimize", DECL_ATTRIBUTES (newdecl));
+  tree_key_value *a1 = lookup_attribute ("optimize", DECL_ATTRIBUTES (olddecl));
+  tree_key_value *a2 = lookup_attribute ("optimize", DECL_ATTRIBUTES (newdecl));
   /* An optimization attribute applied on a declaration after the
      definition is likely not what the user wanted.  */
-  if (a2 != NULL_TREE
+  if (a2 != NULL
       && DECL_SAVED_TREE (olddecl) != NULL_TREE
-      && (a1 == NULL_TREE || !attribute_list_equal (a1, a2)))
+      && (a1 == NULL || !attribute_list_equal (DECL_ATTRIBUTES (olddecl),
+					       DECL_ATTRIBUTES (newdecl))))
     warned |= warning (OPT_Wattributes,
 		       "optimization attribute on %qD follows "
 		       "definition but the attribute doesn%'t match",

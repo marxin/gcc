@@ -177,11 +177,10 @@ rest_of_decl_compilation (tree decl,
      other attributes such as visibility.  Emit the alias now.  */
   if (!in_lto_p)
   {
-    tree alias;
-    alias = lookup_attribute ("alias", DECL_ATTRIBUTES (decl));
-    if (alias)
+    tree_key_value *attr= lookup_attribute ("alias", DECL_ATTRIBUTES (decl));
+    if (attr)
       {
-	alias = TREE_VALUE (TREE_VALUE (alias));
+	tree alias = TREE_VALUE (attr->value);
 	alias = get_identifier (TREE_STRING_POINTER (alias));
 	/* A quirk of the initial implementation of aliases required that the
 	   user add "extern" to all of them.  Which is silly, but now

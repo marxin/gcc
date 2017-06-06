@@ -791,10 +791,7 @@ hsa_brig_function_name (const char *p)
 
 void hsa_summary_t::process_gpu_implementation_attributes (tree gdecl)
 {
-  DECL_ATTRIBUTES (gdecl)
-    = tree_cons (get_identifier ("flatten"), NULL_TREE,
-		 DECL_ATTRIBUTES (gdecl));
-
+  add_decl_attribute (gdecl, "flatten");
   tree fn_opts = DECL_FUNCTION_SPECIFIC_OPTIMIZATION (gdecl);
   if (fn_opts == NULL_TREE)
     fn_opts = optimization_default_node;

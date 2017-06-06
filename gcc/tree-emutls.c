@@ -299,7 +299,8 @@ new_emutls_decl (tree decl, tree alias_of)
   DECL_VISIBILITY_SPECIFIED (to) = DECL_VISIBILITY_SPECIFIED (decl);
   DECL_DLLIMPORT_P (to) = DECL_DLLIMPORT_P (decl);
 
-  DECL_ATTRIBUTES (to) = targetm.merge_decl_attributes (decl, to);
+  // TODO
+//  DECL_ATTRIBUTES (to) = targetm.merge_decl_attributes (decl, to);
 
   if (DECL_ONE_ONLY (decl))
     make_decl_one_only (to, DECL_ASSEMBLER_NAME (to));

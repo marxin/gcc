@@ -142,6 +142,7 @@ static const char * const tree_node_kind_names[] = {
   "binfos",
   "ssa names",
   "constructors",
+  "attribute lists",
   "random kinds",
   "lang_decl kinds",
   "lang_type kinds",
@@ -1046,7 +1047,7 @@ make_node_stat (enum tree_code code MEM_STAT_DECL)
       TYPE_CANONICAL (t) = t;
 
       /* Default to no attributes for type, but let target change that.  */
-      TYPE_ATTRIBUTES (t) = NULL_TREE;
+      TYPE_ATTRIBUTES (t) = NULL;
       targetm.set_default_type_attributes (t);
 
       /* We have not yet computed the alias set for this type.  */
@@ -1901,6 +1902,7 @@ build_constructor_va (tree type, int nelts, ...)
   va_end (p);
   return build_constructor (type, v);
 }
+
 
 /* Return a new FIXED_CST node whose type is TYPE and value is F.  */
 
@@ -2930,6 +2932,76 @@ ctor_to_vec (tree ctor)
 
   return vec;
 }
+
+attribute_list *
+alloc_attribute_list (tree attr_name, tree attr_value)
+{
+  attribute_list *v;
+  vec_alloc (v, 1);
+
+  if (attr_name != NULL_TREE)
+    v->quick_push ({attr_name, attr_value});
+  
+  return v;
+}
+
+attribute_list *
+alloc_attribute_list (const char *attr_name)
+{
+  attribute_list *l = alloc_attribute_list ();
+  add_attribute (l, attr_name);
+  return l;
+}
+
+
+attribute_list *
+add_attribute (attribute_list *list, tree attr_name,
+	       tree attr_value)
+{
+  list->quick_push ({ attr_name, attr_value });
+  return list;
+}
+
+
+attribute_list *
+add_attribute (attribute_list *list, const char *attr_name,
+	       tree attr_value)
+{
+  add_attribute (list, get_identifier (attr_name), attr_value);
+  return list;
+}
+
+void
+add_decl_attribute (tree decl, tree attr_name, tree attr_value)
+{
+  if (DECL_ATTRIBUTES (decl) == NULL)
+    DECL_ATTRIBUTES (decl) = alloc_attribute_list (attr_name, attr_value);
+  else
+    add_attribute (DECL_ATTRIBUTES (decl), attr_name, attr_value);
+}
+
+void
+add_decl_attribute (tree decl, const char *attr_name, tree attr_value)
+{
+  add_decl_attribute (decl, get_identifier (attr_name), attr_value);
+}
+
+void
+add_type_attribute (tree type, tree attr_name, tree attr_value)
+{
+  if (TYPE_ATTRIBUTES (type) == NULL)
+    TYPE_ATTRIBUTES (type) = alloc_attribute_list (attr_name, attr_value);
+  else
+    add_attribute (TYPE_ATTRIBUTES (type), attr_name, attr_value);
+}
+
+void
+add_type_attribute (tree type, const char *attr_name, tree attr_value)
+{
+  add_type_attribute (type, get_identifier (attr_name), attr_value);
+}
+
+
 
 /* Return the size nominally occupied by an object of type TYPE
    when it resides in memory.  The value is measured in units of bytes,
@@ -4808,7 +4880,7 @@ protected_set_expr_location (tree t, location_t loc)
    is ATTRIBUTE.  */
 
 tree
-build_decl_attribute_variant (tree ddecl, tree attribute)
+build_decl_attribute_variant (tree ddecl, attribute_list *attribute)
 {
   DECL_ATTRIBUTES (ddecl) = attribute;
   return ddecl;
@@ -4820,7 +4892,8 @@ build_decl_attribute_variant (tree ddecl, tree attribute)
    Record such modified types already made so we don't make duplicates.  */
 
 tree
-build_type_attribute_qual_variant (tree ttype, tree attribute, int quals)
+build_type_attribute_qual_variant (tree ttype, attribute_list *attribute,
+				   int quals)
 {
   if (! attribute_list_equal (TYPE_ATTRIBUTES (ttype), attribute))
     {
@@ -4977,41 +5050,38 @@ cmp_attrib_identifiers (const_tree attr1, const_tree attr2)
    attribute values are known to be equal; otherwise return false.  */
 
 bool
-attribute_value_equal (const_tree attr1, const_tree attr2)
+attribute_value_equal (tree_key_value *attr1, tree_key_value *attr2)
 {
-  if (TREE_VALUE (attr1) == TREE_VALUE (attr2))
+  if (attr1->value == attr2->value)
     return true;
 
-  if (TREE_VALUE (attr1) != NULL_TREE
-      && TREE_CODE (TREE_VALUE (attr1)) == TREE_LIST
-      && TREE_VALUE (attr2) != NULL_TREE
-      && TREE_CODE (TREE_VALUE (attr2)) == TREE_LIST)
+  if (attr1->value != NULL_TREE
+      && TREE_CODE (attr1->value) == TREE_LIST
+      && attr2->value != NULL_TREE
+      && TREE_CODE (attr2->value) == TREE_LIST)
     {
       /* Handle attribute format.  */
       if (is_attribute_p ("format", get_attribute_name (attr1)))
 	{
-	  attr1 = TREE_VALUE (attr1);
-	  attr2 = TREE_VALUE (attr2);
+	  const_tree a1 = attr1->value;
+	  const_tree a2 = attr2->value;
 	  /* Compare the archetypes (printf/scanf/strftime/...).  */
-	  if (!cmp_attrib_identifiers (TREE_VALUE (attr1),
-				       TREE_VALUE (attr2)))
+	  if (!cmp_attrib_identifiers (TREE_VALUE (a1), TREE_VALUE (a2)))
 	    return false;
 	  /* Archetypes are the same.  Compare the rest.  */
-	  return (simple_cst_list_equal (TREE_CHAIN (attr1),
-					 TREE_CHAIN (attr2)) == 1);
+	  return (simple_cst_list_equal (TREE_CHAIN (a1),
+					 TREE_CHAIN (a2)) == 1);
 	}
-      return (simple_cst_list_equal (TREE_VALUE (attr1),
-				     TREE_VALUE (attr2)) == 1);
+      return (simple_cst_list_equal (attr1->value, attr2->value) == 1);
     }
 
   if ((flag_openmp || flag_openmp_simd)
-      && TREE_VALUE (attr1) && TREE_VALUE (attr2)
-      && TREE_CODE (TREE_VALUE (attr1)) == OMP_CLAUSE
-      && TREE_CODE (TREE_VALUE (attr2)) == OMP_CLAUSE)
-    return omp_declare_simd_clauses_equal (TREE_VALUE (attr1),
-					   TREE_VALUE (attr2));
+      && attr1->value && attr2->value
+      && TREE_CODE (attr1->value) == OMP_CLAUSE
+      && TREE_CODE (attr2->value) == OMP_CLAUSE)
+    return omp_declare_simd_clauses_equal (attr1->value, attr2->value);
 
-  return (simple_cst_equal (TREE_VALUE (attr1), TREE_VALUE (attr2)) == 1);
+  return simple_cst_equal (attr1->value, attr2->value) == 1;
 }
 
 /* Return 0 if the attributes for two types are incompatible, 1 if they
@@ -5020,46 +5090,48 @@ attribute_value_equal (const_tree attr1, const_tree attr2)
 int
 comp_type_attributes (const_tree type1, const_tree type2)
 {
-  const_tree a1 = TYPE_ATTRIBUTES (type1);
-  const_tree a2 = TYPE_ATTRIBUTES (type2);
-  const_tree a;
+  attribute_list *a1 = TYPE_ATTRIBUTES (type1);
+  attribute_list *a2 = TYPE_ATTRIBUTES (type2);
 
   if (a1 == a2)
     return 1;
-  for (a = a1; a != NULL_TREE; a = TREE_CHAIN (a))
+
+  unsigned i;
+  for (i = 0; i < ATTR_LIST_NELTS (a1); i++)
     {
+      tree_key_value *a = ATTR_LIST_ELT (a1, i);
       const struct attribute_spec *as;
-      const_tree attr;
 
       as = lookup_attribute_spec (get_attribute_name (a));
       if (!as || as->affects_type_identity == false)
         continue;
 
-      attr = lookup_attribute (as->name, CONST_CAST_TREE (a2));
+      tree_key_value *attr = lookup_attribute (as->name, a2);
       if (!attr || !attribute_value_equal (a, attr))
         break;
     }
-  if (!a)
+  if (i == ATTR_LIST_NELTS (a1) - 1)
     {
-      for (a = a2; a != NULL_TREE; a = TREE_CHAIN (a))
+      for (i = 0; i < ATTR_LIST_NELTS (a2); i++)
 	{
+	  tree_key_value *a = ATTR_LIST_ELT (a2, i);
 	  const struct attribute_spec *as;
 
 	  as = lookup_attribute_spec (get_attribute_name (a));
 	  if (!as || as->affects_type_identity == false)
 	    continue;
 
-	  if (!lookup_attribute (as->name, CONST_CAST_TREE (a1)))
+	  if (!lookup_attribute (as->name, (a1)))
 	    break;
 	  /* We don't need to compare trees again, as we did this
 	     already in first loop.  */
 	}
       /* All types - affecting identity - are equal, so
          there is no need to call target hook for comparison.  */
-      if (!a)
+      if (i == ATTR_LIST_NELTS (a2) - 1)
         return 1;
     }
-  if (lookup_attribute ("transaction_safe", CONST_CAST_TREE (a)))
+  if (lookup_attribute ("transaction_safe", a1))
     return 0;
   /* As some type combinations - like default calling-convention - might
      be compatible, we have to call the target hook to get the final result.  */
@@ -5072,7 +5144,7 @@ comp_type_attributes (const_tree type1, const_tree type2)
    Record such modified types already made so we don't make duplicates.  */
 
 tree
-build_type_attribute_variant (tree ttype, tree attribute)
+build_type_attribute_variant (tree ttype, attribute_list *attribute)
 {
   return build_type_attribute_qual_variant (ttype, attribute,
 					    TYPE_QUALS (ttype));
@@ -5590,7 +5662,12 @@ find_decls_types_r (tree *tp, int *ws, void *data)
       if (TREE_CODE (t) != TYPE_DECL)
 	fld_worklist_push (DECL_INITIAL (t), fld);
 
-      fld_worklist_push (DECL_ATTRIBUTES (t), fld);
+      attribute_list *al = DECL_ATTRIBUTES (t);
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (al); i++)
+	{
+	  fld_worklist_push (ATTR_LIST_ELT (al, i)->index, fld);
+	  fld_worklist_push (ATTR_LIST_ELT (al, i)->value, fld);
+	}
       fld_worklist_push (DECL_ABSTRACT_ORIGIN (t), fld);
 
       if (TREE_CODE (t) == FUNCTION_DECL)
@@ -5629,7 +5706,14 @@ find_decls_types_r (tree *tp, int *ws, void *data)
 	fld_worklist_push (TYPE_CACHED_VALUES (t), fld);
       fld_worklist_push (TYPE_SIZE (t), fld);
       fld_worklist_push (TYPE_SIZE_UNIT (t), fld);
-      fld_worklist_push (TYPE_ATTRIBUTES (t), fld);
+
+      attribute_list *al = TYPE_ATTRIBUTES (t);
+      for (unsigned i = 0; i < ATTR_LIST_NELTS (al); i++)
+	{
+	  fld_worklist_push (ATTR_LIST_ELT (al, i)->index, fld);
+	  fld_worklist_push (ATTR_LIST_ELT (al, i)->value, fld);
+	}
+
       fld_worklist_push (TYPE_POINTER_TO (t), fld);
       fld_worklist_push (TYPE_REFERENCE_TO (t), fld);
       fld_worklist_push (TYPE_NAME (t), fld);
@@ -6069,34 +6153,44 @@ private_is_attribute_p (const char *attr_name, size_t attr_len, const_tree ident
 
 /* The backbone of lookup_attribute().  ATTR_LEN is the string length
    of ATTR_NAME, and LIST is not NULL_TREE.  */
-tree
-private_lookup_attribute (const char *attr_name, size_t attr_len, tree list)
+tree_key_value *
+private_lookup_attribute (const char *attr_name, size_t attr_len,
+			  attribute_list *list, unsigned *index,
+			  unsigned start)
 {
-  while (list)
+  for (unsigned i = start; i < ATTR_LIST_NELTS (list); i++) 
     {
-      size_t ident_len = IDENTIFIER_LENGTH (get_attribute_name (list));
+      tree_key_value *tuple = ATTR_LIST_ELT (list, i);
+      size_t ident_len = IDENTIFIER_LENGTH (get_attribute_name (tuple));
 
       if (ident_len == attr_len)
 	{
 	  if (!strcmp (attr_name,
-		       IDENTIFIER_POINTER (get_attribute_name (list))))
-	    break;
+		       IDENTIFIER_POINTER (get_attribute_name (tuple))))
+	    {
+	      if (index)
+		*index = i + 1;
+	      return tuple;
+	    }
 	}
       /* TODO: If we made sure that attributes were stored in the
 	 canonical form without '__...__' (ie, as in 'text' as opposed
 	 to '__text__') then we could avoid the following case.  */
       else if (ident_len == attr_len + 4)
 	{
-	  const char *p = IDENTIFIER_POINTER (get_attribute_name (list));
+	  const char *p = IDENTIFIER_POINTER (get_attribute_name (tuple));
 	  if (p[0] == '_' && p[1] == '_'
 	      && p[ident_len - 2] == '_' && p[ident_len - 1] == '_'
 	      && strncmp (attr_name, p + 2, attr_len) == 0)
-	    break;
+	    {
+	      if (index)
+		*index = i + 1;
+	      return tuple;
+	    }
 	}
-      list = TREE_CHAIN (list);
     }
 
-  return list;
+  return NULL;
 }
 
 /* Given an attribute name ATTR_NAME and a list of attributes LIST,
@@ -6104,36 +6198,32 @@ private_lookup_attribute (const char *attr_name, size_t attr_len, tree list)
    starts with ATTR_NAME. ATTR_NAME must be in the form 'text' (not
    '__text__').  */
 
-tree
+tree_key_value *
 private_lookup_attribute_by_prefix (const char *attr_name, size_t attr_len,
-				    tree list)
+				    attribute_list *list)
 {
-  while (list)
+  for (unsigned i = 0; i < ATTR_LIST_NELTS (list); i++) 
     {
-      size_t ident_len = IDENTIFIER_LENGTH (get_attribute_name (list));
+      tree_key_value *tuple = ATTR_LIST_ELT (list, i);
+      size_t ident_len = IDENTIFIER_LENGTH (get_attribute_name (tuple));
 
       if (attr_len > ident_len)
-	{
-	  list = TREE_CHAIN (list);
-	  continue;
-	}
+	continue;
 
-      const char *p = IDENTIFIER_POINTER (get_attribute_name (list));
+      const char *p = IDENTIFIER_POINTER (get_attribute_name (tuple));
 
       if (strncmp (attr_name, p, attr_len) == 0)
-	break;
+	return tuple;
 
       /* TODO: If we made sure that attributes were stored in the
 	 canonical form without '__...__' (ie, as in 'text' as opposed
 	 to '__text__') then we could avoid the following case.  */
       if (p[0] == '_' && p[1] == '_' &&
 	  strncmp (attr_name, p + 2, attr_len) == 0)
-	break;
-
-      list = TREE_CHAIN (list);
+	return tuple;
     }
 
-  return list;
+  return NULL;
 }
 
 
@@ -6148,57 +6238,59 @@ private_lookup_attribute_by_prefix (const char *attr_name, size_t attr_len,
    TREE_CHAIN of the return value should be passed back in if further
    occurrences are wanted.  ATTR_IDENTIFIER must be an identifier but
    can be in the form 'text' or '__text__'.  */
-static tree
-lookup_ident_attribute (tree attr_identifier, tree list)
+static tree_key_value * 
+lookup_ident_attribute (tree attr_identifier, attribute_list *list)
 {
   gcc_checking_assert (TREE_CODE (attr_identifier) == IDENTIFIER_NODE);
 
-  while (list)
+  for (unsigned i = 0; i < ATTR_LIST_NELTS (list); i++)
     {
-      gcc_checking_assert (TREE_CODE (get_attribute_name (list))
+      tree_key_value *attr = ATTR_LIST_ELT (list, i); 
+      gcc_checking_assert (TREE_CODE (get_attribute_name (attr))
 			   == IDENTIFIER_NODE);
 
       if (cmp_attrib_identifiers (attr_identifier,
-				  get_attribute_name (list)))
+				  get_attribute_name (attr)))
 	/* Found it.  */
-	break;
-      list = TREE_CHAIN (list);
+	return attr;
     }
 
-  return list;
+  return NULL;
 }
 
 /* Remove any instances of attribute ATTR_NAME in LIST and return the
    modified list.  */
 
-tree
-remove_attribute (const char *attr_name, tree list)
+void
+remove_attribute (const char *attr_name, attribute_list *list)
 {
-  tree *p;
   size_t attr_len = strlen (attr_name);
 
   gcc_checking_assert (attr_name[0] != '_');
 
-  for (p = &list; *p; )
+  for (int i = ATTR_LIST_NELTS (list) - 1; i >= 0; i--)
     {
-      tree l = *p;
+      tree_key_value *tuple = ATTR_LIST_ELT (list, i);
       /* TODO: If we were storing attributes in normalized form, here
 	 we could use a simple strcmp().  */
-      if (private_is_attribute_p (attr_name, attr_len, get_attribute_name (l)))
-	*p = TREE_CHAIN (l);
-      else
-	p = &TREE_CHAIN (l);
+      if (private_is_attribute_p (attr_name, attr_len,
+				  get_attribute_name (tuple)))
+	list->ordered_remove (i);
     }
+}
 
-  return list;
+void
+remove_decl_attr (const char *attr_name, tree decl)
+{
+  remove_attribute (attr_name, DECL_ATTRIBUTES (decl));
 }
 
 /* Return an attribute list that is the union of a1 and a2.  */
 
-tree
-merge_attributes (tree a1, tree a2)
+attribute_list *
+merge_attributes (attribute_list *a1, attribute_list *a2)
 {
-  tree attributes;
+  attribute_list *attributes;
 
   /* Either one unset?  Take the set one.  */
 
@@ -6215,24 +6307,24 @@ merge_attributes (tree a1, tree a2)
 	{
 	  /* Pick the longest list, and hang on the other list.  */
 
-	  if (list_length (a1) < list_length (a2))
+	  if (ATTR_LIST_NELTS (a1) < ATTR_LIST_NELTS (a2))
 	    attributes = a2, a2 = a1;
 
-	  for (; a2 != 0; a2 = TREE_CHAIN (a2))
+	  for (unsigned i = 0; i < ATTR_LIST_NELTS (a2); i++)
 	    {
-	      tree a;
-	      for (a = lookup_ident_attribute (get_attribute_name (a2),
-					       attributes);
-		   a != NULL_TREE && !attribute_value_equal (a, a2);
-		   a = lookup_ident_attribute (get_attribute_name (a2),
-					       TREE_CHAIN (a)))
-		;
-	      if (a == NULL_TREE)
+	      tree_key_value *aa2 = ATTR_LIST_ELT (a2, i);
+	      unsigned j;
+	      for (j = 0; j < ATTR_LIST_NELTS (attributes); j++)
 		{
-		  a1 = copy_node (a2);
-		  TREE_CHAIN (a1) = attributes;
-		  attributes = a1;
+		  tree_key_value *aa = ATTR_LIST_ELT (attributes, j);
+		  if (cmp_attrib_identifiers (get_attribute_name (aa),
+					      get_attribute_name (aa2))
+		      && attribute_value_equal (aa, aa2))
+		    break;
 		}
+
+	      if (j == ATTR_LIST_NELTS (attributes) - 1)
+		add_attribute (attributes, aa2->index, aa2->value);
 	    }
 	}
     }
@@ -6242,7 +6334,7 @@ merge_attributes (tree a1, tree a2)
 /* Given types T1 and T2, merge their attributes and return
   the result.  */
 
-tree
+attribute_list *
 merge_type_attributes (tree t1, tree t2)
 {
   return merge_attributes (TYPE_ATTRIBUTES (t1),
@@ -6252,7 +6344,7 @@ merge_type_attributes (tree t1, tree t2)
 /* Given decls OLDDECL and NEWDECL, merge their attributes and return
    the result.  */
 
-tree
+attribute_list *
 merge_decl_attributes (tree olddecl, tree newdecl)
 {
   return merge_attributes (DECL_ATTRIBUTES (olddecl),
@@ -6285,7 +6377,7 @@ merge_dllimport_decl_attributes (tree old, tree new_tree)
   if (!VAR_OR_FUNCTION_DECL_P (new_tree))
     delete_dllimport_p = 0;
   else if (DECL_DLLIMPORT_P (new_tree)
-     	   && lookup_attribute ("dllexport", DECL_ATTRIBUTES (old)))
+     	   && lookup_decl_attr ("dllexport", old))
     {
       DECL_DLLIMPORT_P (new_tree) = 0;
       warning (OPT_Wattributes, "%q+D already declared with dllexport attribute: "
@@ -6970,9 +7062,11 @@ type_hash_canon_hash (tree type)
   if (TREE_TYPE (type))
     hstate.add_object (TYPE_HASH (TREE_TYPE (type)));
 
-  for (tree t = TYPE_ATTRIBUTES (type); t; t = TREE_CHAIN (t))
+  attribute_list *al = TYPE_ATTRIBUTES (type);
+  for (unsigned i = 0; i < ATTR_LIST_NELTS (al); i++)
     /* Just the identifier is adequate to distinguish.  */
-    hstate.add_object (IDENTIFIER_HASH_VALUE (get_attribute_name (t)));
+    hstate.add_object (IDENTIFIER_HASH_VALUE (get_attribute_name
+					      (ATTR_LIST_ELT (al, i))));
 
   switch (TREE_CODE (type))
     {
@@ -7231,7 +7325,8 @@ print_type_hash_statistics (void)
    equivalent to l1.  */
 
 int
-attribute_list_equal (const_tree l1, const_tree l2)
+attribute_list_equal (const attribute_list *l1,
+		      const attribute_list *l2)
 {
   if (l1 == l2)
     return 1;
@@ -7249,40 +7344,41 @@ attribute_list_equal (const_tree l1, const_tree l2)
    correctly.  */
 
 int
-attribute_list_contained (const_tree l1, const_tree l2)
+attribute_list_contained (const attribute_list *l1, const attribute_list *l2)
 {
-  const_tree t1, t2;
-
   /* First check the obvious, maybe the lists are identical.  */
   if (l1 == l2)
     return 1;
 
   /* Maybe the lists are similar.  */
-  for (t1 = l1, t2 = l2;
-       t1 != 0 && t2 != 0
-        && get_attribute_name (t1) == get_attribute_name (t2)
-        && TREE_VALUE (t1) == TREE_VALUE (t2);
-       t1 = TREE_CHAIN (t1), t2 = TREE_CHAIN (t2))
-    ;
+  unsigned i;
+  for (i = 0; i < ATTR_LIST_NELTS (l2); i++)
+    {
+      if (i >= ATTR_LIST_NELTS (l1))
+	break;
+
+      const tree_key_value *attr1 = ATTR_LIST_ELT (l1, i);
+      const tree_key_value *attr2 = ATTR_LIST_ELT (l2, i);
+
+      if (get_attribute_name (attr1) != get_attribute_name (attr2)
+	  || attr1->value != attr2->value)
+	break;
+    }
 
   /* Maybe the lists are equal.  */
-  if (t1 == 0 && t2 == 0)
+  if (i == ATTR_LIST_NELTS (l1) - 1 && i == ATTR_LIST_NELTS (l2) - 1)
     return 1;
 
-  for (; t2 != 0; t2 = TREE_CHAIN (t2))
-    {
-      const_tree attr;
-      /* This CONST_CAST is okay because lookup_attribute does not
-	 modify its argument and the return value is assigned to a
-	 const_tree.  */
-      for (attr = lookup_ident_attribute (get_attribute_name (t2),
-					  CONST_CAST_TREE (l1));
-	   attr != NULL_TREE && !attribute_value_equal (t2, attr);
-	   attr = lookup_ident_attribute (get_attribute_name (t2),
-					  TREE_CHAIN (attr)))
-	;
 
-      if (attr == NULL_TREE)
+  for (; i < ATTR_LIST_NELTS (l2); i++)
+    {
+      tree_key_value *attr2 = (tree_key_value *)ATTR_LIST_ELT (l2, i);
+      tree_key_value *attr1
+	= lookup_ident_attribute (get_attribute_name (attr2),
+				  (attribute_list *)l1);
+
+      if (attr1 == NULL
+	  || !attribute_value_equal (attr1, attr2))
 	return 0;
     }
 
@@ -10623,13 +10719,10 @@ set_call_expr_flags (tree decl, int flags)
   if (flags & ECF_RETURNS_TWICE)
     DECL_IS_RETURNS_TWICE (decl) = 1;
   if (flags & ECF_LEAF)
-    DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("leaf"),
-					NULL, DECL_ATTRIBUTES (decl));
+    add_decl_attribute (decl, "leaf");
   if (flags & ECF_RET1)
-    DECL_ATTRIBUTES (decl)
-      = tree_cons (get_identifier ("fn spec"),
-		   build_tree_list (NULL_TREE, build_string (1, "1")),
-		   DECL_ATTRIBUTES (decl));
+    add_decl_attribute (decl, "fn spec",
+		   build_tree_list (NULL_TREE, build_string (1, "1")));
   if ((flags & ECF_TM_PURE) && flag_tm)
     apply_tm_attr (decl, get_identifier ("transaction_pure"));
   /* Looping const or pure is implied by noreturn.
@@ -12855,17 +12948,18 @@ typedef_variant_p (const_tree type)
 
 /* Warn about a use of an identifier which was marked deprecated.  */
 void
-warn_deprecated_use (tree node, tree attr)
+warn_deprecated_use (tree node, attribute_list *attributes)
 {
   const char *msg;
 
   if (node == 0 || !warn_deprecated_decl)
     return;
 
-  if (!attr)
+  tree_key_value *attr = NULL;
+  if (!attributes)
     {
       if (DECL_P (node))
-	attr = DECL_ATTRIBUTES (node);
+	attributes = DECL_ATTRIBUTES (node);
       else if (TYPE_P (node))
 	{
 	  tree decl = TYPE_STUB_DECL (node);
@@ -12875,11 +12969,11 @@ warn_deprecated_use (tree node, tree attr)
 	}
     }
 
-  if (attr)
-    attr = lookup_attribute ("deprecated", attr);
+  if (attributes)
+    attr = lookup_attribute ("deprecated", attributes);
 
   if (attr)
-    msg = TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr)));
+    msg = TREE_STRING_POINTER (TREE_VALUE (attr->value));
   else
     msg = NULL;
 
@@ -14385,7 +14479,7 @@ get_range_pos_neg (tree arg)
 bool
 nonnull_arg_p (const_tree arg)
 {
-  tree t, attrs, fntype;
+  tree t, fntype;
   unsigned HOST_WIDE_INT arg_num;
 
   gcc_assert (TREE_CODE (arg) == PARM_DECL
@@ -14408,16 +14502,19 @@ nonnull_arg_p (const_tree arg)
     return true;
 
   fntype = TREE_TYPE (cfun->decl);
-  for (attrs = TYPE_ATTRIBUTES (fntype); attrs; attrs = TREE_CHAIN (attrs))
-    {
-      attrs = lookup_attribute ("nonnull", attrs);
 
-      /* If "nonnull" wasn't specified, we know nothing about the argument.  */
-      if (attrs == NULL_TREE)
+  unsigned start = 0;
+  tree_key_value *attrs = lookup_attribute("nonnull", TYPE_ATTRIBUTES (fntype),
+					   &start);
+
+  do
+    {
+     /* If "nonnull" wasn't specified, we know nothing about the argument.  */
+      if (attrs == NULL)
 	return false;
 
       /* If "nonnull" applies to all the arguments, then ARG is non-null.  */
-      if (TREE_VALUE (attrs) == NULL_TREE)
+      if (attrs->value == NULL_TREE)
 	return true;
 
       /* Get the position number for ARG in the function signature.  */
@@ -14432,12 +14529,16 @@ nonnull_arg_p (const_tree arg)
       gcc_assert (t == arg);
 
       /* Now see if ARG_NUM is mentioned in the nonnull list.  */
-      for (t = TREE_VALUE (attrs); t; t = TREE_CHAIN (t))
+      for (t = attrs->value; t; t = TREE_CHAIN (t))
 	{
 	  if (compare_tree_int (TREE_VALUE (t), arg_num) == 0)
 	    return true;
 	}
+
+      attrs = lookup_attribute("nonnull", TYPE_ATTRIBUTES (fntype),
+			       &start, start);
     }
+  while (attrs);
 
   return false;
 }
@@ -14502,7 +14603,7 @@ get_nonnull_args (const_tree fntype)
   if (fntype == NULL_TREE)
     return NULL;
 
-  tree attrs = TYPE_ATTRIBUTES (fntype);
+  attribute_list *attrs = TYPE_ATTRIBUTES (fntype);
   if (!attrs)
     return NULL;
 
@@ -14512,16 +14613,14 @@ get_nonnull_args (const_tree fntype)
      each with zero or more arguments.  The loop below creates a bitmap
      representing a union of all the arguments.  An empty (but non-null)
      bitmap means that all arguments have been declaraed nonnull.  */
-  for ( ; attrs; attrs = TREE_CHAIN (attrs))
+  unsigned start;
+  tree_key_value *attr = lookup_attribute ("nonnull", attrs, &start);
+  while (attr)
     {
-      attrs = lookup_attribute ("nonnull", attrs);
-      if (!attrs)
-	break;
-
       if (!argmap)
 	argmap = BITMAP_ALLOC (NULL);
 
-      if (!TREE_VALUE (attrs))
+      if (!attr->value)
 	{
 	  /* Clear the bitmap in case a previous attribute nonnull
 	     set it and this one overrides it for all arguments.  */
@@ -14531,11 +14630,13 @@ get_nonnull_args (const_tree fntype)
 
       /* Iterate over the indices of the format arguments declared nonnull
 	 and set a bit for each.  */
-      for (tree idx = TREE_VALUE (attrs); idx; idx = TREE_CHAIN (idx))
+      for (tree idx = attr->value; idx; idx = TREE_CHAIN (idx))
 	{
 	  unsigned int val = TREE_INT_CST_LOW (TREE_VALUE (idx)) - 1;
 	  bitmap_set_bit (argmap, val);
 	}
+      
+      attr = lookup_attribute ("nonnull", attrs, &start, start);
     }
 
   return argmap;

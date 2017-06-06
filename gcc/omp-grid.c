@@ -918,12 +918,10 @@ grid_mark_variable_segment (tree var, enum grid_var_segment segment)
   switch (segment)
     {
     case GRID_SEGMENT_GROUP:
-      DECL_ATTRIBUTES (var) = tree_cons (get_identifier ("hsa_group_segment"),
-					 NULL, DECL_ATTRIBUTES (var));
+      add_decl_attribute (var, "hsa_group_segment");
       break;
     case GRID_SEGMENT_GLOBAL:
-      DECL_ATTRIBUTES (var) = tree_cons (get_identifier ("hsa_global_segment"),
-					 NULL, DECL_ATTRIBUTES (var));
+      add_decl_attribute (var, "hsa_global_segment");
       break;
     default:
       gcc_unreachable ();

@@ -84,7 +84,7 @@ extern tree oacc_launch_pack (unsigned code, tree device, unsigned op);
 extern void oacc_replace_fn_attrib (tree fn, tree dims);
 extern void oacc_set_fn_attrib (tree fn, tree clauses, vec<tree> *args);
 extern tree oacc_build_routine_dims (tree clauses);
-extern tree oacc_get_fn_attrib (tree fn);
+extern tree_key_value *oacc_get_fn_attrib (tree fn);
 extern int oacc_get_fn_dim_size (tree fn, int axis);
 extern int oacc_get_ifn_dim_arg (const gimple *stmt);
 

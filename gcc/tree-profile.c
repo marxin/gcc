@@ -145,9 +145,7 @@ gimple_init_gcov_profiler (void)
 						 interval_profiler_fn_type);
       free (CONST_CAST (char *, fn_name));
       TREE_NOTHROW (tree_interval_profiler_fn) = 1;
-      DECL_ATTRIBUTES (tree_interval_profiler_fn)
-	= tree_cons (get_identifier ("leaf"), NULL,
-		     DECL_ATTRIBUTES (tree_interval_profiler_fn));
+      add_decl_attribute (tree_interval_profiler_fn, "leaf");
 
       /* void (*) (gcov_type *, gcov_type)  */
       pow2_profiler_fn_type
@@ -158,9 +156,7 @@ gimple_init_gcov_profiler (void)
       tree_pow2_profiler_fn = build_fn_decl (fn_name, pow2_profiler_fn_type);
       free (CONST_CAST (char *, fn_name));
       TREE_NOTHROW (tree_pow2_profiler_fn) = 1;
-      DECL_ATTRIBUTES (tree_pow2_profiler_fn)
-	= tree_cons (get_identifier ("leaf"), NULL,
-		     DECL_ATTRIBUTES (tree_pow2_profiler_fn));
+      add_decl_attribute (tree_pow2_profiler_fn, "leaf");
 
       /* void (*) (gcov_type *, gcov_type)  */
       one_value_profiler_fn_type
@@ -172,9 +168,7 @@ gimple_init_gcov_profiler (void)
 						  one_value_profiler_fn_type);
       free (CONST_CAST (char *, fn_name));
       TREE_NOTHROW (tree_one_value_profiler_fn) = 1;
-      DECL_ATTRIBUTES (tree_one_value_profiler_fn)
-	= tree_cons (get_identifier ("leaf"), NULL,
-		     DECL_ATTRIBUTES (tree_one_value_profiler_fn));
+      add_decl_attribute (tree_one_value_profiler_fn, "leaf");
 
       init_ic_make_global_vars ();
 
@@ -192,9 +186,7 @@ gimple_init_gcov_profiler (void)
 	      = build_fn_decl (profiler_fn_name, ic_profiler_fn_type);
 
       TREE_NOTHROW (tree_indirect_call_profiler_fn) = 1;
-      DECL_ATTRIBUTES (tree_indirect_call_profiler_fn)
-	= tree_cons (get_identifier ("leaf"), NULL,
-		     DECL_ATTRIBUTES (tree_indirect_call_profiler_fn));
+      add_decl_attribute (tree_indirect_call_profiler_fn, "leaf");
 
       tree_time_profiler_counter
 	= build_decl (UNKNOWN_LOCATION, VAR_DECL,
@@ -215,16 +207,12 @@ gimple_init_gcov_profiler (void)
 						average_profiler_fn_type);
       free (CONST_CAST (char *, fn_name));
       TREE_NOTHROW (tree_average_profiler_fn) = 1;
-      DECL_ATTRIBUTES (tree_average_profiler_fn)
-	= tree_cons (get_identifier ("leaf"), NULL,
-		     DECL_ATTRIBUTES (tree_average_profiler_fn));
+      add_decl_attribute (tree_average_profiler_fn, "leaf");
       fn_name = concat ("__gcov_ior_profiler", fn_suffix, NULL);
       tree_ior_profiler_fn = build_fn_decl (fn_name, average_profiler_fn_type);
       free (CONST_CAST (char *, fn_name));
       TREE_NOTHROW (tree_ior_profiler_fn) = 1;
-      DECL_ATTRIBUTES (tree_ior_profiler_fn)
-	= tree_cons (get_identifier ("leaf"), NULL,
-		     DECL_ATTRIBUTES (tree_ior_profiler_fn));
+      add_decl_attribute (tree_ior_profiler_fn, "leaf");
 
       /* LTO streamer needs assembler names.  Because we create these decls
          late, we need to initialize them by hand.  */

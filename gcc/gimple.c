@@ -1399,7 +1399,7 @@ gimple_call_flags (const gimple *stmt)
 static const_tree
 gimple_call_fnspec (const gcall *stmt)
 {
-  tree type, attr;
+  tree type;
 
   if (gimple_call_internal_p (stmt))
     return internal_fn_fnspec (gimple_call_internal_fn (stmt));
@@ -1408,11 +1408,11 @@ gimple_call_fnspec (const gcall *stmt)
   if (!type)
     return NULL_TREE;
 
-  attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
+  tree_key_value *attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
   if (!attr)
     return NULL_TREE;
 
-  return TREE_VALUE (TREE_VALUE (attr));
+  return TREE_VALUE (attr->value);
 }
 
 /* Detects argument flags for argument number ARG on call STMT.  */
@@ -2729,19 +2729,23 @@ infer_nonnull_range_by_attribute (gimple *stmt, tree op)
   if (is_gimple_call (stmt) && !gimple_call_internal_p (stmt))
     {
       tree fntype = gimple_call_fntype (stmt);
-      tree attrs = TYPE_ATTRIBUTES (fntype);
-      for (; attrs; attrs = TREE_CHAIN (attrs))
-	{
-	  attrs = lookup_attribute ("nonnull", attrs);
+      attribute_list *attrs = TYPE_ATTRIBUTES (fntype);
+      if (!lookup_attribute ("nonnull", attrs))
+      {
+        /* If "nonnull" wasn't specified, we know nothing about
+	   the argument.  */
+	return false;
+      }
 
-	  /* If "nonnull" wasn't specified, we know nothing about
-	     the argument.  */
-	  if (attrs == NULL_TREE)
-	    return false;
+      for (unsigned i = 0; i < attrs->length (); i++)
+	{
+	  tree_key_value tuple = (*attrs)[i];
+	  if (strcmp (TREE_STRING_POINTER (tuple.index), "nonnull") != 0)
+	    continue;
 
 	  /* If "nonnull" applies to all the arguments, then ARG
 	     is non-null if it's in the argument list.  */
-	  if (TREE_VALUE (attrs) == NULL_TREE)
+	  if (tuple.value == NULL_TREE)
 	    {
 	      for (unsigned int i = 0; i < gimple_call_num_args (stmt); i++)
 		{
@@ -2753,7 +2757,7 @@ infer_nonnull_range_by_attribute (gimple *stmt, tree op)
 	    }
 
 	  /* Now see if op appears in the nonnull list.  */
-	  for (tree t = TREE_VALUE (attrs); t; t = TREE_CHAIN (t))
+	  for (tree t = tuple.value; t; t = TREE_CHAIN (t))
 	    {
 	      unsigned int idx = TREE_INT_CST_LOW (TREE_VALUE (t)) - 1;
 	      if (idx < gimple_call_num_args (stmt))

@@ -1904,6 +1904,9 @@ extern machine_mode element_mode (const_tree t);
    to this type.  */
 #define TYPE_ATTRIBUTES(NODE) (TYPE_CHECK (NODE)->type_common.attributes)
 
+#define ATTR_LIST_ELT(NODE,IDX) (&(*NODE)[IDX])
+#define ATTR_LIST_NELTS(NODE) (vec_safe_length (NODE))
+
 /* The alignment necessary for objects of this type.
    The value is an int, measured in bits and must be a power of two.
    We support also an "alignment" of zero.  */
@@ -4021,6 +4024,9 @@ extern tree build_constructor (tree, vec<constructor_elt, va_gc> *);
 extern tree build_constructor_single (tree, tree, tree);
 extern tree build_constructor_from_list (tree, tree);
 extern tree build_constructor_va (tree, int, ...);
+extern attribute_list *alloc_attribute_list (tree attr_name = NULL_TREE,
+					     tree attr_value = NULL_TREE);
+extern attribute_list *alloc_attribute_list (const char *attr_name);
 extern tree build_real_from_int_cst (tree, const_tree);
 extern tree build_complex (tree, tree, tree);
 extern tree build_complex_inf (tree, bool);
@@ -4104,8 +4110,10 @@ extern tree purpose_member (const_tree, tree);
 extern bool vec_member (const_tree, vec<tree, va_gc> *);
 extern tree chain_index (int, tree);
 
-extern int attribute_list_equal (const_tree, const_tree);
-extern int attribute_list_contained (const_tree, const_tree);
+extern int attribute_list_equal (const attribute_list *,
+				 const attribute_list *);
+extern int attribute_list_contained (const attribute_list *,
+				     const attribute_list *);
 extern int tree_int_cst_equal (const_tree, const_tree);
 
 extern bool tree_fits_shwi_p (const_tree)
@@ -4149,9 +4157,9 @@ extern tree make_tree (tree, rtx);
    Such modified types already made are recorded so that duplicates
    are not made.  */
 
-extern tree build_type_attribute_variant (tree, tree);
-extern tree build_decl_attribute_variant (tree, tree);
-extern tree build_type_attribute_qual_variant (tree, tree, int);
+extern tree build_type_attribute_variant (tree, attribute_list *);
+extern tree build_decl_attribute_variant (tree, attribute_list *); 
+extern tree build_type_attribute_qual_variant (tree, attribute_list *, int);
 
 extern bool attribute_value_equal (const_tree, const_tree);
 
@@ -4161,16 +4169,19 @@ extern bool attribute_value_equal (const_tree, const_tree);
 extern int comp_type_attributes (const_tree, const_tree);
 
 /* Default versions of target-overridable functions.  */
-extern tree merge_decl_attributes (tree, tree);
-extern tree merge_type_attributes (tree, tree);
+extern attribute_list *merge_decl_attributes (tree, tree);
+extern attribute_list *merge_type_attributes (tree, tree);
 
 /* This function is a private implementation detail of lookup_attribute()
    and you should never call it directly.  */
-extern tree private_lookup_attribute (const char *, size_t, tree);
+extern tree_key_value *private_lookup_attribute (const char *, size_t,
+						 attribute_list *, unsigned *,
+						 unsigned);
 
 /* This function is a private implementation detail
    of lookup_attribute_by_prefix() and you should never call it directly.  */
-extern tree private_lookup_attribute_by_prefix (const char *, size_t, tree);
+extern tree_key_value *private_lookup_attribute_by_prefix (const char *, size_t,
+							   attribute_list *);
 
 /* Given an attribute name ATTR_NAME and a list of attributes LIST,
    return a pointer to the attribute's list element if the attribute
@@ -4180,18 +4191,20 @@ extern tree private_lookup_attribute_by_prefix (const char *, size_t, tree);
    occurrences are wanted.  ATTR_NAME must be in the form 'text' (not
    '__text__').  */
 
-static inline tree
-lookup_attribute (const char *attr_name, tree list)
+static inline tree_key_value *
+lookup_attribute (const char *attr_name, attribute_list *list,
+		  unsigned *index = NULL, unsigned start = 0)
 {
   gcc_checking_assert (attr_name[0] != '_');  
   /* In most cases, list is NULL_TREE.  */
-  if (list == NULL_TREE)
-    return NULL_TREE;
+  if (list == NULL)
+    return NULL;
   else
     /* Do the strlen() before calling the out-of-line implementation.
        In most cases attr_name is a string constant, and the compiler
        will optimize the strlen() away.  */
-    return private_lookup_attribute (attr_name, strlen (attr_name), list);
+    return private_lookup_attribute (attr_name, strlen (attr_name), list,
+				     index, start);
 }
 
 /* Given an attribute name ATTR_NAME and a list of attributes LIST,
@@ -4199,18 +4212,36 @@ lookup_attribute (const char *attr_name, tree list)
    starts with ATTR_NAME. ATTR_NAME must be in the form 'text' (not
    '__text__').  */
 
-static inline tree
-lookup_attribute_by_prefix (const char *attr_name, tree list)
+static inline tree_key_value *
+lookup_attribute_by_prefix (const char *attr_name, attribute_list *list)
 {
   gcc_checking_assert (attr_name[0] != '_');
   /* In most cases, list is NULL_TREE.  */
-  if (list == NULL_TREE)
-    return NULL_TREE;
+  if (list == NULL)
+    return NULL;
   else
     return private_lookup_attribute_by_prefix (attr_name, strlen (attr_name),
 					       list);
 }
 
+static inline bool 
+attribute_eq (tree_key_value *tuple, const char *attr_name)
+{
+  return strcmp (IDENTIFIER_POINTER (tuple->index), attr_name) == 0;
+}
+
+static inline attribute_list *
+join_attributes (attribute_list *src1, const attribute_list *src2)
+{
+  attribute_list *l = alloc_attribute_list ();
+  
+  for (unsigned i = 0; i < src1->length (); i++)
+    l->quick_push ((*src1)[i]);
+  for (unsigned i = 0; i < src2->length (); i++)
+    l->quick_push ((*src2)[i]);
+
+  return l;
+}
 
 /* This function is a private implementation detail of
    is_attribute_p() and you should never call it directly.  */
@@ -4235,7 +4266,9 @@ is_attribute_p (const char *attr_name, const_tree ident)
    modified list.  ATTR_NAME must be in the form 'text' (not
    '__text__').  */
 
-extern tree remove_attribute (const char *, tree);
+extern void remove_attribute (const char *, attribute_list *);
+
+extern void remove_decl_attr (const char *, tree);
 
 /* Given two attributes lists, return a list of their union.  */
 
@@ -4377,6 +4410,24 @@ extern tree uniform_vector_p (const_tree);
 /* Given a CONSTRUCTOR CTOR, return the element values as a vector.  */
 
 extern vec<tree, va_gc> *ctor_to_vec (tree);
+
+extern void add_decl_attribute (tree decl, const char *attr_name,
+				tree attr_value = NULL_TREE);
+
+extern void add_decl_attribute (tree decl, tree attr_name,
+				tree attr_value = NULL_TREE);
+
+extern void add_type_attribute (tree type, const char *attr_name,
+				tree attr_value = NULL_TREE);
+
+extern void add_type_attribute (tree type, tree attr_name,
+				tree attr_value = NULL_TREE);
+
+extern attribute_list *add_attribute (attribute_list *list, tree attr_name,
+			   tree attr_value = NULL_TREE);
+extern attribute_list *add_attribute (attribute_list *list,
+				      const char *attr_name,
+				      tree attr_value = NULL_TREE);
 
 /* zerop (tree x) is nonzero if X is a constant of value 0.  */
 
@@ -4734,7 +4785,7 @@ extern tree tree_strip_sign_nop_conversions (tree);
 extern const_tree strip_invariant_refs (const_tree);
 extern tree lhd_gcc_personality (void);
 extern void assign_assembler_name_if_needed (tree);
-extern void warn_deprecated_use (tree, tree);
+extern void warn_deprecated_use (tree, attribute_list *);
 extern void cache_integer_cst (tree);
 extern const char *combined_fn_name (combined_fn);
 

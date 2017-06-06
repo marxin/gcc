@@ -8215,7 +8215,7 @@ static tree
 ix86_handle_tm_regparm_attribute (tree *node, tree, tree,
 				  int flags, bool *no_add_attrs)
 {
-  tree alt;
+  attribute_list *alt = alloc_attribute_list ();
 
   /* In no case do we want to add the placeholder attribute.  */
   *no_add_attrs = true;
@@ -8227,12 +8227,9 @@ ix86_handle_tm_regparm_attribute (tree *node, tree, tree,
   /* ??? Is there a better way to validate 32-bit windows?  We have
      cfun->machine->call_abi, but that seems to be set only for 64-bit.  */
   if (CHECK_STACK_LIMIT > 0)
-    alt = tree_cons (get_identifier ("fastcall"), NULL, NULL);
+    add_attribute (alt, "fastcall");
   else
-    {
-      alt = tree_cons (NULL, build_int_cst (NULL, 2), NULL);
-      alt = tree_cons (get_identifier ("regparm"), alt, NULL);
-    }
+    add_attribute (alt, "regparm", build_int_cst (NULL, 2));
   decl_attributes (node, alt, flags);
 
   return NULL_TREE;
@@ -8245,13 +8242,13 @@ ix86_get_callcvt (const_tree type)
 {
   unsigned int ret = 0;
   bool is_stdarg;
-  tree attrs;
+  attribute_list *attrs;
 
   if (TARGET_64BIT)
     return IX86_CALLCVT_CDECL;
 
   attrs = TYPE_ATTRIBUTES (type);
-  if (attrs != NULL_TREE)
+  if (attrs != NULL)
     {
       if (lookup_attribute ("cdecl", attrs))
 	ret |= IX86_CALLCVT_CDECL;
@@ -8319,7 +8316,6 @@ ix86_comp_type_attributes (const_tree type1, const_tree type2)
 static int
 ix86_function_regparm (const_tree type, const_tree decl)
 {
-  tree attr;
   int regparm;
   unsigned int ccvt;
 
@@ -8331,10 +8327,11 @@ ix86_function_regparm (const_tree type, const_tree decl)
 
   if ((ccvt & IX86_CALLCVT_REGPARM) != 0)
     {
-      attr = lookup_attribute ("regparm", TYPE_ATTRIBUTES (type));
+      tree_key_value *attr = lookup_attribute ("regparm",
+					       TYPE_ATTRIBUTES (type));
       if (attr)
 	{
-	  regparm = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (attr)));
+	  regparm = TREE_INT_CST_LOW (TREE_VALUE (attr->value));
 	  return regparm;
 	}
     }
@@ -8495,14 +8492,12 @@ ix86_eax_live_at_start_p (void)
 static bool
 ix86_keep_aggregate_return_pointer (tree fntype)
 {
-  tree attr;
-
   if (!TARGET_64BIT)
     {
-      attr = lookup_attribute ("callee_pop_aggregate_return",
-			       TYPE_ATTRIBUTES (fntype));
+      tree_key_value *attr = lookup_attribute ("callee_pop_aggregate_return",
+					       TYPE_ATTRIBUTES (fntype));
       if (attr)
-	return (TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (attr))) == 0);
+	return (TREE_INT_CST_LOW (TREE_VALUE (attr->value)) == 0);
 
       /* For 32-bit MS-ABI the default is to keep aggregate
          return pointer.  */
@@ -8741,7 +8736,7 @@ ix86_function_type_abi (const_tree fntype)
 {
   enum calling_abi abi = ix86_abi;
 
-  if (fntype == NULL_TREE || TYPE_ATTRIBUTES (fntype) == NULL_TREE)
+  if (fntype == NULL_TREE || TYPE_ATTRIBUTES (fntype) == NULL)
     return abi;
 
   if (abi == SYSV_ABI
@@ -11211,8 +11206,7 @@ ix86_build_builtin_va_list_64 (void)
 
   layout_type (record);
 
-  TYPE_ATTRIBUTES (record) = tree_cons (get_identifier ("sysv_abi va_list"),
-					NULL_TREE, TYPE_ATTRIBUTES (record));
+  add_type_attribute (record, "sysv_abi va_list");
 
   /* The correct type is an array type of one element.  */
   return build_array_type (record, build_index_type (size_zero_node));
@@ -11249,9 +11243,8 @@ ix86_build_builtin_va_list (void)
 	
       /* For MS_ABI we use plain pointer to argument area.  */
       tree char_ptr_type = build_pointer_type (char_type_node);
-      tree attr = tree_cons (get_identifier ("ms_abi va_list"), NULL_TREE,
-			     TYPE_ATTRIBUTES (char_ptr_type));
-      ms_va_list_type_node = build_type_attribute_variant (char_ptr_type, attr);
+      attribute_list *al = alloc_attribute_list ("ms_abi va_list");
+      ms_va_list_type_node = build_type_attribute_variant (char_ptr_type, al);
 
       return ((ix86_abi == MS_ABI)
 	      ? ms_va_list_type_node
@@ -13765,9 +13758,9 @@ get_scratch_register_on_entry (struct scratch_reg *sr)
     {
       tree decl = current_function_decl, fntype = TREE_TYPE (decl);
       bool fastcall_p
-	= lookup_attribute ("fastcall", TYPE_ATTRIBUTES (fntype)) != NULL_TREE;
+	= lookup_attribute ("fastcall", TYPE_ATTRIBUTES (fntype)) != NULL;
       bool thiscall_p
-	= lookup_attribute ("thiscall", TYPE_ATTRIBUTES (fntype)) != NULL_TREE;
+	= lookup_attribute ("thiscall", TYPE_ATTRIBUTES (fntype)) != NULL;
       bool static_chain_p = DECL_STATIC_CHAIN (decl);
       int regparm = ix86_function_regparm (fntype, decl);
       int drap_regno
@@ -32150,8 +32143,7 @@ ix86_add_new_builtins (HOST_WIDE_INT isa, HOST_WIDE_INT isa2)
 	  if (ix86_builtins_isa[i].const_p)
 	    TREE_READONLY (decl) = 1;
 	  if (ix86_builtins_isa[i].leaf_p)
-	    DECL_ATTRIBUTES (decl) = build_tree_list (get_identifier ("leaf"),
-						      NULL_TREE);
+	    add_decl_attribute (decl, "leaf");
 	  if (ix86_builtins_isa[i].nothrow_p)
 	    TREE_NOTHROW (decl) = 1;
 	}
@@ -32288,8 +32280,8 @@ ix86_init_tm_builtins (void)
   const struct builtin_description *d;
   size_t i;
   tree decl;
-  tree attrs_load, attrs_type_load, attrs_store, attrs_type_store;
-  tree attrs_log, attrs_type_log;
+  attribute_list *attrs_load, *attrs_type_load, *attrs_store, *attrs_type_store;
+  attribute_list *attrs_log, *attrs_type_log;
 
   if (!flag_tm)
     return;
@@ -32320,7 +32312,8 @@ ix86_init_tm_builtins (void)
 	  || (lang_hooks.builtin_function
 	      == lang_hooks.builtin_function_ext_scope))
 	{
-	  tree type, attrs, attrs_type;
+	  tree type;
+	  attribute_list *attrs, *attrs_type;
 	  enum built_in_function code = (enum built_in_function) d->code;
 
 	  ftype = (enum ix86_builtin_func_type) d->flag;
@@ -33070,8 +33063,7 @@ ix86_init_mpx_builtins ()
 	 MPX builtins as leaf and nothrow.  */
       if (decl)
 	{
-	  DECL_ATTRIBUTES (decl) = build_tree_list (get_identifier ("leaf"),
-						    NULL_TREE);
+	  add_decl_attribute (decl, "leaf");
 	  TREE_NOTHROW (decl) = 1;
 	}
       else
@@ -33097,8 +33089,7 @@ ix86_init_mpx_builtins ()
 
       if (decl)
 	{
-	  DECL_ATTRIBUTES (decl) = build_tree_list (get_identifier ("leaf"),
-						    NULL_TREE);
+	  add_decl_attribute (decl, "leaf");
 	  TREE_NOTHROW (decl) = 1;
 	}
       else
@@ -33879,8 +33870,8 @@ make_resolver_func (const tree default_decl,
 
   gcc_assert (dispatch_decl != NULL);
   /* Mark dispatch_decl as "ifunc" with resolver as resolver_name.  */
-  DECL_ATTRIBUTES (dispatch_decl) 
-    = make_attribute ("ifunc", resolver_name, DECL_ATTRIBUTES (dispatch_decl));
+  add_decl_attribute (dispatch_decl, "ifunc",
+		 build_string_literal (strlen (resolver_name), resolver_name));
 
   /* Create the alias for dispatch to resolver here.  */
   /*cgraph_create_function_alias (dispatch_decl, decl);*/

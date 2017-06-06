@@ -2384,9 +2384,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
 	      if (DECL_DECLARED_INLINE_P (newdecl))
 		DECL_DISREGARD_INLINE_LIMITS (newdecl) = true;
 	      else
-		DECL_ATTRIBUTES (newdecl)
-		  = remove_attribute ("always_inline",
-				      DECL_ATTRIBUTES (newdecl));
+		remove_decl_attr ("always_inline", newdecl);
 	    }
 	}
       else if (new_defines_function && DECL_INITIAL (olddecl))

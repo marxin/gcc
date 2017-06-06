@@ -2063,7 +2063,7 @@ handling.  If defined, the result is a list of the combined\n\
 that @code{comptypes} has already been called and returned 1.  This\n\
 function may call @code{merge_attributes} to handle machine-independent\n\
 merging.",
- tree, (tree type1, tree type2),
+ void *, (void *type1, void *type2),
  merge_type_attributes)
 
 /* Table of machine attributes and functions to handle them.
@@ -2123,7 +2123,7 @@ shared with other decls, but attributes may be chained on the head of\n\
 the list and @code{*@var{attr_ptr}} modified to point to the new\n\
 attributes, or a copy of the list may be made if further changes are\n\
 needed.",
- void, (tree node, tree *attr_ptr),
+ void, (tree node, void **attr_ptr),
  hook_void_tree_treeptr)
 
 /* Return true if FNDECL (which has at least one machine attribute)

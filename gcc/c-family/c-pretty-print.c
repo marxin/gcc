@@ -786,17 +786,18 @@ pp_c_attributes (c_pretty_printer *pp, tree attributes)
    marked to be displayed on disgnostic.  */
 
 void
-pp_c_attributes_display (c_pretty_printer *pp, tree a)
+pp_c_attributes_display (c_pretty_printer *pp, attribute_list *a)
 {
   bool is_first = true;
 
-  if (a == NULL_TREE)
+  if (a == NULL)
     return;
 
-  for (; a != NULL_TREE; a = TREE_CHAIN (a))
+  for (unsigned i = 0; i < ATTR_LIST_NELTS (a); i++)
     {
+      tree_key_value *attr = ATTR_LIST_ELT (a, i);
       const struct attribute_spec *as;
-      as = lookup_attribute_spec (TREE_PURPOSE (a));
+      as = lookup_attribute_spec (attr->index);
       if (!as || as->affects_type_identity == false)
         continue;
       if (c_dialect_cxx ()
@@ -814,9 +815,9 @@ pp_c_attributes_display (c_pretty_printer *pp, tree a)
        {
          pp_separate_with (pp, ',');
        }
-      pp_tree_identifier (pp, TREE_PURPOSE (a));
-      if (TREE_VALUE (a))
-       pp_c_call_argument_list (pp, TREE_VALUE (a));
+      pp_tree_identifier (pp, attr->index);
+      if (attr->value)
+       pp_c_call_argument_list (pp, attr->value);
     }
 
   if (!is_first)

@@ -10100,7 +10100,7 @@ If defined, this target hook is a function which assigns default attributes to
 the newly defined @var{type}.
 @end deftypefn
 
-@deftypefn {Target Hook} tree TARGET_MERGE_TYPE_ATTRIBUTES (tree @var{type1}, tree @var{type2})
+@deftypefn {Target Hook} {void *} TARGET_MERGE_TYPE_ATTRIBUTES (void *@var{type1}, void *@var{type2})
 Define this target hook if the merging of type attributes needs special
 handling.  If defined, the result is a list of the combined
 @code{TYPE_ATTRIBUTES} of @var{type1} and @var{type2}.  It is assumed
@@ -10144,7 +10144,7 @@ of @code{__declspec} is via a built-in macro, but you should not rely
 on this implementation detail.
 @end defmac
 
-@deftypefn {Target Hook} void TARGET_INSERT_ATTRIBUTES (tree @var{node}, tree *@var{attr_ptr})
+@deftypefn {Target Hook} void TARGET_INSERT_ATTRIBUTES (tree @var{node}, void **@var{attr_ptr})
 Define this target hook if you want to be able to add attributes to a decl
 when it is being created.  This is normally useful for back ends which
 wish to implement a pragma by using the attributes which correspond to

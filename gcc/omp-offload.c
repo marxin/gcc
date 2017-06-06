@@ -86,17 +86,16 @@ vec<tree, va_gc> *offload_funcs, *offload_vars;
    -1 if it is not a routine (i.e. is an offload fn).  */
 
 static int
-oacc_fn_attrib_level (tree attr)
+oacc_fn_attrib_level (tree_key_value *attr)
 {
-  tree pos = TREE_VALUE (attr);
-
+  tree pos = attr->value;
   if (!TREE_PURPOSE (pos))
     return -1;
 
   int ix = 0;
   for (ix = 0; ix != GOMP_DIM_MAX;
        ix++, pos = TREE_CHAIN (pos))
-    if (!integer_zerop (TREE_PURPOSE (pos)))
+    if (!integer_zerop (pos))
       break;
 
   return ix;
@@ -614,11 +613,12 @@ oacc_parse_default_dims (const char *dims)
    function.  */
 
 static void
-oacc_validate_dims (tree fn, tree attrs, int *dims, int level, unsigned used)
+oacc_validate_dims (tree fn, tree_key_value *attrs, int *dims, int level,
+		    unsigned used)
 {
   tree purpose[GOMP_DIM_MAX];
   unsigned ix;
-  tree pos = TREE_VALUE (attrs);
+  tree pos = attrs->value;
 
   /* Make sure the attribute creator attached the dimension
      information.  */
@@ -726,7 +726,8 @@ new_oacc_loop (oacc_loop *parent, gcall *marker)
    Extract the routine's partitioning requirements.  */
 
 static void
-new_oacc_loop_routine (oacc_loop *parent, gcall *call, tree decl, tree attrs)
+new_oacc_loop_routine (oacc_loop *parent, gcall *call, tree decl,
+		       tree_key_value *attrs)
 {
   oacc_loop *loop = new_oacc_loop_raw (parent, gimple_location (call));
   int level = oacc_fn_attrib_level (attrs);
@@ -868,7 +869,7 @@ oacc_loop_discover_walk (oacc_loop *loop, basic_block bb)
 
       /* If this is a routine, make a dummy loop for it.  */
       if (tree decl = gimple_call_fndecl (call))
-	if (tree attrs = oacc_get_fn_attrib (decl))
+	if (tree_key_value *attrs = oacc_get_fn_attrib (decl))
 	  {
 	    gcc_assert (!marker);
 	    new_oacc_loop_routine (loop, call, decl, attrs);
@@ -1431,7 +1432,7 @@ default_goacc_reduction (gcall *call)
 static unsigned int
 execute_oacc_device_lower ()
 {
-  tree attrs = oacc_get_fn_attrib (current_function_decl);
+  tree_key_value *attrs = oacc_get_fn_attrib (current_function_decl);
 
   if (!attrs)
     /* Not an offloaded function.  */

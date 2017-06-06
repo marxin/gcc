@@ -498,9 +498,7 @@ optimize_weakref (symtab_node *node)
   node->weakref = false;
   IDENTIFIER_TRANSPARENT_ALIAS (DECL_ASSEMBLER_NAME (node->decl)) = 0;
   TREE_CHAIN (DECL_ASSEMBLER_NAME (node->decl)) = NULL_TREE;
-  DECL_ATTRIBUTES (node->decl) = remove_attribute ("weakref",
-					           DECL_ATTRIBUTES
-							 (node->decl));
+  remove_decl_attr ("weakref", node->decl);
 
   if (dump_file)
     fprintf (dump_file, "Optimizing weakref %s %s\n",

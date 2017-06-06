@@ -247,9 +247,10 @@ apply_pragma_weak (tree decl, tree value)
     {
       value = build_string (IDENTIFIER_LENGTH (value),
 			    IDENTIFIER_POINTER (value));
-      decl_attributes (&decl, build_tree_list (get_identifier ("alias"),
-					       build_tree_list (NULL, value)),
-		       0);
+
+      attribute_list *l = alloc_attribute_list ();
+      add_attribute (l, "alias");
+      decl_attributes (&decl, l, 0);
     }
 
   if (SUPPORTS_WEAK && DECL_EXTERNAL (decl) && TREE_USED (decl)

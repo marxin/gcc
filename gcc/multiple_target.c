@@ -241,13 +241,13 @@ expand_target_clones (struct cgraph_node *node, bool definition)
 {
   int i;
   /* Parsing target attributes separated by comma.  */
-  tree attr_target = lookup_attribute ("target_clones",
-				       DECL_ATTRIBUTES (node->decl));
+  tree_key_value *attr_target = lookup_attribute ("target_clones",
+						  DECL_ATTRIBUTES (node->decl));
   /* No targets specified.  */
   if (!attr_target)
     return false;
 
-  tree arglist = TREE_VALUE (attr_target);
+  tree arglist = attr_target->value;
   int attr_len = get_attr_len (arglist);
 
   /* No need to clone for 1 target attribute.  */
@@ -295,16 +295,16 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       XDELETEVEC (suffix);
 
       /* Set new attribute for the clone.  */
-      tree attributes = make_attribute ("target", attr,
-					DECL_ATTRIBUTES (new_node->decl));
-      DECL_ATTRIBUTES (new_node->decl) = attributes;
+      add_decl_attribute (new_node->decl, "target");
       location_t saved_loc = input_location;
       input_location = DECL_SOURCE_LOCATION (node->decl);
+      // TODO
+      /*
       if (!targetm.target_option.valid_attribute_p (new_node->decl, NULL,
 						    TREE_VALUE (attributes),
 						    0))
 	return false;
-
+*/
       input_location = saved_loc;
       decl2_v = new_node->function_version ();
       if (decl2_v != NULL)
@@ -328,15 +328,20 @@ expand_target_clones (struct cgraph_node *node, bool definition)
   XDELETEVEC (attr_str);
 
   /* Setting new attribute to initial function.  */
-  tree attributes = make_attribute ("target", "default",
-				    DECL_ATTRIBUTES (node->decl));
-  DECL_ATTRIBUTES (node->decl) = attributes;
+  const char *attr_value = "default";
+  add_decl_attribute (node->decl, "target",
+		      build_string (strlen (attr_value),
+				    attr_value));
   node->local.local = false;
   location_t saved_loc = input_location;
   input_location = DECL_SOURCE_LOCATION (node->decl);
+  bool ret = true;
+  // TODO
+  /*
   bool ret
     = targetm.target_option.valid_attribute_p (node->decl, NULL,
 					       TREE_VALUE (attributes), 0);
+					       */
   input_location = saved_loc;
   return ret;
 }

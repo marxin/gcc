@@ -1473,18 +1473,19 @@ mark_or_check_attr_tags (tree attr, tree *tp, abi_tag_data *p, bool val)
 {
   if (!attr)
     return;
-  for (; (attr = lookup_attribute ("abi_tag", attr));
-       attr = TREE_CHAIN (attr))
-    for (tree list = TREE_VALUE (attr); list;
-	 list = TREE_CHAIN (list))
-      {
-	tree tag = TREE_VALUE (list);
-	tree id = get_identifier (TREE_STRING_POINTER (tag));
-	if (tp)
-	  check_tag (tag, id, tp, p);
-	else
-	  IDENTIFIER_MARKED (id) = val;
-      }
+
+  for (unsigned i = 0; i < ATTRIBUTE_LIST_NELTS (attr); i++)
+    {
+      key_value_pair *pair = ATTRIBUTE_LIST_ELT (attr, i);
+      if (strcmp (TREE_STRING_POINTER (pair->index), "abi_tag") == 0)
+	{
+	  tree id = get_identifier (TREE_STRING_POINTER (pair->index));
+	  if (tp)
+	    check_tag (pair->index, id, tp, p);
+	  else
+	    IDENTIFIER_MARKED (id) = val;
+	}
+    }
 }
 
 /* Find all the ABI tags on T and its enclosing scopes and either call
@@ -1621,9 +1622,7 @@ check_abi_tags (tree t, tree subob, bool just_checking = false)
       if (attr)
 	TREE_VALUE (attr) = chainon (data.tags, TREE_VALUE (attr));
       else
-	DECL_ATTRIBUTES (t)
-	  = tree_cons (get_identifier ("abi_tag"), data.tags,
-		       DECL_ATTRIBUTES (t));
+	add_decl_attr (t, "abi_tag");
     }
 
   mark_abi_tags (t, false);

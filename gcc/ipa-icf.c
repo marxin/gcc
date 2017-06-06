@@ -306,17 +306,21 @@ sem_function::get_hash (void)
    Based on comp_type_attributes.  */
 
 bool
-sem_item::compare_attributes (const_tree a1, const_tree a2)
+sem_item::compare_attributes (attribute_list *a1, attribute_list *a2)
 {
-  const_tree a;
   if (a1 == a2)
     return true;
-  for (a = a1; a != NULL_TREE; a = TREE_CHAIN (a))
-    {
-      const struct attribute_spec *as;
-      const_tree attr;
 
-      as = lookup_attribute_spec (get_attribute_name (a));
+  if (ATTR_LIST_NELTS (a1) != ATTR_LIST_NELTS (a2))
+    return false;
+
+  for (unsigned i = 0; i < ATTR_LIST_NELTS (a1); i++)
+    {
+      tree_key_value *tuple = ATTR_LIST_ELT (a1, i);
+
+      const struct attribute_spec *as;
+
+      as = lookup_attribute_spec (get_attribute_name (tuple));
       /* TODO: We can introduce as->affects_decl_identity
 	 and as->affects_decl_reference_identity if attribute mismatch
 	 gets a common reason to give up on merging.  It may not be worth
@@ -327,27 +331,9 @@ sem_item::compare_attributes (const_tree a1, const_tree a2)
       if (!as)
         continue;
 
-      attr = lookup_attribute (as->name, CONST_CAST_TREE (a2));
-      if (!attr || !attribute_value_equal (a, attr))
+      tree_key_value *tuple2 = lookup_attribute (as->name, a2);
+      if (!tuple2 || !attribute_value_equal (tuple->value, tuple2->value))
         break;
-    }
-  if (!a)
-    {
-      for (a = a2; a != NULL_TREE; a = TREE_CHAIN (a))
-	{
-	  const struct attribute_spec *as;
-
-	  as = lookup_attribute_spec (get_attribute_name (a));
-	  if (!as)
-	    continue;
-
-	  if (!lookup_attribute (as->name, CONST_CAST_TREE (a1)))
-	    break;
-	  /* We don't need to compare trees again, as we did this
-	     already in first loop.  */
-	}
-      if (!a)
-        return true;
     }
   /* TODO: As in comp_type_attributes we may want to introduce target hook.  */
   return false;

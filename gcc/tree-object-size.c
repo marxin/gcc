@@ -401,7 +401,6 @@ static unsigned HOST_WIDE_INT
 alloc_object_size (const gcall *call, int object_size_type)
 {
   tree callee, bytes = NULL_TREE;
-  tree alloc_size;
   int arg1 = -1, arg2 = -1;
 
   gcc_assert (is_gimple_call (call));
@@ -410,11 +409,11 @@ alloc_object_size (const gcall *call, int object_size_type)
   if (!callee)
     return unknown[object_size_type];
 
-  alloc_size = lookup_attribute ("alloc_size",
-				 TYPE_ATTRIBUTES (TREE_TYPE (callee)));
-  if (alloc_size && TREE_VALUE (alloc_size))
+  tree_key_value *alloc_size
+    = lookup_attribute ("alloc_size", TYPE_ATTRIBUTES (TREE_TYPE (callee)));
+  if (alloc_size && alloc_size->value)
     {
-      tree p = TREE_VALUE (alloc_size);
+      tree p = alloc_size->value;
 
       arg1 = TREE_INT_CST_LOW (TREE_VALUE (p))-1;
       if (TREE_CHAIN (p))

@@ -36265,15 +36265,14 @@ cp_parser_oacc_declare (cp_parser *parser, cp_token *pragma_tok)
 
       if (!error)
 	{
-	  tree id;
+	  const char *id;
 
 	  if (OMP_CLAUSE_MAP_KIND (t) == GOMP_MAP_LINK)
-	    id = get_identifier ("omp declare target link");
+	    id = "omp declare target link";
 	  else
-	    id = get_identifier ("omp declare target");
+	    id = "omp declare target";
 
-	  DECL_ATTRIBUTES (decl)
-	    = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (decl));
+	  add_decl_attr (decl, id);
 	  if (global_bindings_p ())
 	    {
 	      symtab_node *node = symtab_node::get (decl);
@@ -36815,7 +36814,7 @@ cp_parser_omp_declare_target (cp_parser *parser, cp_token *pragma_tok)
 	}
       if (!at1)
 	{
-	  DECL_ATTRIBUTES (t) = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (t));
+	  add_decl_attr (t, id);
 	  if (TREE_CODE (t) != FUNCTION_DECL && !is_global_var (t))
 	    continue;
 
@@ -37185,9 +37184,7 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
       DECL_IGNORED_P (fndecl) = 1;
       DECL_OMP_DECLARE_REDUCTION_P (fndecl) = 1;
       SET_DECL_ASSEMBLER_NAME (fndecl, get_identifier ("<udr>"));
-      DECL_ATTRIBUTES (fndecl)
-	= tree_cons (get_identifier ("gnu_inline"), NULL_TREE,
-		     DECL_ATTRIBUTES (fndecl));
+      add_decl_attr (fndecl, "gnu_inline");
       if (processing_template_decl)
 	fndecl = push_template_decl (fndecl);
       bool block_scope = false;
@@ -37638,9 +37635,7 @@ cp_finalize_oacc_routine (cp_parser *parser, tree fndecl, bool is_defn)
       oacc_replace_fn_attrib (fndecl, dims);
 
       /* Add an "omp declare target" attribute.  */
-      DECL_ATTRIBUTES (fndecl)
-	= tree_cons (get_identifier ("omp declare target"),
-		     NULL_TREE, DECL_ATTRIBUTES (fndecl));
+      add_decl_attr (fndecl, "omp declare target");
 
       /* Don't unset parser->oacc_routine here: we may still need it to
 	 diagnose wrong usage.  But, remember that we've used this "#pragma acc

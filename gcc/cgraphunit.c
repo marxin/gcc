@@ -712,7 +712,8 @@ symbol_table::process_same_body_aliases (void)
 static void
 process_common_attributes (symtab_node *node, tree decl)
 {
-  tree weakref = lookup_attribute ("weakref", DECL_ATTRIBUTES (decl));
+  tree_key_value *weakref = lookup_attribute ("weakref",
+					      DECL_ATTRIBUTES (decl));
 
   if (weakref && !lookup_attribute ("alias", DECL_ATTRIBUTES (decl)))
     {
@@ -720,8 +721,7 @@ process_common_attributes (symtab_node *node, tree decl)
 		  "%<weakref%> attribute should be accompanied with"
 		  " an %<alias%> attribute");
       DECL_WEAK (decl) = 0;
-      DECL_ATTRIBUTES (decl) = remove_attribute ("weakref",
-						 DECL_ATTRIBUTES (decl));
+      remove_decl_attr ("weakref", decl);
     }
 
   if (lookup_attribute ("no_reorder", DECL_ATTRIBUTES (decl)))
@@ -779,8 +779,7 @@ process_function_and_variable_attributes (cgraph_node *first,
 		      "%<weakref%> attribute ignored"
 		      " because function is defined");
 	  DECL_WEAK (decl) = 0;
-	  DECL_ATTRIBUTES (decl) = remove_attribute ("weakref",
-						     DECL_ATTRIBUTES (decl));
+	  remove_decl_attr ("weakref", decl);
 	}
 
       if (lookup_attribute ("always_inline", DECL_ATTRIBUTES (decl))
@@ -816,8 +815,7 @@ process_function_and_variable_attributes (cgraph_node *first,
 		      "%<weakref%> attribute ignored"
 		      " because variable is initialized");
 	  DECL_WEAK (decl) = 0;
-	  DECL_ATTRIBUTES (decl) = remove_attribute ("weakref",
-						      DECL_ATTRIBUTES (decl));
+	  remove_decl_attr ("weakref", decl);
 	}
       process_common_attributes (vnode, decl);
     }
@@ -2397,9 +2395,9 @@ ipa_passes (void)
 static tree
 get_alias_symbol (tree decl)
 {
-  tree alias = lookup_attribute ("alias", DECL_ATTRIBUTES (decl));
+  tree_key_value *alias = lookup_attribute ("alias", DECL_ATTRIBUTES (decl));
   return get_identifier (TREE_STRING_POINTER
-			  (TREE_VALUE (TREE_VALUE (alias))));
+			  (TREE_VALUE (alias->value)));
 }
 
 

@@ -560,9 +560,7 @@ symbol_table::remove_unreachable_nodes (FILE *file)
 	      /* After early inlining we drop always_inline attributes on
 		 bodies of functions that are still referenced (have their
 		 address taken).  */
-	      DECL_ATTRIBUTES (node->decl)
-		= remove_attribute ("always_inline",
-				    DECL_ATTRIBUTES (node->decl));
+	      remove_decl_attr ("always_inline", node->decl);
 	      if (!node->in_other_partition)
 		node->local.local = false;
 	      node->remove_callees ();
@@ -911,16 +909,12 @@ cgraph_build_static_cdtor_1 (char which, tree body, int priority, bool final)
       break;
     case 'P':
       DECL_STATIC_CONSTRUCTOR (decl) = 1;
-      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("chkp ctor"),
-					  NULL,
-					  NULL_TREE);
+      add_decl_attribute (decl, "chkp ctor");
       decl_init_priority_insert (decl, priority);
       break;
     case 'B':
       DECL_STATIC_CONSTRUCTOR (decl) = 1;
-      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("bnd_legacy"),
-					  NULL,
-					  NULL_TREE);
+      add_decl_attribute (decl, "bnd_legacy");
       decl_init_priority_insert (decl, priority);
       break;
     case 'D':

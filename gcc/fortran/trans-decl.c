@@ -5762,8 +5762,7 @@ create_main_function (tree fndecl)
   DECL_EXTERNAL (ftn_main) = 0;
   TREE_PUBLIC (ftn_main) = 1;
   TREE_STATIC (ftn_main) = 1;
-  DECL_ATTRIBUTES (ftn_main)
-      = tree_cons (get_identifier("externally_visible"), NULL_TREE, NULL_TREE);
+  add_decl_attr (ftn_main, "externally_visible");
 
   /* Setup the result declaration (for "return 0").  */
   result_decl = build_decl (input_location,

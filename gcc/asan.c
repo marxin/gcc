@@ -2339,8 +2339,7 @@ create_odr_indicator (tree decl, tree type)
   TREE_CONSTANT (ctor) = 1;
   TREE_STATIC (ctor) = 1;
   DECL_INITIAL (var) = ctor;
-  DECL_ATTRIBUTES (var) = tree_cons (get_identifier ("asan odr indicator"),
-				     NULL, DECL_ATTRIBUTES (var));
+  add_decl_attribute (var, "asan odr indicator");
   make_decl_rtl (var);
   varpool_node::finalize_decl (var);
   return fold_convert (uptr, build_fold_addr_expr (var));

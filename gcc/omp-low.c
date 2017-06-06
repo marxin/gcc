@@ -1636,9 +1636,7 @@ create_omp_child_function (omp_context *ctx, bool task_copy)
       const char *target_attr = (is_gimple_omp_offloaded (ctx->stmt)
 				 ? "omp target entrypoint"
 				 : "omp declare target");
-      DECL_ATTRIBUTES (decl)
-	= tree_cons (get_identifier (target_attr),
-		     NULL_TREE, DECL_ATTRIBUTES (decl));
+      add_decl_attribute (decl, target_attr);
     }
 
   t = build_decl (DECL_SOURCE_LOCATION (decl),
@@ -3524,8 +3522,7 @@ lower_rec_simd_input_clauses (tree new_var, omp_context *ctx,
       tree type = TREE_TYPE (new_var), ptype = build_pointer_type (type);
       ivar = lvar = create_tmp_var (type);
       TREE_ADDRESSABLE (ivar) = 1;
-      DECL_ATTRIBUTES (ivar) = tree_cons (get_identifier ("omp simt private"),
-					  NULL, DECL_ATTRIBUTES (ivar));
+      add_decl_attribute (ivar, "omp simt private");
       sctx->simt_eargs.safe_push (build1 (ADDR_EXPR, ptype, ivar));
       tree clobber = build_constructor (type, NULL);
       TREE_THIS_VOLATILE (clobber) = 1;
@@ -3538,9 +3535,7 @@ lower_rec_simd_input_clauses (tree new_var, omp_context *ctx,
       tree avar = create_tmp_var_raw (atype);
       if (TREE_ADDRESSABLE (new_var))
 	TREE_ADDRESSABLE (avar) = 1;
-      DECL_ATTRIBUTES (avar)
-	= tree_cons (get_identifier ("omp simd array"), NULL,
-		     DECL_ATTRIBUTES (avar));
+      add_decl_attribute (avar, "omp simd array");
       gimple_add_tmp_var (avar);
       ivar = build4 (ARRAY_REF, TREE_TYPE (new_var), avar, sctx->idx,
 		     NULL_TREE, NULL_TREE);

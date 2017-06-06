@@ -192,9 +192,7 @@ vtv_build_vtable_verify_fndecl (void)
     }
 
   TREE_NOTHROW (verify_vtbl_ptr_fndecl) = 1;
-  DECL_ATTRIBUTES (verify_vtbl_ptr_fndecl)
-      = tree_cons (get_identifier ("leaf"), NULL,
-                   DECL_ATTRIBUTES (verify_vtbl_ptr_fndecl));
+  add_decl_attr (verify_vtbl_ptr_fndecl, "leaf");
   DECL_PURE_P (verify_vtbl_ptr_fndecl) = 1;
   TREE_PUBLIC (verify_vtbl_ptr_fndecl) = 1;
   DECL_PRESERVE_P (verify_vtbl_ptr_fndecl) = 1;
@@ -255,9 +253,7 @@ init_functions (void)
 
 
   TREE_NOTHROW (vlt_register_set_fndecl) = 1;
-  DECL_ATTRIBUTES (vlt_register_set_fndecl) =
-                    tree_cons (get_identifier ("leaf"), NULL,
-                               DECL_ATTRIBUTES (vlt_register_set_fndecl));
+  add_decl_attr (vlt_register_set_fndecl, "leaf");
   DECL_EXTERNAL(vlt_register_set_fndecl) = 1;
   TREE_PUBLIC (vlt_register_set_fndecl) = 1;
   DECL_PRESERVE_P (vlt_register_set_fndecl) = 1;
@@ -299,9 +295,7 @@ init_functions (void)
     }
 
   TREE_NOTHROW (vlt_register_pairs_fndecl) = 1;
-  DECL_ATTRIBUTES (vlt_register_pairs_fndecl) =
-                    tree_cons (get_identifier ("leaf"), NULL,
-                               DECL_ATTRIBUTES (vlt_register_pairs_fndecl));
+  add_decl_attr (vlt_register_pairs_fndecl, "leaf");
   DECL_EXTERNAL(vlt_register_pairs_fndecl) = 1;
   TREE_PUBLIC (vlt_register_pairs_fndecl) = 1;
   DECL_PRESERVE_P (vlt_register_pairs_fndecl) = 1;

@@ -505,12 +505,15 @@ void
 oacc_replace_fn_attrib (tree fn, tree dims)
 {
   tree ident = get_identifier (OACC_FN_ATTRIB);
-  tree attribs = DECL_ATTRIBUTES (fn);
+  attribute_list *attribs = DECL_ATTRIBUTES (fn);
 
   /* If we happen to be present as the first attrib, drop it.  */
-  if (attribs && TREE_PURPOSE (attribs) == ident)
-    attribs = TREE_CHAIN (attribs);
-  DECL_ATTRIBUTES (fn) = tree_cons (ident, dims, attribs);
+  unsigned index;
+  if (lookup_attribute (IDENTIFIER_POINTER (ident), attribs, &index)
+      && index == 0)
+    attribs->ordered_remove (0);
+  attribs->quick_insert (0, {ident, NULL_TREE});
+  attribs->quick_insert (1, {dims, NULL_TREE});
 }
 
 /* Scan CLAUSES for launch dimensions and attach them to the oacc
@@ -606,7 +609,7 @@ oacc_build_routine_dims (tree clauses)
 /* Retrieve the oacc function attrib and return it.  Non-oacc
    functions will return NULL.  */
 
-tree
+tree_key_value *
 oacc_get_fn_attrib (tree fn)
 {
   return lookup_attribute (OACC_FN_ATTRIB, DECL_ATTRIBUTES (fn));
@@ -619,11 +622,11 @@ oacc_get_fn_attrib (tree fn)
 int
 oacc_get_fn_dim_size (tree fn, int axis)
 {
-  tree attrs = oacc_get_fn_attrib (fn);
+  tree_key_value *attrs = oacc_get_fn_attrib (fn);
 
   gcc_assert (axis < GOMP_DIM_MAX);
 
-  tree dims = TREE_VALUE (attrs);
+  tree dims = attrs->value;
   while (axis--)
     dims = TREE_CHAIN (dims);
 

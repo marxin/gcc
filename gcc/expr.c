@@ -10806,21 +10806,22 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
       if (CALL_EXPR_VA_ARG_PACK (exp))
 	error ("%Kinvalid use of %<__builtin_va_arg_pack ()%>", exp);
       {
-	tree fndecl = get_callee_fndecl (exp), attr;
+	tree fndecl = get_callee_fndecl (exp);
+	tree_key_value *attr;
 
 	if (fndecl
 	    && (attr = lookup_attribute ("error",
 					 DECL_ATTRIBUTES (fndecl))) != NULL)
 	  error ("%Kcall to %qs declared with attribute error: %s",
 		 exp, identifier_to_locale (lang_hooks.decl_printable_name (fndecl, 1)),
-		 TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr))));
+		 TREE_STRING_POINTER (TREE_VALUE (attr->value)));
 	if (fndecl
 	    && (attr = lookup_attribute ("warning",
 					 DECL_ATTRIBUTES (fndecl))) != NULL)
 	  warning_at (tree_nonartificial_location (exp),
 		      0, "%Kcall to %qs declared with attribute warning: %s",
 		      exp, identifier_to_locale (lang_hooks.decl_printable_name (fndecl, 1)),
-		      TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr))));
+		      TREE_STRING_POINTER (TREE_VALUE (attr->value)));
 
 	/* Check for a built-in function.  */
 	if (fndecl && DECL_BUILT_IN (fndecl))

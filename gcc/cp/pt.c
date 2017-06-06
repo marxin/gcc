@@ -12488,8 +12488,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	if (DECL_VISIBILITY_SPECIFIED (t))
 	  {
 	    DECL_VISIBILITY_SPECIFIED (r) = 0;
-	    DECL_ATTRIBUTES (r)
-	      = remove_attribute ("visibility", DECL_ATTRIBUTES (r));
+	    remove_decl_attr ("visibility", r);
 	  }
 	determine_visibility (r);
 	if (DECL_DEFAULTED_OUTSIDE_CLASS_P (r)
@@ -12946,8 +12945,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	    if (DECL_VISIBILITY_SPECIFIED (t))
 	      {
 		DECL_VISIBILITY_SPECIFIED (r) = 0;
-		DECL_ATTRIBUTES (r)
-		  = remove_attribute ("visibility", DECL_ATTRIBUTES (r));
+		remove_decl_attr ("visibility", r);
 	      }
 	    determine_visibility (r);
 	  }

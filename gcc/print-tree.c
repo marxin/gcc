@@ -167,6 +167,12 @@ indent_to (FILE *file, int column)
     fprintf (file, " ");
 }
 
+static void
+print_attributes (FILE *file, attribute_list *attrs, int indent)
+{
+  // TODO
+}
+
 /* Print the node NODE in full on file FILE, preceded by PREFIX,
    starting in column INDENT.  */
 
@@ -487,8 +493,7 @@ print_node (FILE *file, const char *prefix, tree node, int indent,
 
       if (CODE_CONTAINS_STRUCT (code, TS_DECL_COMMON))
 	{
-	  print_node_brief (file, "attributes",
-			    DECL_ATTRIBUTES (node), indent + 4);
+	  print_attributes (file, DECL_ATTRIBUTES (node), indent + 4);
 	  if (code != PARM_DECL)
 	    print_node_brief (file, "initial", DECL_INITIAL (node),
 			      indent + 4);
@@ -612,7 +617,7 @@ print_node (FILE *file, const char *prefix, tree node, int indent,
       else
 	dump_addr (file, " canonical type ", TYPE_CANONICAL (node));
 
-      print_node (file, "attributes", TYPE_ATTRIBUTES (node), indent + 4);
+      print_attributes (file, TYPE_ATTRIBUTES (node), indent + 4);
 
       if (INTEGRAL_TYPE_P (node) || code == REAL_TYPE
 	  || code == FIXED_POINT_TYPE)

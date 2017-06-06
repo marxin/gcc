@@ -155,11 +155,11 @@ static void *expand_regions (struct tm_region *,
    something we examine.  We look at function types, but allow pointers
    to function types and function decls and peek through.  */
 
-static tree
+static attribute_list * 
 get_attrs_for (const_tree x)
 {
   if (x == NULL_TREE)
-    return NULL_TREE;
+    return NULL;
 
   switch (TREE_CODE (x))
     {
@@ -168,16 +168,16 @@ get_attrs_for (const_tree x)
 
     default:
       if (TYPE_P (x))
-	return NULL_TREE;
+	return NULL;
       x = TREE_TYPE (x);
       if (TREE_CODE (x) != POINTER_TYPE)
-	return NULL_TREE;
+	return NULL;
       /* FALLTHRU */
 
     case POINTER_TYPE:
       x = TREE_TYPE (x);
       if (TREE_CODE (x) != FUNCTION_TYPE && TREE_CODE (x) != METHOD_TYPE)
-	return NULL_TREE;
+	return NULL;
       /* FALLTHRU */
 
     case FUNCTION_TYPE:
@@ -224,7 +224,7 @@ is_tm_pure (const_tree x)
 static bool
 is_tm_irrevocable (tree x)
 {
-  tree attrs = get_attrs_for (x);
+  attribute_list *attrs = get_attrs_for (x);
 
   if (attrs && lookup_attribute ("transaction_unsafe", attrs))
     return true;
@@ -248,7 +248,7 @@ is_tm_safe (const_tree x)
 {
   if (flag_tm)
     {
-      tree attrs = get_attrs_for (x);
+      attribute_list *attrs = get_attrs_for (x);
       if (attrs)
 	{
 	  if (lookup_attribute ("transaction_safe", attrs))
@@ -286,7 +286,7 @@ is_tm_pure_call (gimple *call)
 static bool
 is_tm_callable (tree x)
 {
-  tree attrs = get_attrs_for (x);
+  attribute_list *attrs = get_attrs_for (x);
   if (attrs)
     {
       if (lookup_attribute ("transaction_callable", attrs))
@@ -304,7 +304,7 @@ is_tm_callable (tree x)
 bool
 is_tm_may_cancel_outer (tree x)
 {
-  tree attrs = get_attrs_for (x);
+  attribute_list *attrs = get_attrs_for (x);
   if (attrs)
     return lookup_attribute ("transaction_may_cancel_outer", attrs) != NULL;
   return false;

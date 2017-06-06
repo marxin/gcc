@@ -676,6 +676,24 @@ lto_input_ts_decl_minimal_tree_pointers (struct lto_input_block *ib,
   DECL_CONTEXT (expr) = stream_read_tree (ib, data_in);
 }
 
+static attribute_list *
+stream_read_attribute_list (struct lto_input_block *ib,
+		       struct data_in *data_in)
+{
+  HOST_WIDE_INT length = streamer_read_hwi (ib);
+  if (length == 0)
+    return NULL;
+
+  attribute_list *al = alloc_attribute_list ();
+  for (unsigned i = 0; i < length; i++)
+    {
+      tree attr_key = stream_read_tree (ib, data_in);
+      tree attr_value = stream_read_tree (ib, data_in);
+      al->quick_push ({attr_key, attr_value});
+    }
+
+  return al;
+}
 
 /* Read all pointer fields in the TS_DECL_COMMON structure of EXPR from
    input block IB.  DATA_IN contains tables and descriptors for the
@@ -687,7 +705,7 @@ lto_input_ts_decl_common_tree_pointers (struct lto_input_block *ib,
 {
   DECL_SIZE (expr) = stream_read_tree (ib, data_in);
   DECL_SIZE_UNIT (expr) = stream_read_tree (ib, data_in);
-  DECL_ATTRIBUTES (expr) = stream_read_tree (ib, data_in);
+  DECL_ATTRIBUTES (expr) = stream_read_attribute_list (ib, data_in);
 
   /* Do not stream DECL_ABSTRACT_ORIGIN.  We cannot handle debug information
      for early inlining so drop it on the floor instead of ICEing in
@@ -788,7 +806,7 @@ lto_input_ts_type_common_tree_pointers (struct lto_input_block *ib,
 {
   TYPE_SIZE (expr) = stream_read_tree (ib, data_in);
   TYPE_SIZE_UNIT (expr) = stream_read_tree (ib, data_in);
-  TYPE_ATTRIBUTES (expr) = stream_read_tree (ib, data_in);
+  TYPE_ATTRIBUTES (expr) = stream_read_attribute_list (ib, data_in);
   TYPE_NAME (expr) = stream_read_tree (ib, data_in);
   /* Do not stream TYPE_POINTER_TO or TYPE_REFERENCE_TO.  They will be
      reconstructed during fixup.  */

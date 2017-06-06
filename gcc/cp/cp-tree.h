@@ -6116,7 +6116,7 @@ extern void warn_misplaced_attr_for_class_type  (source_location location,
 extern tree check_tag_decl			(cp_decl_specifier_seq *, bool);
 extern tree shadow_tag				(cp_decl_specifier_seq *);
 extern tree groktypename			(cp_decl_specifier_seq *, const cp_declarator *, bool);
-extern tree start_decl				(const cp_declarator *, cp_decl_specifier_seq *, int, tree, tree, tree *);
+extern tree start_decl				(const cp_declarator *, cp_decl_specifier_seq *, int, attribute_list *, tree, tree *);
 extern void start_decl_1			(tree, bool);
 extern bool check_array_initializer		(tree, tree, tree);
 extern void cp_finish_decl			(tree, tree, bool, tree, int);
@@ -6967,7 +6967,7 @@ extern tree maybe_dummy_object			(tree, tree *);
 extern int is_dummy_object			(const_tree);
 extern const struct attribute_spec cxx_attribute_table[];
 extern tree make_ptrmem_cst			(tree, tree);
-extern tree cp_build_type_attribute_variant     (tree, tree);
+extern tree cp_build_type_attribute_variant     (tree, attribute_list *);
 extern tree cp_build_reference_type		(tree, bool);
 extern tree move				(tree);
 extern tree cp_build_qualified_type_real	(tree, int, tsubst_flags_t);
