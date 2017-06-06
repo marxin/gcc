@@ -686,6 +686,32 @@ default_options_optimization (struct gcc_options *opts,
 			 lang_mask, handlers, loc, dc);
 }
 
+static void
+expand_profile_data_prefix (gcc_options *opts)
+{
+  if (opts->x_profile_data_prefix != NULL)
+    {
+      const char *needle = "%w";
+      unsigned needle_strlen = strlen (needle);
+      while (true)
+	{
+	  char *p = CONST_CAST (char *, strstr (opts->x_profile_data_prefix,
+						needle));
+	  if (p)
+	    {
+	      *p = '\0';
+	      char *r = concat (opts->x_profile_data_prefix, getpwd (),
+				p + needle_strlen, NULL);
+
+	      free (CONST_CAST (char *, opts->x_profile_data_prefix));
+	      opts->x_profile_data_prefix = r;
+	    }
+	  else
+	    break;
+      }
+    }
+}
+
 /* After all options at LOC have been read into OPTS and OPTS_SET,
    finalize settings of those options and diagnose incompatible
    combinations.  */
@@ -1003,6 +1029,9 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 
       opts->x_flag_stack_reuse = SR_NONE;
     }
+
+  /* Expand variables in x_profile_data_prefix.  */
+  expand_profile_data_prefix (opts);
 }
 
 #define LEFT_COLUMN	27
