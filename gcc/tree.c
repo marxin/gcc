@@ -4943,34 +4943,16 @@ cmp_attrib_identifiers (const_tree attr1, const_tree attr2)
   if (attr1 == attr2)
     return true;
 
-  /* If they are not equal, they may still be one in the form
-     'text' while the other one is in the form '__text__'.  TODO:
-     If we were storing attributes in normalized 'text' form, then
-     this could all go away and we could take full advantage of
-     the fact that we're comparing identifiers. :-)  */
   const size_t attr1_len = IDENTIFIER_LENGTH (attr1);
   const size_t attr2_len = IDENTIFIER_LENGTH (attr2);
 
-  if (attr2_len == attr1_len + 4)
-    {
-      const char *p = IDENTIFIER_POINTER (attr2);
-      const char *q = IDENTIFIER_POINTER (attr1);
-      if (p[0] == '_' && p[1] == '_'
-	  && p[attr2_len - 2] == '_' && p[attr2_len - 1] == '_'
-	  && strncmp (q, p + 2, attr1_len) == 0)
-	return true;;
-    }
-  else if (attr2_len + 4 == attr1_len)
-    {
-      const char *p = IDENTIFIER_POINTER (attr2);
-      const char *q = IDENTIFIER_POINTER (attr1);
-      if (q[0] == '_' && q[1] == '_'
-	  && q[attr1_len - 2] == '_' && q[attr1_len - 1] == '_'
-	  && strncmp (q + 2, p, attr2_len) == 0)
-	return true;
-    }
+  const char *p = IDENTIFIER_POINTER (attr1);
+  const char *q = IDENTIFIER_POINTER (attr2);
 
-  return false;
+  // TODO: remove
+  gcc_assert (p[0] != '_' && q[0] != '_');
+
+  return attr1_len == attr2_len || strncmp (p, q, attr1_len) == 0;
 }
 
 /* Compare two attributes for their value identity.  Return true if the
@@ -6048,23 +6030,8 @@ private_is_attribute_p (const char *attr_name, size_t attr_len, const_tree ident
 {
   size_t ident_len = IDENTIFIER_LENGTH (ident);
 
-  if (ident_len == attr_len)
-    {
-      if (strcmp (attr_name, IDENTIFIER_POINTER (ident)) == 0)
-	return true;
-    }
-  else if (ident_len == attr_len + 4)
-    {
-      /* There is the possibility that ATTR is 'text' and IDENT is
-	 '__text__'.  */
-      const char *p = IDENTIFIER_POINTER (ident);      
-      if (p[0] == '_' && p[1] == '_'
-	  && p[ident_len - 2] == '_' && p[ident_len - 1] == '_'
-	  && strncmp (attr_name, p + 2, attr_len) == 0)
-	return true;
-    }
-
-  return false;
+  return (ident_len == attr_len
+	  || strcmp (attr_name, IDENTIFIER_POINTER (ident)) == 0);
 }
 
 /* The backbone of lookup_attribute().  ATTR_LEN is the string length
@@ -14539,6 +14506,54 @@ get_nonnull_args (const_tree fntype)
     }
 
   return argmap;
+}
+
+static bool
+wrong_attr_format (tree attr_name)
+{
+  const size_t l = IDENTIFIER_LENGTH (attr_name);
+  const char *s = IDENTIFIER_POINTER (attr_name);
+  if (l > 4 && s[0] == '_')
+    return true;
+
+  return false;
+}
+
+static tree
+clean_attr_name (tree attr_name)
+{
+  const size_t l = IDENTIFIER_LENGTH (attr_name);
+  const char *s = IDENTIFIER_POINTER (attr_name);
+
+  gcc_assert (s[1] == '_');
+  gcc_assert (s[l - 2] == '_');
+  gcc_assert (s[l - 1] == '_');
+  return get_identifier_with_length (s + 2, l - 4);
+}
+
+void
+clean_attribute_names (tree attrs)
+{
+  while (attrs != NULL_TREE)
+    {
+      tree p = TREE_PURPOSE (attrs);
+      tree v = TREE_VALUE (attrs);
+      if (p != NULL_TREE && TREE_CODE (p) == IDENTIFIER_NODE)
+	{
+	  if (wrong_attr_format (p))
+	    TREE_PURPOSE (attrs) = clean_attr_name (p);
+	}
+
+      if (v != NULL_TREE && TREE_CODE (v) == IDENTIFIER_NODE)
+	{
+	  if (wrong_attr_format (v))
+	    TREE_VALUE (attrs) = clean_attr_name (v);
+	}
+      else if (v && TREE_CODE (v) == TREE_LIST)
+	clean_attribute_names (v);
+
+      attrs = TREE_CHAIN (attrs);
+    }
 }
 
 #if CHECKING_P

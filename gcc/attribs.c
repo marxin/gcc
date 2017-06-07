@@ -97,20 +97,6 @@ static const struct attribute_spec empty_attribute_table[] =
   { NULL, 0, 0, false, false, false, NULL, false }
 };
 
-/* Return base name of the attribute.  Ie '__attr__' is turned into 'attr'.
-   To avoid need for copying, we simply return length of the string.  */
-
-static void
-extract_attribute_substring (struct substring *str)
-{
-  if (str->length > 4 && str->str[0] == '_' && str->str[1] == '_'
-      && str->str[str->length - 1] == '_' && str->str[str->length - 2] == '_')
-    {
-      str->length -= 4;
-      str->str += 2;
-    }
-}
-
 /* Insert an array of attributes ATTRIBUTES into a namespace.  This
    array must be NULL terminated.  NS is the name of attribute
    namespace.  The function returns the namespace into which the
@@ -304,7 +290,6 @@ lookup_scoped_attribute_spec (const_tree ns, const_tree name)
 
   attr.str = IDENTIFIER_POINTER (name);
   attr.length = IDENTIFIER_LENGTH (name);
-  extract_attribute_substring (&attr);
   return attrs->attribute_hash->find_with_hash (&attr,
 						substring_hash (attr.str,
 							       	attr.length));
@@ -356,6 +341,7 @@ get_attribute_namespace (const_tree attr)
 tree
 decl_attributes (tree *node, tree attributes, int flags)
 {
+  clean_attribute_names (attributes);
   tree a;
   tree returned_attrs = NULL_TREE;
 

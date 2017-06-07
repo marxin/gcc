@@ -18248,6 +18248,7 @@ cp_parser_namespace_definition (cp_parser* parser)
   /* Start the namespace.  */
   nested_definition_count += push_namespace (identifier, is_inline);
 
+  clean_attribute_names (attribs);
   bool has_visibility = handle_namespace_attrs (current_namespace, attribs);
 
   warning  (OPT_Wnamespaces, "namespace %qD entered", current_namespace);

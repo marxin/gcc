@@ -3974,17 +3974,16 @@ convert_format_name_to_system_name (const char *attr_name)
 static bool
 cmp_attribs (const char *tattr_name, const char *attr_name)
 {
+  // TODO: remove
   int alen = strlen (attr_name);
   int slen = (tattr_name ? strlen (tattr_name) : 0);
   if (alen > 4 && attr_name[0] == '_' && attr_name[1] == '_'
       && attr_name[alen - 1] == '_' && attr_name[alen - 2] == '_')
     {
-      attr_name += 2;
-      alen -= 4;
+      gcc_unreachable ();
     }
-  if (alen != slen || strncmp (tattr_name, attr_name, alen) != 0)
-    return false;
-  return true;
+
+  return strcmp (tattr_name, attr_name) == 0;
 }
 
 /* Handle a "format" attribute; arguments as in

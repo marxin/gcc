@@ -1270,20 +1270,9 @@ handle_mode_attribute (tree *node, tree name, tree args,
     {
       int j;
       const char *p = IDENTIFIER_POINTER (ident);
-      int len = strlen (p);
       machine_mode mode = VOIDmode;
       tree typefm;
       bool valid_mode;
-
-      if (len > 4 && p[0] == '_' && p[1] == '_'
-	  && p[len - 1] == '_' && p[len - 2] == '_')
-	{
-	  char *newp = (char *) alloca (len - 1);
-
-	  strcpy (newp, &p[2]);
-	  newp[len - 4] = '\0';
-	  p = newp;
-	}
 
       /* Change this type to have a type with the specified mode.
 	 First check for the special modes.  */
