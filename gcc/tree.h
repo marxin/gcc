@@ -5493,6 +5493,48 @@ type_with_alias_set_p (const_tree t)
   return false;
 }
 
+/* Compare attribute identifiers ATTR1 and ATTR2 with length ATTR1_LEN and
+   ATTR2_LEN.  If strict is false, consider __ATTR__ and ATTR as same
+   attribute names.  */
+
+static inline bool
+cmp_attribs (const char *attr1, size_t attr1_len,
+	     const char *attr2, size_t attr2_len,
+	     bool strict = true)
+{
+  if (!strict)
+    {
+      if (attr1_len > 4 && attr1[0] == '_')
+	{
+	  attr1 += 2;
+	  attr1_len -= 4;
+	}
+
+      if (attr2_len > 4 && attr2[0] == '_')
+	{
+	  attr2 += 2;
+	  attr2_len -= 4;
+	}
+    }
+  else
+    {
+      gcc_checking_assert (attr1_len == 0 || attr1[0] != '_');
+      gcc_checking_assert (attr2_len == 0 || attr2[0] != '_');
+    }
+
+  return attr1_len == attr2_len && strncmp (attr1, attr2, attr1_len) == 0;
+}
+
+
+/* Compare attribute identifiers ATTR1 and ATTR2.
+   If strict is false, consider __ATTR__ and ATTR as same attribute names.  */
+
+static inline bool
+cmp_attribs (const char *attr1, const char *attr2, bool strict = true)
+{
+  return cmp_attribs (attr1, strlen (attr1), attr2, strlen (attr2), strict);
+}
+
 extern location_t set_block (location_t loc, tree block);
 
 extern void gt_ggc_mx (tree &);

@@ -67,7 +67,6 @@ static bool check_format_string (tree argument,
 static bool get_constant (tree expr, unsigned HOST_WIDE_INT *value,
 			  int validated_p);
 static const char *convert_format_name_to_system_name (const char *attr_name);
-static bool cmp_attribs (const char *tattr_name, const char *attr_name);
 
 static int first_target_format_type;
 static const char *format_name (int format_num);
@@ -3951,10 +3950,10 @@ convert_format_name_to_system_name (const char *attr_name)
       for (i = 0; i < TARGET_OVERRIDES_FORMAT_ATTRIBUTES_COUNT; ++i)
         {
           if (cmp_attribs (TARGET_OVERRIDES_FORMAT_ATTRIBUTES[i].named_attr_src,
-			   attr_name))
+			   attr_name, false))
             return attr_name;
           if (cmp_attribs (TARGET_OVERRIDES_FORMAT_ATTRIBUTES[i].named_attr_dst,
-			   attr_name))
+			   attr_name, false))
             return TARGET_OVERRIDES_FORMAT_ATTRIBUTES[i].named_attr_src;
         }
     }
@@ -3965,32 +3964,14 @@ convert_format_name_to_system_name (const char *attr_name)
        ++i)
     {
       if (cmp_attribs (gnu_target_overrides_format_attributes[i].named_attr_src,
-		       attr_name))
+		       attr_name, false))
         return attr_name;
       if (cmp_attribs (gnu_target_overrides_format_attributes[i].named_attr_dst,
-		       attr_name))
+		       attr_name, false))
         return gnu_target_overrides_format_attributes[i].named_attr_src;
     }
 
   return attr_name;
-}
-
-/* Return true if TATTR_NAME and ATTR_NAME are the same format attribute,
-   counting "name" and "__name__" as the same, false otherwise.  */
-static bool
-cmp_attribs (const char *tattr_name, const char *attr_name)
-{
-  int alen = strlen (attr_name);
-  int slen = (tattr_name ? strlen (tattr_name) : 0);
-  if (alen > 4 && attr_name[0] == '_' && attr_name[1] == '_'
-      && attr_name[alen - 1] == '_' && attr_name[alen - 2] == '_')
-    {
-      attr_name += 2;
-      alen -= 4;
-    }
-  if (alen != slen || strncmp (tattr_name, attr_name, alen) != 0)
-    return false;
-  return true;
 }
 
 /* Handle a "format" attribute; arguments as in
