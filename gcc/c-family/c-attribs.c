@@ -558,17 +558,22 @@ handle_cold_attribute (tree *node, tree name, tree ARG_UNUSED (args),
 void
 add_no_sanitize_value (tree node, unsigned int flags)
 {
-  tree attr = lookup_attribute ("no_sanitize_flags", DECL_ATTRIBUTES (node));
+  tree attr = lookup_attribute ("sanitize no_flags", DECL_ATTRIBUTES (node));
   if (attr)
     {
       unsigned int old_value = tree_to_uhwi (TREE_VALUE (attr));
       flags |= old_value;
-    }
 
-  DECL_ATTRIBUTES (node)
-    = tree_cons (get_identifier ("no_sanitize_flags"),
-		 build_int_cst (unsigned_type_node, flags),
-		 DECL_ATTRIBUTES (node));
+      if (flags == old_value)
+	return;
+
+      TREE_VALUE (attr) = build_int_cst (unsigned_type_node, flags);
+    }
+  else
+    DECL_ATTRIBUTES (node)
+      = tree_cons (get_identifier ("sanitize no_flags"),
+		   build_int_cst (unsigned_type_node, flags),
+		   DECL_ATTRIBUTES (node));
 }
 
 /* Handle a "no_sanitize" attribute; arguments as in

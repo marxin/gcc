@@ -14442,24 +14442,6 @@ nonnull_arg_p (const_tree arg)
   return false;
 }
 
-/* Return true when flag_sanitize & FLAG is non-zero.  If FN is non-null,
-   remove all flags mentioned in "no_sanitize_flags" of DECL_ATTRIBUTES.  */
-
-bool
-sanitize_flags_p (unsigned int flag, const_tree fn)
-{
-  unsigned int result_flags = flag_sanitize & flag;
-
-  if (fn != NULL_TREE)
-    {
-      tree value = lookup_attribute ("no_sanitize_flags", DECL_ATTRIBUTES (fn));
-      if (value)
-	result_flags &= ~tree_to_uhwi (TREE_VALUE (value));
-    }
-
-  return result_flags;
-}
-
 /* Combine LOC and BLOCK to a combined adhoc loc, retaining any range
    information.  */
 

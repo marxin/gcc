@@ -16,6 +16,9 @@ NAME (void) \
 
 void
 __attribute__((no_sanitize(("address"))))
+__attribute__((no_sanitize(("undefined"))))
+__attribute__((no_sanitize(("address"))))
+__attribute__((no_sanitize(("null"))))
 FN (fn1)
 
 void

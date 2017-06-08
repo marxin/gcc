@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "builtins.h"
 #include "ubsan.h"
+#include "asan.h"
 
 #define maybe_fold_build1_loc(FOLD_P, LOC, CODE, TYPE, EXPR) \
   ((FOLD_P) ? fold_build1_loc (LOC, CODE, TYPE, EXPR)	     \

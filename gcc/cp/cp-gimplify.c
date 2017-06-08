@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "c-family/c-ubsan.h"
 #include "cilk.h"
 #include "cp-cilkplus.h"
+#include "asan.h"
 
 /* Forward declarations.  */
 
