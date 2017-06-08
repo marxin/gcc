@@ -4958,7 +4958,10 @@ cmp_attrib_identifiers (const_tree attr1, const_tree attr2)
       if (p[0] == '_' && p[1] == '_'
 	  && p[attr2_len - 2] == '_' && p[attr2_len - 1] == '_'
 	  && strncmp (q, p + 2, attr1_len) == 0)
-	return true;;
+	{
+	  gcc_unreachable ();
+	return true;
+	}
     }
   else if (attr2_len + 4 == attr1_len)
     {
@@ -4967,7 +4970,11 @@ cmp_attrib_identifiers (const_tree attr1, const_tree attr2)
       if (q[0] == '_' && q[1] == '_'
 	  && q[attr1_len - 2] == '_' && q[attr1_len - 1] == '_'
 	  && strncmp (q + 2, p, attr2_len) == 0)
+	{
+
+	  gcc_unreachable ();
 	return true;
+	}
     }
 
   return false;
@@ -6061,7 +6068,10 @@ private_is_attribute_p (const char *attr_name, size_t attr_len, const_tree ident
       if (p[0] == '_' && p[1] == '_'
 	  && p[ident_len - 2] == '_' && p[ident_len - 1] == '_'
 	  && strncmp (attr_name, p + 2, attr_len) == 0)
+	{
+	  gcc_unreachable ();
 	return true;
+	}
     }
 
   return false;
@@ -6091,7 +6101,11 @@ private_lookup_attribute (const char *attr_name, size_t attr_len, tree list)
 	  if (p[0] == '_' && p[1] == '_'
 	      && p[ident_len - 2] == '_' && p[ident_len - 1] == '_'
 	      && strncmp (attr_name, p + 2, attr_len) == 0)
+	    {
+
+	  gcc_unreachable ();
 	    break;
+	    }
 	}
       list = TREE_CHAIN (list);
     }
@@ -6128,7 +6142,11 @@ private_lookup_attribute_by_prefix (const char *attr_name, size_t attr_len,
 	 to '__text__') then we could avoid the following case.  */
       if (p[0] == '_' && p[1] == '_' &&
 	  strncmp (attr_name, p + 2, attr_len) == 0)
+	{
+
+	  gcc_unreachable ();
 	break;
+	}
 
       list = TREE_CHAIN (list);
     }
@@ -14539,6 +14557,23 @@ get_nonnull_args (const_tree fntype)
     }
 
   return argmap;
+}
+
+tree
+canonize_attr_name (tree attr_name)
+{
+  const size_t l = IDENTIFIER_LENGTH (attr_name);
+  const char *s = IDENTIFIER_POINTER (attr_name);
+
+  if (l > 4 && s[0] == '_')
+    {
+      gcc_assert (s[1] == '_');
+      gcc_assert (s[l - 2] == '_');
+      gcc_assert (s[l - 1] == '_');
+      return get_identifier_with_length (s + 2, l - 4);
+    }
+
+  return attr_name;
 }
 
 #if CHECKING_P

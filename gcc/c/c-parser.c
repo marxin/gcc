@@ -4180,6 +4180,7 @@ c_parser_attributes (c_parser *parser)
 	  c_parser_consume_token (parser);
 	  if (c_parser_next_token_is_not (parser, CPP_OPEN_PAREN))
 	    {
+	      attr_name = canonize_attr_name (attr_name);
 	      attr = build_tree_list (attr_name, NULL_TREE);
 	      /* Add this attribute to the list.  */
 	      attrs = chainon (attrs, attr);
@@ -4234,6 +4235,14 @@ c_parser_attributes (c_parser *parser)
 		  release_tree_vector (expr_list);
 		}
 	    }
+
+	  attr_name = canonize_attr_name (attr_name);
+	  if (attr_args
+	      && TREE_VALUE (attr_args)
+	      && TREE_CODE (TREE_VALUE (attr_args)) == IDENTIFIER_NODE)
+	    TREE_VALUE (attr_args)
+	      = canonize_attr_name (TREE_VALUE (attr_args));
+
 	  attr = build_tree_list (attr_name, attr_args);
 	  if (c_parser_next_token_is (parser, CPP_CLOSE_PAREN))
 	    c_parser_consume_token (parser);

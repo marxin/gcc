@@ -4172,6 +4172,8 @@ extern tree private_lookup_attribute (const char *, size_t, tree);
    of lookup_attribute_by_prefix() and you should never call it directly.  */
 extern tree private_lookup_attribute_by_prefix (const char *, size_t, tree);
 
+extern tree canonize_attr_name (tree attr_name);
+
 /* Given an attribute name ATTR_NAME and a list of attributes LIST,
    return a pointer to the attribute's list element if the attribute
    is part of the list, or NULL_TREE if not found.  If the attribute

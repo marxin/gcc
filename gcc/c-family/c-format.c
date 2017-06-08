@@ -3979,6 +3979,7 @@ cmp_attribs (const char *tattr_name, const char *attr_name)
   if (alen > 4 && attr_name[0] == '_' && attr_name[1] == '_'
       && attr_name[alen - 1] == '_' && attr_name[alen - 2] == '_')
     {
+      gcc_unreachable ();
       attr_name += 2;
       alen -= 4;
     }
