@@ -47,4 +47,23 @@ extern char *make_unique_name (tree, const char *, bool);
 extern tree make_dispatcher_decl (const tree);
 extern bool is_function_default_version (const tree);
 
+/* For a given IDENTIFIER_NODE, strip leading and trailing '_' characters
+   so that we have a canonized shape or attribute names.  */
+
+static inline tree
+canonize_attr_name (tree attr_name)
+{
+  const size_t l = IDENTIFIER_LENGTH (attr_name);
+  const char *s = IDENTIFIER_POINTER (attr_name);
+
+  if (l > 4 && s[0] == '_')
+    {
+      gcc_checking_assert (s[l - 2] == '_');
+      return get_identifier_with_length (s + 2, l - 4);
+    }
+
+  return attr_name;
+}
+
+
 #endif // GCC_ATTRIBS_H

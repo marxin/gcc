@@ -3982,15 +3982,10 @@ cmp_attribs (const char *tattr_name, const char *attr_name)
 {
   int alen = strlen (attr_name);
   int slen = (tattr_name ? strlen (tattr_name) : 0);
-  if (alen > 4 && attr_name[0] == '_' && attr_name[1] == '_'
-      && attr_name[alen - 1] == '_' && attr_name[alen - 2] == '_')
-    {
-      attr_name += 2;
-      alen -= 4;
-    }
-  if (alen != slen || strncmp (tattr_name, attr_name, alen) != 0)
-    return false;
-  return true;
+  gcc_checking_assert (alen == 0 || attr_name[0] != '_');
+  gcc_checking_assert (slen == 0 || tattr_name[0] != '_');
+
+  return (alen == slen && strncmp (tattr_name, attr_name, alen) == 0);
 }
 
 /* Handle a "format" attribute; arguments as in
