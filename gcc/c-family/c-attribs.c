@@ -583,11 +583,11 @@ static tree
 handle_no_sanitize_attribute (tree *node, tree name, tree args, int,
 			      bool *no_add_attrs)
 {
+  *no_add_attrs = true;
   tree id = TREE_VALUE (args);
   if (TREE_CODE (*node) != FUNCTION_DECL)
     {
       warning (OPT_Wattributes, "%qE attribute ignored", name);
-      *no_add_attrs = true;
       return NULL_TREE;
     }
 
@@ -619,11 +619,9 @@ static tree
 handle_no_sanitize_address_attribute (tree *node, tree name, tree, int,
 				      bool *no_add_attrs)
 {
+  *no_add_attrs = true;
   if (TREE_CODE (*node) != FUNCTION_DECL)
-    {
-      warning (OPT_Wattributes, "%qE attribute ignored", name);
-      *no_add_attrs = true;
-    }
+    warning (OPT_Wattributes, "%qE attribute ignored", name);
   else
     add_no_sanitize_value (*node, SANITIZE_ADDRESS);
 
@@ -637,11 +635,9 @@ static tree
 handle_no_sanitize_thread_attribute (tree *node, tree name, tree, int,
 				      bool *no_add_attrs)
 {
+  *no_add_attrs = true;
   if (TREE_CODE (*node) != FUNCTION_DECL)
-    {
-      warning (OPT_Wattributes, "%qE attribute ignored", name);
-      *no_add_attrs = true;
-    }
+    warning (OPT_Wattributes, "%qE attribute ignored", name);
   else
     add_no_sanitize_value (*node, SANITIZE_THREAD);
 
@@ -656,11 +652,9 @@ static tree
 handle_no_address_safety_analysis_attribute (tree *node, tree name, tree, int,
 					     bool *no_add_attrs)
 {
+  *no_add_attrs = true;
   if (TREE_CODE (*node) != FUNCTION_DECL)
-    {
-      warning (OPT_Wattributes, "%qE attribute ignored", name);
-      *no_add_attrs = true;
-    }
+    warning (OPT_Wattributes, "%qE attribute ignored", name);
   else
     add_no_sanitize_value (*node, SANITIZE_ADDRESS);
 
@@ -674,11 +668,9 @@ static tree
 handle_no_sanitize_undefined_attribute (tree *node, tree name, tree, int,
 				      bool *no_add_attrs)
 {
+  *no_add_attrs = true;
   if (TREE_CODE (*node) != FUNCTION_DECL)
-    {
-      warning (OPT_Wattributes, "%qE attribute ignored", name);
-      *no_add_attrs = true;
-    }
+    warning (OPT_Wattributes, "%qE attribute ignored", name);
   else
     add_no_sanitize_value (*node,
 			   SANITIZE_UNDEFINED | SANITIZE_UNDEFINED_NONDEFAULT);
