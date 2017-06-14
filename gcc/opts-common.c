@@ -1245,6 +1245,12 @@ set_option (struct gcc_options *opts, struct gcc_options *opts_set,
   switch (option->var_type)
     {
     case CLVC_BOOLEAN:
+	*(bool *) flag_var = value;
+	if (set_flag_var)
+	  *(bool *) set_flag_var = 1;
+	break;
+
+    case CLVC_INTEGER:
 	*(int *) flag_var = value;
 	if (set_flag_var)
 	  *(int *) set_flag_var = 1;
@@ -1347,6 +1353,9 @@ option_enabled (int opt_idx, void *opts)
     switch (option->var_type)
       {
       case CLVC_BOOLEAN:
+	return *(bool*) flag_var != 0;
+
+      case CLVC_INTEGER:
 	return *(int *) flag_var != 0;
 
       case CLVC_EQUAL:
@@ -1390,6 +1399,11 @@ get_option_state (struct gcc_options *opts, int option,
   switch (cl_options[option].var_type)
     {
     case CLVC_BOOLEAN:
+      state->data = flag_var;
+      state->size = sizeof (bool);
+      break;
+
+    case CLVC_INTEGER:
     case CLVC_EQUAL:
       state->data = flag_var;
       state->size = (cl_options[option].cl_host_wide_int

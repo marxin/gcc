@@ -197,6 +197,9 @@ function var_type(flags)
 		en = opt_args("Enum", flags);
 		return enum_type[en] " "
 	}
+	else if (flag_set_p("Boolean", flags)) {
+		return "bool "
+	  }
 	else if (!flag_set_p("Joined.*", flags) && !flag_set_p("Separate", flags))
 		return "int "
 	else if (flag_set_p("UInteger", flags))
@@ -216,6 +219,9 @@ function var_type_struct(flags)
 		en = opt_args("Enum", flags);
 		return enum_type[en] " "
 	}
+	else if (flag_set_p("Boolean", flags)) {
+		return "bool "
+	  }
 	else if (!flag_set_p("Joined.*", flags) && !flag_set_p("Separate", flags)) {
 		if (flag_set_p(".*Mask.*", flags)) {
 			if (host_wide_int[var_name(flags)] == "yes")
@@ -236,6 +242,8 @@ function var_set(flags)
 {
 	if (flag_set_p("Defer", flags))
 		return "0, CLVC_DEFER, 0"
+	if (flag_set_p("Boolean", flags))
+		return "0, CLVC_BOOLEAN, 0"
 	s = nth_arg(1, opt_args("Var", flags))
 	if (s != "")
 		return "0, CLVC_EQUAL, " s
@@ -261,7 +269,7 @@ function var_set(flags)
 	}
 	if (var_type(flags) == "const char *")
 		return "0, CLVC_STRING, 0"
-	return "0, CLVC_BOOLEAN, 0"
+	return "0, CLVC_INTEGER, 0"
 }
 
 # Given that an option called NAME has flags FLAGS, return an initializer

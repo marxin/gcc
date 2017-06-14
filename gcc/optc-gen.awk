@@ -197,6 +197,10 @@ for (i = 0; i < n_opts; i++) {
 
 	init = opt_args("Init", flags[i])
 	if (init != "") {
+		if ((init < 0 || init > 1) && flag_set_p("Boolean", flags[i]))
+		  print "#error can't combine Boolean flag with value " init \
+			" for " name
+
 		if (name in var_init && var_init[name] != init)
 			print "#error multiple initializers for " name
 		var_init[name] = init

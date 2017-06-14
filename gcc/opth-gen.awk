@@ -136,6 +136,7 @@ n_opt_char = 3;
 n_opt_short = 0;
 n_opt_int = 0;
 n_opt_enum = 0;
+n_opt_bitfield = 0;
 n_opt_other = 0;
 var_opt_char[0] = "unsigned char x_optimize";
 var_opt_char[1] = "unsigned char x_optimize_size";
@@ -163,7 +164,8 @@ for (i = 0; i < n_opts; i++) {
 
 		else if (otype ~ ("^enum +[_" alnum "]+ *$"))
 			var_opt_enum[n_opt_enum++] = otype "x_" name;
-
+		else if (otype ~ ("^bool $"))
+			var_opt_bitfield[n_opt_bitfield++] = "unsigned x_" name " : 1";
 		else
 			var_opt_other[n_opt_other++] = otype "x_" name;
 	}
@@ -188,6 +190,11 @@ for (i = 0; i < n_opt_short; i++) {
 for (i = 0; i < n_opt_char; i++) {
 	print "  " var_opt_char[i] ";";
 }
+
+for (i = 0; i < n_opt_bitfield; i++) {
+	print "  " var_opt_bitfield[i] ";";
+}
+
 
 print "};";
 print "";

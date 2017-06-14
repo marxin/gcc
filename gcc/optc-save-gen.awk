@@ -779,10 +779,13 @@ print "/* Stream out optimization options  */";
 print "void";
 print "cl_optimization_stream_out (struct bitpack_d *bp,";
 print "                            struct cl_optimization *ptr)";
-print "{";
+print "{fprintf (stderr, \"streaming\\n\");";
 for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
-	print "  bp_pack_value (bp, ptr->" name", 64);";
+	if (var_opt_val_type[i] == "bool ")
+		print "  bp_pack_value (bp, ptr->" name", 1);";
+	else
+		print "  bp_pack_value (bp, ptr->" name", 64);";
 }
 print "}";
 
@@ -794,7 +797,10 @@ print "                           struct cl_optimization *ptr)";
 print "{";
 for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
-	print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_value (bp, 64);";
+	if (var_opt_val_type[i] == "bool ")
+		print "  ptr->" name" = bp_unpack_value (bp, 1);";
+	else
+		print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_value (bp, 64);";
 }
 print "}";
 }

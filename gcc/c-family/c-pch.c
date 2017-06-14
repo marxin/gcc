@@ -35,7 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 
 static const struct c_pch_matching
 {
-  int *flag_var;
+  bool *flag_var;
   const char *flag_name;
 } pch_matching[] = {
   { &flag_exceptions, "-fexceptions" },
