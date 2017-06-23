@@ -1168,6 +1168,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 					   gen_int_mode (base_align_bias
 							 - base_offset, Pmode),
 					   NULL_RTX, 1, OPTAB_DIRECT));
+      asan_stack_birth_insn = get_last_insn ();
     }
   mem = gen_rtx_MEM (ptr_mode, base);
   mem = adjust_address (mem, VOIDmode, base_align_bias);

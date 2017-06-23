@@ -5220,6 +5220,8 @@ expand_function_start (tree subr)
      In some cases this requires emitting insns.  */
   assign_parms (subr);
 
+  start_sequence ();
+
   /* If function gets a static chain arg, store it.  */
   if (cfun->static_chain_decl)
     {
@@ -5282,6 +5284,17 @@ expand_function_start (tree subr)
 
       emit_move_insn (r_save, targetm.builtin_setjmp_frame_value ());
       update_nonlocal_goto_save_area ();
+    }
+
+  rtx_insn *seq = get_insns ();
+  end_sequence ();
+
+  if (seq)
+    {
+      if (asan_stack_birth_insn == NULL_RTX)
+	asan_stack_birth_insn = get_insns ();
+
+      emit_insn_after (seq, asan_stack_birth_insn);
     }
 
   /* The following was moved from init_function_start.
