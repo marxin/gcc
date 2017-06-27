@@ -7507,7 +7507,8 @@ ix86_can_inline_p (tree caller, tree callee)
   tree callee_tree = DECL_FUNCTION_SPECIFIC_TARGET (callee);
 
   /* If callee has no option attributes, then it is ok to inline.  */
-  if (!callee_tree)
+  if (!callee_tree
+      || lookup_attribute ("optimize", DECL_ATTRIBUTES (callee)) == NULL_TREE)
     ret = true;
 
   /* If caller has no option attributes, but callee does then it is not ok to
