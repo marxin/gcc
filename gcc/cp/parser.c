@@ -24765,7 +24765,8 @@ cp_parser_gnu_attribute_list (cp_parser* parser)
 		  tree tv;
 		  if (arguments != NULL_TREE
 		      && ((tv = TREE_VALUE (arguments)) != NULL_TREE)
-		      && TREE_CODE (tv) == IDENTIFIER_NODE)
+		      && TREE_CODE (tv) == IDENTIFIER_NODE
+		      && !id_equal (TREE_PURPOSE (attribute), "cleanup"))
 		    TREE_VALUE (arguments) = canonize_attr_name (tv);
 		  release_tree_vector (vec);
 		}
