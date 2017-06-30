@@ -870,7 +870,7 @@ sanitize_asan_mark_poison (void)
 static tree
 rewrite_usage_of_param (tree *op, int *walk_subtrees, void *)
 {
-  if (TREE_CODE (*op) == PARM_DECL && DECL_VALUE_EXPR (*op) != NULL_TREE)
+  if (TREE_CODE (*op) == PARM_DECL && DECL_HAS_VALUE_EXPR_P (*op))
     {
       *op = DECL_VALUE_EXPR (*op);
       *walk_subtrees = 0;
@@ -888,7 +888,8 @@ sanitize_rewrite_addressable_params (function *fun)
 {
   gimple *g;
   gimple_seq stmts = NULL;
-  auto_vec<tree> addressable_params;
+  bool has_any_addressable_param = false;
+  auto_vec<tree> clear_value_expr_list;
 
   for (tree arg = DECL_ARGUMENTS (current_function_decl);
        arg; arg = DECL_CHAIN (arg))
@@ -898,14 +899,13 @@ sanitize_rewrite_addressable_params (function *fun)
 	  TREE_ADDRESSABLE (arg) = 0;
 	  /* The parameter is no longer addressable.  */
 	  tree type = TREE_TYPE (arg);
-	  addressable_params.safe_push (arg);
+	  has_any_addressable_param = true;
 
 	  /* Create a new automatic variable.  */
 	  tree var = build_decl (DECL_SOURCE_LOCATION (arg),
 				 VAR_DECL, DECL_NAME (arg), type);
 	  TREE_ADDRESSABLE (var) = 1;
 	  DECL_ARTIFICIAL (var) = 1;
-	  DECL_SEEN_IN_BIND_EXPR_P (var) = 0;
 
 	  gimple_add_tmp_var (var);
 
@@ -914,6 +914,7 @@ sanitize_rewrite_addressable_params (function *fun)
 		     "Rewriting parameter whose address is taken: %s\n",
 		     IDENTIFIER_POINTER (DECL_NAME (arg)));
 
+	  DECL_HAS_VALUE_EXPR_P (arg) = 1;
 	  SET_DECL_VALUE_EXPR (arg, var);
 
 	  /* Assign value of parameter to newly created variable.  */
@@ -922,23 +923,14 @@ sanitize_rewrite_addressable_params (function *fun)
 	    {
 	      /* We need to create a SSA name that will be used for the
 		 assignment.  */
-	      tree tmp;
-	      if (DECL_GIMPLE_REG_P (arg))
-		tmp = ssa_default_def (cfun, arg);
-	      else
-		{
-		  tmp = make_ssa_name (type);
-		  g = gimple_build_assign (tmp, arg);
-		  gimple_set_location (g, DECL_SOURCE_LOCATION (arg));
-		  gimple_seq_add_stmt (&stmts, g);
-		}
+	      DECL_GIMPLE_REG_P (arg) = 1;
+	      tree tmp = get_or_create_ssa_default_def (cfun, arg);
 	      g = gimple_build_assign (var, tmp);
 	      gimple_set_location (g, DECL_SOURCE_LOCATION (arg));
 	      gimple_seq_add_stmt (&stmts, g);
 	    }
 	  else
 	    {
-	      dump_function (0, cfun->decl);
 	      g = gimple_build_assign (var, arg);
 	      gimple_set_location (g, DECL_SOURCE_LOCATION (arg));
 	      gimple_seq_add_stmt (&stmts, g);
@@ -948,11 +940,12 @@ sanitize_rewrite_addressable_params (function *fun)
 	    {
 	      g = gimple_build_debug_bind (arg, var, NULL);
 	      gimple_seq_add_stmt (&stmts, g);
+	      clear_value_expr_list.safe_push (arg);
 	    }
 	}
     }
 
-  if (addressable_params.is_empty ())
+  if (!has_any_addressable_param)
     return;
 
   /* Replace all usages of PARM_DECLs with the newly
@@ -970,13 +963,19 @@ sanitize_rewrite_addressable_params (function *fun)
       for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gphi *phi = dyn_cast<gphi *> (gsi_stmt (gsi));
-	  for (unsigned i = 0; i < gimple_phi_num_args (phi); ++i)
-	    {
-	      hash_set<tree> visited_nodes;
-	      walk_tree (gimple_phi_arg_def_ptr (phi, i),
-			 rewrite_usage_of_param, NULL, &visited_nodes);
-	    }
+	  gimple_stmt_iterator it = gsi_for_stmt (phi);
+	  walk_gimple_stmt (&it, NULL, rewrite_usage_of_param, NULL);
 	}
+    }
+
+  /* Unset value expr for parameters for which we created debug bind
+     expressions.  */
+  unsigned i;
+  tree arg;
+  FOR_EACH_VEC_ELT (clear_value_expr_list, i, arg)
+    {
+      DECL_HAS_VALUE_EXPR_P (arg) = 0;
+      SET_DECL_VALUE_EXPR (arg, NULL_TREE);
     }
 
   /* Insert default assignments at the beginning of a function.  */
