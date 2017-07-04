@@ -115,6 +115,7 @@
 #include "bb-reorder.h"
 #include "except.h"
 #include "fibonacci_heap.h"
+#include "dbgcnt.h"
 
 /* The number of rounds.  In most cases there will only be 4 rounds, but
    when partitioning hot and cold basic blocks into separate sections of
@@ -2910,6 +2911,13 @@ pass_partition_blocks::execute (function *fun)
   clear_aux_for_blocks ();
 
   crossing_edges.release ();
+
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      if (BB_PARTITION (bb) == BB_COLD_PARTITION && dbg_cnt (cold_bb))
+	emit_insn_after (targetm.gen_trap (), bb_note (bb));
+    }
 
   /* ??? FIXME: DF generates the bb info for a block immediately.
      And by immediately, I mean *during* creation of the block.

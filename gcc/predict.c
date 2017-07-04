@@ -213,6 +213,8 @@ static bool
 probably_never_executed (struct function *fun,
                          profile_count count, int)
 {
+  return count == profile_count::zero ();
+
   gcc_checking_assert (fun);
   if (count == profile_count::zero ())
     return true;

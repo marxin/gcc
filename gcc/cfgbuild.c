@@ -97,9 +97,11 @@ control_flow_insn_p (const rtx_insn *insn)
 
     case INSN:
       /* Treat trap instructions like noreturn calls (same provision).  */
+      /*
       if (GET_CODE (PATTERN (insn)) == TRAP_IF
 	  && XEXP (PATTERN (insn), 0) == const1_rtx)
 	return true;
+	*/
       if (!cfun->can_throw_non_call_exceptions)
 	return false;
       break;
