@@ -2915,8 +2915,15 @@ pass_partition_blocks::execute (function *fun)
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
     {
+      static int counter = 0;
       if (BB_PARTITION (bb) == BB_COLD_PARTITION && dbg_cnt (cold_bb))
-	emit_insn_after (targetm.gen_trap (), bb_note (bb));
+	{
+//	  fprintf (stderr, "setting trap do BB #%d\n", counter);
+	  rtx eax = gen_rtx_REG (Pmode, AX_REG);
+	  emit_insn_after (targetm.gen_trap (), bb_note (bb));
+	  rtx r = gen_rtx_SET (eax, GEN_INT (counter++));
+	  emit_insn_after (r, bb_note (bb));
+	}
     }
 
   /* ??? FIXME: DF generates the bb info for a block immediately.
