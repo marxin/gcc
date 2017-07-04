@@ -247,6 +247,8 @@ probably_never_executed_bb_p (struct function *fun, const_basic_block bb)
 static bool
 unlikely_executed_edge_p (edge e)
 {
+  return e->count == profile_count::zero ();
+
   return (e->count == profile_count::zero ()
 	  || e->probability == profile_probability::never ())
 	 || (e->flags & (EDGE_EH | EDGE_FAKE));
@@ -817,6 +819,8 @@ unlikely_executed_stmt_p (gimple *stmt)
 static bool
 unlikely_executed_bb_p (basic_block bb)
 {
+  return bb->count == profile_count::zero ();
+
   if (bb->count == profile_count::zero ())
     return true;
   if (bb == ENTRY_BLOCK_PTR_FOR_FN (cfun) || bb == EXIT_BLOCK_PTR_FOR_FN (cfun))
