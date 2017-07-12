@@ -7140,6 +7140,12 @@ ix86_valid_target_attribute_inner_p (tree args, char *p_strings[],
   /* Handle multiple arguments separated by commas.  */
   next_optstr = ASTRDUP (TREE_STRING_POINTER (args));
 
+  if (next_optstr && *next_optstr == '\0')
+  {
+      error ("attribute %<target%> argument can't be an empty string");
+      return false;
+  }
+
   while (next_optstr && *next_optstr != '\0')
     {
       char *p = next_optstr;
