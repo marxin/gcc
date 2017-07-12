@@ -83,6 +83,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "calls.h"
 #include "varasm.h"
+#include "stringpool.h"
+#include "attribs.h"
 
 /* Return true when NODE can not be local. Worker for cgraph_local_node_p.  */
 

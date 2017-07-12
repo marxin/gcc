@@ -63,6 +63,8 @@
 #include "gadaint.h"
 #include "ada-tree.h"
 #include "gigi.h"
+#include "stringpool.h"
+#include "attribs.h"
 
 /* We should avoid allocating more than ALLOCA_THRESHOLD bytes via alloca,
    for fear of running out of stack space.  If we need more, we use xmalloc
