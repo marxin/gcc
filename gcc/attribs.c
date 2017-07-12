@@ -725,6 +725,9 @@ sorted_attr_string (tree arglist)
     {
       const char *str = TREE_STRING_POINTER (TREE_VALUE (arg));
       size_t len = strlen (str);
+      /* Skip empty string.  */
+      if (len == 0)
+	continue;
       str_len_sum += len + 1;
       if (arg != arglist)
 	argnum++;
@@ -739,6 +742,9 @@ sorted_attr_string (tree arglist)
     {
       const char *str = TREE_STRING_POINTER (TREE_VALUE (arg));
       size_t len = strlen (str);
+      /* Skip empty string.  */
+      if (len == 0)
+	continue;
       memcpy (attr_str + str_len_sum, str, len);
       attr_str[str_len_sum + len] = TREE_CHAIN (arg) ? ',' : '\0';
       str_len_sum += len + 1;
