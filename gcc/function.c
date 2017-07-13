@@ -5220,6 +5220,14 @@ expand_function_start (tree subr)
      In some cases this requires emitting insns.  */
   assign_parms (subr);
 
+  /* The following was moved from init_function_start.
+     The move is supposed to make sdb output more accurate.  */
+  /* Indicate the beginning of the function body,
+     as opposed to parm setup.  */
+  rtx_note *b = emit_note (NOTE_INSN_FUNCTION_BEG);
+
+  gcc_assert (NOTE_P (get_last_insn ()));
+
   /* If function gets a static chain arg, store it.  */
   if (cfun->static_chain_decl)
     {
@@ -5284,15 +5292,7 @@ expand_function_start (tree subr)
       update_nonlocal_goto_save_area ();
     }
 
-  /* The following was moved from init_function_start.
-     The move is supposed to make sdb output more accurate.  */
-  /* Indicate the beginning of the function body,
-     as opposed to parm setup.  */
-  emit_note (NOTE_INSN_FUNCTION_BEG);
-
-  gcc_assert (NOTE_P (get_last_insn ()));
-
-  parm_birth_insn = get_last_insn ();
+  parm_birth_insn = b;
 
   if (crtl->profile)
     {

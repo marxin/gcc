@@ -1340,6 +1340,16 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       emit_cmp_and_jump_insns (ret, const0_rtx, EQ, NULL_RTX,
 			       VOIDmode, 0, lab,
 			       profile_probability::very_likely ());
+      /* Preserve static chain register in order to not have it clobbered in
+	 __asan_stack_malloc_N function.  */
+      rtx chain = targetm.calls.static_chain (current_function_decl, true);
+      rtx saved_chain;
+      if (chain)
+	{
+	  saved_chain = gen_reg_rtx (Pmode);
+	  emit_move_insn (saved_chain, chain);
+	}
+
       snprintf (buf, sizeof buf, "__asan_stack_malloc_%d",
 		use_after_return_class);
       ret = init_one_libfunc (buf);
@@ -1347,6 +1357,8 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 				     GEN_INT (asan_frame_size
 					      + base_align_bias),
 				     TYPE_MODE (pointer_sized_int_node));
+      if (chain)
+	emit_move_insn (chain, saved_chain);
       /* __asan_stack_malloc_[n] returns a pointer to fake stack if succeeded
 	 and NULL otherwise.  Check RET value is NULL here and jump over the
 	 BASE reassignment in this case.  Otherwise, reassign BASE to RET.  */
