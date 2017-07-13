@@ -4347,7 +4347,8 @@ cp_make_fname_decl (location_t loc, tree id, int type_dep)
     {
       DECL_CONTEXT (decl) = current_function_decl;
       decl = pushdecl_outermost_localscope (decl);
-      add_decl_expr (decl);
+      if (decl != error_mark_node)
+	add_decl_expr (decl);
     }
   else
     {
