@@ -1309,6 +1309,7 @@ OBJS = \
 	gimple-ssa-warn-alloca.o \
 	gimple-streamer-in.o \
 	gimple-streamer-out.o \
+	gimple-switch-low.o \
 	gimple-walk.o \
 	gimplify.o \
 	gimplify-me.o \
