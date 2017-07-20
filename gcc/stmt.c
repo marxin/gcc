@@ -1230,11 +1230,6 @@ expand_case (gswitch *stmt)
      The two options at this point are a dispatch table (casesi or
      tablejump) or a decision tree.  */
 
-  if (expand_switch_as_decision_tree_p (range, uniq, count))
-    emit_case_decision_tree (index_expr, index_type,
-                             case_list, default_label,
-                             default_prob);
-  else
     {
       /* If the default case is unreachable, then set default_label to NULL
 	 so that we omit the range check when generating the dispatch table.
