@@ -511,7 +511,7 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return flag_tree_switch_conversion != 0; }
+  virtual bool gate (function *) { return true; }
   virtual unsigned int execute (function *);
 
 }; // class pass_lower_switch
