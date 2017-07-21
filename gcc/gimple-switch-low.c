@@ -361,7 +361,62 @@ emit_case_decision_tree (gswitch *s, tree index_expr, tree index_type,
     emit_jump (bb, default_bb);
 
   /* Remove all edges and do just an edge that will reach default_bb.  */
-  delete_basic_block (gimple_bb (s));
+  gsi = gsi_last_bb (gimple_bb (s));
+  gsi_remove (&gsi, true);
+}
+
+static void
+add_phi_operand_mapping (const vec<basic_block> bbs, basic_block switch_bb,
+			 hash_map <tree, tree> *map)
+{
+  /* Record all PHI nodes that have to be fixed after conversion.  */
+  for (unsigned i = 0; i < bbs.length (); i++)
+    {
+      basic_block bb = bbs[i];
+
+      gphi_iterator gsi;
+      for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gphi *phi = gsi.phi ();
+
+	  for (unsigned i = 0; i < gimple_phi_num_args (phi); i++)
+	    {
+	      basic_block phi_src_bb = gimple_phi_arg_edge (phi, i)->src;
+	      if (phi_src_bb == switch_bb)
+		{
+		  tree def = gimple_phi_arg_def (phi, i);
+		  tree result = gimple_phi_result (phi);
+		  map->put (result, def);
+		  break;
+		}
+	    }
+	}
+    }
+}
+static void
+fix_phi_operands_after_transform (auto_vec<basic_block> &case_bbs,
+				  hash_map<tree, tree> *phis_to_fix)
+{
+  for (unsigned i = 0; i < case_bbs.length (); i++)
+    {
+      basic_block bb = case_bbs[i];
+      gphi_iterator gsi;
+      for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gphi *phi = gsi.phi ();
+
+	  tree *replacement = phis_to_fix->get (gimple_phi_result (phi));
+	  if (replacement)
+	    {
+	      for (unsigned j = 0; j < gimple_phi_num_args (phi); j++)
+		{
+		  tree def = gimple_phi_arg_def (phi, j);
+		  if (def == NULL_TREE)
+		    *gimple_phi_arg_def_ptr (phi, j) = *replacement;
+		}
+	    }
+	}
+    }
 }
 
 /* Attempt to expand gimple switch STMT to a decision tree.  */
@@ -378,6 +433,9 @@ try_switch_expansion (gswitch *stmt)
   tree index_type = TREE_TYPE (index_expr);
   tree elt;
   basic_block bb = gimple_bb (stmt);
+
+  hash_map<tree, tree> phis_to_fix;
+  auto_vec<basic_block> case_bbs;
 
   /* A list of case labels; it is first built as a list and it may then
      be rearranged into a nearly balanced binary tree.  */
@@ -399,6 +457,7 @@ try_switch_expansion (gswitch *stmt)
   default_bb = label_to_block_fn (cfun, default_label);
   edge default_edge = EDGE_SUCC (bb, 0);
   profile_probability default_prob = default_edge->probability;
+  case_bbs.safe_push (default_bb);
 
   /* Get upper and lower bounds of case values.  */
   elt = gimple_switch_label (stmt, 1);
@@ -463,8 +522,11 @@ try_switch_expansion (gswitch *stmt)
 	case_list, low, high, case_bb, lab,
 	case_edge->probability.apply_scale (1, (intptr_t) (case_edge->aux)),
 	case_node_pool);
+
+      case_bbs.safe_push (case_bb);
     }
   reset_out_edges_aux (bb);
+  add_phi_operand_mapping (case_bbs, bb, &phis_to_fix);
 
   /* cleanup_tree_cfg removes all SWITCH_EXPR with a single
      destination, such as one with a default case only.
@@ -480,6 +542,7 @@ try_switch_expansion (gswitch *stmt)
     {
       emit_case_decision_tree (stmt, index_expr, index_type, case_list,
 			       default_bb, default_label, default_prob);
+      fix_phi_operands_after_transform (case_bbs, &phis_to_fix);
       return true;
     }
 
@@ -547,7 +610,6 @@ pass_lower_switch::execute (function *fun)
     {
       free_dominance_info (CDI_DOMINATORS);
       free_dominance_info (CDI_POST_DOMINATORS);
-      mark_virtual_operands_for_renaming (cfun);
     }
 
   return 0;
