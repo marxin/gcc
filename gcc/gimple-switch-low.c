@@ -48,6 +48,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "cfgloop.h"
 #include "target.h"
 #include "alloc-pool.h"
+#include "tree-into-ssa.h"
 
 struct case_node
 {
@@ -500,7 +501,7 @@ const pass_data pass_data_lower_switch =
   0, /* properties_provided */
   0, /* properties_destroyed */
   0, /* todo_flags_start */
-  TODO_cleanup_cfg | TODO_update_ssa, /* todo_flags_finish */
+  TODO_update_ssa | TODO_cleanup_cfg, /* todo_flags_finish */
 };
 
 class pass_lower_switch : public gimple_opt_pass
@@ -546,6 +547,7 @@ pass_lower_switch::execute (function *fun)
     {
       free_dominance_info (CDI_DOMINATORS);
       free_dominance_info (CDI_POST_DOMINATORS);
+      mark_virtual_operands_for_renaming (cfun);
     }
 
   return 0;
