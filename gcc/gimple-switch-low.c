@@ -610,6 +610,7 @@ pass_lower_switch::execute (function *fun)
     {
       free_dominance_info (CDI_DOMINATORS);
       free_dominance_info (CDI_POST_DOMINATORS);
+      mark_virtual_operands_for_renaming (cfun);
     }
 
   return 0;
