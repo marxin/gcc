@@ -390,6 +390,7 @@ lower_phi_internal_fn ()
     }
 }
 
+
 static unsigned int
 execute_build_cfg (void)
 {
@@ -405,6 +406,8 @@ execute_build_cfg (void)
   cleanup_tree_cfg ();
   loop_optimizer_init (AVOID_CFG_MODIFICATIONS);
   replace_loop_annotate ();
+
+
   return 0;
 }
 

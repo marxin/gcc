@@ -868,6 +868,10 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
   free_aux_for_blocks ();
 }
 
+
+static void
+dump_switch_statement (gswitch *s, histogram_value hist);
+
 /* Load value histograms values whose description is stored in VALUES array
    from .gcda file.  
 
@@ -946,9 +950,148 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
         }
     }
 
+  /* Dump statistics here.  */
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple *stmt = last_stmt (bb);
+      if (stmt && gimple_code (stmt) == GIMPLE_SWITCH)
+	{
+	  gswitch *s = as_a<gswitch *> (stmt);
+	  histogram_value hist = gimple_histogram_value (cfun, stmt);
+	  dump_switch_statement (s, hist);
+	}
+    }
+
+
   for (t = 0; t < GCOV_N_VALUE_COUNTERS; t++)
     free (histogram_counts[t]);
 }
+
+static int
+cmp2 (const void * a, const void * b)
+{
+  const HOST_WIDE_INT c1 = *(const HOST_WIDE_INT*)a;
+  const HOST_WIDE_INT c2 = *(const HOST_WIDE_INT*)b;
+
+  return c1 - c2;
+}
+
+static void
+dump_switch_statement (gswitch *s, histogram_value hist)
+{
+  tree index = gimple_switch_index (s);
+  tree type = TREE_TYPE (index);
+
+  unsigned n = gimple_switch_num_labels (s);
+
+#define XXX (1024 * 1024)
+  char *buffer = XNEWVEC (char, XXX);
+
+  unsigned x = sprintf (buffer, "SWITCH_STATEMENT: ");
+  for(unsigned i = 0; i < n; i++)
+    {
+      tree label = gimple_switch_label (s, i);
+      basic_block case_bb = label_to_block_fn (cfun, CASE_LABEL (label));
+      tree l = CASE_LOW (label);
+      tree h = CASE_HIGH (label);
+
+      if (l == NULL && h == NULL)
+	{
+	  x += sprintf (buffer + x, "default:bb_%d ", case_bb->index);
+	}
+      else
+	{
+	  HOST_WIDE_INT low = tree_fits_uhwi_p (l) ? tree_to_uhwi (l) : tree_to_shwi (l);
+	  x += sprintf (buffer + x, "case_%ld", low);
+	  if (h != NULL)
+	    {
+	      HOST_WIDE_INT high = tree_fits_uhwi_p (l) ? tree_to_uhwi (h) : tree_to_shwi (h);
+	      x += sprintf (buffer + x, "..%ld", high);
+	    }
+
+	  x += sprintf (buffer + x, ":bb_%d ", case_bb->index);
+	}
+    }
+
+  x += sprintf (buffer + x, "#TYPE_precision:%d,unsigned:%d",
+		TYPE_PRECISION (type), TYPE_UNSIGNED (type));
+
+  if (TREE_CODE (type) == ENUMERAL_TYPE)
+    {
+      auto_vec<HOST_WIDE_INT> enum_values;
+      for (tree values = TYPE_VALUES (type); values;
+	   values = TREE_CHAIN (values))
+	{
+	  tree v = TREE_VALUE (values);
+	  if (TREE_CODE (v) == CONST_DECL)
+	    v = DECL_INITIAL (v);
+	  HOST_WIDE_INT value = tree_fits_uhwi_p (v) ? tree_to_uhwi (v) : tree_to_shwi (v);
+
+	  bool found = false;
+	  for (unsigned i = 0; i < enum_values.length (); i++)
+	    if (enum_values[i] == value)
+	      {
+		found = true;
+		break;
+	      }
+
+	  if (!found)
+	    enum_values.safe_push (value);
+	}
+
+      x += sprintf (buffer + x, " ENUM_VALUES(%d): ", enum_values.length ());
+
+      enum_values.qsort (cmp2);
+      auto_vec<HOST_WIDE_INT> tmp;
+      for (unsigned i = 0; i < enum_values.length (); i++)
+	{
+	  if (tmp.is_empty ())
+	    tmp.safe_push (enum_values[i]);
+	  else if (tmp[tmp.length () - 1] + 1 == enum_values[i])
+	    tmp.safe_push (enum_values[i]);
+	  else
+	    {
+	      if (tmp.length () == 1)
+		x += sprintf (buffer + x, "%ld ", tmp[0]);
+	      else
+		x += sprintf (buffer + x, "%ld...%ld ", tmp[0],
+			      tmp[tmp.length () - 1]);
+	      tmp.truncate (0);
+	      tmp.safe_push (enum_values[i]);
+	    }
+	}
+
+      if (!tmp.is_empty ())
+	{
+	  if (tmp.length () == 1)
+	    x += sprintf (buffer + x, "%ld ", tmp[0]);
+	  else
+	    x += sprintf (buffer + x, "%ld...%ld ", tmp[0],
+			  tmp[tmp.length () - 1]);
+	}
+    }
+
+  if (hist->hvalue.counters)
+    {
+      x += sprintf (buffer + x, "#SWITCH_HISTOGRAM: {");
+      for (unsigned i = 0; i < hist->n_counters; i++)
+	{
+	  x += sprintf (buffer + x , "%" PRId64,
+			(int64_t) hist->hvalue.counters[i]);
+	  if (i != hist->n_counters - 1)
+	    x += sprintf (buffer + x, ",");
+	}
+      x += sprintf(buffer + x, "}");
+    }
+
+  
+  x += sprintf (buffer + x, "#");
+  gcc_assert (x < XXX);
+
+  inform (gimple_location (s), buffer);
+}
+
 
 /* When passed NULL as file_name, initialize.
    When passed something else, output the necessary commands to change
