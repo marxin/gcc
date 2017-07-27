@@ -15,5 +15,4 @@ void func2(int* val)
   d: d(val);
 }
 
-/* { dg-final { scan-tree-dump-not "a \\\(" "ccp1" } } */
-/* { dg-final { scan-tree-dump-not "b \\\(" "ccp1" } } */
+/* { dg-final { scan-tree-dump-not "goto" "ccp1" } } */
