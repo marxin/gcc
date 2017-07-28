@@ -1009,21 +1009,24 @@ dump_gimple_switch (pretty_printer *buffer, gswitch *gs, int spc,
     {
       tree case_label = gimple_switch_label (gs, i);
       gcc_checking_assert (case_label != NULL_TREE);
-      dump_generic_node (buffer, case_label, spc, flags, false);
-      pp_space (buffer);
-      tree label = CASE_LABEL (case_label);
-      dump_generic_node (buffer, label, spc, flags, false);
+	  tree label = CASE_LABEL (case_label);
+	  dump_generic_node (buffer, case_label, spc, flags, false);
+	  pp_space (buffer);
 
-      if (cfun && cfun->cfg)
+      basic_block dest;
+      if (cfun && cfun->cfg
+	  && (dest = label_to_block (label)) && dest)
 	{
-	  basic_block dest = label_to_block (label);
-	  if (dest)
-	    {
-	      edge label_edge = find_edge (gimple_bb (gs), dest);
-	      if (label_edge && !(flags & TDF_GIMPLE))
-		dump_edge_probability (buffer, label_edge);
-	    }
+	  pp_string (buffer, "<bb ");
+	  pp_decimal_int (buffer, dest->index);
+	  pp_string (buffer, ">");
+	  edge label_edge = find_edge (gimple_bb (gs), dest);
+
+	  if (label_edge && !(flags & TDF_GIMPLE))
+	    dump_edge_probability (buffer, label_edge);
 	}
+      else
+	dump_generic_node (buffer, label, spc, flags, false);
 
       if (i < gimple_switch_num_labels (gs) - 1)
 	{
@@ -1120,13 +1123,6 @@ dump_gimple_label (pretty_printer *buffer, glabel *gs, int spc,
   else
     {
       dump_generic_node (buffer, label, spc, flags, false);
-      basic_block bb = gimple_bb (gs);
-      if (bb && !(flags & TDF_GIMPLE))
-	{
-	  if (gimple_bb (gs))
-	    pp_scalar (buffer, " (<bb %d>)", gimple_bb (gs)->index);
-	  pp_scalar (buffer, " %s", dump_profile (bb->frequency, bb->count));
-	}
       pp_colon (buffer);
     }
   if (flags & TDF_GIMPLE)
@@ -2699,16 +2695,12 @@ dump_gimple_bb_header (FILE *outf, basic_block bb, int indent,
     }
   else
     {
-      gimple *stmt = first_stmt (bb);
-      if (!stmt || gimple_code (stmt) != GIMPLE_LABEL)
-	{
-	  if (flags & TDF_GIMPLE)
-	    fprintf (outf, "%*sbb_%d:\n", indent, "", bb->index);
-	  else
-	    fprintf (outf, "%*s<bb %d> %s:\n",
-		     indent, "", bb->index, dump_profile (bb->frequency,
-							  bb->count));
-	}
+      if (flags & TDF_GIMPLE)
+	fprintf (outf, "%*sbb_%d:\n", indent, "", bb->index);
+      else
+	fprintf (outf, "%*s<bb %d> %s:\n",
+		 indent, "", bb->index, dump_profile (bb->frequency,
+						      bb->count));
     }
 }
 
@@ -2764,22 +2756,10 @@ pp_cfg_jump (pretty_printer *buffer, edge e, dump_flags_t flags)
     }
   else
     {
-      gimple *stmt = first_stmt (e->dest);
-
       pp_string (buffer, "goto <bb ");
       pp_decimal_int (buffer, e->dest->index);
       pp_greater (buffer);
-      if (stmt && gimple_code (stmt) == GIMPLE_LABEL)
-	{
-	  pp_string (buffer, " (");
-	  dump_generic_node (buffer,
-			     gimple_label_label (as_a <glabel *> (stmt)),
-			     0, 0, false);
-	  pp_right_paren (buffer);
-	  pp_semicolon (buffer);
-	}
-      else
-	pp_semicolon (buffer);
+      pp_semicolon (buffer);
 
       dump_edge_probability (buffer, e);
     }
