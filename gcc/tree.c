@@ -13541,10 +13541,7 @@ verify_type_variant (const_tree t, tree tv)
      of the copies.  */
   if (RECORD_OR_UNION_TYPE_P (t) && TYPE_BINFO (t) && TYPE_BINFO (tv)
       && TYPE_BINFO (t) != TYPE_BINFO (tv)
-      /* FIXME: Java sometimes keep dump TYPE_BINFOs on variant types.
-	 Since there is no cheap way to tell C++/Java type w/o LTO, do checking
-	 at LTO time only.  */
-      && (in_lto_p && odr_type_p (t)))
+      && odr_type_p (t))
     {
       error ("type variant has different TYPE_BINFO");
       debug_tree (tv);

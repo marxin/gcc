@@ -2773,7 +2773,7 @@ gimplify_compound_lval (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
   /* Now EXPR_STACK is a stack of pointers to all the refs we've
      walked through and P points to the innermost expression.
 
-     Java requires that we elaborated nodes in source order.  That
+     We elaborate nodes in source order.  That
      means we must gimplify the inner expression followed by each of
      the indices, in order.  But we can't gimplify the inner
      expression until we deal with any variable bounds, sizes, or
