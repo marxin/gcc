@@ -1122,11 +1122,7 @@ dump_gimple_label (pretty_printer *buffer, glabel *gs, int spc,
       dump_generic_node (buffer, label, spc, flags, false);
       basic_block bb = gimple_bb (gs);
       if (bb && !(flags & TDF_GIMPLE))
-	{
-	  if (gimple_bb (gs))
-	    pp_scalar (buffer, " (<bb %d>)", gimple_bb (gs)->index);
-	  pp_scalar (buffer, " %s", dump_profile (bb->frequency, bb->count));
-	}
+	pp_scalar (buffer, " %s", dump_profile (bb->frequency, bb->count));
       pp_colon (buffer);
     }
   if (flags & TDF_GIMPLE)
