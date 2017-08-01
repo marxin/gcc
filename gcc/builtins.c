@@ -3420,7 +3420,7 @@ expand_builtin_mempcpy_with_bounds (tree exp, rtx target)
 }
 
 /* Helper function to do the actual work for expand of memory copy family
-   functions (memcpy, mempcpy, stpcpy).  Expansing should assign LEN bytes
+   functions (memcpy, mempcpy, stpcpy).  Expansion should assign LEN bytes
    of memory from SRC to DEST and assign to TARGET if convenient.
    If ENDP is 0 return the
    destination pointer, if ENDP is 1 return the end pointer ala
@@ -3491,6 +3491,9 @@ expand_builtin_memory_copy_args (tree dest, tree src, tree len,
 				     ? BLOCK_OP_TAILCALL : BLOCK_OP_NORMAL,
 				     expected_align, expected_size,
 				     min_size, max_size, probable_max_size);
+
+  if (target == const0_rtx)
+    return target;
 
   if (dest_addr == 0)
     {
