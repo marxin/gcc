@@ -3651,13 +3651,24 @@ expand_builtin_memory_copy_args (tree dest, tree src, tree len,
   src_mem = get_memory_rtx (src, len);
   set_mem_align (src_mem, src_align);
 
+  bool is_move_done;
+
   /* Copy word part most expediently.  */
   dest_addr = emit_block_move_hints (dest_mem, src_mem, len_rtx,
 				     CALL_EXPR_TAILCALL (exp)
 				     && (endp == 0 || target == const0_rtx)
 				     ? BLOCK_OP_TAILCALL : BLOCK_OP_NORMAL,
 				     expected_align, expected_size,
-				     min_size, max_size, probable_max_size);
+				     min_size, max_size, probable_max_size,
+				     TARGET_HAS_FAST_MEMPCPY_ROUTINE
+				     && endp == 1,
+				     &is_move_done);
+
+  /* Bail out when a mempcpy call would be expanded as libcall and when
+     we have a target that provides a fast implementation
+     of mempcpy routine.  */
+  if (!is_move_done)
+    return NULL_RTX;
 
   if (dest_addr == 0)
     {

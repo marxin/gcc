@@ -48,5 +48,5 @@ main (void)
   return 0;
 }
 
-/* { dg-final { scan-assembler-not "\<mempcpy\>" } } */
-/* { dg-final { scan-assembler "memcpy" } } */
+/* { dg-final { scan-assembler-not "\<mempcpy\>" { target { i?86-*-* x86_64-*-* } } } } */
+/* { dg-final { scan-assembler "memcpy" { target  { ! { i?86-*-* x86_64-*-* } } } } } */

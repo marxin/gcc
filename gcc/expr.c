@@ -1554,6 +1554,8 @@ compare_by_pieces (rtx arg0, rtx arg1, unsigned HOST_WIDE_INT len,
    MIN_SIZE is the minimal size of block to move
    MAX_SIZE is the maximal size of block to move, if it can not be represented
    in unsigned HOST_WIDE_INT, than it is mask of all ones.
+   If BAIL_OUT_LIBCALL is set true, do not emit library call and set
+   *IS_MOVE_DONE to false.
 
    Return the address of the new block, if memcpy is called and returns it,
    0 otherwise.  */
@@ -1563,11 +1565,16 @@ emit_block_move_hints (rtx x, rtx y, rtx size, enum block_op_methods method,
 		       unsigned int expected_align, HOST_WIDE_INT expected_size,
 		       unsigned HOST_WIDE_INT min_size,
 		       unsigned HOST_WIDE_INT max_size,
-		       unsigned HOST_WIDE_INT probable_max_size)
+		       unsigned HOST_WIDE_INT probable_max_size,
+		       bool bail_out_libcall, bool *is_move_done)
 {
   bool may_use_call;
   rtx retval = 0;
   unsigned int align;
+
+  /* When not doing a bail out, we always emit a memory move.  */
+  if (is_move_done)
+    *is_move_done = true;
 
   gcc_assert (size);
   if (CONST_INT_P (size) && INTVAL (size) == 0)
@@ -1625,6 +1632,13 @@ emit_block_move_hints (rtx x, rtx y, rtx size, enum block_op_methods method,
 	   && ADDR_SPACE_GENERIC_P (MEM_ADDR_SPACE (x))
 	   && ADDR_SPACE_GENERIC_P (MEM_ADDR_SPACE (y)))
     {
+      if (bail_out_libcall)
+	{
+	  if (is_move_done)
+	    *is_move_done = false;
+	  return retval;
+	}
+
       /* Since x and y are passed to a libcall, mark the corresponding
 	 tree EXPR as addressable.  */
       tree y_expr = MEM_EXPR (y);
