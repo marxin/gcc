@@ -59,6 +59,7 @@ static GTY(()) tree tree_indirect_call_profiler_fn;
 static GTY(()) tree tree_average_profiler_fn;
 static GTY(()) tree tree_ior_profiler_fn;
 static GTY(()) tree tree_time_profiler_counter;
+static GTY(()) tree tree_switch_profiler_fn;
 
 
 static GTY(()) tree ic_void_ptr_var;
@@ -123,6 +124,7 @@ gimple_init_gcov_profiler (void)
   tree gcov_type_ptr;
   tree ic_profiler_fn_type;
   tree average_profiler_fn_type;
+  tree switch_profiler_fn_type;
   const char *profiler_fn_name;
   const char *fn_name;
 
@@ -226,6 +228,16 @@ gimple_init_gcov_profiler (void)
 	= tree_cons (get_identifier ("leaf"), NULL,
 		     DECL_ATTRIBUTES (tree_ior_profiler_fn));
 
+      switch_profiler_fn_type 
+	      = build_function_type_list (void_type_node,
+					  gcov_type_ptr, gcov_type_ptr, gcov_type_node, gcov_type_node, NULL_TREE);
+      fn_name = "__gcov_switch_profiler";
+      tree_switch_profiler_fn = build_fn_decl (fn_name, switch_profiler_fn_type);
+      TREE_NOTHROW (tree_switch_profiler_fn) = 1;
+      DECL_ATTRIBUTES (tree_switch_profiler_fn)
+	= tree_cons (get_identifier ("leaf"), NULL,
+		     DECL_ATTRIBUTES (tree_switch_profiler_fn));
+
       /* LTO streamer needs assembler names.  Because we create these decls
          late, we need to initialize them by hand.  */
       DECL_ASSEMBLER_NAME (tree_interval_profiler_fn);
@@ -234,6 +246,7 @@ gimple_init_gcov_profiler (void)
       DECL_ASSEMBLER_NAME (tree_indirect_call_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_average_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_ior_profiler_fn);
+      DECL_ASSEMBLER_NAME (tree_switch_profiler_fn);
     }
 }
 
@@ -282,9 +295,8 @@ gimple_gen_edge_profiler (int edgeno, edge e)
    variable containing the value.  */
 
 static tree
-prepare_instrumented_value (gimple_stmt_iterator *gsi, histogram_value value)
+prepare_instrumented_value (gimple_stmt_iterator *gsi, tree val)
 {
-  tree val = value->hvalue.value;
   if (POINTER_TYPE_P (TREE_TYPE (val)))
     val = fold_convert (build_nonstandard_integer_type
 			  (TYPE_PRECISION (TREE_TYPE (val)), 1), val);
@@ -312,7 +324,7 @@ gimple_gen_interval_profiler (histogram_value value, unsigned tag, unsigned base
   ref_ptr = force_gimple_operand_gsi (&gsi,
 				      build_addr (ref),
 				      true, NULL_TREE, true, GSI_SAME_STMT);
-  val = prepare_instrumented_value (&gsi, value);
+  val = prepare_instrumented_value (&gsi, value->hvalue.value);
   call = gimple_build_call (tree_interval_profiler_fn, 4,
 			    ref_ptr, val, start, steps);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
@@ -333,7 +345,7 @@ gimple_gen_pow2_profiler (histogram_value value, unsigned tag, unsigned base)
 
   ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
 				      true, NULL_TREE, true, GSI_SAME_STMT);
-  val = prepare_instrumented_value (&gsi, value);
+  val = prepare_instrumented_value (&gsi, value->hvalue.value);
   call = gimple_build_call (tree_pow2_profiler_fn, 2, ref_ptr, val);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }
@@ -353,7 +365,7 @@ gimple_gen_one_value_profiler (histogram_value value, unsigned tag, unsigned bas
 
   ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
 				      true, NULL_TREE, true, GSI_SAME_STMT);
-  val = prepare_instrumented_value (&gsi, value);
+  val = prepare_instrumented_value (&gsi, value->hvalue.value);
   call = gimple_build_call (tree_one_value_profiler_fn, 2, ref_ptr, val);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }
@@ -574,8 +586,33 @@ gimple_gen_average_profiler (histogram_value value, unsigned tag, unsigned base)
   ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
 				      true, NULL_TREE,
 				      true, GSI_SAME_STMT);
-  val = prepare_instrumented_value (&gsi, value);
+  val = prepare_instrumented_value (&gsi, value->hvalue.value);
   call = gimple_build_call (tree_average_profiler_fn, 2, ref_ptr, val);
+  gsi_insert_before (&gsi, call, GSI_NEW_STMT);
+}
+
+void
+gimple_gen_switch_profiler (histogram_value value, unsigned tag, unsigned base)
+{
+  gimple *stmt = value->hvalue.stmt;
+  gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
+  tree ref_ptr = tree_coverage_counter_addr (tag, base);
+  gcall *call;
+
+  ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
+				      true, NULL_TREE,
+				      true, GSI_SAME_STMT);
+  tree val = prepare_instrumented_value (&gsi, value->hvalue.value);
+  tree val2 = value->hvalue.value2;
+  tree type = TREE_TYPE (value->hvalue.value);
+
+  tree is_unsigned = build_int_cst (gcov_type_node,
+				    TYPE_UNSIGNED (type) ? 1 : 0);
+
+  tree addr = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (val2)),
+		      val2);
+  call = gimple_build_call (tree_switch_profiler_fn, 4, ref_ptr, addr, val,
+			    is_unsigned);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }
 
@@ -594,7 +631,7 @@ gimple_gen_ior_profiler (histogram_value value, unsigned tag, unsigned base)
 
   ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
 				      true, NULL_TREE, true, GSI_SAME_STMT);
-  val = prepare_instrumented_value (&gsi, value);
+  val = prepare_instrumented_value (&gsi, value->hvalue.value);
   call = gimple_build_call (tree_ior_profiler_fn, 2, ref_ptr, val);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }

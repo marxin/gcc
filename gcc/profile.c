@@ -200,6 +200,10 @@ instrument_values (histogram_values values)
 	  gimple_gen_time_profiler (t, 0);
 	  break;
 
+	case HIST_TYPE_SWITCH:
+	  gimple_gen_switch_profiler (hist, t, 0);
+	  break;
+
 	default:
 	  gcc_unreachable ();
 	}

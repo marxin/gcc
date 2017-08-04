@@ -392,5 +392,48 @@ __gcov_ior_profiler_atomic (gcov_type *counters, gcov_type value)
 }
 #endif
 
+#ifdef L_gcov_switch_profiler
+
+void
+__gcov_switch_profiler (gcov_type *counters, gcov_type *switch_cases,
+			gcov_type value, gcov_type is_unsigned)
+{
+  if (is_unsigned)
+    {
+      gcov_type n = switch_cases[0];
+      switch_cases++;
+      gcov_type_unsigned unsigned_value = (gcov_type_unsigned)value;
+      gcov_type_unsigned *unsigned_cases = (gcov_type_unsigned *)switch_cases;
+      switch_cases++;
+
+      for (unsigned i = 0; i < n; i++)
+	if (unsigned_cases[2 * i] <= unsigned_value
+	    && unsigned_value <= unsigned_cases[2 * i + 1])
+	  {
+	    counters[i + 1]++;
+	    return;
+	  }
+
+      /* Default label.  */
+      counters[0]++;
+    }
+  else
+    {
+      gcov_type n = switch_cases[0];
+      switch_cases++;
+
+      for (unsigned i = 0; i < n; i++)
+	if (switch_cases[2 * i] <= value && value <= switch_cases[2 * i + 1])
+	  {
+	    counters[i + 1]++;
+	    return;
+	  }
+
+      /* Default label.  */
+      counters[0]++;
+    }
+}
+#endif
+
 
 #endif /* inhibit_libc */

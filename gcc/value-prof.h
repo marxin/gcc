@@ -35,6 +35,7 @@ enum hist_type
   HIST_TYPE_TIME_PROFILE, /* Used for time profile */
   HIST_TYPE_INDIR_CALL_TOPN, /* Tries to identify the top N most frequently
                                 called functions in indirect call.  */
+  HIST_TYPE_SWITCH,
   HIST_TYPE_MAX
 };
 
@@ -49,6 +50,7 @@ struct histogram_value_t
   struct
     {
       tree value;		/* The value to profile.  */
+      tree value2;		/* The value to profile.  */
       gimple *stmt;		/* Insn containing the value.  */
       gcov_type *counters;		        /* Pointer to first counter.  */
       struct histogram_value_t *next;		/* Linked list pointer.  */
@@ -76,7 +78,8 @@ extern void gimple_find_values_to_profile (histogram_values *);
 extern bool gimple_value_profile_transformations (void);
 
 histogram_value gimple_alloc_histogram_value (struct function *, enum hist_type,
-					      gimple *stmt, tree);
+					      gimple *stmt, tree, tree value2 =
+					      NULL_TREE);
 histogram_value gimple_histogram_value (struct function *, gimple *);
 histogram_value gimple_histogram_value_of_type (struct function *, gimple *,
 						enum hist_type);
@@ -106,6 +109,7 @@ extern void gimple_gen_ic_func_profiler (void);
 extern void gimple_gen_time_profiler (unsigned, unsigned);
 extern void gimple_gen_average_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_ior_profiler (histogram_value, unsigned, unsigned);
+extern void gimple_gen_switch_profiler (histogram_value, unsigned, unsigned);
 extern void stream_out_histogram_value (struct output_block *, histogram_value);
 extern void stream_in_histogram_value (struct lto_input_block *, gimple *);
 extern struct cgraph_node* find_func_by_profile_id (int func_id);

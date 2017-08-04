@@ -114,10 +114,12 @@ static bool gimple_ic_transform (gimple_stmt_iterator *);
 
 histogram_value
 gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, gimple *stmt, tree value)
+			      enum hist_type type, gimple *stmt, tree value,
+			      tree value2)
 {
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
+   hist->hvalue.value2 = value2;
    hist->hvalue.stmt = stmt;
    hist->type = type;
    return hist;
@@ -333,6 +335,23 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
         }
       fprintf (dump_file, ".\n");
       break;
+    case HIST_TYPE_SWITCH:
+      fprintf (dump_file, "Switch statement ");
+      if (hist->hvalue.counters)
+	{
+	  fprintf (dump_file, "{");
+           for (unsigned i = 0; i < hist->n_counters; i++)
+             {
+               fprintf (dump_file, "%" PRId64,
+			(int64_t) hist->hvalue.counters[i]);
+
+	       if (i != hist->n_counters - 1)
+		 fprintf (dump_file, ", ");
+             }
+	   fprintf (dump_file, "}.\n");
+        }
+
+      break;
     case HIST_TYPE_MAX:
       gcc_unreachable ();
    }
@@ -420,6 +439,9 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple *stmt)
         case HIST_TYPE_INDIR_CALL_TOPN:
           ncounters = (GCOV_ICALL_TOPN_VAL << 2) + 1;
           break;
+
+	case HIST_TYPE_SWITCH:
+	  gcc_unreachable ();
 
 	case HIST_TYPE_MAX:
 	  gcc_unreachable ();
@@ -1977,9 +1999,78 @@ gimple_indirect_call_to_profile (gimple *stmt, histogram_values *values)
                           HIST_TYPE_INDIR_CALL_TOPN :
                           HIST_TYPE_INDIR_CALL,
 			stmt, callee));
-
-  return;
 }
+
+static void
+gimple_switch_to_profile (gimple *stmt, histogram_values *values)
+{
+  if (gimple_code (stmt) != GIMPLE_SWITCH)
+    return;
+
+  gswitch *s = dyn_cast<gswitch *> (stmt);
+  location_t loc = gimple_location (s);
+
+  tree index = gimple_switch_index (s);
+  unsigned case_count = gimple_switch_num_labels (s);
+
+  vec<constructor_elt, va_gc> *constructor;
+  vec_alloc (constructor, 2 * (case_count - 1) + 1);
+
+  unsigned ctor_index = 0;
+
+  constructor_elt elt;
+  elt.index = build_int_cst (get_gcov_type (), ctor_index++);
+  elt.value = build_int_cst (get_gcov_type (), case_count - 1);
+
+  constructor->quick_push (elt);
+
+  for (unsigned i = 1; i < case_count; i++)
+    {
+      tree range[2];
+
+      constructor_elt elt;
+
+      tree c = gimple_switch_label (s, i);
+      range[0] = CASE_LOW (c);
+      range[1] = CASE_HIGH (c);
+      if (range[1] == NULL_TREE)
+	range[1] = range[0];
+
+      for (unsigned i = 0; i < 2; i++)
+	{
+	  elt.index = build_int_cst (get_gcov_type(), ctor_index++);
+	  elt.value
+	    = unshare_expr_without_location (fold_convert (get_gcov_type(),
+							   range[i]));
+	  
+	  constructor->quick_push (elt);
+	}
+    }
+
+  tree array_type = build_index_type (size_int (case_count - 1));
+  array_type = build_array_type (get_gcov_type (), array_type);
+
+  tree ctor = build_constructor (array_type, constructor);
+  TREE_CONSTANT (ctor) = true;
+  TREE_STATIC (ctor) = true;
+
+  tree decl = build_decl (loc, VAR_DECL, NULL_TREE, array_type);
+  DECL_INITIAL (decl) = ctor;
+  TREE_STATIC (decl) = 1;
+  DECL_NAME (decl) = create_tmp_var_name ("SWITCH_CASES");
+  DECL_ARTIFICIAL (decl) = 1;
+  DECL_IGNORED_P (decl) = 1;
+  TREE_CONSTANT (decl) = 1;
+  TREE_READONLY (decl) = 1;
+  varpool_node::finalize_decl (decl);
+
+  values->reserve (3);
+
+  values->quick_push (gimple_alloc_histogram_value (cfun,
+						    HIST_TYPE_SWITCH, stmt,
+						    index, decl));
+}
+
 
 /* Find values inside STMT for that we want to measure histograms for
    string operations.  */
@@ -2028,6 +2119,7 @@ gimple_values_to_profile (gimple *stmt, histogram_values *values)
   gimple_divmod_values_to_profile (stmt, values);
   gimple_stringops_values_to_profile (stmt, values);
   gimple_indirect_call_to_profile (stmt, values);
+  gimple_switch_to_profile (stmt, values);
 }
 
 void
@@ -2080,6 +2172,14 @@ gimple_find_values_to_profile (histogram_values *values)
         case HIST_TYPE_INDIR_CALL_TOPN:
           hist->n_counters = GCOV_ICALL_TOPN_NCOUNTS;
           break;
+
+	case HIST_TYPE_SWITCH:
+	    {
+	      gswitch *s = dyn_cast<gswitch *> (hist->hvalue.stmt);
+	      hist->n_counters = gimple_switch_num_labels (s);
+	      gcc_assert (hist->n_counters);
+	      break;
+	    }
 
 	default:
 	  gcc_unreachable ();
