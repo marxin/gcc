@@ -382,6 +382,7 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
 	   && !disregard_limits
 	   && !lookup_attribute ("flatten",
 				 DECL_ATTRIBUTES (caller->decl))
+	   && opt_for_fn (caller->decl, optimize)
            && !caller_growth_limits (e))
     inlinable = false;
   /* Don't inline a function with a higher optimization level than the
