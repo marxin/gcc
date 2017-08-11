@@ -747,8 +747,10 @@ dump_prediction (FILE *file, enum br_predictor predictor, int probability,
 	{
 	  fprintf (file, " hit ");
 	  e->count.dump (file);
-	  fprintf (file, " (%.1f%%)", e->count.to_gcov_type() * 100.0
-		   / bb->count.to_gcov_type ());
+
+	  if (e->count.initialized_p ())
+	    fprintf (file, " (%.1f%%)", e->count.to_gcov_type() * 100.0
+		     / bb->count.to_gcov_type ());
 	}
     }
 
@@ -3446,7 +3448,7 @@ determine_unlikely_bbs ()
           if (dump_file && (dump_flags & TDF_DETAILS))
 	    fprintf (dump_file, "Basic block %i is locally unlikely\n",
 		     bb->index);
-	  bb->count = profile_count::zero ();
+	  bb->count = profile_count::guessed_zero ();
 	}
 
       if (bb->count == profile_count::zero ())
@@ -3463,7 +3465,7 @@ determine_unlikely_bbs ()
             if (dump_file && (dump_flags & TDF_DETAILS))
 	      fprintf (dump_file, "Edge %i->%i is locally unlikely\n",
 		       bb->index, e->dest->index);
-	    e->count = profile_count::zero ();
+	    e->count = profile_count::guessed_zero ();
 	  }
 
       gcc_checking_assert (!bb->aux);
@@ -3503,23 +3505,25 @@ determine_unlikely_bbs ()
 	  if (found)
 	    continue;
 	}
-      if (!(bb->count == profile_count::zero ())
-	  && (dump_file && (dump_flags & TDF_DETAILS)))
-	fprintf (dump_file,
-		 "Basic block %i is marked unlikely by backward prop\n",
-		 bb->index);
-      bb->count = profile_count::zero ();
-      bb->frequency = 0;
-      FOR_EACH_EDGE (e, ei, bb->preds)
-	if (!(e->count == profile_count::zero ()))
+      if (!(bb->count == profile_count::zero ()))
 	  {
-	    e->count = profile_count::zero ();
-	    if (!(e->src->count == profile_count::zero ()))
-	      {
-	        nsuccs[e->src->index]--;
-	        if (!nsuccs[e->src->index])
-		  worklist.safe_push (e->src);
-	      }
+	    if (dump_file && (dump_flags & TDF_DETAILS))
+	      fprintf (dump_file,
+		       "Basic block %i is marked unlikely by backward prop\n",
+		       bb->index);
+	    bb->count = profile_count::guessed_zero ();
+	    bb->frequency = 0;
+	    FOR_EACH_EDGE (e, ei, bb->preds)
+	      if (!(e->count == profile_count::zero ()))
+		{
+		  e->count = profile_count::guessed_zero ();
+		  if (!(e->src->count == profile_count::zero ()))
+		    {
+		      nsuccs[e->src->index]--;
+		      if (!nsuccs[e->src->index])
+			worklist.safe_push (e->src);
+		    }
+		}
 	  }
     }
 }
