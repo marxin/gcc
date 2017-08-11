@@ -3131,9 +3131,10 @@ cgraph_node::verify_node (void)
       error ("execution count is negative");
       error_found = true;
     }
-  if (global.inlined_to && same_comdat_group)
+  if (global.inlined_to && same_comdat_group
+      && get_comdat_group () != global.inlined_to->get_comdat_group ())
     {
-      error ("inline clone in same comdat group list");
+      error ("inline clone in a different comdat group list");
       error_found = true;
     }
   if (!definition && !in_other_partition && local.local)
