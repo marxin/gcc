@@ -9078,7 +9078,7 @@ for LTO, use @command{gcc-ar} and @command{gcc-ranlib} instead of @command{ar}
 and @command{ranlib}; 
 to show the symbols of object files with GIMPLE bytecode, use
 @command{gcc-nm}.  Those commands require that @command{ar}, @command{ranlib}
-and @command{nm} have been compiled with plugin support.  At link time, use the the
+and @command{nm} have been compiled with plugin support.  At link time, use the
 flag @option{-fuse-linker-plugin} to ensure that the library participates in
 the LTO optimization process:
 
