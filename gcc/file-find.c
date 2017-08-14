@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "filenames.h"
 #include "file-find.h"
+#include "selftest.h"
 
 static bool debug = false;
 
@@ -126,11 +127,22 @@ do_add_prefix (struct path_prefix *pprefix, const char *prefix, bool first)
   /* Keep track of the longest prefix.  */
 
   len = strlen (prefix);
+  bool append_separator = !IS_DIR_SEPARATOR (prefix[len - 1]);
+  if (append_separator)
+    len++;
+
   if (len > pprefix->max_len)
     pprefix->max_len = len;
 
   pl = XNEW (struct prefix_list);
-  pl->prefix = xstrdup (prefix);
+  char *dup = XCNEWVEC (char, len + 1);
+  memcpy (dup, prefix, append_separator ? len - 1 : len);
+  if (append_separator)
+    {
+      dup[len - 1] = DIR_SEPARATOR;
+      dup[len] = '\0';
+    }
+  pl->prefix = dup;
 
   if (*prev)
     pl->next = *prev;
@@ -212,34 +224,170 @@ prefix_from_string (const char *p, struct path_prefix *pprefix)
 void
 remove_prefix (const char *prefix, struct path_prefix *pprefix)
 {
-  struct prefix_list *remove, **prev, **remove_prev = NULL;
+  char *dup = NULL;
   int max_len = 0;
+  size_t len = strlen (prefix);
+  if (prefix[len - 1] != DIR_SEPARATOR)
+    {
+      char *dup = XNEWVEC (char, len + 2);
+      memcpy (dup, prefix, len);
+      dup[len] = DIR_SEPARATOR;
+      dup[len + 1] = '\0';
+      prefix = dup;
+    }
 
   if (pprefix->plist)
     {
-      prev = &pprefix->plist;
-      for (struct prefix_list *pl = pprefix->plist; pl->next; pl = pl->next)
+      prefix_list *prev = NULL;
+      for (struct prefix_list *pl = pprefix->plist; pl;)
 	{
 	  if (strcmp (prefix, pl->prefix) == 0)
 	    {
-	      remove = pl;
-	      remove_prev = prev;
-	      continue;
+	      if (prev == NULL)
+		pprefix->plist = pl->next;
+	      else
+		prev->next = pl->next;
+
+	      prefix_list *remove = pl;
+	      free (remove);
+	      pl = pl->next;
 	    }
+	  else
+	    {
+	      prev = pl;
 
-	  int l = strlen (pl->prefix);
-	  if (l > max_len)
-	    max_len = l;
+	      int l = strlen (pl->prefix);
+	      if (l > max_len)
+		max_len = l;
 
-	  prev = &pl;
-	}
-
-      if (remove_prev)
-	{
-	  *remove_prev = remove->next;
-	  free (remove);
+	      pl = pl->next;
+	    }
 	}
 
       pprefix->max_len = max_len;
     }
+
+  if (dup)
+    free (dup);
 }
+
+#if CHECKING_P
+
+namespace selftest {
+
+/* Encode '#' and '_' to path and dir separators in order to test portability
+   of the test-cases.  */
+
+static char *
+purge (const char *input)
+{
+  char *s = xstrdup (input);
+  for (char *c = s; *c != '\0'; c++)
+    switch (*c)
+      {
+      case '/':
+      case ':':
+	*c = 'a'; /* Poison default string values.  */
+	break;
+      case '_':
+	*c = PATH_SEPARATOR;
+	break;
+      case '#':
+	*c = DIR_SEPARATOR;
+	break;
+      default:
+	break;
+      }
+
+  return s;
+}
+
+const char *env1 = purge ("#home#user#bin_#home#user#bin_#bin_#usr#bin");
+const char *env2 = purge ("#root_#root_#root");
+
+/* Verify creation of prefix.  */
+
+static void
+file_find_verify_prefix_creation (void)
+{
+  path_prefix prefix;
+  memset (&prefix, 0, sizeof (prefix));
+  prefix_from_string (env1, &prefix);
+
+  ASSERT_EQ (15, prefix.max_len);
+
+  /* All prefixes end with DIR_SEPARATOR.  */
+  ASSERT_STREQ (purge ("#home#user#bin#"), prefix.plist->prefix);
+  ASSERT_STREQ (purge ("#home#user#bin#"), prefix.plist->next->prefix);
+  ASSERT_STREQ (purge ("#bin#"), prefix.plist->next->next->prefix);
+  ASSERT_STREQ (purge ("#usr#bin#"), prefix.plist->next->next->next->prefix);
+  ASSERT_EQ (NULL, prefix.plist->next->next->next->next);
+}
+
+/* Verify adding a prefix.  */
+
+static void
+file_find_verify_prefix_add (void)
+{
+  path_prefix prefix;
+  memset (&prefix, 0, sizeof (prefix));
+  prefix_from_string (env1, &prefix);
+
+  add_prefix (&prefix, purge ("#root"));
+  ASSERT_STREQ (purge ("#home#user#bin#"), prefix.plist->prefix);
+  ASSERT_STREQ (purge ("#root#"),
+		prefix.plist->next->next->next->next->prefix);
+
+  add_prefix_begin (&prefix, purge ("#var"));
+  ASSERT_STREQ (purge ("#var#"), prefix.plist->prefix);
+}
+
+/* Verify adding a prefix.  */
+
+static void
+file_find_verify_prefix_removal (void)
+{
+  path_prefix prefix;
+  memset (&prefix, 0, sizeof (prefix));
+  prefix_from_string (env1, &prefix);
+
+  /* All occurences of a prefix should be removed.  */
+  remove_prefix (purge ("#home#user#bin"), &prefix);
+
+  ASSERT_EQ (9, prefix.max_len);
+  ASSERT_STREQ (purge ("#bin#"), prefix.plist->prefix);
+  ASSERT_STREQ (purge ("#usr#bin#"), prefix.plist->next->prefix);
+  ASSERT_EQ (NULL, prefix.plist->next->next);
+
+  remove_prefix (purge ("#usr#bin#"), &prefix);
+  ASSERT_EQ (5, prefix.max_len);
+  ASSERT_STREQ (purge ("#bin#"), prefix.plist->prefix);
+  ASSERT_EQ (NULL, prefix.plist->next);
+
+  remove_prefix (purge ("#dev#random#"), &prefix);
+  remove_prefix (purge ("#bi#"), &prefix);
+
+  remove_prefix (purge ("#bin#"), &prefix);
+  ASSERT_EQ (NULL, prefix.plist);
+  ASSERT_EQ (0, prefix.max_len);
+
+  memset (&prefix, 0, sizeof (prefix));
+  prefix_from_string (env2, &prefix);
+  ASSERT_EQ (6, prefix.max_len);
+
+  remove_prefix (purge ("#root#"), &prefix);
+  ASSERT_EQ (NULL, prefix.plist);
+  ASSERT_EQ (0, prefix.max_len);
+}
+
+/* Run all of the selftests within this file.  */
+
+void file_find_c_tests ()
+{
+  file_find_verify_prefix_creation ();
+  file_find_verify_prefix_add ();
+  file_find_verify_prefix_removal ();
+}
+
+} // namespace selftest
+#endif /* CHECKING_P */

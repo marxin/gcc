@@ -194,15 +194,20 @@ main (int ac, char **av)
 #ifdef CROSS_DIRECTORY_STRUCTURE
       real_exe_name = concat (target_machine, "-", PERSONALITY, NULL);
 #endif
-      /* Do not search original location in the same folder.  */
-      char *exe_folder = lrealpath (av[0]);
-      exe_folder[strlen (exe_folder) - strlen (lbasename (exe_folder))] = '\0';
-      char *location = concat (exe_folder, PERSONALITY, NULL);
+      char *wrapper_file = lrealpath (av[0]);
+      exe_name = lrealpath (find_a_file (&path, real_exe_name, X_OK));
 
-      if (access (location, X_OK) == 0)
-	remove_prefix (exe_folder, &path);
+      /* If the exe_name points to the wrapper, remove folder of the wrapper
+	 from prefix and try search again.  */
+      if (strcmp (exe_name, wrapper_file) == 0)
+	{
+	  char *exe_folder = wrapper_file;
+	  exe_folder[strlen (exe_folder) - strlen (lbasename (exe_folder))] = '\0';
+	  remove_prefix (exe_folder, &path);
 
-      exe_name = find_a_file (&path, real_exe_name, X_OK);
+	  exe_name = find_a_file (&path, real_exe_name, X_OK);
+	}
+
       if (!exe_name)
 	{
 	  fprintf (stderr, "%s: Cannot find binary '%s'\n", av[0],
