@@ -1291,7 +1291,8 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
     }
   clear_bb_predictions (bb);
 
-  if (!bb->count.initialized_p () && !dry_run)
+  if (!first->probability.initialized_p ()
+      && !second->probability.initialized_p() && !dry_run)
     {
       first->probability
 	 = profile_probability::from_reg_br_prob_base (combined_probability);
@@ -3448,7 +3449,7 @@ determine_unlikely_bbs ()
           if (dump_file && (dump_flags & TDF_DETAILS))
 	    fprintf (dump_file, "Basic block %i is locally unlikely\n",
 		     bb->index);
-	  bb->count = profile_count::guessed_zero ();
+	  bb->count = profile_count::zero ();
 	}
 
       if (bb->count == profile_count::zero ())
@@ -3465,7 +3466,7 @@ determine_unlikely_bbs ()
             if (dump_file && (dump_flags & TDF_DETAILS))
 	      fprintf (dump_file, "Edge %i->%i is locally unlikely\n",
 		       bb->index, e->dest->index);
-	    e->count = profile_count::guessed_zero ();
+	    e->count = profile_count::zero ();
 	  }
 
       gcc_checking_assert (!bb->aux);
@@ -3511,12 +3512,12 @@ determine_unlikely_bbs ()
 	      fprintf (dump_file,
 		       "Basic block %i is marked unlikely by backward prop\n",
 		       bb->index);
-	    bb->count = profile_count::guessed_zero ();
+	    bb->count = profile_count::zero ();
 	    bb->frequency = 0;
 	    FOR_EACH_EDGE (e, ei, bb->preds)
 	      if (!(e->count == profile_count::zero ()))
 		{
-		  e->count = profile_count::guessed_zero ();
+		  e->count = profile_count::zero ();
 		  if (!(e->src->count == profile_count::zero ()))
 		    {
 		      nsuccs[e->src->index]--;
