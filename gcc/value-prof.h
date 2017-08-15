@@ -35,6 +35,7 @@ enum hist_type
   HIST_TYPE_TIME_PROFILE, /* Used for time profile */
   HIST_TYPE_INDIR_CALL_TOPN, /* Tries to identify the top N most frequently
                                 called functions in indirect call.  */
+  HIST_TYPE_SWITCH_COUNTS, /* Measures frequencies of switch labels.  */
   HIST_TYPE_MAX
 };
 
@@ -93,6 +94,10 @@ void stringop_block_profile (gimple *, unsigned int *, HOST_WIDE_INT *);
 gcall *gimple_ic (gcall *, struct cgraph_node *, profile_probability,
 		  profile_count, profile_count);
 bool check_ic_target (gcall *, struct cgraph_node *);
+void record_phi_operand_mapping (const vec<basic_block> bbs,
+				 basic_block switch_bb,
+				 hash_map <tree, tree> *map);
+void fix_phi_operands_for_edge (edge e, hash_map<tree, tree> *phi_mapping);
 
 
 /* In tree-profile.c.  */

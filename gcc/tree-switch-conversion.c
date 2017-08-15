@@ -49,6 +49,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "alloc-pool.h"
 #include "target.h"
 #include "tree-into-ssa.h"
+#include "value-prof.h"
 
 /* ??? For lang_hooks.types.type_for_mode, but is there a word_mode
    type in the GIMPLE type system that is language-independent?  */
@@ -1679,7 +1680,11 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return flag_tree_switch_conversion != 0; }
+  virtual bool gate (function *)
+  {
+    return flag_tree_switch_conversion != 0
+      && profile_arc_flag == 0 && flag_profile_use == 0;
+  }
   virtual unsigned int execute (function *);
 
 }; // class pass_convert_switch
@@ -2002,22 +2007,6 @@ expand_switch_as_decision_tree_p (tree range,
   return false;
 }
 
-static void
-fix_phi_operands_for_edge (edge e, hash_map<tree, tree> *phi_mapping)
-{
-  basic_block bb = e->dest;
-  gphi_iterator gsi;
-  for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-    {
-      gphi *phi = gsi.phi ();
-
-      tree *definition = phi_mapping->get (gimple_phi_result (phi));
-      if (definition)
-	add_phi_arg (phi, *definition, e, UNKNOWN_LOCATION);
-    }
-}
-
-
 /* Add an unconditional jump to CASE_BB that happens in basic block BB.  */
 
 static void
@@ -2075,35 +2064,6 @@ emit_case_decision_tree (gswitch *s, tree index_expr, tree index_type,
   /* Remove all edges and do just an edge that will reach default_bb.  */
   gsi = gsi_last_bb (gimple_bb (s));
   gsi_remove (&gsi, true);
-}
-
-static void
-record_phi_operand_mapping (const vec<basic_block> bbs, basic_block switch_bb,
-			    hash_map <tree, tree> *map)
-{
-  /* Record all PHI nodes that have to be fixed after conversion.  */
-  for (unsigned i = 0; i < bbs.length (); i++)
-    {
-      basic_block bb = bbs[i];
-
-      gphi_iterator gsi;
-      for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-	{
-	  gphi *phi = gsi.phi ();
-
-	  for (unsigned i = 0; i < gimple_phi_num_args (phi); i++)
-	    {
-	      basic_block phi_src_bb = gimple_phi_arg_edge (phi, i)->src;
-	      if (phi_src_bb == switch_bb)
-		{
-		  tree def = gimple_phi_arg_def (phi, i);
-		  tree result = gimple_phi_result (phi);
-		  map->put (result, def);
-		  break;
-		}
-	    }
-	}
-    }
 }
 
 /* Attempt to expand gimple switch STMT to a decision tree.  */

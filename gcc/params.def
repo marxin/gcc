@@ -1285,6 +1285,13 @@ DEFPARAM (PARAM_VECT_EPILOGUES_NOMASK,
 	  "Enable loop epilogue vectorization using smaller vector size.",
 	  0, 0, 1)
 
+DEFPARAM (PARAM_MIN_SWITCH_CASE_HOTNESS,
+	  "min-switch-case-hotness",
+	  "When having a profile, the most common cases will be compared "
+	  "before a switch statement.  The hotness describes minimal "
+	  "frequency of a case.",
+	  30, 1, 100)
+
 /*
 
 Local variables:
