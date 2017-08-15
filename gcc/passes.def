@@ -197,6 +197,7 @@ along with GCC; see the file COPYING3.  If not see
       NEXT_PASS (pass_post_ipa_warn);
       /* After CCP we rewrite no longer addressed locals into SSA
 	 form if possible.  */
+      NEXT_PASS (pass_profiling_convert_switch);
       NEXT_PASS (pass_complete_unrolli);
       NEXT_PASS (pass_backprop);
       NEXT_PASS (pass_phiprop);

@@ -46,6 +46,11 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "gimplify-me.h"
 #include "tree-cfg.h"
 #include "cfgloop.h"
+#include "value-prof.h"
+
+#include <utility>
+
+using namespace std;
 
 /* ??? For lang_hooks.types.type_for_mode, but is there a word_mode
    type in the GIMPLE type system that is language-independent?  */
@@ -1599,7 +1604,11 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return flag_tree_switch_conversion != 0; }
+  virtual bool gate (function *)
+  {
+    return flag_tree_switch_conversion != 0
+      && profile_arc_flag == 0 && flag_profile_use == 0;
+  }
   virtual unsigned int execute (function *);
 
 }; // class pass_convert_switch
@@ -1661,4 +1670,273 @@ gimple_opt_pass *
 make_pass_convert_switch (gcc::context *ctxt)
 {
   return new pass_convert_switch (ctxt);
+}
+
+namespace {
+
+const pass_data pass_data_profiling_convert_switch =
+{
+  GIMPLE_PASS, /* type */
+  "switchconvprof", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_TREE_SWITCH_CONVERSION, /* tv_id */
+  ( PROP_cfg | PROP_ssa ), /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  TODO_update_ssa, /* todo_flags_finish */
+};
+
+class pass_profiling_convert_switch : public gimple_opt_pass
+{
+public:
+  pass_profiling_convert_switch (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_profiling_convert_switch, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  virtual bool gate (function *)
+  {
+    return flag_tree_switch_conversion != 0 && flag_profile_use != 0;
+  }
+
+  virtual unsigned int execute (function *);
+
+}; // class pass_convert_switch
+
+int cmp_frequencies (const void *a, const void *b)
+{
+  const pair<unsigned, gcov_type> *p0 = (const  pair<unsigned, gcov_type> *)a;
+  const pair<unsigned, gcov_type> *p1 = (const  pair<unsigned, gcov_type> *)b;
+
+  return p1->second - p0->second;
+}
+
+static void
+record_phi_operand_mapping (const vec<basic_block> bbs, basic_block switch_bb,
+			    hash_map <tree, tree> *map)
+{
+  /* Record all PHI nodes that have to be fixed after conversion.  */
+  for (unsigned i = 0; i < bbs.length (); i++)
+    {
+      basic_block bb = bbs[i];
+
+      gphi_iterator gsi;
+      for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gphi *phi = gsi.phi ();
+
+	  for (unsigned i = 0; i < gimple_phi_num_args (phi); i++)
+	    {
+	      basic_block phi_src_bb = gimple_phi_arg_edge (phi, i)->src;
+	      if (phi_src_bb == switch_bb)
+		{
+		  tree def = gimple_phi_arg_def (phi, i);
+		  tree result = gimple_phi_result (phi);
+		  map->put (result, def);
+		  break;
+		}
+	    }
+	}
+    }
+}
+
+static void
+fix_phi_operands_for_edge (edge e, hash_map<tree, tree> *phi_mapping)
+{
+  basic_block bb = e->dest;
+  gphi_iterator gsi;
+  for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+    {
+      gphi *phi = gsi.phi ();
+
+      tree *definition = phi_mapping->get (gimple_phi_result (phi));
+      if (definition)
+	add_phi_arg (phi, *definition, e, UNKNOWN_LOCATION);
+    }
+}
+
+unsigned int
+pass_profiling_convert_switch::execute (function *fun)
+{
+  basic_block bb;
+  auto_vec<gswitch *> switches;
+
+  FOR_EACH_BB_FN (bb, fun)
+  {
+    gimple *stmt = last_stmt (bb);
+    if (stmt == NULL)
+      continue;
+
+    gswitch *swtch = dyn_cast<gswitch *> (stmt);
+    if (swtch)
+      switches.safe_push (swtch);
+  }
+
+  for (unsigned i = 0; i < switches.length (); i++)
+    {
+      gswitch *swtch = switches[i];
+      basic_block bb = gimple_bb (swtch);
+      histogram_value hist = gimple_histogram_value (fun, swtch);
+      if (hist)
+	{
+	  auto_vec<pair<unsigned, gcov_type>> most_frequent;
+	  unsigned n = gimple_switch_num_labels (swtch);
+	  gcov_type total = 0;
+	  for (unsigned j = 0; j < n; j++)
+	    total += hist->hvalue.counters[j];
+
+	  if (total == 0)
+	    {
+	      gimple_remove_histogram_value (fun, swtch, hist);
+	      continue;
+	    }
+
+	  gcov_type threshold = 30 * total / 100;
+
+	  auto_vec<tree> reduced_switch_cases;
+	  hash_set<basic_block> used_cases;
+	  auto_vec<basic_block> case_bbs;
+	  hash_map<tree, tree> phi_mapping;
+
+	  for (unsigned i = 0; i < n; i++)
+	    {
+	      tree label = gimple_switch_label (swtch, i);
+	      basic_block case_bb
+		= label_to_block_fn (fun, CASE_LABEL (label));
+
+	      case_bbs.safe_push (case_bb);
+
+	      gcov_type freq = hist->hvalue.counters[i];
+	      if (i > 0 && freq > 0 && freq >= threshold)
+		most_frequent.safe_push (pair<unsigned, gcov_type> (i, freq));
+	      else
+		{
+		  if (i > 0)
+		    reduced_switch_cases.safe_push (gimple_switch_label (swtch, i));
+		  used_cases.add (case_bb);
+		}
+	    }
+
+	  /* Sort by frequencies.  */
+	  most_frequent.qsort (cmp_frequencies);
+
+	  if (!most_frequent.is_empty ())
+	    {
+	      record_phi_operand_mapping (case_bbs, bb, &phi_mapping);
+	      tree switch_index = gimple_switch_index (swtch);
+
+	      gimple_stmt_iterator gsi = gsi_last_bb (bb);
+	      edge e;
+	      if (gsi_end_p (gsi))
+		e = split_block_after_labels (bb);
+	      else
+		{
+		  gsi_prev (&gsi);
+		  e = split_block (bb, gsi_stmt (gsi));
+		}
+	      basic_block cond_bb = split_edge (e);
+
+	      for (unsigned i = 0; i < most_frequent.length (); i++)
+		{
+		  unsigned index = most_frequent[i].first;
+		  gcov_type freq = most_frequent[i].second;
+		  tree label = gimple_switch_label (swtch, index);
+		  basic_block case_bb
+		    = label_to_block_fn (fun, CASE_LABEL (label));
+		  tree type = TREE_TYPE (switch_index);
+
+		  tree low = fold_convert (type, CASE_LOW (label));
+		  tree high = CASE_HIGH (label);
+		  if (high != NULL_TREE)
+		    high = fold_convert (type, high);
+
+		  gcond *cond;
+		  gimple_stmt_iterator gsi = gsi_last_bb (cond_bb);
+		  if (high != NULL_TREE)
+		    {
+		      tree utype = unsigned_type_for (type);
+
+		      tree lhs = make_ssa_name (type);
+		      gassign *sub1
+			= gimple_build_assign (lhs, MINUS_EXPR, switch_index, low);
+
+		      tree converted = make_ssa_name (utype);
+		      gassign *a = gimple_build_assign (converted, NOP_EXPR, lhs);
+
+		      tree rhs = fold_build2 (MINUS_EXPR, utype,
+					      fold_convert (type, high),
+					      fold_convert (type, low));
+		      gimple_stmt_iterator gsi = gsi_last_bb (cond_bb);
+		      gsi_insert_before (&gsi, sub1, GSI_SAME_STMT);
+		      gsi_insert_before (&gsi, a, GSI_SAME_STMT);
+
+		      cond = gimple_build_cond (LE_EXPR, converted, rhs,
+						NULL_TREE, NULL_TREE);
+		    }
+		  else
+		    cond = gimple_build_cond (EQ_EXPR, switch_index, low,
+					      NULL_TREE, NULL_TREE);
+
+		  gsi_insert_before (&gsi, cond, GSI_SAME_STMT);
+
+		  edge e = single_succ_edge (cond_bb);
+		  e->flags = EDGE_FALSE_VALUE;
+		  edge true_edge = make_edge (cond_bb, case_bb, EDGE_TRUE_VALUE);
+		  fix_phi_operands_for_edge (true_edge, &phi_mapping);
+		  true_edge->probability
+		    = profile_probability::always ().apply_scale (freq, total);
+		  e->probability = true_edge->probability.invert ();
+		  total -= freq;
+
+		  if (i != most_frequent.length () - 1)
+		    cond_bb = split_edge (e);
+		}
+
+	      gimple_remove_histogram_value (fun, swtch, hist);
+
+	      /* Remove superfluous edges.  */
+	      auto_vec<edge> remove_edges;
+
+	      edge_iterator ei;
+	      bb = gimple_bb (swtch);
+	      FOR_EACH_EDGE (e, ei, bb->succs)
+		if (!used_cases.contains (e->dest))
+		  remove_edges.safe_push (e);
+
+	      for (unsigned j = 0; j < remove_edges.length (); j++)
+		remove_edge (remove_edges[j]);
+
+	      /* Build new switch a replace the old one.  */
+	      gimple *new_switch
+		= gimple_build_switch (switch_index,
+				       gimple_switch_default_label (swtch),
+				       reduced_switch_cases);
+
+	      if (dump_file)
+		{
+		  fprintf (dump_file, "Switch statement transformed (%d): ",
+			   most_frequent.length ());
+		  print_gimple_stmt (dump_file, swtch, 0, TDF_SLIM);
+		  fprintf (dump_file, "\n");
+		}
+
+	      gsi = gsi_for_stmt (swtch);
+	      gsi_replace (&gsi, new_switch, true);
+	    }
+	}
+    }
+
+  free_dominance_info (CDI_DOMINATORS);
+  free_dominance_info (CDI_POST_DOMINATORS);
+
+  return 0;
+}
+
+} // anon namespace
+
+gimple_opt_pass *
+make_pass_profiling_convert_switch (gcc::context *ctxt)
+{
+  return new pass_profiling_convert_switch (ctxt);
 }

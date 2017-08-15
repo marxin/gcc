@@ -35,6 +35,7 @@ enum hist_type
   HIST_TYPE_TIME_PROFILE, /* Used for time profile */
   HIST_TYPE_INDIR_CALL_TOPN, /* Tries to identify the top N most frequently
                                 called functions in indirect call.  */
+  HIST_TYPE_SWITCH_COUNTS, /* Measures frequencies of switch labels.  */
   HIST_TYPE_MAX
 };
 

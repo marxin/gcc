@@ -64,6 +64,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "dumpfile.h"
 #include "cfgloop.h"
+#include "memmodel.h"
+#include "target.h"
+#include "ssa.h"
 
 #include "profile.h"
 
@@ -922,7 +925,7 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
         act_count[t] += hist->n_counters;
 
       gimple_add_histogram_value (cfun, stmt, hist);
-      hist->hvalue.counters =  XNEWVEC (gcov_type, hist->n_counters);
+      hist->hvalue.counters = XNEWVEC (gcov_type, hist->n_counters);
       for (j = 0; j < hist->n_counters; j++)
         if (aact_count)
           hist->hvalue.counters[j] = aact_count[j];
@@ -1010,6 +1013,123 @@ compare_freqs (const void *p1, const void *p2)
   return e2->dest->index - e1->dest->index;
 }
 
+static bool
+unfold_common_switch_cases (gswitch *swtch)
+{
+  bool modified = false;
+
+  hash_set<tree> seen_labels;
+  basic_block switch_bb = gimple_bb (swtch);
+
+  hash_map<tree, vec<tree>> groups;
+
+  for (unsigned i = 0; i < gimple_switch_num_labels (swtch); i++)
+    {
+      tree cs = gimple_switch_label (swtch, i);
+      tree case_label = CASE_LABEL (cs);
+      basic_block bb = label_to_block (case_label);
+
+      if (seen_labels.contains (case_label))
+	{
+	  modified = true;
+	  edge e = find_edge (switch_bb, bb);
+	  basic_block new_bb = split_edge (e);
+	  basic_block s = single_succ_edge (new_bb)->dest;
+	  edge new_edge = make_edge (switch_bb, s, 0);
+
+	  /* After we split the edge, all cases having case_label will
+	     be given a new one.  */
+	  tree new_case_label = CASE_LABEL (cs);
+
+	  /* New glabel should be created.  */
+	  gimple_stmt_iterator gsi = gsi_start_bb (new_bb);
+	  glabel *l = dyn_cast<glabel *> (gsi_stmt (gsi));
+
+	  gsi = gsi_start_bb (s);
+	  l = dyn_cast<glabel *> (gsi_stmt (gsi));
+
+	  tree new_label_expr = build_case_label (CASE_LOW (cs),
+						  CASE_HIGH (cs),
+						  gimple_label_label (l));
+
+	  gimple_switch_set_label (swtch, i, new_label_expr);
+	  seen_labels.add (new_case_label);
+
+	  /* It's possible that we create a new edge that will point to single
+	     predecessor of switch BB.  */
+	  for (gphi_iterator gsi = gsi_start_phis (s); !gsi_end_p (gsi);
+	       gsi_next (&gsi))
+	    {
+	      gphi *phi = gsi.phi ();
+
+	      unsigned n = gimple_phi_num_args (phi);
+	      if (gimple_phi_arg_def (phi, n - 1) == NULL_TREE)
+		{
+		  gcc_assert (gimple_phi_arg_edge (phi, n - 1) == new_edge);
+		  for (unsigned i = 0; i < n - 1; i++)
+		    if (gimple_phi_arg_edge (phi, i)->src == new_bb)
+		      {
+			add_phi_arg (phi, gimple_phi_arg_def (phi, i),
+				     new_edge, UNKNOWN_LOCATION);
+			break;
+		      }
+		}
+	    }
+	}
+      else
+	seen_labels.add (case_label);
+    }
+
+  unsigned edge_count = EDGE_COUNT (switch_bb->succs);
+
+  /* Set even probabilities for all edges.  */
+  if (modified)
+    {
+      edge e;
+      edge_iterator ei;
+
+      FOR_EACH_EDGE (e, ei, switch_bb->succs)
+	e->probability
+	  = profile_probability::guessed_always ().apply_scale (1, edge_count);
+    }
+
+  gcc_assert (edge_count == gimple_switch_num_labels (swtch));
+
+  return modified;
+}
+
+
+static void
+add_switch_histograms (void)
+{
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_stmt_iterator gsi = gsi_last_bb (bb);
+      if (!gsi_end_p (gsi))
+	{
+	  gswitch *swtch = dyn_cast<gswitch *> (gsi_stmt (gsi));
+	  if (swtch == NULL)
+	    continue;
+
+	  unsigned edge_count = EDGE_COUNT (bb->succs);
+	  gcc_assert (edge_count == gimple_switch_num_labels (swtch));
+
+	  histogram_value h
+	    = gimple_alloc_histogram_value (cfun, HIST_TYPE_SWITCH_COUNTS,
+					    swtch, NULL);
+	  h->n_counters = edge_count;
+	  h->hvalue.counters = XNEWVEC (gcov_type, edge_count);
+	  for (unsigned i = 0; i < edge_count; i++)
+	    h->hvalue.counters[i] = EDGE_SUCC (bb, i)->count.to_gcov_type ();
+
+	  gimple_add_histogram_value (cfun, swtch, h);
+	  histogram_value th = gimple_histogram_value (cfun, swtch);
+	  gcc_assert (th != NULL);
+	}
+    }
+}
+
 /* Instrument and/or analyze program behavior based on program the CFG.
 
    This function creates a representation of the control flow graph (of
@@ -1039,6 +1159,24 @@ branch_prob (void)
   struct edge_list *el;
   histogram_values values = histogram_values ();
   unsigned cfg_checksum, lineno_checksum;
+
+  bool modified = false;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_stmt_iterator gsi = gsi_last_bb (bb);
+      if (!gsi_end_p (gsi))
+	{
+	  gswitch *swtch = dyn_cast<gswitch *> (gsi_stmt (gsi));
+	  if (swtch)
+	    modified |= unfold_common_switch_cases (swtch);
+	}
+    }
+
+  if (modified)
+    {
+      free_dominance_info (CDI_DOMINATORS);
+      free_dominance_info (CDI_POST_DOMINATORS);
+    }
 
   total_num_times_called++;
 
@@ -1332,6 +1470,9 @@ branch_prob (void)
       compute_branch_probabilities (cfg_checksum, lineno_checksum);
       if (flag_profile_values)
 	compute_value_histograms (values, cfg_checksum, lineno_checksum);
+
+      if (profile_info)
+	add_switch_histograms ();
     }
 
   remove_fake_edges ();

@@ -333,6 +333,20 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
         }
       fprintf (dump_file, ".\n");
       break;
+    case HIST_TYPE_SWITCH_COUNTS:
+	{
+	fprintf (dump_file, "Switch case frequencies: [");
+	gswitch *swtch = dyn_cast<gswitch *> (hist->hvalue.stmt);
+	unsigned n = gimple_switch_num_labels (swtch);
+	for (unsigned i = 0; i < n; i++)
+	  {
+	    fprintf (dump_file, "%" PRId64, (uint64_t)hist->hvalue.counters[i]);
+	    if (i != n - 1)
+	      fprintf (dump_file, ",");
+	  }
+	fprintf (dump_file, "].\n");
+	break;
+	}
     case HIST_TYPE_MAX:
       gcc_unreachable ();
    }
@@ -420,6 +434,10 @@ stream_in_histogram_value (struct lto_input_block *ib, gimple *stmt)
         case HIST_TYPE_INDIR_CALL_TOPN:
           ncounters = (GCOV_ICALL_TOPN_VAL << 2) + 1;
           break;
+
+	case HIST_TYPE_SWITCH_COUNTS:
+	  ncounters = gimple_switch_num_labels (dyn_cast<gswitch *> (stmt));
+	  break;
 
 	case HIST_TYPE_MAX:
 	  gcc_unreachable ();
@@ -2081,6 +2099,7 @@ gimple_find_values_to_profile (histogram_values *values)
           hist->n_counters = GCOV_ICALL_TOPN_NCOUNTS;
           break;
 
+	case HIST_TYPE_SWITCH_COUNTS:
 	default:
 	  gcc_unreachable ();
 	}
