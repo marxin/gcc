@@ -1220,8 +1220,24 @@ coverage_init (const char *filename)
     g->get_passes ()->get_pass_profile ()->static_pass_number;
   g->get_dumps ()->dump_start (profile_pass_num, NULL);
 
-  if (!profile_data_prefix && !IS_ABSOLUTE_PATH (filename))
-    profile_data_prefix = getpwd ();
+  if (!IS_ABSOLUTE_PATH (filename))
+    {
+      if (profile_data_prefix)
+	{
+	  const char *pwd = getpwd ();
+	  unsigned l1 = strlen (profile_data_prefix);
+	  unsigned l2 = strlen (pwd);
+
+	  char *b = XNEWVEC (char, l1 + l2 + 2);
+	  memcpy (b, profile_data_prefix, l1);
+	  b[l1] = '/';
+	  memcpy (b + l1 + 1, pwd, l2);
+	  b[l1 + l2 + 1] = '\0';
+	  profile_data_prefix = b;
+	}
+      else
+	profile_data_prefix = getpwd ();
+    }
 
   if (profile_data_prefix)
     prefix_len = strlen (profile_data_prefix);

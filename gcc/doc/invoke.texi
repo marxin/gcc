@@ -10915,6 +10915,9 @@ and used by @option{-fprofile-use} and @option{-fbranch-probabilities}
 and its related options.  Both absolute and relative paths can be used.
 By default, GCC uses the current directory as @var{path}, thus the
 profile data file appears in the same directory as the object file.
+In order to prevent filename clashing, if object file name is not an absolute
+path, current working directory path is appended to @var{path}
+and used as a destination for @file{@var{sourcename}.gcda} file.
 
 @item -fprofile-generate
 @itemx -fprofile-generate=@var{path}
