@@ -1227,8 +1227,18 @@ coverage_init (const char *filename)
     g->get_passes ()->get_pass_profile ()->static_pass_number;
   g->get_dumps ()->dump_start (profile_pass_num, NULL);
 
-  if (!profile_data_prefix && !IS_ABSOLUTE_PATH (filename))
-    profile_data_prefix = getpwd ();
+  if (!IS_ABSOLUTE_PATH (filename))
+    {
+      if (profile_data_prefix)
+	{
+	  const char dir_separator_str[] = { DIR_SEPARATOR, '\0' };
+	  const char *pwd = getpwd ();
+	  char *b = concat (profile_data_prefix, dir_separator_str, pwd, NULL);
+	  profile_data_prefix = b;
+	}
+      else
+	profile_data_prefix = getpwd ();
+    }
 
   if (profile_data_prefix)
     prefix_len = strlen (profile_data_prefix);
@@ -1240,7 +1250,7 @@ coverage_init (const char *filename)
   if (profile_data_prefix)
     {
       memcpy (da_file_name, profile_data_prefix, prefix_len);
-      da_file_name[prefix_len++] = '/';
+      da_file_name[prefix_len++] = DIR_SEPARATOR;
     }
   memcpy (da_file_name + prefix_len, filename, len);
   strcpy (da_file_name + prefix_len + len, GCOV_DATA_SUFFIX);
