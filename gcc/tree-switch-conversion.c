@@ -1486,6 +1486,88 @@ gen_inbound_check (gswitch *swtch, struct switch_conv_info *info)
     }
 }
 
+/* Generate GIMPLE IL to basic block BB which compares whether INDEX
+   value is within range LOW ... HIGH.  We create a LHS and RHS that
+   can be then compared in order to hit the interval or not.  */
+
+static void
+generate_high_low_equality (basic_block bb, tree index, tree low, tree high,
+			    tree *lhs, tree *rhs)
+{
+  tree type = TREE_TYPE (index);
+  tree utype = unsigned_type_for (type);
+
+  low = fold_convert (type, low);
+  high = fold_convert (type, high);
+
+  tree tmp = make_ssa_name (type);
+  gassign *sub1
+    = gimple_build_assign (tmp, MINUS_EXPR, index, low);
+
+  *lhs = make_ssa_name (utype);
+  gassign *a = gimple_build_assign (*lhs, NOP_EXPR, tmp);
+
+  *rhs = fold_build2 (MINUS_EXPR, utype, high, low);
+  gimple_stmt_iterator gsi = gsi_last_bb (bb);
+  gsi_insert_before (&gsi, sub1, GSI_SAME_STMT);
+  gsi_insert_before (&gsi, a, GSI_SAME_STMT);
+}
+
+/* Expand SWTCH with at maximum a single non-default edge to simple gimple
+   condition.  */
+
+static void
+expand_degenerated_switch (gswitch *swtch)
+{
+  tree index = gimple_switch_index (swtch);
+  gimple_stmt_iterator gsi = gsi_for_stmt (swtch);
+
+  if (gimple_switch_num_labels (swtch) == 1)
+    {
+      gsi_remove (&gsi, true);
+
+      if (dump_file)
+	fprintf (dump_file, ";; Removing GIMPLE switch:\n");
+    }
+  else
+    {
+    tree default_label = CASE_LABEL (gimple_switch_default_label (swtch));
+      tree label = gimple_switch_label (swtch, 1);
+      tree low = CASE_LOW (label);
+      tree high = CASE_HIGH (label);
+
+      basic_block default_bb = label_to_block_fn (cfun, default_label);
+      basic_block case_bb = label_to_block_fn (cfun, CASE_LABEL (label));
+
+      basic_block bb = gimple_bb (swtch);
+      gcond *cond;
+
+      /* Replace switch statement with condition statement.  */
+      if (high)
+	{
+	  tree lhs, rhs;
+	  generate_high_low_equality (bb, index, low, high, &lhs, &rhs);
+	  cond = gimple_build_cond (LE_EXPR, lhs, rhs, NULL_TREE, NULL_TREE);
+	}
+      else
+	cond = gimple_build_cond (EQ_EXPR, index,
+				  fold_convert (TREE_TYPE (index), low),
+				  NULL_TREE, NULL_TREE);
+
+      gsi_replace (&gsi, cond, true);
+
+      /* Update edges.  */
+      edge case_edge = find_edge (bb, case_bb);
+      edge default_edge = find_edge (bb, default_bb);
+
+      case_edge->flags |= EDGE_TRUE_VALUE;
+      default_edge->flags |= EDGE_FALSE_VALUE;
+
+      if (dump_file)
+	fprintf (dump_file, ";; Expanding GIMPLE switch as condition:\n");
+    }
+}
+
 /* The following function is invoked on every switch statement (the current one
    is given in SWTCH) and runs the individual phases of switch conversion on it
    one after another until one fails or the conversion is completed.
@@ -1501,10 +1583,11 @@ process_switch (gswitch *swtch)
      that decide on the code generation approach for this switch.  */
   group_case_labels_stmt (swtch);
 
-  /* If this switch is now a degenerate case with only a default label,
-     there is nothing left for us to do.   */
-  if (gimple_switch_num_labels (swtch) < 2)
-    return "switch is a degenerate case";
+  if (gimple_switch_num_labels (swtch) <= 2)
+    {
+      expand_degenerated_switch (swtch);
+      return NULL;
+    }
 
   collect_switch_conv_info (swtch, &info);
 
@@ -2047,6 +2130,12 @@ try_switch_expansion (gswitch *stmt)
   hash_map<tree, tree> phi_mapping;
   auto_vec<basic_block> case_bbs;
 
+  if (gimple_switch_num_labels (stmt) <= 2)
+    {
+      expand_degenerated_switch (stmt);
+      return true;
+    }
+
   /* A list of case labels; it is first built as a list and it may then
      be rearranged into a nearly balanced binary tree.  */
   case_node *case_list = 0;
@@ -2057,10 +2146,6 @@ try_switch_expansion (gswitch *stmt)
   /* cleanup_tree_cfg removes all SWITCH_EXPR with their index
      expressions being INTEGER_CST.  */
   gcc_assert (TREE_CODE (index_expr) != INTEGER_CST);
-
-  /* Optimization of switch statements with only one label has already
-     occurred, so we should never see them at this point.  */
-  gcc_assert (ncases > 1);
 
   /* Find the default case target label.  */
   tree default_label = CASE_LABEL (gimple_switch_default_label (stmt));
@@ -2702,27 +2787,13 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 	    }
 	  else if (!low_bound && !high_bound)
 	    {
-	      tree type = TREE_TYPE (index);
-	      tree utype = unsigned_type_for (type);
-
-	      tree lhs = make_ssa_name (type);
-	      gassign *sub1
-		= gimple_build_assign (lhs, MINUS_EXPR, index, node->low);
-
-	      tree converted = make_ssa_name (utype);
-	      gassign *a = gimple_build_assign (converted, NOP_EXPR, lhs);
-
-	      tree rhs = fold_build2 (MINUS_EXPR, utype,
-				      fold_convert (type, node->high),
-				      fold_convert (type, node->low));
-	      gimple_stmt_iterator gsi = gsi_last_bb (bb);
-	      gsi_insert_before (&gsi, sub1, GSI_SAME_STMT);
-	      gsi_insert_before (&gsi, a, GSI_SAME_STMT);
-
+	      tree lhs, rhs;
+	      generate_high_low_equality (bb, index, node->low, node->high,
+					  &lhs, &rhs);
 	      probability
 		= conditional_probability (default_prob,
 					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, converted, rhs, GT_EXPR,
+	      bb = emit_cmp_and_jump_insns (bb, lhs, rhs, GT_EXPR,
 					    default_bb, probability,
 					    phi_mapping);
 	    }
