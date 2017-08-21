@@ -32,7 +32,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "cfghooks.h"
 #include "predict.h"
-#include "alloc-pool.h"
 #include "memmodel.h"
 #include "tm_p.h"
 #include "optabs.h"
@@ -63,42 +62,25 @@ along with GCC; see the file COPYING3.  If not see
    as in C, the high and low limits are the same.
 
    We start with a vector of case nodes sorted in ascending order, and
-   the default label as the last element in the vector.  Before expanding
-   to RTL, we transform this vector into a list linked via the RIGHT
-   fields in the case_node struct.  Nodes with higher case values are
-   later in the list.
+   the default label as the last element in the vector.
 
-   Switch statements can be output in three forms.  A branch table is
-   used if there are more than a few labels and the labels are dense
-   within the range between the smallest and largest case value.  If a
-   branch table is used, no further manipulations are done with the case
-   node chain.
+   Switch statements are expanded in jump table form.
 
-   The alternative to the use of a branch table is to generate a series
-   of compare and jump insns.  When that is done, we use the LEFT, RIGHT,
-   and PARENT fields to hold a binary tree.  Initially the tree is
-   totally unbalanced, with everything on the right.  We balance the tree
-   with nodes on the left having lower case values than the parent
-   and nodes on the right having higher values.  We then output the tree
-   in order.
+*/
 
-   For very small, suitable switch statements, we can generate a series
-   of simple bit test and branches instead.  */
-
-struct case_node
+struct simple_case_node
 {
-  struct case_node	*left;	/* Left son in binary tree */
-  struct case_node	*right;	/* Right son in binary tree; also node chain */
-  struct case_node	*parent; /* Parent of node in binary tree */
-  tree			low;	/* Lowest index value for this label */
-  tree			high;	/* Highest index value for this label */
-  tree			code_label; /* Label to jump to when node matches */
-  profile_probability   prob; /* Probability of taking this case.  */
-  /* Probability of reaching subtree rooted at this node */
-  profile_probability   subtree_prob;
-};
+  simple_case_node (tree low, tree high, tree code_label):
+    m_low (low), m_high (high), m_code_label (code_label)
+  {}
 
-typedef struct case_node *case_node_ptr;
+  /* Lowest index value for this label */
+  tree m_low;
+  /* Highest index value for this label */
+  tree m_high;
+  /* Label to jump to when node matches */
+  tree m_code_label;
+};
 
 extern basic_block label_to_block_fn (struct function *, tree);
 
@@ -705,37 +687,6 @@ do_jump_if_equal (machine_mode mode, rtx op0, rtx op1, rtx_code_label *label,
 			   NULL_RTX, NULL, label, prob);
 }
 
-/* Do the insertion of a case label into case_list.  The labels are
-   fed to us in descending order from the sorted vector of case labels used
-   in the tree part of the middle end.  So the list we construct is
-   sorted in ascending order.
-   
-   LABEL is the case label to be inserted. LOW and HIGH are the bounds
-   against which the index is compared to jump to LABEL and PROB is the
-   estimated probability LABEL is reached from the switch statement.  */
-
-static struct case_node *
-add_case_node (struct case_node *head, tree low, tree high,
-	       tree label, profile_probability prob,
-	       object_allocator<case_node> &case_node_pool)
-{
-  struct case_node *r;
-
-  gcc_checking_assert (low);
-  gcc_checking_assert (high && (TREE_TYPE (low) == TREE_TYPE (high)));
-
-  /* Add this label to the chain.  */
-  r = case_node_pool.allocate ();
-  r->low = low;
-  r->high = high;
-  r->code_label = label;
-  r->parent = r->left = NULL;
-  r->prob = prob;
-  r->subtree_prob = prob;
-  r->right = head;
-  return r;
-}
-
 /* Return the sum of probabilities of outgoing edges of basic block BB.  */
 
 static profile_probability
@@ -780,14 +731,13 @@ conditional_probability (profile_probability target_prob,
 
 static void
 emit_case_dispatch_table (tree index_expr, tree index_type,
-			  struct case_node *case_list, rtx default_label,
+			  auto_vec<simple_case_node> &case_list, rtx default_label,
 			  edge default_edge,  tree minval, tree maxval,
 			  tree range, basic_block stmt_bb)
 {
   int i, ncases;
-  struct case_node *n;
   rtx *labelvec;
-  rtx_insn *fallback_label = label_rtx (case_list->code_label);
+  rtx_insn *fallback_label = label_rtx (case_list[0].m_code_label);
   rtx_code_label *table_label = gen_label_rtx ();
   bool has_gaps = false;
   profile_probability default_prob = default_edge ? default_edge->probability
@@ -822,22 +772,23 @@ emit_case_dispatch_table (tree index_expr, tree index_type,
   labelvec = XALLOCAVEC (rtx, ncases);
   memset (labelvec, 0, ncases * sizeof (rtx));
 
-  for (n = case_list; n; n = n->right)
+  for (unsigned j = 0; j < case_list.length (); j++)
     {
+      simple_case_node *n = &case_list[j];
       /* Compute the low and high bounds relative to the minimum
 	 value since that should fit in a HOST_WIDE_INT while the
 	 actual values may not.  */
       HOST_WIDE_INT i_low
 	= tree_to_uhwi (fold_build2 (MINUS_EXPR, index_type,
-				     n->low, minval));
+				     n->m_low, minval));
       HOST_WIDE_INT i_high
 	= tree_to_uhwi (fold_build2 (MINUS_EXPR, index_type,
-				     n->high, minval));
+				     n->m_high, minval));
       HOST_WIDE_INT i;
 
       for (i = i_low; i <= i_high; i ++)
 	labelvec[i]
-	  = gen_rtx_LABEL_REF (Pmode, label_rtx (n->code_label));
+	  = gen_rtx_LABEL_REF (Pmode, label_rtx (n->m_code_label));
     }
 
   /* The dispatch table may contain gaps, including at the beginning of
@@ -909,36 +860,6 @@ emit_case_dispatch_table (tree index_expr, tree index_type,
   emit_barrier ();
 }
 
-/* Reset the aux field of all outgoing edges of basic block BB.  */
-
-static inline void
-reset_out_edges_aux (basic_block bb)
-{
-  edge e;
-  edge_iterator ei;
-  FOR_EACH_EDGE (e, ei, bb->succs)
-    e->aux = (void *)0;
-}
-
-/* Compute the number of case labels that correspond to each outgoing edge of
-   STMT. Record this information in the aux field of the edge.  */
-
-static inline void
-compute_cases_per_edge (gswitch *stmt)
-{
-  basic_block bb = gimple_bb (stmt);
-  reset_out_edges_aux (bb);
-  int ncases = gimple_switch_num_labels (stmt);
-  for (int i = ncases - 1; i >= 1; --i)
-    {
-      tree elt = gimple_switch_label (stmt, i);
-      tree lab = CASE_LABEL (elt);
-      basic_block case_bb = label_to_block_fn (cfun, lab);
-      edge case_edge = find_edge (bb, case_bb);
-      case_edge->aux = (void *)((intptr_t)(case_edge->aux) + 1);
-    }
-}
-
 /* Terminate a case Ada or switch (C) statement
    in which ORIG_INDEX is the expression to be tested.
    If ORIG_TYPE is not NULL, it is the original ORIG_INDEX
@@ -950,7 +871,7 @@ expand_case (gswitch *stmt)
 {
   tree minval = NULL_TREE, maxval = NULL_TREE, range = NULL_TREE;
   rtx_code_label *default_label;
-  unsigned int count, uniq;
+  unsigned int count;
   int i;
   int ncases = gimple_switch_num_labels (stmt);
   tree index_expr = gimple_switch_index (stmt);
@@ -958,12 +879,7 @@ expand_case (gswitch *stmt)
   tree elt;
   basic_block bb = gimple_bb (stmt);
 
-  /* A list of case labels; it is first built as a list and it may then
-     be rearranged into a nearly balanced binary tree.  */
-  struct case_node *case_list = 0;
-
-  /* A pool for case nodes.  */
-  object_allocator<case_node> case_node_pool ("struct case_node pool");
+  auto_vec<simple_case_node> case_list;
 
   /* An ERROR_MARK occurs for various reasons including invalid data type.
      ??? Can this still happen, with GIMPLE and all?  */
@@ -1000,10 +916,7 @@ expand_case (gswitch *stmt)
 
   /* Listify the labels queue and gather some numbers to decide
      how to expand this switch().  */
-  uniq = 0;
   count = 0;
-  hash_set<tree> seen_labels;
-  compute_cases_per_edge (stmt);
 
   for (i = ncases - 1; i >= 1; --i)
     {
@@ -1019,11 +932,6 @@ expand_case (gswitch *stmt)
       count++;
       if (high)
 	count++;
-
-      /* If we have not seen this label yet, then increase the
-	 number of unique case node targets seen.  */
-      if (!seen_labels.add (lab))
-	uniq++;
 
       /* The bounds on the case range, LOW and HIGH, have to be converted
 	 to case's index type TYPE.  Note that the original type of the
@@ -1043,14 +951,8 @@ expand_case (gswitch *stmt)
       if (TREE_OVERFLOW (high))
 	high = wide_int_to_tree (index_type, high);
 
-      basic_block case_bb = label_to_block_fn (cfun, lab);
-      edge case_edge = find_edge (bb, case_bb);
-      case_list = add_case_node (
-          case_list, low, high, lab,
-          case_edge->probability.apply_scale (1, (intptr_t)(case_edge->aux)),
-          case_node_pool);
+      case_list.safe_push (simple_case_node (low, high, lab));
     }
-  reset_out_edges_aux (bb);
 
   /* cleanup_tree_cfg removes all SWITCH_EXPR with a single
      destination, such as one with a default case only.
@@ -1150,8 +1052,7 @@ expand_sjlj_dispatch_table (rtx dispatch_index,
   else
     {
       /* Similar to expand_case, but much simpler.  */
-      struct case_node *case_list = 0;
-      object_allocator<case_node> case_node_pool ("struct sjlj_case pool");
+      auto_vec<simple_case_node> case_list;
       tree index_expr = make_tree (index_type, dispatch_index);
       tree minval = build_int_cst (index_type, 0);
       tree maxval = CASE_LOW (dispatch_table.last ());
@@ -1161,12 +1062,8 @@ expand_sjlj_dispatch_table (rtx dispatch_index,
       for (int i = ncases - 1; i >= 0; --i)
 	{
 	  tree elt = dispatch_table[i];
-	  tree low = CASE_LOW (elt);
-	  tree lab = CASE_LABEL (elt);
-	  case_list = add_case_node (case_list, low, low, lab,
-				     profile_probability::guessed_always ()
-					.apply_scale (1, ncases),
-				     case_node_pool);
+	  case_list.safe_push (simple_case_node (CASE_LOW (elt), CASE_HIGH (elt),
+						 CASE_LABEL (elt)));
 	}
 
       emit_case_dispatch_table (index_expr, index_type,
