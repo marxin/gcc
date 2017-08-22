@@ -50,14 +50,16 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "target.h"
 #include "tree-into-ssa.h"
 
+#include "tree-switch-conversion.h"
+
+using namespace tree_switch_conversion;
+
 /* ??? For lang_hooks.types.type_for_mode, but is there a word_mode
    type in the GIMPLE type system that is language-independent?  */
 #include "langhooks.h"
 
 
-/* Maximum number of case bit tests.
-   FIXME: This should be derived from PARAM_CASE_VALUES_THRESHOLD and
-	  targetm.case_values_threshold(), or be its own param.  */
+/* Maximum number of case bit tests.  */
 #define MAX_CASE_BIT_TESTS  3
 
 /* Split the basic block at the statement pointed to by GSIP, and insert
@@ -77,20 +79,15 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 
 static basic_block
 hoist_edge_and_branch_if_true (gimple_stmt_iterator *gsip,
-			       tree cond, edge e_true,
-			       bool update_dominators)
+			       tree cond, basic_block case_bb)
 {
   tree tmp;
   gcond *cond_stmt;
   edge e_false;
   basic_block new_bb, split_bb = gsi_bb (*gsip);
-  bool dominated_e_true = false;
 
+  edge e_true = make_edge (split_bb, case_bb, EDGE_TRUE_VALUE);
   gcc_assert (e_true->src == split_bb);
-
-  if (update_dominators
-      && get_immediate_dominator (CDI_DOMINATORS, e_true->dest) == split_bb)
-    dominated_e_true = true;
 
   tmp = force_gimple_operand_gsi (gsip, cond, /*simple=*/true, NULL,
 				  /*before=*/true, GSI_SAME_STMT);
@@ -101,375 +98,13 @@ hoist_edge_and_branch_if_true (gimple_stmt_iterator *gsip,
   new_bb = e_false->dest;
   redirect_edge_pred (e_true, split_bb);
 
-  e_true->flags &= ~EDGE_FALLTHRU;
-  e_true->flags |= EDGE_TRUE_VALUE;
-
   e_false->flags &= ~EDGE_FALLTHRU;
   e_false->flags |= EDGE_FALSE_VALUE;
   e_false->probability = e_true->probability.invert ();
   e_false->count = split_bb->count - e_true->count;
   new_bb->count = e_false->count;
 
-  if (update_dominators)
-    {
-      if (dominated_e_true)
-	set_immediate_dominator (CDI_DOMINATORS, e_true->dest, split_bb);
-      set_immediate_dominator (CDI_DOMINATORS, e_false->dest, split_bb);
-    }
-
   return new_bb;
-}
-
-
-/* Return true if a switch should be expanded as a bit test.
-   RANGE is the difference between highest and lowest case.
-   UNIQ is number of unique case node targets, not counting the default case.
-   COUNT is the number of comparisons needed, not counting the default case.  */
-
-static bool
-expand_switch_using_bit_tests_p (tree range,
-				 unsigned int uniq,
-				 unsigned int count, bool speed_p)
-{
-  return (((uniq == 1 && count >= 3)
-	   || (uniq == 2 && count >= 5)
-	   || (uniq == 3 && count >= 6))
-	  && lshift_cheap_p (speed_p)
-	  && compare_tree_int (range, GET_MODE_BITSIZE (word_mode)) < 0
-	  && compare_tree_int (range, 0) > 0);
-}
-
-/* Implement switch statements with bit tests
-
-A GIMPLE switch statement can be expanded to a short sequence of bit-wise
-comparisons.  "switch(x)" is converted into "if ((1 << (x-MINVAL)) & CST)"
-where CST and MINVAL are integer constants.  This is better than a series
-of compare-and-banch insns in some cases,  e.g. we can implement:
-
-	if ((x==4) || (x==6) || (x==9) || (x==11))
-
-as a single bit test:
-
-	if ((1<<x) & ((1<<4)|(1<<6)|(1<<9)|(1<<11)))
-
-This transformation is only applied if the number of case targets is small,
-if CST constains at least 3 bits, and "1 << x" is cheap.  The bit tests are
-performed in "word_mode".
-
-The following example shows the code the transformation generates:
-
-	int bar(int x)
-	{
-		switch (x)
-		{
-		case '0':  case '1':  case '2':  case '3':  case '4':
-		case '5':  case '6':  case '7':  case '8':  case '9':
-		case 'A':  case 'B':  case 'C':  case 'D':  case 'E':
-		case 'F':
-			return 1;
-		}
-		return 0;
-	}
-
-==>
-
-	bar (int x)
-	{
-		tmp1 = x - 48;
-		if (tmp1 > (70 - 48)) goto L2;
-		tmp2 = 1 << tmp1;
-		tmp3 = 0b11111100000001111111111;
-		if ((tmp2 & tmp3) != 0) goto L1 ; else goto L2;
-	L1:
-		return 1;
-	L2:
-		return 0;
-	}
-
-TODO: There are still some improvements to this transformation that could
-be implemented:
-
-* A narrower mode than word_mode could be used if that is cheaper, e.g.
-  for x86_64 where a narrower-mode shift may result in smaller code.
-
-* The compounded constant could be shifted rather than the one.  The
-  test would be either on the sign bit or on the least significant bit,
-  depending on the direction of the shift.  On some machines, the test
-  for the branch would be free if the bit to test is already set by the
-  shift operation.
-
-This transformation was contributed by Roger Sayle, see this e-mail:
-   http://gcc.gnu.org/ml/gcc-patches/2003-01/msg01950.html
-*/
-
-/* A case_bit_test represents a set of case nodes that may be
-   selected from using a bit-wise comparison.  HI and LO hold
-   the integer to be tested against, TARGET_EDGE contains the
-   edge to the basic block to jump to upon success and BITS
-   counts the number of case nodes handled by this test,
-   typically the number of bits set in HI:LO.  The LABEL field
-   is used to quickly identify all cases in this set without
-   looking at label_to_block for every case label.  */
-
-struct case_bit_test
-{
-  wide_int mask;
-  edge target_edge;
-  tree label;
-  int bits;
-};
-
-/* Comparison function for qsort to order bit tests by decreasing
-   probability of execution.  Our best guess comes from a measured
-   profile.  If the profile counts are equal, break even on the
-   number of case nodes, i.e. the node with the most cases gets
-   tested first.
-
-   TODO: Actually this currently runs before a profile is available.
-   Therefore the case-as-bit-tests transformation should be done
-   later in the pass pipeline, or something along the lines of
-   "Efficient and effective branch reordering using profile data"
-   (Yang et. al., 2002) should be implemented (although, how good
-   is a paper is called "Efficient and effective ..." when the
-   latter is implied by the former, but oh well...).  */
-
-static int
-case_bit_test_cmp (const void *p1, const void *p2)
-{
-  const struct case_bit_test *const d1 = (const struct case_bit_test *) p1;
-  const struct case_bit_test *const d2 = (const struct case_bit_test *) p2;
-
-  if (d2->target_edge->count < d1->target_edge->count)
-    return -1;
-  if (d2->target_edge->count > d1->target_edge->count)
-    return 1;
-  if (d2->bits != d1->bits)
-    return d2->bits - d1->bits;
-
-  /* Stabilize the sort.  */
-  return LABEL_DECL_UID (d2->label) - LABEL_DECL_UID (d1->label);
-}
-
-/*  Expand a switch statement by a short sequence of bit-wise
-    comparisons.  "switch(x)" is effectively converted into
-    "if ((1 << (x-MINVAL)) & CST)" where CST and MINVAL are
-    integer constants.
-
-    INDEX_EXPR is the value being switched on.
-
-    MINVAL is the lowest case value of in the case nodes,
-    and RANGE is highest value minus MINVAL.  MINVAL and RANGE
-    are not guaranteed to be of the same type as INDEX_EXPR
-    (the gimplifier doesn't change the type of case label values,
-    and MINVAL and RANGE are derived from those values).
-    MAXVAL is MINVAL + RANGE.
-
-    There *MUST* be MAX_CASE_BIT_TESTS or less unique case
-    node targets.  */
-
-static void
-emit_case_bit_tests (gswitch *swtch, tree index_expr,
-		     tree minval, tree range, tree maxval)
-{
-  struct case_bit_test test[MAX_CASE_BIT_TESTS] = { {} };
-  unsigned int i, j, k;
-  unsigned int count;
-
-  basic_block switch_bb = gimple_bb (swtch);
-  basic_block default_bb, new_default_bb, new_bb;
-  edge default_edge;
-  bool update_dom = dom_info_available_p (CDI_DOMINATORS);
-
-  vec<basic_block> bbs_to_fix_dom = vNULL;
-
-  tree index_type = TREE_TYPE (index_expr);
-  tree unsigned_index_type = unsigned_type_for (index_type);
-  unsigned int branch_num = gimple_switch_num_labels (swtch);
-
-  gimple_stmt_iterator gsi;
-  gassign *shift_stmt;
-
-  tree idx, tmp, csui;
-  tree word_type_node = lang_hooks.types.type_for_mode (word_mode, 1);
-  tree word_mode_zero = fold_convert (word_type_node, integer_zero_node);
-  tree word_mode_one = fold_convert (word_type_node, integer_one_node);
-  int prec = TYPE_PRECISION (word_type_node);
-  wide_int wone = wi::one (prec);
-
-  /* Get the edge for the default case.  */
-  tmp = gimple_switch_default_label (swtch);
-  default_bb = label_to_block (CASE_LABEL (tmp));
-  default_edge = find_edge (switch_bb, default_bb);
-
-  /* Go through all case labels, and collect the case labels, profile
-     counts, and other information we need to build the branch tests.  */
-  count = 0;
-  for (i = 1; i < branch_num; i++)
-    {
-      unsigned int lo, hi;
-      tree cs = gimple_switch_label (swtch, i);
-      tree label = CASE_LABEL (cs);
-      edge e = find_edge (switch_bb, label_to_block (label));
-      for (k = 0; k < count; k++)
-	if (e == test[k].target_edge)
-	  break;
-
-      if (k == count)
-	{
-	  gcc_checking_assert (count < MAX_CASE_BIT_TESTS);
-	  test[k].mask = wi::zero (prec);
-	  test[k].target_edge = e;
-	  test[k].label = label;
-	  test[k].bits = 1;
-	  count++;
-	}
-      else
-        test[k].bits++;
-
-      lo = tree_to_uhwi (int_const_binop (MINUS_EXPR,
-					  CASE_LOW (cs), minval));
-      if (CASE_HIGH (cs) == NULL_TREE)
-	hi = lo;
-      else
-	hi = tree_to_uhwi (int_const_binop (MINUS_EXPR,
-					    CASE_HIGH (cs), minval));
-
-      for (j = lo; j <= hi; j++)
-	test[k].mask |= wi::lshift (wone, j);
-    }
-
-  qsort (test, count, sizeof (*test), case_bit_test_cmp);
-
-  /* If all values are in the 0 .. BITS_PER_WORD-1 range, we can get rid of
-     the minval subtractions, but it might make the mask constants more
-     expensive.  So, compare the costs.  */
-  if (compare_tree_int (minval, 0) > 0
-      && compare_tree_int (maxval, GET_MODE_BITSIZE (word_mode)) < 0)
-    {
-      int cost_diff;
-      HOST_WIDE_INT m = tree_to_uhwi (minval);
-      rtx reg = gen_raw_REG (word_mode, 10000);
-      bool speed_p = optimize_bb_for_speed_p (gimple_bb (swtch));
-      cost_diff = set_rtx_cost (gen_rtx_PLUS (word_mode, reg,
-					      GEN_INT (-m)), speed_p);
-      for (i = 0; i < count; i++)
-	{
-	  rtx r = immed_wide_int_const (test[i].mask, word_mode);
-	  cost_diff += set_src_cost (gen_rtx_AND (word_mode, reg, r),
-				     word_mode, speed_p);
-	  r = immed_wide_int_const (wi::lshift (test[i].mask, m), word_mode);
-	  cost_diff -= set_src_cost (gen_rtx_AND (word_mode, reg, r),
-				     word_mode, speed_p);
-	}
-      if (cost_diff > 0)
-	{
-	  for (i = 0; i < count; i++)
-	    test[i].mask = wi::lshift (test[i].mask, m);
-	  minval = build_zero_cst (TREE_TYPE (minval));
-	  range = maxval;
-	}
-    }
-
-  /* We generate two jumps to the default case label.
-     Split the default edge, so that we don't have to do any PHI node
-     updating.  */
-  new_default_bb = split_edge (default_edge);
-
-  if (update_dom)
-    {
-      bbs_to_fix_dom.create (10);
-      bbs_to_fix_dom.quick_push (switch_bb);
-      bbs_to_fix_dom.quick_push (default_bb);
-      bbs_to_fix_dom.quick_push (new_default_bb);
-    }
-
-  /* Now build the test-and-branch code.  */
-
-  gsi = gsi_last_bb (switch_bb);
-
-  /* idx = (unsigned)x - minval.  */
-  idx = fold_convert (unsigned_index_type, index_expr);
-  idx = fold_build2 (MINUS_EXPR, unsigned_index_type, idx,
-		     fold_convert (unsigned_index_type, minval));
-  idx = force_gimple_operand_gsi (&gsi, idx,
-				  /*simple=*/true, NULL_TREE,
-				  /*before=*/true, GSI_SAME_STMT);
-
-  /* if (idx > range) goto default */
-  range = force_gimple_operand_gsi (&gsi,
-				    fold_convert (unsigned_index_type, range),
-				    /*simple=*/true, NULL_TREE,
-				    /*before=*/true, GSI_SAME_STMT);
-  tmp = fold_build2 (GT_EXPR, boolean_type_node, idx, range);
-  new_bb = hoist_edge_and_branch_if_true (&gsi, tmp, default_edge, update_dom);
-  if (update_dom)
-    bbs_to_fix_dom.quick_push (new_bb);
-  gcc_assert (gimple_bb (swtch) == new_bb);
-  gsi = gsi_last_bb (new_bb);
-
-  /* Any blocks dominated by the GIMPLE_SWITCH, but that are not successors
-     of NEW_BB, are still immediately dominated by SWITCH_BB.  Make it so.  */
-  if (update_dom)
-    {
-      vec<basic_block> dom_bbs;
-      basic_block dom_son;
-
-      dom_bbs = get_dominated_by (CDI_DOMINATORS, new_bb);
-      FOR_EACH_VEC_ELT (dom_bbs, i, dom_son)
-	{
-	  edge e = find_edge (new_bb, dom_son);
-	  if (e && single_pred_p (e->dest))
-	    continue;
-	  set_immediate_dominator (CDI_DOMINATORS, dom_son, switch_bb);
-	  bbs_to_fix_dom.safe_push (dom_son);
-	}
-      dom_bbs.release ();
-    }
-
-  /* csui = (1 << (word_mode) idx) */
-  csui = make_ssa_name (word_type_node);
-  tmp = fold_build2 (LSHIFT_EXPR, word_type_node, word_mode_one,
-		     fold_convert (word_type_node, idx));
-  tmp = force_gimple_operand_gsi (&gsi, tmp,
-				  /*simple=*/false, NULL_TREE,
-				  /*before=*/true, GSI_SAME_STMT);
-  shift_stmt = gimple_build_assign (csui, tmp);
-  gsi_insert_before (&gsi, shift_stmt, GSI_SAME_STMT);
-  update_stmt (shift_stmt);
-
-  /* for each unique set of cases:
-        if (const & csui) goto target  */
-  for (k = 0; k < count; k++)
-    {
-      tmp = wide_int_to_tree (word_type_node, test[k].mask);
-      tmp = fold_build2 (BIT_AND_EXPR, word_type_node, csui, tmp);
-      tmp = force_gimple_operand_gsi (&gsi, tmp,
-				      /*simple=*/true, NULL_TREE,
-				      /*before=*/true, GSI_SAME_STMT);
-      tmp = fold_build2 (NE_EXPR, boolean_type_node, tmp, word_mode_zero);
-      new_bb = hoist_edge_and_branch_if_true (&gsi, tmp, test[k].target_edge,
-					      update_dom);
-      if (update_dom)
-	bbs_to_fix_dom.safe_push (new_bb);
-      gcc_assert (gimple_bb (swtch) == new_bb);
-      gsi = gsi_last_bb (new_bb);
-    }
-
-  /* We should have removed all edges now.  */
-  gcc_assert (EDGE_COUNT (gsi_bb (gsi)->succs) == 0);
-
-  /* If nothing matched, go to the default label.  */
-  make_edge (gsi_bb (gsi), new_default_bb, EDGE_FALLTHRU);
-
-  /* The GIMPLE_SWITCH is now redundant.  */
-  gsi_remove (&gsi, true);
-
-  if (update_dom)
-    {
-      /* Fix up the dominator tree.  */
-      iterate_fix_dominators (CDI_DOMINATORS, bbs_to_fix_dom, true);
-      bbs_to_fix_dom.release ();
-    }
 }
 
 /*
@@ -606,9 +241,7 @@ struct switch_conv_info
      labels.  */
   bool default_case_nonstandard;
 
-  /* Parameters for expand_switch_using_bit_tests.  Should be computed
-     the same way as in expand_case.  */
-  unsigned int uniq;
+  /* Count is number of non-default edges.  */
   unsigned int count;
 };
 
@@ -725,11 +358,6 @@ collect_switch_conv_info (gswitch *swtch, struct switch_conv_info *info)
 	count++;
     }
   info->count = count;
- 
-  /* Get the number of unique non-default targets out of the GIMPLE_SWITCH
-     block.  Assume a CFG cleanup would have already removed degenerate
-     switch statements, this allows us to just use EDGE_COUNT.  */
-  info->uniq = EDGE_COUNT (gimple_bb (swtch)->succs) - 1;
 }
 
 /* Checks whether the range given by individual case statements of the SWTCH
@@ -1492,7 +1120,7 @@ gen_inbound_check (gswitch *swtch, struct switch_conv_info *info)
    conversion failed.  */
 
 static const char *
-process_switch (gswitch *swtch)
+expand_switch_conv (gswitch *swtch)
 {
   struct switch_conv_info info;
 
@@ -1513,26 +1141,6 @@ process_switch (gswitch *swtch)
 
   /* A switch on a constant should have been optimized in tree-cfg-cleanup.  */
   gcc_checking_assert (! TREE_CONSTANT (info.index_expr));
-
-  if (info.uniq <= MAX_CASE_BIT_TESTS)
-    {
-      if (expand_switch_using_bit_tests_p (info.range_size,
-					   info.uniq, info.count,
-					   optimize_bb_for_speed_p
-					     (gimple_bb (swtch))))
-	{
-	  if (dump_file)
-	    fputs ("  expanding as bit test is preferable\n", dump_file);
-	  emit_case_bit_tests (swtch, info.index_expr, info.range_min,
-			       info.range_size, info.range_max);
-	  loops_state_set (LOOPS_NEED_FIXUP);
-	  return NULL;
-	}
-
-      if (info.uniq <= 2)
-	/* This will be expanded as a decision tree in stmt.c:expand_case.  */
-	return "  expanding as jumps is preferable";
-    }
 
   /* If there is no common successor, we cannot do the transformation.  */
   if (! info.final_bb)
@@ -1628,8 +1236,8 @@ pass_convert_switch::execute (function *fun)
 	    putc ('\n', dump_file);
 	  }
 
-	failure_reason = process_switch (as_a <gswitch *> (stmt));
-	if (! failure_reason)
+	failure_reason = expand_switch_conv (as_a <gswitch *> (stmt));
+	if (!failure_reason)
 	  {
 	    if (dump_file)
 	      {
@@ -1659,35 +1267,73 @@ pass_convert_switch::execute (function *fun)
 
 } // anon namespace
 
-gimple_opt_pass *
-make_pass_convert_switch (gcc::context *ctxt)
+group_cluster::~group_cluster ()
 {
-  return new pass_convert_switch (ctxt);
+  for (unsigned i = 0; i < m_cases.length (); i++)
+    delete m_cases[i];
+
+  m_cases.release ();
 }
 
-struct case_node
+
+
+jump_table_cluster::jump_table_cluster (vec<cluster *> &clusters,
+					unsigned start, unsigned end)
 {
-  case_node		*left;	/* Left son in binary tree.  */
-  case_node		*right;	/* Right son in binary tree;
-				   also node chain.  */
-  case_node		*parent; /* Parent of node in binary tree.  */
-  tree			low;	/* Lowest index value for this label.  */
-  tree			high;	/* Highest index value for this label.  */
-  basic_block		case_bb; /* Label to jump to when node matches.  */
-  tree			case_label; /* Label to jump to when node matches.  */
-  profile_probability   prob; /* Probability of taking this case.  */
-  profile_probability   subtree_prob;  /* Probability of reaching subtree
-					  rooted at this node.  */
-};
+  gcc_checking_assert (end - start + 1 >= 1);
+  m_cases.create (end - start + 1);
+  for (unsigned i = start; i <= end; i++)
+    m_cases.quick_push (static_cast<simple_cluster *> (clusters[i]));
+}
 
-typedef case_node *case_node_ptr;
+static void
+fix_phi_operands_for_edges (vec<basic_block> case_bbs,
+			    hash_map<tree, tree> *phi_mapping)
+{
+  gphi_iterator gsi;
 
-static basic_block emit_case_nodes (basic_block, tree, case_node_ptr,
-				    basic_block, tree, profile_probability,
-				    tree, hash_map<tree, tree> *);
-static bool node_has_low_bound (case_node_ptr, tree);
-static bool node_has_high_bound (case_node_ptr, tree);
-static bool node_is_bounded (case_node_ptr, tree);
+  for (unsigned i = 0; i < case_bbs.length (); i++)
+    {
+      basic_block bb = case_bbs[i];
+      for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gphi *phi = gsi.phi ();
+	  for (unsigned j = 0; j < gimple_phi_num_args (phi); j++)
+	    {
+	      tree def = gimple_phi_arg_def (phi, j);
+	      if (def == NULL_TREE)
+		{
+		  edge e = gimple_phi_arg_edge (phi, j);
+		  tree *definition = phi_mapping->get (gimple_phi_result (phi));
+		  gcc_assert (definition);
+		  add_phi_arg (phi, *definition, e, UNKNOWN_LOCATION);
+		}
+	    }
+	}
+    }
+}
+
+void
+jump_table_cluster::emit (tree index_expr, tree,
+			  tree default_label_expr, basic_block default_bb)
+{
+  /* For jump table we just emit a new gswitch statement that will
+     be latter lowered to jump table.  */
+  auto_vec <tree> labels;
+  labels.create (m_cases.length ());
+
+  make_edge (m_case_bb, default_bb, 0);
+  for (unsigned i = 0; i < m_cases.length (); i++)
+    {
+      labels.quick_push (unshare_expr (m_cases[i]->m_case_label_expr));
+      make_edge (m_case_bb, m_cases[i]->m_case_bb, 0);
+    }
+
+  gswitch *s = gimple_build_switch (index_expr,
+				    unshare_expr (default_label_expr), labels);
+  gimple_stmt_iterator gsi = gsi_start_bb (m_case_bb);
+  gsi_insert_after (&gsi, s, GSI_NEW_STMT);
+}
 
 /* Return the smallest number of different values for which it is best to use a
    jump-table instead of a tree of conditional branches.  */
@@ -1703,72 +1349,542 @@ case_values_threshold (void)
   return threshold;
 }
 
-/* Reset the aux field of all outgoing edges of basic block BB.  */
-
-static inline void
-reset_out_edges_aux (basic_block bb)
+vec<cluster *>
+jump_table_cluster::find_jump_tables (vec<cluster *> &clusters)
 {
-  edge e;
-  edge_iterator ei;
-  FOR_EACH_EDGE (e, ei, bb->succs)
-    e->aux = (void *) 0;
+  unsigned l = clusters.length ();
+  auto_vec<min_cluster_item> min;
+  min.reserve (l + 1);
+
+  min.quick_push (min_cluster_item (0, 0, 0));
+
+  for (unsigned i = 1; i <= l; i++)
+    {
+      /* Set minimal # of clusters with i-th item to infinite.  */
+      min.quick_push (min_cluster_item (INT_MAX, INT_MAX, INT_MAX));
+
+      for (unsigned j = 0; j < i; j++)
+	{
+	  unsigned HOST_WIDE_INT s = min[j].m_non_jt_cases;
+	  if (i - j < case_values_threshold ())
+	    s += i - j;
+	  
+	  /* Prefer clusters with smaller number of numbers covered.  */
+	  if ((min[j].m_count + 1 < min[i].m_count ||
+	       (min[j].m_count + 1 == min[i].m_count && s < min[i].m_non_jt_cases))
+	      && can_be_handled (clusters, j, i - 1))
+	    min [i] = min_cluster_item (min[j].m_count + 1, j, s);
+	}
+    }
+
+  /* No result.  */
+  if (min[l].m_count == INT_MAX)
+    return clusters.copy ();
+
+  vec<cluster *> output;
+  output.create (4);
+
+  /* Find and build the clusters.  */
+  for (int end = l;;)
+    {
+      int start = min[end].m_start;
+
+      /* Do not allow clusters with small number of cases.  */
+      if (is_beneficial (clusters, start, end - 1))
+	output.safe_push (new jump_table_cluster (clusters, start, end - 1));
+      else
+	for (int i = end - 1; i >= start; i--)
+	  output.safe_push(clusters[i]);
+
+      end = start;
+
+      if (start <= 0)
+	break;
+    }
+
+  output.reverse ();
+  return output;
 }
 
-/* Compute the number of case labels that correspond to each outgoing edge of
-   STMT.  Record this information in the aux field of the edge.  */
-
-static inline void
-compute_cases_per_edge (gswitch *stmt)
+bool
+jump_table_cluster::can_be_handled (const vec<cluster *> &clusters,
+				    unsigned start, unsigned end)
 {
-  basic_block bb = gimple_bb (stmt);
-  reset_out_edges_aux (bb);
-  int ncases = gimple_switch_num_labels (stmt);
-  for (int i = ncases - 1; i >= 1; --i)
+  /* If the switch is relatively small such that the cost of one
+     indirect jump on the target are higher than the cost of a
+     decision tree, go with the decision tree.
+
+     If range of values is much bigger than number of values,
+     or if it is too large to represent in a HOST_WIDE_INT,
+     make a sequence of conditional branches instead of a dispatch.
+
+     The definition of "much bigger" depends on whether we are
+     optimizing for size or for speed.  If the former, the maximum
+     ratio range/count = 3, because this was found to be the optimal
+     ratio for size on i686-pc-linux-gnu, see PR11823.  The ratio
+     10 is much older, and was probably selected after an extensive
+     benchmarking investigation on numerous platforms.  Or maybe it
+     just made sense to someone at some point in the history of GCC,
+     who knows...  */
+  unsigned HOST_WIDE_INT max_ratio = optimize_insn_for_size_p () ? 3 : 10;
+
+  unsigned HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
+					    clusters[end]->get_high ());
+
+  unsigned HOST_WIDE_INT value_count = 0;
+  for (unsigned i = start; i <= end; i++)
+    value_count += get_range (clusters[i]->get_low (), clusters[i]->get_high ());
+
+  return max_ratio * value_count >= range;
+}
+
+bool
+jump_table_cluster::is_beneficial (const vec<cluster *> &,
+				   unsigned start, unsigned end)
+{
+  return end - start + 1 >= case_values_threshold ();
+}
+
+bit_test_cluster::bit_test_cluster (vec<cluster *> &clusters,
+				    unsigned start, unsigned end)
+{
+  gcc_checking_assert (end - start + 1 >= 1);
+  m_cases.create (end - start + 1);
+  for (unsigned i = start; i <= end; i++)
+    m_cases.safe_push (static_cast<simple_cluster *> (clusters[i]));
+}
+
+vec<cluster *>
+bit_test_cluster::find_bit_tests (vec<cluster *> &clusters)
+{
+  vec<cluster *> output;
+  output.create (4);
+
+  unsigned l = clusters.length ();
+  auto_vec<min_cluster_item> min;
+  min.reserve (l + 1);
+
+  min.quick_push (min_cluster_item (0, 0, 0));
+
+  for (unsigned i = 1; i <= l; i++)
     {
-      tree elt = gimple_switch_label (stmt, i);
+      /* Set minimal # of clusters with i-th item to infinite.  */
+      min.quick_push (min_cluster_item (INT_MAX, INT_MAX, INT_MAX));
+
+      for (unsigned j = 0; j < i; j++)
+	{
+	  if (min[j].m_count + 1 < min[i].m_count
+	      && can_be_handled (clusters, j, i - 1))
+	    min [i] = min_cluster_item (min[j].m_count + 1, j, INT_MAX);
+	}
+    }
+
+  /* No result.  */
+  if (min[l].m_count == INT_MAX)
+    return clusters.copy ();
+
+  /* Find and build the clusters.  */
+  for (int end = l;;)
+    {
+      int start = min[end].m_start;
+
+      if (is_beneficial (clusters, start, end - 1))
+	output.safe_push (new bit_test_cluster (clusters, start, end - 1));
+      else
+	for (int i = end - 1; i >=  start; i--)
+	  output.safe_push (clusters[i]);
+
+      end = start;
+
+      if (start <= 0)
+	break;
+    }
+
+  output.reverse ();
+  return output;
+}
+
+bool
+bit_test_cluster::can_be_handled (const vec<cluster *> &clusters,
+				  unsigned start, unsigned end)
+{
+  HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
+				   clusters[end]->get_high ());
+
+  if (range >= GET_MODE_BITSIZE (word_mode))
+    return false;
+
+  auto_bitmap dest_bbs;
+
+  for (unsigned i = start; i <= end; i++)
+    {
+      simple_cluster *sc = static_cast<simple_cluster *> (clusters[i]);
+      bitmap_set_bit (dest_bbs, sc->m_case_bb->index);
+    }
+
+  return bitmap_count_bits (dest_bbs) <= 3; 
+}
+
+bool
+bit_test_cluster::is_beneficial (const vec<cluster *> &clusters,
+				 unsigned start, unsigned end)
+{
+  auto_bitmap dest_bbs;
+
+  for (unsigned i = start; i <= end; i++)
+    {
+      simple_cluster *sc = static_cast<simple_cluster *> (clusters[i]);
+      bitmap_set_bit (dest_bbs, sc->m_case_bb->index);
+    }
+
+  unsigned HOST_WIDE_INT uniq = bitmap_count_bits (dest_bbs);
+  unsigned HOST_WIDE_INT count = end - start + 1;
+
+  return (((uniq == 1 && count >= 3)
+	   || (uniq == 2 && count >= 5)
+	   || (uniq == 3 && count >= 6)));
+}
+
+/* Implement switch statements with bit tests
+
+A GIMPLE switch statement can be expanded to a short sequence of bit-wise
+comparisons.  "switch(x)" is converted into "if ((1 << (x-MINVAL)) & CST)"
+where CST and MINVAL are integer constants.  This is better than a series
+of compare-and-banch insns in some cases,  e.g. we can implement:
+
+	if ((x==4) || (x==6) || (x==9) || (x==11))
+
+as a single bit test:
+
+	if ((1<<x) & ((1<<4)|(1<<6)|(1<<9)|(1<<11)))
+
+This transformation is only applied if the number of case targets is small,
+if CST constains at least 3 bits, and "1 << x" is cheap.  The bit tests are
+performed in "word_mode".
+
+The following example shows the code the transformation generates:
+
+	int bar(int x)
+	{
+		switch (x)
+		{
+		case '0':  case '1':  case '2':  case '3':  case '4':
+		case '5':  case '6':  case '7':  case '8':  case '9':
+		case 'A':  case 'B':  case 'C':  case 'D':  case 'E':
+		case 'F':
+			return 1;
+		}
+		return 0;
+	}
+
+==>
+
+	bar (int x)
+	{
+		tmp1 = x - 48;
+		if (tmp1 > (70 - 48)) goto L2;
+		tmp2 = 1 << tmp1;
+		tmp3 = 0b11111100000001111111111;
+		if ((tmp2 & tmp3) != 0) goto L1 ; else goto L2;
+	L1:
+		return 1;
+	L2:
+		return 0;
+	}
+
+TODO: There are still some improvements to this transformation that could
+be implemented:
+
+* A narrower mode than word_mode could be used if that is cheaper, e.g.
+  for x86_64 where a narrower-mode shift may result in smaller code.
+
+* The compounded constant could be shifted rather than the one.  The
+  test would be either on the sign bit or on the least significant bit,
+  depending on the direction of the shift.  On some machines, the test
+  for the branch would be free if the bit to test is already set by the
+  shift operation.
+
+This transformation was contributed by Roger Sayle, see this e-mail:
+   http://gcc.gnu.org/ml/gcc-patches/2003-01/msg01950.html
+*/
+
+
+int
+case_bit_test::cmp (const void *p1, const void *p2)
+{
+  const struct case_bit_test *const d1 = (const struct case_bit_test *) p1;
+  const struct case_bit_test *const d2 = (const struct case_bit_test *) p2;
+
+  if (d2->bits != d1->bits)
+    return d2->bits - d1->bits;
+
+  /* Stabilize the sort.  */
+  return (LABEL_DECL_UID (CASE_LABEL (d2->label))
+	  - LABEL_DECL_UID (CASE_LABEL (d1->label)));
+}
+
+/*  Expand a switch statement by a short sequence of bit-wise
+    comparisons.  "switch(x)" is effectively converted into
+    "if ((1 << (x-MINVAL)) & CST)" where CST and MINVAL are
+    integer constants.
+
+    INDEX_EXPR is the value being switched on.
+
+    MINVAL is the lowest case value of in the case nodes,
+    and RANGE is highest value minus MINVAL.  MINVAL and RANGE
+    are not guaranteed to be of the same type as INDEX_EXPR
+    (the gimplifier doesn't change the type of case label values,
+    and MINVAL and RANGE are derived from those values).
+    MAXVAL is MINVAL + RANGE.
+
+    There *MUST* be MAX_CASE_BIT_TESTS or less unique case
+    node targets.  */
+
+void
+bit_test_cluster::emit (tree index_expr, tree index_type,
+			tree, basic_block default_bb)
+{
+  struct case_bit_test test[MAX_CASE_BIT_TESTS] = { {} };
+  unsigned int i, j, k;
+  unsigned int count;
+
+  tree unsigned_index_type = unsigned_type_for (index_type);
+
+  gimple_stmt_iterator gsi;
+  gassign *shift_stmt;
+
+  tree idx, tmp, csui;
+  tree word_type_node = lang_hooks.types.type_for_mode (word_mode, 1);
+  tree word_mode_zero = fold_convert (word_type_node, integer_zero_node);
+  tree word_mode_one = fold_convert (word_type_node, integer_one_node);
+  int prec = TYPE_PRECISION (word_type_node);
+  wide_int wone = wi::one (prec);
+
+  tree minval = get_low ();
+  tree maxval = get_high ();
+  tree range = int_const_binop (MINUS_EXPR, maxval, minval);
+
+  /* Go through all case labels, and collect the case labels, profile
+     counts, and other information we need to build the branch tests.  */
+  count = 0;
+  for (i = 0; i < m_cases.length (); i++)
+    {
+      unsigned int lo, hi;
+      simple_cluster *n = static_cast<simple_cluster *> (m_cases[i]);
+      for (k = 0; k < count; k++)
+	if (n->m_case_bb == test[k].target_bb)
+	  break;
+
+      if (k == count)
+	{
+	  gcc_checking_assert (count < MAX_CASE_BIT_TESTS);
+	  test[k].mask = wi::zero (prec);
+	  test[k].target_bb = n->m_case_bb;
+	  test[k].label = n->m_case_label_expr;
+	  test[k].bits = 1;
+	  count++;
+	}
+      else
+        test[k].bits++;
+
+      lo = tree_to_uhwi (int_const_binop (MINUS_EXPR, n->get_low (), minval));
+      if (n->get_high () == NULL_TREE)
+	hi = lo;
+      else
+	hi = tree_to_uhwi (int_const_binop (MINUS_EXPR, n->get_high (),
+					    minval));
+
+      for (j = lo; j <= hi; j++)
+	test[k].mask |= wi::lshift (wone, j);
+    }
+
+  qsort (test, count, sizeof (*test), case_bit_test::cmp);
+
+  /* If all values are in the 0 .. BITS_PER_WORD-1 range, we can get rid of
+     the minval subtractions, but it might make the mask constants more
+     expensive.  So, compare the costs.  */
+  if (compare_tree_int (minval, 0) > 0
+      && compare_tree_int (maxval, GET_MODE_BITSIZE (word_mode)) < 0)
+    {
+      int cost_diff;
+      HOST_WIDE_INT m = tree_to_uhwi (minval);
+      rtx reg = gen_raw_REG (word_mode, 10000);
+      bool speed_p = optimize_insn_for_speed_p ();
+      cost_diff = set_rtx_cost (gen_rtx_PLUS (word_mode, reg,
+					      GEN_INT (-m)), speed_p);
+      for (i = 0; i < count; i++)
+	{
+	  rtx r = immed_wide_int_const (test[i].mask, word_mode);
+	  cost_diff += set_src_cost (gen_rtx_AND (word_mode, reg, r),
+				     word_mode, speed_p);
+	  r = immed_wide_int_const (wi::lshift (test[i].mask, m), word_mode);
+	  cost_diff -= set_src_cost (gen_rtx_AND (word_mode, reg, r),
+				     word_mode, speed_p);
+	}
+      if (cost_diff > 0)
+	{
+	  for (i = 0; i < count; i++)
+	    test[i].mask = wi::lshift (test[i].mask, m);
+	  minval = build_zero_cst (TREE_TYPE (minval));
+	  range = maxval;
+	}
+    }
+
+  /* Now build the test-and-branch code.  */
+
+  gsi = gsi_last_bb (m_case_bb);
+
+  /* idx = (unsigned)x - minval.  */
+  idx = fold_convert (unsigned_index_type, index_expr);
+  idx = fold_build2 (MINUS_EXPR, unsigned_index_type, idx,
+		     fold_convert (unsigned_index_type, minval));
+  idx = force_gimple_operand_gsi (&gsi, idx,
+				  /*simple=*/true, NULL_TREE,
+				  /*before=*/true, GSI_SAME_STMT);
+
+  /* if (idx > range) goto default */
+  range = force_gimple_operand_gsi (&gsi,
+				    fold_convert (unsigned_index_type, range),
+				    /*simple=*/true, NULL_TREE,
+				    /*before=*/true, GSI_SAME_STMT);
+  tmp = fold_build2 (GT_EXPR, boolean_type_node, idx, range);
+  basic_block new_bb = hoist_edge_and_branch_if_true (&gsi, tmp, default_bb);
+  gsi = gsi_last_bb (new_bb);
+
+  /* csui = (1 << (word_mode) idx) */
+  csui = make_ssa_name (word_type_node);
+  tmp = fold_build2 (LSHIFT_EXPR, word_type_node, word_mode_one,
+		     fold_convert (word_type_node, idx));
+  tmp = force_gimple_operand_gsi (&gsi, tmp,
+				  /*simple=*/false, NULL_TREE,
+				  /*before=*/true, GSI_SAME_STMT);
+  shift_stmt = gimple_build_assign (csui, tmp);
+  gsi_insert_before (&gsi, shift_stmt, GSI_SAME_STMT);
+  update_stmt (shift_stmt);
+
+  /* for each unique set of cases:
+        if (const & csui) goto target  */
+  for (k = 0; k < count; k++)
+    {
+      tmp = wide_int_to_tree (word_type_node, test[k].mask);
+      tmp = fold_build2 (BIT_AND_EXPR, word_type_node, csui, tmp);
+      tmp = force_gimple_operand_gsi (&gsi, tmp,
+				      /*simple=*/true, NULL_TREE,
+				      /*before=*/true, GSI_SAME_STMT);
+      tmp = fold_build2 (NE_EXPR, boolean_type_node, tmp, word_mode_zero);
+      new_bb = hoist_edge_and_branch_if_true (&gsi, tmp, test[k].target_bb);
+      gsi = gsi_last_bb (new_bb);
+    }
+
+  /* We should have removed all edges now.  */
+  gcc_assert (EDGE_COUNT (gsi_bb (gsi)->succs) == 0);
+
+  /* If nothing matched, go to the default label.  */
+  make_edge (gsi_bb (gsi), default_bb, EDGE_FALLTHRU);
+}
+
+static bool try_switch_expansion (gswitch *stmt, vec<cluster *> &clusters,
+				  const vec<basic_block> &case_bbs);
+
+static bool
+analyze_switch_statement (gswitch *swtch)
+{
+  unsigned l = gimple_switch_num_labels (swtch);
+  auto_vec<cluster *> clusters;
+  clusters.create (l - 1);
+
+  auto_vec<basic_block> case_bbs;
+  case_bbs.create (l);
+
+  tree default_label = CASE_LABEL (gimple_switch_default_label (swtch));
+  basic_block default_bb = label_to_block_fn (cfun, default_label);
+  case_bbs.quick_push (default_bb);
+
+  for (unsigned i = 1; i < l; i++)
+    {
+      tree elt = gimple_switch_label (swtch, i);
       tree lab = CASE_LABEL (elt);
       basic_block case_bb = label_to_block_fn (cfun, lab);
-      edge case_edge = find_edge (bb, case_bb);
-      case_edge->aux = (void *) ((intptr_t) (case_edge->aux) + 1);
+      tree low = CASE_LOW (elt);
+      tree high = CASE_HIGH (elt);
+      if (high == NULL_TREE)
+	high = low;
+
+      clusters.quick_push (new simple_cluster (low, high, elt, case_bb));
+      case_bbs.quick_push (case_bb);
     }
+
+  /* Find jump table clusters.  */
+  vec<cluster *> output = jump_table_cluster::find_jump_tables (clusters);
+
+  /* Find jump table clusters.  */
+  vec<cluster *> output2;
+  auto_vec<cluster *> tmp;
+  output2.create (1);
+  tmp.create (1);
+
+  for (unsigned i = 0; i < output.length (); i++)
+    {
+      cluster *c = output[i];
+      if (c->get_type () != SIMPLE_CASE)
+	{
+	  if (!tmp.is_empty ())
+	    {
+	      vec<cluster *> n = bit_test_cluster::find_bit_tests (tmp);
+	      output2.safe_splice (n);
+	      n.release ();
+	      tmp.truncate (0);
+	    }
+	  output2.safe_push (c);
+	}
+      else
+	tmp.safe_push (c);
+    }
+
+  /* We still can have a temporary vector to test.  */
+  if (!tmp.is_empty ())
+    {
+      vec<cluster *> n = bit_test_cluster::find_bit_tests (tmp);
+      output2.safe_splice (n);
+      n.release ();
+    }
+
+  if (dump_file)
+    {
+      fprintf (dump_file, ";; GIMPLE switch case clusters: ");
+      for (unsigned i = 0; i < output2.length (); i++)
+	output2[i]->dump (dump_file);
+      fprintf (dump_file, "\n");
+    }
+
+  output.release ();
+
+  bool expanded = try_switch_expansion (swtch, output2, case_bbs);
+
+  for (unsigned i = 0; i < output2.length (); i++)
+    delete output2[i];
+
+  output2.release ();
+
+  return expanded;
 }
 
-/* Do the insertion of a case label into case_list.  The labels are
-   fed to us in descending order from the sorted vector of case labels used
-   in the tree part of the middle end.  So the list we construct is
-   sorted in ascending order.
-
-   LABEL is the case label to be inserted.  LOW and HIGH are the bounds
-   against which the index is compared to jump to LABEL and PROB is the
-   estimated probability LABEL is reached from the switch statement.  */
-
-static case_node *
-add_case_node (case_node *head, tree low, tree high, basic_block case_bb,
-	       tree case_label, profile_probability prob,
-	       object_allocator<case_node> &case_node_pool)
+gimple_opt_pass *
+make_pass_convert_switch (gcc::context *ctxt)
 {
-  case_node *r;
-
-  gcc_checking_assert (low);
-  gcc_checking_assert (high && (TREE_TYPE (low) == TREE_TYPE (high)));
-
-  /* Add this label to the chain.  */
-  r = case_node_pool.allocate ();
-  r->low = low;
-  r->high = high;
-  r->case_bb = case_bb;
-  r->case_label = case_label;
-  r->parent = r->left = NULL;
-  r->prob = prob;
-  r->subtree_prob = prob;
-  r->right = head;
-  return r;
+  return new pass_convert_switch (ctxt);
 }
+
+static basic_block emit_case_nodes (basic_block, tree, case_tree_node *,
+				    basic_block, profile_probability, tree);
+static bool node_has_low_bound (case_tree_node *, tree);
+static bool node_has_high_bound (case_tree_node *, tree);
+static bool node_is_bounded (case_tree_node *, tree);
 
 /* Dump ROOT, a list or tree of case nodes, to file.  */
 
 static void
-dump_case_nodes (FILE *f, case_node *root, int indent_step, int indent_level)
+dump_case_nodes (FILE *f, case_tree_node *root, int indent_step, int indent_level)
 {
   if (root == 0)
     return;
@@ -1778,12 +1894,7 @@ dump_case_nodes (FILE *f, case_node *root, int indent_step, int indent_level)
 
   fputs (";; ", f);
   fprintf (f, "%*s", indent_step * indent_level, "");
-  print_dec (root->low, f, TYPE_SIGN (TREE_TYPE (root->low)));
-  if (!tree_int_cst_equal (root->low, root->high))
-    {
-      fprintf (f, " ... ");
-      print_dec (root->high, f, TYPE_SIGN (TREE_TYPE (root->high)));
-    }
+  root->c->dump (f);
   fputs ("\n", f);
 
   dump_case_nodes (f, root->right, indent_step, indent_level);
@@ -1800,23 +1911,23 @@ dump_case_nodes (FILE *f, case_node *root, int indent_step, int indent_level)
    branch is then transformed recursively.  */
 
 static void
-balance_case_nodes (case_node_ptr *head, case_node_ptr parent)
+balance_case_nodes (case_tree_node **head, case_tree_node *parent)
 {
-  case_node_ptr np;
+  case_tree_node *np;
 
   np = *head;
   if (np)
     {
       int i = 0;
       int ranges = 0;
-      case_node_ptr *npp;
-      case_node_ptr left;
+      case_tree_node **npp;
+      case_tree_node *left;
 
       /* Count the number of entries on branch.  Also count the ranges.  */
 
       while (np)
 	{
-	  if (!tree_int_cst_equal (np->low, np->high))
+	  if (!tree_int_cst_equal (np->c->get_low (), np->c->get_high ()))
 	    ranges++;
 
 	  i++;
@@ -1841,7 +1952,7 @@ balance_case_nodes (case_node_ptr *head, case_node_ptr parent)
 	      while (1)
 		{
 		  /* Skip nodes while their cost does not reach that amount.  */
-		  if (!tree_int_cst_equal ((*npp)->low, (*npp)->high))
+		  if (!tree_int_cst_equal ((*npp)->c->get_low (), (*npp)->c->get_high ()))
 		    i--;
 		  i--;
 		  if (i <= 0)
@@ -1877,127 +1988,10 @@ balance_case_nodes (case_node_ptr *head, case_node_ptr parent)
     }
 }
 
-/* Return true if a switch should be expanded as a decision tree.
-   RANGE is the difference between highest and lowest case.
-   UNIQ is number of unique case node targets, not counting the default case.
-   COUNT is the number of comparisons needed, not counting the default case.  */
-
-static bool
-expand_switch_as_decision_tree_p (tree range,
-				  unsigned int uniq ATTRIBUTE_UNUSED,
-				  unsigned int count)
-{
-  int max_ratio;
-
-  /* If neither casesi or tablejump is available, or flag_jump_tables
-     over-ruled us, we really have no choice.  */
-  if (!targetm.have_casesi () && !targetm.have_tablejump ())
-    return true;
-  if (!flag_jump_tables)
-    return true;
-#ifndef ASM_OUTPUT_ADDR_DIFF_ELT
-  if (flag_pic)
-    return true;
-#endif
-
-  /* If the switch is relatively small such that the cost of one
-     indirect jump on the target are higher than the cost of a
-     decision tree, go with the decision tree.
-
-     If range of values is much bigger than number of values,
-     or if it is too large to represent in a HOST_WIDE_INT,
-     make a sequence of conditional branches instead of a dispatch.
-
-     The definition of "much bigger" depends on whether we are
-     optimizing for size or for speed.  If the former, the maximum
-     ratio range/count = 3, because this was found to be the optimal
-     ratio for size on i686-pc-linux-gnu, see PR11823.  The ratio
-     10 is much older, and was probably selected after an extensive
-     benchmarking investigation on numerous platforms.  Or maybe it
-     just made sense to someone at some point in the history of GCC,
-     who knows...  */
-  max_ratio = optimize_insn_for_size_p () ? 3 : 10;
-  if (count < case_values_threshold () || !tree_fits_uhwi_p (range)
-      || compare_tree_int (range, max_ratio * count) > 0)
-    return true;
-
-  return false;
-}
-
 static void
-fix_phi_operands_for_edge (edge e, hash_map<tree, tree> *phi_mapping)
-{
-  basic_block bb = e->dest;
-  gphi_iterator gsi;
-  for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-    {
-      gphi *phi = gsi.phi ();
-
-      tree *definition = phi_mapping->get (gimple_phi_result (phi));
-      if (definition)
-	add_phi_arg (phi, *definition, e, UNKNOWN_LOCATION);
-    }
-}
-
-
-/* Add an unconditional jump to CASE_BB that happens in basic block BB.  */
-
-static void
-emit_jump (basic_block bb, basic_block case_bb,
-	   hash_map<tree, tree> *phi_mapping)
-{
-  edge e = single_succ_edge (bb);
-  redirect_edge_succ (e, case_bb);
-  fix_phi_operands_for_edge (e, phi_mapping);
-}
-
-/* Generate a decision tree, switching on INDEX_EXPR and jumping to
-   one of the labels in CASE_LIST or to the DEFAULT_LABEL.
-   DEFAULT_PROB is the estimated probability that it jumps to
-   DEFAULT_LABEL.
-
-   We generate a binary decision tree to select the appropriate target
-   code.  */
-
-static void
-emit_case_decision_tree (gswitch *s, tree index_expr, tree index_type,
-			 case_node_ptr case_list, basic_block default_bb,
-			 tree default_label, profile_probability default_prob,
-			 hash_map<tree, tree> *phi_mapping)
-{
-  balance_case_nodes (&case_list, NULL);
-
-  if (dump_file)
-    dump_function_to_file (current_function_decl, dump_file, dump_flags);
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    {
-      int indent_step = ceil_log2 (TYPE_PRECISION (index_type)) + 2;
-      fprintf (dump_file, ";; Expanding GIMPLE switch as decision tree:\n");
-      dump_case_nodes (dump_file, case_list, indent_step, 0);
-    }
-
-  basic_block bb = gimple_bb (s);
-  gimple_stmt_iterator gsi = gsi_last_bb (bb);
-  edge e;
-  if (gsi_end_p (gsi))
-    e = split_block_after_labels (bb);
-  else
-    {
-      gsi_prev (&gsi);
-      e = split_block (bb, gsi_stmt (gsi));
-    }
-  bb = split_edge (e);
-
-  bb = emit_case_nodes (bb, index_expr, case_list, default_bb, default_label,
-			default_prob, index_type, phi_mapping);
-
-  if (bb)
-    emit_jump (bb, default_bb, phi_mapping);
-
-  /* Remove all edges and do just an edge that will reach default_bb.  */
-  gsi = gsi_last_bb (gimple_bb (s));
-  gsi_remove (&gsi, true);
-}
+emit_case_decision_tree (basic_block bb, gswitch *s, tree index_expr, tree index_type,
+			 case_tree_node *case_list, basic_block default_bb,
+			 profile_probability default_prob);
 
 static void
 record_phi_operand_mapping (const vec<basic_block> bbs, basic_block switch_bb,
@@ -2031,130 +2025,128 @@ record_phi_operand_mapping (const vec<basic_block> bbs, basic_block switch_bb,
 /* Attempt to expand gimple switch STMT to a decision tree.  */
 
 static bool
-try_switch_expansion (gswitch *stmt)
+try_switch_expansion (gswitch *stmt, vec<cluster *> &clusters,
+		      const vec<basic_block> &case_bbs)
 {
-  tree minval = NULL_TREE, maxval = NULL_TREE, range = NULL_TREE;
   basic_block default_bb;
-  unsigned int count, uniq;
-  int i;
-  int ncases = gimple_switch_num_labels (stmt);
   tree index_expr = gimple_switch_index (stmt);
   tree index_type = TREE_TYPE (index_expr);
-  tree elt;
   basic_block bb = gimple_bb (stmt);
 
   hash_map<tree, tree> phi_mapping;
-  auto_vec<basic_block> case_bbs;
 
   /* A list of case labels; it is first built as a list and it may then
      be rearranged into a nearly balanced binary tree.  */
-  case_node *case_list = 0;
+  case_tree_node *case_list = 0;
 
   /* A pool for case nodes.  */
-  object_allocator<case_node> case_node_pool ("struct case_node pool");
+  object_allocator<case_tree_node> case_node_pool ("struct case_node pool");
 
-  /* cleanup_tree_cfg removes all SWITCH_EXPR with their index
-     expressions being INTEGER_CST.  */
-  gcc_assert (TREE_CODE (index_expr) != INTEGER_CST);
-
-  if (ncases == 1)
+  if (gimple_switch_num_labels (stmt) == 1)
     return false;
 
   /* Find the default case target label.  */
-  tree default_label = CASE_LABEL (gimple_switch_default_label (stmt));
-  default_bb = label_to_block_fn (cfun, default_label);
+  tree default_label_expr = CASE_LABEL (gimple_switch_default_label (stmt));
+  default_bb = label_to_block_fn (cfun, default_label_expr);
   edge default_edge = find_edge (bb, default_bb);
   profile_probability default_prob = default_edge->probability;
-  case_bbs.safe_push (default_bb);
 
-  /* Get upper and lower bounds of case values.  */
-  elt = gimple_switch_label (stmt, 1);
-  minval = fold_convert (index_type, CASE_LOW (elt));
-  elt = gimple_switch_label (stmt, ncases - 1);
-  if (CASE_HIGH (elt))
-    maxval = fold_convert (index_type, CASE_HIGH (elt));
-  else
-    maxval = fold_convert (index_type, CASE_LOW (elt));
+  /* Do the insertion of a case label into case_list.  The labels are
+     fed to us in descending order from the sorted vector of case labels used
+     in the tree part of the middle end.  So the list we construct is
+     sorted in ascending order.  */
 
-  /* Compute span of values.  */
-  range = fold_build2 (MINUS_EXPR, index_type, maxval, minval);
-
-  /* Listify the labels queue and gather some numbers to decide
-     how to expand this switch.  */
-  uniq = 0;
-  count = 0;
-  hash_set<tree> seen_labels;
-  compute_cases_per_edge (stmt);
-
-  for (i = ncases - 1; i >= 1; --i)
+  for (int i = clusters.length () - 1; i >= 0; i--)
     {
-      elt = gimple_switch_label (stmt, i);
-      tree low = CASE_LOW (elt);
-      gcc_assert (low);
-      tree high = CASE_HIGH (elt);
-      gcc_assert (!high || tree_int_cst_lt (low, high));
-      tree lab = CASE_LABEL (elt);
-
-      /* Count the elements.
-	 A range counts double, since it requires two compares.  */
-      count++;
-      if (high)
-	count++;
-
-      /* If we have not seen this label yet, then increase the
-	 number of unique case node targets seen.  */
-      if (!seen_labels.add (lab))
-	uniq++;
-
-      /* The bounds on the case range, LOW and HIGH, have to be converted
-	 to case's index type TYPE.  Note that the original type of the
-	 case index in the source code is usually "lost" during
-	 gimplification due to type promotion, but the case labels retain the
-	 original type.  Make sure to drop overflow flags.  */
-      low = fold_convert (index_type, low);
-      if (TREE_OVERFLOW (low))
-	low = wide_int_to_tree (index_type, low);
-
-      /* The canonical from of a case label in GIMPLE is that a simple case
-	 has an empty CASE_HIGH.  For the casesi and tablejump expanders,
-	 the back ends want simple cases to have high == low.  */
-      if (!high)
-	high = low;
-      high = fold_convert (index_type, high);
-      if (TREE_OVERFLOW (high))
-	high = wide_int_to_tree (index_type, high);
-
-      basic_block case_bb = label_to_block_fn (cfun, lab);
-      edge case_edge = find_edge (bb, case_bb);
-      case_list = add_case_node (
-	case_list, low, high, case_bb, lab,
-	case_edge->probability.apply_scale (1, (intptr_t) (case_edge->aux)),
-	case_node_pool);
-
-      case_bbs.safe_push (case_bb);
+      case_tree_node *r = case_list;
+      case_list = case_node_pool.allocate ();
+      case_list->right = r;
+      case_list->c = clusters[i];
     }
-  reset_out_edges_aux (bb);
+
   record_phi_operand_mapping (case_bbs, bb, &phi_mapping);
 
-  /* cleanup_tree_cfg removes all SWITCH_EXPR with a single
-     destination, such as one with a default case only.
-     It also removes cases that are out of range for the switch
-     type, so we should never get a zero here.  */
-  gcc_assert (count > 0);
-
-  /* Decide how to expand this switch.
-     The two options at this point are a dispatch table (casesi or
-     tablejump) or a decision tree.  */
-
-  if (expand_switch_as_decision_tree_p (range, uniq, count))
+  /* Split basic block that contains the gswitch statement.  */
+  gimple_stmt_iterator gsi = gsi_last_bb (bb);
+  edge e;
+  if (gsi_end_p (gsi))
+    e = split_block_after_labels (bb);
+  else
     {
-      emit_case_decision_tree (stmt, index_expr, index_type, case_list,
-			       default_bb, default_label, default_prob,
-			       &phi_mapping);
-      return true;
+      gsi_prev (&gsi);
+      e = split_block (bb, gsi_stmt (gsi));
+    }
+  bb = split_edge (e);
+
+  /* Create new basic blocks for non-case clusters where specific expansion
+     needs to happen.  */
+  for (unsigned i = 0; i < clusters.length (); i++)
+    if (clusters[i]->get_type () != SIMPLE_CASE)
+      {
+	clusters[i]->m_case_bb = create_empty_bb (bb);
+	clusters[i]->m_case_bb->loop_father = bb->loop_father;
+      }
+
+  emit_case_decision_tree (bb, stmt, index_expr, index_type, case_list,
+			   default_bb, default_prob);
+
+  /* Emit cluster-specific switch handling.  */
+  for (unsigned i = 0; i < clusters.length (); i++)
+    if (clusters[i]->get_type () != SIMPLE_CASE)
+      clusters[i]->emit (index_expr, index_type,
+			 gimple_switch_default_label (stmt), default_bb);
+
+  fix_phi_operands_for_edges (case_bbs, &phi_mapping);
+
+  return true;
+}
+
+
+/* Add an unconditional jump to CASE_BB that happens in basic block BB.  */
+
+static void
+emit_jump (basic_block bb, basic_block case_bb)
+{
+  edge e = single_succ_edge (bb);
+  redirect_edge_succ (e, case_bb);
+}
+
+/* Generate a decision tree, switching on INDEX_EXPR and jumping to
+   one of the labels in CASE_LIST or to the DEFAULT_LABEL.
+   DEFAULT_PROB is the estimated probability that it jumps to
+   DEFAULT_LABEL.
+
+   We generate a binary decision tree to select the appropriate target
+   code.  */
+
+static void
+emit_case_decision_tree (basic_block bb, gswitch *s, tree index_expr, tree index_type,
+			 case_tree_node *case_list, basic_block default_bb,
+			 profile_probability default_prob)
+{
+  balance_case_nodes (&case_list, NULL);
+
+  if (dump_file)
+    dump_function_to_file (current_function_decl, dump_file, dump_flags);
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      int indent_step = ceil_log2 (TYPE_PRECISION (index_type)) + 2;
+      fprintf (dump_file, ";; Expanding GIMPLE switch as decision tree:\n");
+      dump_case_nodes (dump_file, case_list, indent_step, 0);
     }
 
-  return false;
+  bb = emit_case_nodes (bb, index_expr, case_list, default_bb,
+			default_prob, index_type);
+
+  if (bb)
+    emit_jump (bb, default_bb);
+
+  /* Remove all edges and do just an edge that will reach default_bb.  */
+  bb = gimple_bb (s);
+  gimple_stmt_iterator gsi = gsi_last_bb (bb);
+  gsi_remove (&gsi, true);
+
+  delete_basic_block (bb);
 }
 
 /* The main function of the pass scans statements for switches and invokes
@@ -2194,24 +2186,33 @@ pass_lower_switch::execute (function *fun)
   basic_block bb;
   bool expanded = false;
 
+  auto_vec<gimple *> switch_statements;
+  switch_statements.create (1);
+
   FOR_EACH_BB_FN (bb, fun)
     {
       gimple *stmt = last_stmt (bb);
       if (stmt && gimple_code (stmt) == GIMPLE_SWITCH)
+	switch_statements.safe_push (stmt);
+    }
+
+  for (unsigned i = 0; i < switch_statements.length (); i++)
+    {
+      gimple *stmt = switch_statements[i];
+      if (dump_file)
 	{
-	  if (dump_file)
-	    {
-	      expanded_location loc = expand_location (gimple_location (stmt));
+	  expanded_location loc = expand_location (gimple_location (stmt));
 
-	      fprintf (dump_file, "beginning to process the following "
-				  "SWITCH statement (%s:%d) : ------- \n",
-		       loc.file, loc.line);
-	      print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
-	      putc ('\n', dump_file);
-	    }
-
-	  expanded |= try_switch_expansion (as_a<gswitch *> (stmt));
+	  fprintf (dump_file, "beginning to process the following "
+		   "SWITCH statement (%s:%d) : ------- \n",
+		   loc.file, loc.line);
+	  print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
+	  putc ('\n', dump_file);
 	}
+
+      gswitch *swtch = dyn_cast<gswitch *> (stmt);
+      if (swtch)
+	expanded |= analyze_switch_statement (swtch);
     }
 
   if (expanded)
@@ -2232,12 +2233,15 @@ make_pass_lower_switch (gcc::context *ctxt)
   return new pass_lower_switch (ctxt);
 }
 
+// TODO: all usages of op0 == index, so do a member
 /* Generate code to jump to LABEL if OP0 and OP1 are equal in mode MODE.
    PROB is the probability of jumping to LABEL.  */
 static basic_block
 do_jump_if_equal (basic_block bb, tree op0, tree op1, basic_block label_bb,
-		  profile_probability prob, hash_map<tree, tree> *phi_mapping)
+		  profile_probability prob)
 {
+  op1 = fold_convert (TREE_TYPE (op0), op1);
+
   gcond *cond = gimple_build_cond (EQ_EXPR, op0, op1, NULL_TREE, NULL_TREE);
   gimple_stmt_iterator gsi = gsi_last_bb (bb);
   gsi_insert_before (&gsi, cond, GSI_SAME_STMT);
@@ -2250,7 +2254,6 @@ do_jump_if_equal (basic_block bb, tree op0, tree op1, basic_block label_bb,
   false_edge->probability = prob.invert ();
 
   edge true_edge = make_edge (bb, label_bb, EDGE_TRUE_VALUE);
-  fix_phi_operands_for_edge (true_edge, phi_mapping);
   true_edge->probability = prob;
 
   return false_edge->dest;
@@ -2278,9 +2281,11 @@ do_jump_if_equal (basic_block bb, tree op0, tree op1, basic_block label_bb,
 static basic_block
 emit_cmp_and_jump_insns (basic_block bb, tree op0, tree op1,
 			 tree_code comparison, basic_block label_bb,
-			 profile_probability prob,
-			 hash_map<tree, tree> *phi_mapping)
+			 profile_probability prob)
 {
+  // TODO: it's once called with lhs != index.
+  op1 = fold_convert (TREE_TYPE (op0), op1);
+
   gcond *cond = gimple_build_cond (comparison, op0, op1, NULL_TREE, NULL_TREE);
   gimple_stmt_iterator gsi = gsi_last_bb (bb);
   gsi_insert_after (&gsi, cond, GSI_NEW_STMT);
@@ -2293,24 +2298,9 @@ emit_cmp_and_jump_insns (basic_block bb, tree op0, tree op1,
   false_edge->probability = prob.invert ();
 
   edge true_edge = make_edge (bb, label_bb, EDGE_TRUE_VALUE);
-  fix_phi_operands_for_edge (true_edge, phi_mapping);
   true_edge->probability = prob;
 
   return false_edge->dest;
-}
-
-/* Computes the conditional probability of jumping to a target if the branch
-   instruction is executed.
-   TARGET_PROB is the estimated probability of jumping to a target relative
-   to some basic block BB.
-   BASE_PROB is the probability of reaching the branch instruction relative
-   to the same basic block BB.  */
-
-static inline profile_probability
-conditional_probability (profile_probability target_prob,
-			 profile_probability base_prob)
-{
-  return target_prob / base_prob;
 }
 
 /* Emit step-by-step code to select a case for the value of INDEX.
@@ -2340,10 +2330,9 @@ conditional_probability (profile_probability target_prob,
    tests for the value 50, then this node need not test anything.  */
 
 static basic_block
-emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
-		 basic_block default_bb, tree default_label,
-		 profile_probability default_prob, tree index_type,
-		 hash_map<tree, tree> *phi_mapping)
+emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
+		 basic_block default_bb,
+		 profile_probability default_prob, tree index_type)
 {
   /* If INDEX has an unsigned type, we must make unsigned branches.  */
   profile_probability probability;
@@ -2353,17 +2342,17 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
      If they have, emit an unconditional jump for this node.  */
   if (node_is_bounded (node, index_type))
     {
-      emit_jump (bb, node->case_bb, phi_mapping);
+      emit_jump (bb, node->c->m_case_bb);
       return NULL;
     }
 
-  else if (tree_int_cst_equal (node->low, node->high))
+  else if (tree_int_cst_equal (node->c->get_low (), node->c->get_high ()))
     {
-      probability = conditional_probability (prob, subtree_prob + default_prob);
+      probability = prob / (subtree_prob + default_prob);
       /* Node is single valued.  First see if the index expression matches
 	 this node and then check our children, if any.  */
-      bb = do_jump_if_equal (bb, index, node->low, node->case_bb, probability,
-			     phi_mapping);
+      bb = do_jump_if_equal (bb, index, node->c->get_low (), node->c->m_case_bb,
+			     probability);
       /* Since this case is taken at this point, reduce its weight from
 	 subtree_weight.  */
       subtree_prob -= prob;
@@ -2377,36 +2366,30 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 
 	  if (node_is_bounded (node->right, index_type))
 	    {
-	      probability
-		= conditional_probability (node->right->prob,
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->high, GT_EXPR,
-					    node->right->case_bb, probability,
-					    phi_mapping);
+	      probability = node->right->prob / subtree_prob + default_prob;
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
+					    node->right->c->m_case_bb, probability);
 	      bb = emit_case_nodes (bb, index, node->left, default_bb,
-				    default_label, default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 
 	  else if (node_is_bounded (node->left, index_type))
 	    {
-	      probability
-		= conditional_probability (node->left->prob,
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->high, LT_EXPR,
-					    node->left->case_bb, probability,
-					    phi_mapping);
+	      probability = node->left->prob / (subtree_prob + default_prob);
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), LT_EXPR,
+					    node->left->c->m_case_bb, probability);
 	      bb = emit_case_nodes (bb, index, node->right, default_bb,
-				    default_label, default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 
 	  /* If both children are single-valued cases with no
 	     children, finish up all the work.  This way, we can save
 	     one ordered comparison.  */
-	  else if (tree_int_cst_equal (node->right->low, node->right->high)
+	  else if (tree_int_cst_equal (node->right->c->get_low (),
+				       node->right->c->get_high ())
 		   && node->right->left == 0 && node->right->right == 0
-		   && tree_int_cst_equal (node->left->low, node->left->high)
+		   && tree_int_cst_equal (node->left->c->get_low (),
+					  node->left->c->get_high ())
 		   && node->left->left == 0 && node->left->right == 0)
 	    {
 	      /* Neither node is bounded.  First distinguish the two sides;
@@ -2414,21 +2397,15 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 
 	      /* See if the value matches what the right hand side
 		 wants.  */
-	      probability
-		= conditional_probability (node->right->prob,
-					   subtree_prob + default_prob);
-	      bb = do_jump_if_equal (bb, index, node->right->low,
-				     node->right->case_bb, probability,
-				     phi_mapping);
+	      probability = node->right->prob / (subtree_prob + default_prob);
+	      bb = do_jump_if_equal (bb, index, node->right->c->get_low (),
+				     node->right->c->m_case_bb, probability);
 
 	      /* See if the value matches what the left hand side
 		 wants.  */
-	      probability
-		= conditional_probability (node->left->prob,
-					   subtree_prob + default_prob);
-	      bb = do_jump_if_equal (bb, index, node->left->low,
-				     node->left->case_bb, probability,
-				     phi_mapping);
+	      probability = node->left->prob / (subtree_prob + default_prob);
+	      bb = do_jump_if_equal (bb, index, node->left->c->get_low (),
+				     node->left->c->m_case_bb, probability);
 	    }
 
 	  else
@@ -2444,29 +2421,26 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 		 subtree or the left subtree.  Divide the probability
 		 equally.  */
 	      probability
-		= conditional_probability (node->right->subtree_prob
-					     + default_prob.apply_scale (1, 2),
-					   subtree_prob + default_prob);
+		= ((node->right->subtree_prob + default_prob.apply_scale (1, 2))
+		   / (subtree_prob + default_prob));
 	      /* See if the value is on the right.  */
-	      bb = emit_cmp_and_jump_insns (bb, index, node->high, GT_EXPR,
-					    test_bb, probability, phi_mapping);
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
+					    test_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 
 	      /* Value must be on the left.
 		 Handle the left-hand subtree.  */
 	      bb = emit_case_nodes (bb, index, node->left, default_bb,
-				    default_label, default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	      /* If left-hand subtree does nothing,
 		 go to default.  */
 
 	      if (bb && default_bb)
-		emit_jump (bb, default_bb, phi_mapping);
+		emit_jump (bb, default_bb);
 
 	      /* Code branches here for the right-hand subtree.  */
 	      bb = emit_case_nodes (test_bb, index, node->right, default_bb,
-				    default_label, default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	}
       else if (node->right != 0 && node->left == 0)
@@ -2479,34 +2453,29 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 	     cost too much space to save so little time.  */
 
 	  if (node->right->right || node->right->left
-	      || !tree_int_cst_equal (node->right->low, node->right->high))
+	      || !tree_int_cst_equal (node->right->c->get_low (), node->right->c->get_high ()))
 	    {
 	      if (!node_has_low_bound (node, index_type))
 		{
-		  probability
-		    = conditional_probability (default_prob.apply_scale (1, 2),
-					       subtree_prob + default_prob);
-		  bb = emit_cmp_and_jump_insns (bb, index, node->high, LT_EXPR,
-						default_bb, probability,
-						phi_mapping);
+		  probability = (default_prob.apply_scale (1, 2)
+				 / (subtree_prob + default_prob));
+		  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), LT_EXPR,
+						default_bb, probability);
 		  default_prob = default_prob.apply_scale (1, 2);
 		}
 
 	      bb = emit_case_nodes (bb, index, node->right, default_bb,
-				    default_label, default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	  else
 	    {
-	      probability
-		= conditional_probability (node->right->subtree_prob,
-					   subtree_prob + default_prob);
+	      probability = (node->right->subtree_prob
+			     / (subtree_prob + default_prob));
 	      /* We cannot process node->right normally
 		 since we haven't ruled out the numbers less than
 		 this node's value.  So handle node->right explicitly.  */
-	      bb = do_jump_if_equal (bb, index, node->right->low,
-				     node->right->case_bb, probability,
-				     phi_mapping);
+	      bb = do_jump_if_equal (bb, index, node->right->c->get_low (),
+				     node->right->c->m_case_bb, probability);
 	    }
 	}
 
@@ -2514,33 +2483,29 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 	{
 	  /* Just one subtree, on the left.  */
 	  if (node->left->left || node->left->right
-	      || !tree_int_cst_equal (node->left->low, node->left->high))
+	      || !tree_int_cst_equal (node->left->c->get_low (), node->left->c->get_high ()))
 	    {
 	      if (!node_has_high_bound (node, index_type))
 		{
-		  probability
-		    = conditional_probability (default_prob.apply_scale (1, 2),
-					       subtree_prob + default_prob);
-		  bb = emit_cmp_and_jump_insns (bb, index, node->high, GT_EXPR,
-						default_bb, probability,
-						phi_mapping);
+		  probability = (default_prob.apply_scale (1, 2)
+				 / (subtree_prob + default_prob));
+		  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
+						default_bb, probability);
 		  default_prob = default_prob.apply_scale (1, 2);
 		}
 
 	      bb = emit_case_nodes (bb, index, node->left, default_bb,
-				    default_label, default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	  else
 	    {
 	      probability
-		= conditional_probability (node->left->subtree_prob,
-					   subtree_prob + default_prob);
+		= node->left->subtree_prob / (subtree_prob + default_prob);
 	      /* We cannot process node->left normally
 		 since we haven't ruled out the numbers less than
 		 this node's value.  So handle node->left explicitly.  */
-	      do_jump_if_equal (bb, index, node->left->low, node->left->case_bb,
-				probability, phi_mapping);
+	      do_jump_if_equal (bb, index, node->left->c->get_low (), node->left->c->m_case_bb,
+				probability);
 	    }
 	}
     }
@@ -2564,11 +2529,9 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 	      /* Right hand node is fully bounded so we can eliminate any
 		 testing and branch directly to the target code.  */
 	      probability
-		= conditional_probability (node->right->subtree_prob,
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->high, GT_EXPR,
-					    node->right->case_bb, probability,
-					    phi_mapping);
+		= node->right->subtree_prob / (subtree_prob + default_prob);
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
+					    node->right->c->m_case_bb, probability);
 	    }
 	  else
 	    {
@@ -2580,26 +2543,22 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 				  single_succ_edge (bb)->dest);
 
 	      probability
-		= conditional_probability (node->right->subtree_prob
-					     + default_prob.apply_scale (1, 2),
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->high, GT_EXPR,
-					    test_bb, probability, phi_mapping);
+		= ((node->right->subtree_prob + default_prob.apply_scale (1, 2))
+		   / (subtree_prob + default_prob));
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
+					    test_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 	    }
 
 	  /* Value belongs to this node or to the left-hand subtree.  */
 
-	  probability
-	    = conditional_probability (prob, subtree_prob + default_prob);
-	  bb = emit_cmp_and_jump_insns (bb, index, node->low, GE_EXPR,
-					node->case_bb, probability,
-					phi_mapping);
+	  probability = prob / (subtree_prob + default_prob);
+	  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), GE_EXPR,
+					node->c->m_case_bb, probability);
 
 	  /* Handle the left-hand subtree.  */
 	  bb = emit_case_nodes (bb, index, node->left, default_bb,
-				default_label, default_prob, index_type,
-				phi_mapping);
+				default_prob, index_type);
 
 	  /* If right node had to be handled later, do that now.  */
 	  if (test_bb)
@@ -2607,11 +2566,10 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 	      /* If the left-hand subtree fell through,
 		 don't let it fall into the right-hand subtree.  */
 	      if (bb && default_bb)
-		emit_jump (bb, default_bb, phi_mapping);
+		emit_jump (bb, default_bb);
 
 	      bb = emit_case_nodes (test_bb, index, node->right, default_bb,
-				    default_label, default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	}
 
@@ -2621,26 +2579,20 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 	     if they are possible.  */
 	  if (!node_has_low_bound (node, index_type))
 	    {
-	      probability
-		= conditional_probability (default_prob.apply_scale (1, 2),
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->low, LT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+	      probability = (default_prob.apply_scale (1, 2)
+			     / (subtree_prob + default_prob));
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), LT_EXPR,
+					    default_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 	    }
 
 	  /* Value belongs to this node or to the right-hand subtree.  */
-
-	  probability
-	    = conditional_probability (prob, subtree_prob + default_prob);
-	  bb = emit_cmp_and_jump_insns (bb, index, node->high, LE_EXPR,
-					node->case_bb, probability,
-					phi_mapping);
+	  probability = prob / (subtree_prob + default_prob);
+	  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), LE_EXPR,
+					node->c->m_case_bb, probability);
 
 	  bb = emit_case_nodes (bb, index, node->right, default_bb,
-				default_label, default_prob, index_type,
-				phi_mapping);
+				default_prob, index_type);
 	}
 
       else if (node->right == 0 && node->left != 0)
@@ -2649,26 +2601,21 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 	     if they are possible.  */
 	  if (!node_has_high_bound (node, index_type))
 	    {
-	      probability
-		= conditional_probability (default_prob.apply_scale (1, 2),
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->high, GT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+	      probability = (default_prob.apply_scale (1, 2)
+			     / (subtree_prob + default_prob));
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
+					    default_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 	    }
 
 	  /* Value belongs to this node or to the left-hand subtree.  */
 
-	  probability
-	    = conditional_probability (prob, subtree_prob + default_prob);
-	  bb = emit_cmp_and_jump_insns (bb, index, node->low, GE_EXPR,
-					node->case_bb, probability,
-					phi_mapping);
+	  probability = prob / (subtree_prob + default_prob);
+	  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), GE_EXPR,
+					node->c->m_case_bb, probability);
 
 	  bb = emit_case_nodes (bb, index, node->left, default_bb,
-				default_label, default_prob, index_type,
-				phi_mapping);
+				default_prob, index_type);
 	}
 
       else
@@ -2681,37 +2628,28 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
 
 	  if (!high_bound && low_bound)
 	    {
-	      probability
-		= conditional_probability (default_prob,
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->high, GT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+	      probability = default_prob / (subtree_prob + default_prob);
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
+					    default_bb, probability);
 	    }
 
 	  else if (!low_bound && high_bound)
 	    {
-	      probability
-		= conditional_probability (default_prob,
-					   subtree_prob + default_prob);
-	      bb = emit_cmp_and_jump_insns (bb, index, node->low, LT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+	      probability = default_prob / (subtree_prob + default_prob);
+	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), LT_EXPR,
+					    default_bb, probability);
 	    }
 	  else if (!low_bound && !high_bound)
 	    {
 	      tree lhs, rhs;
-	      generate_high_low_equality (bb, index, node->low, node->high,
+	      generate_high_low_equality (bb, index, node->c->get_low (), node->c->get_high (),
 					  &lhs, &rhs);
-	      probability
-		= conditional_probability (default_prob,
-					   subtree_prob + default_prob);
+	      probability = default_prob / (subtree_prob + default_prob);
 	      bb = emit_cmp_and_jump_insns (bb, lhs, rhs, GT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+					    default_bb, probability);
 	    }
 
-	  emit_jump (bb, node->case_bb, phi_mapping);
+	  emit_jump (bb, node->c->m_case_bb);
 	  return NULL;
 	}
     }
@@ -2730,15 +2668,15 @@ emit_case_nodes (basic_block bb, tree index, case_node_ptr node,
    span.  Thus the test would be redundant.  */
 
 static bool
-node_has_low_bound (case_node_ptr node, tree index_type)
+node_has_low_bound (case_tree_node *node, tree index_type)
 {
   tree low_minus_one;
-  case_node_ptr pnode;
+  case_tree_node *pnode;
 
   /* If the lower bound of this node is the lowest value in the index type,
      we need not test it.  */
 
-  if (tree_int_cst_equal (node->low, TYPE_MIN_VALUE (index_type)))
+  if (tree_int_cst_equal (node->c->get_low (), TYPE_MIN_VALUE (index_type)))
     return true;
 
   /* If this node has a left branch, the value at the left must be less
@@ -2748,17 +2686,17 @@ node_has_low_bound (case_node_ptr node, tree index_type)
   if (node->left)
     return false;
 
-  low_minus_one = fold_build2 (MINUS_EXPR, TREE_TYPE (node->low), node->low,
-			       build_int_cst (TREE_TYPE (node->low), 1));
+  low_minus_one = fold_build2 (MINUS_EXPR, TREE_TYPE (node->c->get_low ()), node->c->get_low (),
+			       build_int_cst (TREE_TYPE (node->c->get_low ()), 1));
 
   /* If the subtraction above overflowed, we can't verify anything.
      Otherwise, look for a parent that tests our value - 1.  */
 
-  if (!tree_int_cst_lt (low_minus_one, node->low))
+  if (!tree_int_cst_lt (low_minus_one, node->c->get_low ()))
     return false;
 
   for (pnode = node->parent; pnode; pnode = pnode->parent)
-    if (tree_int_cst_equal (low_minus_one, pnode->high))
+    if (tree_int_cst_equal (low_minus_one, pnode->c->get_high ()))
       return true;
 
   return false;
@@ -2775,10 +2713,10 @@ node_has_low_bound (case_node_ptr node, tree index_type)
    span.  Thus the test would be redundant.  */
 
 static bool
-node_has_high_bound (case_node_ptr node, tree index_type)
+node_has_high_bound (case_tree_node *node, tree index_type)
 {
   tree high_plus_one;
-  case_node_ptr pnode;
+  case_tree_node *pnode;
 
   /* If there is no upper bound, obviously no test is needed.  */
 
@@ -2788,7 +2726,7 @@ node_has_high_bound (case_node_ptr node, tree index_type)
   /* If the upper bound of this node is the highest value in the type
      of the index expression, we need not test against it.  */
 
-  if (tree_int_cst_equal (node->high, TYPE_MAX_VALUE (index_type)))
+  if (tree_int_cst_equal (node->c->get_high (), TYPE_MAX_VALUE (index_type)))
     return true;
 
   /* If this node has a right branch, the value at the right must be greater
@@ -2798,17 +2736,17 @@ node_has_high_bound (case_node_ptr node, tree index_type)
   if (node->right)
     return false;
 
-  high_plus_one = fold_build2 (PLUS_EXPR, TREE_TYPE (node->high), node->high,
-			       build_int_cst (TREE_TYPE (node->high), 1));
+  high_plus_one = fold_build2 (PLUS_EXPR, TREE_TYPE (node->c->get_high ()), node->c->get_high (),
+			       build_int_cst (TREE_TYPE (node->c->get_high ()), 1));
 
   /* If the addition above overflowed, we can't verify anything.
      Otherwise, look for a parent that tests our value + 1.  */
 
-  if (!tree_int_cst_lt (node->high, high_plus_one))
+  if (!tree_int_cst_lt (node->c->get_high (), high_plus_one))
     return false;
 
   for (pnode = node->parent; pnode; pnode = pnode->parent)
-    if (tree_int_cst_equal (high_plus_one, pnode->low))
+    if (tree_int_cst_equal (high_plus_one, pnode->c->get_low ()))
       return true;
 
   return false;
@@ -2819,7 +2757,7 @@ node_has_high_bound (case_node_ptr node, tree index_type)
    bounds of NODE would be redundant.  */
 
 static bool
-node_is_bounded (case_node_ptr node, tree index_type)
+node_is_bounded (case_tree_node *node, tree index_type)
 {
   return (node_has_low_bound (node, index_type)
 	  && node_has_high_bound (node, index_type));
