@@ -452,13 +452,14 @@ STAGE1_CONFIGURE_FLAGS = --disable-intermodule $(STAGE1_CHECKING) \
 	  --disable-coverage --enable-languages="$(STAGE1_LANGUAGES)" \
 	  --disable-build-format-warnings
 
-STAGEprofile_CFLAGS = $(STAGE2_CFLAGS) -fprofile-generate
+profile_folder=`${PWD_COMMAND}`/gcov-profiles/
+STAGEprofile_CFLAGS = $(STAGE2_CFLAGS) -fprofile-generate=$(profile_folder)
 STAGEprofile_TFLAGS = $(STAGE2_TFLAGS)
 
 STAGEtrain_CFLAGS = $(STAGE3_CFLAGS)
 STAGEtrain_TFLAGS = $(STAGE3_TFLAGS)
 
-STAGEfeedback_CFLAGS = $(STAGE4_CFLAGS) -fprofile-use
+STAGEfeedback_CFLAGS = $(STAGE4_CFLAGS) -fprofile-use=$(profile_folder) -fdump-ipa-profile
 STAGEfeedback_TFLAGS = $(STAGE4_TFLAGS)
 
 STAGEautoprofile_CFLAGS = $(STAGE2_CFLAGS) -g
