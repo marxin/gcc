@@ -61,7 +61,10 @@ struct cluster
   /* Return range of a cluster.  */
   static unsigned HOST_WIDE_INT get_range (tree low, tree high)
   {
-    return tree_to_uhwi (int_const_binop (MINUS_EXPR, high, low)) + 1;
+    tree unsigned_type = unsigned_type_for (TREE_TYPE (low));
+    tree r = fold_build2 (MINUS_EXPR, unsigned_type, high, low);
+
+    return tree_to_uhwi (r) + 1;
   }
 
   /* Case label.  */
@@ -153,7 +156,8 @@ struct group_cluster: public cluster
   virtual void
   dump (FILE *f)
   {
-    fprintf (f, "%s:", get_type () == JUMP_TABLE ? "JT" : "BT");
+    fprintf (f, "%s(%d):", get_type () == JUMP_TABLE ? "JT" : "BT",
+	     m_cases.length ());
     PRINT_CASE (f, get_low ());
     fprintf (f, "-");
     PRINT_CASE (f, get_high ());

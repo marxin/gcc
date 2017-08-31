@@ -1370,6 +1370,33 @@ jump_table_cluster::jump_table_cluster (vec<cluster *> &clusters,
     m_cases.quick_push (static_cast<simple_cluster *> (clusters[i]));
 }
 
+static void
+fix_phi_operands_for_edges (vec<basic_block> case_bbs,
+			    hash_map<tree, tree> *phi_mapping)
+{
+  gphi_iterator gsi;
+
+  for (unsigned i = 0; i < case_bbs.length (); i++)
+    {
+      basic_block bb = case_bbs[i];
+      for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gphi *phi = gsi.phi ();
+	  for (unsigned j = 0; j < gimple_phi_num_args (phi); j++)
+	    {
+	      tree def = gimple_phi_arg_def (phi, j);
+	      if (def == NULL_TREE)
+		{
+		  edge e = gimple_phi_arg_edge (phi, j);
+		  tree *definition = phi_mapping->get (gimple_phi_result (phi));
+		  gcc_assert (definition);
+		  add_phi_arg (phi, *definition, e, UNKNOWN_LOCATION);
+		}
+	    }
+	}
+    }
+}
+
 void
 jump_table_cluster::emit (tree index_expr, tree,
 			  tree default_label_expr, basic_block default_bb)
@@ -1538,7 +1565,7 @@ bit_test_cluster::find_bit_tests (vec<cluster *> &clusters)
 
   /* No result.  */
   if (min[l].m_count == INT_MAX)
-    return clusters;
+    return clusters.copy ();
 
   /* Find and build the clusters.  */
   for (int end = l;;)
@@ -1933,8 +1960,7 @@ make_pass_convert_switch (gcc::context *ctxt)
 }
 
 static basic_block emit_case_nodes (basic_block, tree, case_tree_node *,
-				    basic_block, profile_probability,
-				    tree, hash_map<tree, tree> *);
+				    basic_block, profile_probability, tree);
 static bool node_has_low_bound (case_tree_node *, tree);
 static bool node_has_high_bound (case_tree_node *, tree);
 static bool node_is_bounded (case_tree_node *, tree);
@@ -2049,8 +2075,7 @@ balance_case_nodes (case_tree_node **head, case_tree_node *parent)
 static void
 emit_case_decision_tree (basic_block bb, gswitch *s, tree index_expr, tree index_type,
 			 case_tree_node *case_list, basic_block default_bb,
-			 profile_probability default_prob,
-			 hash_map<tree, tree> *phi_mapping);
+			 profile_probability default_prob);
 
 static void
 record_phi_operand_mapping (const vec<basic_block> bbs, basic_block switch_bb,
@@ -2144,8 +2169,7 @@ try_switch_expansion (gswitch *stmt, vec<cluster *> &clusters,
       }
 
   emit_case_decision_tree (bb, stmt, index_expr, index_type, case_list,
-			   default_bb, default_prob,
-			   &phi_mapping);
+			   default_bb, default_prob);
 
   /* Emit cluster-specific switch handling.  */
   for (unsigned i = 0; i < clusters.length (); i++)
@@ -2153,34 +2177,19 @@ try_switch_expansion (gswitch *stmt, vec<cluster *> &clusters,
       clusters[i]->emit (index_expr, index_type,
 			 gimple_switch_default_label (stmt), default_bb);
 
+  fix_phi_operands_for_edges (case_bbs, &phi_mapping);
+
   return true;
-}
-
-static void
-fix_phi_operands_for_edge (edge e, hash_map<tree, tree> *phi_mapping)
-{
-  basic_block bb = e->dest;
-  gphi_iterator gsi;
-  for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-    {
-      gphi *phi = gsi.phi ();
-
-      tree *definition = phi_mapping->get (gimple_phi_result (phi));
-      if (definition)
-	add_phi_arg (phi, *definition, e, UNKNOWN_LOCATION);
-    }
 }
 
 
 /* Add an unconditional jump to CASE_BB that happens in basic block BB.  */
 
 static void
-emit_jump (basic_block bb, basic_block case_bb,
-	   hash_map<tree, tree> *phi_mapping)
+emit_jump (basic_block bb, basic_block case_bb)
 {
   edge e = single_succ_edge (bb);
   redirect_edge_succ (e, case_bb);
-  fix_phi_operands_for_edge (e, phi_mapping);
 }
 
 /* Generate a decision tree, switching on INDEX_EXPR and jumping to
@@ -2194,8 +2203,7 @@ emit_jump (basic_block bb, basic_block case_bb,
 static void
 emit_case_decision_tree (basic_block bb, gswitch *s, tree index_expr, tree index_type,
 			 case_tree_node *case_list, basic_block default_bb,
-			 profile_probability default_prob,
-			 hash_map<tree, tree> *phi_mapping)
+			 profile_probability default_prob)
 {
   balance_case_nodes (&case_list, NULL);
 
@@ -2209,10 +2217,10 @@ emit_case_decision_tree (basic_block bb, gswitch *s, tree index_expr, tree index
     }
 
   bb = emit_case_nodes (bb, index_expr, case_list, default_bb,
-			default_prob, index_type, phi_mapping);
+			default_prob, index_type);
 
   if (bb)
-    emit_jump (bb, default_bb, phi_mapping);
+    emit_jump (bb, default_bb);
 
   /* Remove all edges and do just an edge that will reach default_bb.  */
   bb = gimple_bb (s);
@@ -2311,7 +2319,7 @@ make_pass_lower_switch (gcc::context *ctxt)
    PROB is the probability of jumping to LABEL.  */
 static basic_block
 do_jump_if_equal (basic_block bb, tree op0, tree op1, basic_block label_bb,
-		  profile_probability prob, hash_map<tree, tree> *phi_mapping)
+		  profile_probability prob)
 {
   op1 = fold_convert (TREE_TYPE (op0), op1);
 
@@ -2327,7 +2335,6 @@ do_jump_if_equal (basic_block bb, tree op0, tree op1, basic_block label_bb,
   false_edge->probability = prob.invert ();
 
   edge true_edge = make_edge (bb, label_bb, EDGE_TRUE_VALUE);
-  fix_phi_operands_for_edge (true_edge, phi_mapping);
   true_edge->probability = prob;
 
   return false_edge->dest;
@@ -2355,8 +2362,7 @@ do_jump_if_equal (basic_block bb, tree op0, tree op1, basic_block label_bb,
 static basic_block
 emit_cmp_and_jump_insns (basic_block bb, tree op0, tree op1,
 			 tree_code comparison, basic_block label_bb,
-			 profile_probability prob,
-			 hash_map<tree, tree> *phi_mapping)
+			 profile_probability prob)
 {
   // TODO: it's once called with lhs != index.
   op1 = fold_convert (TREE_TYPE (op0), op1);
@@ -2373,7 +2379,6 @@ emit_cmp_and_jump_insns (basic_block bb, tree op0, tree op1,
   false_edge->probability = prob.invert ();
 
   edge true_edge = make_edge (bb, label_bb, EDGE_TRUE_VALUE);
-  fix_phi_operands_for_edge (true_edge, phi_mapping);
   true_edge->probability = prob;
 
   return false_edge->dest;
@@ -2408,8 +2413,7 @@ emit_cmp_and_jump_insns (basic_block bb, tree op0, tree op1,
 static basic_block
 emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		 basic_block default_bb,
-		 profile_probability default_prob, tree index_type,
-		 hash_map<tree, tree> *phi_mapping)
+		 profile_probability default_prob, tree index_type)
 {
   /* If INDEX has an unsigned type, we must make unsigned branches.  */
   profile_probability probability;
@@ -2419,7 +2423,7 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
      If they have, emit an unconditional jump for this node.  */
   if (node_is_bounded (node, index_type))
     {
-      emit_jump (bb, node->c->m_case_bb, phi_mapping);
+      emit_jump (bb, node->c->m_case_bb);
       return NULL;
     }
 
@@ -2429,7 +2433,7 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
       /* Node is single valued.  First see if the index expression matches
 	 this node and then check our children, if any.  */
       bb = do_jump_if_equal (bb, index, node->c->get_low (), node->c->m_case_bb,
-			     probability, phi_mapping);
+			     probability);
       /* Since this case is taken at this point, reduce its weight from
 	 subtree_weight.  */
       subtree_prob -= prob;
@@ -2445,22 +2449,18 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 	    {
 	      probability = node->right->prob / subtree_prob + default_prob;
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
-					    node->right->c->m_case_bb, probability,
-					    phi_mapping);
+					    node->right->c->m_case_bb, probability);
 	      bb = emit_case_nodes (bb, index, node->left, default_bb,
-				    default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 
 	  else if (node_is_bounded (node->left, index_type))
 	    {
 	      probability = node->left->prob / (subtree_prob + default_prob);
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), LT_EXPR,
-					    node->left->c->m_case_bb, probability,
-					    phi_mapping);
+					    node->left->c->m_case_bb, probability);
 	      bb = emit_case_nodes (bb, index, node->right, default_bb,
-				    default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 
 	  /* If both children are single-valued cases with no
@@ -2480,15 +2480,13 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		 wants.  */
 	      probability = node->right->prob / (subtree_prob + default_prob);
 	      bb = do_jump_if_equal (bb, index, node->right->c->get_low (),
-				     node->right->c->m_case_bb, probability,
-				     phi_mapping);
+				     node->right->c->m_case_bb, probability);
 
 	      /* See if the value matches what the left hand side
 		 wants.  */
 	      probability = node->left->prob / (subtree_prob + default_prob);
 	      bb = do_jump_if_equal (bb, index, node->left->c->get_low (),
-				     node->left->c->m_case_bb, probability,
-				     phi_mapping);
+				     node->left->c->m_case_bb, probability);
 	    }
 
 	  else
@@ -2508,24 +2506,22 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		   / (subtree_prob + default_prob));
 	      /* See if the value is on the right.  */
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
-					    test_bb, probability, phi_mapping);
+					    test_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 
 	      /* Value must be on the left.
 		 Handle the left-hand subtree.  */
 	      bb = emit_case_nodes (bb, index, node->left, default_bb,
-				    default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	      /* If left-hand subtree does nothing,
 		 go to default.  */
 
 	      if (bb && default_bb)
-		emit_jump (bb, default_bb, phi_mapping);
+		emit_jump (bb, default_bb);
 
 	      /* Code branches here for the right-hand subtree.  */
 	      bb = emit_case_nodes (test_bb, index, node->right, default_bb,
-				    default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	}
       else if (node->right != 0 && node->left == 0)
@@ -2545,14 +2541,12 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		  probability = (default_prob.apply_scale (1, 2)
 				 / (subtree_prob + default_prob));
 		  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), LT_EXPR,
-						default_bb, probability,
-						phi_mapping);
+						default_bb, probability);
 		  default_prob = default_prob.apply_scale (1, 2);
 		}
 
 	      bb = emit_case_nodes (bb, index, node->right, default_bb,
-				    default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	  else
 	    {
@@ -2562,8 +2556,7 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		 since we haven't ruled out the numbers less than
 		 this node's value.  So handle node->right explicitly.  */
 	      bb = do_jump_if_equal (bb, index, node->right->c->get_low (),
-				     node->right->c->m_case_bb, probability,
-				     phi_mapping);
+				     node->right->c->m_case_bb, probability);
 	    }
 	}
 
@@ -2578,14 +2571,12 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		  probability = (default_prob.apply_scale (1, 2)
 				 / (subtree_prob + default_prob));
 		  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
-						default_bb, probability,
-						phi_mapping);
+						default_bb, probability);
 		  default_prob = default_prob.apply_scale (1, 2);
 		}
 
 	      bb = emit_case_nodes (bb, index, node->left, default_bb,
-				    default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	  else
 	    {
@@ -2595,7 +2586,7 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		 since we haven't ruled out the numbers less than
 		 this node's value.  So handle node->left explicitly.  */
 	      do_jump_if_equal (bb, index, node->left->c->get_low (), node->left->c->m_case_bb,
-				probability, phi_mapping);
+				probability);
 	    }
 	}
     }
@@ -2621,8 +2612,7 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 	      probability
 		= node->right->subtree_prob / (subtree_prob + default_prob);
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
-					    node->right->c->m_case_bb, probability,
-					    phi_mapping);
+					    node->right->c->m_case_bb, probability);
 	    }
 	  else
 	    {
@@ -2637,7 +2627,7 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 		= ((node->right->subtree_prob + default_prob.apply_scale (1, 2))
 		   / (subtree_prob + default_prob));
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
-					    test_bb, probability, phi_mapping);
+					    test_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 	    }
 
@@ -2645,13 +2635,11 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 
 	  probability = prob / (subtree_prob + default_prob);
 	  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), GE_EXPR,
-					node->c->m_case_bb, probability,
-					phi_mapping);
+					node->c->m_case_bb, probability);
 
 	  /* Handle the left-hand subtree.  */
 	  bb = emit_case_nodes (bb, index, node->left, default_bb,
-				default_prob, index_type,
-				phi_mapping);
+				default_prob, index_type);
 
 	  /* If right node had to be handled later, do that now.  */
 	  if (test_bb)
@@ -2659,11 +2647,10 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 	      /* If the left-hand subtree fell through,
 		 don't let it fall into the right-hand subtree.  */
 	      if (bb && default_bb)
-		emit_jump (bb, default_bb, phi_mapping);
+		emit_jump (bb, default_bb);
 
 	      bb = emit_case_nodes (test_bb, index, node->right, default_bb,
-				    default_prob, index_type,
-				    phi_mapping);
+				    default_prob, index_type);
 	    }
 	}
 
@@ -2676,20 +2663,17 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 	      probability = (default_prob.apply_scale (1, 2)
 			     / (subtree_prob + default_prob));
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), LT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+					    default_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 	    }
 
 	  /* Value belongs to this node or to the right-hand subtree.  */
 	  probability = prob / (subtree_prob + default_prob);
 	  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), LE_EXPR,
-					node->c->m_case_bb, probability,
-					phi_mapping);
+					node->c->m_case_bb, probability);
 
 	  bb = emit_case_nodes (bb, index, node->right, default_bb,
-				default_prob, index_type,
-				phi_mapping);
+				default_prob, index_type);
 	}
 
       else if (node->right == 0 && node->left != 0)
@@ -2701,8 +2685,7 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 	      probability = (default_prob.apply_scale (1, 2)
 			     / (subtree_prob + default_prob));
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+					    default_bb, probability);
 	      default_prob = default_prob.apply_scale (1, 2);
 	    }
 
@@ -2710,12 +2693,10 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 
 	  probability = prob / (subtree_prob + default_prob);
 	  bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), GE_EXPR,
-					node->c->m_case_bb, probability,
-					phi_mapping);
+					node->c->m_case_bb, probability);
 
 	  bb = emit_case_nodes (bb, index, node->left, default_bb,
-				default_prob, index_type,
-				phi_mapping);
+				default_prob, index_type);
 	}
 
       else
@@ -2730,16 +2711,14 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 	    {
 	      probability = default_prob / (subtree_prob + default_prob);
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_high (), GT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+					    default_bb, probability);
 	    }
 
 	  else if (!low_bound && high_bound)
 	    {
 	      probability = default_prob / (subtree_prob + default_prob);
 	      bb = emit_cmp_and_jump_insns (bb, index, node->c->get_low (), LT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+					    default_bb, probability);
 	    }
 	  else if (!low_bound && !high_bound)
 	    {
@@ -2748,11 +2727,10 @@ emit_case_nodes (basic_block bb, tree index, case_tree_node *node,
 					  &lhs, &rhs);
 	      probability = default_prob / (subtree_prob + default_prob);
 	      bb = emit_cmp_and_jump_insns (bb, lhs, rhs, GT_EXPR,
-					    default_bb, probability,
-					    phi_mapping);
+					    default_bb, probability);
 	    }
 
-	  emit_jump (bb, node->c->m_case_bb, phi_mapping);
+	  emit_jump (bb, node->c->m_case_bb);
 	  return NULL;
 	}
     }
