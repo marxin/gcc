@@ -8927,7 +8927,32 @@ extract_true_false_controlled_edges (basic_block dom, basic_block phiblock,
   return true;
 }
 
+/* Generate GIMPLE IL to basic block BB which compares whether INDEX
+   value is within range LOW ... HIGH.  We create a LHS and RHS that
+   can be then compared in order to hit the interval or not.  */
 
+void
+generate_high_low_equality (basic_block bb, tree index, tree low, tree high,
+			    tree *lhs, tree *rhs)
+{
+  tree type = TREE_TYPE (index);
+  tree utype = unsigned_type_for (type);
+
+  low = fold_convert (type, low);
+  high = fold_convert (type, high);
+
+  tree tmp = make_ssa_name (type);
+  gassign *sub1
+    = gimple_build_assign (tmp, MINUS_EXPR, index, low);
+
+  *lhs = make_ssa_name (utype);
+  gassign *a = gimple_build_assign (*lhs, NOP_EXPR, tmp);
+
+  *rhs = fold_build2 (MINUS_EXPR, utype, high, low);
+  gimple_stmt_iterator gsi = gsi_last_bb (bb);
+  gsi_insert_before (&gsi, sub1, GSI_SAME_STMT);
+  gsi_insert_before (&gsi, a, GSI_SAME_STMT);
+}
 
 /* Emit return warnings.  */
 
