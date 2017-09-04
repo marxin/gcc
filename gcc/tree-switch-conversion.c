@@ -1435,6 +1435,10 @@ jump_table_cluster::can_be_handled (const vec<cluster *> &clusters,
   unsigned HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
 					    clusters[end]->get_high ());
 
+  unsigned int max = PARAM_VALUE (PARAM_MAX_JUMP_TABLE_SIZE);
+  if (max != 0 && range > max)
+    return false;
+
   unsigned HOST_WIDE_INT value_count = 0;
   for (unsigned i = start; i <= end; i++)
     value_count += get_range (clusters[i]->get_low (), clusters[i]->get_high ());

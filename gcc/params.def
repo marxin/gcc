@@ -722,6 +722,8 @@ DEFPARAM (PARAM_MAX_JUMP_THREAD_DUPLICATION_STMTS,
           "Maximum number of statements allowed in a block that needs to be duplicated when threading jumps.",
 	  15, 0, 0)
 
+DEFPARAM (PARAM_MAX_JUMP_TABLE_SIZE, "max-jump-table-size", "Max size", 0, 0, 0)
+
 /* This is the maximum number of fields a variable may have before the pointer analysis machinery
    will stop trying to treat it in a field-sensitive manner.
    There are programs out there with thousands of fields per structure, and handling them
