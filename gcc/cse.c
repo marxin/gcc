@@ -2135,7 +2135,7 @@ use_related_value (rtx x, struct table_elt *elt)
 {
   struct table_elt *relt = 0;
   struct table_elt *p, *q;
-  HOST_WIDE_INT offset;
+  offset_int offset;
 
   /* First, is there anything related known?
      If we have a table element, we can tell from that.
@@ -2192,9 +2192,14 @@ use_related_value (rtx x, struct table_elt *elt)
   if (q == 0)
     return 0;
 
-  offset = (get_integer_term (x) - get_integer_term (p->exp));
-  /* Note: OFFSET may be 0 if P->xexp and X are related by commutativity.  */
-  return plus_constant (q->mode, q->exp, offset);
+  offset = (offset_int (get_integer_term (x)) - get_integer_term (p->exp));
+  if (wi::fits_shwi_p (offset))
+    {
+      /* Note: OFFSET may be 0 if P->xexp and X are related by commutativity.  */
+      return plus_constant (q->mode, q->exp, offset.to_shwi ());
+    }
+  else
+    return 0;
 }
 
 

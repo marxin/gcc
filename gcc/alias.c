@@ -2580,8 +2580,14 @@ memrefs_conflict_p (int xsize, rtx x, int ysize, rtx y, HOST_WIDE_INT c)
     {
       if (CONST_INT_P (x) && CONST_INT_P (y))
 	{
-	  c += (INTVAL (y) - INTVAL (x));
-	  return offset_overlap_p (c, xsize, ysize);
+	  offset_int offset = (offset_int (INTVAL (y)) - INTVAL (x));
+	  if (wi::fits_shwi_p (offset))
+	  {
+	    c += offset.to_shwi ();
+	    return offset_overlap_p (c, xsize, ysize);
+	  }
+	  else
+	    return -1;
 	}
 
       if (GET_CODE (x) == CONST)
