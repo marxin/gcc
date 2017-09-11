@@ -929,7 +929,9 @@ set_usage_bits (group_info *group, HOST_WIDE_INT offset, HOST_WIDE_INT width,
 {
   HOST_WIDE_INT i;
   bool expr_escapes = can_escape (expr);
-  if (offset > -MAX_OFFSET && offset + width < MAX_OFFSET)
+  if (offset > -MAX_OFFSET
+      && offset < MAX_OFFSET
+      && offset + width < MAX_OFFSET)
     for (i=offset; i<offset+width; i++)
       {
 	bitmap store1;
@@ -1536,7 +1538,11 @@ record_store (rtx body, bb_info_t bb_info)
     }
   store_info->group_id = group_id;
   store_info->begin = offset;
-  store_info->end = offset + width;
+  if (offset > HOST_WIDE_INT_MAX - width)
+    store_info->end = HOST_WIDE_INT_MAX;
+  else
+    store_info->end = offset + width;
+
   store_info->is_set = GET_CODE (body) == SET;
   store_info->rhs = rhs;
   store_info->const_rhs = const_rhs;
@@ -1972,6 +1978,14 @@ check_mem_read_rtx (rtx *loc, bb_info_t bb_info)
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, " adding wild read, canon_address failure.\n");
+      add_wild_read (bb_info);
+      return;
+    }
+
+  if (offset > MAX_OFFSET)
+    {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, " reaches MAX_OFFSET.\n");
       add_wild_read (bb_info);
       return;
     }
