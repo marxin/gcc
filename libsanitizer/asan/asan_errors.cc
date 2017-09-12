@@ -391,7 +391,7 @@ static void PrintContainerOverflowHint() {
          "AddressSanitizerContainerOverflow.\n");
 }
 
-static void PrintShadowByte(InternalScopedString *str, const char *before,
+void PrintShadowByte(InternalScopedString *str, const char *before,
     u8 byte, const char *after = "\n") {
   PrintMemoryByte(str, before, byte, /*in_shadow*/true, after);
 }

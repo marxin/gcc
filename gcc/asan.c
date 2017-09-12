@@ -1161,14 +1161,13 @@ asan_pp_string (pretty_printer *pp)
 /* Return a CONST_INT representing 4 subsequent shadow memory bytes.  */
 
 static rtx
-asan_shadow_cst (unsigned char shadow_bytes[4])
+asan_shadow_cst (unsigned char shadow_bytes[ASAN_SHADOW_CHUNK_SIZE])
 {
-  int i;
   unsigned HOST_WIDE_INT val = 0;
   gcc_assert (WORDS_BIG_ENDIAN == BYTES_BIG_ENDIAN);
-  for (i = 0; i < 4; i++)
-    val |= (unsigned HOST_WIDE_INT) shadow_bytes[BYTES_BIG_ENDIAN ? 3 - i : i]
-	   << (BITS_PER_UNIT * i);
+  for (unsigned i = 0; i < ASAN_SHADOW_CHUNK_SIZE; i++)
+    val |= (unsigned HOST_WIDE_INT) shadow_bytes[BYTES_BIG_ENDIAN ?
+      (ASAN_SHADOW_CHUNK_SIZE - 1) - i : i] << (BITS_PER_UNIT * i);
   return gen_int_mode (val, SImode);
 }
 
@@ -1254,7 +1253,9 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   rtx_code_label *lab;
   rtx_insn *insns;
   char buf[32];
-  unsigned char shadow_bytes[4];
+
+  gcc_assert (ASAN_RED_ZONE_SIZE % ASAN_SHADOW_GRANULARITY == 0);
+  unsigned char shadow_bytes[ASAN_SHADOW_CHUNK_SIZE];
   HOST_WIDE_INT base_offset = offsets[length - 1];
   HOST_WIDE_INT base_align_bias = 0, offset, prev_offset;
   HOST_WIDE_INT asan_frame_size = offsets[0] - base_offset;
@@ -1394,8 +1395,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
     = plus_constant (Pmode, shadow_base,
 		     asan_shadow_offset ()
 		     + (base_align_bias >> ASAN_SHADOW_SHIFT));
-  gcc_assert (asan_shadow_set != -1
-	      && (ASAN_RED_ZONE_SIZE >> ASAN_SHADOW_SHIFT) == 4);
+  gcc_assert (asan_shadow_set != -1);
   shadow_mem = gen_rtx_MEM (SImode, shadow_base);
   set_mem_alias_set (shadow_mem, asan_shadow_set);
   if (STRICT_ALIGNMENT)
@@ -1408,7 +1408,6 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       offset = offsets[l - 1];
       if ((offset - base_offset) & (ASAN_RED_ZONE_SIZE - 1))
 	{
-	  int i;
 	  HOST_WIDE_INT aoff
 	    = base_offset + ((offset - base_offset)
 			     & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1));
@@ -1416,7 +1415,8 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 				       (aoff - prev_offset)
 				       >> ASAN_SHADOW_SHIFT);
 	  prev_offset = aoff;
-	  for (i = 0; i < 4; i++, aoff += ASAN_SHADOW_GRANULARITY)
+	  for (unsigned i = 0; i < ASAN_SHADOW_CHUNK_SIZE;
+	       i++, aoff += ASAN_SHADOW_GRANULARITY)
 	    if (aoff < offset)
 	      {
 		if (aoff < offset - (HOST_WIDE_INT)ASAN_SHADOW_GRANULARITY + 1)
@@ -1435,7 +1435,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 				       (offset - prev_offset)
 				       >> ASAN_SHADOW_SHIFT);
 	  prev_offset = offset;
-	  memset (shadow_bytes, cur_shadow_byte, 4);
+	  memset (shadow_bytes, cur_shadow_byte, ASAN_SHADOW_CHUNK_SIZE);
 	  emit_move_insn (shadow_mem, asan_shadow_cst (shadow_bytes));
 	  offset += ASAN_RED_ZONE_SIZE;
 	}
@@ -3160,7 +3160,7 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
 
   HOST_WIDE_INT real_size_in_bytes = size_in_bytes == -1 ? 1 : size_in_bytes;
 
-  tree shadow_ptr_type = shadow_ptr_types[real_size_in_bytes == 16 ? 1 : 0];
+  tree shadow_ptr_type = shadow_ptr_types[real_size_in_bytes == 32 ? 1 : 0];
   tree shadow_type = TREE_TYPE (shadow_ptr_type);
 
   gimple_stmt_iterator gsi = *iter;
@@ -3211,7 +3211,7 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
   tree base_addr = gimple_assign_lhs (g);
 
   tree t = NULL_TREE;
-  if (real_size_in_bytes >= 8)
+  if (real_size_in_bytes >= ASAN_SHADOW_GRANULARITY)
     {
       tree shadow = build_shadow_mem_access (&gsi, loc, base_addr,
 					     shadow_ptr_type);
@@ -3219,6 +3219,7 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
     }
   else
     {
+      // TODO: update comment!
       /* Slow path for 1, 2 and 4 byte accesses.  */
       /* Test (shadow != 0)
 	 & ((base_addr & 7) + (real_size_in_bytes - 1)) >= shadow).  */
@@ -3230,10 +3231,10 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
       /* Aligned (>= 8 bytes) can test just
 	 (real_size_in_bytes - 1 >= shadow), as base_addr & 7 is known
 	 to be 0.  */
-      if (align < 8)
+      if (align < 16)
 	{
 	  gimple_seq_add_stmt (&seq, build_assign (BIT_AND_EXPR,
-						   base_addr, 7));
+						   base_addr, 15));
 	  gimple_seq_add_stmt (&seq,
 			       build_type_cast (shadow_type,
 						gimple_seq_last (seq)));
@@ -3275,7 +3276,7 @@ asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
 	  gimple_seq seq = NULL;
 	  gimple_seq_add_stmt (&seq, shadow_test);
 	  gimple_seq_add_stmt (&seq, build_assign (BIT_AND_EXPR,
-						   base_end_addr, 7));
+						   base_end_addr, 15));
 	  gimple_seq_add_stmt (&seq, build_type_cast (shadow_type,
 						      gimple_seq_last (seq)));
 	  gimple_seq_add_stmt (&seq, build_assign (GE_EXPR,
