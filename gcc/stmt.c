@@ -776,18 +776,18 @@ emit_case_dispatch_table (tree index_expr, tree index_type,
   for (unsigned j = 0; j < case_list.length (); j++)
     {
       simple_case_node *n = &case_list[j];
+      tree index_type_unsigned = signed_or_unsigned_type_for (1, index_type);
       /* Compute the low and high bounds relative to the minimum
 	 value since that should fit in a HOST_WIDE_INT while the
 	 actual values may not.  */
-      HOST_WIDE_INT i_low
-	= tree_to_uhwi (fold_build2 (MINUS_EXPR, index_type,
+      unsigned HOST_WIDE_INT i_low
+	= tree_to_uhwi (fold_build2 (MINUS_EXPR, index_type_unsigned,
 				     n->m_low, minval));
-      HOST_WIDE_INT i_high
-	= tree_to_uhwi (fold_build2 (MINUS_EXPR, index_type,
+      unsigned HOST_WIDE_INT i_high
+	= tree_to_uhwi (fold_build2 (MINUS_EXPR, index_type_unsigned,
 				     n->m_high, minval));
-      HOST_WIDE_INT i;
 
-      for (i = i_low; i <= i_high; i ++)
+      for (unsigned HOST_WIDE_INT i = i_low; i <= i_high; i ++)
 	labelvec[i]
 	  = gen_rtx_LABEL_REF (Pmode, label_rtx (n->m_code_label));
     }
@@ -913,7 +913,10 @@ expand_case (gswitch *stmt)
     maxval = fold_convert (index_type, CASE_LOW (elt));
 
   /* Compute span of values.  */
-  range = fold_build2 (MINUS_EXPR, index_type, maxval, minval);
+  tree index_type_unsigned = signed_or_unsigned_type_for (1, index_type);
+  range = fold_build2 (MINUS_EXPR, index_type_unsigned,
+		       fold_convert (index_type_unsigned, maxval),
+		       fold_convert (index_type_unsigned, minval));
 
   /* Listify the labels queue and gather some numbers to decide
      how to expand this switch().  */
