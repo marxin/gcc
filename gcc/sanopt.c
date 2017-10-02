@@ -45,6 +45,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "tree-dfa.h"
 #include "tree-ssa.h"
+#include "varasm.h"
 
 /* This is used to carry information about basic blocks.  It is
    attached to the AUX field of the standard CFG block.  */
@@ -148,6 +149,61 @@ struct sanopt_tree_triplet_hash : typed_noop_remove <sanopt_tree_triplet>
   }
 };
 
+/* Tree couple for ptr_check_map.  */
+struct sanopt_tree_couple
+{
+  tree ptr;
+  bool positive;
+};
+
+/* Traits class for tree triplet hash maps below.  */
+
+struct sanopt_tree_couple_hash : typed_noop_remove <sanopt_tree_couple>
+{
+  typedef sanopt_tree_couple value_type;
+  typedef sanopt_tree_couple compare_type;
+
+  static inline hashval_t
+  hash (const sanopt_tree_couple &ref)
+  {
+    inchash::hash hstate (0);
+    inchash::add_expr (ref.ptr, hstate);
+    hstate.add_int (ref.positive);
+    return hstate.end ();
+  }
+
+  static inline bool
+  equal (const sanopt_tree_couple &ref1, const sanopt_tree_couple &ref2)
+  {
+    return operand_equal_p (ref1.ptr, ref2.ptr, 0)
+	   && ref1.positive == ref2.positive;
+  }
+
+  static inline void
+  mark_deleted (sanopt_tree_couple &ref)
+  {
+    ref.ptr = reinterpret_cast<tree> (1);
+  }
+
+  static inline void
+  mark_empty (sanopt_tree_couple &ref)
+  {
+    ref.ptr = NULL;
+  }
+
+  static inline bool
+  is_deleted (const sanopt_tree_couple &ref)
+  {
+    return ref.ptr == (void *) 1;
+  }
+
+  static inline bool
+  is_empty (const sanopt_tree_couple &ref)
+  {
+    return ref.ptr == NULL;
+  }
+};
+
 /* This is used to carry various hash maps and variables used
    in sanopt_optimize_walker.  */
 
@@ -165,6 +221,10 @@ struct sanopt_ctx
      of UBSAN_VPTR) to a vector of UBSAN_VPTR call statements that check
      that virtual table pointer.  */
   hash_map<sanopt_tree_triplet_hash, auto_vec<gimple *> > vptr_check_map;
+
+  /* This map maps a couple (tree and boolean) to a vector of UBSAN_PTR
+     call statements that check that pointer overflow.  */
+  hash_map<sanopt_tree_couple_hash, auto_vec<gimple *> > ptr_check_map;
 
   /* Number of IFN_ASAN_CHECK statements.  */
   int asan_num_accesses;
@@ -342,6 +402,137 @@ maybe_optimize_ubsan_null_ifn (struct sanopt_ctx *ctx, gimple *stmt)
   if (!remove)
     v.safe_push (stmt);
   return remove;
+}
+
+/* Return true when pointer PTR for a given OFFSET is already sanitized
+   in a given sanitization context CTX.  */
+
+static bool
+has_dominating_ubsan_ptr_check (sanopt_ctx *ctx, tree ptr, tree cur_offset)
+{
+  int r = get_range_pos_neg (cur_offset);
+  gcc_assert (r != 3);
+  bool positive = r == 1;
+
+  sanopt_tree_couple couple;
+  couple.ptr = ptr;
+  couple.positive = positive;
+
+  auto_vec<gimple *> &v = ctx->ptr_check_map.get_or_insert (couple);
+  gimple *g = maybe_get_dominating_check (v);
+  if (!g)
+    return false;
+
+  /* We already have recorded a UBSAN_PTR check for this pointer.  Perhaps we
+     can drop this one.  But only if this check doesn't specify larger offset.
+     */
+  tree offset = gimple_call_arg (g, 1);
+  gcc_assert (TREE_CODE (offset) == INTEGER_CST);
+
+  if (positive && tree_int_cst_le (cur_offset, offset))
+    return true;
+  else if (!positive && tree_int_cst_le (offset, cur_offset))
+    return true;
+
+  return false;
+}
+
+/* Record UBSAN_PTR check of given context CTX.  Register pointer PTR on
+   a given OFFSET that it's handled by GIMPLE STMT.  */
+
+static void
+record_ubsan_ptr_check_stmt (sanopt_ctx *ctx, gimple *stmt, tree ptr,
+			     tree offset)
+{
+  int r = get_range_pos_neg (offset);
+  gcc_assert (r != 3);
+  bool positive = r == 1;
+
+  sanopt_tree_couple couple;
+  couple.ptr = ptr;
+  couple.positive = positive;
+
+  auto_vec<gimple *> &v = ctx->ptr_check_map.get_or_insert (couple);
+  v.safe_push (stmt);
+}
+
+/* Optimize away redundant UBSAN_PTR calls.  */
+
+static bool
+maybe_optimize_ubsan_ptr_ifn (sanopt_ctx *ctx, gimple *stmt)
+{
+  gcc_assert (gimple_call_num_args (stmt) == 2);
+  tree ptr = gimple_call_arg (stmt, 0);
+  tree cur_offset = gimple_call_arg (stmt, 1);
+
+  if (TREE_CODE (cur_offset) != INTEGER_CST)
+    return false;
+
+  if (integer_zerop (cur_offset))
+    return true;
+
+  if (has_dominating_ubsan_ptr_check (ctx, ptr, cur_offset))
+    return true;
+
+  tree base = ptr;
+  if (TREE_CODE (base) == ADDR_EXPR)
+    {
+      base = TREE_OPERAND (base, 0);
+
+      HOST_WIDE_INT bitsize, bitpos;
+      machine_mode mode;
+      int volatilep = 0, reversep, unsignedp = 0;
+      tree offset;
+      base = get_inner_reference (base, &bitsize, &bitpos, &offset, &mode,
+				  &unsignedp, &reversep, &volatilep);
+      if (DECL_P (base))
+	{
+	  gcc_assert (!DECL_REGISTER (base));
+	  /* If BASE is a fixed size automatic variable or
+	     global variable defined in the current TU and bitpos
+	     fits, don't instrument anything.  */
+	  if ((offset == NULL_TREE || TREE_CODE (offset) == INTEGER_CST)
+	      && (VAR_P (base)
+		  || TREE_CODE (base) == PARM_DECL
+		  || TREE_CODE (base) == RESULT_DECL)
+	      && DECL_SIZE (base)
+	      && TREE_CODE (DECL_SIZE (base)) == INTEGER_CST
+	      && (!is_global_var (base) || decl_binds_to_current_def_p (base)))
+	    {
+	      HOST_WIDE_INT bytepos = bitpos / BITS_PER_UNIT;
+	      offset_int total_offset = bytepos;
+	      if (offset != NULL_TREE)
+		total_offset += wi::sext (wi::to_offset (offset), POINTER_SIZE);
+	      total_offset += wi::sext (wi::to_offset (cur_offset),
+					POINTER_SIZE);
+
+	      /* New total offset can fit in pointer type.  */
+	      if (wi::fits_shwi_p (total_offset))
+		{
+		  tree toffset = build_int_cst (TREE_TYPE (cur_offset),
+						total_offset.to_shwi ());
+		  tree ptr2 = build1 (ADDR_EXPR,
+				      build_pointer_type (TREE_TYPE (base)),
+				      base);
+
+		  /* If total offset is non-negative and smaller or equal
+		     to size of declaration, then no check is needed.  */
+		  if (get_range_pos_neg (toffset) == 1
+		      && tree_int_cst_le (toffset, DECL_SIZE_UNIT (base)))
+		    return true;
+		  /* Maybe we already have a dominating check for the BASE.  */
+		  else if (has_dominating_ubsan_ptr_check (ctx, ptr2, toffset))
+		    return true;
+		}
+	    }
+	}
+    }
+
+  /* For this PTR we don't have any UBSAN_PTR stmts recorded, so there's
+     nothing to optimize yet.  */
+  record_ubsan_ptr_check_stmt (ctx, stmt, ptr, cur_offset);
+
+  return false;
 }
 
 /* Optimize away redundant UBSAN_VPTR calls.  The second argument
@@ -586,6 +777,9 @@ sanopt_optimize_walker (basic_block bb, struct sanopt_ctx *ctx)
 	  case IFN_UBSAN_VPTR:
 	    remove = maybe_optimize_ubsan_vptr_ifn (ctx, stmt);
 	    break;
+	  case IFN_UBSAN_PTR:
+	    remove = maybe_optimize_ubsan_ptr_ifn (ctx, stmt);
+	    break;
 	  case IFN_ASAN_CHECK:
 	    if (asan_check_optimize)
 	      remove = maybe_optimize_asan_check_ifn (ctx, stmt);
@@ -604,15 +798,22 @@ sanopt_optimize_walker (basic_block bb, struct sanopt_ctx *ctx)
 	  /* Drop this check.  */
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
-	      fprintf (dump_file, "Optimizing out\n  ");
+	      fprintf (dump_file, "Optimizing out: ");
 	      print_gimple_stmt (dump_file, stmt, 0, dump_flags);
-	      fprintf (dump_file, "\n");
 	    }
 	  unlink_stmt_vdef (stmt);
 	  gsi_remove (&gsi, true);
 	}
       else
-	gsi_next (&gsi);
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    {
+	      fprintf (dump_file, "Leaving: ");
+	      print_gimple_stmt (dump_file, stmt, 0, dump_flags);
+	    }
+
+	  gsi_next (&gsi);
+	}
     }
 
   if (asan_check_optimize)
@@ -1008,7 +1209,7 @@ pass_sanopt::execute (function *fun)
   if (optimize
       && (flag_sanitize
 	  & (SANITIZE_NULL | SANITIZE_ALIGNMENT
-	     | SANITIZE_ADDRESS | SANITIZE_VPTR)))
+	     | SANITIZE_ADDRESS | SANITIZE_VPTR | SANITIZE_POINTER_OVERFLOW)))
     asan_num_accesses = sanopt_optimize (fun, &contains_asan_mark);
   else if (flag_sanitize & SANITIZE_ADDRESS)
     {
@@ -1103,9 +1304,8 @@ pass_sanopt::execute (function *fun)
 
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
-	      fprintf (dump_file, "Expanded\n  ");
+	      fprintf (dump_file, "Expanded: ");
 	      print_gimple_stmt (dump_file, stmt, 0, dump_flags);
-	      fprintf (dump_file, "\n");
 	    }
 
 	  if (!no_next)
