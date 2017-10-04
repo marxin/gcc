@@ -368,7 +368,6 @@ switch_conversion::build_constructors ()
       while (tree_int_cst_lt (pos, CASE_LOW (cs)))
 	{
 	  int k;
-	  gcc_assert (!m_contiguous_range);
 	  for (k = 0; k < m_phi_count; k++)
 	    {
 	      constructor_elt elt;
