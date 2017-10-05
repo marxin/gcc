@@ -971,7 +971,9 @@ proper position among the other output files.  */
 /* Linker command line options for -fsanitize= early on the command line.  */
 #ifndef SANITIZER_EARLY_SPEC
 #define SANITIZER_EARLY_SPEC "\
-%{!nostdlib:%{!nodefaultlibs:%{%:sanitize(address):" LIBASAN_EARLY_SPEC "} \
+%{!nostdlib:%{!nodefaultlibs:%{%:sanitize(address)\
+    |%:sanitize(pointer-compare)\
+    |%:sanitize(pointer-subtract):" LIBASAN_EARLY_SPEC "} \
     %{%:sanitize(thread):" LIBTSAN_EARLY_SPEC "} \
     %{%:sanitize(leak):" LIBLSAN_EARLY_SPEC "}}}"
 #endif
@@ -981,6 +983,10 @@ proper position among the other output files.  */
 #define SANITIZER_SPEC "\
 %{!nostdlib:%{!nodefaultlibs:%{%:sanitize(address):" LIBASAN_SPEC "\
     %{static:%ecannot specify -static with -fsanitize=address}}\
+    %{%:sanitize(pointer-compare):" LIBASAN_SPEC "\
+    %{static:%ecannot specify -static with -fsanitize=pointer-compare}}\
+    %{%:sanitize(pointer-subtract):" LIBASAN_SPEC "\
+    %{static:%ecannot specify -static with -fsanitize=pointer-subtract}}\
     %{%:sanitize(thread):" LIBTSAN_SPEC "\
     %{static:%ecannot specify -static with -fsanitize=thread}}\
     %{%:sanitize(undefined):" LIBUBSAN_SPEC "}\
@@ -9421,6 +9427,10 @@ sanitize_spec_function (int argc, const char **argv)
     return (flag_sanitize & SANITIZE_USER_ADDRESS) ? "" : NULL;
   if (strcmp (argv[0], "kernel-address") == 0)
     return (flag_sanitize & SANITIZE_KERNEL_ADDRESS) ? "" : NULL;
+  if (strcmp (argv[0], "pointer-compare") == 0)
+    return (flag_sanitize & SANITIZE_POINTER_COMPARE) ? "" : NULL;
+  if (strcmp (argv[0], "pointer-subtract") == 0)
+    return (flag_sanitize & SANITIZE_POINTER_SUBTRACT) ? "" : NULL;
   if (strcmp (argv[0], "thread") == 0)
     return (flag_sanitize & SANITIZE_THREAD) ? "" : NULL;
   if (strcmp (argv[0], "undefined") == 0)

@@ -2370,6 +2370,104 @@ maybe_instrument_call (gimple_stmt_iterator *iter)
   return instrumented;
 }
 
+/* Return true if a given opcode CODE is potentially a non-valid comparison
+   of pointer types.  */
+
+static bool
+is_pointer_compare_opcode (tree_code code)
+{
+  return (code == LE_EXPR || code == LT_EXPR || code == GE_EXPR
+	  || code == GT_EXPR);
+}
+
+/* Instrument potential invalid operation executed on pointer types:
+   comparison different from != and == and subtraction of pointers.  */
+
+static void
+instrument_pointer_comparison (void)
+{
+  basic_block bb;
+  gimple_stmt_iterator i;
+
+  bool sanitize_comparison_p = sanitize_flags_p (SANITIZE_POINTER_COMPARE);
+  bool sanitize_subtraction_p = sanitize_flags_p (SANITIZE_POINTER_SUBTRACT);
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      for (i = gsi_start_bb (bb); !gsi_end_p (i); gsi_next (&i))
+	{
+	  gimple *s = gsi_stmt (i);
+
+	  tree ptr1 = NULL_TREE;
+	  tree ptr2 = NULL_TREE;
+	  enum built_in_function fn = BUILT_IN_NONE;
+
+	  if (sanitize_comparison_p)
+	    {
+	      if (is_gimple_assign (s)
+		  && gimple_assign_rhs_class (s) == GIMPLE_BINARY_RHS
+		  && POINTER_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (s)))
+		  && POINTER_TYPE_P (TREE_TYPE (gimple_assign_rhs2 (s)))
+		  && is_pointer_compare_opcode (gimple_assign_rhs_code (s)))
+		{
+		  ptr1 = gimple_assign_rhs1 (s);
+		  ptr2 = gimple_assign_rhs2 (s);
+		  fn = BUILT_IN_ASAN_POINTER_COMPARE;
+		}
+	      else if (gimple_code (s) == GIMPLE_COND
+		       && POINTER_TYPE_P (TREE_TYPE (gimple_cond_lhs (s)))
+		       && POINTER_TYPE_P (TREE_TYPE (gimple_cond_rhs (s)))
+		       && is_pointer_compare_opcode (gimple_cond_code (s)))
+		{
+		  ptr1 = gimple_cond_lhs (s);
+		  ptr2 = gimple_cond_rhs (s);
+		  fn = BUILT_IN_ASAN_POINTER_COMPARE;
+		}
+	    }
+
+	  if (sanitize_subtraction_p
+	      && is_gimple_assign (s)
+	      && gimple_assign_rhs_class (s) == GIMPLE_BINARY_RHS
+	      && gimple_assign_rhs_code (s) == MINUS_EXPR)
+	    {
+	      tree rhs1 = gimple_assign_rhs1 (s);
+	      tree rhs2 = gimple_assign_rhs2 (s);
+
+	      if (TREE_CODE (rhs1) == SSA_NAME
+		  || TREE_CODE (rhs2) == SSA_NAME)
+		{
+		  gassign *def1
+		    = dyn_cast<gassign *>(SSA_NAME_DEF_STMT (rhs1));
+		  gassign *def2
+		    = dyn_cast<gassign *>(SSA_NAME_DEF_STMT (rhs2));
+
+		  if (def1 && def2
+		      && gimple_assign_rhs_class (def1) == GIMPLE_UNARY_RHS
+		      && gimple_assign_rhs_class (def2) == GIMPLE_UNARY_RHS)
+		    {
+		      if (POINTER_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (def1)))
+			  && POINTER_TYPE_P
+			  (TREE_TYPE (gimple_assign_rhs1 (def2))))
+			{
+			  ptr1 = rhs1;
+			  ptr2 = rhs2;
+			  fn = BUILT_IN_ASAN_POINTER_SUBTRACT;
+			}
+		    }
+		}
+	    }
+
+	  if (ptr1 != NULL_TREE && ptr2 != NULL_TREE)
+	    {
+	      tree decl = builtin_decl_implicit (fn);
+	      gimple *g = gimple_build_call (decl, 2, ptr1, ptr2);
+	      gimple_set_location (g, gimple_location (s));
+	      gsi_insert_before (&i, g, GSI_SAME_STMT);
+	    }
+	}
+    }
+}
+
 /* Walk each instruction of all basic block and instrument those that
    represent memory references: loads, stores, or function calls.
    In a given basic block, this function avoids instrumenting memory
@@ -3432,6 +3530,9 @@ asan_instrument (void)
 {
   if (shadow_ptr_types[0] == NULL_TREE)
     asan_init_shadow_ptr_types ();
+
+  if (sanitize_flags_p (SANITIZE_POINTER_COMPARE | SANITIZE_POINTER_SUBTRACT))
+    instrument_pointer_comparison ();
   transform_statements ();
   last_alloca_addr = NULL_TREE;
   return 0;
@@ -3440,7 +3541,8 @@ asan_instrument (void)
 static bool
 gate_asan (void)
 {
-  return sanitize_flags_p (SANITIZE_ADDRESS);
+  return sanitize_flags_p (SANITIZE_ADDRESS | SANITIZE_POINTER_COMPARE
+			   | SANITIZE_POINTER_SUBTRACT);
 }
 
 namespace {

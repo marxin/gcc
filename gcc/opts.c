@@ -966,6 +966,14 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 	      "%<-fsanitize=address%> and %<-fsanitize=kernel-address%> "
 	      "are incompatible with %<-fsanitize=thread%>");
 
+  if ((opts->x_flag_sanitize & SANITIZE_POINTER_COMPARE
+       || opts->x_flag_sanitize & SANITIZE_POINTER_SUBTRACT)
+      && (opts->x_flag_sanitize & SANITIZE_THREAD))
+    error_at (loc,
+	      "%<-fsanitize=pointer-compare%> and "
+	      "%<-fsanitize=pointer-subtract%> "
+	      "are incompatible with %<-fsanitize=thread%>");
+
   if ((opts->x_flag_sanitize & SANITIZE_LEAK)
       && (opts->x_flag_sanitize & SANITIZE_THREAD))
     error_at (loc,
@@ -1496,6 +1504,8 @@ const struct sanitizer_opts_s sanitizer_opts[] =
   SANITIZER_OPT (address, (SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS), true),
   SANITIZER_OPT (kernel-address, (SANITIZE_ADDRESS | SANITIZE_KERNEL_ADDRESS),
 		 true),
+  SANITIZER_OPT (pointer-compare, SANITIZE_POINTER_COMPARE, true),
+  SANITIZER_OPT (pointer-subtract, SANITIZE_POINTER_SUBTRACT, true),
   SANITIZER_OPT (thread, SANITIZE_THREAD, false),
   SANITIZER_OPT (leak, SANITIZE_LEAK, false),
   SANITIZER_OPT (shift, SANITIZE_SHIFT, true),

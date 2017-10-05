@@ -1302,7 +1302,9 @@ process_options (void)
 	  flag_check_pointer_bounds = 0;
 	}
 
-      if (flag_sanitize & SANITIZE_ADDRESS)
+      if (flag_sanitize & SANITIZE_ADDRESS
+	  || flag_sanitize & SANITIZE_POINTER_COMPARE
+	  || flag_sanitize & SANITIZE_POINTER_SUBTRACT)
 	{
 	  error_at (UNKNOWN_LOCATION,
 		    "%<-fcheck-pointer-bounds%> is not supported with "
