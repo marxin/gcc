@@ -1452,8 +1452,18 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
     return void_node;
 
   if (is_builtin_fn (fun))
-    return cxx_eval_builtin_function_call (ctx, t, fun,
-					   lval, non_constant_p, overflow_p);
+    {
+      /* Distinguish between __builtin_unreachable placed by user and one
+	 added in cp_maybe_instrument_return.  Ignore the later one.  */
+      if (DECL_FUNCTION_CODE (fun) == BUILT_IN_UNREACHABLE
+	  && (DECL_SOURCE_LOCATION (ctx->call->fundef->decl)
+	      == EXPR_LOCATION (t)))
+	return void_node;
+
+      return cxx_eval_builtin_function_call (ctx, t, fun,
+					     lval, non_constant_p, overflow_p);
+    }
+
   if (!DECL_DECLARED_CONSTEXPR_P (fun))
     {
       if (!ctx->quiet)
