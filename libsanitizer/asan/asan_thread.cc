@@ -322,6 +322,29 @@ bool AsanThread::GetStackFrameAccessByAddr(uptr addr,
   return true;
 }
 
+uptr AsanThread::GetStackFrameVariableBeginning(uptr addr)
+{
+  uptr bottom = 0;
+  if (AddrIsInStack(addr)) {
+    bottom = stack_bottom();
+  } else if (has_fake_stack()) {
+    bottom = fake_stack()->AddrIsInFakeStack(addr);
+    CHECK(bottom);
+  }
+  uptr aligned_addr = addr & ~(SANITIZER_WORDSIZE/8 - 1);  // align addr.
+  u8 *shadow_ptr = (u8*)MemToShadow(aligned_addr);
+  u8 *shadow_bottom = (u8*)MemToShadow(bottom);
+
+  while (shadow_ptr >= shadow_bottom &&
+	 (*shadow_ptr != kAsanStackLeftRedzoneMagic &&
+	  *shadow_ptr != kAsanStackMidRedzoneMagic &&
+	  *shadow_ptr != kAsanStackRightRedzoneMagic)) {
+    shadow_ptr--;
+  }
+
+  return (uptr)shadow_ptr;
+}
+
 bool AsanThread::AddrIsInStack(uptr addr) {
   const auto bounds = GetStackBounds();
   return addr >= bounds.bottom && addr < bounds.top;
