@@ -220,6 +220,15 @@ bool GetStackAddressInformation(uptr addr, uptr access_size,
   return true;
 }
 
+bool GetStackVariableBeginning(uptr addr, uptr *shadow_addr)
+{
+  AsanThread *t = FindThreadByStackAddress(addr);
+  if (!t) return false;
+
+  *shadow_addr = t->GetStackFrameVariableBeginning (addr);
+  return true;
+}
+
 static void PrintAccessAndVarIntersection(const StackVarDescr &var, uptr addr,
                                           uptr access_size, uptr prev_var_end,
                                           uptr next_var_beg) {
@@ -328,6 +337,24 @@ void GlobalAddressDescription::Print(const char *bug_type) const {
       StackDepotGet(reg_sites[i]).Print();
     }
   }
+}
+
+bool GlobalAddressDescription::PointsInsideASameVariable
+  (const GlobalAddressDescription &other) const
+{
+  // we must have just a single variables candidate
+  if (size != 1 || other.size != 1)
+    return false;
+
+  if (globals[0].beg != other.globals[0].beg)
+    return false;
+
+  // check that both descriptions are inside a same global variable
+  return (globals[0].beg <= addr
+      && other.globals[0].beg <= other.addr
+      && (addr + access_size) <= (globals[0].beg + globals[0].size)
+      && ((other.addr + other.access_size)
+	<= (other.globals[0].beg + other.globals[0].size)));
 }
 
 void StackAddressDescription::Print() const {

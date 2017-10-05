@@ -138,6 +138,7 @@ struct StackAddressDescription {
 
 bool GetStackAddressInformation(uptr addr, uptr access_size,
                                 StackAddressDescription *descr);
+bool GetStackVariableBeginning(uptr addr, uptr *shadow_addr);
 
 struct GlobalAddressDescription {
   uptr addr;
@@ -149,6 +150,10 @@ struct GlobalAddressDescription {
   u8 size;
 
   void Print(const char *bug_type = "") const;
+
+  // Return true when this descriptions points inside a same global variable
+  // as other. Descriptions can have different address within the variable
+  bool PointsInsideASameVariable (const GlobalAddressDescription &other) const;
 };
 
 bool GetGlobalAddressInformation(uptr addr, uptr access_size,

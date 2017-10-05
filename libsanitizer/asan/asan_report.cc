@@ -344,14 +344,58 @@ static INLINE void CheckForInvalidPointerPair(void *p1, void *p2) {
   if (!flags()->detect_invalid_pointer_pairs) return;
   uptr a1 = reinterpret_cast<uptr>(p1);
   uptr a2 = reinterpret_cast<uptr>(p2);
-  AsanChunkView chunk1 = FindHeapChunkByAddress(a1);
-  AsanChunkView chunk2 = FindHeapChunkByAddress(a2);
-  bool valid1 = chunk1.IsAllocated();
-  bool valid2 = chunk2.IsAllocated();
-  if (!valid1 || !valid2 || !chunk1.Eq(chunk2)) {
-    GET_CALLER_PC_BP_SP;
-    return ReportInvalidPointerPair(pc, bp, sp, a1, a2);
+
+  if (a1 == a2)
+    return;
+
+  uptr shadow_offset1, shadow_offset2;
+  bool valid1, valid2;
+  {
+    ThreadRegistryLock l(&asanThreadRegistry());
+
+    valid1 = GetStackVariableBeginning(a1, &shadow_offset1);
+    valid2 = GetStackVariableBeginning(a2, &shadow_offset2);
   }
+
+  if (valid1 && valid2) {
+    if (shadow_offset1 == shadow_offset2)
+      return;
+  }
+  else if (!valid1 && !valid2) {
+    AsanChunkView chunk1 = FindHeapChunkByAddress(a1);
+    AsanChunkView chunk2 = FindHeapChunkByAddress(a2);
+    valid1 = chunk1.IsAllocated();
+    valid2 = chunk2.IsAllocated();
+
+    if (valid1 && valid2) {
+      if (chunk1.Eq(chunk2))
+	return;
+    }
+    else if (!valid1 && !valid2) {
+      uptr offset = a1 < a2 ? a2 - a1 : a1 - a2;
+      uptr left = a1 < a2 ? a1 : a2;
+      if (offset <= 2048) {
+	if (__asan_region_is_poisoned (left, offset) == 0)
+	  return;
+	else {
+	  GET_CALLER_PC_BP_SP;
+	  ReportInvalidPointerPair(pc, bp, sp, a1, a2);
+	  return;
+	}
+      }
+
+      GlobalAddressDescription gdesc1, gdesc2;
+      valid1 = GetGlobalAddressInformation(a1, 0, &gdesc1);
+      valid2 = GetGlobalAddressInformation(a2, 0, &gdesc2);
+
+      if (valid1 && valid2
+	  && gdesc1.PointsInsideASameVariable (gdesc2))
+	return;
+    }
+  }
+
+  GET_CALLER_PC_BP_SP;
+  ReportInvalidPointerPair(pc, bp, sp, a1, a2);
 }
 // ----------------------- Mac-specific reports ----------------- {{{1
 
