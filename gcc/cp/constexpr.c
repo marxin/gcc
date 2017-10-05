@@ -1452,8 +1452,20 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
     return void_node;
 
   if (is_builtin_fn (fun))
-    return cxx_eval_builtin_function_call (ctx, t, fun,
-					   lval, non_constant_p, overflow_p);
+    {
+      /* Do not allow__builtin_unreachable in constexpr function.  */
+      if (DECL_FUNCTION_CODE (fun) == BUILT_IN_UNREACHABLE)
+	{
+	  error_at (loc, "constexpr can't contain call of a non-return "
+		    "function %q+E", fun);
+	  *non_constant_p = true;
+	  return void_node;
+	}
+
+      return cxx_eval_builtin_function_call (ctx, t, fun,
+					     lval, non_constant_p, overflow_p);
+    }
+
   if (!DECL_DECLARED_CONSTEXPR_P (fun))
     {
       if (!ctx->quiet)
