@@ -344,14 +344,72 @@ static INLINE void CheckForInvalidPointerPair(void *p1, void *p2) {
   if (!flags()->detect_invalid_pointer_pairs) return;
   uptr a1 = reinterpret_cast<uptr>(p1);
   uptr a2 = reinterpret_cast<uptr>(p2);
-  AsanChunkView chunk1 = FindHeapChunkByAddress(a1);
-  AsanChunkView chunk2 = FindHeapChunkByAddress(a2);
-  bool valid1 = chunk1.IsAllocated();
-  bool valid2 = chunk2.IsAllocated();
-  if (!valid1 || !valid2 || !chunk1.Eq(chunk2)) {
-    GET_CALLER_PC_BP_SP;
-    return ReportInvalidPointerPair(pc, bp, sp, a1, a2);
+
+  if (a1 == a2)
+    return;
+
+  uptr offset = a1 < a2 ? a2 - a1 : a1 - a2;
+  uptr left = a1 < a2 ? a1 : a2;
+  uptr right = a1 < a2 ? a2 : a1;
+  if (offset <= 2048) {
+    if (__asan_region_is_poisoned(left, offset) == 0)
+      return;
+    else
+      goto do_error;
   }
+
+  uptr shadow_offset1, shadow_offset2;
+
+  {
+    ThreadRegistryLock l(&asanThreadRegistry());
+
+    // check whether left is a stack memory pointer
+    if (GetStackVariableBeginning(left, &shadow_offset1)) {
+      if (GetStackVariableBeginning(right - 1, &shadow_offset2) &&
+	  shadow_offset1 == shadow_offset2)
+	return;
+      else
+	goto do_error;
+    }
+  }
+
+  // check whether left is a heap memory address
+  HeapAddressDescription hdesc1, hdesc2;
+  if (GetHeapAddressInformation(left, 0, &hdesc1) &&
+      hdesc1.chunk_access.access_type == kAccessTypeInside) {
+    if (GetHeapAddressInformation(right, 0, &hdesc2) &&
+	hdesc2.chunk_access.access_type == kAccessTypeInside &&
+	(hdesc1.chunk_access.chunk_begin
+	 == hdesc2.chunk_access.chunk_begin))
+      return;
+    else
+      goto do_error;
+  }
+  // check whether left is an address of a global variable
+  GlobalAddressDescription gdesc1, gdesc2;
+  if (GetGlobalAddressInformation(left, 0, &gdesc1)) {
+    if (GetGlobalAddressInformation(right - 1, 0, &gdesc2) &&
+	gdesc1.PointsInsideASameVariable (gdesc2))
+      return;
+    else
+      goto do_error;
+  }
+
+  {
+    ThreadRegistryLock l(&asanThreadRegistry());
+    if (GetStackVariableBeginning(right - 1, &shadow_offset2))
+      goto do_error;
+  }
+  if (GetHeapAddressInformation(right, 0, &hdesc2) ||
+      GetGlobalAddressInformation(right - 1, 0, &gdesc2))
+    goto do_error;
+
+  /* At this point we know nothing about both a1 and a2 addresses.  */
+  return;
+
+do_error:
+  GET_CALLER_PC_BP_SP;
+  ReportInvalidPointerPair(pc, bp, sp, a1, a2);
 }
 // ----------------------- Mac-specific reports ----------------- {{{1
 
