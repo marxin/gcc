@@ -247,10 +247,11 @@ proc scan-assembler-times { args } {
     set text [read $fd]
     close $fd
 
-    if { [llength [regexp -inline -all -- $pattern $text]] == [lindex $args 1]} {
+    set pattern_count [llength [regexp -inline -all -- $pattern $text]]
+    if {$pattern_count == [lindex $args 1]} {
 	pass "$testcase scan-assembler-times $pp_pattern [lindex $args 1]"
     } else {
-	fail "$testcase scan-assembler-times $pp_pattern [lindex $args 1]"
+	fail "$testcase scan-assembler-times $pp_pattern [lindex $args 1] (found $pattern_count times)"
     }
 }
 
