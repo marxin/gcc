@@ -1182,7 +1182,12 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 	{
 	  new_call = build_call_array_loc (EXPR_LOCATION (t), TREE_TYPE (t),
 					   CALL_EXPR_FN (t), nargs, args);
-	  error ("%q+E is not a constant expression", new_call);
+
+	  /* Do not allow__builtin_unreachable in constexpr function.  */
+	  if (DECL_FUNCTION_CODE (fun) == BUILT_IN_UNREACHABLE)
+	    error ("constexpr call flows off the end of the function");
+	  else
+	    error ("%q+E is not a constant expression", new_call);
 	}
       *non_constant_p = true;
       return t;
