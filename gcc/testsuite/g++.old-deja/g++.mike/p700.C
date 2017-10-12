@@ -2111,6 +2111,7 @@ char mystrcmp(String30 s, String30 t)
 
 
 
+int
 main()
 {
 	Proc0();

@@ -25,6 +25,8 @@ struct A : D
 
 A baz (const char *, A = C ());
 
+A a;
+
 A
 B::foo ()
 {
@@ -35,10 +37,13 @@ B::foo ()
   catch (...)
     {
     }
+
+  return a;
 }
 
 A
 B::bar ()
 {
   baz ("bar");
+  return a;
 }

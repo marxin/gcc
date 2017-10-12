@@ -7,6 +7,7 @@ template <typename T>
 T f()
 {
   T a = T();  // { dg-error "value-initialization of reference" }
+  return T();
 }
 
 int &a = f<int&>(); // { dg-message "required from here" }

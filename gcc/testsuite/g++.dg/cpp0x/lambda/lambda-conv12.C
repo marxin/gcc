@@ -10,7 +10,7 @@ template <typename F> struct B<F> { using type = F; };
 struct {
   template <typename... F,
             typename Overload = typename B<typename A<F>::type...>::type>
-  Overload operator()(F...){}
+  Overload operator()(F...){ Overload a; return a; }
 } a;
 int main() {
   auto f = a([](int) {}, [](float) {});

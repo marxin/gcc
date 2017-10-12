@@ -58,6 +58,7 @@ namespace std
   template < typename _Tp > _Tp forward (typename remove_reference <
 					 _Tp >::type &)
   {
+    return _Tp();
   }
   template < class _T1, class _T2 > struct pair
   {

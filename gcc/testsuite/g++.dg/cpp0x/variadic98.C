@@ -177,6 +177,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     };
     template<typename _Tp>     struct less : public binary_function<_Tp, _Tp, bool>     {
 	bool       operator()(const _Tp& __x, const _Tp& __y) const       {
+	    return true;
 	}
     };
     template<typename _Pair>     struct _Select1st : public unary_function<_Pair,            typename _Pair::first_type>     {

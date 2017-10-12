@@ -17,6 +17,8 @@ UnicodeString &
 A::m_fn1 (UnicodeString &, int &p2, UErrorCode &) const
 {
   UnicodeString a[2];
+  static UnicodeString b;
+  return b;
 }
 
 /* { dg-final { scan-tree-dump-not "\\n  OBJ_TYPE_REF" "fre3"  } } */

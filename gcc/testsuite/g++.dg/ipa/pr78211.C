@@ -37,7 +37,7 @@ namespace __gnu_cxx {
     reference operator*() const noexcept { }
   };
   template<typename _IteratorL, typename _IteratorR, typename _Container>
-  inline bool operator!=(const __normal_iterator<_IteratorL, _Container>& __lhs, const __normal_iterator<_IteratorR, _Container>& __rhs) noexcept { }
+  inline bool operator!=(const __normal_iterator<_IteratorL, _Container>& __lhs, const __normal_iterator<_IteratorR, _Container>& __rhs) noexcept { return true; }
 }
 namespace std {
   template<typename _CharT> struct char_traits;

@@ -22,6 +22,7 @@ template <typename FunctionObj> struct function_obj_invoker0
   {
     FunctionObj f;
     f ();
+    return 0;
   }
 };
 template <typename FunctionObj> struct get_function_obj_invoker0

@@ -348,7 +348,7 @@ namespace std __attribute__ ((__visibility__ ("default")))
   template<typename _Tp>
     inline reference_wrapper<_Tp>
     ref(_Tp& __t) noexcept
-    {}
+    { return reference_wrapper<_Tp>(); }
   template<typename _Tp>
     struct _Maybe_wrap_member_pointer
     {

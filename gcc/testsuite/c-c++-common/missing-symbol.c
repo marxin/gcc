@@ -1,4 +1,4 @@
-/* { dg-options "-fdiagnostics-show-caret" } */
+/* { dg-options "-fdiagnostics-show-caret -Wno-return-type" } */
 
 extern int foo (void);
 extern int bar (void);
@@ -20,6 +20,8 @@ int missing_close_paren_in_switch (int i)
     default:
       return i;
     }
+
+  return 0;
 } /* { dg-error "1: expected" } */
   /* { dg-begin-multiline-output "" }
  }

@@ -4,7 +4,7 @@ class wxPaintEvent {  };
 struct wxDCBase
 { 
   wxDCBase ();
-  virtual int GetLayoutDirection() const{}
+  virtual void GetLayoutDirection() const{}
   virtual void SetLayoutDirection(int){}
 };
 struct wxWindowDC  : public wxDCBase {};

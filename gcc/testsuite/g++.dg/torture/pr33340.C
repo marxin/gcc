@@ -1,4 +1,4 @@
-void* operator new(__SIZE_TYPE__, void* __p) { }
+void* operator new(__SIZE_TYPE__, void* __p) { return 0; }
 
 struct auto_ptr {
         int* p;

@@ -24,9 +24,9 @@ struct C
 
 struct D
 {
-  friend int D () {}
+  friend int D () { return 0; }
   friend int ~D () {}		// { dg-error "return type|in friend decl" }
-  friend int D (const D &) {}
+  friend int D (const D &d) { return d; }
 };
 
 struct E

@@ -119,4 +119,5 @@ bool
 bar ()
 {
   vec.push_back (std::decimal::decimal32 (0));
+  return true;
 }
