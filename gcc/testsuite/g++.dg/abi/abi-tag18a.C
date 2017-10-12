@@ -11,9 +11,13 @@ inline A1 f() {
   struct T {
     A2 g() {
       static X x;
+      static A2 a2;
+      return a2;
     }
   };
   T().g();
+  static A1 a;
+  return a;
 }
 int main() {
   f();

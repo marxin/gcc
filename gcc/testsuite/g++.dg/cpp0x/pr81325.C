@@ -35,7 +35,7 @@ struct I {
 };
 template <typename ResultT, typename ArgT> struct J {
   void operator()();
-  ResultT operator()(ArgT) {}
+  ResultT operator()(ArgT) { static ResultT a; return a; }
 };
 struct K {
   int AllowBind;

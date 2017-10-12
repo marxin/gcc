@@ -40,9 +40,9 @@ decltype(*(T*)0+*(U*)0) add4(T t, U u)
 template <class T>
 struct A
 {
-  T f() {}
+  T f() { static T a; return a; }
   template <class U>
-  T g() {}
+  T g() { static T a; return a; }
   template <class V>
   struct B
   {

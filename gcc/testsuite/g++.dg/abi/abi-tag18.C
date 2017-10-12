@@ -11,9 +11,13 @@ inline A1 f() {
   struct T {
     A2 g() {			// { dg-warning "mangled name" }
       static X x;		// { dg-warning "mangled name" }
+      static A2 a2;
+      return a2;
     }
   };
   T().g();
+  static A1 a;
+  return a;
 }
 int main() {
   f();

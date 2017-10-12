@@ -3,7 +3,7 @@
 
 template <typename F> struct Tag {
   static void fp() { f()(0); }
-  static F f() {}
+  static F f() { static F a; return a; }
 };
 
 struct Dispatch {

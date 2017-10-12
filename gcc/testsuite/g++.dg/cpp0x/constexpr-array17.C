@@ -18,6 +18,8 @@ struct D {
   template <typename _ForwardIterator, typename _Size>
   static _ForwardIterator __uninit_default_n(_ForwardIterator p1, _Size) {
     _Construct(p1);
+    static _ForwardIterator a;
+    return a;
   }
 };
 template <typename _ForwardIterator, typename _Size>

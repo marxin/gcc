@@ -144,6 +144,7 @@ int test2_18()
     sink_2_18(ca);		// { dg-error "" }
     sink_2_18(va);		// { dg-error "" }
     sink_2_18(cva);		// { dg-error "" }
+    return 0;
 }
 
 two   sink_2_23(const          A&);
@@ -250,6 +251,7 @@ int test2_28()
     const volatile A cva = a; // { dg-error "deleted" }
     sink_2_28(va);		// { dg-error "" }
     sink_2_28(cva);		// { dg-error "" }
+    return 0;
 }
 
 three sink_2_35(volatile       A&);
@@ -439,6 +441,7 @@ int test2_68()
     sink_2_68(ca);		// { dg-error "" }
     sink_2_68(va);		// { dg-error "" }
     sink_2_68(cva);		// { dg-error "" }
+    return 0;
 }
 
 seven sink_2_78(volatile       A&&);
@@ -454,6 +457,7 @@ int test2_78()
     sink_2_78(ca);		// { dg-error "" }
     sink_2_78(va);		// { dg-error "" }
     sink_2_78(cva);		// { dg-error "" }
+    return 0;
 }
 
 int main()

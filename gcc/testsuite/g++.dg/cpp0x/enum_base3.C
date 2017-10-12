@@ -17,7 +17,7 @@ struct C
 };
 struct D : C
 {
-  B foo () const { B a; a.foo (d); }
+  B foo () const { B a; a.foo (d); static B b; return b; }
   H d;
 };
 struct F : C
