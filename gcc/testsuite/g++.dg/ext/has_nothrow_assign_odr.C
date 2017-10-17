@@ -9,6 +9,7 @@ bool f ();
 int main ()
 {
   assert (__has_nothrow_assign (S) == f ());
+  return 0;
 }
 
 const S& S::operator= (const S&) { }

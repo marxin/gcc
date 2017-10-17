@@ -3,6 +3,7 @@
    a type change.  */
 /* { dg-do compile } */
 /* { dg-options "-O2 -fdump-ipa-cp"  } */
+/* { dg-additional-options "-Wno-return-type" } */
 struct A {
   void operator==(const A &);
 };

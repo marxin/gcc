@@ -2,6 +2,7 @@
 // { dg-lto-options "-O2 -rdynamic" }
 // { dg-extra-ld-options "-r -nostdlib" }
 // { dg-require-effective-target rdynamic }
+// { dg-additional-options "-Wno-return-type" }
 
 #pragma GCC visibility push(hidden)
 struct A { int &operator[] (long); };

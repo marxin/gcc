@@ -1,5 +1,6 @@
 /* { dg-do compile } */
 /* { dg-options "-O2 -std=c++11" } */
+/* { dg-additional-options "-Wno-return-type" } */
 
 struct A {};
 struct B {};

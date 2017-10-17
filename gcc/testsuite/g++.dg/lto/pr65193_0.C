@@ -46,6 +46,7 @@ namespace std
       float_next (const T &p1, Policy &p2)
 	{
 	  float_next_imp (p1, p2);
+	  return 0;
 	}
   template <class T, class Policy> void float_prior_imp (T, Policy)
     {

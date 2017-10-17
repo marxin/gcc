@@ -1,3 +1,5 @@
+// { dg-additional-options "-Wno-return-type" }
+
 namespace std
 {
   template < class _CharT > struct char_traits;

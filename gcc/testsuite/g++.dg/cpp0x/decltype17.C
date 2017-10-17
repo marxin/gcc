@@ -25,4 +25,6 @@ int main()
     return 2;
   if (strcmp (typeid(h).name(), "FOivE") != 0)
     return 3;
+
+  return 0;
 }

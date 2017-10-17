@@ -1,3 +1,5 @@
+// { dg-additional-options "-Wno-return-type" }
+
 extern "C" {
    typedef struct __locale_struct {
    }

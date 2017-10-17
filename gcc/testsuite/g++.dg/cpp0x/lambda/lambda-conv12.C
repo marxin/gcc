@@ -15,4 +15,5 @@ struct {
 int main() {
   auto f = a([](int) {}, [](float) {});
   f({});
+  return 0;
 }

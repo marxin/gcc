@@ -19,6 +19,7 @@ public:
   bitset set ()
   {
     _M_do_set ();
+    return bitmap();
   }
 };
 

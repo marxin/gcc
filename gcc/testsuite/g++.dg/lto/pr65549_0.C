@@ -135,10 +135,12 @@ public:
     then(0, [] {});
   }
 } clients;
-main() {
+int main() {
   B app;
   app.run(0, 0, [&] {
     auto config = app.configuration()[0].as<std::string>();
     clients.then([] {});
   });
+
+  return 0;
 }

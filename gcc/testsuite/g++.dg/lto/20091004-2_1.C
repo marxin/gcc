@@ -1,3 +1,5 @@
+// { dg-additional-options "-Wno-return-type" }
+
 typedef double Real;
 class Vector {
     int dimen;

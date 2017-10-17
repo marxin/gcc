@@ -4,7 +4,7 @@
 #include <typeinfo>
 extern "C" void abort();
 
-int f() {}
+int f() { return 0; }
 
 struct A
 {

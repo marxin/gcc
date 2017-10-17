@@ -9,6 +9,7 @@ constexpr T g(T t) { return f(t); } // { dg-error "f.int" }
 int main()
 {
   constexpr int i = g(1);	// { dg-error "g.T" }
+  return 0;
 }
 
 // --------------------

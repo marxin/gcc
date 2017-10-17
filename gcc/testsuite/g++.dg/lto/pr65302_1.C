@@ -1,3 +1,5 @@
+// { dg-additional-options "-Wno-return-type" }
+
 #pragma implementation
 #pragma interface
 class CstringStorageReference {

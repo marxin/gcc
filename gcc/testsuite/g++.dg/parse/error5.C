@@ -1,7 +1,7 @@
 // PR c++/13269
 // { dg-options "-fshow-column" }
 
-class Foo { int foo() } };
+class Foo { int foo() return 0; } };
 
 // { dg-error "30:expected identifier before numeric constant" "identifier" { target *-*-* } 4 }
 
