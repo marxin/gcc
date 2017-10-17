@@ -1,5 +1,6 @@
 // PR c++/42358
 // { dg-do assemble { target c++11 } }
+// { dg-additional-options "-Wno-return-type" }
 
 typedef __PTRDIFF_TYPE__ ptrdiff_t;
 typedef __SIZE_TYPE__ size_t;

@@ -70,4 +70,5 @@ int main()
     }
 
   auto j = 42, k = 24;
+  return 0;
 }

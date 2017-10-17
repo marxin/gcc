@@ -1,5 +1,6 @@
 // { dg-do compile }
 // { dg-options "-O -fstrict-aliasing -ftree-pre -fno-tree-fre -fno-tree-sra" }
+// { dg-additional-options "-Wno-return-type" }
 
 typedef __SIZE_TYPE__ size_t;
 namespace std 

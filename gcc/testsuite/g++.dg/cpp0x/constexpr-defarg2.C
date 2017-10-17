@@ -25,7 +25,8 @@ struct A : D
 
 A baz (const char *, A = C ());
 
-A a;
+C c;
+A a (c);
 
 A
 B::foo ()

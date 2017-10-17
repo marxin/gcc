@@ -9,7 +9,7 @@ struct B { void *operator new(size_t s){ return 0; } };  // { dg-message "operat
 
 struct C : A,B {}; 
 
-int crash() 
+void crash() 
 {
   C *c=new C();   // { dg-error "ambiguous" }
 }

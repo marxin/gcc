@@ -2,6 +2,7 @@
 // { dg-options "-O2 -fno-inline -fdump-final-insns" }
 // { dg-do compile { target c++11 } }
 // { dg-final cleanup-final-insns-dump }
+// { dg-additional-options "-Wno-return-type" }
 
 namespace std
 {

@@ -1,6 +1,7 @@
 // PR c++/44148
 // { dg-do compile }
 // { dg-options "" }
+// { dg-additional-options "-Wno-return-type" }
 // { dg-options "-fpic" { target fpic } }
 
 template <typename T> struct S2

@@ -21,4 +21,5 @@ auto k(T t, U u, V v) -> decltype (t.U::template B<V>::MEM)
 int main()
 {
   k( C(), A<int>(), D() );
+  return 0;
 }
