@@ -4,7 +4,7 @@
 
 template <typename F> struct Tag {
   static void fp() { f()(0); }
-  static F f() { return F(); }
+  static F f() {}
 };
 
 struct Dispatch {

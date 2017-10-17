@@ -1,6 +1,5 @@
 /* { dg-do compile } */
 /* { dg-options "-O2 -std=c++11" } */
-/* { dg-additional-options "-Wno-return-type" } */
 
 struct A {};
 struct B {};
@@ -15,7 +14,7 @@ template <typename> struct D
 extern template class D<char>;
 enum L { M };
 struct F { virtual char *foo (); };
-template <class> struct I : B { static int foo (int) { return 0; };
+template <class> struct I : B { static int foo (int) { return 0; } };
 struct G { typedef I<int> t; };
 void foo (int) { G::t::foo (0); }
 void bar (const D<char> &, const D<int> &, int, L);

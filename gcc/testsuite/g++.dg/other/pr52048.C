@@ -13,12 +13,11 @@ template <typename T>
 struct B
 {
   typedef typename A <T>::a a;
-  a operator *() { return a(); }
+  a operator *() {}
 };
 template <typename T, typename U>
 bool operator != (B <T>, B <U>)
 {
-  return true;
 }
 template <typename T>
 struct C
@@ -55,12 +54,12 @@ struct J : public I
 class K {};
 struct L
 {
-  bool baz () { return false; }
+  bool baz () {}
 };
 struct M
 {
   K m1 (K);
-  K m2 (H *) { return K(); }
+  K m2 (H *) {}
 };
 struct N : J
 {
@@ -78,5 +77,4 @@ N::bar (G &)
       if (l.baz ())
 	m.m1 (m.m2 (h));
     }
-  return false;
 }

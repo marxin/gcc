@@ -25,7 +25,8 @@ template <typename T, typename M> const M &C<T, M>::m_fn2(const T &) {
   A a = _map.m_fn2();
   a == _map.m_fn1();
   m_fn1();
-  return M();
+  static M a;
+  return a;
 }
 
 void fn1() { b.m_fn2(0); }

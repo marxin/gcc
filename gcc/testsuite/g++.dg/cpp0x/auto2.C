@@ -9,7 +9,7 @@ int f() { return 0; }
 struct A
 {
   int i;
-  int f() {}
+  int f() { return 0; }
   A operator+(A a) { return a; }
 };
 

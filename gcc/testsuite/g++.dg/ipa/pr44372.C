@@ -23,7 +23,6 @@ struct S2
   template < typename T > S2 s (S3 < T > s3)
   {
     S1 (s3, 0);
-    return S2();
   }
   S2 (int i) : j (i)
   { }

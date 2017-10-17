@@ -1,6 +1,6 @@
 /* { dg-lto-do link } */
 /* { dg-require-effective-target fpic } */
-/* { dg-lto-options {{-fPIC -r -nostdlib -flto -O2 -g}} } */
+/* { dg-lto-options {{-fPIC -r -nostdlib -flto -O2 -g -Wno-return-type}} } */
 
 void frexp (int, int *);
 namespace std
@@ -46,7 +46,6 @@ namespace std
       float_next (const T &p1, Policy &p2)
 	{
 	  float_next_imp (p1, p2);
-	  return 0;
 	}
   template <class T, class Policy> void float_prior_imp (T, Policy)
     {

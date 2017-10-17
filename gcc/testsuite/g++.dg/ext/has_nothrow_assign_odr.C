@@ -1,5 +1,7 @@
 // PR c++/36870
 // { dg-do run }
+
+
 #include <cassert>
 
 struct S { const S& operator= (const S&); };
@@ -12,6 +14,6 @@ int main ()
   return 0;
 }
 
-const S& S::operator= (const S&) { }
+const S& S::operator= (const S&a) { return a; }
 
 bool f () { return __has_nothrow_assign (S); }

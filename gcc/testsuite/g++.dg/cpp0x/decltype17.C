@@ -1,5 +1,6 @@
 // PR c++/36628
 // { dg-do run { target c++11 } }
+// { dg-additional-options "-Wno-return-type" }
 
 #include <typeinfo>
 #include <string.h>

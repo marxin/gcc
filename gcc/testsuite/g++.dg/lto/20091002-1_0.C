@@ -1,8 +1,7 @@
 // { dg-lto-do link }
 // { dg-require-effective-target fpic }
-// { dg-lto-options {{-fPIC -flto}} }
+// { dg-lto-options {{-fPIC -flto -Wno-return-type}} }
 // { dg-extra-ld-options "-fPIC -r -nostdlib" }
-// { dg-additional-options "-Wno-return-type" }
 
 namespace std __attribute__ ((__visibility__ ("default")))
 {

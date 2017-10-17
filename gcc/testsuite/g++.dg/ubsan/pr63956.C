@@ -1,7 +1,6 @@
 // PR sanitizer/63956
 // { dg-do compile }
 // { dg-options "-std=c++14 -fsanitize=undefined,float-divide-by-zero,float-cast-overflow" }
-// { dg-additional-options "-Wno-return-type" }
 
 #define SA(X) static_assert((X),#X)
 #define INT_MIN (-__INT_MAX__ - 1)

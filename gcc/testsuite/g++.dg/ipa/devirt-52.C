@@ -16,7 +16,7 @@ struct B
 {
   template <typename V> B (V);
 };
-template <typename V> V foo (B) { return V(); }
+template <typename V> V foo (B) {}
 class C;
 template <typename> struct D
 {
@@ -49,8 +49,6 @@ template <typename W> struct F<D<W>> : E
     D<C> b = foo<D<C>>(0);
     "" + b->bar () + "";
   }
-
-  return A<char>();
 };
 struct G : F<D<int>>
 {

@@ -1,7 +1,6 @@
 // { dg-lto-do link }
-// { dg-lto-options {{-O3 -Wno-multichar}} } 
+// { dg-lto-options {{-O3 -Wno-multichar -Wno-return-type}} } 
 // { dg-extra-ld-options "-flto -flto-partition=1to1 -r -nostdlib" }
-// { dg-additional-options "-Wno-return-type" }
 
     extern "C" {
   typedef struct {

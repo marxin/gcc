@@ -1,4 +1,4 @@
-// { dg-additional-options "-Wno-return-type" }
+// { dg-lto-options "-Wno-return-type" }
 
   extern "C" {
     typedef struct _IO_FILE FILE;

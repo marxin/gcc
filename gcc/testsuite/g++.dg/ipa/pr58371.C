@@ -2,6 +2,7 @@
 /* { dg-options "-O2" } */
 /* { dg-additional-options "-Wno-return-type" } */
 
+
 typedef int size_t;
 namespace {
 template < typename > struct char_traits;
@@ -33,7 +34,6 @@ struct __numeric_limits_base {
 };
 template < typename _Tp > struct numeric_limits:__numeric_limits_base {
   static _Tp max () {
-    return _Tp();
   }
 };
 template < typename _Tp, typename _Alloc > struct _Vector_base {
@@ -52,10 +52,7 @@ public:
   typedef size_t size_type;
   size_type size () {
   } const_reference operator[] (size_type) {
-      return const_reference();
   }
-
-  return 0;
 };
 template < typename _CharT, typename =
 char_traits < _CharT > >class basic_ostream;
@@ -71,8 +68,6 @@ public:
   _CharT char_type;
   typedef basic_ostream __ostream_type;
   __ostream_type & operator<< (const void *) {
-      static __ostream_type a;
-      return a;
   }
 };
 }
@@ -85,8 +80,6 @@ class LogMessage {
 public:
   LogMessage (const char *, int, LogSeverity);
   std::ostream & stream () {
-      static std::ostream a;
-      return a;
   }
 };
 class LogMessageVoidify {
@@ -112,7 +105,6 @@ public:
     LogMessageVoidify () & logging::
     LogMessage ("../../base/memory/weak_ptr.h", 0,
                 logging::LOG_ERROR_REPORT).stream () << ". ";
-    return 0;
   } T *ptr_;
 };
 template < class > class SupportsWeakPtr:internal::SupportsWeakPtrBase {
@@ -131,7 +123,6 @@ public:
       ListType & observers = list_->observers_;
       if (observers[0])
         ++index_;
-      return 0;
     }
     base::WeakPtr < ObserverListBase > list_;
     size_t

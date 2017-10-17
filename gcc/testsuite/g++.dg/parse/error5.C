@@ -1,5 +1,6 @@
 // PR c++/13269
 // { dg-options "-fshow-column" }
+// { dg-additional-options "-Wno-return-type" }
 
 class Foo { int foo() return 0; } };
 

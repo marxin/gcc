@@ -1,4 +1,6 @@
 // { dg-lto-do assemble }
+// { dg-lto-options "-Wno-return-type" }
+
 struct Foo {
  static const int dummy;
 

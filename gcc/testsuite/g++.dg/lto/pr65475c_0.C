@@ -1,5 +1,5 @@
 /* { dg-lto-do link } */
-/* { dg-lto-options "-O2  -w" } */
+/* { dg-lto-options "-O2 -w -Wno-return-type" } */
 /* { dg-extra-ld-options { -O2 -Wno-odr -r -nostdlib } } */
 namespace std
 {
