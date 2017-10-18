@@ -4,12 +4,11 @@
 int f(int);
 
 template <class T>
-constexpr T g(T t) { return f(t); } // { dg-error "f.int" }
+constexpr T g(T t) { return f(t); } // { dg-error "f.int" "" { target c++14_only } }
 
 int main()
 {
   constexpr int i = g(1);	// { dg-error "g.T" }
-  return 0;
 }
 
 // --------------------
