@@ -2,7 +2,7 @@
 // { dg-options "-fshow-column" }
 // { dg-additional-options "-Wno-return-type" }
 
-class Foo { int foo() return 0; } };
+class Foo { int foo() } };
 
 // { dg-error "30:expected identifier before numeric constant" "identifier" { target *-*-* } 4 }
 

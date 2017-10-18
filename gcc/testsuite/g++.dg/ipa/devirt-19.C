@@ -3,7 +3,8 @@
    a type change.  */
 /* { dg-do compile } */
 /* { dg-options "-O2 -fdump-ipa-cp"  } */
-/* { dg-additional-options "-Wno-return-type" } */
+/* { dg-additional-options "-Wno-return-type"  } */
+
 struct A {
   void operator==(const A &);
 };
@@ -25,8 +26,6 @@ template <typename T, typename M> const M &C<T, M>::m_fn2(const T &) {
   A a = _map.m_fn2();
   a == _map.m_fn1();
   m_fn1();
-  static M a;
-  return a;
 }
 
 void fn1() { b.m_fn2(0); }
