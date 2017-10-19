@@ -10861,7 +10861,9 @@ information.  This may be repeated any number of times.  You can run
 concurrent instances of your program, and provided that the file system
 supports locking, the data files will be correctly updated.  Also
 @code{fork} calls are detected and correctly handled (double counting
-will not happen).
+will not happen).  For C language, a non-strict ISO C mode
+(@option{-ansi}, @option{-std=c90}, @option{-std=c99} or @option{-std=c11})
+is needed.
 
 @item
 For profile-directed optimizations, compile the source files again with
