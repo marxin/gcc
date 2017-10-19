@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 
 #include "profile.h"
+#include "gimple-pretty-print.h"
 
 /* Map from BBs/edges to gcov counters.  */
 vec<gcov_type> bb_gcov_counts;
@@ -948,30 +949,31 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 
 /* When passed NULL as file_name, initialize.
    When passed something else, output the necessary commands to change
-   line to LINE and offset to FILE_NAME.  */
+   line to LINE, column to COLUMN and offset to FILE_NAME.  */
 static void
-output_location (char const *file_name, int line,
+output_location (char const *file_name, int line, int column,
 		 gcov_position_t *offset, basic_block bb)
 {
   static char const *prev_file_name;
-  static int prev_line;
-  bool name_differs, line_differs;
+  static int prev_line, prev_column;
+  bool name_differs, line_column_differs;
 
   if (!file_name)
     {
       prev_file_name = NULL;
       prev_line = -1;
+      prev_column = -1;
       return;
     }
 
   name_differs = !prev_file_name || filename_cmp (file_name, prev_file_name);
-  line_differs = prev_line != line;
+  line_column_differs = prev_line != line || prev_column != column;
 
   if (!*offset)
     {
       *offset = gcov_write_tag (GCOV_TAG_LINES);
       gcov_write_unsigned (bb->index);
-      name_differs = line_differs = true;
+      name_differs = line_column_differs = true;
     }
 
   /* If this is a new source file, then output the
@@ -982,10 +984,12 @@ output_location (char const *file_name, int line,
       gcov_write_unsigned (0);
       gcov_write_filename (prev_file_name);
     }
-  if (line_differs)
+  if (line_column_differs)
     {
       gcov_write_unsigned (line);
+      gcov_write_unsigned (column);
       prev_line = line;
+      prev_column = column;
     }
 }
 
@@ -1281,7 +1285,7 @@ branch_prob (void)
 
       /* Line numbers.  */
       /* Initialize the output.  */
-      output_location (NULL, 0, NULL, NULL);
+      output_location (NULL, 0, 0, NULL, NULL);
 
       FOR_EACH_BB_FN (bb, cfun)
 	{
@@ -1292,16 +1296,21 @@ branch_prob (void)
 	    {
 	      expanded_location curr_location =
 		expand_location (DECL_SOURCE_LOCATION (current_function_decl));
-	      output_location (curr_location.file, curr_location.line,
+	      output_location (curr_location.file, curr_location.line, 1,
 			       &offset, bb);
 	    }
 
+	  fprintf (stderr, "BB %d:\n", bb->index);
 	  for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	    {
 	      gimple *stmt = gsi_stmt (gsi);
 	      if (!RESERVED_LOCATION_P (gimple_location (stmt)))
+		{
 		output_location (gimple_filename (stmt), gimple_lineno (stmt),
-				 &offset, bb);
+				 gimple_column (stmt), &offset, bb);
+		print_gimple_stmt (stderr, stmt, 0, TDF_VOPS|TDF_MEMSYMS);
+		inform (gimple_location (stmt), "output_location");		
+		}
 	    }
 
 	  /* Notice GOTO expressions eliminated while constructing the CFG.  */
@@ -1311,7 +1320,7 @@ branch_prob (void)
 	      expanded_location curr_location
 		= expand_location (single_succ_edge (bb)->goto_locus);
 	      output_location (curr_location.file, curr_location.line,
-			       &offset, bb);
+			       curr_location.column, &offset, bb);
 	    }
 
 	  if (offset)

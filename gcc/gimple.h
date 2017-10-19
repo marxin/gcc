@@ -1813,6 +1813,13 @@ gimple_lineno (const gimple *stmt)
   return LOCATION_LINE (gimple_location (stmt));
 }
 
+/* Return the column number of the location of STMT.  */
+
+static inline int
+gimple_column (const gimple *stmt)
+{
+  return LOCATION_COLUMN (gimple_location (stmt));
+}
 
 /* Determine whether SEQ is a singleton. */
 

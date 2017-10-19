@@ -398,7 +398,8 @@ tag_lines (const char *filename ATTRIBUTE_UNUSED,
 	    }
 	  if (lineno)
 	    {
-	      printf ("%s%u", sep, lineno);
+	      unsigned column = gcov_read_unsigned ();
+	      printf ("%s%u:%u", sep, lineno, column);
 	      sep = ", ";
 	    }
 	  else

@@ -114,6 +114,16 @@ typedef struct arc_info
   struct arc_info *pred_next;
 } arc_t;
 
+struct line_location_info
+{
+  line_location_info (unsigned _line):
+    line (_line)
+  {}
+
+  unsigned line;
+  vector<unsigned> columns;
+};
+
 /* Describes which locations (lines and files) are associated with
    a basic block.  */
 
@@ -124,7 +134,7 @@ struct block_location_info
   {}
 
   unsigned source_file_idx;
-  vector<unsigned> lines;
+  vector<line_location_info> lines;
 };
 
 /* Describes a basic block. Contains lists of arcs to successor and
@@ -914,6 +924,14 @@ output_intermediate_file (FILE *gcov_file, source_t *src)
     }
 }
 
+struct
+{
+  bool operator() (line_location_info a, line_location_info b) const
+  {   
+    return a.line < b.line;
+  }   
+} line_comparer;
+
 /* Process a single input file.  */
 
 static void
@@ -961,12 +979,13 @@ process_file (const char *file_name)
 
 		  /* Sort lines of locations.  */
 		  sort (block->locations[i].lines.begin (),
-			block->locations[i].lines.end ());
+			block->locations[i].lines.end (),
+			line_comparer);
 
 		  if (!block->locations[i].lines.empty ())
 		    {
 		      unsigned last_line
-			= block->locations[i].lines.back () + 1;
+			= block->locations[i].lines.back ().line + 1;
 		      if (last_line > sources[s].num_lines)
 			sources[s].num_lines = last_line;
 		    }
@@ -1478,7 +1497,24 @@ read_graph_file (void)
 	      unsigned lineno = gcov_read_unsigned ();
 
 	      if (lineno)
-		block->locations.back ().lines.push_back (lineno);
+		{
+		  unsigned column = gcov_read_unsigned ();
+		  vector<line_location_info> &lines
+		    = block->locations.back().lines;
+
+		  for (unsigned i = 0; i < lines.size (); i++)
+		    {
+		      if (lines[i].line == lineno)
+			{
+			  lines[i].columns.push_back (column);
+			  continue;
+			}
+		    }
+
+		  line_location_info l (lineno);
+		  l.columns.push_back (column);
+		  block->locations.back ().lines.push_back (l);
+		}
 	      else
 		{
 		  const char *file_name = gcov_read_string ();
@@ -2265,10 +2301,10 @@ add_line_counts (coverage_t *coverage, function_t *fn)
 	{
 	  const source_t *src = &sources[block->locations[i].source_file_idx];
 
-	  vector<unsigned> &lines = block->locations[i].lines;
+	  vector<line_location_info> &lines = block->locations[i].lines;
 	  for (unsigned j = 0; j < lines.size (); j++)
 	    {
-	      line = &src->lines[lines[j]];
+	      line = &src->lines[lines[j].line];
 	      if (coverage)
 		{
 		  if (!line->exists)
@@ -2414,7 +2450,9 @@ output_branch_count (FILE *gcov_file, int ix, const arc_t *arc)
 	fnotice (gcov_file, "branch %2d never executed", ix);
 
       if (flag_verbose)
-	fnotice (gcov_file, " (BB %d)", arc->dst->id);
+	{
+	  fnotice (gcov_file, " (BB %d)", arc->dst->id);
+	}
 
       fnotice (gcov_file, "\n");
     }
@@ -2560,7 +2598,22 @@ output_lines (FILE *gcov_file, const source_t *src)
 			   : block->exceptional ? "%%%%%" : "$$$$$",
 			   line_num, ix++);
 		  if (flag_verbose)
-		    fprintf (gcov_file, " (BB %u)", block->id);
+		    {
+		      fprintf (gcov_file, " (BB %u)", block->id);
+		      for (unsigned i = 0; i < block->locations.size (); i++)
+			{
+			  block_location_info &bl = block->locations[i];
+			  for (unsigned j = 0; j < bl.lines.size (); j++)
+			    {
+			      line_location_info &li = bl.lines[j];
+			      for (unsigned k = 0; k < li.columns.size (); k++)
+				{
+				  fprintf (gcov_file, " %u:%u", li.line,
+					   li.columns[k]);
+				}
+			    }
+			}
+		    }
 		  fprintf (gcov_file, "\n");
 		}
 	      if (flag_branches)
