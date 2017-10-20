@@ -341,6 +341,9 @@ used in a compilation unit.  Such functions are marked with @samp{-}
 even though they contain a code.  Use @option{-fkeep-inline-functions} and
 @option{-fkeep-static-functions} in order to properly
 record @var{execution_count} of such functions.
+Executed lines having a statement with zero @var{execution_count} end with
+@samp{*} character and are colored with magenta color with @option{-k}
+option.
 
 Some lines of information at the start have @var{line_number} of zero.
 These preamble lines are of the form
