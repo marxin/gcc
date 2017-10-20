@@ -81,32 +81,7 @@
       It would be impractical for GCC to become a full-fledged
       terminal program linked against ncurses or the like, so it will
       not detect terminfo(5) capabilities.  */
-#define COLOR_SEPARATOR		";"
-#define COLOR_NONE		"00"
-#define COLOR_BOLD		"01"
-#define COLOR_UNDERSCORE	"04"
-#define COLOR_BLINK		"05"
-#define COLOR_REVERSE		"07"
-#define COLOR_FG_BLACK		"30"
-#define COLOR_FG_RED		"31"
-#define COLOR_FG_GREEN		"32"
-#define COLOR_FG_YELLOW		"33"
-#define COLOR_FG_BLUE		"34"
-#define COLOR_FG_MAGENTA	"35"
-#define COLOR_FG_CYAN		"36"
-#define COLOR_FG_WHITE		"37"
-#define COLOR_BG_BLACK		"40"
-#define COLOR_BG_RED		"41"
-#define COLOR_BG_GREEN		"42"
-#define COLOR_BG_YELLOW		"43"
-#define COLOR_BG_BLUE		"44"
-#define COLOR_BG_MAGENTA	"45"
-#define COLOR_BG_CYAN		"46"
-#define COLOR_BG_WHITE		"47"
-#define SGR_START		"\33["
-#define SGR_END			"m\33[K"
-#define SGR_SEQ(str)		SGR_START str SGR_END
-#define SGR_RESET		SGR_SEQ("")
+#include "color-macros.h"
 
 
 /* The context and logic for choosing default --color screen attributes
