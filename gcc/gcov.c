@@ -256,6 +256,7 @@ typedef struct line_info
 			      Used in all-blocks mode.  */
   unsigned exists : 1;
   unsigned unexceptional : 1;
+  unsigned has_unexecuted_block : 1;
 } line_t;
 
 bool
@@ -2289,7 +2290,11 @@ add_line_counts (coverage_t *coverage, function_t *fn)
 		}
 	      line->exists = 1;
 	      if (!block->exceptional)
-		line->unexceptional = 1;
+		{
+		  line->unexceptional = 1;
+		  if (block->count == 0 && block->is_call_return)
+		    line->has_unexecuted_block = 1;
+		}
 	      line->count += block->count;
 	    }
 	}
@@ -2488,6 +2493,7 @@ pad_count_string (string &s)
 
 static void
 output_line_beginning (FILE *f, bool exists, bool unexceptional,
+		       bool has_unexecuted_block,
 		       gcov_type count, unsigned line_num,
 		       const char *exceptional_string,
 		       const char *unexceptional_string)
@@ -2498,6 +2504,16 @@ output_line_beginning (FILE *f, bool exists, bool unexceptional,
       if (count > 0)
 	{
 	  s = format_gcov (count, 0, -1);
+	  if (has_unexecuted_block)
+	    {
+	      if (flag_use_colors)
+		{
+		  pad_count_string (s);
+		  s = SGR_SEQ (COLOR_BG_MAGENTA COLOR_SEPARATOR COLOR_FG_WHITE) + s + SGR_RESET;
+		}
+	      else
+		s += "*";
+	    }
 	  pad_count_string (s);
 	}
       else
@@ -2600,7 +2616,7 @@ output_lines (FILE *gcov_file, const source_t *src)
 	 There are 16 spaces of indentation added before the source
 	 line so that tabs won't be messed up.  */
       output_line_beginning (gcov_file, line->exists, line->unexceptional,
-			     line->count, line_num,
+			     line->has_unexecuted_block, line->count, line_num,
 			     "=====", "#####");
       fprintf (gcov_file, ":%s\n", retval ? retval : "/*EOF*/");
 
@@ -2616,7 +2632,7 @@ output_lines (FILE *gcov_file, const source_t *src)
 	      if (!block->is_call_return)
 		{
 		  output_line_beginning (gcov_file, line->exists,
-					 block->exceptional,
+					 block->exceptional, false,
 					 block->count, line_num,
 					 "%%%%%", "$$$$$");
 		  fprintf (gcov_file, "-block %2d", ix++);
