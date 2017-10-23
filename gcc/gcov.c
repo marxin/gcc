@@ -393,6 +393,10 @@ static int flag_use_colors = 0;
 
 static int flag_all_blocks = 0;
 
+/* Output human readable numbers.  */
+
+static int flag_human_readable_numbers = 0;
+
 /* Output summary info for each function.  */
 
 static int flag_function_summary = 0;
@@ -710,6 +714,7 @@ print_usage (int error_p)
   fnotice (file, "  -f, --function-summaries        Output summaries for each function\n");
   fnotice (file, "  -h, --help                      Print this help, then exit\n");
   fnotice (file, "  -i, --intermediate-format       Output .gcov file in intermediate text format\n");
+  fnotice (file, "  -j, --human-numbers             Output human readable numbers\n");
   fnotice (file, "  -k, --use-colors                Emit colored output\n");
   fnotice (file, "  -l, --long-file-names           Use long output file names for included\n\
                                     source files\n");
@@ -752,6 +757,7 @@ static const struct option options[] =
   { "branch-probabilities", no_argument,       NULL, 'b' },
   { "branch-counts",        no_argument,       NULL, 'c' },
   { "intermediate-format",  no_argument,       NULL, 'i' },
+  { "human-numbers",	    no_argument,       NULL, 'j' },
   { "no-output",            no_argument,       NULL, 'n' },
   { "long-file-names",      no_argument,       NULL, 'l' },
   { "function-summaries",   no_argument,       NULL, 'f' },
@@ -775,7 +781,7 @@ process_args (int argc, char **argv)
 {
   int opt;
 
-  const char *opts = "abcdfhiklmno:prs:uvwx";
+  const char *opts = "abcdfhijklmno:prs:uvwx";
   while ((opt = getopt_long (argc, argv, opts, options, NULL)) != -1)
     {
       switch (opt)
@@ -797,6 +803,9 @@ process_args (int argc, char **argv)
 	  /* print_usage will exit.  */
 	case 'l':
 	  flag_long_names = 1;
+	  break;
+	case 'j':
+	  flag_human_readable_numbers = 1;
 	  break;
 	case 'k':
 	  flag_use_colors = 1;
@@ -1959,6 +1968,36 @@ add_branch_counts (coverage_t *coverage, const arc_t *arc)
     }
 }
 
+/* Format COUNT, if flag_human_readable_numbers is set, return it human
+   readable format.  */
+
+static char const *
+format_count (gcov_type count)
+{
+  static char buffer[64];
+  float v = count;
+  const char *units[] = {"", "K", "M", "G", "Y", "P", "E", "Z"};
+
+  if (count < 1000 || !flag_human_readable_numbers)
+    {
+      sprintf (buffer, "%" PRId64, count);
+      return buffer;
+    }
+
+  for (unsigned i = 0; i < sizeof (units); i++)
+    {
+      if (v < 1000.0f)
+	{
+	  sprintf (buffer, "%3.2f%s", v, units[i]);
+	  return buffer;
+	}
+
+      v /= 1000.0f;
+    }
+
+  gcc_unreachable ();
+}
+
 /* Format a GCOV_TYPE integer as either a percent ratio, or absolute
    count.  If dp >= 0, format TOP/BOTTOM * 100 to DP decimal places.
    If DP is zero, no decimal point is printed. Only print 100% when
@@ -2006,7 +2045,7 @@ format_gcov (gcov_type top, gcov_type bottom, int dp)
 	}
     }
   else
-    sprintf (buffer, "%" PRId64, (int64_t)top);
+    return format_count (top);
 
   return buffer;
 }
