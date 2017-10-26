@@ -327,6 +327,11 @@ non-exceptional paths or only exceptional paths such as C++ exception
 handlers, respectively. Given @samp{-a} option, unexecuted blocks are
 marked @samp{$$$$$} or @samp{%%%%%}, depending on whether a basic block
 is reachable via non-exceptional or exceptional paths.
+Note that GCC can perform function removal for functions obviously not
+used in a compilation unit.  Such functions are marked with @samp{-}
+even though they contain a code.  Use @option{-fkeep-inline-functions} and
+@option{-fkeep-static-functions} in order to properly
+record @var{execution_count} of such functions.
 
 Some lines of information at the start have @var{line_number} of zero.
 These preamble lines are of the form
