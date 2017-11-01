@@ -1088,6 +1088,14 @@ struct function_start_pair_hash : typed_noop_remove <function_start>
   }
 };
 
+/* Function filter based on function_info::artificial variable.  */
+
+static bool
+is_artificial (function_info *fn)
+{
+  return fn->artificial;
+}
+
 /* Process a single input file.  */
 
 static void
@@ -1122,33 +1130,39 @@ process_file (const char *file_name)
 	  fn_map.put (needle, *it);
       }
 
+  /* Remove all artificial function.  */
+  functions.erase (remove_if (functions.begin (), functions.end (),
+			      is_artificial), functions.end ());
+
   for (vector<function_t *>::iterator it = functions.begin ();
        it != functions.end (); it++)
     {
       function_t *fn = *it;
+      unsigned src = fn->src;
 
       if (fn->counts || no_data_file)
 	{
-	  unsigned src = fn->src;
-	  unsigned block_no;
+	  source_info *s = &sources[src];
+	  s->functions.push_back (fn);
 
-	  /* Process only non-artificial functions.  */
-	  if (!fn->artificial)
+	  /* Mark last line in files touched by function.  */
+	  for (unsigned block_no = 0; block_no != fn->blocks.size (); block_no++)
 	    {
-	      source_info *s = &sources[src];
-	      s->functions.push_back (fn);
-
-	      /* Mark last line in files touched by function.  */
-	      for (block_no = 0; block_no != fn->blocks.size (); block_no++)
+	      block_t *block = &fn->blocks[block_no];
+	      for (unsigned i = 0; i < block->locations.size (); i++)
 		{
-		  block_t *block = &fn->blocks[block_no];
-		  for (unsigned i = 0; i < block->locations.size (); i++)
-		    {
-		      /* Sort lines of locations.  */
-		      sort (block->locations[i].lines.begin (),
-			    block->locations[i].lines.end ());
+		  /* Sort lines of locations.  */
+		  sort (block->locations[i].lines.begin (),
+			block->locations[i].lines.end ());
 
-		      if (!block->locations[i].lines.empty ())
+		  if (!block->locations[i].lines.empty ())
+		    {
+		      s = &sources[block->locations[i].source_file_idx];
+		      unsigned last_line
+			= block->locations[i].lines.back ();
+
+		      /* Record new lines for the function.  */
+		      if (last_line >= s->lines.size ())
 			{
 			  s = &sources[block->locations[i].source_file_idx];
 			  unsigned last_line
@@ -1162,17 +1176,18 @@ process_file (const char *file_name)
 			    }
 			}
 		    }
-
-		  /* Allocate lines for group function, following start_line
-		     and end_line information of the function.  */
-		  if (fn->is_group)
-		    fn->lines.resize (fn->end_line - fn->start_line + 1);
 		}
-
-	      solve_flow_graph (fn);
-	      if (fn->has_catch)
-		find_exception_blocks (fn);
 	    }
+
+	  /* Allocate lines for group function, following start_line
+	     and end_line information of the function.  */
+	  if (fn->is_group)
+	    fn->lines.resize (fn->end_line - fn->start_line + 1);
+
+
+	  solve_flow_graph (fn);
+	  if (fn->has_catch)
+	    find_exception_blocks (fn);
 	}
       else
 	{
@@ -1221,8 +1236,6 @@ generate_results (const char *file_name)
     {
       function_t *fn = *it;
       coverage_t coverage;
-      if (fn->artificial)
-	continue;
 
       memset (&coverage, 0, sizeof (coverage));
       coverage.name = flag_demangled_names ? fn->demangled_name : fn->name;
