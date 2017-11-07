@@ -877,6 +877,9 @@ lto_post_options (const char **pfilename ATTRIBUTE_UNUSED)
   if (!flag_merge_constants)
     flag_merge_constants = 1;
 
+  if (warn_return_type == -1)
+    warn_return_type = 0;
+
   /* Initialize the compiler back end.  */
   return false;
 }

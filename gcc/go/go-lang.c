@@ -313,6 +313,9 @@ go_langhook_post_options (const char **pfilename ATTRIBUTE_UNUSED)
       && !global_options_set.x_flag_reorder_blocks_and_partition)
     global_options.x_flag_reorder_blocks_and_partition = 0;
 
+  if (warn_return_type == -1)
+    warn_return_type = 0;
+
   /* Returning false means that the backend should be used.  */
   return false;
 }

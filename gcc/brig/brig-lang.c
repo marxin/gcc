@@ -171,6 +171,9 @@ brig_langhook_post_options (const char **pfilename ATTRIBUTE_UNUSED)
      broken code if not force disabling it.  */
   flag_strict_aliasing = 0;
 
+  if (warn_return_type == -1)
+    warn_return_type = 0;
+
   /* Returning false means that the backend should be used.  */
   return false;
 }
