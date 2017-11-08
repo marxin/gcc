@@ -5020,8 +5020,6 @@ cp_build_binary_op (location_t location,
       if ((code0 == POINTER_TYPE || code1 == POINTER_TYPE)
 	  && sanitize_flags_p (SANITIZE_POINTER_COMPARE))
 	{
-	  gcc_assert (current_function_decl != NULL_TREE);
-
 	  op0 = save_expr (op0);
 	  op1 = save_expr (op1);
 
@@ -5425,8 +5423,6 @@ pointer_diff (location_t loc, tree op0, tree op1, tree ptrtype,
 
   if (sanitize_flags_p (SANITIZE_POINTER_SUBTRACT))
     {
-      gcc_assert (current_function_decl != NULL_TREE);
-
       op0 = save_expr (op0);
       op1 = save_expr (op1);
 

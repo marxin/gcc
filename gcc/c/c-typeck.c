@@ -11751,8 +11751,6 @@ build_binary_op (location_t location, enum tree_code code,
       if ((code0 == POINTER_TYPE || code1 == POINTER_TYPE)
 	  && sanitize_flags_p (SANITIZE_POINTER_COMPARE))
 	{
-	  gcc_assert (current_function_decl != NULL_TREE);
-
 	  op0 = save_expr (op0);
 	  op1 = save_expr (op1);
 
