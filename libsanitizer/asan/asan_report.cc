@@ -299,6 +299,9 @@ static bool IsInvalidPointerPair(uptr a1, uptr a2) {
   if (a1 == a2)
     return false;
 
+  if (!a1 || !a2)
+    return false;
+
   // 256B in shadow memory can be iterated quite fast
   static const uptr kMaxOffset = 2048;
 

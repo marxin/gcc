@@ -1506,7 +1506,9 @@ const struct sanitizer_opts_s sanitizer_opts[] =
 {
 #define SANITIZER_OPT(name, flags, recover) \
     { #name, flags, sizeof #name - 1, recover }
-  SANITIZER_OPT (address, (SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS), true),
+  SANITIZER_OPT (address, (SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS
+			   | SANITIZE_POINTER_COMPARE
+			   | SANITIZE_POINTER_SUBTRACT), true),
   SANITIZER_OPT (kernel-address, (SANITIZE_ADDRESS | SANITIZE_KERNEL_ADDRESS),
 		 true),
   SANITIZER_OPT (pointer-compare, SANITIZE_POINTER_COMPARE, true),
