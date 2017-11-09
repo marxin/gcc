@@ -149,7 +149,7 @@ verify_flow_info (void)
       /* FIXME: Graphite and SLJL and target code still tends to produce
 	 edges with no probablity.  */
       if (profile_status_for_fn (cfun) >= PROFILE_GUESSED
-          && !bb->count.initialized_p () && !flag_graphite && 0)
+	  && !bb->count.initialized_p () && !flag_graphite)
 	{
 	  error ("verify_flow_info: Missing count of block %i", bb->index);
 	  err = 1;
@@ -166,7 +166,7 @@ verify_flow_info (void)
 	  /* FIXME: Graphite and SLJL and target code still tends to produce
 	     edges with no probablity.  */
 	  if (profile_status_for_fn (cfun) >= PROFILE_GUESSED
-	      && !e->probability.initialized_p () && !flag_graphite && 0)
+	      && !e->probability.initialized_p () && !flag_graphite)
 	    {
 	      error ("Uninitialized probability of edge %i->%i", e->src->index,
 		     e->dest->index);

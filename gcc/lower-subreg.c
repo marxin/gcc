@@ -1641,6 +1641,9 @@ decompose_multiword_subregs (bool decompose_copies)
 		     exception edges ourselves.  */
 		  fallthru = split_block (bb, insn);
 		  rtl_make_eh_edge (NULL, bb, BB_END (bb));
+		  edge eh_edge = EDGE_SUCC (bb, 1);
+		  eh_edge->probability = profile_probability::very_unlikely ();
+		  fallthru->probability = eh_edge->probability.invert ();
 		  bb = fallthru->dest;
 		  insn = BB_HEAD (bb);
 		}

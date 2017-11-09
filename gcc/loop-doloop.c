@@ -505,7 +505,8 @@ doloop_modify (struct loop *loop, struct niter_desc *desc,
       redirect_edge_and_branch_force (single_succ_edge (preheader), new_preheader);
       set_immediate_dominator (CDI_DOMINATORS, new_preheader, preheader);
 
-      set_zero->count = profile_count::uninitialized ();
+      /* Reasonable zero.  */
+      set_zero->count = profile_count::zero ();
 
       te = single_succ_edge (preheader);
       for (; ass; ass = XEXP (ass, 1))
