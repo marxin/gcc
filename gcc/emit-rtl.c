@@ -191,7 +191,8 @@ static rtx gen_const_vector (machine_mode, int);
 static void copy_rtx_if_shared_1 (rtx *orig);
 
 /* Probability of the conditional branch currently proceeded by try_split.  */
-profile_probability split_branch_probability;
+profile_probability split_branch_probability
+  = profile_probability::uninitialized ();
 
 /* Returns a hash code for X (which is a really a CONST_INT).  */
 
