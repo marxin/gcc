@@ -2590,7 +2590,7 @@ pass_reorder_blocks::execute (function *fun)
   cfg_layout_initialize (CLEANUP_EXPENSIVE);
 
   reorder_basic_blocks ();
-  cleanup_cfg (CLEANUP_EXPENSIVE);
+  cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_NO_PARTITIONING);
 
   FOR_EACH_BB_FN (bb, fun)
     if (bb->next_bb != EXIT_BLOCK_PTR_FOR_FN (fun))
