@@ -890,7 +890,7 @@ finish_return_stmt (tree expr)
       || (flag_openmp && !check_omp_return ()))
     {
       /* Suppress -Wreturn-type for this function.  */
-      if (warn_return_type)
+      if (warn_return_type > 0)
 	TREE_NO_WARNING (current_function_decl) = true;
       return error_mark_node;
     }

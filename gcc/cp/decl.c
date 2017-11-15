@@ -15583,7 +15583,7 @@ finish_function (bool inline_p)
     save_function_data (fndecl);
 
   /* Complain if there's just no return statement.  */
-  if (warn_return_type
+  if (warn_return_type > 0
       && !VOID_TYPE_P (TREE_TYPE (fntype))
       && !dependent_type_p (TREE_TYPE (fntype))
       && !current_function_returns_value && !current_function_returns_null

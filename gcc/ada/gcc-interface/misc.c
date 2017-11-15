@@ -262,9 +262,6 @@ gnat_post_options (const char **pfilename ATTRIBUTE_UNUSED)
   /* No psABI change warnings for Ada.  */
   warn_psabi = 0;
 
-  /* No return type warnings for Ada.  */
-  warn_return_type = 0;
-
   /* No caret by default for Ada.  */
   if (!global_options_set.x_flag_diagnostics_show_caret)
     global_dc->show_caret = false;
