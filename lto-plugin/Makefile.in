@@ -577,8 +577,8 @@ uninstall-am: uninstall-libexecsubLTLIBRARIES
 	pdf pdf-am ps ps-am tags uninstall uninstall-am \
 	uninstall-libexecsubLTLIBRARIES
 
-override CFLAGS := $(filter-out -fsanitize=address,$(CFLAGS))
-override LDFLAGS := $(filter-out -fsanitize=address,$(LDFLAGS))
+override CFLAGS := $(filter-out -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract,$(CFLAGS))
+override LDFLAGS := $(filter-out -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract,$(LDFLAGS))
 
 all-local: $(in_gcc_libs)
 

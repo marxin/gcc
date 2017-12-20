@@ -240,7 +240,7 @@ AC_SUBST(PICFLAG)
 
 NOASANFLAG=
 case " ${CFLAGS} " in
-  *\ -fsanitize=address\ *) NOASANFLAG=-fno-sanitize=address ;;
+  *\ -fsanitize=address\ *) NOASANFLAG=-fno-sanitize=address,pointer-compare,pointer-subtract ;;
 esac
 AC_SUBST(NOASANFLAG)
 

@@ -693,8 +693,8 @@ uninstall-am: uninstall-cc1libLTLIBRARIES uninstall-pluginLTLIBRARIES
 	pdf pdf-am ps ps-am tags uninstall uninstall-am \
 	uninstall-cc1libLTLIBRARIES uninstall-pluginLTLIBRARIES
 
-override CXXFLAGS := $(filter-out -fsanitize=address,$(CXXFLAGS))
-override LDFLAGS := $(filter-out -fsanitize=address,$(LDFLAGS))
+override CXXFLAGS := $(filter-out -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract,$(CXXFLAGS))
+override LDFLAGS := $(filter-out -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract,$(LDFLAGS))
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
