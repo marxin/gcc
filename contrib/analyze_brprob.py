@@ -270,15 +270,16 @@ parser.add_argument('-w', '--write-def-file', action = 'store_true',
 args = parser.parse_args()
 
 profile = Profile(args.dump_file)
-r = re.compile('  (.*) heuristics( of edge [0-9]*->[0-9]*)?( \\(.*\\))?: (.*)%.*exec ([0-9]*) hit ([0-9]*)')
 loop_niter_str = ';;  profile-based iteration count: '
+
 for l in open(args.dump_file):
-    m = r.match(l)
-    if m != None and m.group(3) == None:
-        name = m.group(1)
-        prediction = float(m.group(4))
-        count = int(m.group(5))
-        hits = int(m.group(6))
+    if l.startswith(';;heuristics;'):
+        parts = l.strip().split(';')
+        assert len(parts) == 8
+        name = parts[3]
+        prediction = float(parts[6])
+        count = int(parts[4])
+        hits = int(parts[5])
 
         profile.add(name, prediction, count, hits)
     elif l.startswith(loop_niter_str):
