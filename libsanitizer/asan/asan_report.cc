@@ -344,6 +344,9 @@ static INLINE void CheckForInvalidPointerPair(void *p1, void *p2) {
   uptr a1 = reinterpret_cast<uptr>(p1);
   uptr a2 = reinterpret_cast<uptr>(p2);
 
+  if (flags()->detect_invalid_pointer_pairs == 1 && (a1 == 0 || a2 == 0))
+    return;
+
   if (IsInvalidPointerPair(a1, a2)) {
     GET_CALLER_PC_BP_SP;
     ReportInvalidPointerPair(pc, bp, sp, a1, a2);
