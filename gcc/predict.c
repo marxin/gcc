@@ -3357,7 +3357,7 @@ handle_missing_profiles (void)
       if (!(node->count == profile_count::zero ()))
         continue;
       for (e = node->callers; e; e = e->next_caller)
-	if (e->count.initialized_p () && e->count > 0)
+	if (e->count.initialized_p () && e->count.ipa_p () && e->count > 0)
 	  {
             call_count = call_count + e->count;
 
