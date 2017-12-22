@@ -3005,12 +3005,17 @@ fold_strstr_to_strncmp (tree rhs1, tree rhs2, gimple *stmt)
 	    {
 	      gimple_stmt_iterator gsi = gsi_for_stmt (call_stmt);
 	      tree strncmp_decl = builtin_decl_explicit (BUILT_IN_STRNCMP);
+
+	      tree arg1_len_tmp = make_ssa_name (TREE_TYPE (arg1_len));
+	      gassign *arg1_stmt = gimple_build_assign (arg1_len_tmp, arg1_len);
 	      gcall *strncmp_call = gimple_build_call (strncmp_decl, 3,
-						      arg0, arg1, arg1_len);
+						      arg0, arg1,
+						      arg1_len_tmp);
 	      tree strncmp_lhs = make_ssa_name (integer_type_node);
 	      gimple_set_vuse (strncmp_call, gimple_vuse (call_stmt));
 	      gimple_call_set_lhs (strncmp_call, strncmp_lhs);
 	      gsi_remove (&gsi, true);
+	      gsi_insert_before (&gsi, arg1_stmt, GSI_SAME_STMT);
 	      gsi_insert_before (&gsi, strncmp_call, GSI_SAME_STMT);
 	      tree zero = build_zero_cst (TREE_TYPE (strncmp_lhs));
 
