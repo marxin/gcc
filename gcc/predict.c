@@ -2632,14 +2632,6 @@ return_prediction (tree val, enum prediction *prediction)
     }
   else if (INTEGRAL_TYPE_P (TREE_TYPE (val)))
     {
-      /* Negative return values are often used to indicate
-         errors.  */
-      if (TREE_CODE (val) == INTEGER_CST
-	  && tree_int_cst_sgn (val) < 0)
-	{
-	  *prediction = NOT_TAKEN;
-	  return PRED_NEGATIVE_RETURN;
-	}
       /* Constant return values seems to be commonly taken.
          Zero/one often represent booleans so exclude them from the
 	 heuristics.  */
@@ -2820,9 +2812,6 @@ tree_bb_level_predictions (void)
 				       DECL_ATTRIBUTES (decl)))
 		predict_paths_leading_to (bb, PRED_COLD_FUNCTION,
 					  NOT_TAKEN);
-	      if (decl && recursive_call_p (current_function_decl, decl))
-		predict_paths_leading_to (bb, PRED_RECURSIVE_CALL,
-					  NOT_TAKEN);
 	    }
 	  else if (gimple_code (stmt) == GIMPLE_PREDICT)
 	    {
@@ -2880,12 +2869,10 @@ tree_estimate_probability_bb (basic_block bb, bool local_only)
 		     something exceptional.  */
 		  && gimple_has_side_effects (stmt))
 		{
+		  /* Consider just normal function calls, skip indirect and
+		  polymorphic calls as these tend to be unreliable.  */
 		  if (gimple_call_fndecl (stmt))
 		    predict_edge_def (e, PRED_CALL, NOT_TAKEN);
-		  else if (virtual_method_call_p (gimple_call_fn (stmt)))
-		    predict_edge_def (e, PRED_POLYMORPHIC_CALL, NOT_TAKEN);
-		  else
-		    predict_edge_def (e, PRED_INDIR_CALL, TAKEN);
 		  break;
 		}
 	    }
