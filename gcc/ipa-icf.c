@@ -1113,6 +1113,16 @@ sem_function::merge (sem_item *alias_item)
       return false;
     }
 
+  if (!original->in_same_comdat_group_p (alias))
+    {
+      if (dump_file)
+	fprintf (dump_file,
+		 "Not unifying; alias nor wrapper cannot be created; "
+		 "across comdat group boundary\n\n");
+
+      return false;
+    }
+
   /* See if original is in a section that can be discarded if the main
      symbol is not used.  */
 
