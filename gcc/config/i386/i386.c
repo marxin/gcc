@@ -4460,6 +4460,37 @@ ix86_can_inline_p (tree caller, tree callee)
 /* Remember the last target of ix86_set_current_function.  */
 static GTY(()) tree ix86_previous_fndecl;
 
+/* Set the indirect_branch_type field from the function FNDECL.  */
+
+static void
+ix86_set_indirect_branch_type (tree fndecl)
+{
+  if (cfun->machine->indirect_branch_type == indirect_branch_unset)
+    {
+      tree attr = lookup_attribute ("indirect_branch",
+				    DECL_ATTRIBUTES (fndecl));
+      if (attr != NULL)
+	{
+	  tree args = TREE_VALUE (attr);
+	  if (args == NULL)
+	    gcc_unreachable ();
+	  tree cst = TREE_VALUE (args);
+	  if (strcmp (TREE_STRING_POINTER (cst), "keep") == 0)
+	    cfun->machine->indirect_branch_type = indirect_branch_keep;
+	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk") == 0)
+	    cfun->machine->indirect_branch_type = indirect_branch_thunk;
+	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-inline") == 0)
+	    cfun->machine->indirect_branch_type = indirect_branch_thunk_inline;
+	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-extern") == 0)
+	    cfun->machine->indirect_branch_type = indirect_branch_thunk_extern;
+	  else
+	    gcc_unreachable ();
+	}
+      else
+	cfun->machine->indirect_branch_type = ix86_indirect_branch;
+    }
+}
+
 /* Establish appropriate back-end context for processing the function
    FNDECL.  The argument might be NULL to indicate processing at top
    level, outside of any function scope.  */
@@ -4498,6 +4529,9 @@ ix86_set_current_function (tree fndecl)
 	  cl_target_option_restore (&global_options, def);
 	  target_reinit ();
 	}
+
+      if (cfun->machine)
+	ix86_set_indirect_branch_type (fndecl);
     }
 }
 
@@ -23867,9 +23901,11 @@ ix86_output_indirect_branch (rtx call_op, const char *xasm,
   char push_buf[64];
   bool need_bnd_p = false;
 
-  if (ix86_indirect_branch != indirect_branch_thunk_inline)
+  if (cfun->machine->indirect_branch_type
+      != indirect_branch_thunk_inline)
     {
-      bool need_thunk = ix86_indirect_branch == indirect_branch_thunk;
+      bool need_thunk
+	= cfun->machine->indirect_branch_type == indirect_branch_thunk;
       if (need_bnd_p)
 	indirect_thunk_bnd_needed |= need_thunk;
       else
@@ -23978,7 +24014,7 @@ const char *
 ix86_output_indirect_jmp (rtx call_op)
 {
   if (ix86_red_zone_size == 0
-      && ix86_indirect_branch != indirect_branch_keep)
+      && cfun->machine->indirect_branch_type != indirect_branch_keep)
     {
       ix86_output_indirect_branch (call_op, "%0", true);
       return "";
@@ -23995,7 +24031,7 @@ ix86_output_call_insn (rtx insn, rtx call_op)
   bool direct_p = constant_call_address_operand (call_op, VOIDmode);
   bool output_indirect_p
     = (!TARGET_SEH
-       && ix86_indirect_branch != indirect_branch_keep);
+       && cfun->machine->indirect_branch_type != indirect_branch_keep);
   bool seh_nop_p = false;
   const char *xasm;
 
@@ -35165,6 +35201,29 @@ ix86_handle_fndecl_attribute (tree *node, tree name,
                name);
       *no_add_attrs = true;
     }
+
+  if (is_attribute_p ("indirect_branch", name))
+    {
+      tree cst = TREE_VALUE (args);
+      if (TREE_CODE (cst) != STRING_CST)
+	{
+	  warning (OPT_Wattributes,
+		   "%qE attribute requires a string constant argument",
+		   name);
+	  *no_add_attrs = true;
+	}
+      else if (strcmp (TREE_STRING_POINTER (cst), "keep") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk-inline") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk-extern") != 0)
+	{
+	  warning (OPT_Wattributes,
+		   "argument to %qE attribute is not "
+		   "(keep|thunk|thunk-inline|thunk-extern)", name);
+	  *no_add_attrs = true;
+	}
+    }
+
   return NULL_TREE;
 }
 
@@ -38683,6 +38742,8 @@ static const struct attribute_spec ix86_attribute_table[] =
     false },
   { "callee_pop_aggregate_return", 1, 1, false, true, true,
     ix86_handle_callee_pop_aggregate_return, true },
+  { "indirect_branch", 1, 1, true, false, false,
+    ix86_handle_fndecl_attribute, false },
   /* End element.  */
   { NULL,        0, 0, false, false, false, NULL, false }
 };

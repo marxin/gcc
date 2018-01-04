@@ -2349,6 +2349,9 @@ struct GTY(()) machine_function {
      stack below the return address.  */
   BOOL_BITFIELD static_chain_on_stack : 1;
 
+  /* How to generate indirec branch.  */
+  ENUM_BITFIELD(indirect_branch) indirect_branch_type : 3;
+
   /* During prologue/epilogue generation, the current frame state.
      Otherwise, the frame state at the end of the prologue.  */
   struct machine_frame_state fs;
