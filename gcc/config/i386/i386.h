@@ -2358,6 +2358,9 @@ struct GTY(()) machine_function {
   /* How to generate indirec branch.  */
   ENUM_BITFIELD(indirect_branch) indirect_branch_type : 3;
 
+  /* How to generate function return.  */
+  ENUM_BITFIELD(indirect_branch) function_return_type : 3;
+
   /* During prologue/epilogue generation, the current frame state.
      Otherwise, the frame state at the end of the prologue.  */
   struct machine_frame_state fs;
