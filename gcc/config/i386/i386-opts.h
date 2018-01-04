@@ -85,4 +85,9 @@ enum ix86_veclibabi {
   ix86_veclibabi_type_acml
 };
 
+enum indirect_branch {
+  indirect_branch_keep,
+  indirect_branch_thunk
+};
+
 #endif

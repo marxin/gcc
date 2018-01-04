@@ -425,6 +425,20 @@ mprefer-avx128
 Target Report Mask(PREFER_AVX128) SAVE
 Use 128-bit AVX instructions instead of 256-bit AVX instructions in the auto-vectorizer.
 
+mindirect-branch=
+Target Report RejectNegative Joined Enum(indirect_branch) Var(ix86_indirect_branch) Init(indirect_branch_keep)
+Update indirect call and jump.
+
+Enum
+Name(indirect_branch) Type(enum indirect_branch)
+Known indirect branch choices (for use with the -mindirect-branch= option):
+
+EnumValue
+Enum(indirect_branch) String(keep) Value(indirect_branch_keep)
+
+EnumValue
+Enum(indirect_branch) String(thunk) Value(indirect_branch_thunk)
+
 ;; ISA support
 
 m32

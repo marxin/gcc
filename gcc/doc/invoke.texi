@@ -656,7 +656,8 @@ Objective-C and Objective-C++ Dialects}.
 -mcmodel=@var{code-model} -mabi=@var{name} -maddress-mode=@var{mode} @gol
 -m32 -m64 -mx32 -mlarge-data-threshold=@var{num} @gol
 -msse2avx -mfentry -m8bit-idiv @gol
--mavx256-split-unaligned-load -mavx256-split-unaligned-store}
+-mavx256-split-unaligned-load -mavx256-split-unaligned-store @gol
+-mindirect-branch=@var{choice} }
 
 @emph{i386 and x86-64 Windows Options}
 @gccoptlist{-mconsole -mcygwin -mno-cygwin -mdll @gol
@@ -20985,6 +20986,13 @@ family of functions.
 The default value of this option is enabled, thus the only useful form
 of the option is @option{-fno-sync-libcalls}.  This option is used in
 the implementation of the @file{libatomic} runtime library.
+
+@item -mindirect-branch=@var{choice}
+@opindex -mindirect-branch
+Update indirect call and jump with @var{choice}.  The default is
+@samp{keep}, which keeps indirect call and jump unmodified.
+@samp{thunk} converts indirect call and jump to push and
+PC-relative call thunk.
 
 @end table
 
