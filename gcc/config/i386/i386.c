@@ -16315,6 +16315,29 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
     CALL_INSN_FUNCTION_USAGE (call) = use;
 }
 
+/* Output the assembly for a call instruction.  */
+
+const char *
+ix86_output_call_insn (rtx insn, rtx call_op, int addr_op)
+{
+  bool direct_p = constant_call_address_operand (call_op, Pmode);
+
+  gcc_assert (addr_op == 0 || addr_op == 1);
+
+  if (SIBLING_CALL_P (insn))
+    {
+      if (direct_p)
+	return addr_op ? "jmp\t%P1" : "jmp\t%P0";
+      else
+	return addr_op ? "jmp\t%A1" : "jmp\t%A0";
+    }
+
+  if (direct_p)
+    return addr_op ? "call\t%P1" : "call\t%P0";
+  else
+    return addr_op ? "call\t%A1" : "call\t%A0";
+}
+
 
 /* Clear stack slot assignments remembered from previous functions.
    This is called from INIT_EXPANDERS once before RTL is emitted for each
