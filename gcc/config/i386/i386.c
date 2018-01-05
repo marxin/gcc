@@ -5632,8 +5632,6 @@ symbolic_reference_mentioned_p (rtx op)
 int
 ix86_can_use_return_insn_p (void)
 {
-  struct ix86_frame frame;
-
   if (! reload_completed || frame_pointer_needed)
     return 0;
 
@@ -5644,7 +5642,7 @@ ix86_can_use_return_insn_p (void)
     return 0;
 
   ix86_compute_frame_layout ();
-  frame = cfun->machine->frame;
+  struct ix86_frame frame = cfun->machine->frame;
   return frame.to_allocate == 0 && frame.nregs == 0;
 }
 
@@ -5946,22 +5944,22 @@ HOST_WIDE_INT
 ix86_initial_elimination_offset (int from, int to)
 {
   ix86_compute_frame_layout ();
-  struct ix86_frame frame = cfun->machine->frame;
+  struct ix86_frame *frame = &cfun->machine->frame;
 
   if (from == ARG_POINTER_REGNUM && to == HARD_FRAME_POINTER_REGNUM)
-    return frame.hard_frame_pointer_offset;
+    return frame->hard_frame_pointer_offset;
   else if (from == FRAME_POINTER_REGNUM
 	   && to == HARD_FRAME_POINTER_REGNUM)
-    return frame.hard_frame_pointer_offset - frame.frame_pointer_offset;
+    return frame->hard_frame_pointer_offset - frame->frame_pointer_offset;
   else
     {
       gcc_assert (to == STACK_POINTER_REGNUM);
 
       if (from == ARG_POINTER_REGNUM)
-	return frame.stack_pointer_offset;
+	return frame->stack_pointer_offset;
 
       gcc_assert (from == FRAME_POINTER_REGNUM);
-      return frame.stack_pointer_offset - frame.frame_pointer_offset;
+      return frame->stack_pointer_offset - frame->frame_pointer_offset;
     }
 }
 
