@@ -5632,8 +5632,6 @@ symbolic_reference_mentioned_p (rtx op)
 int
 ix86_can_use_return_insn_p (void)
 {
-  struct ix86_frame frame;
-
   if (! reload_completed || frame_pointer_needed)
     return 0;
 
@@ -5644,7 +5642,7 @@ ix86_can_use_return_insn_p (void)
     return 0;
 
   ix86_compute_frame_layout ();
-  frame = cfun->machine->frame;
+  struct ix86_frame frame = cfun->machine->frame;
   return frame.to_allocate == 0 && frame.nregs == 0;
 }
 
@@ -5946,22 +5944,22 @@ HOST_WIDE_INT
 ix86_initial_elimination_offset (int from, int to)
 {
   ix86_compute_frame_layout ();
-  struct ix86_frame frame = cfun->machine->frame;
+  struct ix86_frame *frame = &cfun->machine->frame;
 
   if (from == ARG_POINTER_REGNUM && to == HARD_FRAME_POINTER_REGNUM)
-    return frame.hard_frame_pointer_offset;
+    return frame->hard_frame_pointer_offset;
   else if (from == FRAME_POINTER_REGNUM
 	   && to == HARD_FRAME_POINTER_REGNUM)
-    return frame.hard_frame_pointer_offset - frame.frame_pointer_offset;
+    return frame->hard_frame_pointer_offset - frame->frame_pointer_offset;
   else
     {
       gcc_assert (to == STACK_POINTER_REGNUM);
 
       if (from == ARG_POINTER_REGNUM)
-	return frame.stack_pointer_offset;
+	return frame->stack_pointer_offset;
 
       gcc_assert (from == FRAME_POINTER_REGNUM);
-      return frame.stack_pointer_offset - frame.frame_pointer_offset;
+      return frame->stack_pointer_offset - frame->frame_pointer_offset;
     }
 }
 
@@ -6270,7 +6268,7 @@ ix86_expand_prologue (void)
   HOST_WIDE_INT allocate;
 
   ix86_compute_frame_layout ();
-  struct ix86_frame frame = cfun->machine->frame;
+  struct ix86_frame *frame = &cfun->machine->frame;
 
   if (cfun->machine->force_align_arg_pointer)
     {
@@ -6330,23 +6328,23 @@ ix86_expand_prologue (void)
       RTX_FRAME_RELATED_P (insn) = 1;
     }
 
-  allocate = frame.to_allocate;
+  allocate = frame->to_allocate;
 
-  if (!frame.save_regs_using_mov)
+  if (!frame->save_regs_using_mov)
     ix86_emit_save_regs ();
   else
-    allocate += frame.nregs * UNITS_PER_WORD;
+    allocate += frame->nregs * UNITS_PER_WORD;
 
   /* When using red zone we may start register saving before allocating
      the stack frame saving one cycle of the prologue. However I will
      avoid doing this if I am going to have to probe the stack since
      at least on x86_64 the stack probe can turn into a call that clobbers
      a red zone location */
-  if (TARGET_RED_ZONE && frame.save_regs_using_mov
+  if (TARGET_RED_ZONE && frame->save_regs_using_mov
       && (! TARGET_STACK_PROBE || allocate < CHECK_STACK_LIMIT))
     ix86_emit_save_regs_using_mov (frame_pointer_needed ? hard_frame_pointer_rtx
 				   : stack_pointer_rtx,
-				   -frame.nregs * UNITS_PER_WORD);
+				   -frame->nregs * UNITS_PER_WORD);
 
   if (allocate == 0)
     ;
@@ -6388,23 +6386,23 @@ ix86_expand_prologue (void)
 	  if (frame_pointer_needed)
 	    t = plus_constant (hard_frame_pointer_rtx,
 			       allocate
-			       - frame.to_allocate
-			       - frame.nregs * UNITS_PER_WORD);
+			       - frame->to_allocate
+			       - frame->nregs * UNITS_PER_WORD);
 	  else
 	    t = plus_constant (stack_pointer_rtx, allocate);
 	  emit_move_insn (eax, gen_rtx_MEM (Pmode, t));
 	}
     }
 
-  if (frame.save_regs_using_mov
+  if (frame->save_regs_using_mov
       && !(TARGET_RED_ZONE
          && (! TARGET_STACK_PROBE || allocate < CHECK_STACK_LIMIT)))
     {
-      if (!frame_pointer_needed || !frame.to_allocate)
-        ix86_emit_save_regs_using_mov (stack_pointer_rtx, frame.to_allocate);
+      if (!frame_pointer_needed || !frame->to_allocate)
+        ix86_emit_save_regs_using_mov (stack_pointer_rtx, frame->to_allocate);
       else
         ix86_emit_save_regs_using_mov (hard_frame_pointer_rtx,
-				       -frame.nregs * UNITS_PER_WORD);
+				       -frame->nregs * UNITS_PER_WORD);
     }
 
   pic_reg_used = false;
@@ -6456,7 +6454,7 @@ ix86_expand_prologue (void)
      relative to the value of the stack pointer at the end of the function
      prologue, and moving instructions that access redzone area via frame
      pointer inside push sequence violates this assumption.  */
-  if (frame_pointer_needed && frame.red_zone_size)
+  if (frame_pointer_needed && frame->red_zone_size)
     emit_insn (gen_memory_blockage ());
 
   /* Emit cld instruction if stringops are used in the function.  */
