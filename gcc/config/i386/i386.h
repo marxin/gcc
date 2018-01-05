@@ -2436,6 +2436,47 @@ enum ix86_stack_slot
 
 #define FASTCALL_PREFIX '@'
 
+#ifndef USED_FOR_TARGET
+/* Structure describing stack frame layout.
+   Stack grows downward:
+
+   [arguments]
+					      <- ARG_POINTER
+   saved pc
+
+   saved frame pointer if frame_pointer_needed
+					      <- HARD_FRAME_POINTER
+   [saved regs]
+
+   [padding1]          \
+		        )
+   [va_arg registers]  (
+		        > to_allocate	      <- FRAME_POINTER
+   [frame]	       (
+		        )
+   [padding2]	       /
+  */
+struct ix86_frame GTY(())
+{
+  int nregs;
+  int padding1;
+  int va_arg_size;
+  HOST_WIDE_INT frame;
+  int padding2;
+  int outgoing_arguments_size;
+  int red_zone_size;
+
+  HOST_WIDE_INT to_allocate;
+  /* The offsets relative to ARG_POINTER.  */
+  HOST_WIDE_INT frame_pointer_offset;
+  HOST_WIDE_INT hard_frame_pointer_offset;
+  HOST_WIDE_INT stack_pointer_offset;
+
+  /* When save_regs_using_mov is set, emit prologue using
+     move instead of push instructions.  */
+  bool save_regs_using_mov;
+};
+
 struct machine_function GTY(())
 {
   struct stack_local_entry *stack_locals;
@@ -2444,6 +2485,10 @@ struct machine_function GTY(())
   int save_varrargs_registers;
   int accesses_prev_frame;
   int optimize_mode_switching[MAX_386_ENTITIES];
+
+  /* Cached initial frame layout for the current function.  */
+  struct ix86_frame frame;
+
   int needs_cld;
   /* Set by ix86_compute_frame_layout and used by prologue/epilogue
      expander to determine the style used.  */
@@ -2462,6 +2507,7 @@ struct machine_function GTY(())
      approximation.  */
   int tls_descriptor_call_expanded_p;
 };
+#endif
 
 #define ix86_stack_locals (cfun->machine->stack_locals)
 #define ix86_save_varrargs_registers (cfun->machine->save_varrargs_registers)
@@ -2476,6 +2522,7 @@ struct machine_function GTY(())
    REG_SP is live.  */
 #define ix86_current_function_calls_tls_descriptor \
   (ix86_tls_descriptor_calls_expanded_in_cfun && df_regs_ever_live_p (SP_REG))
+#define ix86_red_zone_size (cfun->machine->frame.red_zone_size)
 
 /* Control behavior of x86_file_start.  */
 #define X86_FILE_START_VERSION_DIRECTIVE false
