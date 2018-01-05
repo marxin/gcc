@@ -6499,22 +6499,21 @@ ix86_expand_epilogue (int style)
 {
   int regno;
   int sp_valid = !frame_pointer_needed || current_function_sp_is_unchanging;
-  struct ix86_frame frame;
   HOST_WIDE_INT offset;
 
   ix86_compute_frame_layout ();
-  frame = cfun->machine->frame;
+  struct ix86_frame *frame = &cfun->machine->frame;
 
   /* See the comment about red zone and frame
      pointer usage in ix86_expand_prologue.  */
-  if (frame_pointer_needed && frame.red_zone_size)
+  if (frame_pointer_needed && frame->red_zone_size)
     emit_insn (gen_memory_blockage ()); 
 
   /* Calculate start of saved registers relative to ebp.  Special care
      must be taken for the normal return case of a function using
      eh_return: the eax and edx registers are marked as saved, but not
      restored along this path.  */
-  offset = frame.nregs;
+  offset = frame->nregs;
   if (current_function_calls_eh_return && style != 2)
     offset -= 2;
   offset *= -UNITS_PER_WORD;
@@ -6529,14 +6528,14 @@ ix86_expand_epilogue (int style)
      are no registers to restore.  We also use this code when TARGET_USE_LEAVE
      and there is exactly one register to pop. This heuristic may need some
      tuning in future.  */
-  if ((!sp_valid && frame.nregs <= 1)
+  if ((!sp_valid && frame->nregs <= 1)
       || (TARGET_EPILOGUE_USING_MOVE
 	  && cfun->machine->use_fast_prologue_epilogue
-	  && (frame.nregs > 1 || frame.to_allocate))
-      || (frame_pointer_needed && !frame.nregs && frame.to_allocate)
+	  && (frame->nregs > 1 || frame->to_allocate))
+      || (frame_pointer_needed && !frame->nregs && frame->to_allocate)
       || (frame_pointer_needed && TARGET_USE_LEAVE
 	  && cfun->machine->use_fast_prologue_epilogue
-	  && frame.nregs == 1)
+	  && frame->nregs == 1)
       || current_function_calls_eh_return)
     {
       /* Restore registers.  We can use ebp or esp to address the memory
@@ -6545,9 +6544,9 @@ ix86_expand_epilogue (int style)
 	 end of block of saved registers, where we may simplify addressing
 	 mode.  */
 
-      if (!frame_pointer_needed || (sp_valid && !frame.to_allocate))
+      if (!frame_pointer_needed || (sp_valid && !frame->to_allocate))
 	ix86_emit_restore_regs_using_mov (stack_pointer_rtx,
-					  frame.to_allocate, style == 2);
+					  frame->to_allocate, style == 2);
       else
 	ix86_emit_restore_regs_using_mov (hard_frame_pointer_rtx,
 					  offset, style == 2);
@@ -6572,15 +6571,15 @@ ix86_expand_epilogue (int style)
 	  else
 	    {
 	      tmp = gen_rtx_PLUS (Pmode, stack_pointer_rtx, sa);
-	      tmp = plus_constant (tmp, (frame.to_allocate
-                                         + frame.nregs * UNITS_PER_WORD));
+	      tmp = plus_constant (tmp, (frame->to_allocate
+                                         + frame->nregs * UNITS_PER_WORD));
 	      emit_insn (gen_rtx_SET (VOIDmode, stack_pointer_rtx, tmp));
 	    }
 	}
       else if (!frame_pointer_needed)
 	pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
-				   GEN_INT (frame.to_allocate
-					    + frame.nregs * UNITS_PER_WORD),
+				   GEN_INT (frame->to_allocate
+					    + frame->nregs * UNITS_PER_WORD),
 				   style);
       /* If not an i386, mov & pop is faster than "leave".  */
       else if (TARGET_USE_LEAVE || optimize_size
@@ -6608,9 +6607,9 @@ ix86_expand_epilogue (int style)
 				     hard_frame_pointer_rtx,
 				     GEN_INT (offset), style);
 	}
-      else if (frame.to_allocate)
+      else if (frame->to_allocate)
 	pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
-				   GEN_INT (frame.to_allocate), style);
+				   GEN_INT (frame->to_allocate), style);
 
       for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
 	if (ix86_save_reg (regno, false))
