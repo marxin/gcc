@@ -1629,46 +1629,6 @@ struct stack_local_entry GTY(())
   struct stack_local_entry *next;
 };
 
-/* Structure describing stack frame layout.
-   Stack grows downward:
-
-   [arguments]
-					      <- ARG_POINTER
-   saved pc
-
-   saved frame pointer if frame_pointer_needed
-					      <- HARD_FRAME_POINTER
-   [saved regs]
-
-   [padding1]          \
-		        )
-   [va_arg registers]  (
-		        > to_allocate	      <- FRAME_POINTER
-   [frame]	       (
-		        )
-   [padding2]	       /
-  */
-struct ix86_frame
-{
-  int nregs;
-  int padding1;
-  int va_arg_size;
-  HOST_WIDE_INT frame;
-  int padding2;
-  int outgoing_arguments_size;
-  int red_zone_size;
-
-  HOST_WIDE_INT to_allocate;
-  /* The offsets relative to ARG_POINTER.  */
-  HOST_WIDE_INT frame_pointer_offset;
-  HOST_WIDE_INT hard_frame_pointer_offset;
-  HOST_WIDE_INT stack_pointer_offset;
-
-  /* When save_regs_using_mov is set, emit prologue using
-     move instead of push instructions.  */
-  bool save_regs_using_mov;
-};
-
 /* Code model option.  */
 enum cmodel ix86_cmodel;
 /* Asm dialect.  */
@@ -1750,7 +1710,7 @@ static bool ext_80387_constants_init = 0;
 static struct machine_function * ix86_init_machine_status (void);
 static rtx ix86_function_value (const_tree, const_tree, bool);
 static int ix86_function_regparm (const_tree, const_tree);
-static void ix86_compute_frame_layout (struct ix86_frame *);
+static void ix86_compute_frame_layout (void);
 static bool ix86_expand_vector_init_one_nonzero (bool, enum machine_mode,
 						 rtx, rtx, int);
 
@@ -5683,7 +5643,8 @@ ix86_can_use_return_insn_p (void)
       && current_function_args_size >= 32768)
     return 0;
 
-  ix86_compute_frame_layout (&frame);
+  ix86_compute_frame_layout ();
+  frame = cfun->machine->frame;
   return frame.to_allocate == 0 && frame.nregs == 0;
 }
 
@@ -5984,8 +5945,8 @@ ix86_nsaved_regs (void)
 HOST_WIDE_INT
 ix86_initial_elimination_offset (int from, int to)
 {
-  struct ix86_frame frame;
-  ix86_compute_frame_layout (&frame);
+  ix86_compute_frame_layout ();
+  struct ix86_frame frame = cfun->machine->frame;
 
   if (from == ARG_POINTER_REGNUM && to == HARD_FRAME_POINTER_REGNUM)
     return frame.hard_frame_pointer_offset;
@@ -6007,8 +5968,9 @@ ix86_initial_elimination_offset (int from, int to)
 /* Fill structure ix86_frame about frame of currently computed function.  */
 
 static void
-ix86_compute_frame_layout (struct ix86_frame *frame)
+ix86_compute_frame_layout (void)
 {
+  struct ix86_frame *frame = &cfun->machine->frame;
   HOST_WIDE_INT total_size;
   unsigned int stack_alignment_needed;
   HOST_WIDE_INT offset;
@@ -6305,10 +6267,10 @@ ix86_expand_prologue (void)
 {
   rtx insn;
   bool pic_reg_used;
-  struct ix86_frame frame;
   HOST_WIDE_INT allocate;
 
-  ix86_compute_frame_layout (&frame);
+  ix86_compute_frame_layout ();
+  struct ix86_frame frame = cfun->machine->frame;
 
   if (cfun->machine->force_align_arg_pointer)
     {
@@ -6542,7 +6504,8 @@ ix86_expand_epilogue (int style)
   struct ix86_frame frame;
   HOST_WIDE_INT offset;
 
-  ix86_compute_frame_layout (&frame);
+  ix86_compute_frame_layout ();
+  frame = cfun->machine->frame;
 
   /* See the comment about red zone and frame
      pointer usage in ix86_expand_prologue.  */
