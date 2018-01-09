@@ -14,4 +14,3 @@ t(void)
 }
 /* { dg-final { scan-tree-dump-times "loop guard with recursion" 1 "profile_estimate"} } */
 /* { dg-final { scan-tree-dump-times "loop exit with recursion" 2 "profile_estimate"} } */
-/* { dg-final { scan-tree-dump-times "recursive call" 1 "profile_estimate"} } */
