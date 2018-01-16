@@ -9216,7 +9216,8 @@ put_condition_code (enum rtx_code code, enum machine_mode mode, int reverse,
    If CODE is 'k', pretend the mode is SImode.
    If CODE is 'q', pretend the mode is DImode.
    If CODE is 'h', pretend the reg is the 'high' byte register.
-   If CODE is 'y', print "st(0)" instead of "st", if the reg is stack op.  */
+   If CODE is 'y', print "st(0)" instead of "st", if the reg is stack op.
+   If CODE is 'V', print naked full integer register name without %.  */
 
 void
 print_reg (rtx x, int code, FILE *file)
@@ -9228,7 +9229,7 @@ print_reg (rtx x, int code, FILE *file)
 		  && REGNO (x) != FPSR_REG
 		  && REGNO (x) != FPCR_REG));
 
-  if (ASSEMBLER_DIALECT == ASM_ATT)
+  if (ASSEMBLER_DIALECT == ASM_ATT && code != 'V')
     putc ('%', file);
 
   if (x == pc_rtx)
@@ -9252,6 +9253,14 @@ print_reg (rtx x, int code, FILE *file)
     code = 0;
   else
     code = GET_MODE_SIZE (GET_MODE (x));
+
+  if (code == 'V')
+    {
+      if (REGNO (x))
+	code = GET_MODE_SIZE (word_mode);
+      else
+	error ("'V' modifier on non-integer register");
+    }
 
   /* Irritatingly, AMD extended registers use different naming convention
      from the normal registers.  */
@@ -9378,6 +9387,7 @@ get_some_local_dynamic_name (void)
    & -- print some in-use local-dynamic symbol name.
    H -- print a memory address offset by 8; used for sse high-parts
    Y -- print condition for SSE5 com* instruction.
+   V -- print naked full integer register name without %.
    + -- print a branch hint as 'cs' or 'ds' prefix
    ; -- print a semicolon (after prefixes due to bug in older gas).
  */
@@ -9525,6 +9535,7 @@ print_operand (FILE *file, rtx x, int code)
 	case 'y':
 	case 'X':
 	case 'P':
+	case 'V':
 	  break;
 
 	case 's':
