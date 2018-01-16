@@ -562,7 +562,8 @@
 (define_predicate "call_insn_operand"
   (ior (match_operand 0 "constant_call_address_operand")
        (ior (match_operand 0 "call_register_no_elim_operand")
-	    (match_operand 0 "memory_operand"))))
+	    (and (not (match_test "ix86_indirect_branch_register"))
+		 (match_operand 0 "memory_operand")))))
 
 ;; Similarly, but for tail calls, in which we cannot allow memory references.
 (define_predicate "sibcall_insn_operand"
