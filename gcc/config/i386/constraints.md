@@ -104,7 +104,8 @@
 
 (define_constraint "w"
   "@internal Call memory operand."
-    (match_operand 0 "memory_operand"))
+    (and (match_operand 0 "memory_operand")
+	 (not (match_test "ix86_indirect_branch_register"))))
 
 ;; Integer constant constraints.
 (define_constraint "I"
