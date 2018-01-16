@@ -1196,6 +1196,9 @@ do {									\
 /* First floating point reg */
 #define FIRST_FLOAT_REG 8
 
+#define FIRST_INT_REG AX_REG
+#define LAST_INT_REG  SP_REG
+
 /* First & last stack-like regs */
 #define FIRST_STACK_REG FIRST_FLOAT_REG
 #define LAST_STACK_REG (FIRST_FLOAT_REG + 7)
@@ -1217,6 +1220,9 @@ do {									\
    may be accessed via the stack pointer) in functions that seem suitable.
    This is computed in `reload', in reload1.c.  */
 #define FRAME_POINTER_REQUIRED  ix86_frame_pointer_required ()
+
+#define LEGACY_INT_REGNO_P(N) (IN_RANGE ((N), FIRST_INT_REG, LAST_INT_REG))
+#define LEGACY_INT_REG_P(X) (REG_P (X) && LEGACY_INT_REGNO_P (REGNO (X)))
 
 /* Override this in other tm.h files to cope with various OS lossage
    requiring a frame pointer.  */
@@ -2384,6 +2390,19 @@ enum ix86_stack_slot
   MAX_386_STACK_LOCALS
 };
 
+/* This is used to mitigate variant #2 of the speculative execution
+   vulnerabilities on x86 processors identified by CVE-2017-5715, aka
+   Spectre.  They convert indirect branches and function returns to
+   call and return thunks to avoid speculative execution via indirect
+   call, jmp and ret.  */
+enum indirect_branch {
+  indirect_branch_unset = 0,
+  indirect_branch_keep,
+  indirect_branch_thunk,
+  indirect_branch_thunk_inline,
+  indirect_branch_thunk_extern
+};
+
 /* Define this macro if the port needs extra instructions inserted
    for mode switching in an optimizing compilation.  */
 
@@ -2506,6 +2525,13 @@ struct machine_function GTY(())
      ix86_current_function_calls_tls_descriptor macro for a better
      approximation.  */
   int tls_descriptor_call_expanded_p;
+
+  /* How to generate indirec branch.  */
+  ENUM_BITFIELD(indirect_branch) indirect_branch_type : 3;
+
+  /* If true, the current function has local indirect jumps, like
+     "indirect_jump" or "tablejump".  */
+  BOOL_BITFIELD has_local_indirect_jump : 1;
 };
 #endif
 
