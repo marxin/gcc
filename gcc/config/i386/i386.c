@@ -1713,6 +1713,7 @@ static int ix86_function_regparm (const_tree, const_tree);
 static void ix86_compute_frame_layout (void);
 static bool ix86_expand_vector_init_one_nonzero (bool, enum machine_mode,
 						 rtx, rtx, int);
+static void ix86_set_current_function (tree);
 
 
 /* The svr4 ABI for the i386 says that records and unions are returned
@@ -1791,6 +1792,25 @@ static int ix86_isa_flags_explicit;
 /* Vectorization library interface and handlers.  */
 tree (*ix86_veclib_handler)(enum built_in_function, tree, tree) = NULL;
 static tree ix86_veclibabi_acml (enum built_in_function, tree, tree);
+
+/* Return true if a red-zone is in use.  We can't use red-zone when
+   there are local indirect jumps, like "indirect_jump" or "tablejump",
+   which jumps to another place in the function, since "call" in the
+   indirect thunk pushes the return address onto stack, destroying
+   red-zone.
+
+   TODO: If we can reserve the first 2 WORDs, for PUSH and, another
+   for CALL, in red-zone, we can allow local indirect jumps with
+   indirect thunk.  */
+
+static inline bool
+ix86_using_red_zone (void)
+{
+  return (TARGET_RED_ZONE
+	  && !TARGET_64BIT_MS_ABI
+	  && (!cfun->machine->has_local_indirect_jump
+	      || cfun->machine->indirect_branch_type == indirect_branch_keep));
+}
 
 /* Implement TARGET_HANDLE_OPTION.  */
 
@@ -5691,6 +5711,198 @@ ix86_setup_frame_addresses (void)
 # define USE_HIDDEN_LINKONCE 0
 #endif
 
+/* Label count for call and return thunks.  It is used to make unique
+   labels in call and return thunks.  */
+static int indirectlabelno;
+
+/* True if call and return thunk functions are needed.  */
+static bool indirect_thunk_needed = false;
+
+/* Bit masks of integer registers, which contain branch target, used
+   by call and return thunks functions.  */
+static int indirect_thunks_used;
+
+#ifndef INDIRECT_LABEL
+# define INDIRECT_LABEL "LIND"
+#endif
+
+/* Fills in the label name that should be used for the indirect thunk.  */
+
+static void
+indirect_thunk_name (char name[32], int regno)
+{
+  if (USE_HIDDEN_LINKONCE)
+    {
+      if (regno >= 0)
+	{
+	  const char *reg_prefix;
+	  if (LEGACY_INT_REGNO_P (regno))
+	    reg_prefix = TARGET_64BIT ? "r" : "e";
+	  else
+	    reg_prefix = "";
+	  sprintf (name, "__x86_indirect_thunk_%s%s",
+		   reg_prefix, reg_names[regno]);
+	}
+      else
+	sprintf (name, "__x86_indirect_thunk");
+    }
+  else
+    {
+      if (regno >= 0)
+	ASM_GENERATE_INTERNAL_LABEL (name, "LITR", regno);
+      else
+	ASM_GENERATE_INTERNAL_LABEL (name, "LIT", 0);
+    }
+}
+
+/* Output a call and return thunk for indirect branch.
+   If REGNO != -1,  the function
+   address is in REGNO and the call and return thunk looks like:
+
+	call	L2
+   L1:
+	pause
+	jmp	L1
+   L2:
+	mov	%REG, (%sp)
+	ret
+
+   Otherwise, the function address is on the top of stack and the
+   call and return thunk looks like:
+
+	call L2
+  L1:
+	pause
+	jmp L1
+  L2:
+	lea WORD_SIZE(%sp), %sp
+	ret
+ */
+
+static void
+output_indirect_thunk (int regno)
+{
+  char indirectlabel1[32];
+  char indirectlabel2[32];
+
+  ASM_GENERATE_INTERNAL_LABEL (indirectlabel1, INDIRECT_LABEL,
+			       indirectlabelno++);
+  ASM_GENERATE_INTERNAL_LABEL (indirectlabel2, INDIRECT_LABEL,
+			       indirectlabelno++);
+
+  /* Call */
+  fputs ("\tcall\t", asm_out_file);
+  assemble_name_raw (asm_out_file, indirectlabel2);
+  fputc ('\n', asm_out_file);
+
+  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, indirectlabel1);
+
+  /* Pause + lfence.  */
+  fprintf (asm_out_file, "\tpause\n\tlfence\n");
+
+  /* Jump.  */
+  fputs ("\tjmp\t", asm_out_file);
+  assemble_name_raw (asm_out_file, indirectlabel1);
+  fputc ('\n', asm_out_file);
+
+  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, indirectlabel2);
+
+  if (regno >= 0)
+    {
+      /* MOV.  */
+      rtx xops[2];
+      xops[0] = gen_rtx_MEM (word_mode, stack_pointer_rtx);
+      xops[1] = gen_rtx_REG (word_mode, regno);
+      output_asm_insn ("mov\t{%1, %0|%0, %1}", xops);
+    }
+  else
+    {
+      /* LEA.  */
+      rtx xops[2];
+      xops[0] = stack_pointer_rtx;
+      xops[1] = plus_constant (stack_pointer_rtx, UNITS_PER_WORD);
+      output_asm_insn ("lea\t{%a1, %0|%0, %a1}", xops);
+    }
+
+  fputs ("\tret\n", asm_out_file);
+}
+
+/* Output a funtion with a call and return thunk for indirect branch.
+   If REGNO != -1,  the
+   function address is in REGNO.  Otherwise, the function address is
+   on the top of stack.  */
+
+static void
+output_indirect_thunk_function (int regno)
+{
+  char name[32];
+  tree decl;
+
+  /* Create __x86_indirect_thunk.  */
+  indirect_thunk_name (name, regno);
+  decl = build_decl (FUNCTION_DECL,
+		     get_identifier (name),
+		     build_function_type_list (void_type_node, NULL_TREE));
+  DECL_RESULT (decl) = build_decl (RESULT_DECL,
+				   NULL_TREE, void_type_node);
+  TREE_PUBLIC (decl) = 1;
+  TREE_STATIC (decl) = 1;
+  DECL_IGNORED_P (decl) = 1;
+
+#if TARGET_MACHO
+  if (TARGET_MACHO)
+    {
+      switch_to_section (darwin_sections[picbase_thunk_section]);
+      fputs ("\t.weak_definition\t", asm_out_file);
+      assemble_name (asm_out_file, name);
+      fputs ("\n\t.private_extern\t", asm_out_file);
+      assemble_name (asm_out_file, name);
+      putc ('\n', asm_out_file);
+      ASM_OUTPUT_LABEL (asm_out_file, name);
+      DECL_WEAK (decl) = 1;
+    }
+  else
+#endif
+    if (USE_HIDDEN_LINKONCE)
+      {
+	DECL_COMDAT (decl) = 1;
+	make_decl_one_only (decl);
+
+	targetm.asm_out.unique_section (decl, 0);
+	switch_to_section (get_named_section (decl, NULL, 0));
+
+	targetm.asm_out.globalize_label (asm_out_file, name);
+	fputs ("\t.hidden\t", asm_out_file);
+	assemble_name (asm_out_file, name);
+	putc ('\n', asm_out_file);
+	ASM_DECLARE_FUNCTION_NAME (asm_out_file, name, decl);
+      }
+    else
+      {
+	switch_to_section (text_section);
+	ASM_OUTPUT_LABEL (asm_out_file, name);
+      }
+
+  DECL_INITIAL (decl) = make_node (BLOCK);
+  current_function_decl = decl;
+  allocate_struct_function (decl, false);
+  init_function_start (decl);
+  /* We're about to hide the function body from callees of final_* by
+     emitting it directly; tell them we're a thunk, if they care.  */
+  cfun->is_thunk = true;
+  first_function_block_is_cold = false;
+  /* Make sure unwind info is emitted for the thunk if needed.  */
+  final_start_function (emit_barrier (), asm_out_file, 1);
+
+  output_indirect_thunk (regno);
+
+  final_end_function ();
+  init_insn_lengths ();
+  free_after_compilation (cfun);
+  set_cfun (NULL);
+  current_function_decl = NULL;
+}
+
 static int pic_labels_used;
 
 /* Fills in the label name that should be used for a pc thunk for
@@ -5707,6 +5919,297 @@ get_pc_thunk_name (char name[32], unsigned int regno)
     ASM_GENERATE_INTERNAL_LABEL (name, "LPR", regno);
 }
 
+/* Remember the last target of ix86_set_current_function.  */
+static GTY(()) tree ix86_previous_fndecl;
+
+/* Set the indirect_branch_type field from VALUE string.  */
+
+static void
+ix86_set_indirect_branch_type_from_string (const char *value)
+{
+  if (value == NULL || strcmp (value, "keep") == 0)
+    cfun->machine->indirect_branch_type = indirect_branch_keep;
+  else if (strcmp (value, "thunk") == 0)
+    cfun->machine->indirect_branch_type = indirect_branch_thunk;
+  else if (strcmp (value, "thunk-inline") == 0)
+    cfun->machine->indirect_branch_type = indirect_branch_thunk_inline;
+  else if (strcmp (value, "thunk-extern") == 0)
+    cfun->machine->indirect_branch_type = indirect_branch_thunk_extern;
+  else
+    gcc_unreachable ();
+}
+
+/* Set the indirect_branch_type field from the function FNDECL.  */
+
+static void
+ix86_set_indirect_branch_type (tree fndecl)
+{
+  if (cfun->machine->indirect_branch_type == indirect_branch_unset)
+    {
+      tree attr = lookup_attribute ("indirect_branch",
+				    DECL_ATTRIBUTES (fndecl));
+      if (attr != NULL)
+	{
+	  tree args = TREE_VALUE (attr);
+	  if (args == NULL)
+	    gcc_unreachable ();
+	  tree cst = TREE_VALUE (args);
+	  ix86_set_indirect_branch_type_from_string (TREE_STRING_POINTER (cst));
+	}
+      else
+	ix86_set_indirect_branch_type_from_string (ix86_indirect_branch);
+    }
+}
+
+/* Establish appropriate back-end context for processing the function
+   FNDECL.  The argument might be NULL to indicate processing at top
+   level, outside of any function scope.  */
+static void
+ix86_set_current_function (tree fndecl)
+{
+  /* Only change the context if the function changes.  This hook is called
+     several times in the course of compiling a function, and we don't want to
+     slow things down too much or call target_reinit when it isn't safe.  */
+  if (fndecl && fndecl != ix86_previous_fndecl)
+    {
+      ix86_previous_fndecl = fndecl;
+      if (cfun->machine)
+	ix86_set_indirect_branch_type (fndecl);
+    }
+}
+
+/* Output indirect branch via a call and return thunk.  CALL_OP is a
+   register which contains the branch target.  XASM is the assembly
+   template for CALL_OP.  Branch is a tail call if SIBCALL_P is true.
+   A normal call is converted to:
+
+	call __x86_indirect_thunk_reg
+
+   and a tail call is converted to:
+
+	jmp __x86_indirect_thunk_reg
+ */
+
+static void
+ix86_output_indirect_branch_via_reg (rtx call_op, bool sibcall_p)
+{
+  char thunk_name_buf[32];
+  char *thunk_name;
+  /* A sibcall via r11 register.  */
+  int regno = call_op == NULL_RTX ? R11_REG : REGNO (call_op);
+
+  if (cfun->machine->indirect_branch_type
+      != indirect_branch_thunk_inline)
+    {
+      if (cfun->machine->indirect_branch_type == indirect_branch_thunk)
+	{
+	  int i = regno;
+	  if (i >= FIRST_REX_INT_REG)
+	    i -= (FIRST_REX_INT_REG - LAST_INT_REG - 1);
+	  indirect_thunks_used |= 1 << i;
+	}
+      indirect_thunk_name (thunk_name_buf, regno);
+      thunk_name = thunk_name_buf;
+    }
+  else
+    thunk_name = NULL;
+
+  if (sibcall_p)
+    {
+      if (thunk_name != NULL)
+	fprintf (asm_out_file, "\tjmp\t%s\n", thunk_name);
+      else
+	output_indirect_thunk (regno);
+    }
+  else
+    {
+      if (thunk_name != NULL)
+	{
+	  fprintf (asm_out_file, "\tcall\t%s\n", thunk_name);
+	  return;
+	}
+
+      char indirectlabel1[32];
+      char indirectlabel2[32];
+
+      ASM_GENERATE_INTERNAL_LABEL (indirectlabel1,
+				   INDIRECT_LABEL,
+				   indirectlabelno++);
+      ASM_GENERATE_INTERNAL_LABEL (indirectlabel2,
+				   INDIRECT_LABEL,
+				   indirectlabelno++);
+
+      /* Jump.  */
+      fputs ("\tjmp\t", asm_out_file);
+      assemble_name_raw (asm_out_file, indirectlabel2);
+      fputc ('\n', asm_out_file);
+
+      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, indirectlabel1);
+
+      if (thunk_name != NULL)
+	fprintf (asm_out_file, "\tjmp\t%s\n", thunk_name);
+      else
+	output_indirect_thunk (regno);
+
+      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, indirectlabel2);
+
+      /* Call.  */
+      fputs ("\tcall\t", asm_out_file);
+      assemble_name_raw (asm_out_file, indirectlabel1);
+      fputc ('\n', asm_out_file);
+    }
+}
+
+/* Output indirect branch via a call and return thunk.  CALL_OP is
+   the branch target.  XASM is the assembly template for CALL_OP.
+   Branch is a tail call if SIBCALL_P is true.  A normal call is
+   converted to:
+
+	jmp L2
+   L1:
+	push CALL_OP
+	jmp __x86_indirect_thunk
+   L2:
+	call L1
+
+   and a tail call is converted to:
+
+	push CALL_OP
+	jmp __x86_indirect_thunk
+ */
+
+static void
+ix86_output_indirect_branch_via_push (rtx call_op, const char *xasm,
+				      bool sibcall_p)
+{
+  char thunk_name_buf[32];
+  char *thunk_name;
+  char push_buf[64];
+  int regno = -1;
+
+  if (cfun->machine->indirect_branch_type
+      != indirect_branch_thunk_inline)
+    {
+      if (cfun->machine->indirect_branch_type == indirect_branch_thunk)
+	indirect_thunk_needed = true;
+      indirect_thunk_name (thunk_name_buf, regno);
+      thunk_name = thunk_name_buf;
+    }
+  else
+    thunk_name = NULL;
+
+  snprintf (push_buf, sizeof (push_buf), "push{%c}\t%s",
+	    TARGET_64BIT ? 'q' : 'l', xasm);
+
+  if (sibcall_p)
+    {
+      output_asm_insn (push_buf, &call_op);
+      if (thunk_name != NULL)
+	fprintf (asm_out_file, "\tjmp\t%s\n", thunk_name);
+      else
+	output_indirect_thunk (regno);
+    }
+  else
+    {
+      char indirectlabel1[32];
+      char indirectlabel2[32];
+
+      ASM_GENERATE_INTERNAL_LABEL (indirectlabel1,
+				   INDIRECT_LABEL,
+				   indirectlabelno++);
+      ASM_GENERATE_INTERNAL_LABEL (indirectlabel2,
+				   INDIRECT_LABEL,
+				   indirectlabelno++);
+
+      /* Jump.  */
+      fputs ("\tjmp\t", asm_out_file);
+      assemble_name_raw (asm_out_file, indirectlabel2);
+      fputc ('\n', asm_out_file);
+
+      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, indirectlabel1);
+
+      /* An external function may be called via GOT, instead of PLT.  */
+      if (MEM_P (call_op))
+	{
+	  struct ix86_address parts;
+	  rtx addr = XEXP (call_op, 0);
+	  if (ix86_decompose_address (addr, &parts)
+	      && parts.base == stack_pointer_rtx)
+	    {
+	      /* Since call will adjust stack by -UNITS_PER_WORD,
+		 we must convert "disp(stack, index, scale)" to
+		 "disp+UNITS_PER_WORD(stack, index, scale)".  */
+	      if (parts.index)
+		{
+		  addr = gen_rtx_MULT (Pmode, parts.index,
+				       GEN_INT (parts.scale));
+		  addr = gen_rtx_PLUS (Pmode, stack_pointer_rtx,
+				       addr);
+		}
+	      else
+		addr = stack_pointer_rtx;
+
+	      rtx disp;
+	      if (parts.disp != NULL_RTX)
+		disp = plus_constant (parts.disp,
+				      UNITS_PER_WORD);
+	      else
+		disp = GEN_INT (UNITS_PER_WORD);
+
+	      addr = gen_rtx_PLUS (Pmode, addr, disp);
+	      call_op = gen_rtx_MEM (GET_MODE (call_op), addr);
+	    }
+	}
+
+      output_asm_insn (push_buf, &call_op);
+
+      if (thunk_name != NULL)
+	fprintf (asm_out_file, "\tjmp\t%s\n", thunk_name);
+      else
+	output_indirect_thunk (regno);
+
+      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, indirectlabel2);
+
+      /* Call.  */
+      fputs ("\tcall\t", asm_out_file);
+      assemble_name_raw (asm_out_file, indirectlabel1);
+      fputc ('\n', asm_out_file);
+    }
+}
+
+/* Output indirect branch via a call and return thunk.  CALL_OP is
+   the branch target.  XASM is the assembly template for CALL_OP.
+   Branch is a tail call if SIBCALL_P is true.   */
+
+static void
+ix86_output_indirect_branch (rtx call_op, const char *xasm,
+			     bool sibcall_p)
+{
+  if (REG_P (call_op))
+    ix86_output_indirect_branch_via_reg (call_op, sibcall_p);
+  else
+    ix86_output_indirect_branch_via_push (call_op, xasm, sibcall_p);
+}
+/* Output indirect jump.  CALL_OP is the jump target.  Jump is a
+   function return if RET_P is true.  */
+
+const char *
+ix86_output_indirect_jmp (rtx call_op, bool ret_p)
+{
+  if (cfun->machine->indirect_branch_type != indirect_branch_keep)
+    {
+      /* We can't have red-zone if this isn't a function return since
+	 "call" in the indirect thunk pushes the return address onto
+	 stack, destroying red-zone.  */
+      if (!ret_p && ix86_red_zone_size != 0)
+	gcc_unreachable ();
+
+      ix86_output_indirect_branch (call_op, "%0", true);
+      return "";
+    }
+  else
+    return "jmp\t%A0";
+}
 
 /* This function generates code for -fpic that loads %ebx with
    the return address of the caller and then returns.  */
@@ -5717,9 +6220,22 @@ ix86_file_end (void)
   rtx xops[2];
   int regno;
 
+  if (indirect_thunk_needed)
+    output_indirect_thunk_function (-1);
+
+  for (regno = FIRST_REX_INT_REG; regno <= LAST_REX_INT_REG; regno++)
+    {
+      int i = regno - FIRST_REX_INT_REG + LAST_INT_REG + 1;
+      if ((indirect_thunks_used & (1 << i)))
+	output_indirect_thunk_function (regno);
+    }
+
   for (regno = 0; regno < 8; ++regno)
     {
       char name[32];
+
+      if ((indirect_thunks_used & (1 << regno)))
+	output_indirect_thunk_function (regno);
 
       if (! ((pic_labels_used >> regno) & 1))
 	continue;
@@ -16281,7 +16797,10 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
 const char *
 ix86_output_call_insn (rtx insn, rtx call_op, int addr_op)
 {
-  bool direct_p = constant_call_address_operand (call_op, Pmode);
+  bool r11_sibcall_p = call_op == NULL_RTX;
+  bool direct_p = !r11_sibcall_p && constant_call_address_operand (call_op, Pmode);
+  bool output_indirect_p
+    = cfun->machine->indirect_branch_type != indirect_branch_keep;
 
   gcc_assert (addr_op == 0 || addr_op == 1);
 
@@ -16290,13 +16809,38 @@ ix86_output_call_insn (rtx insn, rtx call_op, int addr_op)
       if (direct_p)
 	return addr_op ? "jmp\t%P1" : "jmp\t%P0";
       else
-	return addr_op ? "jmp\t%A1" : "jmp\t%A0";
+	{
+	  if (output_indirect_p)
+	    {
+	      if (r11_sibcall_p)
+		ix86_output_indirect_branch_via_reg (NULL_RTX, true);
+	      else
+		ix86_output_indirect_branch (call_op, addr_op ? "%1" : "%0",
+					     true);
+	      return "";
+	    }
+	  else
+	    {
+	      if (r11_sibcall_p)
+		return "jmp\t{*%%}r11";
+	      else
+		return addr_op ? "jmp\t%A1" : "jmp\t%A0";
+	    }
+	}
     }
 
   if (direct_p)
     return addr_op ? "call\t%P1" : "call\t%P0";
   else
-    return addr_op ? "call\t%A1" : "call\t%A0";
+    {
+      if (output_indirect_p)
+	{
+	  ix86_output_indirect_branch (call_op, addr_op ? "%1" : "%0", false);
+	  return "";
+	}
+      else
+	return addr_op ? "call\t%A1" : "call\t%A0";
+    }
 }
 
 
@@ -22686,6 +23230,65 @@ ix86_handle_struct_attribute (tree *node, tree name,
       *no_add_attrs = true;
     }
 
+  if (is_attribute_p ("indirect_branch", name))
+    {
+      tree cst = TREE_VALUE (args);
+      if (TREE_CODE (cst) != STRING_CST)
+	{
+	  warning (OPT_Wattributes,
+		   "%qE attribute requires a string constant argument",
+		   name);
+	  *no_add_attrs = true;
+	}
+      else if (strcmp (TREE_STRING_POINTER (cst), "keep") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk-inline") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk-extern") != 0)
+	{
+	  warning (OPT_Wattributes,
+		   "argument to %qE attribute is not "
+		   "(keep|thunk|thunk-inline|thunk-extern)", name);
+	  *no_add_attrs = true;
+	}
+    }
+
+  return NULL_TREE;
+}
+
+static tree
+ix86_handle_fndecl_attribute (tree *node, tree name,
+                              tree args,
+                              int flags ATTRIBUTE_UNUSED, bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    {
+      warning (OPT_Wattributes, "%qE attribute only applies to functions",
+               name);
+      *no_add_attrs = true;
+    }
+
+  if (is_attribute_p ("indirect_branch", name))
+    {
+      tree cst = TREE_VALUE (args);
+      if (TREE_CODE (cst) != STRING_CST)
+	{
+	  warning (OPT_Wattributes,
+		   "%qE attribute requires a string constant argument",
+		   name);
+	  *no_add_attrs = true;
+	}
+      else if (strcmp (TREE_STRING_POINTER (cst), "keep") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk-inline") != 0
+	       && strcmp (TREE_STRING_POINTER (cst), "thunk-extern") != 0)
+	{
+	  warning (OPT_Wattributes,
+		   "argument to %qE attribute is not "
+		   "(keep|thunk|thunk-inline|thunk-extern)", name);
+	  *no_add_attrs = true;
+	}
+    }
+
   return NULL_TREE;
 }
 
@@ -25233,6 +25836,7 @@ static const struct attribute_spec ix86_attribute_table[] =
 #endif
   { "ms_struct", 0, 0, false, false,  false, ix86_handle_struct_attribute },
   { "gcc_struct", 0, 0, false, false,  false, ix86_handle_struct_attribute },
+  { "indirect_branch", 1, 1, true, false, false, ix86_handle_fndecl_attribute },
 #ifdef SUBTARGET_ATTRIBUTE_TABLE
   SUBTARGET_ATTRIBUTE_TABLE,
 #endif
@@ -25444,6 +26048,9 @@ x86_builtin_vectorization_cost (bool runtime_test)
 
 #undef TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST
 #define TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST x86_builtin_vectorization_cost
+
+#undef TARGET_SET_CURRENT_FUNCTION
+#define TARGET_SET_CURRENT_FUNCTION ix86_set_current_function
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
