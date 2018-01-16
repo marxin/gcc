@@ -560,7 +560,9 @@
 
 ;; Test for a valid operand for indirect branch.
 (define_predicate "indirect_branch_operand"
-  (match_operand 0 "nonimmediate_operand"))
+   (ior (match_operand 0 "register_operand")
+       (and (not (match_test "ix86_indirect_branch_register"))
+	    (match_operand 0 "memory_operand"))))
 
 ;; Test for a valid operand for a call instruction.
 (define_predicate "call_insn_operand"
