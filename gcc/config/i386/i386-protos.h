@@ -259,3 +259,4 @@ extern rtx construct_plt_address (rtx);
 #endif
 extern int asm_preferred_eh_data_format (int, int);
 extern const char * ix86_output_call_insn (rtx insn, rtx call_op, int addr_op);
+extern const char * ix86_output_indirect_jmp (rtx call_op, bool ret_p);
