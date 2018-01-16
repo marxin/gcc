@@ -558,6 +558,10 @@
   (ior (match_operand 0 "register_no_elim_operand")
        (match_operand 0 "immediate_operand")))
 
+;; Test for a valid operand for indirect branch.
+(define_predicate "indirect_branch_operand"
+  (match_operand 0 "nonimmediate_operand"))
+
 ;; Test for a valid operand for a call instruction.
 (define_predicate "call_insn_operand"
   (ior (match_operand 0 "constant_call_address_operand")
