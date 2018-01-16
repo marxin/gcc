@@ -19,7 +19,7 @@
 
 ;;; Unused letters:
 ;;;     B     H           TU W
-;;;           h jk          vw  z
+;;;           h jk          v  z
 
 ;; Integer register constraints.
 ;; It is not necessary to define 'r' here.
@@ -101,6 +101,10 @@
 (define_register_constraint "Ym"
  "TARGET_MMX && TARGET_INTER_UNIT_MOVES ? MMX_REGS : NO_REGS"
  "@internal Any MMX register, when inter-unit moves are enabled.")
+
+(define_constraint "w"
+  "@internal Call memory operand."
+    (match_operand 0 "memory_operand"))
 
 ;; Integer constant constraints.
 (define_constraint "I"
