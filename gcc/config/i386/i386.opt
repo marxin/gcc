@@ -287,3 +287,23 @@ Support AES built-in functions and code generation
 mpclmul
 Target Report RejectNegative Var(x86_pclmul)
 Support PCLMUL built-in functions and code generation
+
+mindirect-branch=
+Target Report RejectNegative Joined Enum(indirect_branch) Var(ix86_indirect_branch) Init(0)
+Convert indirect call and jump to call and return thunks.
+
+Enum
+Name(indirect_branch) Type(enum indirect_branch)
+Known indirect branch choices (for use with the -mindirect-branch= option):
+
+EnumValue
+Enum(indirect_branch) String(keep) Value(indirect_branch_keep)
+
+EnumValue
+Enum(indirect_branch) String(thunk) Value(indirect_branch_thunk)
+
+EnumValue
+Enum(indirect_branch) String(thunk-inline) Value(indirect_branch_thunk_inline)
+
+EnumValue
+Enum(indirect_branch) String(thunk-extern) Value(indirect_branch_thunk_extern)
