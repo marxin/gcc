@@ -559,7 +559,7 @@ Objective-C and Objective-C++ Dialects}.
 -momit-leaf-frame-pointer  -mno-red-zone -mno-tls-direct-seg-refs @gol
 -mcmodel=@var{code-model} @gol
 -m32  -m64 -mlarge-data-threshold=@var{num} @gol
--mfused-madd -mno-fused-madd}
+-mfused-madd -mno-fused-madd -mindirect-branch=@var{choice}}
 
 @emph{IA-64 Options}
 @gccoptlist{-mbig-endian  -mlittle-endian  -mgnu-as  -mgnu-ld  -mno-pic @gol
@@ -15284,6 +15284,17 @@ the DSOs.
 
 An overview of these techniques, their benefits and how to use them
 is at @w{@uref{http://gcc.gnu.org/wiki/Visibility}}.
+
+@item -mindirect-branch=@var{choice}
+@opindex -mindirect-branch
+Convert indirect call and jump with @var{choice}.  The default is
+@samp{keep}, which keeps indirect call and jump unmodified.
+@samp{thunk} converts indirect call and jump to call and return thunk.
+@samp{thunk-inline} converts indirect call and jump to inlined call
+and return thunk.  @samp{thunk-extern} converts indirect call and jump
+to external call and return thunk provided in a separate object file.
+You can control this behavior for a specific function by using the
+function attribute @code{indirect_branch}.  @xref{Function Attributes}.
 
 @end table
 
