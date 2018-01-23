@@ -117,6 +117,7 @@
 #include "fibonacci_heap.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "dbgcnt.h"
 
 /* The number of rounds.  In most cases there will only be 4 rounds, but
    when partitioning hot and cold basic blocks into separate sections of
@@ -2521,6 +2522,15 @@ insert_section_boundary_note (void)
           switched_sections = true;
           emit_note_before (NOTE_INSN_SWITCH_TEXT_SECTIONS, BB_HEAD (bb));
           current_partition = BB_PARTITION (bb);
+	}
+      if (BB_PARTITION (bb) == BB_COLD_PARTITION)
+	{
+	  if (dbg_cnt (cold_trap))
+	    {
+	      rtx_insn *insn = targetm.gen_trap ();
+	      rtx label = BB_HEAD (bb);
+	      emit_insn_after (insn, label);
+	    }
 	}
     }
 
