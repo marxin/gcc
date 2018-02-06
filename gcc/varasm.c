@@ -1790,6 +1790,8 @@ assemble_start_function (tree decl, const char *fnname)
       ASM_OUTPUT_ALIGN (asm_out_file, align);
     }
 
+  int align_functions_log = floor_log2 (align_functions * 2 - 1);
+
   /* Handle a user-specified function alignment.
      Note that we still need to align to DECL_ALIGN, as above,
      because ASM_OUTPUT_MAX_SKIP_ALIGN might not do any alignment at all.  */

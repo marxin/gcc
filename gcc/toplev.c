@@ -1222,7 +1222,6 @@ init_alignments (void)
     align_labels_max_skip = align_labels - 1;
   if (align_functions <= 0)
     align_functions = 1;
-  align_functions_log = floor_log2 (align_functions * 2 - 1);
 }
 
 /* Process the options that have been parsed.  */

@@ -54,7 +54,6 @@ struct target_flag_state {
   int x_align_jumps_max_skip;
   int x_align_labels_log;
   int x_align_labels_max_skip;
-  int x_align_functions_log;
 
   /* The excess precision currently in effect.  */
   enum excess_precision x_flag_excess_precision;
@@ -79,8 +78,6 @@ extern struct target_flag_state *this_target_flag_state;
   (this_target_flag_state->x_align_labels_log)
 #define align_labels_max_skip \
   (this_target_flag_state->x_align_labels_max_skip)
-#define align_functions_log \
-  (this_target_flag_state->x_align_functions_log)
 #define flag_excess_precision \
   (this_target_flag_state->x_flag_excess_precision)
 
