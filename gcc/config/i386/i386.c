@@ -6018,9 +6018,6 @@ get_pc_thunk_name (char name[32], unsigned int regno)
     ASM_GENERATE_INTERNAL_LABEL (name, "LPR", regno);
 }
 
-/* Remember the last target of ix86_set_current_function.  */
-static GTY(()) tree ix86_previous_fndecl;
-
 /* Set the indirect_branch_type field from VALUE string.  */
 
 static void
@@ -6122,15 +6119,8 @@ ix86_set_indirect_branch_type (tree fndecl)
 static void
 ix86_set_current_function (tree fndecl)
 {
-  /* Only change the context if the function changes.  This hook is called
-     several times in the course of compiling a function, and we don't want to
-     slow things down too much or call target_reinit when it isn't safe.  */
-  if (fndecl && fndecl != ix86_previous_fndecl)
-    {
-      ix86_previous_fndecl = fndecl;
-      if (cfun->machine)
-	ix86_set_indirect_branch_type (fndecl);
-    }
+  if (fndecl && cfun->machine)
+    ix86_set_indirect_branch_type (fndecl);
 }
 
 /* Output indirect branch via a call and return thunk.  CALL_OP is a
