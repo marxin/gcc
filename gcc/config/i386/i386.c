@@ -1814,9 +1814,6 @@ ix86_using_red_zone (void)
 static enum indirect_branch
 get_indirect_branch_type_from_string (const char *value)
 {
-  if (value == NULL)
-    return indirect_branch_unset;
-
   if (strcmp (value, "keep") == 0)
     return indirect_branch_keep;
   else if (strcmp (value, "thunk") == 0)
@@ -6018,22 +6015,14 @@ get_pc_thunk_name (char name[32], unsigned int regno)
     ASM_GENERATE_INTERNAL_LABEL (name, "LPR", regno);
 }
 
-/* Remember the last target of ix86_set_current_function.  */
-static GTY(()) tree ix86_previous_fndecl;
-
 /* Set the indirect_branch_type field from VALUE string.  */
 
 static void
 ix86_set_indirect_branch_type_from_string (const char *value)
 {
-  if (value == NULL)
-    cfun->machine->indirect_branch_type = indirect_branch_keep;
-  else
-    {
-      cfun->machine->indirect_branch_type
-	= get_indirect_branch_type_from_string (value);
-      gcc_assert (cfun->machine->indirect_branch_type != indirect_branch_unset);
-    }
+  cfun->machine->indirect_branch_type
+    = get_indirect_branch_type_from_string (value);
+  gcc_assert (cfun->machine->indirect_branch_type != indirect_branch_unset);
 }
 
 /* Set the function_return_type field from VALUE string.  */
@@ -6041,14 +6030,9 @@ ix86_set_indirect_branch_type_from_string (const char *value)
 static void
 ix86_set_function_return_type_from_string (const char *value)
 {
-  if (value == NULL)
-    cfun->machine->function_return_type = indirect_branch_keep;
-  else
-    {
-      cfun->machine->function_return_type
-	= get_indirect_branch_type_from_string (value);
-      gcc_assert (cfun->machine->function_return_type != indirect_branch_unset);
-    }
+  cfun->machine->function_return_type
+    = get_indirect_branch_type_from_string (value);
+  gcc_assert (cfun->machine->function_return_type != indirect_branch_unset);
 }
 
 
@@ -6122,15 +6106,8 @@ ix86_set_indirect_branch_type (tree fndecl)
 static void
 ix86_set_current_function (tree fndecl)
 {
-  /* Only change the context if the function changes.  This hook is called
-     several times in the course of compiling a function, and we don't want to
-     slow things down too much or call target_reinit when it isn't safe.  */
-  if (fndecl && fndecl != ix86_previous_fndecl)
-    {
-      ix86_previous_fndecl = fndecl;
-      if (cfun->machine)
-	ix86_set_indirect_branch_type (fndecl);
-    }
+  if (fndecl && cfun->machine)
+    ix86_set_indirect_branch_type (fndecl);
 }
 
 /* Output indirect branch via a call and return thunk.  CALL_OP is a
@@ -6349,6 +6326,7 @@ ix86_output_indirect_branch (rtx call_op, bool sibcall_p)
 const char *
 ix86_output_indirect_jmp (rtx call_op, bool ret_p)
 {
+  gcc_assert (cfun->machine->indirect_branch_type != indirect_branch_unset);
   if (cfun->machine->indirect_branch_type != indirect_branch_keep)
     {
       /* We can't have red-zone if this isn't a function return since
@@ -6370,6 +6348,7 @@ ix86_output_indirect_jmp (rtx call_op, bool ret_p)
 const char *
 ix86_output_function_return (bool long_p)
 {
+  gcc_assert (cfun->machine->indirect_branch_type != indirect_branch_unset);
   if (cfun->machine->function_return_type != indirect_branch_keep)
     {
       char thunk_name[32];

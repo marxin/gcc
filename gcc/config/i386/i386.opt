@@ -289,11 +289,11 @@ Target Report RejectNegative Var(x86_pclmul)
 Support PCLMUL built-in functions and code generation
 
 mindirect-branch=
-Target Report RejectNegative Joined Enum(indirect_branch) Var(ix86_indirect_branch) Init(0)
+Target Report RejectNegative Joined Enum(indirect_branch) Var(ix86_indirect_branch) Init("keep")
 Convert indirect call and jump to call and return thunks.
 
 mfunction-return=
-Target Report RejectNegative Joined Enum(indirect_branch) Var(ix86_function_return) Init(0)
+Target Report RejectNegative Joined Enum(indirect_branch) Var(ix86_function_return) Init("keep")
 Convert function return to call and return thunk.
 
 Enum
