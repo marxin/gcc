@@ -471,20 +471,10 @@ get_attr_min_length (rtx_insn *insn)
    `middle bits', so we have to assume the worst when aligning up from an
    address mod X to one mod Y, which is Y - X.  */
 
-#ifndef LABEL_ALIGN
-#define LABEL_ALIGN(LABEL) align_labels_log
-#endif
-
-#ifndef LOOP_ALIGN
-#define LOOP_ALIGN(LABEL) align_loops_log
-#endif
+#define ALIGN_LOG2(alignment) (alignment <= 2 ? 0 : floor_log2 (alignment * 2 - 1))
 
 #ifndef LABEL_ALIGN_AFTER_BARRIER
 #define LABEL_ALIGN_AFTER_BARRIER(LABEL) 0
-#endif
-
-#ifndef JUMP_ALIGN
-#define JUMP_ALIGN(LABEL) align_jumps_log
 #endif
 
 int
@@ -717,7 +707,7 @@ compute_alignments (void)
 		     bb_loop_depth (bb));
 	  continue;
 	}
-      max_log = LABEL_ALIGN (label);
+      max_log = ALIGN_LOG2 (align_labels);
       max_skip = targetm.asm_out.label_align_max_skip (label);
       profile_count fallthru_count = profile_count::zero ();
       profile_count branch_count = profile_count::zero ();
@@ -764,7 +754,7 @@ compute_alignments (void)
 		      <= ENTRY_BLOCK_PTR_FOR_FN (cfun)
 			   ->count.apply_scale (1, 2)))))
 	{
-	  log = JUMP_ALIGN (label);
+	  log = ALIGN_LOG2 (align_jumps);
 	  if (dump_file)
 	    fprintf (dump_file, "  jump alignment added.\n");
 	  if (max_log < log)
@@ -784,7 +774,7 @@ compute_alignments (void)
 	      > fallthru_count.apply_scale
 		    (PARAM_VALUE (PARAM_ALIGN_LOOP_ITERATIONS), 1)))
 	{
-	  log = LOOP_ALIGN (label);
+	  log = ALIGN_LOG2 (align_loops);
 	  if (dump_file)
 	    fprintf (dump_file, "  internal loop alignment added.\n");
 	  if (max_log < log)
@@ -953,7 +943,7 @@ shorten_branches (rtx_insn *first)
 	  rtx_jump_table_data *table = jump_table_for_label (label);
 	  if (!table)
 	    {
-	      log = LABEL_ALIGN (label);
+	      log = ALIGN_LOG2 (align_labels);
 	      if (max_log < log)
 		{
 		  max_log = log;

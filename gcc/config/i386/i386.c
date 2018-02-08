@@ -3351,15 +3351,19 @@ ix86_default_align (struct gcc_options *opts)
       opts->x_align_loops = processor_target_table[ix86_tune].align_loop;
       align_loops_max_skip = processor_target_table[ix86_tune].align_loop_max_skip;
     }
+  else
+    align_loops_max_skip = 0;
+
   if (opts->x_align_jumps == 0)
     {
       opts->x_align_jumps = processor_target_table[ix86_tune].align_jump;
       align_jumps_max_skip = processor_target_table[ix86_tune].align_jump_max_skip;
     }
+  else
+    align_jumps_max_skip = 0;
+
   if (opts->x_align_functions == 0)
-    {
-      opts->x_align_functions = processor_target_table[ix86_tune].align_func;
-    }
+    opts->x_align_functions = processor_target_table[ix86_tune].align_func;
 }
 
 /* Implement TARGET_OVERRIDE_OPTIONS_AFTER_CHANGE hook.  */

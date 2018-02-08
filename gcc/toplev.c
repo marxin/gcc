@@ -1209,15 +1209,12 @@ init_alignments (void)
     align_loops = 1;
   if (align_loops_max_skip > align_loops)
     align_loops_max_skip = align_loops - 1;
-  align_loops_log = floor_log2 (align_loops * 2 - 1);
   if (align_jumps <= 0)
     align_jumps = 1;
   if (align_jumps_max_skip > align_jumps)
     align_jumps_max_skip = align_jumps - 1;
-  align_jumps_log = floor_log2 (align_jumps * 2 - 1);
   if (align_labels <= 0)
     align_labels = 1;
-  align_labels_log = floor_log2 (align_labels * 2 - 1);
   if (align_labels_max_skip > align_labels)
     align_labels_max_skip = align_labels - 1;
   if (align_functions <= 0)

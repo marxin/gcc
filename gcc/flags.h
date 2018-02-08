@@ -48,11 +48,8 @@ struct target_flag_state {
      0 means `use default', 1 means `don't align'.
      For each variable, there is an _log variant which is the power
      of two not less than the variable, for .align output.  */
-  int x_align_loops_log;
   int x_align_loops_max_skip;
-  int x_align_jumps_log;
   int x_align_jumps_max_skip;
-  int x_align_labels_log;
   int x_align_labels_max_skip;
 
   /* The excess precision currently in effect.  */
@@ -66,16 +63,10 @@ extern struct target_flag_state *this_target_flag_state;
 #define this_target_flag_state (&default_target_flag_state)
 #endif
 
-#define align_loops_log \
-  (this_target_flag_state->x_align_loops_log)
 #define align_loops_max_skip \
   (this_target_flag_state->x_align_loops_max_skip)
-#define align_jumps_log \
-  (this_target_flag_state->x_align_jumps_log)
 #define align_jumps_max_skip \
   (this_target_flag_state->x_align_jumps_max_skip)
-#define align_labels_log \
-  (this_target_flag_state->x_align_labels_log)
 #define align_labels_max_skip \
   (this_target_flag_state->x_align_labels_max_skip)
 #define flag_excess_precision \
