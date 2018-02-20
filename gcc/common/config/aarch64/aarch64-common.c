@@ -175,7 +175,8 @@ static const struct arch_to_arch_name all_architectures[] =
    aarch64_parse_opt_result describing the result.  */
 
 enum aarch64_parse_opt_result
-aarch64_parse_extension (const char *str, unsigned long *isa_flags)
+aarch64_parse_extension (const char *str, unsigned long *isa_flags,
+			 char **invalid_extension)
 {
   /* The extension string is parsed left to right.  */
   const struct aarch64_option_extension *opt = NULL;
@@ -226,6 +227,11 @@ aarch64_parse_extension (const char *str, unsigned long *isa_flags)
       if (opt->name == NULL)
 	{
 	  /* Extension not found in list.  */
+	  if (invalid_extension)
+	    {
+	      *invalid_extension = xstrdup (str);
+	      (*invalid_extension)[len] = '\0';
+	    }
 	  return AARCH64_PARSE_INVALID_FEATURE;
 	}
 
@@ -233,6 +239,16 @@ aarch64_parse_extension (const char *str, unsigned long *isa_flags)
     };
 
   return AARCH64_PARSE_OK;
+}
+
+/* Append all extension candidates and put them to CANDIDATES vector.  */
+
+void
+aarch64_get_all_extension_candidates (auto_vec<const char *> *candidates)
+{
+  const struct aarch64_option_extension *opt;
+  for (opt = all_extensions; opt->name != NULL; opt++)
+    candidates->safe_push (opt->name);
 }
 
 /* Return a string representation of ISA_FLAGS.  DEFAULT_ARCH_FLAGS
@@ -322,7 +338,7 @@ aarch64_rewrite_selected_cpu (const char *name)
     fatal_error (input_location, "unknown value %qs for -mcpu", name);
 
   unsigned long extensions = p_to_a->flags;
-  aarch64_parse_extension (extension_str.c_str (), &extensions);
+  aarch64_parse_extension (extension_str.c_str (), &extensions, NULL);
 
   std::string outstr = a_to_an->arch_name
 	+ aarch64_get_extension_string_for_isa_flags (extensions,
