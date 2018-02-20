@@ -4193,6 +4193,11 @@ ix86_option_override_internal (bool main_args_p,
 		|| ((processor_alias_table[i].flags & PTA_64BIT) != 0)))
 	  candidates.safe_push (processor_alias_table[i].name);
 
+#ifdef HAVE_LOCAL_CPU_DETECT
+      /* Add also "native" as possible value.  */
+      candidates.safe_push ("native");
+#endif
+
       char *s;
       const char *hint
 	= candidates_list_and_hint (opts->x_ix86_arch_string, s, candidates);
