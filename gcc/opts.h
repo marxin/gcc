@@ -191,6 +191,9 @@ struct cl_enum
 
   /* Function to get the value of a variable of this type.  */
   int (*get) (const void *var);
+
+  /* For to be printed in help.  */
+  bool force_help;
 };
 
 extern const struct cl_enum cl_enums[];

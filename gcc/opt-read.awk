@@ -89,6 +89,9 @@ BEGIN {
 			enum_index[name] = n_enums
 			enum_unknown_error[name] = unknown_error
 			enum_help[name] = $3
+			enum_force_help[name] = test_flag("ForceHelp", props, "true")
+			if (enum_force_help[name] == "")
+			  enum_force_help[name] = "false"
 			n_enums++
 		}
 		else if ($1 == "EnumValue")  {

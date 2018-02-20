@@ -1337,7 +1337,8 @@ print_filtered_help (unsigned int include_flags,
     {
       unsigned int j, pos;
 
-      if (opts->x_help_enum_printed[i] != 1)
+      if (opts->x_help_enum_printed[i] != 1
+	  && !cl_enums[i].force_help)
 	continue;
       if (cl_enums[i].help == NULL)
 	continue;
