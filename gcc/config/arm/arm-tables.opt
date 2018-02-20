@@ -21,8 +21,8 @@
 ; <http://www.gnu.org/licenses/>.
 
 Enum
-Name(processor_type) Type(enum processor_type)
-Known ARM CPUs (for use with the -mcpu= and -mtune= options):
+Name(processor_type) Type(enum processor_type) ForceHelp
+Known ARM CPUs (for use with the -mtune= options):
 
 EnumValue
 Enum(processor_type) String(arm8) Value( TARGET_CPU_arm8)
@@ -298,7 +298,7 @@ EnumValue
 Enum(processor_type) String(cortex-r52) Value( TARGET_CPU_cortexr52)
 
 Enum
-Name(arm_arch) Type(int)
+Name(arm_arch) Type(int) ForceHelp
 Known ARM architectures (for use with the -march= option):
 
 EnumValue

@@ -167,7 +167,8 @@ for (i = 0; i < n_enums; i++) {
 	print "    cl_enum_" name "_data,"
 	print "    sizeof (" enum_type[name] "),"
 	print "    cl_enum_" name "_set,"
-	print "    cl_enum_" name "_get"
+	print "    cl_enum_" name "_get,"
+	print "    " enum_force_help[name]
 	print "  },"
 }
 print "};"

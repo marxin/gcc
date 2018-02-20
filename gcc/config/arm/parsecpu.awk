@@ -441,8 +441,8 @@ function gen_opt () {
     boilerplate("md")
 
     print "Enum"
-    print "Name(processor_type) Type(enum processor_type)"
-    print "Known ARM CPUs (for use with the -mcpu= and -mtune= options):\n"
+    print "Name(processor_type) Type(enum processor_type) ForceHelp"
+    print "Known ARM CPUs (for use with the -mtune= options):\n"
 
     ncpus = split (cpu_list, cpus)
 
@@ -454,7 +454,7 @@ function gen_opt () {
     }
 
     print "Enum"
-    print "Name(arm_arch) Type(int)"
+    print "Name(arm_arch) Type(int) ForceHelp"
     print "Known ARM architectures (for use with the -march= option):\n"
 
     narchs = split (arch_list, archs)

@@ -120,6 +120,10 @@ being described by this record.
 This property is required; it says what value (representable as
 @code{int}) should be used for the given string.
 
+@item ForceHelp
+This property is optional.  If present, enum values is printed
+in @option{--help} output.
+
 @item Canonical
 This property is optional.  If present, it says the present string is
 the canonical one among all those with the given value.  Other strings
