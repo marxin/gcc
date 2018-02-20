@@ -1303,6 +1303,9 @@ print_filtered_help (unsigned int include_flags,
       if (option->var_type == CLVC_ENUM
 	  && opts->x_help_enum_printed[option->var_enum] != 2)
 	opts->x_help_enum_printed[option->var_enum] = 1;
+      else if (option->var_enum_help != -1
+	       && opts->x_help_enum_printed[option->var_enum_help] != 2)
+	opts->x_help_enum_printed[option->var_enum_help] = 1;
     }
 
   if (! found)

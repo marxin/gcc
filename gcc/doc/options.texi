@@ -120,6 +120,11 @@ being described by this record.
 This property is required; it says what value (representable as
 @code{int}) should be used for the given string.
 
+@item EnumHelp(@var{name})
+Some string options accept enum values as arguments.
+When using @samp{EnumHelp}, list of possible values is listed
+in @option{--help} output.
+
 @item Canonical
 This property is optional.  If present, it says the present string is
 the canonical one among all those with the given value.  Other strings

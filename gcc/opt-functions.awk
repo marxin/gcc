@@ -232,37 +232,42 @@ function var_type_struct(flags)
 }
 
 # Given that an option has flags FLAGS, return an initializer for the
-# "var_enum", "var_type" and "var_value" fields of its cl_options[] entry.
+# "var_enum", "var_enum_help", "var_type" and "var_value" fields of its cl_options[] entry.
 function var_set(flags)
 {
+  help_enum_index = "-1"
+	if (flag_set_p("HelpEnum.*", flags)) {
+		help_enum_index = enum_index[opt_args("HelpEnum", flags)];
+	}
+
 	if (flag_set_p("Defer", flags))
-		return "0, CLVC_DEFER, 0"
+		return "-1, -1, CLVC_DEFER, 0"
 	s = nth_arg(1, opt_args("Var", flags))
 	if (s != "")
-		return "0, CLVC_EQUAL, " s
+		return "-1, -1, CLVC_EQUAL, " s
 	s = opt_args("Mask", flags);
 	if (s != "") {
 		vn = var_name(flags);
 		if (vn)
-			return "0, CLVC_BIT_SET, OPTION_MASK_" s
+			return "-1, -1, CLVC_BIT_SET, OPTION_MASK_" s
 		else
-			return "0, CLVC_BIT_SET, MASK_" s
+			return "-1, -1, CLVC_BIT_SET, MASK_" s
 	}
 	s = nth_arg(0, opt_args("InverseMask", flags));
 	if (s != "") {
 		vn = var_name(flags);
 		if (vn)
-			return "0, CLVC_BIT_CLEAR, OPTION_MASK_" s
+			return "-1, -1, CLVC_BIT_CLEAR, OPTION_MASK_" s
 		else
-			return "0, CLVC_BIT_CLEAR, MASK_" s
+			return "-1, -1, CLVC_BIT_CLEAR, MASK_" s
 	}
 	if (flag_set_p("Enum.*", flags)) {
 		en = opt_args("Enum", flags);
-		return enum_index[en] ", CLVC_ENUM, 0"
+		return enum_index[en] ", -1, CLVC_ENUM, 0"
 	}
 	if (var_type(flags) == "const char *")
-		return "0, CLVC_STRING, 0"
-	return "0, CLVC_BOOLEAN, 0"
+		return "-1, " help_enum_index ", CLVC_STRING, 0"
+	return "-1, -1, CLVC_BOOLEAN, 0"
 }
 
 # Given that an option called NAME has flags FLAGS, return an initializer

@@ -107,7 +107,10 @@ struct cl_option
   unsigned short flag_var_offset;
   /* Index in cl_enums of enum used for this option's arguments, for
      CLVC_ENUM options.  */
-  unsigned short var_enum;
+  short var_enum;
+  /* Index in cl_enums of enum used for string options which
+     have strings as possible values.  */
+  short var_enum_help;
   /* How this option's value is determined and sets a field.  */
   enum cl_var_type var_type;
   /* Value or bit-mask with which to set a field.  */
