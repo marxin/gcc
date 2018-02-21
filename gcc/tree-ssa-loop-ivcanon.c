@@ -63,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-inline.h"
 #include "tree-cfgcleanup.h"
 #include "builtins.h"
+#include "dbgcnt.h"
 
 /* Specifies types of loops that may be unrolled.  */
 
@@ -696,6 +697,9 @@ try_unroll_loop_completely (struct loop *loop,
   unsigned HOST_WIDE_INT n_unroll = 0;
   bool n_unroll_found = false;
   edge edge_to_cancel = NULL;
+
+  if (!dbg_cnt(unroll))
+    return false;
 
   /* See if we proved number of iterations to be low constant.
 
