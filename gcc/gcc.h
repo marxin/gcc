@@ -47,6 +47,7 @@ class driver
   void maybe_putenv_OFFLOAD_TARGETS () const;
   void build_option_suggestions (void);
   const char *suggest_option (const char *bad_opt);
+  void suggest_completion (const char *starting);
   void handle_unrecognized_options ();
   int maybe_print_and_exit () const;
   bool prepare_infiles ();
