@@ -179,6 +179,20 @@ param_string_value_p (enum compiler_param index, const char *value_name,
   return true;
 }
 
+void
+param_print_candidates (const char *starting)
+{
+  const char *prefix = "-param=";
+  size_t l = strlen (starting);
+  for (unsigned i = 0; i < num_compiler_params; ++i)
+    {
+      const char *candidate = compiler_params[i].option;
+      if (strlen (candidate) >= l
+	  && strstr (candidate, starting) == candidate)
+	printf ("-%s%s\n", prefix,candidate);
+    }
+}
+
 /* Set the VALUE associated with the parameter given by NAME in PARAMS
    and PARAMS_SET.  */
 

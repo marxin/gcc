@@ -220,6 +220,8 @@ static int print_help_list;
 
 static int print_version;
 
+static const char *completion = NULL;
+
 /* Flag indicating whether we should ONLY print the command and
    arguments (like verbose_flag) without executing the command.
    Displayed arguments are quoted so that the generated command
@@ -3818,6 +3820,11 @@ driver_handle_option (struct gcc_options *opts,
       add_linker_option ("--version", strlen ("--version"));
       break;
 
+    case OPT__completion_:
+      validated = true;
+      completion = decoded->arg;
+      break;
+
     case OPT__help:
       print_help_list = 1;
 
@@ -7300,6 +7307,12 @@ driver::main (int argc, char **argv)
   maybe_putenv_OFFLOAD_TARGETS ();
   handle_unrecognized_options ();
 
+  if (completion)
+    {
+      suggest_completion (completion);
+      return 0;
+    }
+
   if (!maybe_print_and_exit ())
     return 0;
 
@@ -7866,6 +7879,36 @@ driver::suggest_option (const char *bad_opt)
   return find_closest_string
     (bad_opt,
      (auto_vec <const char *> *) m_option_suggestions);
+}
+
+void
+driver::suggest_completion (const char *starting)
+{
+  /* Lazily populate m_option_suggestions.  */
+  if (!m_option_suggestions)
+    build_option_suggestions ();
+  gcc_assert (m_option_suggestions);
+
+  if (starting[0] == '-')
+    starting++;
+
+  size_t l = strlen (starting);
+  const char *prefix = "-param=";
+  if (l >= strlen (prefix) && strstr (starting, prefix) == starting)
+    {
+      starting += strlen (prefix);
+      param_print_candidates (starting);
+      return;
+    }
+
+//  fprintf (stderr, "we want for: '%s'\n", starting);
+  for (int i = 0; i < m_option_suggestions->length (); i++)
+    {
+      char *candidate = (*m_option_suggestions)[i];
+      if (strlen (candidate) >= l
+	  && strstr (candidate, starting) == candidate)
+	printf ("-%s\n", candidate);
+    }
 }
 
 /* Reject switches that no pass was interested in.  */
