@@ -8,7 +8,11 @@
 
 # For more thorough testing, see bootstrap-debug-lean.mk
 
-STAGE1_CFLAGS += -match=native -mtune=native
-STAGE2_CFLAGS += -gtoggle -match=native -mtune=native
-STAGE3_CFLAGS += -match=native -mtune=native
+STAGE1_CFLAGS += -march=native -mtune=native
+STAGE2_CFLAGS += -gtoggle -march=native -mtune=native
+STAGE3_CFLAGS += -march=native -mtune=native
+STAGEprofile_CFLAGS += -march=native -mtune=native
+STAGEtrain_CFLAGS += -march=native -mtune=native
+STAGEfeedback_CFLAGS += -march=native -mtune=native
+
 do-compare = $(SHELL) $(srcdir)/contrib/compare-debug $$f1 $$f2
