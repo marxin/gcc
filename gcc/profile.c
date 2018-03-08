@@ -1271,15 +1271,9 @@ branch_prob (void)
 				 &offset, bb);
 	    }
 
-	  /* Notice GOTO expressions eliminated while constructing the CFG.  */
-	  if (single_succ_p (bb)
-	      && !RESERVED_LOCATION_P (single_succ_edge (bb)->goto_locus))
-	    {
-	      expanded_location curr_location
-		= expand_location (single_succ_edge (bb)->goto_locus);
-	      output_location (curr_location.file, curr_location.line,
-			       &offset, bb);
-	    }
+	  /* Notice that explicit GOTO expression that are in original source
+	     code will be represented in GIMPLE with GIMPLE_PREDICT
+	     of GOTO_PRED type.  */
 
 	  if (offset)
 	    {
