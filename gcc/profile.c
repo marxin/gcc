@@ -64,6 +64,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "dumpfile.h"
 #include "cfgloop.h"
+#include "gimple-predict.h"
 
 #include "profile.h"
 
@@ -1271,9 +1272,30 @@ branch_prob (void)
 				 &offset, bb);
 	    }
 
-	  /* Notice that explicit GOTO expression that are in original source
-	     code will be represented in GIMPLE with GIMPLE_PREDICT
-	     of GOTO_PRED type.  */
+	  /* Notice GOTO expressions eliminated while constructing the CFG.  */
+	  if (single_succ_p (bb)
+	      && !RESERVED_LOCATION_P (single_succ_edge (bb)->goto_locus))
+	    {
+	      bool add = true;
+	      gsi = gsi_last_bb (bb);
+	      if (!gsi_end_p (gsi))
+		{
+		  gsi_prev (&gsi);
+
+		  if (!gsi_end_p (gsi)
+		      && gimple_code (gsi_stmt (gsi)) == GIMPLE_PREDICT
+		      && gimple_predict_predictor (gsi_stmt (gsi)) == PRED_GOTO)
+		    add = false;
+		}
+
+	      if (add)
+		{
+		  expanded_location curr_location
+		    = expand_location (single_succ_edge (bb)->goto_locus);
+		  output_location (curr_location.file, curr_location.line,
+				   &offset, bb);
+		}
+	    }
 
 	  if (offset)
 	    {
