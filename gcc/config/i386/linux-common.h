@@ -126,3 +126,5 @@ extern void file_end_indicate_exec_stack_and_cet (void);
 
 #undef TARGET_ASM_FILE_END
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack_and_cet
+
+#define SUBTARGET_LIBC_FUNC_SPEED ix86_linux_libc_func_speed

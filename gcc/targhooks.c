@@ -1642,6 +1642,15 @@ no_c99_libc_has_function (enum function_class fn_class ATTRIBUTE_UNUSED)
   return false;
 }
 
+/* This hook determines whether a function from libc has a fast implementation
+   FN is present at the runtime.  */
+
+enum libc_speed
+default_libc_func_speed (int)
+{
+  return LIBC_UNKNOWN_SPEED;
+}
+
 tree
 default_builtin_tm_load_store (tree ARG_UNUSED (type))
 {
