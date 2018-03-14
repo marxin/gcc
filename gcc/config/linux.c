@@ -37,3 +37,24 @@ linux_libc_has_function (enum function_class fn_class)
 
   return false;
 }
+
+/* This hook determines whether a function from libc has a fast implementation
+   FN is present at the runtime.  We override it for i386 and glibc C library
+   as this combination provides fast implementation of mempcpy function.  */
+
+enum libc_speed
+ix86_linux_libc_func_speed (int fn)
+{
+  enum built_in_function f = (built_in_function)fn;
+
+  if (!OPTION_GLIBC)
+    return LIBC_UNKNOWN_SPEED;
+
+  switch (f)
+    {
+      case BUILT_IN_MEMPCPY:
+	return LIBC_FAST_SPEED;
+      default:
+	return LIBC_UNKNOWN_SPEED;
+    }
+}

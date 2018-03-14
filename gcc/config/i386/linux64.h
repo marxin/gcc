@@ -37,3 +37,5 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define MUSL_DYNAMIC_LINKER64 "/lib/ld-musl-x86_64.so.1"
 #undef MUSL_DYNAMIC_LINKERX32
 #define MUSL_DYNAMIC_LINKERX32 "/lib/ld-musl-x32.so.1"
+
+#define SUBTARGET_LIBC_FUNC_SPEED ix86_linux_libc_func_speed

@@ -2639,6 +2639,13 @@ DEFHOOK
  bool, (enum function_class fn_class),
  default_libc_has_function)
 
+DEFHOOK
+(libc_func_speed,
+ "This hook determines whether a function from libc has a fast implementation\n\
+@var{fn} is present at the runtime.",
+ libc_speed, (int fn),
+ default_libc_func_speed)
+
 /* True if new jumps cannot be created, to replace existing ones or
    not, at the current point in the compilation.  */
 DEFHOOK

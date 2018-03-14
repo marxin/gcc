@@ -20,3 +20,4 @@ along with GCC; see the file COPYING3.  If not see
 extern bool linux_has_ifunc_p (void);
 
 extern bool linux_libc_has_function (enum function_class fn_class);
+extern enum libc_speed ix86_linux_libc_func_speed (int fn);
