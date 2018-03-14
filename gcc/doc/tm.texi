@@ -5501,6 +5501,10 @@ macro, a reasonable default is used.
 This hook determines whether a function from a class of functions
 @var{fn_class} is present at the runtime.
 @end deftypefn
+@deftypefn {Target Hook} libc_speed TARGET_LIBC_FUNC_SPEED (int @var{fn})
+This hook determines whether a function from libc has a fast implementation
+@var{fn} is present at the runtime.
+@end deftypefn
 
 @defmac NEXT_OBJC_RUNTIME
 Set this macro to 1 to use the "NeXT" Objective-C message sending conventions

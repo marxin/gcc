@@ -205,6 +205,7 @@ extern bool default_have_conditional_execution (void);
 extern bool default_libc_has_function (enum function_class);
 extern bool no_c99_libc_has_function (enum function_class);
 extern bool gnu_libc_has_function (enum function_class);
+extern enum libc_speed default_libc_func_speed (int);
 
 extern tree default_builtin_tm_load_store (tree);
 

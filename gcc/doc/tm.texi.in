@@ -3933,6 +3933,7 @@ macro, a reasonable default is used.
 @end defmac
 
 @hook TARGET_LIBC_HAS_FUNCTION
+@hook TARGET_LIBC_FUNC_SPEED
 
 @defmac NEXT_OBJC_RUNTIME
 Set this macro to 1 to use the "NeXT" Objective-C message sending conventions

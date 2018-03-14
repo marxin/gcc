@@ -48,5 +48,6 @@ main (void)
   return 0;
 }
 
-/* { dg-final { scan-assembler-not "\<mempcpy\>" } } */
-/* { dg-final { scan-assembler "memcpy" } } */
+/* { dg-final { scan-assembler-not "\<mempcpy\>" { target { ! { i?86-*-gnu* x86_64-*-gnu* i?86-*-linux* x86_64-*-linux* } } } } } */
+/* { dg-final { scan-assembler "memcpy" { target  { ! { i?86-*-gnu* x86_64-*-gnu* i?86-*-linux* x86_64-*-linux* } } } } } */
+/* { dg-final { scan-assembler "mempcpy" { target  { i?86-*-gnu* x86_64-*-gnu* i?86-*-linux* x86_64-*-linux* } } } } */

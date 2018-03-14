@@ -384,6 +384,13 @@ enum excess_precision_type
   EXCESS_PRECISION_TYPE_FAST
 };
 
+enum libc_speed
+{
+  LIBC_FAST_SPEED,
+  LIBC_SLOW_SPEED,
+  LIBC_UNKNOWN_SPEED
+};
+
 /* Support for user-provided GGC and PCH markers.  The first parameter
    is a pointer to a pointer, the second a cookie.  */
 typedef void (*gt_pointer_operator) (void *, void *);

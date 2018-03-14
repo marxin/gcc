@@ -3651,13 +3651,26 @@ expand_builtin_memory_copy_args (tree dest, tree src, tree len,
   src_mem = get_memory_rtx (src, len);
   set_mem_align (src_mem, src_align);
 
+  /* emit_block_move_hints can generate a library call to memcpy function.
+     In situations when a libc library provides fast implementation
+     of mempcpy, then it's better to call mempcpy directly.  */
+  bool avoid_libcall
+    = (endp == 1
+       && targetm.libc_func_speed ((int)BUILT_IN_MEMPCPY) == LIBC_FAST_SPEED
+       && target != const0_rtx);
+
   /* Copy word part most expediently.  */
+  bool libcall_avoided = false;
   dest_addr = emit_block_move_hints (dest_mem, src_mem, len_rtx,
 				     CALL_EXPR_TAILCALL (exp)
 				     && (endp == 0 || target == const0_rtx)
 				     ? BLOCK_OP_TAILCALL : BLOCK_OP_NORMAL,
 				     expected_align, expected_size,
-				     min_size, max_size, probable_max_size);
+				     min_size, max_size, probable_max_size,
+				     avoid_libcall ? &libcall_avoided: NULL);
+
+  if (libcall_avoided)
+    return NULL_RTX;
 
   if (dest_addr == 0)
     {

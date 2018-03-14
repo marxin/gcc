@@ -2735,6 +2735,27 @@ ix86_using_red_zone (void)
 	  && (!cfun->machine->has_local_indirect_jump
 	      || cfun->machine->indirect_branch_type == indirect_branch_keep));
 }
+
+/* This hook determines whether a function from libc has a fast implementation
+   FN is present at the runtime.  We override it for i386 and glibc C library
+   as this combination provides fast implementation of mempcpy function.  */
+
+enum libc_speed
+ix86_libc_func_speed (int fn)
+{
+  enum built_in_function f = (built_in_function)fn;
+
+  if (!OPTION_GLIBC)
+    return LIBC_UNKNOWN_SPEED;
+
+  switch (f)
+    {
+      case BUILT_IN_MEMPCPY:
+	return LIBC_FAST_SPEED;
+      default:
+	return LIBC_UNKNOWN_SPEED;
+    }
+}
 
 /* Return a string that documents the current -m options.  The caller is
    responsible for freeing the string.  */
@@ -52104,6 +52125,9 @@ ix86_run_selftests (void)
 
 #undef TARGET_WARN_PARAMETER_PASSING_ABI
 #define TARGET_WARN_PARAMETER_PASSING_ABI ix86_warn_parameter_passing_abi
+
+#undef TARGET_LIBC_FUNC_SPEED
+#define TARGET_LIBC_FUNC_SPEED ix86_libc_func_speed
 
 #if CHECKING_P
 #undef TARGET_RUN_TARGET_SELFTESTS
