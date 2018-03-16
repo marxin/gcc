@@ -24,6 +24,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
 #include "libgcov.h"
+#include "gcov-io.h"
 
 #if defined(inhibit_libc)
 /* If libc and its header files are not available, provide dummy functions.  */
@@ -830,7 +831,8 @@ read_fatal:;
 static
 #endif
 void
-gcov_do_dump (struct gcov_info *list, int run_counted)
+gcov_do_dump (struct gcov_info *list, int run_counted,
+	      gcov_ctr_summary *summary)
 {
   struct gcov_info *gi_ptr;
   struct gcov_filename gf;
@@ -839,6 +841,10 @@ gcov_do_dump (struct gcov_info *list, int run_counted)
   struct gcov_summary this_prg;
 
   crc32 = compute_summary (list, &this_prg, &gf.max_length);
+
+  // TODO
+  if (summary)
+    memcpy (&this_prg.ctrs[GCOV_COUNTER_ARCS], summary, sizeof (*summary));
 
   allocate_filename_struct (&gf);
 #if !GCOV_LOCKED

@@ -207,6 +207,8 @@ struct gcov_info
 #else
   const struct gcov_fn_info **functions;
 #endif /* !IN_GCOV_TOOL */
+  struct gcov_summary *summaries;
+  unsigned n_summaries;		/* number of summaries */
 };
 
 /* Root of a program/shared-object state */
