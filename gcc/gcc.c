@@ -1131,7 +1131,8 @@ static const char *cpp_options =
 "%(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w}\
  %{f*} %{g*:%{%:debug-level-gt(0):%{g*}\
  %{!fno-working-directory:-fworking-directory}}} %{O*}\
- %{undef} %{save-temps*:-fpch-preprocess}";
+ %{undef} %{save-temps*:-fpch-preprocess}\
+ %{Wimplicit-fallthrough*|Werror=implicit-fallthrough*:%{save-temps*:-C}}";
 
 /* This contains cpp options which are not passed when the preprocessor
    output will be used by another program.  */
