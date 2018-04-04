@@ -26,6 +26,7 @@ asan_files = \
 	asan_flags.cc \
 	asan_globals.cc \
 	asan_interceptors.cc \
+	asan_interceptors_string.cc \
 	asan_interceptors_memintrinsics.cc \
 	asan_linux.cc \
 	asan_mac.cc \
