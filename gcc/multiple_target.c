@@ -58,11 +58,11 @@ replace_function_decl (tree *op, int *walk_subtrees, void *data)
   return NULL;
 }
 
-/* If the call in NODE has multiple target attribute with multiple fields,
-   replace it with dispatcher call and create dispatcher (once).  */
+/* If the call in NODE is a target_clone attribute clone, redirect all
+   edges and references that point to cgraph NODE.  */
 
 static void
-create_dispatcher_calls (struct cgraph_node *node)
+redirect_target_clone_callers (struct cgraph_node *node)
 {
   ipa_ref *ref;
 
@@ -300,10 +300,12 @@ create_target_clone (cgraph_node *node, bool definition, char *name)
 }
 
 /* If the function in NODE has multiple target attributes
-   create the appropriate clone for each valid target attribute.  */
+   create the appropriate clone for each valid target attribute.
+   TO_REDIRECT is a vector where we place all newly created clones.  */
 
 static bool
-expand_target_clones (struct cgraph_node *node, bool definition)
+expand_target_clones (struct cgraph_node *node, bool definition,
+		      auto_vec <cgraph_node *> &to_redirect)
 {
   int i;
   /* Parsing target attributes separated by comma.  */
@@ -404,6 +406,8 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       before->next = after;
       after->prev = before;
       DECL_FUNCTION_VERSIONED (new_node->decl) = 1;
+
+      to_redirect.safe_push (new_node);
     }
 
   XDELETEVEC (attrs);
@@ -420,6 +424,8 @@ expand_target_clones (struct cgraph_node *node, bool definition)
     = targetm.target_option.valid_attribute_p (node->decl, NULL,
 					       TREE_VALUE (attributes), 0);
   input_location = saved_loc;
+  to_redirect.safe_push (node);
+
   return ret;
 }
 
@@ -428,13 +434,12 @@ ipa_target_clone (void)
 {
   struct cgraph_node *node;
 
-  bool target_clone_pass = false;
+  auto_vec <cgraph_node *> nodes_to_redirect;
   FOR_EACH_FUNCTION (node)
-    target_clone_pass |= expand_target_clones (node, node->definition);
+    expand_target_clones (node, node->definition, nodes_to_redirect);
 
-  if (target_clone_pass)
-    FOR_EACH_FUNCTION (node)
-      create_dispatcher_calls (node);
+  for (unsigned i = 0; i < nodes_to_redirect.length (); i++)
+    redirect_target_clone_callers (nodes_to_redirect[i]);
 
   return 0;
 }
