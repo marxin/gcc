@@ -88,7 +88,7 @@ create_dispatcher_calls (struct cgraph_node *node)
   if (!idecl)
     {
       error_at (DECL_SOURCE_LOCATION (node->decl),
-		"default target_clones attribute was not set");
+		"default %<target_clones%> attribute was not set");
       return;
     }
 
@@ -165,6 +165,11 @@ create_dispatcher_calls (struct cgraph_node *node)
   symtab->change_decl_assembler_name (node->decl,
 				      clone_function_name (node->decl,
 							   "default"));
+  DECL_COMDAT (node->decl) = 0;
+  DECL_WEAK (node->decl) = 0;
+  DECL_ARTIFICIAL (node->decl) = 1;
+  node->force_output = true;
+  node->set_comdat_group (NULL);
 }
 
 /* Return length of attribute names string,
@@ -216,26 +221,30 @@ get_attr_str (tree arglist, char *attr_str)
 }
 
 /* Return number of attributes separated by comma and put them into ARGS.
-   If there is no DEFAULT attribute return -1.  */
+   If there is no DEFAULT attribute return -1.  If there is an empty
+   string in attribute return -2.  */
 
 static int
-separate_attrs (char *attr_str, char **attrs)
+separate_attrs (char *attr_str, char **attrs, int attrnum)
 {
   int i = 0;
-  bool has_default = false;
+  int default_count = 0;
 
   for (char *attr = strtok (attr_str, ",");
        attr != NULL; attr = strtok (NULL, ","))
     {
       if (strcmp (attr, "default") == 0)
 	{
-	  has_default = true;
+	  default_count++;
 	  continue;
 	}
       attrs[i++] = attr;
     }
-  if (!has_default)
+  if (default_count == 0)
     return -1;
+  else if (i + default_count < attrnum)
+    return -2;
+
   return i;
 }
 
@@ -321,7 +330,7 @@ expand_target_clones (struct cgraph_node *node, bool definition)
     {
       warning_at (DECL_SOURCE_LOCATION (node->decl),
 		  0,
-		  "single target_clones attribute is ignored");
+		  "single %<target_clones%> attribute is ignored");
       return false;
     }
 
@@ -345,11 +354,19 @@ expand_target_clones (struct cgraph_node *node, bool definition)
   int attrnum = get_attr_str (arglist, attr_str);
   char **attrs = XNEWVEC (char *, attrnum);
 
-  attrnum = separate_attrs (attr_str, attrs);
+  attrnum = separate_attrs (attr_str, attrs, attrnum);
   if (attrnum == -1)
     {
       error_at (DECL_SOURCE_LOCATION (node->decl),
 		"default target was not set");
+      XDELETEVEC (attrs);
+      XDELETEVEC (attr_str);
+      return false;
+    }
+  else if (attrnum == -2)
+    {
+      error_at (DECL_SOURCE_LOCATION (node->decl),
+		"an empty string cannot be in %<target_clones%> attribute");
       XDELETEVEC (attrs);
       XDELETEVEC (attr_str);
       return false;
@@ -382,6 +399,7 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       DECL_ATTRIBUTES (new_node->decl) = attributes;
       location_t saved_loc = input_location;
       input_location = DECL_SOURCE_LOCATION (node->decl);
+
       if (!targetm.target_option.valid_attribute_p (new_node->decl, NULL,
 						    TREE_VALUE (attributes),
 						    0))
@@ -427,14 +445,14 @@ static unsigned int
 ipa_target_clone (void)
 {
   struct cgraph_node *node;
+  auto_vec<cgraph_node *> to_dispatch;
 
-  bool target_clone_pass = false;
   FOR_EACH_FUNCTION (node)
-    target_clone_pass |= expand_target_clones (node, node->definition);
+    if (expand_target_clones (node, node->definition))
+      to_dispatch.safe_push (node);
 
-  if (target_clone_pass)
-    FOR_EACH_FUNCTION (node)
-      create_dispatcher_calls (node);
+  for (unsigned i = 0; i < to_dispatch.length (); i++)
+    create_dispatcher_calls (to_dispatch[i]);
 
   return 0;
 }
