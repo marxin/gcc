@@ -684,17 +684,25 @@ odr_subtypes_equivalent_p (tree t1, tree t2,
     {
       if (!types_same_for_odr (t1, t2, true))
         return false;
+      bool o1 = odr_type_p (t1), o2 = odr_type_p (t2);
+      if (!o1 || !o2)
+       	return false;
       /* Limit recursion: if subtypes are ODR types and we know that they are
 	 same, be happy.  We need to call get_odr_type on both subtypes since
 	 we don't know which among t1 and t2 defines the common ODR type and
-	 therefore which call will report the ODR violation, if any.  */
-	 if (!odr_type_p (t1)
-	     || !odr_type_p (t2)
-	     || !COMPLETE_TYPE_P (t1)
-	     || !COMPLETE_TYPE_P (t2)
-	     || (!get_odr_type (t1, true)->odr_violated
-		 && !get_odr_type (t2, true)->odr_violated))
-        return true;
+	 therefore which call will report the ODR violation, if any. 
+	
+	 Be sure to first register subtypes into odr_type_hash so we discover
+	 possible mismatches.  Do register in case T1 is incomplete
+	 because we do not want register any derived types before odr_type_hash
+	 is upated to a complete type.  */
+      if (COMPLETE_TYPE_P (t1) && COMPLETE_TYPE_P (t2))
+	{
+	  register_odr_type (t1);
+	  register_odr_type (t2);
+          if (!get_odr_type (t1, true)->odr_violated)
+	    return true;
+	}
     }
 
   /* Component types, builtins and possibly violating ODR types

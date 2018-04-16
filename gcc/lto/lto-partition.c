@@ -152,8 +152,8 @@ add_symbol_to_partition_1 (ltrans_partition part, symtab_node *node)
   if (cgraph_node *cnode = dyn_cast <cgraph_node *> (node))
     {
       struct cgraph_edge *e;
-      if (!node->alias)
-        part->insns += ipa_fn_summaries->get (cnode)->self_size;
+      if (!node->alias && c == SYMBOL_PARTITION)
+        part->insns += ipa_fn_summaries->get (cnode)->size;
 
       /* Add all inline clones and callees that are duplicated.  */
       for (e = cnode->callees; e; e = e->next_callee)
@@ -276,8 +276,9 @@ undo_partition (ltrans_partition partition, unsigned int n_nodes)
 	delete partition->initializers_visited;
       partition->initializers_visited = NULL;
 
-      if (!node->alias && (cnode = dyn_cast <cgraph_node *> (node)))
-        partition->insns -= ipa_fn_summaries->get (cnode)->self_size;
+      if (!node->alias && (cnode = dyn_cast <cgraph_node *> (node))
+          && node->get_partitioning_class () == SYMBOL_PARTITION)
+        partition->insns -= ipa_fn_summaries->get (cnode)->size;
       lto_symtab_encoder_delete_node (partition->encoder, node);
       node->aux = (void *)((size_t)node->aux - 1);
     }
