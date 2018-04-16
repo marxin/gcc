@@ -1,6 +1,6 @@
-struct Environment {
-  struct AsyncHooks { // { dg-lto-warning "10: type 'struct AsyncHooks' violates the C\\+\\+ One Definition Rule" }
-    int providers_[1]; // { dg-lto-message "the first difference of corresponding definitions is field 'providers_'" }
+struct Environment { // { dg-lto-message "8: a type with different size is defined in another translation unit" }
+  struct AsyncHooks { // { dg-lto-message "10: a different type is defined in another translation unit" }
+    int providers_[1]; // { dg-lto-message "21: a field of same name but different type is defined in another translation unit" }
   };
   AsyncHooks async_hooks_;
 };
