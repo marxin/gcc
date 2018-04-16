@@ -1775,9 +1775,10 @@ lto_read_decls (struct lto_file_decl_data *decl_data, const void *data,
 		}
 	      /* Compute the canonical type of all types.
 		 ???  Should be able to assert that !TYPE_CANONICAL.  */
-	      if (TYPE_P (t) && !TYPE_CANONICAL (t))
+	      if (TYPE_P (t))
 		{
-		  gimple_register_canonical_type (t);
+		  if (!TYPE_CANONICAL (t))
+		    gimple_register_canonical_type (t);
 		  if (odr_type_p (t))
 		    register_odr_type (t);
 		}
