@@ -21,7 +21,7 @@ template < typename _Tp, _Lock_policy, bool = is_array< _Tp >::value,
            bool = is_void::value >
 class __shared_ptr_access {};
 template < typename _Tp, _Lock_policy _Lp >
-class __shared_ptr : __shared_ptr_access< _Tp, _Lp > {
+class __shared_ptr : __shared_ptr_access< _Tp, _Lp > { // { dg-lto-warning "7: type 'struct __shared_ptr' violates the C\\+\\+ One Definition Rule" }
   using element_type = _Tp;
   element_type *_M_ptr;
   __shared_count< _Lp > _M_refcount;
@@ -88,7 +88,7 @@ class ExtNameBuff;
 class ExtSheetBuffer;
 class ExcelToSc;
 class XclImpColRowSettings;
-struct RootData {
+struct RootData { // { dg-lto-warning "8: type 'struct RootData' violates the C\\+\\+ One Definition Rule" }
   BiffTyp eDateiTyp;
   ExtSheetBuffer *pExtSheetBuff;
   SharedFormulaBuffer *pShrfmlaBuff;

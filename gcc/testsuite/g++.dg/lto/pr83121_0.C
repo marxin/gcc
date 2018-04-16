@@ -3,9 +3,9 @@
 /* We need -O0 to avoid the "Environment" locals in the test functions
    from being optimized away.  */
 
-struct Environment { // { dg-lto-warning "8: type 'struct Environment' violates the C\\+\\+ One Definition Rule" }
-  struct AsyncHooks {
-    int providers_[2]; // { dg-lto-message "a field of same name but different type is defined in another translation unit" }
+struct Environment { // { dg-lto-warning "8: type .struct Environment. violates the C\\+\\+ One Definition Rule" }
+  struct AsyncHooks { // { dg-lto-warning "10: type .struct AsyncHooks. violates the C\\+\\+ One Definition Rule" }
+    int providers_[2]; // { dg-lto-message "21: the first difference of corresponding definitions is field .providers_." }
   };
   AsyncHooks async_hooks_;
 };
