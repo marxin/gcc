@@ -88,7 +88,7 @@ class ExtNameBuff;
 class ExtSheetBuffer;
 class ExcelToSc;
 class XclImpColRowSettings;
-struct RootData {
+struct RootData { // { dg-lto-warning "8: type 'struct RootData' violates the C\\+\\+ One Definition Rule" }
   BiffTyp eDateiTyp;
   ExtSheetBuffer *pExtSheetBuff;
   SharedFormulaBuffer *pShrfmlaBuff;
@@ -139,12 +139,12 @@ struct XclRootData { // { dg-lto-warning "8: type 'struct XclRootData' violates 
   RootDataRef mxRD;
   virtual ~XclRootData();
 };
-class XclRoot {
+class XclRoot { // { dg-lto-warning "7: type 'struct XclRoot' violates the C\\+\\+ One Definition Rule" }
 public:
   virtual ~XclRoot();
   XclRootData &mrData;
 };
-class XclImpRoot : XclRoot {};
+class XclImpRoot : XclRoot {}; // { dg-lto-warning "7: type 'struct XclImpRoot' violates the C\\+\\+ One Definition Rule" }
 class XclImpColRowSettings : XclImpRoot {};
 void lcl_ExportExcelBiff() {
 XclRootData aExpData();
