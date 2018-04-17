@@ -981,7 +981,32 @@ compare_virtual_tables (varpool_node *prevailing, varpool_node *vtable)
 }
 
 static int
-cmp_type_location (tree p1, tree p2)
+cmp_types_by_location (location_t loc1, location_t loc2)
+{
+  expanded_location xloc1 = expand_location (loc1);
+  expanded_location xloc2 = expand_location (loc2);
+
+  if (xloc1.file == NULL && xloc2.file == NULL)
+    return 0;
+  else if (xloc1.file != NULL && xloc2.file == NULL)
+    return -1;
+  else if (xloc1.file == NULL && xloc2.file != NULL)
+    return 1;
+
+  int r = strcmp (xloc1.file, xloc2.file);
+  if (r == 0)
+    {
+      if (xloc1.line == xloc2.line)
+	return xloc1.column - xloc2.column;
+      else
+       return xloc1.line - xloc2.line;
+    }
+  else
+    return r;
+}
+
+static int
+cmp_types_by_location (tree p1, tree p2)
 {
   if (p1 == p2)
     return 0;
@@ -992,25 +1017,8 @@ cmp_type_location (tree p1, tree p2)
   if (tname1 == tname2)
     return 0;
 
-  const char *f1 = DECL_SOURCE_FILE (tname1);
-  const char *f2 = DECL_SOURCE_FILE (tname2);
-
-  int r = strcmp (f1, f2);
-  if (r == 0)
-    {
-      int l1 = DECL_SOURCE_LINE (tname1);
-      int l2 = DECL_SOURCE_LINE (tname2);
-      if (l1 == l2)
-       {
-        int l1 = DECL_SOURCE_COLUMN (tname1);
-        int l2 = DECL_SOURCE_COLUMN (tname2);
-        return l1 - l2;
-       }
-      else
-       return l1 - l2;
-    }
-  else
-    return r;
+  return cmp_types_by_location (DECL_SOURCE_LOCATION (tname1),
+				DECL_SOURCE_LOCATION (tname2));
 }
 
 /* Output ODR violation warning about T1 and T2 with REASON.
@@ -1023,7 +1031,7 @@ void
 warn_odr (tree t1, tree t2, tree st1, tree st2,
 	  bool warn, bool *warned, const char *reason)
 {
-  if (cmp_type_location (t1, t2) > 0)
+  if (cmp_types_by_location (t1, t2) > 0)
     {
       std::swap (t1, t2);
       std::swap (st1, st2);
@@ -1118,35 +1126,11 @@ warn_types_mismatch (tree t1, tree t2, location_t loc1, location_t loc2)
 		      : UNKNOWN_LOCATION;
   bool loc_t2_useful = false;
 
-  expanded_location xloc1 = expand_location (loc_t1);
-  expanded_location xloc2 = expand_location (loc_t2);
-
-  bool doswap = false;
-  if (xloc1.file != NULL && xloc2.file != NULL)
+  if (cmp_types_by_location (loc_t1, loc_t2) > 0)
     {
-      int r = strcmp (xloc1.file, xloc2.file);
-      if (r == 0)
-	{
-	  if (xloc1.line == xloc2.line)
-	    {
-	      if (xloc1.column > xloc2.column)
-		doswap = true;
-	    }
-	  else if (xloc1.line > xloc2.line)
-	    doswap = true;
-	}
-      else if (r > 0)
-	doswap = true;
-
-      if (doswap)
-	{
-	  std::swap (t1, t2);
-	  std::swap (loc_t1, loc_t2);
-	  std::swap (xloc1, xloc2);
-	}
+      std::swap (t1, t2);
+      std::swap (loc_t1, loc_t2);
     }
-  else if (xloc1.file == NULL && xloc2.file != NULL)
-    doswap = true;
 
   /* With LTO it is a common case that the location of both types match.
      See if T2 has a location that is different from T1. If so, we will
@@ -1159,6 +1143,8 @@ warn_types_mismatch (tree t1, tree t2, location_t loc1, location_t loc2)
 	loc_t2_useful = true;
       else
 	{
+	  expanded_location xloc1 = expand_location (loc_t1);
+	  expanded_location xloc2 = expand_location (loc_t2);
 	  if (strcmp (xloc1.file, xloc2.file)
 	      || xloc1.line != xloc2.line
 	      || xloc1.column != xloc2.column)
