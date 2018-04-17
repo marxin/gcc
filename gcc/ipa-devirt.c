@@ -964,6 +964,47 @@ compare_virtual_tables (varpool_node *prevailing, varpool_node *vtable)
     }
 }
 
+static int
+cmp_types_by_location (location_t loc1, location_t loc2)
+{
+  expanded_location xloc1 = expand_location (loc1);
+  expanded_location xloc2 = expand_location (loc2);
+
+  if (xloc1.file == NULL && xloc2.file == NULL)
+    return 0;
+  else if (xloc1.file != NULL && xloc2.file == NULL)
+    return -1;
+  else if (xloc1.file == NULL && xloc2.file != NULL)
+    return 1;
+
+  int r = strcmp (xloc1.file, xloc2.file);
+  if (r == 0)
+    {
+      if (xloc1.line == xloc2.line)
+	return xloc1.column - xloc2.column;
+      else
+       return xloc1.line - xloc2.line;
+    }
+  else
+    return r;
+}
+
+static int
+cmp_types_by_location (tree p1, tree p2)
+{
+  if (p1 == p2)
+    return 0;
+
+  tree tname1 = TYPE_NAME (p1);
+  tree tname2 = TYPE_NAME (p2);
+
+  if (tname1 == tname2)
+    return 0;
+
+  return cmp_types_by_location (DECL_SOURCE_LOCATION (tname1),
+				DECL_SOURCE_LOCATION (tname2));
+}
+
 /* Output ODR violation warning about T1 and T2 with REASON.
    Display location of ST1 and ST2 if REASON speaks about field or
    method of the type.
@@ -974,6 +1015,12 @@ void
 warn_odr (tree t1, tree t2, tree st1, tree st2,
 	  bool warn, bool *warned, const char *reason)
 {
+  if (cmp_types_by_location (t1, t2) > 0)
+    {
+      std::swap (t1, t2);
+      std::swap (st1, st2);
+    }
+
   tree decl2 = TYPE_NAME (t2);
   if (warned)
     *warned = false;
@@ -1063,6 +1110,12 @@ warn_types_mismatch (tree t1, tree t2, location_t loc1, location_t loc2)
 		      : UNKNOWN_LOCATION;
   bool loc_t2_useful = false;
 
+  if (cmp_types_by_location (loc_t1, loc_t2) > 0)
+    {
+      std::swap (t1, t2);
+      std::swap (loc_t1, loc_t2);
+    }
+
   /* With LTO it is a common case that the location of both types match.
      See if T2 has a location that is different from T1. If so, we will
      inform user about the location.
@@ -1076,7 +1129,6 @@ warn_types_mismatch (tree t1, tree t2, location_t loc1, location_t loc2)
 	{
 	  expanded_location xloc1 = expand_location (loc_t1);
 	  expanded_location xloc2 = expand_location (loc_t2);
-
 	  if (strcmp (xloc1.file, xloc2.file)
 	      || xloc1.line != xloc2.line
 	      || xloc1.column != xloc2.column)
