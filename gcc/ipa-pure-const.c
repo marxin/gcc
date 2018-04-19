@@ -965,7 +965,7 @@ malloc_candidate_p (function *fun, bool ipa)
 	  cgraph_edge *cs = node->get_edge (call_stmt);
 	  if (cs)
 	    {
-	      ipa_call_summary *es = ipa_call_summaries->get (cs);
+	      ipa_call_summary *es = ipa_call_summaries->get_create (cs);
 	      gcc_assert (es);
 	      es->is_return_callee_uncaptured = true;
 	    }
@@ -998,7 +998,7 @@ malloc_candidate_p (function *fun, bool ipa)
 	    cgraph_edge *cs = node->get_edge (call_stmt);
 	    if (cs)
 	      {
-		ipa_call_summary *es = ipa_call_summaries->get (cs);
+		ipa_call_summary *es = ipa_call_summaries->get_create (cs);
 		gcc_assert (es);
 		es->is_return_callee_uncaptured = true;
 	      }
@@ -1955,7 +1955,7 @@ propagate_malloc (void)
 	  vec<cgraph_node *> callees = vNULL;
 	  for (cgraph_edge *cs = node->callees; cs; cs = cs->next_callee)
 	    {
-	      ipa_call_summary *es = ipa_call_summaries->get (cs);
+	      ipa_call_summary *es = ipa_call_summaries->get_create (cs);
 	      if (es && es->is_return_callee_uncaptured)
 		callees.safe_push (cs->callee);
 	    }
