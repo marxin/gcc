@@ -1805,7 +1805,6 @@ void
 cgraph_node::remove (void)
 {
   cgraph_node *n;
-  int uid = this->uid;
 
   if (symtab->ipa_clones_dump_file && symtab->cloned_nodes.contains (this))
     fprintf (symtab->ipa_clones_dump_file,
@@ -1907,7 +1906,7 @@ cgraph_node::remove (void)
       instrumented_version = NULL;
     }
 
-  symtab->release_symbol (this, uid);
+  symtab->release_symbol (this);
 }
 
 /* Likewise indicate that a node is having address taken.  */

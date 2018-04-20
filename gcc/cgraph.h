@@ -1396,8 +1396,6 @@ public:
   int count_materialization_scale;
   /* Unique id of the node.  */
   int uid;
-  /* Summary unique id of the node.  */
-  int summary_uid;
   /* ID assigned by the profiling.  */
   unsigned int profile_id;
   /* Time profiler: first run of function.  */
@@ -2020,7 +2018,7 @@ public:
   friend class cgraph_node;
   friend class cgraph_edge;
 
-  symbol_table (): cgraph_max_summary_uid (1)
+  symbol_table (): cgraph_max_uid (1)
   {
   }
 
@@ -2080,9 +2078,8 @@ public:
   /* Allocate new callgraph node and insert it into basic data structures.  */
   cgraph_node *create_empty (void);
 
-  /* Release a callgraph NODE with UID and put in to the list
-     of free nodes.  */
-  void release_symbol (cgraph_node *node, int uid);
+  /* Release a callgraph NODE.  */
+  void release_symbol (cgraph_node *node);
 
   /* Output all variables enqueued to be assembled.  */
   bool output_variables (void);
@@ -2230,7 +2227,6 @@ public:
 
   int cgraph_count;
   int cgraph_max_uid;
-  int cgraph_max_summary_uid;
 
   int edges_count;
   int edges_max_uid;
@@ -2598,7 +2594,7 @@ symbol_table::unregister (symtab_node *node)
 /* Release a callgraph NODE with UID and put in to the list of free nodes.  */
 
 inline void
-symbol_table::release_symbol (cgraph_node *node, int uid)
+symbol_table::release_symbol (cgraph_node *node)
 {
   cgraph_count--;
 
@@ -2606,7 +2602,6 @@ symbol_table::release_symbol (cgraph_node *node, int uid)
      list.  */
   memset (node, 0, sizeof (*node));
   node->type = SYMTAB_FUNCTION;
-  node->uid = uid;
   SET_NEXT_FREE_NODE (node, free_nodes);
   free_nodes = node;
 }
@@ -2624,12 +2619,9 @@ symbol_table::allocate_cgraph_symbol (void)
       free_nodes = NEXT_FREE_NODE (node);
     }
   else
-    {
-      node = ggc_cleared_alloc<cgraph_node> ();
-      node->uid = cgraph_max_uid++;
-    }
+    node = ggc_cleared_alloc<cgraph_node> ();
 
-  node->summary_uid = cgraph_max_summary_uid++;
+  node->uid = cgraph_max_uid++;
   return node;
 }
 
