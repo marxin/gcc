@@ -1208,7 +1208,7 @@ is_pass_explicitly_enabled_or_disabled (opt_pass *pass,
   if (!slot)
     return false;
 
-  cgraph_uid = func ? cgraph_node::get (func)->uid : 0;
+  cgraph_uid = func ? cgraph_node::get (func)->get_uid () : 0;
   if (func && DECL_ASSEMBLER_NAME_SET_P (func))
     aname = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (func));
 
@@ -1682,7 +1682,7 @@ static void
 remove_cgraph_node_from_order (cgraph_node *node, void *data)
 {
   uid_hash_t *removed_nodes = (uid_hash_t *)data;
-  removed_nodes->add (node->uid);
+  removed_nodes->add (node->get_uid ());
 }
 
 /* If we are in IPA mode (i.e., current_function_decl is NULL), call
@@ -1713,7 +1713,7 @@ do_per_function_toporder (void (*callback) (function *, void *data), void *data)
 	  cgraph_node *node = order[i];
 
 	  /* Function could be inlined and removed as unreachable.  */
-	  if (node == NULL || removed_nodes.contains (node->uid))
+	  if (node == NULL || removed_nodes.contains (node->get_uid ()))
 	    continue;
 
 	  /* Allow possibly removed nodes to be garbage collected.  */
