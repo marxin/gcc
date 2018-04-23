@@ -384,6 +384,17 @@ public:
     return get (hashable_uid (edge), false);
   }
 
+  /* Remove edge from summary.  */
+  void remove (cgraph_edge *edge)
+  {
+    T **v = m_map.get (edge->uid);
+    if (v)
+      {
+	m_map.remove (hashable_uid (edge));
+	release (*v);
+      }
+  }
+
   /* Return number of elements handled by data structure.  */
   size_t elements ()
   {
