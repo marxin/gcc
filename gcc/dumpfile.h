@@ -199,6 +199,13 @@ dump_enabled_p (void)
   return (dump_file || alt_dump_file);
 }
 
+/* Dump when a folding pattern is applied.  */
+
+extern void
+__attribute__ ((cold))
+dump_folding (FILE *dump_file, const char *pattern_location, const char *file,
+	      int line);
+
 namespace gcc {
 
 class dump_manager

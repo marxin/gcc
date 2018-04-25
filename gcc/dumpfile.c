@@ -1057,3 +1057,11 @@ enable_rtl_dump_file (void)
 			    NULL);
   return num_enabled > 0;
 }
+
+void
+dump_folding (FILE *dump_file, const char *pattern_location, const char *file,
+	      int line)
+{
+  fprintf (dump_file, "Applying pattern %s, %s:%d\n", pattern_location, file,
+	   line);
+}

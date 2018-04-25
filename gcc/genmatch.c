@@ -3241,11 +3241,11 @@ dt_simplify::gen_1 (FILE *f, int indent, bool gimple, operand *result)
 	}
     }
 
-  fprintf_indent (f, indent, "if (dump_file && (dump_flags & TDF_FOLDING)) "
-	   "fprintf (dump_file, \"Applying pattern ");
-  output_line_directive (f,
-			 result ? result->location : s->match->location, true);
-  fprintf (f, ", %%s:%%d\\n\", __FILE__, __LINE__);\n");
+  fprintf_indent (f, indent, "if (__builtin_expect (dump_file != NULL, false) "
+		  "&& (dump_flags & TDF_FOLDING)) dump_folding (dump_file, \"");
+  output_line_directive (f, result ? result->location : s->match->location,
+			 true);
+  fprintf (f, "\", __FILE__, __LINE__);\n");
 
   if (!result)
     {
