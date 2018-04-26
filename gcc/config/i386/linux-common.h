@@ -54,22 +54,6 @@ along with GCC; see the file COPYING3.  If not see
 		       GNU_USER_TARGET_MATHFILE_SPEC " " \
 		       ANDROID_ENDFILE_SPEC)
 
-#ifndef LIBMPX_LIBS
-#define LIBMPX_LIBS "\
- %:include(libmpx.spec)%(link_libmpx)"
-#endif
-
-#ifndef LINK_MPX
-#if defined (HAVE_LD_BNDPLT_SUPPORT)
-#define LINK_MPX "-z bndplt "
-#else
-#define LINK_MPX \
-  "%nGCC was configured with a linker with no '-z bndplt' support. " \
-  "It significantly reduces MPX coverage for dynamic codes. " \
-  "It is strongly recommended to use GCC properly configured for MPX."
-#endif
-#endif
-
 #ifdef HAVE_LD_PUSHPOPSTATE_SUPPORT
 #define MPX_LD_AS_NEEDED_GUARD_PUSH "--push-state --no-as-needed"
 #define MPX_LD_AS_NEEDED_GUARD_POP "--pop-state"
