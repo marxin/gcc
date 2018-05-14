@@ -1447,19 +1447,11 @@ public:
   ~auto_vec () { this->release (); }
 };
 
-
-/* Allocate heap memory for pointer V and create the internal vector
-   with space for NELEMS elements.  If NELEMS is 0, the internal
-   vector is initialized to empty.  */
-
-template<typename T>
-inline void
-vec_alloc (vec<T> *&v, unsigned nelems CXX_MEM_STAT_INFO)
+class auto_string_vec : public auto_vec <char *>
 {
-  v = new vec<T>;
-  v->create (nelems PASS_MEM_STAT);
-}
-
+ public:
+  ~auto_string_vec ();
+};
 
 /* Conditionally allocate heap memory for VEC and its internal vector.  */
 
@@ -1553,6 +1545,29 @@ vec<T, va_heap, vl_ptr>::iterate (unsigned ix, T **ptr) const
        vec_safe_iterate ((V), (I), &(P));	\
        (I)--)
 
+/* auto_string_vec's dtor, freeing all contained strings, automatically
+   chaining up to ~auto_vec <char *>, which frees the internal buffer.  */
+
+inline
+auto_string_vec::~auto_string_vec ()
+{
+  int i;
+  char *str;
+  FOR_EACH_VEC_ELT (*this, i, str)
+    free (str);
+}
+
+/* Allocate heap memory for pointer V and create the internal vector
+   with space for NELEMS elements.  If NELEMS is 0, the internal
+   vector is initialized to empty.  */
+
+template<typename T>
+inline void
+vec_alloc (vec<T> *&v, unsigned nelems CXX_MEM_STAT_INFO)
+{
+  v = new vec<T>;
+  v->create (nelems PASS_MEM_STAT);
+}
 
 /* Return a copy of this vector.  */
 
