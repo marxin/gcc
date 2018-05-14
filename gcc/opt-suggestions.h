@@ -33,9 +33,6 @@ public:
   option_proposer (): m_option_suggestions (NULL)
   {}
 
-  /* Default destructor.  */
-  ~option_proposer ();
-
   /* Helper function for driver::handle_unrecognized_options.
 
      Given an unrecognized option BAD_OPT (without the leading dash),
@@ -45,11 +42,23 @@ public:
      The returned string is owned by the option_proposer instance.  */
   const char *suggest_option (const char *bad_opt);
 
+  /* Print to stdout all options that start with OPTION_PREFIX.  */
+  void suggest_completion (const char *option_prefix);
+
+  /* Build completions that start with OPTION_PREFIX and save them
+     into RESULTS vector.  */
+  void get_completions (const char *option_prefix, auto_string_vec &results);
+
 private:
   /* Helper function for option_proposer::suggest_option.  Populate
      m_option_suggestions with candidate strings for misspelled options.
      The strings will be freed by the option_proposer's dtor.  */
   void build_option_suggestions ();
+
+  /* Find parameter completions for --param format with SEPARATOR.
+     Again, save the completions into results.  */
+  void find_param_completions (const char separator, const char *option_prefix,
+			       auto_string_vec &results);
 
 private:
   /* Cache with all suggestions.  */

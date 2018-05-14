@@ -125,6 +125,39 @@ assert_str_contains (const location &loc,
 	 desc_haystack, desc_needle, val_haystack, val_needle);
 }
 
+/* Implementation detail of ASSERT_STR_STARTSWITH.
+   Use strstr to determine if val_haystack starts with val_needle.
+   ::selftest::pass if it starts.
+   ::selftest::fail if it does not start.  */
+
+void
+assert_str_startswith (const location &loc,
+		       const char *desc_str,
+		       const char *desc_prefix,
+		       const char *val_str,
+		       const char *val_prefix)
+{
+  /* If val_str is NULL, fail with a custom error message.  */
+  if (val_str == NULL)
+    fail_formatted (loc, "ASSERT_STR_STARTSWITH (%s, %s) str=NULL",
+		    desc_str, desc_prefix);
+
+  /* If val_prefix is NULL, fail with a custom error message.  */
+  if (val_prefix == NULL)
+    fail_formatted (loc,
+		    "ASSERT_STR_STARTSWITH (%s, %s) str=\"%s\" prefix=NULL",
+		    desc_str, desc_prefix, val_str);
+
+  const char *test = strstr (val_str, val_prefix);
+  if (test == val_str)
+    pass (loc, "ASSERT_STR_STARTSWITH");
+  else
+    fail_formatted
+	(loc, "ASSERT_STR_STARTSWITH (%s, %s) str=\"%s\" prefix=\"%s\"",
+	 desc_str, desc_prefix, val_str, val_prefix);
+}
+
+
 /* Constructor.  Generate a name for the file.  */
 
 named_temp_file::named_temp_file (const char *suffix)
