@@ -24,6 +24,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
 #include "libgcov.h"
+#include "gcov-io.h"
 
 #if defined(inhibit_libc)
 /* If libc and its header files are not available, provide dummy functions.  */
@@ -785,13 +786,15 @@ read_fatal:;
 
 /* Dump all the coverage counts for the program. It first computes program
    summary and then traverses gcov_list list and dumps the gcov_info
-   objects one by one.  */
+   objects one by one.  If SUMMARY is set, stream out SUMMARY instead of
+   computed summary, it's used in gcov-tool for compute_histogram command.  */
 
 #if !IN_GCOV_TOOL
 static
 #endif
 void
-gcov_do_dump (struct gcov_info *list, int run_counted)
+gcov_do_dump (struct gcov_info *list, int run_counted,
+	      struct gcov_summary *summary)
 {
   struct gcov_info *gi_ptr;
   struct gcov_filename gf;
@@ -800,6 +803,8 @@ gcov_do_dump (struct gcov_info *list, int run_counted)
   struct gcov_summary this_prg;
 
   crc32 = compute_summary (list, &this_prg, &gf.max_length);
+  if (summary)
+    memcpy (&this_prg, summary, sizeof (*summary));
 
   allocate_filename_struct (&gf);
 #if !GCOV_LOCKED
@@ -829,7 +834,7 @@ __gcov_dump_one (struct gcov_root *root)
   if (root->dumped)
     return;
 
-  gcov_do_dump (root->list, root->run_counted);
+  gcov_do_dump (root->list, root->run_counted, NULL);
   
   root->dumped = 1;
   root->run_counted = 1;

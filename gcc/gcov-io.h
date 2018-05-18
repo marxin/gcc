@@ -190,7 +190,7 @@ typedef uint64_t gcov_type_unsigned;
 
 #define ATTRIBUTE_HIDDEN
 
-#endif /* !IN_LIBGOCV */
+#endif /* !IN_LIBGCOV */
 
 #ifndef GCOV_LINKAGE
 #define GCOV_LINKAGE extern
@@ -384,6 +384,10 @@ GCOV_LINKAGE void gcov_write_string (const char *);
 GCOV_LINKAGE void gcov_write_filename (const char *);
 GCOV_LINKAGE gcov_position_t gcov_write_tag (gcov_unsigned_t);
 GCOV_LINKAGE void gcov_write_length (gcov_position_t /*position*/);
+#endif
+
+#if IN_GCOV_TOOL
+GCOV_LINKAGE unsigned gcov_histo_index (gcov_type value);
 #endif
 
 #if IN_GCOV <= 0 && !IN_LIBGCOV

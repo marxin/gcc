@@ -702,7 +702,7 @@ gcov_time (void)
 #if !IN_GCOV
 /* Determine the index into histogram for VALUE. */
 
-#if IN_LIBGCOV
+#if IN_LIBGCOV && !IN_GCOV_TOOL
 static unsigned
 #else
 GCOV_LINKAGE unsigned
