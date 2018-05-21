@@ -1044,6 +1044,7 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 #define MAX_CODE_ALIGN 16
 #define MAX_CODE_ALIGN_VALUE (1 << MAX_CODE_ALIGN)
 
+#if 0
   if (opts->x_align_loops > MAX_CODE_ALIGN_VALUE)
     error_at (loc, "-falign-loops=%d is not between 0 and %d",
 	      opts->x_align_loops, MAX_CODE_ALIGN_VALUE);
@@ -1059,6 +1060,7 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
   if (opts->x_align_labels > MAX_CODE_ALIGN_VALUE)
     error_at (loc, "-falign-labels=%d is not between 0 and %d",
 	      opts->x_align_labels, MAX_CODE_ALIGN_VALUE);
+#endif
 }
 
 #define LEFT_COLUMN	27

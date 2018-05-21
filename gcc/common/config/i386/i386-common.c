@@ -1317,7 +1317,7 @@ ix86_handle_option (struct gcc_options *opts,
 	error_at (loc, "-malign-loops=%d is not between 0 and %d",
 		  value, MAX_CODE_ALIGN);
       else
-	opts->x_align_loops = 1 << value;
+      {}
       return true;
 
     case OPT_malign_jumps_:
@@ -1326,7 +1326,7 @@ ix86_handle_option (struct gcc_options *opts,
 	error_at (loc, "-malign-jumps=%d is not between 0 and %d",
 		  value, MAX_CODE_ALIGN);
       else
-	opts->x_align_jumps = 1 << value;
+      {}
       return true;
 
     case OPT_malign_functions_:
@@ -1336,7 +1336,7 @@ ix86_handle_option (struct gcc_options *opts,
 	error_at (loc, "-malign-functions=%d is not between 0 and %d",
 		  value, MAX_CODE_ALIGN);
       else
-	opts->x_align_functions = 1 << value;
+      {}
       return true;
 
     case OPT_mbranch_cost_:

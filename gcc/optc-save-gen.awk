@@ -85,6 +85,7 @@ n_opt_char = 3;
 n_opt_short = 0;
 n_opt_int = 0;
 n_opt_enum = 0;
+n_opt_string = 0;
 n_opt_other = 0;
 var_opt_char[0] = "optimize";
 var_opt_char[1] = "optimize_size";
@@ -123,6 +124,9 @@ for (i = 0; i < n_opts; i++) {
 			else if (otype ~ "^signed +char *$")
 				var_opt_range[name] = "-128, 127"
 		}
+
+		else if (otype ~ "^const char \\**$")
+			var_opt_string[n_opt_string++] = name;
 		else
 			var_opt_other[n_opt_other++] = name;
 	}
@@ -155,6 +159,12 @@ for (i = 0; i < n_opt_char; i++) {
 	print "  ptr->x_" var_opt_char[i] " = opts->x_" var_opt_char[i] ";";
 }
 
+for (i = 0; i < n_opt_string; i++) {
+	name = var_opt_string[i];
+	print "  if (opts->x_" name")";
+	print "    ptr->x_" name " = xstrdup (opts->x_" name ");";
+}
+
 print "}";
 
 print "";
@@ -182,6 +192,13 @@ for (i = 0; i < n_opt_short; i++) {
 for (i = 0; i < n_opt_char; i++) {
 	print "  opts->x_" var_opt_char[i] " = ptr->x_" var_opt_char[i] ";";
 }
+
+for (i = 0; i < n_opt_string; i++) {
+	name = var_opt_string[i];
+	print "  if (ptr->x_" name")";
+	print "    opts->x_" name " = ptr->x_" name ";";
+}
+
 
 print "  targetm.override_options_after_change ();";
 print "}";
@@ -237,6 +254,16 @@ for (i = 0; i < n_opt_char; i++) {
 	print "             \"" var_opt_char[i] "\",";
 	print "             ptr->x_" var_opt_char[i] ");";
 	print "";
+}
+
+for (i = 0; i < n_opt_string; i++) {
+	print "  if (ptr->x_" var_opt_char[i] ")";
+	print "    fprintf (file, \"%*s%s (%s)\\n\",";
+	print "             indent_to, \"\",";
+	print "             \"" var_opt_string[i] "\",";
+	print "             ptr->x_" var_opt_string[i] ");";
+	print "";
+
 }
 
 print "}";
@@ -298,6 +325,16 @@ for (i = 0; i < n_opt_char; i++) {
 	print "             \"" var_opt_char[i] "\",";
 	print "             ptr1->x_" var_opt_char[i] ",";
 	print "             ptr2->x_" var_opt_char[i] ");";
+	print "";
+}
+
+for (i = 0; i < n_opt_string; i++) {
+	print "  if (ptr1->x_" var_opt_string[i] " != ptr2->x_" var_opt_string[i] ")";
+	print "    fprintf (file, \"%*s%s (%s/%s)\\n\",";
+	print "             indent_to, \"\",";
+	print "             \"" var_opt_string[i] "\",";
+	print "             ptr1->x_" var_opt_string[i] ",";
+	print "             ptr2->x_" var_opt_string[i] ");";
 	print "";
 }
 
@@ -766,6 +803,12 @@ for (i = 0; i < n_opt_val; i++) {
 	if (!var_opt_hash[i])
 		continue;
 	name = var_opt_val[i]
+
+
+	otype = var_opt_val_type[i];
+	if (otype ~ "^const char \\**$")
+	{}
+	else
 	print "  hstate.add_hwi (ptr->" name");";
 }
 print "  return hstate.end ();";
@@ -779,6 +822,11 @@ print "                            struct cl_optimization *ptr)";
 print "{";
 for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
+
+	otype = var_opt_val_type[i];
+	if (otype ~ "^const char \\**$")
+	{}
+	else
 	print "  bp_pack_value (bp, ptr->" name", 64);";
 }
 print "}";
@@ -791,6 +839,11 @@ print "                           struct cl_optimization *ptr)";
 print "{";
 for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
+
+	otype = var_opt_val_type[i];
+	if (otype ~ "^const char \\**$")
+	{}
+	else
 	print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_value (bp, 64);";
 }
 print "}";

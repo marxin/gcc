@@ -1200,29 +1200,114 @@ target_supports_section_anchors_p (void)
   return true;
 }
 
-/* Default the align_* variables to 1 if they're still unset, and
-   set up the align_*_log variables.  */
-static void
-init_alignments (void)
+/* Read a decimal number from string FLAG, up to end of line or comma.
+   Emit error message if number ends with any other character.
+   Return pointer past comma, or NULL if end of line.  */
+
+static const char *
+read_uint (const char *flag, const char *name, int *np)
 {
-  if (align_loops <= 0)
-    align_loops = 1;
-  if (align_loops_max_skip > align_loops)
-    align_loops_max_skip = align_loops - 1;
-  align_loops_log = floor_log2 (align_loops * 2 - 1);
-  if (align_jumps <= 0)
-    align_jumps = 1;
-  if (align_jumps_max_skip > align_jumps)
-    align_jumps_max_skip = align_jumps - 1;
-  align_jumps_log = floor_log2 (align_jumps * 2 - 1);
-  if (align_labels <= 0)
-    align_labels = 1;
-  align_labels_log = floor_log2 (align_labels * 2 - 1);
-  if (align_labels_max_skip > align_labels)
-    align_labels_max_skip = align_labels - 1;
-  if (align_functions <= 0)
-    align_functions = 1;
-  align_functions_log = floor_log2 (align_functions * 2 - 1);
+  const char *flag_start = flag;
+  int n = 0;
+  char c;
+
+  while ((c = *flag++) >= '0' && c <= '9')
+    n = n*10 + (c-'0');
+  *np = n & 0x3fffffff; /* avoid accidentally negative numbers */
+  if (c == '\0')
+    return NULL;
+  if (c == ',')
+    return flag;
+
+  error_at (UNKNOWN_LOCATION, "-falign-%s parameter is bad at '%s'",
+            name, flag_start);
+  return NULL;
+}
+
+/* Parse "N[,M][,...]" string FLAG into struct align_flags A.
+   Return pointer past second comma, or NULL if end of line.  */
+
+static const char *
+read_log_maxskip (const char *flag, const char *name, struct align_flags *a)
+{
+  int n, m;
+  flag = read_uint (flag, name, &a->log);
+  n = a->log;
+  if (n != 0)
+    a->log = floor_log2 (n * 2 - 1);
+  if (!flag)
+    {
+      a->maxskip = n ? n - 1 : 0;
+      return flag;
+    }
+  flag = read_uint (flag, name, &a->maxskip);
+  m = a->maxskip;
+  if (m > n) m = n;
+  if (m > 0) m--; /* -falign-foo=N,M means M-1 max bytes of padding, not M */
+  a->maxskip = m;
+  return flag;
+}
+
+/* Parse "N[,M[,N2[,M2]]]" string FLAG into a pair of struct align_flags.  */
+
+static void
+parse_N_M (const char *flag, const char *name, struct align_flags a[2],
+	   unsigned int min_align_log)
+{
+  if (flag)
+    {
+      flag = read_log_maxskip (flag, name, &a[0]);
+      if (flag)
+	flag = read_log_maxskip (flag, name, &a[1]);
+#ifdef SUBALIGN_LOG
+      else
+	{
+	  /* N2[,M2] is not specified. This arch has a default for N2.
+	     Before -falign-foo=N,M,N2,M2 was introduced, x86 had a tweak.
+	     -falign-functions=N with N > 8 was adding secondary alignment.
+	     -falign-functions=10 was emitting this before every function:
+			.p2align 4,,9
+			.p2align 3
+	     Now this behavior (and more) can be explicitly requested:
+	     -falign-functions=16,10,8
+	     Retain old behavior if N2 is missing: */
+
+	  int align = 1 << a[0].log;
+	  int subalign = 1 << SUBALIGN_LOG;
+
+	  if (a[0].log > SUBALIGN_LOG && a[0].maxskip >= subalign - 1)
+	    {
+	      /* Set N2 unless subalign can never have any effect */
+	      if (align > a[0].maxskip + 1)
+		a[1].log = SUBALIGN_LOG;
+	    }
+	}
+#endif
+    }
+  if ((unsigned int)a[0].log < min_align_log)
+    {
+      a[0].log = min_align_log;
+      a[0].maxskip = (1 << min_align_log) - 1;
+    }
+}
+
+/* Minimum alignment requirements, if arch has them.  */
+
+unsigned int min_align_loops_log = 0;
+unsigned int min_align_jumps_log = 0;
+unsigned int min_align_labels_log = 0;
+unsigned int min_align_functions_log = 0;
+
+/* Process -falign-foo=N[,M[,N2[,M2]]] options.  */
+
+void
+parse_alignment_opts (void)
+{
+  parse_N_M (str_align_loops, "loops", align_loops, min_align_loops_log);
+  parse_N_M (str_align_jumps, "jumps", align_jumps, min_align_jumps_log);
+  parse_N_M (str_align_labels, "labels", align_labels, min_align_labels_log);
+  parse_N_M (str_align_functions, "functions", align_functions,
+	     min_align_functions_log);
 }
 
 /* Process the options that have been parsed.  */
@@ -1245,6 +1330,7 @@ process_options (void)
   location_t saved_location = input_location;
   input_location = UNKNOWN_LOCATION;
   targetm.target_option.override ();
+
   input_location = saved_location;
 
   if (flag_diagnostics_generate_patch)
@@ -1768,9 +1854,6 @@ process_options (void)
 static void
 backend_init_target (void)
 {
-  /* Initialize alignment variables.  */
-  init_alignments ();
-
   /* This depends on stack_pointer_rtx.  */
   init_fake_stack_mems ();
 
