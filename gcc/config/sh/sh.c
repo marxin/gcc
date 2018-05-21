@@ -1007,29 +1007,29 @@ sh_override_options_after_change (void)
       Aligning all jumps increases the code size, even if it might
       result in slightly faster code.  Thus, it is set to the smallest 
       alignment possible if not specified by the user.  */
-  if (align_loops == 0)
-    align_loops = optimize_size ? 2 : 4;
+  if (flag_align_loops && !str_align_loops)
+    str_align_loops = optimize_size ? "2" : "4";
 
-  if (align_jumps == 0)
-    align_jumps = 2;
-  else if (align_jumps < 2)
-    align_jumps = 2;
+  if (flag_align_jumps && !str_align_jumps)
+    str_align_jumps = "2";
+  else
+    min_align_jumps_log = 1;
 
-  if (align_functions == 0)
-    align_functions = optimize_size ? 2 : 4;
+  if (flag_align_functions && !str_align_functions)
+    str_align_functions = optimize_size ? "2" : "4";
 
   /* The linker relaxation code breaks when a function contains
      alignments that are larger than that at the start of a
      compilation unit.  */
   if (TARGET_RELAX)
     {
-      int min_align = align_loops > align_jumps ? align_loops : align_jumps;
+      parse_alignment_opts ();
+      min_align_functions_log = align_loops_log > align_jumps_log ?
+				align_loops_log : align_jumps_log;
 
       /* Also take possible .long constants / mova tables into account.	*/
-      if (min_align < 4)
-	min_align = 4;
-      if (align_functions < min_align)
-	align_functions = min_align;
+      if (min_align_functions_log < 2)
+	min_align_functions_log = 2;
     }
 }
 
