@@ -614,13 +614,13 @@ alpha_override_options_after_change (void)
   /* ??? Kludge these by not doing anything if we don't optimize.  */
   if (optimize > 0)
     {
-      if (align_loops <= 0)
-	align_loops = 16;
-      if (align_jumps <= 0)
-	align_jumps = 16;
+      if (flag_align_loops && !str_align_loops)
+	str_align_loops = "16";
+      if (flag_align_jumps && !str_align_jumps)
+	str_align_jumps = "16";
     }
-  if (align_functions <= 0)
-    align_functions = 16;
+  if (flag_align_functions && !str_align_functions)
+    str_align_functions = "16";
 }
 
 /* Returns 1 if VALUE is a mask that contains full bytes of zero or ones.  */
