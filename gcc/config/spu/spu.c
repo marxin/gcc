@@ -2769,7 +2769,8 @@ static void
 spu_sched_init (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 		int max_ready ATTRIBUTE_UNUSED)
 {
-  if (align_labels > 4 || align_loops > 4 || align_jumps > 4)
+  parse_alignment_opts ();
+  if (align_labels_log > 2 || align_loops_log > 2 || align_jumps_log > 2)
     {
       /* When any block might be at least 8-byte aligned, assume they
          will all be at least 8-byte aligned to make sure dual issue
