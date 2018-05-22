@@ -43,7 +43,9 @@ extern bool final_insns_dump_p;
 /* Other basic status info about current function.  */
 
 /* Target-dependent global state.  */
-struct align_flags {
+
+struct align_flags_tuple
+{
   /* Values of the -falign-* flags: how much to align labels in code.
      log is "align to 2^log" (so 0 means no alignment).
      maxskip is the maximum allowed amount of padding to insert. */
@@ -51,13 +53,19 @@ struct align_flags {
   int maxskip;
 };
 
-struct target_flag_state {
+struct align_flags
+{
+  align_flags_tuple levels[2];
+};
+
+struct target_flag_state
+{
   /* Each falign-foo can generate up to two levels of alignment:
      -falign-foo=N:M[:N2:M2] */
-  struct align_flags x_align_loops[2];
-  struct align_flags x_align_jumps[2];
-  struct align_flags x_align_labels[2];
-  struct align_flags x_align_functions[2];
+  align_flags x_align_loops;
+  align_flags x_align_jumps;
+  align_flags x_align_labels;
+  align_flags x_align_functions;
 
   /* The excess precision currently in effect.  */
   enum excess_precision x_flag_excess_precision;
@@ -74,14 +82,14 @@ extern struct target_flag_state *this_target_flag_state;
 #define align_jumps              (this_target_flag_state->x_align_jumps)
 #define align_labels             (this_target_flag_state->x_align_labels)
 #define align_functions          (this_target_flag_state->x_align_functions)
-#define align_loops_log          (align_loops[0].log)
-#define align_jumps_log          (align_jumps[0].log)
-#define align_labels_log         (align_labels[0].log)
-#define align_functions_log      (align_functions[0].log)
-#define align_loops_max_skip     (align_loops[0].maxskip)
-#define align_jumps_max_skip     (align_jumps[0].maxskip)
-#define align_labels_max_skip    (align_labels[0].maxskip)
-#define align_functions_max_skip (align_functions[0].maxskip)
+#define align_loops_log          (align_loops.levels[0].log)
+#define align_jumps_log          (align_jumps.levels[0].log)
+#define align_labels_log         (align_labels.levels[0].log)
+#define align_functions_log      (align_functions.levels[0].log)
+#define align_loops_max_skip     (align_loops.levels[0].maxskip)
+#define align_jumps_max_skip     (align_jumps.levels[0].maxskip)
+#define align_labels_max_skip    (align_labels.levels[0].maxskip)
+#define align_functions_max_skip (align_functions.levels[0].maxskip)
 /* String representaions of the above options are available in
    const char *str_align_foo. NULL if not set. */
 

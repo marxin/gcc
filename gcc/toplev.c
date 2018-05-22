@@ -1205,7 +1205,7 @@ target_supports_section_anchors_p (void)
    values are popped.  */
 
 static void
-read_log_maxskip (auto_vec<unsigned> &values, align_flags *a)
+read_log_maxskip (auto_vec<unsigned> &values, align_flags_tuple *a)
 {
   unsigned n = values.pop ();
   if (n != 0)
@@ -1246,7 +1246,7 @@ parse_align_values (const char *flag, auto_vec<unsigned> &result_values)
 /* Parse "N[:M[:N2[:M2]]]" string FLAG into a pair of struct align_flags.  */
 
 static void
-parse_N_M (const char *flag, const char *name, struct align_flags a[2],
+parse_N_M (const char *flag, const char *name, align_flags &a,
 	   unsigned int min_align_log)
 {
   if (flag)
@@ -1256,6 +1256,14 @@ parse_N_M (const char *flag, const char *name, struct align_flags a[2],
 #else
       unsigned max_valid_values = 2;
 #endif
+
+      static hash_map <nofree_string_hash, align_flags> cache;
+      align_flags *entry = cache.get (flag);
+      if (entry)
+	{
+	  a = *entry;
+	  return;
+	}
 
       auto_vec<unsigned> result_values;
       bool r = parse_align_values (flag, result_values);
@@ -1271,9 +1279,9 @@ parse_N_M (const char *flag, const char *name, struct align_flags a[2],
       /* Reverse values for easier manipulation.  */
       result_values.reverse ();
 
-      read_log_maxskip (result_values, &a[0]);
+      read_log_maxskip (result_values, &a.levels[0]);
       if (!result_values.is_empty ())
-	read_log_maxskip (result_values, &a[1]);
+	read_log_maxskip (result_values, &a.levels[1]);
 #ifdef SUBALIGN_LOG
       else
 	{
@@ -1287,32 +1295,36 @@ parse_N_M (const char *flag, const char *name, struct align_flags a[2],
 	     -falign-functions=16:10:8
 	     Retain old behavior if N2 is missing: */
 
-	  int align = 1 << a[0].log;
+	  int align = 1 << a.levels[0].log;
 	  int subalign = 1 << SUBALIGN_LOG;
 
-	  if (a[0].log > SUBALIGN_LOG && a[0].maxskip >= subalign - 1)
+	  if (a.levels[0].log > SUBALIGN_LOG
+	      && a.levels[0].maxskip >= subalign - 1)
 	    {
 	      /* Set N2 unless subalign can never have any effect */
-	      if (align > a[0].maxskip + 1)
-		a[1].log = SUBALIGN_LOG;
+	      if (align > a.levels[0].maxskip + 1)
+		a.levels[1].log = SUBALIGN_LOG;
 	    }
 	}
 #endif
+
+      /* Cache seen value.  */
+      cache.put (flag, a);
     }
   else
     {
       /* Reset values to zero.  */
       for (unsigned i = 0; i < 2; i++)
 	{
-	  a[i].log = 0;
-	  a[i].maxskip = 0;
+	  a.levels[i].log = 0;
+	  a.levels[i].maxskip = 0;
 	}
     }
 
-  if ((unsigned int)a[0].log < min_align_log)
+  if ((unsigned int)a.levels[0].log < min_align_log)
     {
-      a[0].log = min_align_log;
-      a[0].maxskip = (1 << min_align_log) - 1;
+      a.levels[0].log = min_align_log;
+      a.levels[0].maxskip = (1 << min_align_log) - 1;
     }
 }
 
