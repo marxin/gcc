@@ -1200,52 +1200,47 @@ target_supports_section_anchors_p (void)
   return true;
 }
 
-/* Read a decimal number from string FLAG, up to end of line or comma.
-   Emit error message if number ends with any other character.
-   Return pointer past comma, or NULL if end of line.  */
+/* Parse "N[:M][:...]" into struct align_flags A.
+   VALUES contains parsed values (in reverse order), all processed
+   values are popped.  */
 
-static const char *
-read_uint (const char *flag, const char *name, int *np)
+static void
+read_log_maxskip (auto_vec<unsigned> &values, align_flags *a)
 {
-  const char *flag_start = flag;
-  int n = 0;
-  char c;
-
-  while ((c = *flag++) >= '0' && c <= '9')
-    n = n*10 + (c-'0');
-  *np = n & 0x3fffffff; /* avoid accidentally negative numbers */
-  if (c == '\0')
-    return NULL;
-  if (c == ':')
-    return flag;
-
-  error_at (UNKNOWN_LOCATION, "-falign-%s parameter is bad at '%s'",
-            name, flag_start);
-  return NULL;
-}
-
-/* Parse "N[,M][,...]" string FLAG into struct align_flags A.
-   Return pointer past second comma, or NULL if end of line.  */
-
-static const char *
-read_log_maxskip (const char *flag, const char *name, struct align_flags *a)
-{
-  int n, m;
-  flag = read_uint (flag, name, &a->log);
-  n = a->log;
+  unsigned n = values.pop ();
   if (n != 0)
     a->log = floor_log2 (n * 2 - 1);
-  if (!flag)
+  if (values.is_empty ())
+    a->maxskip = n ? n - 1 : 0;
+  else
     {
-      a->maxskip = n ? n - 1 : 0;
-      return flag;
+      unsigned m = values.pop ();
+      if (m > n)
+	m = n;
+      /* -falign-foo=N:M means M-1 max bytes of padding, not M */
+      if (m > 0)
+	m--;
+      a->maxskip = m;
     }
-  flag = read_uint (flag, name, &a->maxskip);
-  m = a->maxskip;
-  if (m > n) m = n;
-  if (m > 0) m--; /* -falign-foo=N:M means M-1 max bytes of padding, not M */
-  a->maxskip = m;
-  return flag;
+}
+
+static bool
+parse_align_values (const char *flag, auto_vec<unsigned> &result_values)
+{
+  char *str = xstrdup (flag);
+  for (char *p = strtok (str, ":"); p; p = strtok (NULL, ":"))
+    {
+      char *end;
+      int v = strtol (p, &end, 10);
+      if (*end != '\0' || v < 0)
+	return false;
+
+      result_values.safe_push ((unsigned)v);
+    }
+
+  free (str);
+
+  return true;
 }
 
 /* Parse "N[:M[:N2[:M2]]]" string FLAG into a pair of struct align_flags.  */
@@ -1256,13 +1251,33 @@ parse_N_M (const char *flag, const char *name, struct align_flags a[2],
 {
   if (flag)
     {
-      flag = read_log_maxskip (flag, name, &a[0]);
-      if (flag)
-	flag = read_log_maxskip (flag, name, &a[1]);
+#ifdef SUBALIGN_LOG
+      unsigned max_valid_values = 4;
+#else
+      unsigned max_valid_values = 2;
+#endif
+
+      auto_vec<unsigned> result_values;
+      bool r = parse_align_values (flag, result_values);
+      if (!r
+	  || result_values.is_empty ()
+	  || result_values.length () > max_valid_values)
+	{
+	  error_at (UNKNOWN_LOCATION, "%<-falign-%s%> parameter is bad %<%s%>",
+		    name, flag);
+	  return;
+	}
+
+      /* Reverse values for easier manipulation.  */
+      result_values.reverse ();
+
+      read_log_maxskip (result_values, &a[0]);
+      if (!result_values.is_empty ())
+	read_log_maxskip (result_values, &a[1]);
 #ifdef SUBALIGN_LOG
       else
 	{
-	  /* N2[,M2] is not specified. This arch has a default for N2.
+	  /* N2[:M2] is not specified. This arch has a default for N2.
 	     Before -falign-foo=N:M:N2:M2 was introduced, x86 had a tweak.
 	     -falign-functions=N with N > 8 was adding secondary alignment.
 	     -falign-functions=10 was emitting this before every function:
