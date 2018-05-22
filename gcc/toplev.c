@@ -1299,6 +1299,16 @@ parse_N_M (const char *flag, const char *name, struct align_flags a[2],
 	}
 #endif
     }
+  else
+    {
+      /* Reset values to zero.  */
+      for (unsigned i = 0; i < 2; i++)
+	{
+	  a[i].log = 0;
+	  a[i].maxskip = 0;
+	}
+    }
+
   if ((unsigned int)a[0].log < min_align_log)
     {
       a[0].log = min_align_log;

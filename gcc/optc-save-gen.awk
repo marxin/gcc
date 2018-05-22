@@ -163,6 +163,8 @@ for (i = 0; i < n_opt_string; i++) {
 	name = var_opt_string[i];
 	print "  if (opts->x_" name")";
 	print "    ptr->x_" name " = xstrdup (opts->x_" name ");";
+	print "  else";
+	print "    ptr->x_" name " = NULL;";
 }
 
 print "}";
@@ -195,8 +197,7 @@ for (i = 0; i < n_opt_char; i++) {
 
 for (i = 0; i < n_opt_string; i++) {
 	name = var_opt_string[i];
-	print "  if (ptr->x_" name")";
-	print "    opts->x_" name " = ptr->x_" name ";";
+	print "  opts->x_" name " = ptr->x_" name ";";
 }
 
 
@@ -803,13 +804,16 @@ for (i = 0; i < n_opt_val; i++) {
 	if (!var_opt_hash[i])
 		continue;
 	name = var_opt_val[i]
-
-
 	otype = var_opt_val_type[i];
 	if (otype ~ "^const char \\**$")
-	{}
+	{
+		print "  if (ptr->" name")";
+		print "    hstate.add (ptr->" name", strlen (ptr->" name"));";
+		print "  else";
+		print "    hstate.add_int (0);";
+	}
 	else
-	print "  hstate.add_hwi (ptr->" name");";
+		print "  hstate.add_hwi (ptr->" name");";
 }
 print "  return hstate.end ();";
 print "}";
@@ -817,34 +821,34 @@ print "}";
 print "";
 print "/* Stream out optimization options  */";
 print "void";
-print "cl_optimization_stream_out (struct bitpack_d *bp,";
+print "cl_optimization_stream_out (struct output_block *ob,";
+print "                            struct bitpack_d *bp,";
 print "                            struct cl_optimization *ptr)";
 print "{";
 for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
-
 	otype = var_opt_val_type[i];
 	if (otype ~ "^const char \\**$")
-	{}
+		print "  bp_pack_string (ob, bp, ptr->" name", true);";
 	else
-	print "  bp_pack_value (bp, ptr->" name", 64);";
+		print "  bp_pack_value (bp, ptr->" name", 64);";
 }
 print "}";
 
 print "";
 print "/* Stream in optimization options  */";
 print "void";
-print "cl_optimization_stream_in (struct bitpack_d *bp,";
-print "                           struct cl_optimization *ptr)";
+print "cl_optimization_stream_in (struct data_in *data_in ATTRIBUTE_UNUSED,";
+print "                           struct bitpack_d *bp ATTRIBUTE_UNUSED,";
+print "                           struct cl_optimization *ptr ATTRIBUTE_UNUSED)";
 print "{";
 for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
-
 	otype = var_opt_val_type[i];
 	if (otype ~ "^const char \\**$")
-	{}
+	      print "  ptr->" name" = bp_unpack_string (data_in, bp);";
 	else
-	print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_value (bp, 64);";
+	      print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_value (bp, 64);";
 }
 print "}";
 }
