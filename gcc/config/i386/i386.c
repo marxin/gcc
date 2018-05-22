@@ -1790,25 +1790,6 @@ static int ix86_isa_flags_explicit;
 tree (*ix86_veclib_handler)(enum built_in_function, tree, tree) = NULL;
 static tree ix86_veclibabi_acml (enum built_in_function, tree, tree);
 
-/* Return true if a red-zone is in use.  We can't use red-zone when
-   there are local indirect jumps, like "indirect_jump" or "tablejump",
-   which jumps to another place in the function, since "call" in the
-   indirect thunk pushes the return address onto stack, destroying
-   red-zone.
-
-   TODO: If we can reserve the first 2 WORDs, for PUSH and, another
-   for CALL, in red-zone, we can allow local indirect jumps with
-   indirect thunk.  */
-
-static inline bool
-ix86_using_red_zone (void)
-{
-  return (TARGET_RED_ZONE
-	  && !TARGET_64BIT_MS_ABI
-	  && (!cfun->machine->has_local_indirect_jump
-	      || cfun->machine->indirect_branch_type == indirect_branch_keep));
-}
-
 /* Get indiret_branch enum value based on string VALUE.  */
 
 static enum indirect_branch
@@ -6773,7 +6754,9 @@ ix86_compute_frame_layout (void)
 
   if (TARGET_RED_ZONE && current_function_sp_is_unchanging
       && current_function_is_leaf
-      && !ix86_current_function_calls_tls_descriptor)
+      && !ix86_current_function_calls_tls_descriptor
+      && (!cfun->machine->has_local_indirect_jump
+	  || cfun->machine->indirect_branch_type == indirect_branch_keep))
     {
       frame->red_zone_size = frame->to_allocate;
       if (frame->save_regs_using_mov)
