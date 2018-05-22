@@ -1216,7 +1216,7 @@ read_uint (const char *flag, const char *name, int *np)
   *np = n & 0x3fffffff; /* avoid accidentally negative numbers */
   if (c == '\0')
     return NULL;
-  if (c == ',')
+  if (c == ':')
     return flag;
 
   error_at (UNKNOWN_LOCATION, "-falign-%s parameter is bad at '%s'",
@@ -1243,12 +1243,12 @@ read_log_maxskip (const char *flag, const char *name, struct align_flags *a)
   flag = read_uint (flag, name, &a->maxskip);
   m = a->maxskip;
   if (m > n) m = n;
-  if (m > 0) m--; /* -falign-foo=N,M means M-1 max bytes of padding, not M */
+  if (m > 0) m--; /* -falign-foo=N:M means M-1 max bytes of padding, not M */
   a->maxskip = m;
   return flag;
 }
 
-/* Parse "N[,M[,N2[,M2]]]" string FLAG into a pair of struct align_flags.  */
+/* Parse "N[:M[:N2[:M2]]]" string FLAG into a pair of struct align_flags.  */
 
 static void
 parse_N_M (const char *flag, const char *name, struct align_flags a[2],
@@ -1263,13 +1263,13 @@ parse_N_M (const char *flag, const char *name, struct align_flags a[2],
       else
 	{
 	  /* N2[,M2] is not specified. This arch has a default for N2.
-	     Before -falign-foo=N,M,N2,M2 was introduced, x86 had a tweak.
+	     Before -falign-foo=N:M:N2:M2 was introduced, x86 had a tweak.
 	     -falign-functions=N with N > 8 was adding secondary alignment.
 	     -falign-functions=10 was emitting this before every function:
 			.p2align 4,,9
 			.p2align 3
 	     Now this behavior (and more) can be explicitly requested:
-	     -falign-functions=16,10,8
+	     -falign-functions=16:10:8
 	     Retain old behavior if N2 is missing: */
 
 	  int align = 1 << a[0].log;
@@ -1298,7 +1298,7 @@ unsigned int min_align_jumps_log = 0;
 unsigned int min_align_labels_log = 0;
 unsigned int min_align_functions_log = 0;
 
-/* Process -falign-foo=N[,M[,N2[,M2]]] options.  */
+/* Process -falign-foo=N[:M[:N2[:M2]]] options.  */
 
 void
 parse_alignment_opts (void)

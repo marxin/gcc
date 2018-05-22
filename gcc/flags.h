@@ -53,7 +53,7 @@ struct align_flags {
 
 struct target_flag_state {
   /* Each falign-foo can generate up to two levels of alignment:
-     -falign-foo=N,M[,N2,M2] */
+     -falign-foo=N:M[:N2:M2] */
   struct align_flags x_align_loops[2];
   struct align_flags x_align_jumps[2];
   struct align_flags x_align_labels[2];
