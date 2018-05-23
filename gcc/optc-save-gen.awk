@@ -162,7 +162,7 @@ for (i = 0; i < n_opt_char; i++) {
 for (i = 0; i < n_opt_string; i++) {
 	name = var_opt_string[i];
 	print "  if (opts->x_" name")";
-	print "    ptr->x_" name " = xstrdup (opts->x_" name ");";
+	print "    ptr->x_" name " = opts->x_" name ";";
 	print "  else";
 	print "    ptr->x_" name " = NULL;";
 }
@@ -846,7 +846,11 @@ for (i = 0; i < n_opt_val; i++) {
 	name = var_opt_val[i]
 	otype = var_opt_val_type[i];
 	if (otype ~ "^const char \\**$")
+	{
 	      print "  ptr->" name" = bp_unpack_string (data_in, bp);";
+	      print "  if (ptr->" name")";
+	      print "    ptr->" name" = xstrdup (ptr->" name");";
+	}
 	else
 	      print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_value (bp, 64);";
 }
