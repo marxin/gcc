@@ -1039,28 +1039,6 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
   if ((opts->x_flag_sanitize & SANITIZE_KERNEL_ADDRESS) && opts->x_flag_tm)
     sorry ("transactional memory is not supported with "
 	   "%<-fsanitize=kernel-address%>");
-
-  /* Comes from final.c -- no real reason to change it.  */
-#define MAX_CODE_ALIGN 16
-#define MAX_CODE_ALIGN_VALUE (1 << MAX_CODE_ALIGN)
-
-#if 0
-  if (opts->x_align_loops > MAX_CODE_ALIGN_VALUE)
-    error_at (loc, "-falign-loops=%d is not between 0 and %d",
-	      opts->x_align_loops, MAX_CODE_ALIGN_VALUE);
-
-  if (opts->x_align_jumps > MAX_CODE_ALIGN_VALUE)
-    error_at (loc, "-falign-jumps=%d is not between 0 and %d",
-	      opts->x_align_jumps, MAX_CODE_ALIGN_VALUE);
-
-  if (opts->x_align_functions > MAX_CODE_ALIGN_VALUE)
-    error_at (loc, "-falign-functions=%d is not between 0 and %d",
-	      opts->x_align_functions, MAX_CODE_ALIGN_VALUE);
-
-  if (opts->x_align_labels > MAX_CODE_ALIGN_VALUE)
-    error_at (loc, "-falign-labels=%d is not between 0 and %d",
-	      opts->x_align_labels, MAX_CODE_ALIGN_VALUE);
-#endif
 }
 
 #define LEFT_COLUMN	27
@@ -1783,7 +1761,10 @@ parse_no_sanitize_attribute (char *value)
 
 bool
 parse_and_check_align_values (const char *flag,
-			      auto_vec<unsigned> &result_values)
+			      const char *name,
+			      auto_vec<unsigned> &result_values,
+			      bool report_error,
+			      location_t loc)
 {
   char *str = xstrdup (flag);
   for (char *p = strtok (str, ":"); p; p = strtok (NULL, ":"))
@@ -1791,7 +1772,13 @@ parse_and_check_align_values (const char *flag,
       char *end;
       int v = strtol (p, &end, 10);
       if (*end != '\0' || v < 0)
-	return false;
+	{
+	  if (report_error)
+	    error_at (loc, "invalid arguments for %<-falign-%s%> option: %qs",
+		      name, flag);
+
+	  return false;
+	}
 
       result_values.safe_push ((unsigned)v);
     }
@@ -1807,7 +1794,25 @@ parse_and_check_align_values (const char *flag,
 
   if (result_values.is_empty ()
       || result_values.length () > max_valid_values)
-    return false;
+    {
+      if (report_error)
+	error_at (loc, "invalid number of arguments for %<-falign-%s%> "
+		  "option: %qs", name, flag);
+      return false;
+    }
+
+  /* Comes from final.c -- no real reason to change it.  */
+#define MAX_CODE_ALIGN 16
+#define MAX_CODE_ALIGN_VALUE (1 << MAX_CODE_ALIGN)
+
+  for (unsigned i = 0; i < result_values.length (); i++)
+    if (result_values[i] > MAX_CODE_ALIGN_VALUE)
+      {
+	if (report_error)
+	  error_at (loc, "%<-falign-%s%> is not between 0 and %d",
+		    name, MAX_CODE_ALIGN_VALUE);
+	return false;
+      }
 
   return true;
 }
@@ -1816,9 +1821,7 @@ static void
 check_alignment_argument (location_t loc, const char *flag, const char *name)
 {
   auto_vec<unsigned> align_result;
-  if (!parse_and_check_align_values (flag, align_result))
-    error_at (loc, "invalid arguments for %<-falign-%s%> option: %qs",
-	      name, flag);
+  parse_and_check_align_values (flag, name, align_result, true, loc);
 }
 
 /* Handle target- and language-independent options.  Return zero to

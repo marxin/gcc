@@ -1240,7 +1240,8 @@ parse_N_M (const char *flag, align_flags &a, unsigned int min_align_log)
 	}
 
       auto_vec<unsigned> result_values;
-      bool r = parse_and_check_align_values (flag, result_values);
+      bool r = parse_and_check_align_values (flag, NULL, result_values, false,
+					     UNKNOWN_LOCATION);
       if (!r)
 	return;
 

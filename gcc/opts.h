@@ -441,6 +441,9 @@ extern const char *candidates_list_and_hint (const char *arg, char *&str,
 
 
 extern bool parse_and_check_align_values (const char *flag,
-					  auto_vec<unsigned> &result_values);
+					  const char *name,
+					  auto_vec<unsigned> &result_values,
+					  bool report_error,
+					  location_t loc);
 
 #endif
