@@ -1781,6 +1781,46 @@ parse_no_sanitize_attribute (char *value)
   return flags;
 }
 
+bool
+parse_and_check_align_values (const char *flag,
+			      auto_vec<unsigned> &result_values)
+{
+  char *str = xstrdup (flag);
+  for (char *p = strtok (str, ":"); p; p = strtok (NULL, ":"))
+    {
+      char *end;
+      int v = strtol (p, &end, 10);
+      if (*end != '\0' || v < 0)
+	return false;
+
+      result_values.safe_push ((unsigned)v);
+    }
+
+  free (str);
+
+  /* Check that we have a correct number of values.  */
+#ifdef SUBALIGN_LOG
+  unsigned max_valid_values = 4;
+#else
+  unsigned max_valid_values = 2;
+#endif
+
+  if (result_values.is_empty ()
+      || result_values.length () > max_valid_values)
+    return false;
+
+  return true;
+}
+
+static void
+check_alignment_argument (location_t loc, const char *flag, const char *name)
+{
+  auto_vec<unsigned> align_result;
+  if (!parse_and_check_align_values (flag, align_result))
+    error_at (loc, "invalid arguments for %<-falign-%s%> option: %qs",
+	      name, flag);
+}
+
 /* Handle target- and language-independent options.  Return zero to
    generate an "unknown option" message.  Only options that need
    extra handling need to be listed here; if you simply want
@@ -2498,6 +2538,22 @@ common_handle_option (struct gcc_options *opts,
     case OPT_fipa_icf:
       opts->x_flag_ipa_icf_functions = value;
       opts->x_flag_ipa_icf_variables = value;
+      break;
+
+    case OPT_falign_loops_:
+      check_alignment_argument (loc, arg, "loops");
+      break;
+
+    case OPT_falign_jumps_:
+      check_alignment_argument (loc, arg, "jumps");
+      break;
+
+    case OPT_falign_labels_:
+      check_alignment_argument (loc, arg, "labels");
+      break;
+
+    case OPT_falign_functions_:
+      check_alignment_argument (loc, arg, "functions");
       break;
 
     default:

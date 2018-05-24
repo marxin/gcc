@@ -1224,39 +1224,13 @@ read_log_maxskip (auto_vec<unsigned> &values, align_flags_tuple *a)
     }
 }
 
-static bool
-parse_align_values (const char *flag, auto_vec<unsigned> &result_values)
-{
-  char *str = xstrdup (flag);
-  for (char *p = strtok (str, ":"); p; p = strtok (NULL, ":"))
-    {
-      char *end;
-      int v = strtol (p, &end, 10);
-      if (*end != '\0' || v < 0)
-	return false;
-
-      result_values.safe_push ((unsigned)v);
-    }
-
-  free (str);
-
-  return true;
-}
-
 /* Parse "N[:M[:N2[:M2]]]" string FLAG into a pair of struct align_flags.  */
 
 static void
-parse_N_M (const char *flag, const char *name, align_flags &a,
-	   unsigned int min_align_log)
+parse_N_M (const char *flag, align_flags &a, unsigned int min_align_log)
 {
   if (flag)
     {
-#ifdef SUBALIGN_LOG
-      unsigned max_valid_values = 4;
-#else
-      unsigned max_valid_values = 2;
-#endif
-
       static hash_map <nofree_string_hash, align_flags> cache;
       align_flags *entry = cache.get (flag);
       if (entry)
@@ -1266,15 +1240,9 @@ parse_N_M (const char *flag, const char *name, align_flags &a,
 	}
 
       auto_vec<unsigned> result_values;
-      bool r = parse_align_values (flag, result_values);
-      if (!r
-	  || result_values.is_empty ()
-	  || result_values.length () > max_valid_values)
-	{
-	  error_at (UNKNOWN_LOCATION, "%<-falign-%s%> parameter is bad %<%s%>",
-		    name, flag);
-	  return;
-	}
+      bool r = parse_and_check_align_values (flag, result_values);
+      if (!r)
+	return;
 
       /* Reverse values for easier manipulation.  */
       result_values.reverse ();
@@ -1340,11 +1308,10 @@ unsigned int min_align_functions_log = 0;
 void
 parse_alignment_opts (void)
 {
-  parse_N_M (str_align_loops, "loops", align_loops, min_align_loops_log);
-  parse_N_M (str_align_jumps, "jumps", align_jumps, min_align_jumps_log);
-  parse_N_M (str_align_labels, "labels", align_labels, min_align_labels_log);
-  parse_N_M (str_align_functions, "functions", align_functions,
-	     min_align_functions_log);
+  parse_N_M (str_align_loops, align_loops, min_align_loops_log);
+  parse_N_M (str_align_jumps, align_jumps, min_align_jumps_log);
+  parse_N_M (str_align_labels, align_labels, min_align_labels_log);
+  parse_N_M (str_align_functions, align_functions, min_align_functions_log);
 }
 
 /* Process the options that have been parsed.  */
