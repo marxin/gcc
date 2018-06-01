@@ -724,7 +724,7 @@ static void
 dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
 	       unsigned run_counted,
 	       gcov_unsigned_t crc32, struct gcov_summary *all_prg,
-	       struct gcov_summary *this_prg)
+	       struct gcov_summary *this_prg, bool merge)
 {
   struct gcov_summary prg; /* summary for this object over all program.  */
   int error;
@@ -764,10 +764,13 @@ dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
       summary_pos = eof_pos;
     }
 
-  error = merge_summary (gf->filename, run_counted, &prg, this_prg,
-			 crc32, all_prg);
-  if (error == -1)
-    goto read_fatal;
+  if (merge)
+    {
+      error = merge_summary (gf->filename, run_counted, &prg, this_prg,
+			     crc32, all_prg);
+      if (error == -1)
+	goto read_fatal;
+    }
 
   write_one_data (gi_ptr, &prg, eof_pos, summary_pos);
   /* fall through */
@@ -816,7 +819,8 @@ gcov_do_dump (struct gcov_info *list, int run_counted,
 
   /* Now merge each file.  */
   for (gi_ptr = list; gi_ptr; gi_ptr = gi_ptr->next)
-    dump_one_gcov (gi_ptr, &gf, run_counted, crc32, &all_prg, &this_prg);
+    dump_one_gcov (gi_ptr, &gf, run_counted, crc32, &all_prg, &this_prg,
+		   summary != NULL);
 
   free (gf.filename);
 }
