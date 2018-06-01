@@ -950,8 +950,6 @@ gcov_profile_compute_histogram (struct gcov_info *profile,
 	  gcov_summary *s = &gi_ptr->summaries[i];
 	  runs += s->runs;
 
-	  if (s->sum_max > summary->sum_max)
-	    summary->sum_max = s->sum_max;
 	  if (s->run_max > summary->run_max)
 	    summary->run_max = s->run_max;
 	}
@@ -959,6 +957,9 @@ gcov_profile_compute_histogram (struct gcov_info *profile,
       if (runs > summary->runs)
 	summary->runs = runs;
     }
+
+  /* Conservative calculation of sum of maximum in each run.  */
+  summary->sum_max = summary->runs * summary->run_max;
 
   /* Write the calculated histogram to all profile files.  */
   if (verbose)
