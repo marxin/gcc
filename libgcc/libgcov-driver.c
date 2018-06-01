@@ -803,8 +803,11 @@ gcov_do_dump (struct gcov_info *list, int run_counted,
   struct gcov_summary this_prg;
 
   crc32 = compute_summary (list, &this_prg, &gf.max_length);
-  if (summary)
-    memcpy (&this_prg, summary, sizeof (*summary));
+  if (summary != NULL)
+    {
+      crc32 = summary->checksum;
+      memcpy (&this_prg, summary, sizeof (*summary));
+    }
 
   allocate_filename_struct (&gf);
 #if !GCOV_LOCKED

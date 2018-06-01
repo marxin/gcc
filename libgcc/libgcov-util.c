@@ -913,6 +913,9 @@ gcov_profile_compute_histogram (struct gcov_info *profile,
 
   memset (summary, 0, sizeof (*summary));
 
+  /* Save special checksum.  */
+  summary->checksum = GCOV_COMPUTED_HISTOGRAM_CHECKSUM;
+
   /* Compute histogram for all files.  */
   for (gi_ptr = profile; gi_ptr; gi_ptr = gi_ptr->next)
     {
