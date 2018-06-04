@@ -965,6 +965,9 @@ gcov_profile_compute_histogram (struct gcov_info *profile,
   if (verbose)
     fnotice (stdout, "\nComputed histogram:\n");
 
+
+  fnotice (stdout, "runs: %d\n", summary->runs);
+
   for (unsigned h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
     {
       histo_bucket = &summary->histogram[h_ix];
