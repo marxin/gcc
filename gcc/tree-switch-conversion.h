@@ -240,6 +240,10 @@ struct jump_table_cluster: public group_cluster
   void emit (tree index_expr, tree index_type,
 	     tree default_label_expr, basic_block default_bb);
 
+  /* Find jump tables of given CLUSTERS, where all members of the vector
+     are of type simple_cluster.  New clusters are returned.  */
+  static vec<cluster *> find_jump_tables (vec<cluster *> &clusters);
+
   /* Return true when cluster starting at START and ending at END (inclusive)
      can build a jump-table.  */
   static bool can_be_handled (const vec<cluster *> &clusters, unsigned start,
@@ -347,6 +351,10 @@ struct bit_test_cluster: public group_cluster
     node targets.  */
   void emit (tree index_expr, tree index_type,
 	     tree default_label_expr, basic_block default_bb);
+
+  /* Find bit tests of given CLUSTERS, where all members of the vector
+     are of type simple_cluster.  New clusters are returned.  */
+  static vec<cluster *> find_bit_tests (vec<cluster *> &clusters);
 
   /* Return true when cluster starting at START and ending at END (inclusive)
      can build a bit test.  */
