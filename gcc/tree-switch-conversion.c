@@ -1001,10 +1001,6 @@ jump_table_cluster::find_jump_tables (vec<cluster *> &clusters)
 	break;
     }
 
-  /* For now allow jump_table expansion only for the whole switch statement.  */
-  if (output.length () != 1)
-    return clusters.copy ();
-
   output.reverse ();
   return output;
 }
@@ -1041,6 +1037,15 @@ jump_table_cluster::can_be_handled (const vec<cluster *> &clusters,
   for (unsigned i = start; i <= end; i++)
     value_count += get_range (clusters[i]->get_low (),
 			      clusters[i]->get_high ());
+
+  /* Calculate approximate number of comparisons.  Balanced tree will
+     have all cases as nodes, plus we'll need to compare for holes
+     in between the cases.  */
+  unsigned HOST_WIDE_INT comparisons = 4 * (end - start);
+
+  /* Allow code growth for switch statements to double at maximum.  */
+  if (range > comparisons * 2)
+    return false;
 
   return range <= max_ratio * value_count;
 }
@@ -1112,10 +1117,6 @@ bit_test_cluster::find_bit_tests (vec<cluster *> &clusters)
       if (start <= 0)
 	break;
     }
-
-  /* For now allow jump_table expansion only for the whole switch statement.  */
-  if (output.length () != 1)
-    return clusters.copy ();
 
   output.reverse ();
   return output;

@@ -188,8 +188,11 @@ struct group_cluster: public cluster
       total_values += m_cases[i]->get_range (m_cases[i]->get_low (),
 					     m_cases[i]->get_high ());
 
-    fprintf (f, "%s(%d):", get_type () == JUMP_TABLE ? "JT" : "BT",
-	     total_values);
+
+    unsigned HOST_WIDE_INT range = get_range (get_low (), get_high ());
+    fprintf (f, "%s(%d,density: %.2f%%):",
+	     get_type () == JUMP_TABLE ? "JT" : "BT",
+	     total_values, 100.0 * m_cases.length () / range);
     PRINT_CASE (f, get_low ());
     fprintf (f, "-");
     PRINT_CASE (f, get_high ());
