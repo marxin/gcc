@@ -1085,7 +1085,7 @@ jump_table_cluster::can_be_handled (const vec<cluster *> &clusters,
   if (!flag_jump_tables)
     return false;
 
-  unsigned HOST_WIDE_INT max_ratio = optimize_insn_for_size_p () ? 3 : 10;
+  unsigned HOST_WIDE_INT max_ratio = optimize_insn_for_size_p () ? 3 : 8;
 
   unsigned HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
 					    clusters[end]->get_high ());
