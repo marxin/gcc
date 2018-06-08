@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-symtab.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "calls.h"
 
 /* Replace the cgraph node NODE with PREVAILING_NODE in the cgraph, merging
    all edges and removing the old node.  */
@@ -547,7 +548,7 @@ lto_symtab_merge_p (tree prevailing, tree decl)
     {
       if (DECL_BUILT_IN (prevailing) != DECL_BUILT_IN (decl))
 	{
-          if (symtab->dump_file)
+	  if (symtab->dump_file)
 	    fprintf (symtab->dump_file, "Not merging decls; "
 		     "DECL_BUILT_IN mismatch\n");
 	  return false;
@@ -561,44 +562,23 @@ lto_symtab_merge_p (tree prevailing, tree decl)
 		     "DECL_BUILT_IN_CLASS or CODE mismatch\n");
 	  return false;
 	}
-    }
 
-  /* FIXME: after MPX is removed, use flags_from_decl_or_type
-     function instead.  PR lto/85248.  */
-  if (DECL_ATTRIBUTES (prevailing) != DECL_ATTRIBUTES (decl))
-    {
-      tree prev_attr = lookup_attribute ("error", DECL_ATTRIBUTES (prevailing));
-      tree attr = lookup_attribute ("error", DECL_ATTRIBUTES (decl));
-      if ((prev_attr == NULL) != (attr == NULL)
-	  || (prev_attr && !attribute_value_equal (prev_attr, attr)))
+      if (DECL_ATTRIBUTES (prevailing) != DECL_ATTRIBUTES (decl))
 	{
-          if (symtab->dump_file)
-	    fprintf (symtab->dump_file, "Not merging decls; "
-		     "error attribute mismatch\n");
-	  return false;
-	}
-
-      prev_attr = lookup_attribute ("warning", DECL_ATTRIBUTES (prevailing));
-      attr = lookup_attribute ("warning", DECL_ATTRIBUTES (decl));
-      if ((prev_attr == NULL) != (attr == NULL)
-	  || (prev_attr && !attribute_value_equal (prev_attr, attr)))
-	{
-          if (symtab->dump_file)
-	    fprintf (symtab->dump_file, "Not merging decls; "
-		     "warning attribute mismatch\n");
-	  return false;
-	}
-
-      prev_attr = lookup_attribute ("noreturn", DECL_ATTRIBUTES (prevailing));
-      attr = lookup_attribute ("noreturn", DECL_ATTRIBUTES (decl));
-      if ((prev_attr == NULL) != (attr == NULL))
-	{
-          if (symtab->dump_file)
-	    fprintf (symtab->dump_file, "Not merging decls; "
-		     "noreturn attribute mismatch\n");
-	  return false;
+	  int prev_decl_attrs
+	    = flags_from_decl_or_type (prevailing);
+	  int decl_attrs
+	    = flags_from_decl_or_type (decl);
+	  if (prev_decl_attrs != decl_attrs)
+	    {
+	      if (symtab->dump_file)
+		fprintf (symtab->dump_file, "Not merging decls; "
+			 "DECL_ATTRIBUTES mismatch\n");
+	      return false;
+	    }
 	}
     }
+
   return true;
 }
 
