@@ -87,6 +87,21 @@ struct GTY(()) size_time_entry
 /* Function inlining information.  */
 struct GTY(()) ipa_fn_summary
 {
+  /* Keep all field empty so summary dumping works during its computation.
+     This is useful for debugging.  */
+  ipa_fn_summary ()
+    : estimated_self_stack_size (0), self_size (0), min_size (0),
+      inlinable (false), single_caller (false),
+      fp_expressions (false), estimated_stack_size (false),
+      stack_frame_offset (false), time (0), size (0), conds (NULL),
+      size_time_table (NULL), loop_iterations (NULL), loop_stride (NULL),
+      array_index (NULL), growth (0), scc_no (0)
+  {
+  }
+
+  /* Default constructor.  */
+  ~ipa_fn_summary ();
+
   /* Information about the function body itself.  */
 
   /* Estimated stack frame consumption by the function.  */
@@ -138,23 +153,8 @@ struct GTY(()) ipa_fn_summary
   /* Number of SCC on the beginning of inlining process.  */
   int scc_no;
 
-  /* Keep all field empty so summary dumping works during its computation.
-     This is useful for debugging.  */
-  ipa_fn_summary ()
-    : estimated_self_stack_size (0), self_size (0), min_size (0),
-      inlinable (false), single_caller (false),
-      fp_expressions (false), estimated_stack_size (false),
-      stack_frame_offset (false), time (0), size (0), conds (NULL),
-      size_time_table (NULL), loop_iterations (NULL), loop_stride (NULL),
-      array_index (NULL), growth (0), scc_no (0)
-    {
-    }
-
   /* Record time and size under given predicates.  */
   void account_size_time (int, sreal, const predicate &, const predicate &);
-
-  /* Reset summary to empty state.  */
-  void reset (struct cgraph_node *node);
 
   /* We keep values scaled up, so fractional sizes can be accounted.  */
   static const int size_scale = 2;
@@ -174,9 +174,15 @@ public:
     return summary;
   }
 
+  /* Remove ipa_fn_summary for all callees of NODE.  */
+  void remove_callees (cgraph_node *node);
 
   virtual void insert (cgraph_node *, ipa_fn_summary *);
-  virtual void remove (cgraph_node *node, ipa_fn_summary *);
+  virtual void remove (cgraph_node *node, ipa_fn_summary *)
+  {
+    remove_callees (node);
+  }
+
   virtual void duplicate (cgraph_node *src, cgraph_node *dst,
 			  ipa_fn_summary *src_data, ipa_fn_summary *dst_data);
 };
@@ -186,6 +192,17 @@ extern GTY(()) function_summary <ipa_fn_summary *> *ipa_fn_summaries;
 /* Information kept about callgraph edges.  */
 struct ipa_call_summary
 {
+  /* Keep all field empty so summary dumping works during its computation.
+     This is useful for debugging.  */
+  ipa_call_summary ()
+    : predicate (NULL), param (vNULL), call_stmt_size (0), call_stmt_time (0),
+      loop_depth (0), is_return_callee_uncaptured (false)
+    {
+    }
+
+  /* Default destructor.  */
+  ~ipa_call_summary ();
+
   class predicate *predicate;
   /* Vector indexed by parameters.  */
   vec<inline_param_summary> param;
@@ -196,17 +213,6 @@ struct ipa_call_summary
   unsigned int loop_depth;
   /* Indicates whether the caller returns the value of it's callee.  */
   bool is_return_callee_uncaptured;
-
-  /* Keep all field empty so summary dumping works during its computation.
-     This is useful for debugging.  */
-  ipa_call_summary ()
-    : predicate (NULL), param (vNULL), call_stmt_size (0), call_stmt_time (0),
-      loop_depth (0)
-    {
-    }
-
-  /* Reset inline summary to empty state.  */
-  void reset ();
 };
 
 class ipa_call_summary_t: public call_summary <ipa_call_summary *>
@@ -215,8 +221,6 @@ public:
   ipa_call_summary_t (symbol_table *symtab, bool ggc):
     call_summary <ipa_call_summary *> (symtab, ggc) {}
 
-  /* Hook that is called by summary when an edge is duplicated.  */
-  virtual void remove (cgraph_edge *cs, ipa_call_summary *);
   /* Hook that is called by summary when an edge is duplicated.  */
   virtual void duplicate (cgraph_edge *src, cgraph_edge *dst,
 			  ipa_call_summary *src_data,
