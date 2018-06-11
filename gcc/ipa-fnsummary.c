@@ -535,66 +535,34 @@ ipa_fn_summary_alloc (void)
   ipa_call_summaries = new ipa_call_summary_t (symtab, false);
 }
 
-/* We are called multiple time for given function; clear
-   data from previous run so they are not cumulated.  */
-
-void
-ipa_call_summary::reset ()
+ipa_call_summary::~ipa_call_summary ()
 {
-  call_stmt_size = call_stmt_time = 0;
-  is_return_callee_uncaptured = false;
   if (predicate)
     edge_predicate_pool.remove (predicate);
-  predicate = NULL;
+
   param.release ();
 }
 
-/* We are called multiple time for given function; clear
-   data from previous run so they are not cumulated.  */
-
-void
-ipa_fn_summary::reset (struct cgraph_node *node)
+ipa_fn_summary::~ipa_fn_summary ()
 {
-  struct cgraph_edge *e;
-
-  self_size = 0;
-  estimated_stack_size = 0;
-  estimated_self_stack_size = 0;
-  stack_frame_offset = 0;
-  size = 0;
-  time = 0;
-  growth = 0;
-  scc_no = 0;
   if (loop_iterations)
-    {
-      edge_predicate_pool.remove (loop_iterations);
-      loop_iterations = NULL;
-    }
+    edge_predicate_pool.remove (loop_iterations);
   if (loop_stride)
-    {
-      edge_predicate_pool.remove (loop_stride);
-      loop_stride = NULL;
-    }
+    edge_predicate_pool.remove (loop_stride);
   if (array_index)
-    {
-      edge_predicate_pool.remove (array_index);
-      array_index = NULL;
-    }
+    edge_predicate_pool.remove (array_index);
   vec_free (conds);
   vec_free (size_time_table);
-  for (e = node->callees; e; e = e->next_callee)
-    ipa_call_summaries->get_create (e)->reset ();
-  for (e = node->indirect_calls; e; e = e->next_callee)
-    ipa_call_summaries->get_create (e)->reset ();
-  fp_expressions = false;
 }
 
-/* Hook that is called by cgraph.c when a node is removed.  */
-
 void
-ipa_fn_summary_t::remove (cgraph_node *node, ipa_fn_summary *info)
+ipa_fn_summary_t::remove_callees (cgraph_node *node)
 {
-  info->reset (node);
+  cgraph_edge *e;
+  for (e = node->callees; e; e = e->next_callee)
+    ipa_call_summaries->remove (e);
+  for (e = node->indirect_calls; e; e = e->next_callee)
+    ipa_call_summaries->remove (e);
 }
 
 /* Same as remap_predicate_after_duplication but handle hint predicate *P.
@@ -625,7 +593,7 @@ ipa_fn_summary_t::duplicate (cgraph_node *src,
 			     ipa_fn_summary *,
 			     ipa_fn_summary *info)
 {
-  memcpy (info, ipa_fn_summaries->get_create (src), sizeof (ipa_fn_summary));
+  new (info) ipa_fn_summary (*ipa_fn_summaries->get_create (src));
   /* TODO: as an optimization, we may avoid copying conditions
      that are known to be false or true.  */
   info->conds = vec_safe_copy (info->conds);
@@ -779,7 +747,7 @@ ipa_call_summary_t::duplicate (struct cgraph_edge *src,
 			       struct ipa_call_summary *srcinfo,
 			       struct ipa_call_summary *info)
 {
-  *info = *srcinfo;
+  new (info) ipa_call_summary (*srcinfo);
   info->predicate = NULL;
   edge_set_predicate (dst, srcinfo->predicate);
   info->param = srcinfo->param.copy ();
@@ -791,17 +759,6 @@ ipa_call_summary_t::duplicate (struct cgraph_edge *src,
 			       - eni_time_weights.call_cost);
     }
 }
-
-
-/* Keep edge cache consistent across edge removal.  */
-
-void
-ipa_call_summary_t::remove (struct cgraph_edge *,
-			    struct ipa_call_summary *sum)
-{
-  sum->reset ();
-}
-
 
 /* Dump edge summaries associated to NODE and recursively to all clones.
    Indent by INDENT.  */
@@ -2419,8 +2376,10 @@ compute_fn_summary (struct cgraph_node *node, bool early)
   if (!ipa_fn_summaries)
     ipa_fn_summary_alloc ();
 
+  /* Create a new ipa_fn_summary.  */
+  ((ipa_fn_summary_t *)ipa_fn_summaries)->remove_callees (node);
+  ipa_fn_summaries->remove (node);
   info = ipa_fn_summaries->get_create (node);
-  info->reset (node);
 
   /* Estimate the stack size for the function if we're optimizing.  */
   self_stack_size = optimize && !node->thunk.thunk_p
@@ -3513,7 +3472,7 @@ ipa_free_fn_summary (void)
     return;
   FOR_EACH_DEFINED_FUNCTION (node)
     if (!node->alias)
-      ipa_fn_summaries->get_create (node)->reset (node);
+      ipa_fn_summaries->remove (node);
   ipa_fn_summaries->release ();
   ipa_fn_summaries = NULL;
   ipa_call_summaries->release ();
