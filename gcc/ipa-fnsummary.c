@@ -845,62 +845,66 @@ ipa_dump_fn_summary (FILE *f, struct cgraph_node *node)
   if (node->definition)
     {
       struct ipa_fn_summary *s = ipa_fn_summaries->get (node);
-      size_time_entry *e;
-      int i;
-      fprintf (f, "IPA function summary for %s/%i", node->name (),
-	       node->order);
-      if (DECL_DISREGARD_INLINE_LIMITS (node->decl))
-	fprintf (f, " always_inline");
-      if (s->inlinable)
-	fprintf (f, " inlinable");
-      if (s->fp_expressions)
-	fprintf (f, " fp_expression");
-      fprintf (f, "\n  global time:     %f\n", s->time.to_double ());
-      fprintf (f, "  self size:       %i\n", s->self_size);
-      fprintf (f, "  global size:     %i\n", s->size);
-      fprintf (f, "  min size:       %i\n", s->min_size);
-      fprintf (f, "  self stack:      %i\n",
-	       (int) s->estimated_self_stack_size);
-      fprintf (f, "  global stack:    %i\n", (int) s->estimated_stack_size);
-      if (s->growth)
-	fprintf (f, "  estimated growth:%i\n", (int) s->growth);
-      if (s->scc_no)
-	fprintf (f, "  In SCC:          %i\n", (int) s->scc_no);
-      for (i = 0; vec_safe_iterate (s->size_time_table, i, &e); i++)
+      if (s != NULL)
 	{
-	  fprintf (f, "    size:%f, time:%f",
-		   (double) e->size / ipa_fn_summary::size_scale,
-		   e->time.to_double ());
-	  if (e->exec_predicate != true)
+	  size_time_entry *e;
+	  int i;
+	  fprintf (f, "IPA function summary for %s", node->dump_name ());
+	  if (DECL_DISREGARD_INLINE_LIMITS (node->decl))
+	    fprintf (f, " always_inline");
+	  if (s->inlinable)
+	    fprintf (f, " inlinable");
+	  if (s->fp_expressions)
+	    fprintf (f, " fp_expression");
+	  fprintf (f, "\n  global time:     %f\n", s->time.to_double ());
+	  fprintf (f, "  self size:       %i\n", s->self_size);
+	  fprintf (f, "  global size:     %i\n", s->size);
+	  fprintf (f, "  min size:       %i\n", s->min_size);
+	  fprintf (f, "  self stack:      %i\n",
+		   (int) s->estimated_self_stack_size);
+	  fprintf (f, "  global stack:    %i\n", (int) s->estimated_stack_size);
+	  if (s->growth)
+	    fprintf (f, "  estimated growth:%i\n", (int) s->growth);
+	  if (s->scc_no)
+	    fprintf (f, "  In SCC:          %i\n", (int) s->scc_no);
+	  for (i = 0; vec_safe_iterate (s->size_time_table, i, &e); i++)
 	    {
-	      fprintf (f, ",  executed if:");
-	      e->exec_predicate.dump (f, s->conds, 0);
+	      fprintf (f, "    size:%f, time:%f",
+		       (double) e->size / ipa_fn_summary::size_scale,
+		       e->time.to_double ());
+	      if (e->exec_predicate != true)
+		{
+		  fprintf (f, ",  executed if:");
+		  e->exec_predicate.dump (f, s->conds, 0);
+		}
+	      if (e->exec_predicate != e->nonconst_predicate)
+		{
+		  fprintf (f, ",  nonconst if:");
+		  e->nonconst_predicate.dump (f, s->conds, 0);
+		}
+	      fprintf (f, "\n");
 	    }
-	  if (e->exec_predicate != e->nonconst_predicate)
+	  if (s->loop_iterations)
 	    {
-	      fprintf (f, ",  nonconst if:");
-	      e->nonconst_predicate.dump (f, s->conds, 0);
+	      fprintf (f, "  loop iterations:");
+	      s->loop_iterations->dump (f, s->conds);
 	    }
+	  if (s->loop_stride)
+	    {
+	      fprintf (f, "  loop stride:");
+	      s->loop_stride->dump (f, s->conds);
+	    }
+	  if (s->array_index)
+	    {
+	      fprintf (f, "  array index:");
+	      s->array_index->dump (f, s->conds);
+	    }
+	  fprintf (f, "  calls:\n");
+	  dump_ipa_call_summary (f, 4, node, s);
 	  fprintf (f, "\n");
 	}
-      if (s->loop_iterations)
-	{
-	  fprintf (f, "  loop iterations:");
-	  s->loop_iterations->dump (f, s->conds);
-	}
-      if (s->loop_stride)
-	{
-	  fprintf (f, "  loop stride:");
-	  s->loop_stride->dump (f, s->conds);
-	}
-      if (s->array_index)
-	{
-	  fprintf (f, "  array index:");
-	  s->array_index->dump (f, s->conds);
-	}
-      fprintf (f, "  calls:\n");
-      dump_ipa_call_summary (f, 4, node, s);
-      fprintf (f, "\n");
+      else
+	fprintf (f, "IPA summary for %s is missing.\n", node->dump_name ());
     }
 }
 
@@ -3092,7 +3096,7 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
 void
 ipa_update_overall_fn_summary (struct cgraph_node *node)
 {
-  struct ipa_fn_summary *info = ipa_fn_summaries->get (node);
+  struct ipa_fn_summary *info = ipa_fn_summaries->get_create (node);
   size_time_entry *e;
   int i;
 

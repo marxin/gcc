@@ -2278,10 +2278,13 @@ dump_overall_stats (void)
     if (!node->global.inlined_to
 	&& !node->alias)
       {
-	sreal time = ipa_fn_summaries->get (node)->time;
-	sum += time;
-	if (node->count.ipa ().initialized_p ())
-	  sum_weighted += time * node->count.ipa ().to_gcov_type ();
+	ipa_fn_summary *s = ipa_fn_summaries->get (node);
+	if (s != NULL)
+	  {
+	  sum += s->time;
+	  if (node->count.ipa ().initialized_p ())
+	    sum_weighted += s->time * node->count.ipa ().to_gcov_type ();
+	  }
       }
   fprintf (dump_file, "Overall time estimate: "
 	   "%f weighted by profile: "
