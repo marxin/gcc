@@ -1348,6 +1348,11 @@ DEFPARAM(PARAM_AVOID_FMA_MAX_BITS,
 	 "Maximum number of bits for which we avoid creating FMAs.",
 	 0, 0, 512)
 
+DEFPARAM(PARAM_JUMP_TABLE_CODE_GROWTH,
+	 "jump-table-code-growth",
+	 "Maximum growth of a binary caused by jump table expansion.",
+	 8, 1, 0)
+
 /*
 
 Local variables:

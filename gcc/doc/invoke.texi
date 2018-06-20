@@ -11205,6 +11205,9 @@ away for the unroll-and-jam transformation to be considered profitable.
 @item unroll-jam-max-unroll
 The maximum number of times the outer loop should be unrolled by
 the unroll-and-jam transformation.
+
+@item jump-table-code-growth
+The maximum growth of a binary caused by jump table expansion.
 @end table
 @end table
 
