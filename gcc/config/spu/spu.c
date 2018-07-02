@@ -58,6 +58,8 @@
 #include "dumpfile.h"
 #include "builtins.h"
 #include "rtl-iter.h"
+#include "flags.h"
+#include "toplev.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -238,8 +240,8 @@ spu_option_override (void)
   flag_omit_frame_pointer = 1;
 
   /* Functions must be 8 byte aligned so we correctly handle dual issue */
-  if (align_functions < 8)
-    align_functions = 8;
+  if (flag_align_functions && !str_align_functions)
+    str_align_functions = "8";
 
   spu_hint_dist = 8*4 - spu_max_nops*4;
   if (spu_hint_dist < 0) 

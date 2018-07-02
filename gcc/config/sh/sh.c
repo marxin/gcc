@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "rtl-iter.h"
 #include "regs.h"
+#include "toplev.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -1012,8 +1013,6 @@ sh_override_options_after_change (void)
 
   if (flag_align_jumps && !str_align_jumps)
     str_align_jumps = "2";
-  else
-    min_align_jumps_log = 1;
 
   if (flag_align_functions && !str_align_functions)
     str_align_functions = optimize_size ? "2" : "4";

@@ -67,6 +67,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "builtins.h"
 #include "rtl-iter.h"
+#include "flags.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -9268,10 +9269,11 @@ alpha_align_insns_1 (unsigned int max_align,
   /* Let shorten branches care for assigning alignments to code labels.  */
   shorten_branches (get_insns ());
 
-  if (align_functions < 4)
+  unsigned int option_alignment = align_functions_max_skip + 1;
+  if (option_alignment < 4)
     align = 4;
-  else if ((unsigned int) align_functions < max_align)
-    align = align_functions;
+  else if ((unsigned int) option_alignment < max_align)
+    align = option_alignment;
   else
     align = max_align;
 

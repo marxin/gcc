@@ -844,9 +844,9 @@ static const struct tune_params thunderx_tunings =
   6, /* memmov_cost  */
   2, /* issue_rate  */
   AARCH64_FUSE_CMP_BRANCH, /* fusible_ops  */
-  8,	/* function_align.  */
-  8,	/* jump_align.  */
-  8,	/* loop_align.  */
+  "8",	/* function_align.  */
+  "8",	/* jump_align.  */
+  "8",	/* loop_align.  */
   2,	/* int_reassoc_width.  */
   4,	/* fp_reassoc_width.  */
   1,	/* vec_reassoc_width.  */
@@ -924,9 +924,9 @@ static const struct tune_params saphira_tunings =
   4, /* issue_rate  */
   (AARCH64_FUSE_MOV_MOVK | AARCH64_FUSE_ADRP_ADD
    | AARCH64_FUSE_MOVK_MOVK), /* fuseable_ops  */
-  16,	/* function_align.  */
-  8,	/* jump_align.  */
-  16,	/* loop_align.  */
+  "16",	/* function_align.  */
+  "8",	/* jump_align.  */
+  "16",	/* loop_align.  */
   2,	/* int_reassoc_width.  */
   4,	/* fp_reassoc_width.  */
   1,	/* vec_reassoc_width.  */
@@ -950,9 +950,9 @@ static const struct tune_params thunderx2t99_tunings =
   4, /* issue_rate.  */
   (AARCH64_FUSE_CMP_BRANCH | AARCH64_FUSE_AES_AESMC
    | AARCH64_FUSE_ALU_BRANCH), /* fusible_ops  */
-  16,	/* function_align.  */
-  8,	/* jump_align.  */
-  16,	/* loop_align.  */
+  "16",	/* function_align.  */
+  "8",	/* jump_align.  */
+  "16",	/* loop_align.  */
   3,	/* int_reassoc_width.  */
   2,	/* fp_reassoc_width.  */
   2,	/* vec_reassoc_width.  */
@@ -10572,12 +10572,12 @@ aarch64_override_options_after_change_1 (struct gcc_options *opts)
      alignment to what the target wants.  */
   if (!opts->x_optimize_size)
     {
-      if (opts->x_align_loops <= 0)
-	opts->x_align_loops = aarch64_tune_params.loop_align;
-      if (opts->x_align_jumps <= 0)
-	opts->x_align_jumps = aarch64_tune_params.jump_align;
-      if (opts->x_align_functions <= 0)
-	opts->x_align_functions = aarch64_tune_params.function_align;
+      if (opts->x_flag_align_loops && !opts->x_str_align_loops)
+	opts->x_str_align_loops = aarch64_tune_params.loop_align;
+      if (opts->x_flag_align_jumps && !opts->x_str_align_jumps)
+	opts->x_str_align_jumps = aarch64_tune_params.jump_align;
+      if (opts->x_flag_align_functions && !opts->x_str_align_functions)
+	opts->x_str_align_functions = aarch64_tune_params.function_align;
     }
 
   /* We default to no pc-relative literal loads.  */
