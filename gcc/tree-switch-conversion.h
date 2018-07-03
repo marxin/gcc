@@ -259,11 +259,16 @@ struct jump_table_cluster: public group_cluster
   static bool is_enabled (void);
 
   /* Max growth ratio for code that is optimized for size.  */
-  static const unsigned HOST_WIDE_INT max_ratio_for_size = 3;
+  static const unsigned HOST_WIDE_INT max_ratio_for_size;
 
   /* Max growth ratio for code that is optimized for speed.  */
-  static const unsigned HOST_WIDE_INT max_ratio_for_speed = 8;
+  static const unsigned HOST_WIDE_INT max_ratio_for_speed;
 };
+
+const unsigned HOST_WIDE_INT jump_table_cluster::max_ratio_for_size = 3;
+
+const unsigned HOST_WIDE_INT jump_table_cluster::max_ratio_for_speed = 8;
+
 
 /* A GIMPLE switch statement can be expanded to a short sequence of bit-wise
 comparisons.  "switch(x)" is converted into "if ((1 << (x-MINVAL)) & CST)"
