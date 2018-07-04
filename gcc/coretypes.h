@@ -384,6 +384,59 @@ enum excess_precision_type
   EXCESS_PRECISION_TYPE_FAST
 };
 
+/* Align flags tuple with alignment in log form and with a maximum skip.  */
+
+struct align_flags_tuple
+{
+  /* Values of the -falign-* flags: how much to align labels in code.
+     log is "align to 2^log" (so 0 means no alignment).
+     maxskip is the maximum allowed amount of padding to insert.  */
+  int log;
+  int maxskip;
+
+  void normalize ()
+  {
+    int n = (1 << log);
+    if (maxskip > n)
+      maxskip = n - 1;
+  }
+
+  /* Return original value of an alignemnt flag.  */
+  int get_value ()
+  {
+    return maxskip + 1;
+  }
+};
+
+/* Target-dependent global state.  */
+
+struct align_flags
+{
+  align_flags (int log0 = 0, int maxskip0 = 0, int log1 = 0, int maxskip1 = 0)
+  {
+    levels[0] = {log0, maxskip0};
+    levels[1] = {log1, maxskip1};
+    normalize ();
+  }
+
+  void normalize ()
+  {
+    for (unsigned i = 0; i < 2; i++)
+      levels[i].normalize ();
+  }
+
+  static align_flags max (const align_flags f0, const align_flags f1)
+    {
+      int log0 = MAX (f0.levels[0].log, f1.levels[0].log);
+      int maxskip0 = MAX (f0.levels[0].maxskip, f1.levels[0].maxskip);
+      int log1 = MAX (f0.levels[1].log, f1.levels[1].log);
+      int maxskip1 = MAX (f0.levels[1].maxskip, f1.levels[1].maxskip);
+      return align_flags (log0, maxskip0, log1, maxskip1);
+    }
+
+  align_flags_tuple levels[2];
+};
+
 /* Support for user-provided GGC and PCH markers.  The first parameter
    is a pointer to a pointer, the second a cookie.  */
 typedef void (*gt_pointer_operator) (void *, void *);

@@ -42,30 +42,6 @@ extern bool final_insns_dump_p;
 
 /* Other basic status info about current function.  */
 
-/* Align flags tuple with alignment in log form and with a maximum skip.  */
-
-struct align_flags_tuple
-{
-  /* Values of the -falign-* flags: how much to align labels in code.
-     log is "align to 2^log" (so 0 means no alignment).
-     maxskip is the maximum allowed amount of padding to insert.  */
-  int log;
-  int maxskip;
-
-  /* Return original value of an alignemnt flag.  */
-  int get_value ()
-  {
-    return maxskip + 1;
-  }
-};
-
-/* Target-dependent global state.  */
-
-struct align_flags
-{
-  align_flags_tuple levels[2];
-};
-
 struct target_flag_state
 {
   /* Each falign-foo can generate up to two levels of alignment:

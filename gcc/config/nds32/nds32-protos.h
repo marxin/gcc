@@ -289,7 +289,7 @@ extern scalar_int_mode nds32_case_vector_shorten_mode (int, int, rtx);
 
 /* Auxiliary functions to decide output alignment or not.  */
 
-extern int nds32_target_alignment (rtx_insn *);
+extern align_flags nds32_target_alignment (rtx_insn *);
 extern unsigned int nds32_data_alignment (tree, unsigned int);
 extern unsigned int nds32_local_alignment (tree, unsigned int);
 

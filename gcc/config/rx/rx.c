@@ -3308,7 +3308,7 @@ rx_match_ccmode (rtx insn, machine_mode cc_mode)
   return true;
 }
 
-int
+align_flags
 rx_align_for_label (rtx lab, int uses_threshold)
 {
   /* This is a simple heuristic to guess when an alignment would not be useful
@@ -3316,14 +3316,14 @@ rx_align_for_label (rtx lab, int uses_threshold)
      due to the misaligned branch.  If uses_threshold is zero then the alignment
      is always useful.  */
   if (LABEL_P (lab) && LABEL_NUSES (lab) < uses_threshold)
-    return 0;
+    return align_flags (0);
 
   if (optimize_size)
-    return 0;
+    return align_flags (0);
   /* These values are log, not bytes.  */
   if (rx_cpu_type == RX100 || rx_cpu_type == RX200)
-    return 2; /* 4 bytes */
-  return 3;   /* 8 bytes */
+    return align_flags (2); /* 4 bytes */
+  return align_flags (3);   /* 8 bytes */
 }
 
 static int

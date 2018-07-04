@@ -9291,7 +9291,8 @@ alpha_align_insns_1 (unsigned int max_align,
       /* When we see a label, resync alignment etc.  */
       if (LABEL_P (i))
 	{
-	  unsigned int new_align = 1 << label_to_alignment (i);
+	  unsigned int new_align
+	    = label_to_alignment (i).levels[0].get_value ();
 
 	  if (new_align >= align)
 	    {
