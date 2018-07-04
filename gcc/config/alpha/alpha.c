@@ -9269,7 +9269,7 @@ alpha_align_insns_1 (unsigned int max_align,
   /* Let shorten branches care for assigning alignments to code labels.  */
   shorten_branches (get_insns ());
 
-  unsigned int option_alignment = align_functions_max_skip + 1;
+  unsigned int option_alignment = align_functions.levels[0].get_value ();
   if (option_alignment < 4)
     align = 4;
   else if ((unsigned int) option_alignment < max_align)

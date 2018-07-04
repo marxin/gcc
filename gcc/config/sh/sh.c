@@ -1015,7 +1015,7 @@ sh_override_options_after_change (void)
   parse_alignment_opts ();
   if (flag_align_jumps && !str_align_jumps)
     str_align_jumps = "2";
-  else if (align_jumps_value < 2)
+  else if (align_jumps.levels[0].get_value () < 2)
     str_align_jumps = "2";
 
   if (flag_align_functions && !str_align_functions)
@@ -1028,12 +1028,13 @@ sh_override_options_after_change (void)
     {
       /* Parse values so that we can compare for current value.  */
       parse_alignment_opts ();
-      int min_align = MAX (align_loops_value, align_jumps_value);
+      int min_align = MAX (align_loops.levels[0].get_value (),
+			   align_jumps.levels[0].get_value ());
 
       /* Also take possible .long constants / mova tables into account.	*/
       if (min_align < 4)
 	min_align = 4;
-      if (align_functions_value < min_align)
+      if (align_functions.levels[0].get_value () < min_align)
 	{
 	  char *r = XNEWVEC (char, 16);
 	  sprintf (r, "%d", min_align);

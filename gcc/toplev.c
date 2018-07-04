@@ -1306,11 +1306,10 @@ unsigned int min_align_functions_log = 0;
 void
 parse_alignment_opts (void)
 {
-  parse_N_M (str_align_loops, state_align_loops, min_align_loops_log);
-  parse_N_M (str_align_jumps, state_align_jumps, min_align_jumps_log);
-  parse_N_M (str_align_labels, state_align_labels, min_align_labels_log);
-  parse_N_M (str_align_functions, state_align_functions,
-	     min_align_functions_log);
+  parse_N_M (str_align_loops, align_loops, min_align_loops_log);
+  parse_N_M (str_align_jumps, align_jumps, min_align_jumps_log);
+  parse_N_M (str_align_labels, align_labels, min_align_labels_log);
+  parse_N_M (str_align_functions, align_functions, min_align_functions_log);
 }
 
 /* Process the options that have been parsed.  */

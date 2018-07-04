@@ -473,11 +473,11 @@ get_attr_min_length (rtx_insn *insn)
    address mod X to one mod Y, which is Y - X.  */
 
 #ifndef LABEL_ALIGN
-#define LABEL_ALIGN(LABEL) align_labels_log
+#define LABEL_ALIGN(LABEL) align_labels.levels[0].log
 #endif
 
 #ifndef LOOP_ALIGN
-#define LOOP_ALIGN(LABEL) align_loops_log
+#define LOOP_ALIGN(LABEL) align_loops.levels[0].log
 #endif
 
 #ifndef LABEL_ALIGN_AFTER_BARRIER
@@ -485,7 +485,7 @@ get_attr_min_length (rtx_insn *insn)
 #endif
 
 #ifndef JUMP_ALIGN
-#define JUMP_ALIGN(LABEL) align_jumps_log
+#define JUMP_ALIGN(LABEL) align_jumps.levels[0].log
 #endif
 
 int
@@ -497,19 +497,19 @@ default_label_align_after_barrier_max_skip (rtx_insn *insn ATTRIBUTE_UNUSED)
 int
 default_loop_align_max_skip (rtx_insn *insn ATTRIBUTE_UNUSED)
 {
-  return align_loops_max_skip;
+  return align_loops.levels[0].maxskip;
 }
 
 int
 default_label_align_max_skip (rtx_insn *insn ATTRIBUTE_UNUSED)
 {
-  return align_labels_max_skip;
+  return align_labels.levels[0].maxskip;
 }
 
 int
 default_jump_align_max_skip (rtx_insn *insn ATTRIBUTE_UNUSED)
 {
-  return align_jumps_max_skip;
+  return align_jumps.levels[0].maxskip;
 }
 
 #ifndef ADDR_VEC_ALIGN
@@ -2532,8 +2532,8 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 		 alignment was used.  Conservatively apply
 		 label subalignment, not jump or loop
 		 subalignment (they are almost always larger).  */
-	      ASM_OUTPUT_MAX_SKIP_ALIGN (file, state_align_labels.levels[1].log,
-					 state_align_labels.levels[1].maxskip);
+	      ASM_OUTPUT_MAX_SKIP_ALIGN (file, align_labels.levels[1].log,
+					 align_labels.levels[1].maxskip);
 #else
 #ifdef ASM_OUTPUT_ALIGN_WITH_NOP
               ASM_OUTPUT_ALIGN_WITH_NOP (file, align);
