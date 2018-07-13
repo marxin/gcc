@@ -654,9 +654,14 @@ coverage_begin_function (unsigned lineno_checksum, unsigned cfg_checksum)
 
   gcov_write_unsigned (lineno_checksum);
   gcov_write_unsigned (cfg_checksum);
-  gcov_write_string (IDENTIFIER_POINTER
-		     (DECL_ASSEMBLER_NAME (current_function_decl)));
-  gcov_write_unsigned (DECL_ARTIFICIAL (current_function_decl));
+  const char *name
+    = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (current_function_decl));
+  gcov_write_string (name);
+
+  /* Mark __static_initialization_and_destruction_* as artificial function.  */
+  bool artificial
+    = strstr (name, "_Z41__static_initialization_and_destruction_") == name;
+  gcov_write_unsigned (artificial);
   gcov_write_filename (xloc.file);
   gcov_write_unsigned (xloc.line);
   gcov_write_unsigned (xloc.column);
