@@ -10649,6 +10649,7 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
 	DECL_ARTIFICIAL (fco) = 1;
 	/* Give the object parameter a different name.  */
 	DECL_NAME (DECL_ARGUMENTS (fco)) = closure_identifier;
+	DECL_CXX_LAMBDA_FUNCTION (fco) = 1;
       }
     if (template_param_list)
       {
