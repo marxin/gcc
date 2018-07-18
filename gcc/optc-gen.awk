@@ -322,8 +322,15 @@ for (i = 0; i < n_opts; i++) {
 
 	alias_arg = opt_args("Alias", flags[i])
 	if (alias_arg == "") {
-		if (flag_set_p("Ignore", flags[i]))
-			alias_data = "NULL, NULL, OPT_SPECIAL_ignore"
+		if (flag_set_p("Ignore", flags[i])) {
+			  alias_data = "NULL, NULL, OPT_SPECIAL_ignore"
+        if (warn_message != "0")
+				  print "#error Ignored option with Warn"
+        if (var_name(flags[i]) != "")
+				  print "#error Ignored option with Var"
+        if (flag_set_p("Report", flags[i]))
+				  print "#error Ignored option with Report"
+      }
 		else
 			alias_data = "NULL, NULL, N_OPTS"
 		if (flag_set_p("Enum.*", flags[i])) {
