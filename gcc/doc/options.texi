@@ -285,10 +285,6 @@ The state of this option should be stored in variable @var{var}
 (actually a macro for @code{global_options.x_@var{var}}).
 The way that the state is stored depends on the type of option:
 
-@item Deprecated
-The option is deprecated and every usage of such option will
-result in a warning.
-
 @itemize @bullet
 @item
 If the option uses the @code{Mask} or @code{InverseMask} properties,
@@ -406,9 +402,9 @@ negated.  @code{NegativeAlias} may not be used with the forms of
 @code{Alias} taking more than one argument.
 
 @item Ignore
-This option is ignored apart from printing any warning specified using
-@code{Warn}.  The option will not be seen by specs and no @samp{OPT_}
-enumeration value is defined for it.
+The option is ignored and every usage of such option will
+result in a warning.  The option will not be seen
+by specs and no @samp{OPT_} enumeration value is defined for it.
 
 @item SeparateAlias
 For an option marked with @code{Joined}, @code{Separate} and

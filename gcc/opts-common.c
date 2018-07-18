@@ -592,7 +592,6 @@ decode_cmdline_option (const char **argv, unsigned int lang_mask,
 	  gcc_assert (option->neg_alias_arg == NULL);
 	  opt_index = new_opt_index;
 	  arg = NULL;
-	  value = 1;
 	}
       else
 	{
@@ -666,10 +665,6 @@ decode_cmdline_option (const char **argv, unsigned int lang_mask,
   /* Check if this is a switch for a different front end.  */
   if (!option_ok_for_language (option, lang_mask))
     errors |= CL_ERR_WRONG_LANG;
-
-  /* Mark all deprecated options.  */
-  if (option->cl_deprecated)
-    errors |= CL_ERR_DEPRECATED;
 
   /* Convert the argument to lowercase if appropriate.  */
   if (arg && option->cl_tolower)
@@ -1239,7 +1234,12 @@ read_cmdline_option (struct gcc_options *opts,
     }
 
   if (decoded->opt_index == OPT_SPECIAL_ignore)
-    return;
+    {
+      /* Warn only about positive ignored options.  */
+      if (decoded->value)
+	warning_at (loc, 0, "switch %qs is no longer supported", opt);
+      return;
+    }
 
   option = &cl_options[decoded->opt_index];
 
@@ -1251,12 +1251,6 @@ read_cmdline_option (struct gcc_options *opts,
   if (decoded->errors & CL_ERR_WRONG_LANG)
     {
       handlers->wrong_lang_callback (decoded, lang_mask);
-      return;
-    }
-
-  if (decoded->errors & CL_ERR_DEPRECATED)
-    {
-      warning_at (loc, 0, "deprecated command line option %qs", opt);
       return;
     }
 
