@@ -252,8 +252,126 @@ Enum(ix86_align_data) String(abi) Value(ix86_align_data_type_abi)
 EnumValue
 Enum(ix86_align_data) String(cacheline) Value(ix86_align_data_type_cacheline)
 
+Enum
+Name(ix86_arch) Type(int)
+Known architectures (for use with the -march= option):
+
+EnumValue
+Enum(ix86_arch) String(generic) Value(0)
+
+EnumValue
+Enum(ix86_arch) String(i386) Value(1)
+
+EnumValue
+Enum(ix86_arch) String(i486) Value(2)
+
+EnumValue
+Enum(ix86_arch) String(pentium) Value(3)
+
+EnumValue
+Enum(ix86_arch) String(lakemont) Value(4)
+
+EnumValue
+Enum(ix86_arch) String(pentiumpro) Value(5)
+
+EnumValue
+Enum(ix86_arch) String(pentium4) Value(6)
+
+EnumValue
+Enum(ix86_arch) String(nocona) Value(7)
+
+EnumValue
+Enum(ix86_arch) String(core2) Value(8)
+
+EnumValue
+Enum(ix86_arch) String(nehalem) Value(9)
+
+EnumValue
+Enum(ix86_arch) String(sandybridge) Value(10)
+
+EnumValue
+Enum(ix86_arch) String(haswell) Value(11)
+
+EnumValue
+Enum(ix86_arch) String(bonnell) Value(12)
+
+EnumValue
+Enum(ix86_arch) String(silvermont) Value(13)
+
+EnumValue
+Enum(ix86_arch) String(goldmont) Value(14)
+
+EnumValue
+Enum(ix86_arch) String(goldmont-plus) Value(15)
+
+EnumValue
+Enum(ix86_arch) String(tremont) Value(16)
+
+EnumValue
+Enum(ix86_arch) String(knl) Value(17)
+
+EnumValue
+Enum(ix86_arch) String(knm) Value(18)
+
+EnumValue
+Enum(ix86_arch) String(skylake) Value(19)
+
+EnumValue
+Enum(ix86_arch) String(skylake-avx512) Value(20)
+
+EnumValue
+Enum(ix86_arch) String(cannonlake) Value(21)
+
+EnumValue
+Enum(ix86_arch) String(icelake-client) Value(22)
+
+EnumValue
+Enum(ix86_arch) String(icelake-server) Value(23)
+
+EnumValue
+Enum(ix86_arch) String(intel) Value(24)
+
+EnumValue
+Enum(ix86_arch) String(geode) Value(25)
+
+EnumValue
+Enum(ix86_arch) String(k6) Value(26)
+
+EnumValue
+Enum(ix86_arch) String(athlon) Value(27)
+
+EnumValue
+Enum(ix86_arch) String(k8) Value(28)
+
+EnumValue
+Enum(ix86_arch) String(amdfam10) Value(29)
+
+EnumValue
+Enum(ix86_arch) String(bdver1) Value(30)
+
+EnumValue
+Enum(ix86_arch) String(bdver2) Value(31)
+
+EnumValue
+Enum(ix86_arch) String(bdver3) Value(32)
+
+EnumValue
+Enum(ix86_arch) String(bdver4) Value(33)
+
+EnumValue
+Enum(ix86_arch) String(btver1) Value(34)
+
+EnumValue
+Enum(ix86_arch) String(btver2) Value(35)
+
+EnumValue
+Enum(ix86_arch) String(znver1) Value(36)
+
+EnumValue
+Enum(ix86_arch) String(native) Value(-1)
+
 march=
-Target RejectNegative Joined Var(ix86_arch_string)
+Target RejectNegative Joined Var(ix86_arch_string) HelpEnum(ix86_arch)
 Generate code for given CPU.
 
 masm=
@@ -509,8 +627,174 @@ mtls-direct-seg-refs
 Target Report Mask(TLS_DIRECT_SEG_REFS)
 Use direct references against %gs when accessing tls data.
 
+Enum
+Name(ix86_tune) Type(int)
+Known CPUs (for use with the -mtune= options):
+
+EnumValue
+Enum(ix86_tune) String(nocona) Value(0)
+
+EnumValue
+Enum(ix86_tune) String(core2) Value(1)
+
+EnumValue
+Enum(ix86_tune) String(nehalem) Value(2)
+
+EnumValue
+Enum(ix86_tune) String(corei7) Value(3)
+
+EnumValue
+Enum(ix86_tune) String(westmere) Value(4)
+
+EnumValue
+Enum(ix86_tune) String(sandybridge) Value(5)
+
+EnumValue
+Enum(ix86_tune) String(corei7-avx) Value(6)
+
+EnumValue
+Enum(ix86_tune) String(ivybridge) Value(7)
+
+EnumValue
+Enum(ix86_tune) String(core-avx-i) Value(8)
+
+EnumValue
+Enum(ix86_tune) String(haswell) Value(9)
+
+EnumValue
+Enum(ix86_tune) String(core-avx2) Value(10)
+
+EnumValue
+Enum(ix86_tune) String(broadwell) Value(11)
+
+EnumValue
+Enum(ix86_tune) String(skylake) Value(12)
+
+EnumValue
+Enum(ix86_tune) String(skylake-avx512) Value(13)
+
+EnumValue
+Enum(ix86_tune) String(cannonlake) Value(14)
+
+EnumValue
+Enum(ix86_tune) String(icelake-client) Value(15)
+
+EnumValue
+Enum(ix86_tune) String(icelake-server) Value(16)
+
+EnumValue
+Enum(ix86_tune) String(bonnell) Value(17)
+
+EnumValue
+Enum(ix86_tune) String(atom) Value(18)
+
+EnumValue
+Enum(ix86_tune) String(silvermont) Value(19)
+
+EnumValue
+Enum(ix86_tune) String(slm) Value(20)
+
+EnumValue
+Enum(ix86_tune) String(goldmont) Value(21)
+
+EnumValue
+Enum(ix86_tune) String(goldmont-plus) Value(22)
+
+EnumValue
+Enum(ix86_tune) String(tremont) Value(23)
+
+EnumValue
+Enum(ix86_tune) String(knl) Value(24)
+
+EnumValue
+Enum(ix86_tune) String(knm) Value(25)
+
+EnumValue
+Enum(ix86_tune) String(intel) Value(26)
+
+EnumValue
+Enum(ix86_tune) String(x86-64) Value(27)
+
+EnumValue
+Enum(ix86_tune) String(eden-x2) Value(28)
+
+EnumValue
+Enum(ix86_tune) String(nano) Value(29)
+
+EnumValue
+Enum(ix86_tune) String(nano-1000) Value(30)
+
+EnumValue
+Enum(ix86_tune) String(nano-2000) Value(31)
+
+EnumValue
+Enum(ix86_tune) String(nano-3000) Value(32)
+
+EnumValue
+Enum(ix86_tune) String(nano-x2) Value(33)
+
+EnumValue
+Enum(ix86_tune) String(eden-x4) Value(34)
+
+EnumValue
+Enum(ix86_tune) String(nano-x4) Value(35)
+
+EnumValue
+Enum(ix86_tune) String(k8) Value(36)
+
+EnumValue
+Enum(ix86_tune) String(k8-sse3) Value(37)
+
+EnumValue
+Enum(ix86_tune) String(opteron) Value(38)
+
+EnumValue
+Enum(ix86_tune) String(opteron-sse3) Value(39)
+
+EnumValue
+Enum(ix86_tune) String(athlon64) Value(40)
+
+EnumValue
+Enum(ix86_tune) String(athlon64-sse3) Value(41)
+
+EnumValue
+Enum(ix86_tune) String(athlon-fx) Value(42)
+
+EnumValue
+Enum(ix86_tune) String(amdfam10) Value(43)
+
+EnumValue
+Enum(ix86_tune) String(barcelona) Value(44)
+
+EnumValue
+Enum(ix86_tune) String(bdver1) Value(45)
+
+EnumValue
+Enum(ix86_tune) String(bdver2) Value(46)
+
+EnumValue
+Enum(ix86_tune) String(bdver3) Value(47)
+
+EnumValue
+Enum(ix86_tune) String(bdver4) Value(48)
+
+EnumValue
+Enum(ix86_tune) String(znver1) Value(49)
+
+EnumValue
+Enum(ix86_tune) String(btver1) Value(50)
+
+EnumValue
+Enum(ix86_tune) String(btver2) Value(51)
+
+EnumValue
+Enum(ix86_tune) String(generic) Value(52)
+
+EnumValue
+Enum(ix86_tune) String(native) Value(53)
+
 mtune=
-Target RejectNegative Joined Var(ix86_tune_string)
+Target RejectNegative Joined Var(ix86_tune_string) HelpEnum(ix86_tune)
 Schedule code for given CPU.
 
 mtune-ctrl=

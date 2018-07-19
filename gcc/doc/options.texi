@@ -120,9 +120,9 @@ being described by this record.
 This property is required; it says what value (representable as
 @code{int}) should be used for the given string.
 
-@item EnumHelp(@var{name})
+@item HelpEnum(@var{name})
 Some string options accept enum values as arguments.
-When using @samp{EnumHelp}, list of possible values is listed
+When using @samp{HelpEnum}, list of possible values are listed
 in @option{--help} output.
 
 @item Canonical
