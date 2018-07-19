@@ -123,9 +123,11 @@ option_proposer::build_option_suggestions (void)
       switch (i)
 	{
 	default:
-	  if (option->var_type == CLVC_ENUM)
+	  if (option->var_type == CLVC_ENUM || option->var_enum_help != -1)
 	    {
-	      const struct cl_enum *e = &cl_enums[option->var_enum];
+	      short enum_index = (option->var_type == CLVC_ENUM
+				  ? option->var_enum : option->var_enum_help);
+	      const struct cl_enum *e = &cl_enums[enum_index];
 	      for (unsigned j = 0; e->values[j].arg != NULL; j++)
 		{
 		  char *with_arg = concat (opt_text, e->values[j].arg, NULL);
