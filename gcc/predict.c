@@ -2262,13 +2262,15 @@ guess_outgoing_edge_probabilities (basic_block bb)
   combine_predictions_for_insn (BB_END (bb), bb);
 }
 
-static tree expr_expected_value (tree, bitmap, enum br_predictor *predictor);
+static tree expr_expected_value (tree, bitmap, enum br_predictor *predictor,
+				 tree *probability);
 
 /* Helper function for expr_expected_value.  */
 
 static tree
 expr_expected_value_1 (tree type, tree op0, enum tree_code code,
-		       tree op1, bitmap visited, enum br_predictor *predictor)
+		       tree op1, bitmap visited, enum br_predictor *predictor,
+		       tree *probability)
 {
   gimple *def;
 
@@ -2329,7 +2331,8 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 	      if (arg == PHI_RESULT (def))
 		continue;
 
-	      new_val = expr_expected_value (arg, visited, &predictor2);
+	      new_val = expr_expected_value (arg, visited, &predictor2,
+					     probability);
 
 	      /* It is difficult to combine value predictors.  Simply assume
 		 that later predictor is weaker and take its prediction.  */
@@ -2353,7 +2356,7 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 					gimple_assign_rhs1 (def),
 					gimple_assign_rhs_code (def),
 					gimple_assign_rhs2 (def),
-					visited, predictor);
+					visited, predictor, NULL);
 	}
 
       if (is_gimple_call (def))
@@ -2395,6 +2398,21 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 		    *predictor = PRED_BUILTIN_EXPECT;
 		  return gimple_call_arg (def, 1);
 		}
+	      case BUILT_IN_EXPECT_WITH_PROBABILITY:
+		{
+		  tree val;
+		  if (gimple_call_num_args (def) != 3)
+		    return NULL;
+		  val = gimple_call_arg (def, 0);
+		  if (TREE_CONSTANT (val))
+		    return val;
+		  if (predictor)
+		    {
+		      *predictor = PRED_BUILTIN_EXPECT_WITH_PROBABILITY;
+		      *probability = gimple_call_arg (def, 2);
+		    }
+		  return gimple_call_arg (def, 1);
+		}
 
 	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_N:
 	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_1:
@@ -2426,10 +2444,10 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
     {
       tree res;
       enum br_predictor predictor2;
-      op0 = expr_expected_value (op0, visited, predictor);
+      op0 = expr_expected_value (op0, visited, predictor, probability);
       if (!op0)
 	return NULL;
-      op1 = expr_expected_value (op1, visited, &predictor2);
+      op1 = expr_expected_value (op1, visited, &predictor2, probability);
       if (predictor && *predictor < predictor2)
 	*predictor = predictor2;
       if (!op1)
@@ -2442,7 +2460,7 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
   if (get_gimple_rhs_class (code) == GIMPLE_UNARY_RHS)
     {
       tree res;
-      op0 = expr_expected_value (op0, visited, predictor);
+      op0 = expr_expected_value (op0, visited, predictor, probability);
       if (!op0)
 	return NULL;
       res = fold_build1 (code, type, op0);
@@ -2463,7 +2481,7 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 
 static tree
 expr_expected_value (tree expr, bitmap visited,
-		     enum br_predictor *predictor)
+		     enum br_predictor *predictor, tree *probability)
 {
   enum tree_code code;
   tree op0, op1;
@@ -2477,7 +2495,8 @@ expr_expected_value (tree expr, bitmap visited,
 
   extract_ops_from_tree (expr, &code, &op0, &op1);
   return expr_expected_value_1 (TREE_TYPE (expr),
-				op0, code, op1, visited, predictor);
+				op0, code, op1, visited, predictor,
+				probability);
 }
 
 /* Predict using opcode of the last statement in basic block.  */
@@ -2488,7 +2507,7 @@ tree_predict_by_opcode (basic_block bb)
   edge then_edge;
   tree op0, op1;
   tree type;
-  tree val;
+  tree val, probability;
   enum tree_code cmp;
   edge_iterator ei;
   enum br_predictor predictor;
@@ -2503,7 +2522,7 @@ tree_predict_by_opcode (basic_block bb)
   cmp = gimple_cond_code (stmt);
   type = TREE_TYPE (op0);
   val = expr_expected_value_1 (boolean_type_node, op0, cmp, op1, auto_bitmap (),
-			       &predictor);
+			       &predictor, &probability);
   if (val && TREE_CODE (val) == INTEGER_CST)
     {
       if (predictor == PRED_BUILTIN_EXPECT)
@@ -2514,6 +2533,19 @@ tree_predict_by_opcode (basic_block bb)
 	  if (integer_zerop (val))
 	    percent = 100 - percent;
 	  predict_edge (then_edge, PRED_BUILTIN_EXPECT, HITRATE (percent));
+	}
+      else if (predictor == PRED_BUILTIN_EXPECT_WITH_PROBABILITY)
+	{
+	  if (!tree_fits_uhwi_p (probability))
+	    return;
+
+	  unsigned percent = tree_to_uhwi (probability);
+	  if (integer_zerop (val))
+	    percent = 100 - percent;
+	  if (percent > 100)
+	    return;
+	  predict_edge (then_edge, PRED_BUILTIN_EXPECT_WITH_PROBABILITY,
+			HITRATE (percent));
 	}
       else
 	predict_edge_def (then_edge, predictor,
@@ -3927,10 +3959,11 @@ pass_strip_predict_hints::execute (function *fun)
 	    {
 	      tree fndecl = gimple_call_fndecl (stmt);
 
-	      if ((fndecl
-		   && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
-		   && DECL_FUNCTION_CODE (fndecl) == BUILT_IN_EXPECT
+	      if ((DECL_BUILT_IN_P (fndecl, BUILT_IN_NORMAL, BUILT_IN_EXPECT)
 		   && gimple_call_num_args (stmt) == 2)
+		  || (DECL_BUILT_IN_P (fndecl, BUILT_IN_NORMAL,
+				       BUILT_IN_EXPECT_WITH_PROBABILITY)
+		      && gimple_call_num_args (stmt) == 3)
 		  || (gimple_call_internal_p (stmt)
 		      && gimple_call_internal_fn (stmt) == IFN_BUILTIN_EXPECT))
 		{
