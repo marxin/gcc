@@ -10776,6 +10776,7 @@ is_simple_builtin (tree decl)
 	/* Builtins that expand to constants.  */
       case BUILT_IN_CONSTANT_P:
       case BUILT_IN_EXPECT:
+      case BUILT_IN_UNPREDICTABLE:
       case BUILT_IN_OBJECT_SIZE:
       case BUILT_IN_UNREACHABLE:
 	/* Simple register moves or loads from stack.  */

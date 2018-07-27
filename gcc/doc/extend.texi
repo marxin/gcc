@@ -11852,6 +11852,12 @@ if (__builtin_expect (ptr != NULL, 1))
 when testing pointer or floating-point values.
 @end deftypefn
 
+@deftypefn {Built-in Function} long __builtin_unpredictable (long @var{exp})
+You may use @code{__builtin_expect} to provide the compiler hint
+that @var{exp} is unpredictable and probabilities based on the expression
+are even.
+@end deftypefn
+
 @deftypefn {Built-in Function} void __builtin_trap (void)
 This function causes the program to exit abnormally.  GCC implements
 this function by using a target-dependent mechanism (such as

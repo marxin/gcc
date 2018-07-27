@@ -2395,6 +2395,12 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 		    *predictor = PRED_BUILTIN_EXPECT;
 		  return gimple_call_arg (def, 1);
 		}
+	      case BUILT_IN_UNPREDICTABLE:
+		{
+		  if (predictor)
+		    *predictor = PRED_BUILTIN_UNPREDICTABLE;
+		  return boolean_true_node;
+		}
 
 	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_N:
 	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_1:
@@ -3929,8 +3935,10 @@ pass_strip_predict_hints::execute (function *fun)
 
 	      if ((fndecl
 		   && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
-		   && DECL_FUNCTION_CODE (fndecl) == BUILT_IN_EXPECT
-		   && gimple_call_num_args (stmt) == 2)
+		   && ((DECL_FUNCTION_CODE (fndecl) == BUILT_IN_EXPECT
+		       && gimple_call_num_args (stmt) == 2)
+		       || (DECL_FUNCTION_CODE (fndecl) == BUILT_IN_UNPREDICTABLE
+			   && gimple_call_num_args (stmt) == 1)))
 		  || (gimple_call_internal_p (stmt)
 		      && gimple_call_internal_fn (stmt) == IFN_BUILTIN_EXPECT))
 		{

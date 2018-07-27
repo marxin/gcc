@@ -51,6 +51,10 @@ DEF_PREDICTOR (PRED_NO_PREDICTION, "no prediction", PROB_ALWAYS, 0)
 DEF_PREDICTOR (PRED_UNCONDITIONAL, "unconditional jump", PROB_ALWAYS,
 	       PRED_FLAG_FIRST_MATCH)
 
+/* Drop all predictions with __builtin_unpredictable.  */
+DEF_PREDICTOR (PRED_BUILTIN_UNPREDICTABLE, "__builtin_unpredictable", PROB_EVEN,
+              PRED_FLAG_FIRST_MATCH)
+
 /* Use number of loop iterations determined by # of iterations
    analysis to set probability.  We don't want to use Dempster-Shaffer
    theory here, as the predictions is exact.  */
