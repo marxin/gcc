@@ -82,8 +82,6 @@ histogram_value gimple_histogram_value_of_type (struct function *, gimple *,
 						enum hist_type);
 void gimple_add_histogram_value (struct function *, gimple *, histogram_value);
 void dump_histograms_for_stmt (struct function *, FILE *, gimple *);
-void gimple_remove_histogram_value (struct function *, gimple *, histogram_value);
-void gimple_remove_stmt_histograms (struct function *, gimple *);
 void gimple_duplicate_stmt_histograms (struct function *, gimple *,
 				       struct function *, gimple *);
 void gimple_move_stmt_histograms (struct function *, gimple *, gimple *);

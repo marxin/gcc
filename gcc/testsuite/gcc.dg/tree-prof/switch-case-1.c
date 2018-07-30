@@ -1,4 +1,4 @@
-/* { dg-options "-O2 -fdump-ipa-profile-all" } */
+/* { dg-options "-O2 -fdump-ipa-profile" } */
 int g;
 
 __attribute__((noinline)) void foo (int  n)
@@ -36,5 +36,5 @@ int main ()
  return 0;
 }
 /* autofdo cannot do that precise execution numbers */
-/* { dg-final-use-not-autofdo { scan-ipa-dump-times ";;   basic block\[^\\n\]*count 4000" 2 "profile"} } */
-/* { dg-final-use-not-autofdo { scan-ipa-dump-times ";;   basic block\[^\\n\]*count 2000" 1 "profile"} } */
+/* { dg-final-use-not-autofdo { scan-ipa-dump-times "bb\[^\\n\]*\\\[count: 4000\\\]" 2 "profile"} } */
+/* { dg-final-use-not-autofdo { scan-ipa-dump-times "bb\[^\\n\]*\\\[count: 2000\\\]" 1 "profile"} } */

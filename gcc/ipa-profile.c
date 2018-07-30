@@ -216,8 +216,6 @@ ipa_profile_generate_summary (void)
 			      e->indirect_info->common_target_probability = REG_BR_PROB_BASE;
 			    }
 			}
-		      gimple_remove_histogram_value (DECL_STRUCT_FUNCTION (node->decl),
-						      stmt, h);
 		    }
 		}
 	      time += estimate_num_insns (stmt, &eni_time_weights);
@@ -228,6 +226,10 @@ ipa_profile_generate_summary (void)
 			       time, size);
 	}
   histogram.qsort (cmp_counts);
+
+  /* Remove all histograms for all functions.  */
+  FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
+    free_histograms (DECL_STRUCT_FUNCTION (node->decl));
 }
 
 /* Serialize the ipa info for lto.  */
@@ -741,6 +743,7 @@ ipa_profile (void)
 	}
     }
   free (order);
+
   return 0;
 }
 
