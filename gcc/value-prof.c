@@ -183,29 +183,6 @@ gimple_add_histogram_value (struct function *fun, gimple *stmt,
   hist->fun = fun;
 }
 
-/* Remove histogram HIST from STMT's histogram list.  */
-
-void
-gimple_remove_histogram_value (struct function *fun, gimple *stmt,
-			       histogram_value hist)
-{
-  histogram_value hist2 = gimple_histogram_value (fun, stmt);
-  if (hist == hist2)
-    {
-      set_histogram_value (fun, stmt, hist->hvalue.next);
-    }
-  else
-    {
-      while (hist2->hvalue.next != hist)
-	hist2 = hist2->hvalue.next;
-      hist2->hvalue.next = hist->hvalue.next;
-    }
-  free (hist->hvalue.counters);
-  if (flag_checking)
-    memset (hist, 0xab, sizeof (*hist));
-  free (hist);
-}
-
 /* Lookup histogram of type TYPE in the STMT.  */
 
 histogram_value
@@ -446,16 +423,6 @@ dump_histograms_for_stmt (struct function *fun, FILE *dump_file, gimple *stmt)
     dump_histogram_value (dump_file, hist);
 }
 
-/* Remove all histograms associated with STMT.  */
-
-void
-gimple_remove_stmt_histograms (struct function *fun, gimple *stmt)
-{
-  histogram_value val;
-  while ((val = gimple_histogram_value (fun, stmt)) != NULL)
-    gimple_remove_histogram_value (fun, stmt, val);
-}
-
 /* Duplicate all histograms associates with OSTMT to STMT.  */
 
 void
@@ -492,66 +459,6 @@ gimple_move_stmt_histograms (struct function *fun, gimple *stmt, gimple *ostmt)
     }
 }
 
-static bool error_found = false;
-
-/* Helper function for verify_histograms.  For each histogram reachable via htab
-   walk verify that it was reached via statement walk.  */
-
-static int
-visit_hist (void **slot, void *data)
-{
-  hash_set<histogram_value> *visited = (hash_set<histogram_value> *) data;
-  histogram_value hist = *(histogram_value *) slot;
-
-  if (!visited->contains (hist)
-      && hist->type != HIST_TYPE_TIME_PROFILE)
-    {
-      error ("dead histogram");
-      dump_histogram_value (stderr, hist);
-      debug_gimple_stmt (hist->hvalue.stmt);
-      error_found = true;
-    }
-  return 1;
-}
-
-/* Verify sanity of the histograms.  */
-
-DEBUG_FUNCTION void
-verify_histograms (void)
-{
-  basic_block bb;
-  gimple_stmt_iterator gsi;
-  histogram_value hist;
-
-  error_found = false;
-  hash_set<histogram_value> visited_hists;
-  FOR_EACH_BB_FN (bb, cfun)
-    for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-      {
-	gimple *stmt = gsi_stmt (gsi);
-
-	for (hist = gimple_histogram_value (cfun, stmt); hist;
-	     hist = hist->hvalue.next)
-	  {
-	    if (hist->hvalue.stmt != stmt)
-	      {
-		error ("Histogram value statement does not correspond to "
-		       "the statement it is associated with");
-		debug_gimple_stmt (stmt);
-		dump_histogram_value (stderr, hist);
-		error_found = true;
-	      }
-            visited_hists.add (hist);
-	  }
-      }
-  if (VALUE_HISTOGRAMS (cfun))
-    htab_traverse (VALUE_HISTOGRAMS (cfun), visit_hist, &visited_hists);
-  if (error_found)
-    internal_error ("verify_histograms failed");
-}
-
-/* Helper function for verify_histograms.  For each histogram reachable via htab
-   walk verify that it was reached via statement walk.  */
 
 static int
 free_hist (void **slot, void *data ATTRIBUTE_UNUSED)
@@ -787,7 +694,6 @@ gimple_divmod_fixed_value_transform (gimple_stmt_iterator *si)
   val = histogram->hvalue.counters[0];
   count = histogram->hvalue.counters[1];
   all = histogram->hvalue.counters[2];
-  gimple_remove_histogram_value (cfun, stmt, histogram);
 
   /* We require that count is at least half of all; this means
      that for the transformation to fire the value must be constant
@@ -947,8 +853,6 @@ gimple_mod_pow2_value_transform (gimple_stmt_iterator *si)
   value = histogram->hvalue.value;
   wrong_values = histogram->hvalue.counters[0];
   count = histogram->hvalue.counters[1];
-
-  gimple_remove_histogram_value (cfun, stmt, histogram);
 
   /* We require that we hit a power of 2 at least half of all evaluations.  */
   if (simple_cst_equal (gimple_assign_rhs2 (stmt), value) != 1
@@ -1126,10 +1030,7 @@ gimple_mod_subtract_transform (gimple_stmt_iterator *si)
 
   /* Compute probability of taking the optimal path.  */
   if (check_counter (stmt, "interval", &count1, &all, gimple_bb (stmt)->count))
-    {
-      gimple_remove_histogram_value (cfun, stmt, histogram);
-      return false;
-    }
+    return false;
 
   if (flag_profile_correction && count1 + count2 > all)
       all = count1 + count2;
@@ -1149,7 +1050,6 @@ gimple_mod_subtract_transform (gimple_stmt_iterator *si)
       || optimize_bb_for_size_p (gimple_bb (stmt)))
     return false;
 
-  gimple_remove_histogram_value (cfun, stmt, histogram);
   if (dump_file)
     {
       fprintf (dump_file, "Mod subtract transformation on insn ");
@@ -1464,10 +1364,7 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
   if (check_counter (stmt, "ic", &all, &bb_all, gimple_bb (stmt)->count)
       || check_counter (stmt, "ic", &count, &all,
 		        profile_count::from_gcov_type (all)))
-    {
-      gimple_remove_histogram_value (cfun, stmt, histogram);
-      return false;
-    }
+    return false;
 
   if (4 * count <= 3 * all)
     return false;
@@ -1499,7 +1396,6 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
 	  fprintf (dump_file, " transformation skipped because of type mismatch");
 	  print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
 	}
-      gimple_remove_histogram_value (cfun, stmt, histogram);
       return false;
     }
 
@@ -1687,7 +1583,6 @@ gimple_stringops_transform (gimple_stmt_iterator *gsi)
   val = histogram->hvalue.counters[0];
   count = histogram->hvalue.counters[1];
   all = histogram->hvalue.counters[2];
-  gimple_remove_histogram_value (cfun, stmt, histogram);
 
   /* We require that count is at least half of all; this means
      that for the transformation to fire the value must be constant
@@ -1764,10 +1659,7 @@ stringop_block_profile (gimple *stmt, unsigned int *expected_align,
   if (!histogram)
     *expected_size = -1;
   else if (!histogram->hvalue.counters[1])
-    {
-      *expected_size = -1;
-      gimple_remove_histogram_value (cfun, stmt, histogram);
-    }
+    *expected_size = -1;
   else
     {
       gcov_type size;
@@ -1779,7 +1671,6 @@ stringop_block_profile (gimple *stmt, unsigned int *expected_align,
       if (size > INT_MAX)
 	size = INT_MAX;
       *expected_size = size;
-      gimple_remove_histogram_value (cfun, stmt, histogram);
     }
 
   histogram = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_IOR);
@@ -1787,10 +1678,7 @@ stringop_block_profile (gimple *stmt, unsigned int *expected_align,
   if (!histogram)
     *expected_align = 0;
   else if (!histogram->hvalue.counters[0])
-    {
-      gimple_remove_histogram_value (cfun, stmt, histogram);
-      *expected_align = 0;
-    }
+    *expected_align = 0;
   else
     {
       gcov_type count;
@@ -1802,7 +1690,6 @@ stringop_block_profile (gimple *stmt, unsigned int *expected_align,
 	     && (alignment <= UINT_MAX / 2 / BITS_PER_UNIT))
 	alignment <<= 1;
       *expected_align = alignment * BITS_PER_UNIT;
-      gimple_remove_histogram_value (cfun, stmt, histogram);
     }
 }
 
@@ -1996,11 +1883,5 @@ gimple_find_values_to_profile (histogram_values *values)
 	default:
 	  gcc_unreachable ();
 	}
-      if (dump_file && hist->hvalue.stmt != NULL)
-        {
-	  fprintf (dump_file, "Stmt ");
-          print_gimple_stmt (dump_file, hist->hvalue.stmt, 0, TDF_SLIM);
-	  dump_histogram_value (dump_file, hist);
-        }
     }
 }

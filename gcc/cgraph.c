@@ -1728,8 +1728,6 @@ release_function_body (tree decl)
 	  clear_edges (fn);
 	  fn->cfg = NULL;
 	}
-      if (fn->value_histograms)
-	free_histograms (fn);
       gimple_set_body (decl, NULL);
       /* Struct function hangs a lot of data that would leak if we didn't
          removed all pointers to it.   */

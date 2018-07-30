@@ -82,12 +82,9 @@ histogram_value gimple_histogram_value_of_type (struct function *, gimple *,
 						enum hist_type);
 void gimple_add_histogram_value (struct function *, gimple *, histogram_value);
 void dump_histograms_for_stmt (struct function *, FILE *, gimple *);
-void gimple_remove_histogram_value (struct function *, gimple *, histogram_value);
-void gimple_remove_stmt_histograms (struct function *, gimple *);
 void gimple_duplicate_stmt_histograms (struct function *, gimple *,
 				       struct function *, gimple *);
 void gimple_move_stmt_histograms (struct function *, gimple *, gimple *);
-void verify_histograms (void);
 void free_histograms (function *);
 void stringop_block_profile (gimple *, unsigned int *, HOST_WIDE_INT *);
 gcall *gimple_ic (gcall *, struct cgraph_node *, profile_probability);
