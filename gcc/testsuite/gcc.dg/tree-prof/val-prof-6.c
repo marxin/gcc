@@ -1,4 +1,4 @@
-/* { dg-options "-O2 -fdump-tree-optimized" } */
+/* { dg-options "-O2 -fdump-ipa-profile-details" } */
 char a[1000];
 char b[1000];
 int size=1000;
@@ -16,5 +16,5 @@ main()
   return 0;
 }
 /* autofdo does not do value profiling so far */
-/* { dg-final-use-not-autofdo { scan-tree-dump "Average value sum:499500" "optimized"} } */
-/* { dg-final-use-not-autofdo { scan-tree-dump "IOR value" "optimized"} } */
+/* { dg-final-use-not-autofdo { scan-tree-dump "Average value sum:499500" "profile"} } */
+/* { dg-final-use-not-autofdo { scan-tree-dump "IOR value" "profile"} } */

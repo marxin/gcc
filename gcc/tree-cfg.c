@@ -5424,7 +5424,6 @@ verify_gimple_in_cfg (struct function *fn, bool verify_nothrow)
   if (err || eh_error_found)
     internal_error ("verify_gimple failed");
 
-  verify_histograms ();
   timevar_pop (TV_TREE_STMT_VERIFY);
 }
 
@@ -7106,7 +7105,6 @@ move_block_to_fn (struct function *dest_cfun, basic_block bb,
       remove_stmt_from_eh_lp_fn (cfun, stmt);
 
       gimple_duplicate_stmt_histograms (dest_cfun, stmt, cfun, stmt);
-      gimple_remove_stmt_histograms (cfun, stmt);
 
       /* We cannot leave any operands allocated from the operand caches of
 	 the current function.  */

@@ -445,7 +445,6 @@ gsi_replace (gimple_stmt_iterator *gsi, gimple *stmt, bool update_eh_info)
 
   /* Free all the data flow information for ORIG_STMT.  */
   gimple_set_bb (orig_stmt, NULL);
-  gimple_remove_stmt_histograms (cfun, orig_stmt);
   delink_stmt_imm_use (orig_stmt);
 
   gsi_set_stmt (gsi, stmt);
@@ -573,7 +572,6 @@ gsi_remove (gimple_stmt_iterator *i, bool remove_permanently)
 	   close.  */
 	cfun->debug_marker_count--;
       require_eh_edge_purge = remove_stmt_from_eh_lp (stmt);
-      gimple_remove_stmt_histograms (cfun, stmt);
     }
 
   /* Update the iterator and re-wire the links in I->SEQ.  */

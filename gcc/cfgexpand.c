@@ -6397,7 +6397,6 @@ pass_expand::execute (function *fun)
   /* Expansion is used by optimization passes too, set maybe_hot_insn_p
      conservatively to true until they are all profile aware.  */
   delete lab_rtx_for_bb;
-  free_histograms (fun);
 
   construct_exit_block ();
   insn_locations_finalize ();
