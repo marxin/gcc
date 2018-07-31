@@ -44,8 +44,10 @@ extern int gcov_profile_merge (struct gcov_info*, struct gcov_info*, int, int);
 extern int gcov_profile_overlap (struct gcov_info*, struct gcov_info*);
 extern int gcov_profile_normalize (struct gcov_info*, gcov_type);
 extern int gcov_profile_scale (struct gcov_info*, float, int, int);
+extern int gcov_profile_compute_histogram (struct gcov_info*,
+					   gcov_histogram *);
 extern struct gcov_info* gcov_read_profile_dir (const char*, int);
-extern void gcov_do_dump (struct gcov_info *, int);
+extern void gcov_do_dump (struct gcov_info *, int, gcov_histogram *);
 extern const char *gcov_get_filename (struct gcov_info *list);
 extern void gcov_set_verbose (void);
 
@@ -92,7 +94,8 @@ unlink_profile_dir (const char *path ATTRIBUTE_UNUSED)
    we will remove all the gcda files in OUT.  */
 
 static void
-gcov_output_files (const char *out, struct gcov_info *profile)
+gcov_output_files (const char *out, struct gcov_info *profile,
+		   gcov_histogram *histogram = NULL)
 {
   char *pwd;
   int ret;
@@ -123,7 +126,7 @@ gcov_output_files (const char *out, struct gcov_info *profile)
     fatal_error (input_location, "output file %s already exists in folder %s",
 		 filename, out);
 
-  gcov_do_dump (profile, 0);
+  gcov_do_dump (profile, 0, histogram);
 
   ret = chdir (pwd);
   if (ret)
@@ -384,6 +387,86 @@ do_rewrite (int argc, char **argv)
   return ret;
 }
 
+/* Read all GCDA files from D1 folder, compute histogram and stream out
+   new GCDA files into OUT directory.  */
+
+static int
+profile_compute_histogram (const char *d1)
+{
+  struct gcov_info * d1_profile;
+
+  d1_profile = gcov_read_profile_dir (d1, 0);
+  if (!d1_profile)
+    return 1;
+
+  gcov_histogram histogram;
+  gcov_profile_compute_histogram (d1_profile, &histogram);
+
+  gcov_output_files (d1, d1_profile, &histogram);
+
+  return 0;
+}
+
+/* Usage function for profile rewrite.  */
+
+static void
+print_compute_histogram_usage_message (int error_p)
+{
+  FILE *file = error_p ? stderr : stdout;
+
+  fnotice (file,
+	   "  compute_histogram [options] <dir>     Compute arcs histogram\n");
+  fnotice (file, "    -v, --verbose                       Verbose mode\n");
+}
+
+static const struct option compute_histogram_options[] =
+{
+  { "verbose",		      no_argument,       NULL, 'v' },
+  { "output",		      required_argument, NULL, 'o' },
+  { 0, 0, 0, 0 }
+};
+
+/* Print profile histogram compution usage and exit.  */
+
+static void
+compute_histogram_usage (void)
+{
+  fnotice (stderr, "Compute histogram subcommand usage:");
+  print_compute_histogram_usage_message (true);
+  exit (FATAL_EXIT_CODE);
+}
+
+/* Driver for profile compute histogram sub-command.  */
+
+static int
+do_compute_histogram (int argc, char **argv)
+{
+  int opt;
+  int ret;
+
+  optind = 0;
+  while ((opt = getopt_long (argc, argv, "v",
+			     compute_histogram_options, NULL)) != -1)
+    {
+      switch (opt)
+      {
+	case 'v':
+	  verbose = true;
+	  gcov_set_verbose ();
+	  break;
+	default:
+	  compute_histogram_usage ();
+      }
+    }
+
+  if (argc - optind == 1)
+    ret = profile_compute_histogram (argv[optind]);
+  else
+    compute_histogram_usage ();
+
+  return ret;
+}
+
 /* Driver function to computer the overlap score b/w profile D1 and D2.
    Return 1 on error and 0 if OK.  */
 
@@ -423,7 +506,6 @@ print_overlap_usage_message (int error_p)
   fnotice (file, "    -o, --object                        Print object level info\n");
   fnotice (file, "    -t <float>, --hot_threshold <float> Set the threshold for hotness\n");
   fnotice (file, "    -v, --verbose                       Verbose mode\n");
-
 }
 
 static const struct option overlap_options[] =
@@ -515,6 +597,7 @@ print_usage (int error_p)
   print_merge_usage_message (error_p);
   print_rewrite_usage_message (error_p);
   print_overlap_usage_message (error_p);
+  print_compute_histogram_usage_message (error_p);
   fnotice (file, "\nFor bug reporting instructions, please see:\n%s.\n",
            bug_report_url);
   exit (status);
@@ -607,6 +690,8 @@ main (int argc, char **argv)
     return do_rewrite (argc - optind, argv + optind);
   else if (!strcmp (sub_command, "overlap"))
     return do_overlap (argc - optind, argv + optind);
+  else if (!strcmp (sub_command, "compute_histogram"))
+    return do_compute_histogram (argc - optind, argv + optind);
 
   print_usage (true);
 }

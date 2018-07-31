@@ -32,6 +32,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "diagnostic.h"
 #include "version.h"
 #include "demangle.h"
+#include "gcov-io.h"
 
 /* Borrowed from basic-block.h.  */
 #define RDIV(X,Y) (((X) + (Y) / 2) / (Y))
@@ -79,6 +80,12 @@ static int k_ctrs_mask[GCOV_COUNTERS];
 static struct gcov_ctr_info k_ctrs[GCOV_COUNTERS];
 /* Number of kind of counters that have been seen.  */
 static int k_ctrs_types;
+/* This variable contains all program summaries.  */
+static struct obstack program_summaries;
+/* The program summary being processed.  */
+static struct gcov_summary *curr_program_summary;
+/* The number of program summaries seen so far.  */
+static unsigned num_program_summary;
 
 /* Merge functions for counters.  */
 #define DEF_GCOV_COUNTER(COUNTER, NAME, FN_TYPE) __gcov_merge ## FN_TYPE,
@@ -223,9 +230,12 @@ tag_counters (unsigned tag, unsigned length)
 static void
 tag_summary (unsigned tag ATTRIBUTE_UNUSED, unsigned length ATTRIBUTE_UNUSED)
 {
-  struct gcov_summary summary;
+  curr_program_summary = (gcov_summary *) xcalloc (sizeof (gcov_summary), 1);
+  gcov_read_summary (curr_program_summary);
+  obstack_grow (&program_summaries, curr_program_summary,
+		sizeof (*curr_program_summary));
 
-  gcov_read_summary (&summary);
+  num_program_summary++;
 }
 
 /* This function is called at the end of reading a gcda file.
@@ -239,9 +249,13 @@ read_gcda_finalize (struct gcov_info *obj_info)
   set_fn_ctrs (curr_fn_info);
   obstack_ptr_grow (&fn_info, curr_fn_info);
 
-  /* We set the following fields: merge, n_functions, and functions.  */
+  /* We set the following fields: merge, n_functions, functions, n_summaries
+     and summaries.  */
   obj_info->n_functions = num_fn_info;
   obj_info->functions = (const struct gcov_fn_info**) obstack_finish (&fn_info);
+  obj_info->n_summaries = num_program_summary;
+  obj_info->summaries
+    = (struct gcov_summary *) obstack_finish (&program_summaries);
 
   /* wrap all the counter array.  */
   for (i=0; i< GCOV_COUNTERS; i++)
@@ -299,6 +313,9 @@ read_gcda_file (const char *filename)
   obstack_init (&fn_info);
   num_fn_info = 0;
   curr_fn_info = 0;
+  obstack_init (&program_summaries);
+  num_program_summary = 0;
+  curr_program_summary = NULL;
   {
     size_t len = strlen (filename) + 1;
     char *str_dup = (char*) xmalloc (len);
@@ -867,6 +884,100 @@ gcov_profile_normalize (struct gcov_info *profile, gcov_type max_val)
 
   return gcov_profile_scale (profile, scale_factor, 0, 0);
 }
+
+/* Insert counter VALUE into HISTOGRAM.  */
+
+static void
+gcov_histogram_insert (gcov_bucket_type *histogram, gcov_type value)
+{
+  unsigned i;
+
+  i = gcov_histo_index (value);
+  histogram[i].num_counters++;
+  histogram[i].cum_value += value;
+
+  if (histogram[i].min_value == 0
+      || value < histogram[i].min_value)
+    histogram[i].min_value = value;
+}
+
+/* Driver for computatation of precise profile histogram.  */
+
+int
+gcov_profile_compute_histogram (struct gcov_info *profile,
+				gcov_histogram *histogram)
+{
+  struct gcov_info *gi_ptr;
+  gcov_bucket_type *histo_bucket;
+  unsigned f_ix;
+
+  memset (histogram, 0, sizeof (*histogram));
+  struct gcov_summary *summary = &histogram->summary;
+
+  /* Compute histogram for all files.  */
+  for (gi_ptr = profile; gi_ptr; gi_ptr = gi_ptr->next)
+    {
+      for (f_ix = 0; f_ix < gi_ptr->n_functions; f_ix++)
+	{
+	  const struct gcov_fn_info *gfi_ptr = gi_ptr->functions[f_ix];
+	  const struct gcov_ctr_info *ci_ptr;
+
+	  if (!gfi_ptr || gfi_ptr->key != gi_ptr)
+	    continue;
+
+	  ci_ptr = gfi_ptr->ctrs;
+	  gcov_merge_fn merge = gi_ptr->merge[GCOV_COUNTER_ARCS];
+
+	  if (merge)
+	    for (unsigned ix = 0; ix < ci_ptr->num; ix++)
+	      {
+		gcov_type value = ci_ptr->values[ix];
+		gcov_histogram_insert (histogram->histogram, value);
+		summary->num++;
+		summary->sum_all += value;
+	      }
+	}
+    }
+
+  /* Iterate all histograms to aggregate some values.  */
+  for (gi_ptr = profile; gi_ptr; gi_ptr = gi_ptr->next)
+    {
+      gcov_type runs = 0;
+      for (unsigned i = 0; i < gi_ptr->n_summaries; i++)
+	{
+	  gcov_summary *s = &gi_ptr->summaries[i];
+	  runs += s->runs;
+
+	  if (s->run_max > summary->run_max)
+	    summary->run_max = s->run_max;
+	}
+
+      if (runs > summary->runs)
+	summary->runs = runs;
+    }
+
+  /* Conservative calculation of sum of maximum in each run.  */
+  summary->sum_max = summary->runs * summary->run_max;
+
+  /* Write the calculated histogram to all profile files.  */
+  if (verbose)
+    fnotice (stdout, "\nComputed histogram:\n");
+
+  fnotice (stdout, "runs: %d\n", summary->runs);
+
+  for (unsigned h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
+    {
+      histo_bucket = &histogram->histogram[h_ix];
+      if (!histo_bucket->num_counters)
+	continue;
+
+      if (verbose)
+	fnotice (stdout, "  %d: %d\n", h_ix, histo_bucket->num_counters);
+    }
+
+  return 0;
+}
+
 
 /* The following variables are defined in gcc/gcov-tool.c.  */
 extern int overlap_func_level;

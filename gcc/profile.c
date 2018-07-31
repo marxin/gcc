@@ -215,10 +215,10 @@ get_working_sets (void)
   unsigned ws_ix, pctinc, pct;
   gcov_working_set_t *ws_info;
 
-  if (!profile_info)
+  if (!program_histogram)
     return;
 
-  compute_working_sets (profile_info, gcov_working_sets);
+  compute_working_sets (program_histogram, gcov_working_sets);
 
   if (dump_file)
     {
@@ -268,32 +268,14 @@ find_working_set (unsigned pct_times_10)
 static gcov_type *
 get_exec_counts (unsigned cfg_checksum, unsigned lineno_checksum)
 {
-  unsigned num_edges = 0;
-  basic_block bb;
   gcov_type *counts;
 
-  /* Count the edges to be (possibly) instrumented.  */
-  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR_FOR_FN (cfun), NULL, next_bb)
-    {
-      edge e;
-      edge_iterator ei;
-
-      FOR_EACH_EDGE (e, ei, bb->succs)
-	if (!EDGE_INFO (e)->ignore && !EDGE_INFO (e)->on_tree)
-	  num_edges++;
-    }
-
-  counts = get_coverage_counts (GCOV_COUNTER_ARCS, num_edges, cfg_checksum,
-				lineno_checksum, &profile_info);
+  counts = get_coverage_counts (GCOV_COUNTER_ARCS, cfg_checksum,
+				lineno_checksum);
   if (!counts)
     return NULL;
 
   get_working_sets ();
-
-  if (dump_file && profile_info)
-    fprintf (dump_file, "Merged %u profiles with maximal count %u.\n",
-	     profile_info->runs, (unsigned) profile_info->sum_max);
-
   return counts;
 }
 
@@ -871,10 +853,9 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	  continue;
 	}
 
-      histogram_counts[t] =
-	get_coverage_counts (COUNTER_FOR_HIST_TYPE (t),
-			     n_histogram_counters[t], cfg_checksum,
-			     lineno_checksum, NULL);
+      histogram_counts[t] = get_coverage_counts (COUNTER_FOR_HIST_TYPE (t),
+						 cfg_checksum,
+						 lineno_checksum);
       if (histogram_counts[t])
 	any = 1;
       act_count[t] = histogram_counts[t];

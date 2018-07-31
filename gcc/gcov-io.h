@@ -190,7 +190,7 @@ typedef uint64_t gcov_type_unsigned;
 
 #define ATTRIBUTE_HIDDEN
 
-#endif /* !IN_LIBGOCV */
+#endif /* !IN_LIBGCOV */
 
 #ifndef GCOV_LINKAGE
 #define GCOV_LINKAGE extern
@@ -242,7 +242,9 @@ typedef uint64_t gcov_type_unsigned;
 #define GCOV_TAG_COUNTER_NUM(LENGTH) ((LENGTH) / 2)
 #define GCOV_TAG_OBJECT_SUMMARY  ((gcov_unsigned_t)0xa1000000) /* Obsolete */
 #define GCOV_TAG_PROGRAM_SUMMARY ((gcov_unsigned_t)0xa3000000)
-#define GCOV_TAG_SUMMARY_LENGTH(NUM) (1 + (10 + 3 * 2) + (NUM) * 5)
+#define GCOV_TAG_HISTOGRAM ((gcov_unsigned_t)0xa5000000)
+#define GCOV_TAG_SUMMARY_LENGTH (3 + 3 * 2)
+#define GCOV_TAG_HISTOGRAM_LENGTH(NUM) (GCOV_TAG_SUMMARY_LENGTH + 8 + (NUM) * 5)
 #define GCOV_TAG_AFDO_FILE_NAMES ((gcov_unsigned_t)0xaa000000)
 #define GCOV_TAG_AFDO_FUNCTION ((gcov_unsigned_t)0xac000000)
 #define GCOV_TAG_AFDO_WORKING_SET ((gcov_unsigned_t)0xaf000000)
@@ -342,6 +344,11 @@ struct gcov_summary
   gcov_type sum_all;		/* Sum of all counters accumulated.  */
   gcov_type run_max;		/* Maximum value on a single run.  */
   gcov_type sum_max;    	/* Sum of individual run max values.  */
+};
+
+struct gcov_histogram
+{
+  struct gcov_summary summary;
   gcov_bucket_type histogram[GCOV_HISTOGRAM_SIZE]; /* Histogram of
 						      counter values.  */
 };
@@ -368,6 +375,7 @@ GCOV_LINKAGE int gcov_close (void) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE gcov_unsigned_t gcov_read_unsigned (void) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE gcov_type gcov_read_counter (void) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE void gcov_read_summary (struct gcov_summary *) ATTRIBUTE_HIDDEN;
+GCOV_LINKAGE void gcov_read_histogram (struct gcov_histogram *) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE const char *gcov_read_string (void);
 GCOV_LINKAGE void gcov_sync (gcov_position_t /*base*/,
 			     gcov_unsigned_t /*length */);
@@ -385,6 +393,10 @@ GCOV_LINKAGE void gcov_write_string (const char *);
 GCOV_LINKAGE void gcov_write_filename (const char *);
 GCOV_LINKAGE gcov_position_t gcov_write_tag (gcov_unsigned_t);
 GCOV_LINKAGE void gcov_write_length (gcov_position_t /*position*/);
+#endif
+
+#if IN_GCOV_TOOL
+GCOV_LINKAGE unsigned gcov_histo_index (gcov_type value);
 #endif
 
 #if IN_GCOV <= 0 && !IN_LIBGCOV
@@ -405,7 +417,7 @@ typedef struct gcov_working_set_info
   gcov_type min_counter;
 } gcov_working_set_t;
 
-GCOV_LINKAGE void compute_working_sets (const gcov_summary *summary,
+GCOV_LINKAGE void compute_working_sets (gcov_histogram *histogram,
                                         gcov_working_set_t *gcov_working_sets);
 #endif
 

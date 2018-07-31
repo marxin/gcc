@@ -24,6 +24,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
 #include "libgcov.h"
+#include "gcov-io.h"
 
 #if defined(inhibit_libc)
 /* If libc and its header files are not available, provide dummy functions.  */
@@ -212,46 +213,6 @@ gcov_histogram_insert(gcov_bucket_type *histogram, gcov_type value)
     histogram[i].min_value = value;
 }
 
-/* Computes a histogram of the arc counters to place in the summary SUM.  */
-
-static void
-gcov_compute_histogram (struct gcov_info *list, struct gcov_summary *sum)
-{
-  struct gcov_info *gi_ptr;
-  const struct gcov_fn_info *gfi_ptr;
-  const struct gcov_ctr_info *ci_ptr;
-  unsigned f_ix, ix;
-  int h_ix;
-
-  /* First check if there are any counts recorded for this counter.  */
-  if (!sum->num)
-    return;
-
-  for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
-    {
-      sum->histogram[h_ix].num_counters = 0;
-      sum->histogram[h_ix].min_value = sum->run_max;
-      sum->histogram[h_ix].cum_value = 0;
-    }
-
-  /* Walk through all the per-object structures and record each of
-     the count values in histogram.  */
-  for (gi_ptr = list; gi_ptr; gi_ptr = gi_ptr->next)
-    {
-      for (f_ix = 0; f_ix != gi_ptr->n_functions; f_ix++)
-        {
-          gfi_ptr = gi_ptr->functions[f_ix];
-
-          if (!gfi_ptr || gfi_ptr->key != gi_ptr)
-            continue;
-
-	  ci_ptr = &gfi_ptr->ctrs[0];
-	  for (ix = 0; ix < ci_ptr->num; ix++)
-	    gcov_histogram_insert (sum->histogram, ci_ptr->values[ix]);
-        }
-    }
-}
-
 /* buffer for the fn_data from another program.  */
 static struct gcov_fn_buffer *fn_buffer;
 /* buffer for summary from other programs to be written out. */
@@ -306,7 +267,6 @@ compute_summary (struct gcov_info *list, struct gcov_summary *this_prg)
 	  ci_ptr++;
 	}
     }
-  gcov_compute_histogram (list, this_prg);
   return crc32;
 }
 
@@ -473,6 +433,7 @@ read_error:
 static void
 write_one_data (const struct gcov_info *gi_ptr,
 		const struct gcov_summary *prg_p,
+		const struct gcov_histogram *histogram,
 		const gcov_position_t eof_pos,
 		const gcov_position_t summary_pos)
 {
@@ -491,6 +452,9 @@ write_one_data (const struct gcov_info *gi_ptr,
 
   /* Generate whole program statistics.  */
   gcov_write_summary (GCOV_TAG_PROGRAM_SUMMARY, prg_p);
+
+  if (histogram)
+    gcov_write_histogram (histogram);
 
   /* Rewrite all the summaries that were after the summary we merged
      into. This is necessary as the merged summary may have a different
@@ -587,11 +551,6 @@ merge_summary (const char *filename __attribute__ ((unused)), int run_counted,
   if (prg->run_max < this_prg->run_max)
     prg->run_max = this_prg->run_max;
   prg->sum_max += this_prg->run_max;
-  if (first)
-    memcpy (prg->histogram, this_prg->histogram,
-	    sizeof (gcov_bucket_type) * GCOV_HISTOGRAM_SIZE);
-  else
-    gcov_histogram_merge (prg->histogram, this_prg->histogram);
 #if !GCOV_LOCKED
   all = all_prg;
   if (!all->runs && prg->runs)
@@ -715,7 +674,8 @@ static void
 dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
 	       unsigned run_counted,
 	       gcov_unsigned_t crc32, struct gcov_summary *all_prg,
-	       struct gcov_summary *this_prg)
+	       struct gcov_summary *this_prg,
+	       struct gcov_histogram *histogram)
 {
   struct gcov_summary prg; /* summary for this object over all program.  */
   int error;
@@ -760,7 +720,7 @@ dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
   if (error == -1)
     goto read_fatal;
 
-  write_one_data (gi_ptr, &prg, eof_pos, summary_pos);
+  write_one_data (gi_ptr, &prg, histogram, eof_pos, summary_pos);
   /* fall through */
 
 read_fatal:;
@@ -777,13 +737,15 @@ read_fatal:;
 
 /* Dump all the coverage counts for the program. It first computes program
    summary and then traverses gcov_list list and dumps the gcov_info
-   objects one by one.  */
+   objects one by one.  If SUMMARY is set, stream out SUMMARY instead of
+   computed summary, it's used in gcov-tool for compute_histogram command.  */
 
 #if !IN_GCOV_TOOL
 static
 #endif
 void
-gcov_do_dump (struct gcov_info *list, int run_counted)
+gcov_do_dump (struct gcov_info *list, int run_counted,
+	      struct gcov_histogram *histogram)
 {
   struct gcov_info *gi_ptr;
   struct gcov_filename gf;
@@ -801,7 +763,8 @@ gcov_do_dump (struct gcov_info *list, int run_counted)
   /* Now merge each file.  */
   for (gi_ptr = list; gi_ptr; gi_ptr = gi_ptr->next)
     {
-      dump_one_gcov (gi_ptr, &gf, run_counted, crc32, &all_prg, &this_prg);
+      dump_one_gcov (gi_ptr, &gf, run_counted, crc32, &all_prg, &this_prg,
+		     histogram);
       free (gf.filename);
     }
 
@@ -824,7 +787,7 @@ __gcov_dump_one (struct gcov_root *root)
   if (root->dumped)
     return;
 
-  gcov_do_dump (root->list, root->run_counted);
+  gcov_do_dump (root->list, root->run_counted, NULL);
   
   root->dumped = 1;
   root->run_counted = 1;

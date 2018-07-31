@@ -557,6 +557,10 @@ ipa_profile (void)
 		   cumulated_time * 100.0 / overall_time,
 		   cumulated_size * 100.0 / overall_size);
 	}
+
+	fprintf (stderr, "Determined min count: %" PRId64 "\n",
+		 threshold);
+
       if (threshold > get_hot_bb_threshold ()
 	  || in_lto_p)
 	{

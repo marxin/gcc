@@ -77,4 +77,7 @@ extern void get_working_sets (void);
    profile.c.  */
 extern const struct gcov_summary *profile_info;
 
+/* Program histogram read by profile.c.  */
+extern struct gcov_histogram *program_histogram;
+
 #endif /* PROFILE_H */

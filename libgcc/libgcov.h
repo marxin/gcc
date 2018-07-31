@@ -207,6 +207,8 @@ struct gcov_info
 #else
   const struct gcov_fn_info **functions;
 #endif /* !IN_GCOV_TOOL */
+  struct gcov_summary *summaries;
+  unsigned n_summaries;		/* number of summaries */
 };
 
 /* Root of a program/shared-object state */
@@ -297,6 +299,8 @@ GCOV_LINKAGE void gcov_write_tag_length (gcov_unsigned_t, gcov_unsigned_t)
     ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE void gcov_write_summary (gcov_unsigned_t /*tag*/,
                                       const struct gcov_summary *)
+    ATTRIBUTE_HIDDEN;
+GCOV_LINKAGE void gcov_write_histogram (const struct gcov_histogram *)
     ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE void gcov_seek (gcov_position_t /*position*/) ATTRIBUTE_HIDDEN;
 GCOV_LINKAGE void gcov_rewrite (void) ATTRIBUTE_HIDDEN;
