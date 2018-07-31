@@ -32,6 +32,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "diagnostic.h"
 #include "version.h"
 #include "demangle.h"
+#include "gcov-io.h"
 
 /* Borrowed from basic-block.h.  */
 #define RDIV(X,Y) (((X) + (Y) / 2) / (Y))
@@ -79,6 +80,8 @@ static int k_ctrs_mask[GCOV_COUNTERS];
 static struct gcov_ctr_info k_ctrs[GCOV_COUNTERS];
 /* Number of kind of counters that have been seen.  */
 static int k_ctrs_types;
+/* The object summary being processed.  */
+static struct gcov_summary *curr_object_summary;
 
 /* Merge functions for counters.  */
 #define DEF_GCOV_COUNTER(COUNTER, NAME, FN_TYPE) __gcov_merge ## FN_TYPE,
@@ -131,7 +134,6 @@ static const tag_format_t tag_table[] =
   {GCOV_TAG_ARCS, "ARCS", tag_arcs},
   {GCOV_TAG_LINES, "LINES", tag_lines},
   {GCOV_TAG_OBJECT_SUMMARY, "OBJECT_SUMMARY", tag_summary},
-  {GCOV_TAG_PROGRAM_SUMMARY, "PROGRAM_SUMMARY", tag_summary},
   {0, NULL, NULL}
 };
 
@@ -223,9 +225,8 @@ tag_counters (unsigned tag, unsigned length)
 static void
 tag_summary (unsigned tag ATTRIBUTE_UNUSED, unsigned length ATTRIBUTE_UNUSED)
 {
-  struct gcov_summary summary;
-
-  gcov_read_summary (&summary);
+  curr_object_summary = (gcov_summary *) xcalloc (sizeof (gcov_summary), 1);
+  gcov_read_summary (curr_object_summary);
 }
 
 /* This function is called at the end of reading a gcda file.
@@ -239,9 +240,11 @@ read_gcda_finalize (struct gcov_info *obj_info)
   set_fn_ctrs (curr_fn_info);
   obstack_ptr_grow (&fn_info, curr_fn_info);
 
-  /* We set the following fields: merge, n_functions, and functions.  */
+  /* We set the following fields: merge, n_functions, functions
+     and summary.  */
   obj_info->n_functions = num_fn_info;
   obj_info->functions = (const struct gcov_fn_info**) obstack_finish (&fn_info);
+  obj_info->summary = curr_object_summary;
 
   /* wrap all the counter array.  */
   for (i=0; i< GCOV_COUNTERS; i++)
@@ -299,6 +302,7 @@ read_gcda_file (const char *filename)
   obstack_init (&fn_info);
   num_fn_info = 0;
   curr_fn_info = 0;
+  curr_object_summary = NULL;
   {
     size_t len = strlen (filename) + 1;
     char *str_dup = (char*) xmalloc (len);
@@ -868,6 +872,126 @@ gcov_profile_normalize (struct gcov_info *profile, gcov_type max_val)
   return gcov_profile_scale (profile, scale_factor, 0, 0);
 }
 
+/* Determine the index into histogram for VALUE. */
+
+static unsigned
+gcov_histo_index (gcov_type value)
+{
+  gcov_type_unsigned v = (gcov_type_unsigned)value;
+  unsigned r = 0;
+  unsigned prev2bits = 0;
+
+  /* Find index into log2 scale histogram, where each of the log2
+     sized buckets is divided into 4 linear sub-buckets for better
+     focus in the higher buckets.  */
+
+  /* Find the place of the most-significant bit set.  */
+  if (v > 0)
+    {
+      /* We use floor_log2 from hwint.c, which takes a HOST_WIDE_INT
+         that is 64 bits and gcov_type_unsigned is 64 bits.  */
+      r = floor_log2 (v);
+    }
+
+  /* If at most the 2 least significant bits are set (value is
+     0 - 3) then that value is our index into the lowest set of
+     four buckets.  */
+  if (r < 2)
+    return (unsigned)value;
+
+  gcov_nonruntime_assert (r < 64);
+
+  /* Find the two next most significant bits to determine which
+     of the four linear sub-buckets to select.  */
+  prev2bits = (v >> (r - 2)) & 0x3;
+  /* Finally, compose the final bucket index from the log2 index and
+     the next 2 bits. The minimum r value at this point is 2 since we
+     returned above if r was 2 or more, so the minimum bucket at this
+     point is 4.  */
+  return (r - 1) * 4 + prev2bits;
+}
+
+/* Insert counter VALUE into HISTOGRAM.  */
+
+static void
+gcov_histogram_insert (gcov_bucket_type *histogram, gcov_type value)
+{
+  unsigned i;
+
+  i = gcov_histo_index (value);
+  histogram[i].num_counters++;
+  histogram[i].cum_value += value;
+
+  if (histogram[i].min_value == 0
+      || value < histogram[i].min_value)
+    histogram[i].min_value = value;
+}
+
+/* Driver for computatation of precise profile histogram.  */
+
+int
+gcov_profile_compute_histogram (struct gcov_info *profile,
+				gcov_histogram *histogram)
+{
+  struct gcov_info *gi_ptr;
+  gcov_bucket_type *histo_bucket;
+  unsigned f_ix;
+
+  memset (histogram, 0, sizeof (*histogram));
+
+  /* Compute histogram for all files.  */
+  for (gi_ptr = profile; gi_ptr; gi_ptr = gi_ptr->next)
+    {
+      for (f_ix = 0; f_ix < gi_ptr->n_functions; f_ix++)
+	{
+	  const struct gcov_fn_info *gfi_ptr = gi_ptr->functions[f_ix];
+	  const struct gcov_ctr_info *ci_ptr;
+
+	  if (!gfi_ptr || gfi_ptr->key != gi_ptr)
+	    continue;
+
+	  ci_ptr = gfi_ptr->ctrs;
+	  gcov_merge_fn merge = gi_ptr->merge[GCOV_COUNTER_ARCS];
+
+	  if (merge)
+	    for (unsigned ix = 0; ix < ci_ptr->num; ix++)
+	      {
+		gcov_type value = ci_ptr->values[ix];
+		gcov_histogram_insert (histogram->histogram, value);
+		histogram->sum_all += value;
+	      }
+	}
+    }
+
+  /* Iterate all histograms to aggregate some values.  */
+  for (gi_ptr = profile; gi_ptr; gi_ptr = gi_ptr->next)
+    {
+      gcov_type runs = gi_ptr->summary->runs;
+      if (runs > histogram->runs)
+	histogram->runs = runs;
+    }
+
+  /* Write the calculated histogram to all profile files.  */
+  if (verbose)
+    {
+      fnotice (stdout, "\nComputed histogram:\n");
+      fnotice (stdout, "Runs: %d\n", histogram->runs);
+    }
+
+  for (unsigned h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
+    {
+      histo_bucket = &histogram->histogram[h_ix];
+      if (!histo_bucket->num_counters)
+	continue;
+
+      if (verbose)
+	fnotice (stdout, "  %3d: %10d\n", h_ix, histo_bucket->num_counters);
+    }
+
+  return 0;
+}
+
+
 /* The following variables are defined in gcc/gcov-tool.c.  */
 extern int overlap_func_level;
 extern int overlap_obj_level;
@@ -892,8 +1016,6 @@ calculate_2_entries (const unsigned long v1, const unsigned long v2,
 }
 
 /*  Compute the overlap score between GCOV_INFO1 and GCOV_INFO2.
-    SUM_1 is the sum_all for profile1 where GCOV_INFO1 belongs.
-    SUM_2 is the sum_all for profile2 where GCOV_INFO2 belongs.
     This function also updates cumulative score CUM_1_RESULT and
     CUM_2_RESULT.  */
 
@@ -1048,12 +1170,6 @@ struct overlap_t {
 /* Cumlative overlap dscore for profile1 and profile2.  */
 static double overlap_sum_1, overlap_sum_2;
 
-/* sum_all for profile1 and profile2.  */
-static gcov_type p1_sum_all, p2_sum_all;
-
-/* run_max for profile1 and profile2.  */
-static gcov_type p1_run_max, p2_run_max;
-
 /* The number of gcda files in the profiles.  */
 static unsigned gcda_files[2];
 
@@ -1200,10 +1316,6 @@ matched_gcov_info (const struct gcov_info *info1, const struct gcov_info *info2)
   return 1;
 }
 
-/* Defined in libgcov-driver.c.  */
-extern gcov_unsigned_t compute_summary (struct gcov_info *,
-					struct gcov_summary *);
-
 /* Compute the overlap score of two profiles with the head of GCOV_LIST1 and
    GCOV_LIST1. Return a number ranging from [0.0, 1.0], with 0.0 meaning no
    match and 1.0 meaning a perfect match.  */
@@ -1212,20 +1324,10 @@ static double
 calculate_overlap (struct gcov_info *gcov_list1,
                    struct gcov_info *gcov_list2)
 {
-  struct gcov_summary this_prg;
   unsigned list1_cnt = 0, list2_cnt= 0, all_cnt;
   unsigned int i, j;
   const struct gcov_info *gi_ptr;
   struct overlap_t *all_infos;
-
-  compute_summary (gcov_list1, &this_prg);
-  overlap_sum_1 = (double) (this_prg.sum_all);
-  p1_sum_all = this_prg.sum_all;
-  p1_run_max = this_prg.run_max;
-  compute_summary (gcov_list2, &this_prg);
-  overlap_sum_2 = (double) (this_prg.sum_all);
-  p2_sum_all = this_prg.sum_all;
-  p2_run_max = this_prg.run_max;
 
   for (gi_ptr = gcov_list1; gi_ptr; gi_ptr = gi_ptr->next)
     list1_cnt++;
@@ -1334,10 +1436,6 @@ calculate_overlap (struct gcov_info *gcov_list1,
 	  cold_gcda_files[1], both_cold_cnt);
   printf ("    zero files:  %12u\t%12u\t%12u\n", zero_gcda_files[0],
 	  zero_gcda_files[1], both_zero_cnt);
-  printf ("       sum_all:  %12" PRId64 "\t%12" PRId64 "\n",
-	  p1_sum_all, p2_sum_all);
-  printf ("       run_max:  %12" PRId64 "\t%12" PRId64 "\n",
-	  p1_run_max, p2_run_max);
 
   return prg_val;
 }

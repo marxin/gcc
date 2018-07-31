@@ -132,9 +132,19 @@ get_hot_bb_threshold ()
   gcov_working_set_t *ws;
   if (min_count == -1)
     {
-      ws = find_working_set (PARAM_VALUE (HOT_BB_COUNT_WS_PERMILLE));
-      gcc_assert (ws);
-      min_count = ws->min_counter;
+      if (profile_info.histogram)
+	{
+	  ws = find_working_set (PARAM_VALUE (HOT_BB_COUNT_WS_PERMILLE));
+	  gcc_assert (ws);
+	  min_count = ws->min_counter;
+
+	  if (dump_file)
+	    fprintf (dump_file, "Setting hotness threshold to %" PRId64 ".\n",
+		     min_count);
+	}
+      else
+	min_count
+	  = profile_info.summary->sum_max / PARAM_VALUE (HOT_BB_COUNT_FRACTION);
     }
   return min_count;
 }
@@ -159,7 +169,7 @@ maybe_hot_count_p (struct function *fun, profile_count count)
   if (!count.ipa_p ())
     {
       struct cgraph_node *node = cgraph_node::get (fun->decl);
-      if (!profile_info || profile_status_for_fn (fun) != PROFILE_READ)
+      if (!profile_info.is_valid () || profile_status_for_fn (fun) != PROFILE_READ)
 	{
 	  if (node->frequency == NODE_FREQUENCY_UNLIKELY_EXECUTED)
 	    return false;
@@ -179,7 +189,7 @@ maybe_hot_count_p (struct function *fun, profile_count count)
       return true;
     }
   /* Code executed at most once is not hot.  */
-  if (count <= MAX (profile_info ? profile_info->runs : 1, 1))
+  if (count <= MAX (profile_info.is_valid () ? profile_info.get_runs () : 1, 1))
     return false;
   return (count.to_gcov_type () >= get_hot_bb_threshold ());
 }
@@ -221,11 +231,11 @@ probably_never_executed (struct function *fun,
   if (count.precise_p () && profile_status_for_fn (fun) == PROFILE_READ)
     {
       int unlikely_count_fraction = PARAM_VALUE (UNLIKELY_BB_COUNT_FRACTION);
-      if (count.apply_scale (unlikely_count_fraction, 1) >= profile_info->runs)
+      if (count.apply_scale (unlikely_count_fraction, 1) >= profile_info.get_runs ())
 	return false;
       return true;
     }
-  if ((!profile_info || profile_status_for_fn (fun) != PROFILE_READ)
+  if ((!profile_info.is_valid () || profile_status_for_fn (fun) != PROFILE_READ)
       && (cgraph_node::get (fun->decl)->frequency
 	  == NODE_FREQUENCY_UNLIKELY_EXECUTED))
     return true;
@@ -3431,7 +3441,7 @@ drop_profile (struct cgraph_node *node, profile_count call_count)
      by a no-return call the profile for the no-return call is not
      dumped and there can be a mismatch.  */
   if (!DECL_COMDAT (node->decl) && !DECL_EXTERNAL (node->decl)
-      && call_count > profile_info->runs)
+      && call_count > profile_info.get_runs ())
     {
       if (flag_profile_correction)
         {
@@ -3523,7 +3533,7 @@ handle_missing_profiles (void)
       if (call_count > 0
           && fn && fn->cfg
           && (call_count.apply_scale (unlikely_count_fraction, 1)
-	      >= profile_info->runs))
+	      >= profile_info.get_runs ()))
         {
           drop_profile (node, call_count);
           worklist.safe_push (node);

@@ -133,15 +133,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    blocks they are for.
 
    The data file contains the following records.
-        data: {unit summary:object summary:program* function-data*}*
+        data: {unit summary:object function-data*}*
 	unit: header int32:checksum
         function-data:	announce_function present counts
 	announce_function: header int32:ident
 		int32:lineno_checksum int32:cfg_checksum
 	present: header int32:present
 	counts: header int64:count*
-	summary: int32:checksum int32:num int32:runs int64:sum
-		 int64:max int64:sum_max histogram
+	summary: int32:checksum int32:runs int32:sum_max
         histogram: {int32:bitvector}8 histogram-buckets*
         histogram-buckets: int32:num int64:min int64:sum
 
@@ -190,7 +189,7 @@ typedef uint64_t gcov_type_unsigned;
 
 #define ATTRIBUTE_HIDDEN
 
-#endif /* !IN_LIBGOCV */
+#endif /* !IN_LIBGCOV */
 
 #ifndef GCOV_LINKAGE
 #define GCOV_LINKAGE extern
@@ -240,9 +239,11 @@ typedef uint64_t gcov_type_unsigned;
 #define GCOV_TAG_COUNTER_BASE 	 ((gcov_unsigned_t)0x01a10000)
 #define GCOV_TAG_COUNTER_LENGTH(NUM) ((NUM) * 2)
 #define GCOV_TAG_COUNTER_NUM(LENGTH) ((LENGTH) / 2)
-#define GCOV_TAG_OBJECT_SUMMARY  ((gcov_unsigned_t)0xa1000000) /* Obsolete */
-#define GCOV_TAG_PROGRAM_SUMMARY ((gcov_unsigned_t)0xa3000000)
-#define GCOV_TAG_SUMMARY_LENGTH(NUM) (1 + (10 + 3 * 2) + (NUM) * 5)
+#define GCOV_TAG_OBJECT_SUMMARY  ((gcov_unsigned_t)0xa1000000)
+#define GCOV_TAG_PROGRAM_SUMMARY ((gcov_unsigned_t)0xa3000000) /* Obsolete */
+#define GCOV_TAG_HISTOGRAM ((gcov_unsigned_t)0xa5000000)
+#define GCOV_TAG_SUMMARY_LENGTH (2)
+#define GCOV_TAG_HISTOGRAM_LENGTH(NUM) (2 + 8 + (NUM) * 5)
 #define GCOV_TAG_AFDO_FILE_NAMES ((gcov_unsigned_t)0xaa000000)
 #define GCOV_TAG_AFDO_FUNCTION ((gcov_unsigned_t)0xac000000)
 #define GCOV_TAG_AFDO_WORKING_SET ((gcov_unsigned_t)0xaf000000)
@@ -336,12 +337,14 @@ typedef struct
 
 struct gcov_summary
 {
-  gcov_unsigned_t checksum;	/* Checksum of program.  */
-  gcov_unsigned_t num;		/* Number of counters.  */
   gcov_unsigned_t runs;		/* Number of program runs.  */
-  gcov_type sum_all;		/* Sum of all counters accumulated.  */
-  gcov_type run_max;		/* Maximum value on a single run.  */
   gcov_type sum_max;    	/* Sum of individual run max values.  */
+};
+
+struct gcov_histogram
+{
+  gcov_unsigned_t runs;		/* Number of program runs.  */
+  gcov_type sum_all;            /* Sum of individual run max values.  */
   gcov_bucket_type histogram[GCOV_HISTOGRAM_SIZE]; /* Histogram of
 						      counter values.  */
 };
@@ -376,11 +379,11 @@ char *mangle_path (char const *base);
 #if !IN_GCOV
 /* Available outside gcov */
 GCOV_LINKAGE void gcov_write_unsigned (gcov_unsigned_t) ATTRIBUTE_HIDDEN;
+GCOV_LINKAGE void gcov_read_histogram (struct gcov_histogram *) ATTRIBUTE_HIDDEN;
 #endif
 
 #if !IN_GCOV && !IN_LIBGCOV
 /* Available only in compiler */
-GCOV_LINKAGE unsigned gcov_histo_index (gcov_type value);
 GCOV_LINKAGE void gcov_write_string (const char *);
 GCOV_LINKAGE void gcov_write_filename (const char *);
 GCOV_LINKAGE gcov_position_t gcov_write_tag (gcov_unsigned_t);
@@ -405,7 +408,7 @@ typedef struct gcov_working_set_info
   gcov_type min_counter;
 } gcov_working_set_t;
 
-GCOV_LINKAGE void compute_working_sets (const gcov_summary *summary,
+GCOV_LINKAGE void compute_working_sets (gcov_histogram *histogram,
                                         gcov_working_set_t *gcov_working_sets);
 #endif
 

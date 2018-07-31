@@ -330,7 +330,7 @@ ipa_propagate_frequency_1 (struct cgraph_node *node, void *data)
 	 errors can make us to push function into unlikely section even when
 	 it is executed by the train run.  Transfer the function only if all
 	 callers are unlikely executed.  */
-      if (profile_info
+      if (profile_info.is_valid ()
 	  && !(edge->callee->count.ipa () == profile_count::zero ())
 	  && (edge->caller->frequency != NODE_FREQUENCY_UNLIKELY_EXECUTED
 	      || (edge->caller->global.inlined_to
@@ -557,6 +557,7 @@ ipa_profile (void)
 		   cumulated_time * 100.0 / overall_time,
 		   cumulated_size * 100.0 / overall_size);
 	}
+
       if (threshold > get_hot_bb_threshold ()
 	  || in_lto_p)
 	{

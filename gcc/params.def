@@ -393,6 +393,10 @@ DEFPARAM(PARAM_SMS_LOOP_AVERAGE_COUNT_THRESHOLD,
 	 "A threshold on the average loop count considered by the swing modulo scheduler.",
 	 0, 0, 0)
 
+DEFPARAM(HOT_BB_COUNT_FRACTION,
+	 "hot-bb-count-fraction",
+	 "Select fraction of the maximal count of repetitions of basic block in program given basic block needs to have to be considered hot (with missing profile histogram)",
+	 10000, 0, 0)
 DEFPARAM(HOT_BB_COUNT_WS_PERMILLE,
 	 "hot-bb-count-ws-permille",
          "A basic block profile count is considered hot if it contributes to "

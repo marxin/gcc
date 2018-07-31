@@ -202,7 +202,7 @@ report_unroll (struct loop *loop, dump_location_t locus)
   dump_printf_loc (report_flags, locus,
                    "loop unrolled %d times",
                    loop->lpt_decision.times);
-  if (profile_info && loop->header->count.initialized_p ())
+  if (profile_info.is_valid () && loop->header->count.initialized_p ())
     dump_printf (report_flags,
                  " (header execution count %d)",
                  (int)loop->header->count.to_gcov_type ());

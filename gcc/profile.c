@@ -81,10 +81,19 @@ struct bb_profile_info {
 
 #define BB_INFO(b)  ((struct bb_profile_info *) (b)->aux)
 
+/* Return number of execution of a compilation unit.  */
 
-/* Counter summary from the last set of coverage counts read.  */
+gcov_type
+profile_info_tuple::get_runs ()
+{
+  return histogram != NULL ? histogram->runs : summary->runs;
+}
 
-const gcov_summary *profile_info;
+/* Counter histogram from the last set of coverage counts read.  */
+
+profile_info_tuple profile_info;
+
+gcov_type profile_max_edge_count;
 
 /* Counter working set information computed from the current counter
    summary. Not initialized unless profile_info summary is non-NULL.  */
@@ -215,10 +224,10 @@ get_working_sets (void)
   unsigned ws_ix, pctinc, pct;
   gcov_working_set_t *ws_info;
 
-  if (!profile_info)
+  if (!profile_info.histogram)
     return;
 
-  compute_working_sets (profile_info, gcov_working_sets);
+  compute_working_sets (profile_info.histogram, gcov_working_sets);
 
   if (dump_file)
     {
@@ -250,7 +259,7 @@ gcov_working_set_t *
 find_working_set (unsigned pct_times_10)
 {
   unsigned i;
-  if (!profile_info)
+  if (!profile_info.is_valid ())
     return NULL;
   gcc_assert (pct_times_10 <= 1000);
   if (pct_times_10 >= 999)
@@ -268,32 +277,14 @@ find_working_set (unsigned pct_times_10)
 static gcov_type *
 get_exec_counts (unsigned cfg_checksum, unsigned lineno_checksum)
 {
-  unsigned num_edges = 0;
-  basic_block bb;
   gcov_type *counts;
 
-  /* Count the edges to be (possibly) instrumented.  */
-  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR_FOR_FN (cfun), NULL, next_bb)
-    {
-      edge e;
-      edge_iterator ei;
-
-      FOR_EACH_EDGE (e, ei, bb->succs)
-	if (!EDGE_INFO (e)->ignore && !EDGE_INFO (e)->on_tree)
-	  num_edges++;
-    }
-
-  counts = get_coverage_counts (GCOV_COUNTER_ARCS, num_edges, cfg_checksum,
-				lineno_checksum, &profile_info);
+  counts = get_coverage_counts (GCOV_COUNTER_ARCS, cfg_checksum,
+				lineno_checksum);
   if (!counts)
     return NULL;
 
   get_working_sets ();
-
-  if (dump_file && profile_info)
-    fprintf (dump_file, "Merged %u profiles with maximal count %u.\n",
-	     profile_info->runs, (unsigned) profile_info->sum_max);
-
   return counts;
 }
 
@@ -439,29 +430,7 @@ read_profile_edge_counts (gcov_type *exec_counts)
 	  {
 	    num_edges++;
 	    if (exec_counts)
-	      {
-		edge_gcov_count (e) = exec_counts[exec_counts_pos++];
-		if (edge_gcov_count (e) > profile_info->sum_max)
-		  {
-		    if (flag_profile_correction)
-		      {
-			static bool informed = 0;
-			if (dump_enabled_p () && !informed)
-			  {
-			    dump_location_t loc
-			      = dump_location_t::from_location_t
-			        (input_location);
-			    dump_printf_loc (MSG_NOTE, loc,
-					     "corrupted profile info: edge count"
-					     " exceeds maximal count\n");
-			  }
-			informed = 1;
-		      }
-		    else
-		      error ("corrupted profile info: edge from %i to %i exceeds maximal count",
-			     bb->index, e->dest->index);
-		  }
-	      }
+	      edge_gcov_count (e) = exec_counts[exec_counts_pos++];
 	    else
 	      edge_gcov_count (e) = 0;
 
@@ -501,7 +470,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
   int inconsistent = 0;
 
   /* Very simple sanity checks so we catch bugs in our profiling code.  */
-  if (!profile_info)
+  if (!profile_info.is_valid ())
     {
       if (dump_file)
 	fprintf (dump_file, "Profile info is missing; giving up\n");
@@ -510,12 +479,6 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
 
   bb_gcov_counts.safe_grow_cleared (last_basic_block_for_fn (cfun));
   edge_gcov_counts = new hash_map<edge,gcov_type>;
-
-  if (profile_info->sum_all < profile_info->sum_max)
-    {
-      error ("corrupted profile info: sum_all is smaller than sum_max");
-      exec_counts = NULL;
-    }
 
   /* Attach extra info block to each bb.  */
   alloc_aux_for_blocks (sizeof (struct bb_profile_info));
@@ -871,10 +834,9 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	  continue;
 	}
 
-      histogram_counts[t] =
-	get_coverage_counts (COUNTER_FOR_HIST_TYPE (t),
-			     n_histogram_counters[t], cfg_checksum,
-			     lineno_checksum, NULL);
+      histogram_counts[t] = get_coverage_counts (COUNTER_FOR_HIST_TYPE (t),
+						 cfg_checksum,
+						 lineno_checksum);
       if (histogram_counts[t])
 	any = 1;
       act_count[t] = histogram_counts[t];
@@ -1419,7 +1381,7 @@ branch_prob (void)
   values.release ();
   free_edge_list (el);
   coverage_end_function (lineno_checksum, cfg_checksum);
-  if (flag_branch_probabilities && profile_info)
+  if (flag_branch_probabilities && profile_info.is_valid ())
     {
       struct loop *loop;
       if (dump_file && (dump_flags & TDF_DETAILS))

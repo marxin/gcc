@@ -318,8 +318,8 @@ static string_table *afdo_string_table;
 /* Store the AutoFDO source profile.  */
 static autofdo_source_profile *afdo_source_profile;
 
-/* gcov_summary structure to store the profile_info.  */
-static gcov_summary *afdo_profile_info;
+/* gcov_histogram structure to store the profile_info.  */
+static profile_info_tuple afdo_profile_info;
 
 /* Helper functions.  */
 
@@ -867,7 +867,6 @@ autofdo_source_profile::read ()
       function_instance::function_instance_stack stack;
       function_instance *s = function_instance::read_function_instance (
           &stack, gcov_read_counter ());
-      afdo_profile_info->sum_all += s->total_count ();
       map_[s->name ()] = s;
     }
   return true;
@@ -1682,10 +1681,9 @@ read_autofdo_file (void)
   if (auto_profile_file == NULL)
     auto_profile_file = DEFAULT_AUTO_PROFILE_FILE;
 
-  autofdo::afdo_profile_info = XNEW (gcov_summary);
-  autofdo::afdo_profile_info->runs = 1;
-  autofdo::afdo_profile_info->sum_max = 0;
-  autofdo::afdo_profile_info->sum_all = 0;
+  autofdo::afdo_profile_info.summary = XNEW (gcov_summary);
+  autofdo::afdo_profile_info.summary->runs = 1;
+  autofdo::afdo_profile_info.summary->sum_max = 0;
 
   /* Read the profile from the profile file.  */
   autofdo::read_profile ();
@@ -1698,7 +1696,8 @@ end_auto_profile (void)
 {
   delete autofdo::afdo_source_profile;
   delete autofdo::afdo_string_table;
-  profile_info = NULL;
+  profile_info.histogram = NULL;
+  profile_info.summary = NULL;
 }
 
 /* Returns TRUE if EDGE is hot enough to be inlined early.  */
@@ -1712,7 +1711,7 @@ afdo_callsite_hot_enough_for_early_inline (struct cgraph_edge *edge)
   if (count > 0)
     {
       bool is_hot;
-      const gcov_summary *saved_profile_info = profile_info;
+      profile_info_tuple saved_profile_info = profile_info;
       /* At early inline stage, profile_info is not set yet. We need to
          temporarily set it to afdo_profile_info to calculate hotness.  */
       profile_info = autofdo::afdo_profile_info;
