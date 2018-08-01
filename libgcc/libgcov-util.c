@@ -884,6 +884,45 @@ gcov_profile_normalize (struct gcov_info *profile, gcov_type max_val)
   return gcov_profile_scale (profile, scale_factor, 0, 0);
 }
 
+/* Determine the index into histogram for VALUE. */
+
+static unsigned
+gcov_histo_index (gcov_type value)
+{
+  gcov_type_unsigned v = (gcov_type_unsigned)value;
+  unsigned r = 0;
+  unsigned prev2bits = 0;
+
+  /* Find index into log2 scale histogram, where each of the log2
+     sized buckets is divided into 4 linear sub-buckets for better
+     focus in the higher buckets.  */
+
+  /* Find the place of the most-significant bit set.  */
+  if (v > 0)
+    {
+      /* We use floor_log2 from hwint.c, which takes a HOST_WIDE_INT
+         that is 64 bits and gcov_type_unsigned is 64 bits.  */
+      r = floor_log2 (v);
+    }
+
+  /* If at most the 2 least significant bits are set (value is
+     0 - 3) then that value is our index into the lowest set of
+     four buckets.  */
+  if (r < 2)
+    return (unsigned)value;
+
+  gcov_nonruntime_assert (r < 64);
+
+  /* Find the two next most significant bits to determine which
+     of the four linear sub-buckets to select.  */
+  prev2bits = (v >> (r - 2)) & 0x3;
+  /* Finally, compose the final bucket index from the log2 index and
+     the next 2 bits. The minimum r value at this point is 2 since we
+     returned above if r was 2 or more, so the minimum bucket at this
+     point is 4.  */
+  return (r - 1) * 4 + prev2bits;
+}
+
 /* Insert counter VALUE into HISTOGRAM.  */
 
 static void
@@ -1302,7 +1341,6 @@ static double
 calculate_overlap (struct gcov_info *gcov_list1,
                    struct gcov_info *gcov_list2)
 {
-  struct gcov_summary this_prg;
   unsigned list1_cnt = 0, list2_cnt= 0, all_cnt;
   unsigned int i, j;
   const struct gcov_info *gi_ptr;

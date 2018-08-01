@@ -411,7 +411,6 @@ static vector<name_map> names;
 /* This holds data summary information.  */
 
 static unsigned object_runs;
-static unsigned program_count;
 
 static unsigned total_lines;
 static unsigned total_executed;
@@ -1797,12 +1796,11 @@ read_count_file (void)
       unsigned length = gcov_read_unsigned ();
       unsigned long base = gcov_position ();
 
-      if (tag == GCOV_TAG_PROGRAM_SUMMARY)
+      if (tag == GCOV_TAG_OBJECT_SUMMARY)
 	{
 	  struct gcov_summary summary;
 	  gcov_read_summary (&summary);
-	  object_runs += summary.runs;
-	  program_count++;
+	  object_runs = summary.runs;
 	}
       else if (tag == GCOV_TAG_FUNCTION && !length)
 	; /* placeholder  */
@@ -2891,7 +2889,6 @@ output_lines (FILE *gcov_file, const source_info *src)
 	       no_data_file ? "-" : da_file_name);
       fprintf (gcov_file, DEFAULT_LINE_START "Runs:%u\n", object_runs);
     }
-  fprintf (gcov_file, DEFAULT_LINE_START "Programs:%u\n", program_count);
 
   source_file = fopen (src->name, "r");
   if (!source_file)

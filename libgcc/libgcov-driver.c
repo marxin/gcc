@@ -157,25 +157,6 @@ fail:
   return (struct gcov_fn_buffer **)free_fn_data (gi_ptr, fn_buffer, ix);
 }
 
-/* Add an unsigned value to the current crc */
-
-static gcov_unsigned_t
-crc32_unsigned (gcov_unsigned_t crc32, gcov_unsigned_t value)
-{
-  unsigned ix;
-
-  for (ix = 32; ix--; value <<= 1)
-    {
-      unsigned feedback;
-
-      feedback = (value ^ crc32) & 0x80000000 ? 0x04c11db7 : 0;
-      crc32 <<= 1;
-      crc32 ^= feedback;
-    }
-
-  return crc32;
-}
-
 /* Check if VERSION of the info block PTR matches libgcov one.
    Return 1 on success, or zero in case of versions mismatch.
    If FILENAME is not NULL, its value used for reporting purposes
@@ -199,24 +180,8 @@ gcov_version (struct gcov_info *ptr, gcov_unsigned_t version,
   return 1;
 }
 
-/* Insert counter VALUE into HISTOGRAM.  */
-
-static void
-gcov_histogram_insert(gcov_bucket_type *histogram, gcov_type value)
-{
-  unsigned i;
-
-  i = gcov_histo_index(value);
-  histogram[i].num_counters++;
-  histogram[i].cum_value += value;
-  if (value < histogram[i].min_value)
-    histogram[i].min_value = value;
-}
-
 /* buffer for the fn_data from another program.  */
 static struct gcov_fn_buffer *fn_buffer;
-/* buffer for summary from other programs to be written out. */
-static struct gcov_summary_buffer *sum_buffer;
 
 /* Including system dependent components. */
 #include "libgcov-driver-system.c"
@@ -228,17 +193,13 @@ static struct gcov_summary_buffer *sum_buffer;
 static int
 merge_one_data (const char *filename,
 		struct gcov_info *gi_ptr,
-		struct gcov_summary *prg_p,
-		struct gcov_summary *this_prg,
-		gcov_position_t *summary_pos_p,
-		gcov_position_t *eof_pos_p)
+		struct gcov_summary *summary)
 {
   gcov_unsigned_t tag, length;
   unsigned t_ix;
-  int f_ix;
+  int f_ix = -1;
   int error = 0;
   struct gcov_fn_buffer **fn_tail = &fn_buffer;
-  struct gcov_summary_buffer **sum_tail = &sum_buffer;
 
   length = gcov_read_unsigned ();
   if (!gcov_version (gi_ptr, length, filename))
@@ -253,44 +214,15 @@ merge_one_data (const char *filename,
       return 0;
     }
 
-  /* Look for program summary.  */
-  for (f_ix = 0;;)
-    {
-      struct gcov_summary tmp;
-
-      *eof_pos_p = gcov_position ();
-      tag = gcov_read_unsigned ();
-      if (tag != GCOV_TAG_OBJECT_SUMMARY)
-        break;
-
-      f_ix--;
-      length = gcov_read_unsigned ();
-      gcov_read_summary (&tmp);
-      if ((error = gcov_is_error ()))
-        goto read_error;
-      if (*summary_pos_p)
-        {
-          /* Save all summaries after the one that will be
-             merged into below. These will need to be rewritten
-             as histogram merging may change the number of non-zero
-             histogram entries that will be emitted, and thus the
-             size of the merged summary.  */
-          (*sum_tail) = (struct gcov_summary_buffer *)
-              xmalloc (sizeof(struct gcov_summary_buffer));
-          (*sum_tail)->summary = tmp;
-          (*sum_tail)->next = 0;
-          sum_tail = &((*sum_tail)->next);
-          goto next_summary;
-        }
-
-      *prg_p = tmp;
-      *summary_pos_p = *eof_pos_p;
-
-    next_summary:;
-    }
+  tag = gcov_read_unsigned ();
+  if (tag != GCOV_TAG_OBJECT_SUMMARY)
+    goto read_mismatch;
+  length = gcov_read_unsigned ();
+  gcov_read_summary (summary);
 
   /* Merge execution counts for each function.  */
-  for (f_ix = 0; (unsigned)f_ix != gi_ptr->n_functions;
+  for (f_ix = 0, tag = gcov_read_unsigned ();
+       (unsigned)f_ix != gi_ptr->n_functions;
        f_ix++, tag = gcov_read_unsigned ())
     {
       const struct gcov_ctr_info *ci_ptr;
@@ -376,22 +308,12 @@ read_error:
 static void
 write_one_data (const struct gcov_info *gi_ptr,
 		const struct gcov_summary *prg_p,
-		const struct gcov_histogram *histogram,
-		const gcov_position_t eof_pos,
-		const gcov_position_t summary_pos)
+		const struct gcov_histogram *histogram)
 {
   unsigned f_ix;
-  struct gcov_summary_buffer *next_sum_buffer;
 
-  /* Write out the data.  */
-  if (!eof_pos)
-    {
-      gcov_write_tag_length (GCOV_DATA_MAGIC, GCOV_VERSION);
-      gcov_write_unsigned (gi_ptr->stamp);
-    }
-
-  if (summary_pos)
-    gcov_seek (summary_pos);
+  gcov_write_tag_length (GCOV_DATA_MAGIC, GCOV_VERSION);
+  gcov_write_unsigned (gi_ptr->stamp);
 
   /* Generate whole program statistics.  */
   gcov_write_summary (GCOV_TAG_OBJECT_SUMMARY, prg_p);
@@ -461,29 +383,13 @@ write_one_data (const struct gcov_info *gi_ptr,
 
 static int
 merge_summary (const char *filename __attribute__ ((unused)), int run_counted,
-	       struct gcov_summary *prg,
-	       struct gcov_summary *this_prg,
-	       struct gcov_summary *all_prg __attribute__ ((unused)))
+	       struct gcov_summary *summary)
 {
-#if !GCOV_LOCKED 
-  /* summary for all instances of program.  */ 
-  struct gcov_summary *all;
-#endif 
-
-  /* Merge the summary.  */
-  int first = !prg->runs;
-
   if (!run_counted)
-    prg->runs++;
-#if !GCOV_LOCKED
-  all = all_prg;
-  if (!all->runs && prg->runs)
-    all->runs = prg->runs;
-#endif
+    summary->runs++;
 
   return 0;
 }
-
 
 /* Sort N entries in VALUE_ARRAY in descending order.
    Each entry in VALUE_ARRAY has two values. The sorting
@@ -572,19 +478,13 @@ gcov_sort_topn_counter_arrays (const struct gcov_info *gi_ptr)
 
 static void
 dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
-	       unsigned run_counted,
-	       struct gcov_summary *all_prg,
-	       struct gcov_summary *this_prg,
-	       struct gcov_histogram *histogram)
+	       unsigned run_counted, struct gcov_histogram *histogram)
 {
-  struct gcov_summary prg; /* summary for this object over all program.  */
+  struct gcov_summary summary = {};
   int error;
   gcov_unsigned_t tag;
-  gcov_position_t summary_pos = 0;
-  gcov_position_t eof_pos = 0;
 
   fn_buffer = 0;
-  sum_buffer = 0;
 
   gcov_sort_topn_counter_arrays (gi_ptr);
 
@@ -601,25 +501,18 @@ dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
           gcov_error ("profiling:%s:Not a gcov data file\n", gf->filename);
           goto read_fatal;
         }
-      error = merge_one_data (gf->filename, gi_ptr, &prg, this_prg,
-			      &summary_pos, &eof_pos);
+      error = merge_one_data (gf->filename, gi_ptr, &summary);
       if (error == -1)
         goto read_fatal;
     }
 
   gcov_rewrite ();
 
-  if (!summary_pos)
-    {
-      memset (&prg, 0, sizeof (prg));
-      summary_pos = eof_pos;
-    }
-
-  error = merge_summary (gf->filename, run_counted, &prg, this_prg, all_prg);
+  error = merge_summary (gf->filename, run_counted, &summary);
   if (error == -1)
     goto read_fatal;
 
-  write_one_data (gi_ptr, &prg, histogram, eof_pos, summary_pos);
+  write_one_data (gi_ptr, &summary, histogram);
   /* fall through */
 
 read_fatal:;
@@ -648,20 +541,13 @@ gcov_do_dump (struct gcov_info *list, int run_counted,
 {
   struct gcov_info *gi_ptr;
   struct gcov_filename gf;
-  gcov_unsigned_t crc32;
-  struct gcov_summary all_prg;
-  struct gcov_summary this_prg;
 
   allocate_filename_struct (&gf);
-#if !GCOV_LOCKED
-  memset (&all_prg, 0, sizeof (all_prg));
-#endif
 
   /* Now merge each file.  */
   for (gi_ptr = list; gi_ptr; gi_ptr = gi_ptr->next)
     {
-      dump_one_gcov (gi_ptr, &gf, run_counted, &all_prg, &this_prg,
-		     histogram);
+      dump_one_gcov (gi_ptr, &gf, run_counted, histogram);
       free (gf.filename);
     }
 

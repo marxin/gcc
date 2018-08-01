@@ -1567,7 +1567,7 @@ input_refs (struct lto_input_block *ib,
 }
 	    
 
-static gcov_summary lto_gcov_summary;
+static gcov_histogram lto_gcov_histogram;
 
 /* Input profile_info from IB.  */
 static void
@@ -1597,7 +1597,6 @@ merge_profile_summaries (struct lto_file_decl_data **file_data_vec)
   gcov_unsigned_t max_runs = 0;
   struct cgraph_node *node;
   struct cgraph_edge *edge;
-  gcov_summary *saved_profile_info = 0;
 
   /* Find unit with maximal number of runs.  If we ever get serious about
      roundoff errors, we might also consider computing smallest common
@@ -1618,10 +1617,8 @@ merge_profile_summaries (struct lto_file_decl_data **file_data_vec)
       return;
     }
 
-  profile_info = &lto_gcov_summary;
-  lto_gcov_summary.runs = max_runs;
-
-  gcc_assert (saved_profile_info);
+  profile_info = &lto_gcov_histogram;
+  lto_gcov_histogram.runs = max_runs;
 
   /* If merging already happent at WPA time, we are done.  */
   if (flag_ltrans)
@@ -1699,10 +1696,6 @@ input_symtab (void)
     }
 
   merge_profile_summaries (file_data_vec);
-
-  if (!flag_auto_profile)
-    get_working_sets ();
-
 
   /* Clear out the aux field that was used to store enough state to
      tell which nodes should be overwritten.  */

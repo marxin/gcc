@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "intl.h"
 #include "params.h"
 #include "auto-profile.h"
+#include "profile.h"
 
 #include "gcov-io.c"
 
@@ -109,9 +110,6 @@ static unsigned bbg_file_stamp;
 
 /* Name of the count data (gcda) file.  */
 static char *da_file_name;
-
-/* Program histogram.  */
-struct gcov_histogram *program_histogram;
 
 /* The names of merge functions for counters.  */
 #define STR(str) #str
@@ -242,12 +240,16 @@ read_counts_file (void)
 	{
 	  gcc_assert (!histogram_read);
 	  histogram_read = true;
-	  program_histogram = XNEW (gcov_histogram);
-	  gcov_read_histogram (program_histogram);
+	  profile_info = XNEW (gcov_histogram);
+	  gcov_read_histogram (profile_info);
 	}
-      else if (tag == GCOV_TAG_PROGRAM_SUMMARY)
+      else if (tag == GCOV_TAG_OBJECT_SUMMARY)
 	{
-	  /* Ignore it.  */
+	  if (profile_info == NULL)
+	    {
+	      profile_info = XCNEW (gcov_histogram);
+	      profile_info->runs = gcov_read_unsigned ();
+	    }
 	}
       else if (GCOV_TAG_IS_COUNTER (tag) && fn_ident)
 	{
@@ -281,7 +283,12 @@ read_counts_file (void)
 	      break;
 	    }
 	  for (ix = 0; ix != n_counts; ix++)
-	    entry->counts[ix] += gcov_read_counter ();
+	    {
+	      gcov_type count = gcov_read_counter ();
+	      if (count > profile_max_edge_count)
+		profile_max_edge_count = count;
+	      entry->counts[ix] += count;	      
+	    }
 	}
       gcov_sync (offset, length);
       if ((is_error = gcov_is_error ()))

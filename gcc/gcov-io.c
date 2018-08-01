@@ -757,59 +757,6 @@ gcov_time (void)
 }
 #endif /* IN_GCOV */
 
-#if !IN_GCOV
-/* Determine the index into histogram for VALUE. */
-
-#if IN_LIBGCOV && !IN_GCOV_TOOL
-static unsigned
-#else
-GCOV_LINKAGE unsigned
-#endif
-gcov_histo_index (gcov_type value)
-{
-  gcov_type_unsigned v = (gcov_type_unsigned)value;
-  unsigned r = 0;
-  unsigned prev2bits = 0;
-
-  /* Find index into log2 scale histogram, where each of the log2
-     sized buckets is divided into 4 linear sub-buckets for better
-     focus in the higher buckets.  */
-
-  /* Find the place of the most-significant bit set.  */
-  if (v > 0)
-    {
-#if IN_LIBGCOV
-      /* When building libgcov we don't include system.h, which includes
-         hwint.h (where floor_log2 is declared). However, libgcov.a
-         is built by the bootstrapped compiler and therefore the builtins
-         are always available.  */
-      r = sizeof (long long) * __CHAR_BIT__ - 1 - __builtin_clzll (v);
-#else
-      /* We use floor_log2 from hwint.c, which takes a HOST_WIDE_INT
-         that is 64 bits and gcov_type_unsigned is 64 bits.  */
-      r = floor_log2 (v);
-#endif
-    }
-
-  /* If at most the 2 least significant bits are set (value is
-     0 - 3) then that value is our index into the lowest set of
-     four buckets.  */
-  if (r < 2)
-    return (unsigned)value;
-
-  gcov_nonruntime_assert (r < 64);
-
-  /* Find the two next most significant bits to determine which
-     of the four linear sub-buckets to select.  */
-  prev2bits = (v >> (r - 2)) & 0x3;
-  /* Finally, compose the final bucket index from the log2 index and
-     the next 2 bits. The minimum r value at this point is 2 since we
-     returned above if r was 2 or more, so the minimum bucket at this
-     point is 4.  */
-  return (r - 1) * 4 + prev2bits;
-}
-#endif /* !IN_GCOV */
-
 /* This is used by gcov-dump (IN_GCOV == -1) and in the compiler
    (!IN_GCOV && !IN_LIBGCOV).  */
 #if IN_GCOV <= 0 && !IN_LIBGCOV

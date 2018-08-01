@@ -73,11 +73,10 @@ extern void del_node_map (void);
 
 extern void get_working_sets (void);
 
-/* Counter summary from the last set of coverage counts read by
+/* Counter histogram from the last set of coverage counts read by
    profile.c.  */
-extern const struct gcov_summary *profile_info;
+extern struct gcov_histogram *profile_info;
 
-/* Program histogram read by profile.c.  */
-extern struct gcov_histogram *program_histogram;
+extern gcov_type profile_max_edge_count;
 
 #endif /* PROFILE_H */

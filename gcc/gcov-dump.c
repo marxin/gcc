@@ -76,7 +76,6 @@ static const tag_format_t tag_table[] =
   {GCOV_TAG_ARCS, "ARCS", tag_arcs},
   {GCOV_TAG_LINES, "LINES", tag_lines},
   {GCOV_TAG_OBJECT_SUMMARY, "OBJECT_SUMMARY", tag_summary},
-  {GCOV_TAG_PROGRAM_SUMMARY, "PROGRAM_SUMMARY", tag_summary},
   {GCOV_TAG_HISTOGRAM, "HISTOGRAM", tag_histogram},
   {0, NULL, NULL}
 };
@@ -463,15 +462,9 @@ tag_counters (const char *filename ATTRIBUTE_UNUSED,
 }
 
 static void
-print_summary (const char *filename,
-	       const gcov_summary &summary)
-{
-}
-
-static void
-tag_summary (const char *filename,
+tag_summary (const char *filename ATTRIBUTE_UNUSED,
 	     unsigned tag ATTRIBUTE_UNUSED, unsigned length ATTRIBUTE_UNUSED,
-	     unsigned depth)
+	     unsigned depth ATTRIBUTE_UNUSED)
 {
   gcov_summary summary;
   gcov_read_summary (&summary);

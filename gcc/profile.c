@@ -82,9 +82,11 @@ struct bb_profile_info {
 #define BB_INFO(b)  ((struct bb_profile_info *) (b)->aux)
 
 
-/* Counter summary from the last set of coverage counts read.  */
+/* Counter histogram from the last set of coverage counts read.  */
 
-const gcov_summary *profile_info;
+gcov_histogram *profile_info;
+
+gcov_type profile_max_edge_count;
 
 /* Counter working set information computed from the current counter
    summary. Not initialized unless profile_info summary is non-NULL.  */
@@ -215,10 +217,10 @@ get_working_sets (void)
   unsigned ws_ix, pctinc, pct;
   gcov_working_set_t *ws_info;
 
-  if (!program_histogram)
+  if (!profile_info->sum_all)
     return;
 
-  compute_working_sets (program_histogram, gcov_working_sets);
+  compute_working_sets (profile_info, gcov_working_sets);
 
   if (dump_file)
     {
@@ -420,7 +422,9 @@ read_profile_edge_counts (gcov_type *exec_counts)
 	if (!EDGE_INFO (e)->ignore && !EDGE_INFO (e)->on_tree)
 	  {
 	    num_edges++;
-	    if (!exec_counts)
+	    if (exec_counts)
+	      edge_gcov_count (e) = exec_counts[exec_counts_pos++];
+	    else
 	      edge_gcov_count (e) = 0;
 
 	    EDGE_INFO (e)->count_valid = 1;

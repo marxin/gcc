@@ -131,9 +131,17 @@ get_hot_bb_threshold ()
   gcov_working_set_t *ws;
   if (min_count == -1)
     {
-      ws = find_working_set (PARAM_VALUE (HOT_BB_COUNT_WS_PERMILLE));
-      gcc_assert (ws);
-      min_count = ws->min_counter;
+      if (profile_info->sum_all)
+	{
+	  ws = find_working_set (PARAM_VALUE (HOT_BB_COUNT_WS_PERMILLE));
+	  gcc_assert (ws);
+	  min_count = ws->min_counter;
+	}
+      else
+	{
+	  gcc_assert (profile_max_edge_count);
+	  min_count = profile_max_edge_count / 10000;
+	}
     }
   return min_count;
 }
