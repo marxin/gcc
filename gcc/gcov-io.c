@@ -447,13 +447,7 @@ GCOV_LINKAGE void
 gcov_write_summary (gcov_unsigned_t tag, const struct gcov_summary *summary)
 {
   gcov_write_tag_length (tag, GCOV_TAG_SUMMARY_LENGTH);
-  gcov_write_unsigned (summary->checksum);
-
-  gcov_write_unsigned (summary->num);
   gcov_write_unsigned (summary->runs);
-  gcov_write_counter (summary->sum_all);
-  gcov_write_counter (summary->run_max);
-  gcov_write_counter (summary->sum_max);
 }
 
 GCOV_LINKAGE void
@@ -476,14 +470,8 @@ gcov_write_histogram (const struct gcov_histogram *histogram)
   gcov_write_tag_length (GCOV_TAG_HISTOGRAM,
 			 GCOV_TAG_HISTOGRAM_LENGTH (h_cnt));
 
-  const struct gcov_summary *summary = &histogram->summary;
-  gcov_write_unsigned (summary->checksum);
-
-  gcov_write_unsigned (summary->num);
-  gcov_write_unsigned (summary->runs);
-  gcov_write_counter (summary->sum_all);
-  gcov_write_counter (summary->run_max);
-  gcov_write_counter (summary->sum_max);
+  gcov_write_unsigned (histogram->runs);
+  gcov_write_unsigned (histogram->sum_all);
 
   for (bv_ix = 0; bv_ix < GCOV_HISTOGRAM_BITVECTOR_SIZE; bv_ix++)
     gcov_write_unsigned (histo_bitvector[bv_ix]);
@@ -655,12 +643,7 @@ gcov_read_string (void)
 GCOV_LINKAGE void
 gcov_read_summary (struct gcov_summary *summary)
 {
-  summary->checksum = gcov_read_unsigned ();
-  summary->num = gcov_read_unsigned ();
   summary->runs = gcov_read_unsigned ();
-  summary->sum_all = gcov_read_counter ();
-  summary->run_max = gcov_read_counter ();
-  summary->sum_max = gcov_read_counter ();
 }
 
 GCOV_LINKAGE void
@@ -669,7 +652,9 @@ gcov_read_histogram (struct gcov_histogram *histogram)
   unsigned h_ix, bv_ix, h_cnt = 0;
   unsigned cur_bitvector;
   unsigned histo_bitvector[GCOV_HISTOGRAM_BITVECTOR_SIZE];
-  gcov_read_summary (&histogram->summary);
+
+  histogram->runs = gcov_read_unsigned ();
+  histogram->sum_all = gcov_read_unsigned ();
 
   memset (histogram->histogram, 0,
 	  sizeof (gcov_bucket_type) * GCOV_HISTOGRAM_SIZE);
@@ -838,7 +823,6 @@ GCOV_LINKAGE void
 compute_working_sets (gcov_histogram *histogram,
                       gcov_working_set_t *gcov_working_sets)
 {
-  const gcov_summary *summary = &histogram->summary;
   gcov_type working_set_cum_values[NUM_GCOV_WORKING_SETS];
   gcov_type ws_cum_hotness_incr;
   gcov_type cum, tmp_cum;
@@ -849,7 +833,7 @@ compute_working_sets (gcov_histogram *histogram,
   /* Compute the amount of sum_all that the cumulative hotness grows
      by in each successive working set entry, which depends on the
      number of working set entries.  */
-  ws_cum_hotness_incr = summary->sum_all / NUM_GCOV_WORKING_SETS;
+  ws_cum_hotness_incr = histogram->sum_all / NUM_GCOV_WORKING_SETS;
 
   /* Next fill in an array of the cumulative hotness values corresponding
      to each working set summary entry we are going to compute below.
@@ -863,7 +847,7 @@ compute_working_sets (gcov_histogram *histogram,
      working set. Divide by 1024 so it becomes a shift, which gives
      almost exactly 99.9%.  */
   working_set_cum_values[NUM_GCOV_WORKING_SETS-1]
-      = summary->sum_all - summary->sum_all/1024;
+      = histogram->sum_all - histogram->sum_all/1024;
 
   /* Next, walk through the histogram in decending order of hotness
      and compute the statistics for the working set summary array.

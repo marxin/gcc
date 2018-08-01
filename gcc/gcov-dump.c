@@ -466,18 +466,6 @@ static void
 print_summary (const char *filename,
 	       const gcov_summary &summary)
 {
-  printf (" checksum=0x%08x", summary.checksum);
-  printf ("\n");
-  print_prefix (filename, 0, 0);
-  printf (VALUE_PADDING_PREFIX "counts=%u, runs=%u",
-	  summary.num, summary.runs);
-
-  printf (", sum_all=%" PRId64,
-	  (int64_t)summary.sum_all);
-  printf (", run_max=%" PRId64,
-	  (int64_t)summary.run_max);
-  printf (", sum_max=%" PRId64,
-	  (int64_t)summary.sum_max);
 }
 
 static void
@@ -487,7 +475,7 @@ tag_summary (const char *filename,
 {
   gcov_summary summary;
   gcov_read_summary (&summary);
-  print_summary (filename, summary);
+  printf (" runs=%u", summary.runs);
 }
 
 static void
@@ -499,9 +487,10 @@ tag_histogram (const char *filename ATTRIBUTE_UNUSED,
   gcov_bucket_type *histo_bucket;
   gcov_histogram histogram;
   gcov_read_histogram (&histogram);
-  print_summary (filename, histogram.summary);
 
-  printf ("\n");
+  printf (" runs=%u, sum_all=%" PRId64 "\n", histogram.runs,
+	  (int64_t)histogram.sum_all);
+
   print_prefix (filename, depth, 0);
   printf (VALUE_PADDING_PREFIX "counter histogram:");
   for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)

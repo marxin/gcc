@@ -420,31 +420,7 @@ read_profile_edge_counts (gcov_type *exec_counts)
 	if (!EDGE_INFO (e)->ignore && !EDGE_INFO (e)->on_tree)
 	  {
 	    num_edges++;
-	    if (exec_counts)
-	      {
-		edge_gcov_count (e) = exec_counts[exec_counts_pos++];
-		if (edge_gcov_count (e) > profile_info->sum_max)
-		  {
-		    if (flag_profile_correction)
-		      {
-			static bool informed = 0;
-			if (dump_enabled_p () && !informed)
-			  {
-			    dump_location_t loc
-			      = dump_location_t::from_location_t
-			        (input_location);
-			    dump_printf_loc (MSG_NOTE, loc,
-					     "corrupted profile info: edge count"
-					     " exceeds maximal count\n");
-			  }
-			informed = 1;
-		      }
-		    else
-		      error ("corrupted profile info: edge from %i to %i exceeds maximal count",
-			     bb->index, e->dest->index);
-		  }
-	      }
-	    else
+	    if (!exec_counts)
 	      edge_gcov_count (e) = 0;
 
 	    EDGE_INFO (e)->count_valid = 1;
@@ -492,12 +468,6 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
 
   bb_gcov_counts.safe_grow_cleared (last_basic_block_for_fn (cfun));
   edge_gcov_counts = new hash_map<edge,gcov_type>;
-
-  if (profile_info->sum_all < profile_info->sum_max)
-    {
-      error ("corrupted profile info: sum_all is smaller than sum_max");
-      exec_counts = NULL;
-    }
 
   /* Attach extra info block to each bb.  */
   alloc_aux_for_blocks (sizeof (struct bb_profile_info));

@@ -867,7 +867,6 @@ autofdo_source_profile::read ()
       function_instance::function_instance_stack stack;
       function_instance *s = function_instance::read_function_instance (
           &stack, gcov_read_counter ());
-      afdo_profile_info->sum_all += s->total_count ();
       map_[s->name ()] = s;
     }
   return true;
@@ -1684,8 +1683,6 @@ read_autofdo_file (void)
 
   autofdo::afdo_profile_info = XNEW (gcov_summary);
   autofdo::afdo_profile_info->runs = 1;
-  autofdo::afdo_profile_info->sum_max = 0;
-  autofdo::afdo_profile_info->sum_all = 0;
 
   /* Read the profile from the profile file.  */
   autofdo::read_profile ();

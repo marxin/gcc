@@ -700,13 +700,8 @@ output_profile_summary (struct lto_simple_output_block *ob)
          units.  */
       gcc_assert (profile_info->runs);
       streamer_write_uhwi_stream (ob->main_stream, profile_info->runs);
-      streamer_write_gcov_count_stream (ob->main_stream, profile_info->sum_max);
 
-      /* sum_all is needed for computing the working set with the
-         histogram.  */
-      streamer_write_gcov_count_stream (ob->main_stream, profile_info->sum_all);
-
-            /* IPA-profile computes hot bb threshold based on cumulated
+      /* IPA-profile computes hot bb threshold based on cumulated
 	 whole program profile.  We need to stream it down to ltrans.  */
        if (flag_wpa)
          streamer_write_gcov_count_stream (ob->main_stream,
@@ -1583,8 +1578,6 @@ input_profile_summary (struct lto_input_block *ib,
   if (runs)
     {
       file_data->profile_info.runs = runs;
-      file_data->profile_info.sum_max = streamer_read_gcov_count (ib);
-      file_data->profile_info.sum_all = streamer_read_gcov_count (ib);
 
       /* IPA-profile computes hot bb threshold based on cumulated
 	 whole program profile.  We need to stream it down to ltrans.  */
@@ -1604,7 +1597,6 @@ merge_profile_summaries (struct lto_file_decl_data **file_data_vec)
   gcov_unsigned_t max_runs = 0;
   struct cgraph_node *node;
   struct cgraph_edge *edge;
-  gcov_type saved_sum_all = 0;
   gcov_summary *saved_profile_info = 0;
 
   /* Find unit with maximal number of runs.  If we ever get serious about
@@ -1628,38 +1620,8 @@ merge_profile_summaries (struct lto_file_decl_data **file_data_vec)
 
   profile_info = &lto_gcov_summary;
   lto_gcov_summary.runs = max_runs;
-  lto_gcov_summary.sum_max = 0;
-
-  /* Rescale all units to the maximal number of runs.
-     sum_max can not be easily merged, as we have no idea what files come from
-     the same run.  We do not use the info anyway, so leave it 0.  */
-  for (j = 0; (file_data = file_data_vec[j]) != NULL; j++)
-    if (file_data->profile_info.runs)
-      {
-	int scale = GCOV_COMPUTE_SCALE (max_runs,
-                                        file_data->profile_info.runs);
-	lto_gcov_summary.sum_max
-            = MAX (lto_gcov_summary.sum_max,
-                   apply_scale (file_data->profile_info.sum_max, scale));
-	lto_gcov_summary.sum_all
-            = MAX (lto_gcov_summary.sum_all,
-                   apply_scale (file_data->profile_info.sum_all, scale));
-        /* Save a pointer to the profile_info with the largest
-           scaled sum_all and the scale for use in merging the
-           histogram.  */
-        if (!saved_profile_info
-            || lto_gcov_summary.sum_all > saved_sum_all)
-          {
-            saved_profile_info = &file_data->profile_info;
-            saved_sum_all = lto_gcov_summary.sum_all;
-          }
-      }
 
   gcc_assert (saved_profile_info);
-
-  /* Watch roundoff errors.  */
-  if (lto_gcov_summary.sum_max < max_runs)
-    lto_gcov_summary.sum_max = max_runs;
 
   /* If merging already happent at WPA time, we are done.  */
   if (flag_ltrans)
