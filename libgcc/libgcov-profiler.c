@@ -37,7 +37,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 #endif
 
-#ifdef L_gcov_interval_profiler
+#if defined(L_gcov_interval_profiler) || defined(L_gcov_shared)
 /* If VALUE is in interval <START, START + STEPS - 1>, then increases the
    corresponding counter in COUNTERS.  If the VALUE is above or below
    the interval, COUNTERS[STEPS] or COUNTERS[STEPS + 1] is increased
@@ -57,7 +57,7 @@ __gcov_interval_profiler (gcov_type *counters, gcov_type value,
 }
 #endif
 
-#if defined(L_gcov_interval_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
+#if (defined(L_gcov_interval_profiler_atomic) || defined(L_gcov_shared)) && GCOV_SUPPORTS_ATOMIC
 /* If VALUE is in interval <START, START + STEPS - 1>, then increases the
    corresponding counter in COUNTERS.  If the VALUE is above or below
    the interval, COUNTERS[STEPS] or COUNTERS[STEPS + 1] is increased
@@ -77,7 +77,7 @@ __gcov_interval_profiler_atomic (gcov_type *counters, gcov_type value,
 }
 #endif
 
-#ifdef L_gcov_pow2_profiler
+#if defined(L_gcov_pow2_profiler) || defined(L_gcov_shared)
 /* If VALUE is a power of two, COUNTERS[1] is incremented.  Otherwise
    COUNTERS[0] is incremented.  */
 
@@ -91,7 +91,7 @@ __gcov_pow2_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#if defined(L_gcov_pow2_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
+#if (defined(L_gcov_pow2_profiler_atomic) || defined(L_gcov_shared)) && GCOV_SUPPORTS_ATOMIC
 /* If VALUE is a power of two, COUNTERS[1] is incremented.  Otherwise
    COUNTERS[0] is incremented.  Function is thread-safe.  */
 
@@ -137,7 +137,7 @@ __gcov_one_value_profiler_body (gcov_type *counters, gcov_type value,
     counters[2]++;
 }
 
-#ifdef L_gcov_one_value_profiler
+#if defined(L_gcov_one_value_profiler) || defined(L_gcov_shared)
 void
 __gcov_one_value_profiler (gcov_type *counters, gcov_type value)
 {
@@ -145,7 +145,7 @@ __gcov_one_value_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#if defined(L_gcov_one_value_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
+#if (defined(L_gcov_one_value_profiler_atomic) || defined(L_gcov_shared)) && GCOV_SUPPORTS_ATOMIC
 
 /* Update one value profilers (COUNTERS) for a given VALUE.
 
@@ -163,7 +163,7 @@ __gcov_one_value_profiler_atomic (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#ifdef L_gcov_indirect_call_topn_profiler
+#if defined(L_gcov_indirect_call_topn_profiler) || defined(L_gcov_shared)
 /* Tries to keep track the most frequent N values in the counters where
    N is specified by parameter TOPN_VAL. To track top N values, 2*N counter
    entries are used.
@@ -271,14 +271,14 @@ __gcov_topn_value_profiler_body (gcov_type *counters, gcov_type value)
 #if defined(HAVE_CC_TLS) && !defined (USE_EMUTLS)
 __thread
 #endif
-gcov_type *__gcov_indirect_call_topn_counters ATTRIBUTE_HIDDEN;
+gcov_type *__gcov_indirect_call_topn_counters;
 
 #if defined(HAVE_CC_TLS) && !defined (USE_EMUTLS)
 __thread
 #endif
-void *__gcov_indirect_call_topn_callee ATTRIBUTE_HIDDEN;
+void *__gcov_indirect_call_topn_callee;
 
-#ifdef TARGET_VTABLE_USES_DESCRIPTORS
+#if defined(TARGET_VTABLE_USES_DESCRIPTORS) || defined(L_gcov_shared)
 #define VTABLE_USES_DESCRIPTORS 1
 #else
 #define VTABLE_USES_DESCRIPTORS 0
@@ -301,7 +301,7 @@ __gcov_indirect_call_topn_profiler (gcov_type value, void* cur_func)
 }
 #endif
 
-#ifdef L_gcov_indirect_call_profiler_v2
+#if defined(L_gcov_indirect_call_profiler_v2) || defined(L_gcov_shared)
 
 /* These two variables are used to actually track caller and callee.  Keep
    them in TLS memory so races are not common (they are written to often).
@@ -341,14 +341,14 @@ __gcov_indirect_call_profiler_v2 (gcov_type value, void* cur_func)
 }
 #endif
 
-#ifdef L_gcov_time_profiler
+#if defined(L_gcov_time_profiler) || defined(L_gcov_shared)
 
 /* Counter for first visit of each function.  */
-gcov_type __gcov_time_profiler_counter ATTRIBUTE_HIDDEN;
+gcov_type __gcov_time_profiler_counter;
 
 #endif
 
-#ifdef L_gcov_average_profiler
+#if defined(L_gcov_average_profiler) || defined(L_gcov_shared)
 /* Increase corresponding COUNTER by VALUE.  FIXME: Perhaps we want
    to saturate up.  */
 
@@ -360,7 +360,7 @@ __gcov_average_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#if defined(L_gcov_average_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
+#if (defined(L_gcov_average_profiler_atomic) || defined(L_gcov_shared)) && GCOV_SUPPORTS_ATOMIC
 /* Increase corresponding COUNTER by VALUE.  FIXME: Perhaps we want
    to saturate up.  Function is thread-safe.  */
 
@@ -372,7 +372,7 @@ __gcov_average_profiler_atomic (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#ifdef L_gcov_ior_profiler
+#if defined(L_gcov_ior_profiler) || defined(L_gcov_shared)
 /* Bitwise-OR VALUE into COUNTER.  */
 
 void
@@ -382,7 +382,7 @@ __gcov_ior_profiler (gcov_type *counters, gcov_type value)
 }
 #endif
 
-#if defined(L_gcov_ior_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
+#if (defined(L_gcov_ior_profiler_atomic) || defined(L_gcov_shared)) && GCOV_SUPPORTS_ATOMIC
 /* Bitwise-OR VALUE into COUNTER.  Function is thread-safe.  */
 
 void

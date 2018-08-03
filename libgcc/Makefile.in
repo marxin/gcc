@@ -912,15 +912,25 @@ libgcov-objects = $(libgcov-merge-objects) $(libgcov-profiler-objects) \
                  $(libgcov-interface-objects) $(libgcov-driver-objects)
 
 $(libgcov-merge-objects): %$(objext): $(srcdir)/libgcov-merge.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
-	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-merge.c
+	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-merge.c $(vis_hide)
 $(libgcov-profiler-objects): %$(objext): $(srcdir)/libgcov-profiler.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
-	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-profiler.c
+	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-profiler.c $(vis_hide)
 $(libgcov-interface-objects): %$(objext): $(srcdir)/libgcov-interface.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
-	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-interface.c
+	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-interface.c $(vis_hide)
 $(libgcov-driver-objects): %$(objext): $(srcdir)/libgcov-driver.c \
   $(srcdir)/libgcov-driver-system.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
-	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-driver.c
+	$(gcc_compile) -DL$* -c $(srcdir)/libgcov-driver.c $(vis_hide)
 
+libgcov-s-merge$(objext): $(srcdir)/libgcov-merge.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
+	$(gcc_compile) -DL_gcov_shared -c $(srcdir)/libgcov-merge.c
+libgcov-s-profiler$(objext): $(srcdir)/libgcov-profiler.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
+	$(gcc_compile) -DL_gcov_shared -c $(srcdir)/libgcov-profiler.c
+libgcov-s-interface$(objext): $(srcdir)/libgcov-interface.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
+	$(gcc_compile) -DL_gcov_shared -c $(srcdir)/libgcov-interface.c
+libgcov-s-driver$(objext): $(srcdir)/libgcov-driver.c $(srcdir)/libgcov-driver-system.c $(srcdir)/gcov.h $(srcdir)/libgcov.h
+	$(gcc_compile) -DL_gcov_shared -c $(srcdir)/libgcov-driver.c
+
+libgcov-s-objects = libgcov-s-merge${objext} libgcov-s-profiler${objext} libgcov-s-interface${objext} libgcov-s-driver${objext}
 
 # Static libraries.
 libgcc.a: $(libgcc-objects)
@@ -944,7 +954,7 @@ libgcc.a libgcov.a libunwind.a libgcc_eh.a:
 
 all: libgcc.a
 ifeq ($(enable_gcov),yes)
-all: libgcov.a
+all: libgcov.a libgcov$(SHLIB_EXT)
 endif
 
 ifneq ($(LIBUNWIND),)
@@ -1005,6 +1015,38 @@ libunwind$(SHLIB_EXT): $(libunwind-s-objects) $(extra-parts)
 		@shlib_objs@,$(objects),$(subst \
 		@shlib_base_name@,libunwind,$(subst \
 		@shlib_slibdir_qual@,$(MULTIOSSUBDIR),$(SHLIBUNWIND_LINK))))))
+
+# Map-file generation.
+libgcov.map.in: $(SHLIBGCOV_MAPFILES)
+	{ cat $(SHLIBGCOV_MAPFILES) \
+	    | sed -e '/^[ 	]*#/d' \
+		  -e 's/^%\(if\|else\|elif\|endif\|define\)/#\1/' \
+	    | $(gcc_compile_bare) -E -xassembler-with-cpp -; \
+	} > tmp-$@
+	mv tmp-$@ $@
+libgcov.map: $(SHLIB_MKMAP) libgcov.map.in $(libgcov-objects)
+	{ $(NM) $(SHLIBGCOV_NM_FLAGS) $(libgcov-objects); echo %%; \
+	  cat libgcov.map.in; \
+	} | $(AWK) -f $(SHLIB_MKMAP) $(SHLIB_MKMAP_OPTS) > tmp-$@
+	mv tmp-$@ $@
+libgcov$(SHLIB_EXT): libgcov.map
+libgcov_mapfile = libgcov.map
+
+libgcov-std.ver: $(srcdir)/libgcov-std.ver.in
+	cat < $< > $@
+
+libgcov$(SHLIB_EXT): $(libgcov-s-objects) libgcc_s$(SHLIB_EXT)
+	# @multilib_flags@ is still needed because this may use
+	# $(GCC_FOR_TARGET) and $(LIBGCC2_CFLAGS) directly.
+	# @multilib_dir@ is not really necessary, but sometimes it has
+	# more uses than just a directory name.
+	$(mkinstalldirs) $(MULTIDIR)
+	$(subst @multilib_flags@,$(CFLAGS) -B./,$(subst \
+		@multilib_dir@,$(MULTIDIR),$(subst \
+		@shlib_objs@,$(objects),$(subst \
+		@shlib_base_name@,libgcov,$(subst \
+		@shlib_map_file@,$(libgcov_mapfile),$(subst \
+		@shlib_slibdir_qual@,$(MULTIOSSUBDIR),$(SHLIBGCOV_LINK)))))))
 
 endif
 
@@ -1172,6 +1214,10 @@ ifeq ($(enable_gcov),yes)
 	$(INSTALL_DATA) libgcov.a $(DESTDIR)$(inst_libdir)/
 	chmod 644 $(DESTDIR)$(inst_libdir)/libgcov.a
 	$(RANLIB) $(DESTDIR)$(inst_libdir)/libgcov.a
+
+	$(subst @multilib_dir@,$(MULTIDIR),$(subst \
+		@shlib_base_name@,libgcov,$(subst \
+		@shlib_slibdir_qual@,$(MULTISUBDIR),$(SHLIBGCOV_INSTALL))))
 endif
 
 	parts="$(INSTALL_PARTS)";				\

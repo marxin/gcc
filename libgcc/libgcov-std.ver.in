@@ -1,0 +1,53 @@
+# Copyright (C) 2018 Free Software Foundation, Inc.
+#
+# This file is part of GCC.
+#
+# GCC is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GCC is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GCC; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+
+GCC_9.1.0 {
+  __gcov_init
+  __gcov_exit
+  __gcov_merge_add
+  __gcov_merge_time_profile
+  __gcov_merge_single
+  __gcov_merge_ior
+  __gcov_merge_icall_topn
+  __gcov_interval_profiler
+  __gcov_interval_profiler_atomic
+  __gcov_pow2_profiler
+  __gcov_pow2_profiler_atomic
+  __gcov_one_value_profiler
+  __gcov_one_value_profiler_atomic
+  __gcov_indirect_call_profiler_v2
+  __gcov_time_profiler
+  __gcov_time_profiler_atomic
+  __gcov_average_profiler
+  __gcov_average_profiler_atomic
+  __gcov_ior_profiler
+  __gcov_ior_profiler_atomic
+  __gcov_indirect_call_topn_profiler
+
+  __gcov_fork
+  __gcov_execl
+  __gcov_execlp
+  __gcov_execle
+  __gcov_execv
+  __gcov_execvp
+  __gcov_execve
+
+  __gcov_indirect_call_callee
+  __gcov_indirect_call_counters
+  __gcov_time_profiler_counter
+}
