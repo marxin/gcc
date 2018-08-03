@@ -1397,17 +1397,16 @@ make_gimple_switch_edges (gswitch *entry, basic_block bb)
 
   for (i = 0; i < n; ++i)
     {
-      tree lab = CASE_LABEL (gimple_switch_label (entry, i));
-      basic_block label_bb = label_to_block (lab);
+      basic_block label_bb = gimple_switch_bb (entry, i);
       make_edge (bb, label_bb, 0);
     }
 }
 
 
-/* Return the basic block holding label DEST.  */
+/* Return the basic block holding label DEST for current function.  */
 
 basic_block
-label_to_block_fn (struct function *ifun, tree dest)
+label_to_block (tree dest)
 {
   int uid = LABEL_DECL_UID (dest);
 
@@ -1424,9 +1423,9 @@ label_to_block_fn (struct function *ifun, tree dest)
       gsi_insert_before (&gsi, stmt, GSI_NEW_STMT);
       uid = LABEL_DECL_UID (dest);
     }
-  if (vec_safe_length (ifun->cfg->x_label_to_block_map) <= (unsigned int) uid)
+  if (vec_safe_length (cfun->cfg->x_label_to_block_map) <= (unsigned int) uid)
     return NULL;
-  return (*ifun->cfg->x_label_to_block_map)[uid];
+  return (*cfun->cfg->x_label_to_block_map)[uid];
 }
 
 /* Create edges for a goto statement at block BB.  Returns true
@@ -1773,7 +1772,7 @@ group_case_labels_stmt (gswitch *stmt)
   int i, next_index, new_size;
   basic_block default_bb = NULL;
 
-  default_bb = label_to_block (CASE_LABEL (gimple_switch_default_label (stmt)));
+  default_bb = gimple_switch_default_bb (stmt);
 
   /* Look for possible opportunities to merge cases.  */
   new_size = i = 1;
@@ -5655,8 +5654,7 @@ gimple_verify_flow_info (void)
 	    /* Mark all the destination basic blocks.  */
 	    for (i = 0; i < n; ++i)
 	      {
-		tree lab = CASE_LABEL (gimple_switch_label (switch_stmt, i));
-		basic_block label_bb = label_to_block (lab);
+		basic_block label_bb = gimple_switch_bb (switch_stmt, i);
 		gcc_assert (!label_bb->aux || label_bb->aux == (void *)1);
 		label_bb->aux = (void *)1;
 	      }
@@ -5711,8 +5709,7 @@ gimple_verify_flow_info (void)
 	    /* Check that we have all of them.  */
 	    for (i = 0; i < n; ++i)
 	      {
-		tree lab = CASE_LABEL (gimple_switch_label (switch_stmt, i));
-		basic_block label_bb = label_to_block (lab);
+		basic_block label_bb = gimple_switch_bb (switch_stmt, i);
 
 		if (label_bb->aux != (void *)2)
 		  {
@@ -9142,6 +9139,41 @@ generate_range_test (basic_block bb, tree index, tree low, tree high,
   gimple_stmt_iterator gsi = gsi_last_bb (bb);
   gsi_insert_seq_before (&gsi, seq, GSI_SAME_STMT);
 }
+
+/* Return the basic block that belongs to label numbered INDEX
+   of a switch statement.  */
+
+basic_block
+gimple_switch_bb (gswitch *gs, unsigned index)
+{
+  return label_to_block (CASE_LABEL (gimple_switch_label (gs, index)));
+}
+
+/* Return the default basic block of a switch statement.  */
+
+basic_block
+gimple_switch_default_bb (gswitch *gs)
+{
+  return gimple_switch_bb (gs, 0);
+}
+
+/* Return the edge that belongs to label numbered INDEX
+   of a switch statement.  */
+
+edge
+gimple_switch_edge (gswitch *gs, unsigned index)
+{
+  return find_edge (gimple_bb (gs), gimple_switch_bb (gs, index));
+}
+
+/* Return the default edge of a switch statement.  */
+
+edge
+gimple_switch_default_edge (gswitch *gs)
+{
+  return gimple_switch_edge (gs, 0);
+}
+
 
 /* Emit return warnings.  */
 

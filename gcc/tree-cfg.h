@@ -33,8 +33,7 @@ extern void init_empty_tree_cfg_for_function (struct function *);
 extern void init_empty_tree_cfg (void);
 extern void start_recording_case_labels (void);
 extern void end_recording_case_labels (void);
-extern basic_block label_to_block_fn (struct function *, tree);
-#define label_to_block(t) (label_to_block_fn (cfun, t))
+extern basic_block label_to_block (tree);
 extern void cleanup_dead_labels (void);
 extern bool group_case_labels_stmt (gswitch *);
 extern bool group_case_labels (void);
@@ -112,6 +111,10 @@ extern bool extract_true_false_controlled_edges (basic_block, basic_block,
 						 edge *, edge *);
 extern void generate_range_test (basic_block bb, tree index, tree low,
 				 tree high, tree *lhs, tree *rhs);
+extern basic_block gimple_switch_bb (gswitch *gs, unsigned index);
+extern basic_block gimple_switch_default_bb (gswitch *gs);
+extern edge gimple_switch_edge (gswitch *gs, unsigned index);
+extern edge gimple_switch_default_edge (gswitch *gs);
 
 /* Return true if the LHS of a call should be removed.  */
 
@@ -122,5 +125,6 @@ should_remove_lhs_p (tree lhs)
 	  && TREE_CODE (TYPE_SIZE_UNIT (TREE_TYPE (lhs))) == INTEGER_CST
 	  && !TREE_ADDRESSABLE (TREE_TYPE (lhs)));
 }
+edge gimple_switch_default_edge (gswitch *gs);
 
 #endif /* _TREE_CFG_H  */

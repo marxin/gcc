@@ -84,13 +84,12 @@ convert_single_case_switch (gswitch *swtch, gimple_stmt_iterator &gsi)
     return false;
 
   tree index = gimple_switch_index (swtch);
-  tree default_label = CASE_LABEL (gimple_switch_default_label (swtch));
   tree label = gimple_switch_label (swtch, 1);
   tree low = CASE_LOW (label);
   tree high = CASE_HIGH (label);
 
-  basic_block default_bb = label_to_block_fn (cfun, default_label);
-  basic_block case_bb = label_to_block_fn (cfun, CASE_LABEL (label));
+  basic_block default_bb = gimple_switch_default_bb (swtch);
+  basic_block case_bb = label_to_block (CASE_LABEL (label));
 
   basic_block bb = gimple_bb (swtch);
   gcond *cond;
