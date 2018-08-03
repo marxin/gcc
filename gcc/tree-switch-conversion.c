@@ -1436,7 +1436,6 @@ bit_test_cluster::emit (tree index_expr, tree index_type,
 
   tree minval = get_low ();
   tree maxval = get_high ();
-  tree range = int_const_binop (MINUS_EXPR, maxval, minval);
 
   /* Go through all case labels, and collect the case labels, profile
      counts, and other information we need to build the branch tests.  */
@@ -1500,7 +1499,6 @@ bit_test_cluster::emit (tree index_expr, tree index_type,
 	  for (i = 0; i < count; i++)
 	    test[i].mask = wi::lshift (test[i].mask, m);
 	  minval = build_zero_cst (TREE_TYPE (minval));
-	  range = maxval;
 	}
     }
 
@@ -1515,15 +1513,6 @@ bit_test_cluster::emit (tree index_expr, tree index_type,
   idx = force_gimple_operand_gsi (&gsi, idx,
 				  /*simple=*/true, NULL_TREE,
 				  /*before=*/true, GSI_SAME_STMT);
-
-  /* if (idx > range) goto default */
-  range = force_gimple_operand_gsi (&gsi,
-				    fold_convert (unsigned_index_type, range),
-				    /*simple=*/true, NULL_TREE,
-				    /*before=*/true, GSI_SAME_STMT);
-  tmp = fold_build2 (GT_EXPR, boolean_type_node, idx, range);
-  basic_block new_bb = hoist_edge_and_branch_if_true (&gsi, tmp, default_bb);
-  gsi = gsi_last_bb (new_bb);
 
   /* csui = (1 << (word_mode) idx) */
   csui = make_ssa_name (word_type_node);
@@ -1546,7 +1535,8 @@ bit_test_cluster::emit (tree index_expr, tree index_type,
 				      /*simple=*/true, NULL_TREE,
 				      /*before=*/true, GSI_SAME_STMT);
       tmp = fold_build2 (NE_EXPR, boolean_type_node, tmp, word_mode_zero);
-      new_bb = hoist_edge_and_branch_if_true (&gsi, tmp, test[k].target_bb);
+      basic_block new_bb
+	= hoist_edge_and_branch_if_true (&gsi, tmp, test[k].target_bb);
       gsi = gsi_last_bb (new_bb);
     }
 
