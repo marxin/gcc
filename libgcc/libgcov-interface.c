@@ -28,15 +28,15 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #if defined(inhibit_libc)
 
-#ifdef L_gcov_flush
+#if defined(L_gcov_flush) || defined(L_gcov_shared)
 void __gcov_flush (void) {}
 #endif
 
-#ifdef L_gcov_reset
+#if defined(L_gcov_reset) || defined(L_gcov_shared)
 void __gcov_reset (void) {}
 #endif
 
-#ifdef L_gcov_dump
+#if defined(L_gcov_dump) || defined(L_gcov_shared)
 void __gcov_dump (void) {}
 #endif
 
@@ -54,8 +54,8 @@ void __gcov_dump (void) {}
 extern __gthread_mutex_t __gcov_flush_mx ATTRIBUTE_HIDDEN;
 extern __gthread_mutex_t __gcov_flush_mx ATTRIBUTE_HIDDEN;
 
-#ifdef L_gcov_flush
-#ifdef __GTHREAD_MUTEX_INIT
+#if defined(L_gcov_flush) || defined(L_gcov_shared)
+#if defined(__GTHREAD_MUTEX_INIT) || defined(L_gcov_shared)
 __gthread_mutex_t __gcov_flush_mx = __GTHREAD_MUTEX_INIT;
 #define init_mx_once()
 #else
@@ -93,7 +93,7 @@ __gcov_flush (void)
 
 #endif /* L_gcov_flush */
 
-#ifdef L_gcov_reset
+#if defined(L_gcov_reset) || defined(L_gcov_shared)
 
 /* Reset all counters to zero.  */
 
@@ -148,7 +148,7 @@ ALIAS_void_fn (__gcov_reset_int, __gcov_reset);
 
 #endif /* L_gcov_reset */
 
-#ifdef L_gcov_dump
+#if defined(L_gcov_dump) || defined(L_gcov_shared)
 /* Function that can be called from application to write profile collected
    so far, in order to collect profile in region of interest.  */
 
@@ -168,7 +168,7 @@ ALIAS_void_fn (__gcov_dump_int, __gcov_dump);
 
 #endif /* L_gcov_dump */
 
-#ifdef L_gcov_fork
+#if defined(L_gcov_fork) || defined(L_gcov_shared)
 /* A wrapper for the fork function.  Flushes the accumulated profiling data, so
    that they are not counted twice.  */
 
@@ -184,7 +184,7 @@ __gcov_fork (void)
 }
 #endif
 
-#ifdef L_gcov_execl
+#if defined(L_gcov_execl) || defined(L_gcov_shared)
 /* A wrapper for the execl function.  Flushes the accumulated
    profiling data, so that they are not lost.  */
 
@@ -215,7 +215,7 @@ __gcov_execl (const char *path, char *arg, ...)
 }
 #endif
 
-#ifdef L_gcov_execlp
+#if defined(L_gcov_execlp) || defined(L_gcov_shared)
 /* A wrapper for the execlp function.  Flushes the accumulated
    profiling data, so that they are not lost.  */
 
@@ -246,7 +246,7 @@ __gcov_execlp (const char *path, char *arg, ...)
 }
 #endif
 
-#ifdef L_gcov_execle
+#if defined(L_gcov_execle) || defined(L_gcov_shared)
 /* A wrapper for the execle function.  Flushes the accumulated
    profiling data, so that they are not lost.  */
 
@@ -279,7 +279,7 @@ __gcov_execle (const char *path, char *arg, ...)
 }
 #endif
 
-#ifdef L_gcov_execv
+#if defined(L_gcov_execv) || defined(L_gcov_shared)
 /* A wrapper for the execv function.  Flushes the accumulated
    profiling data, so that they are not lost.  */
 
@@ -291,7 +291,7 @@ __gcov_execv (const char *path, char *const argv[])
 }
 #endif
 
-#ifdef L_gcov_execvp
+#if defined(L_gcov_execvp) || defined(L_gcov_shared)
 /* A wrapper for the execvp function.  Flushes the accumulated
    profiling data, so that they are not lost.  */
 
@@ -303,7 +303,7 @@ __gcov_execvp (const char *path, char *const argv[])
 }
 #endif
 
-#ifdef L_gcov_execve
+#if defined(L_gcov_execve) || defined(L_gcov_shared)
 /* A wrapper for the execve function.  Flushes the accumulated
    profiling data, so that they are not lost.  */
 

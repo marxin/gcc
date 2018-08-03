@@ -28,19 +28,19 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #if defined(inhibit_libc)
 /* If libc and its header files are not available, provide dummy functions.  */
 
-#ifdef L_gcov_merge_add
+#if defined(L_gcov_merge_add) || defined(L_gcov_shared)
 void __gcov_merge_add (gcov_type *counters  __attribute__ ((unused)),
                        unsigned n_counters __attribute__ ((unused))) {}
 #endif
 
-#ifdef L_gcov_merge_single
+#if defined(L_gcov_merge_single) || defined(L_gcov_shared)
 void __gcov_merge_single (gcov_type *counters  __attribute__ ((unused)),
                           unsigned n_counters __attribute__ ((unused))) {}
 #endif
 
 #else
 
-#ifdef L_gcov_merge_add
+#if defined(L_gcov_merge_add) || defined(L_gcov_shared)
 /* The profile merging function that just adds the counters.  It is given
    an array COUNTERS of N_COUNTERS old counters and it reads the same number
    of counters from the gcov file.  */
@@ -52,7 +52,7 @@ __gcov_merge_add (gcov_type *counters, unsigned n_counters)
 }
 #endif /* L_gcov_merge_add */
 
-#ifdef L_gcov_merge_ior
+#if defined(L_gcov_merge_ior) || defined(L_gcov_shared)
 /* The profile merging function that just adds the counters.  It is given
    an array COUNTERS of N_COUNTERS old counters and it reads the same number
    of counters from the gcov file.  */
@@ -64,7 +64,7 @@ __gcov_merge_ior (gcov_type *counters, unsigned n_counters)
 }
 #endif
 
-#ifdef L_gcov_merge_time_profile
+#if defined(L_gcov_merge_time_profile) || defined(L_gcov_shared)
 /* Time profiles are merged so that minimum from all valid (greater than zero)
    is stored. There could be a fork that creates new counters. To have
    the profile stable, we chosen to pick the smallest function visit time.  */
@@ -84,7 +84,7 @@ __gcov_merge_time_profile (gcov_type *counters, unsigned n_counters)
 }
 #endif /* L_gcov_merge_time_profile */
 
-#ifdef L_gcov_merge_single
+#if defined(L_gcov_merge_single) || defined(L_gcov_shared)
 /* The profile merging function for choosing the most common value.
    It is given an array COUNTERS of N_COUNTERS old counters and it
    reads the same number of counters from the gcov file.  The counters
@@ -122,7 +122,7 @@ __gcov_merge_single (gcov_type *counters, unsigned n_counters)
 }
 #endif /* L_gcov_merge_single */
 
-#ifdef L_gcov_merge_icall_topn
+#if defined(L_gcov_merge_icall_topn) || defined(L_gcov_shared)
 /* The profile merging function used for merging indirect call counts
    This function is given array COUNTERS of N_COUNTERS old counters and it
    reads the same number of counters from the gcov file.  */
