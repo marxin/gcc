@@ -271,12 +271,12 @@ __gcov_topn_value_profiler_body (gcov_type *counters, gcov_type value)
 #if defined(HAVE_CC_TLS) && !defined (USE_EMUTLS)
 __thread
 #endif
-gcov_type *__gcov_indirect_call_topn_counters ATTRIBUTE_HIDDEN;
+gcov_type *__gcov_indirect_call_topn_counters;
 
 #if defined(HAVE_CC_TLS) && !defined (USE_EMUTLS)
 __thread
 #endif
-void *__gcov_indirect_call_topn_callee ATTRIBUTE_HIDDEN;
+void *__gcov_indirect_call_topn_callee;
 
 #ifdef TARGET_VTABLE_USES_DESCRIPTORS
 #define VTABLE_USES_DESCRIPTORS 1
@@ -344,7 +344,7 @@ __gcov_indirect_call_profiler_v2 (gcov_type value, void* cur_func)
 #ifdef L_gcov_time_profiler
 
 /* Counter for first visit of each function.  */
-gcov_type __gcov_time_profiler_counter ATTRIBUTE_HIDDEN;
+gcov_type __gcov_time_profiler_counter;
 
 #endif
 

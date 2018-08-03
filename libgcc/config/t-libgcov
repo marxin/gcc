@@ -1,0 +1,50 @@
+# Copyright (C) 2018 Free Software Foundation, Inc.
+#
+# This file is part of GCC.
+#
+# GCC is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GCC is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GCC; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+
+# Build libgcov for ELF with the GNU linker.
+
+SHLIBGCOV_SOLINK = @shlib_base_name@.so
+SHLIBGCOV_OBJS = @shlib_objs@
+SHLIBGCOV_DIR = @multilib_dir@
+SHLIBGCOV_SLIBDIR_QUAL = @shlib_slibdir_qual@
+SHLIBGCOV_MAP = @shlib_map_file@
+
+SHLIBGCOV_SOVERSION = 1
+SHLIBGCOV_SONAME = @shlib_base_name@.so.$(SHLIBGCOV_SOVERSION)
+
+SHLIBGCOV_LINK = $(CC) $(LIBGCC2_CFLAGS) -shared \
+	$(SHLIBGCOV_LDFLAGS) \
+	-nodefaultlibs -Wl,-h,$(SHLIBGCOV_SONAME) \
+	-Wl,-z,text -Wl,-z,defs -Wl,-z,now -o $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SONAME).tmp \
+	@multilib_flags@ $(SHLIBGCOV_OBJS) -lc -lgcc && \
+	rm -f $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SOLINK) && \
+	if [ -f $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SONAME) ]; then \
+	  mv -f $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SONAME) \
+		$(SHLIBGCOV_DIR)/$(SHLIBGCOV_SONAME).backup; \
+	else true; fi && \
+	mv $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SONAME).tmp \
+	   $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SONAME) && \
+	$(LN_S) $(SHLIBGCOV_SONAME) $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SOLINK)
+
+SHLIBGCOV_INSTALL = \
+	$(SHELL) $(srcdir)/mkinstalldirs $(DESTDIR)$(slibdir)$(SHLIBGCOV_SLIBDIR_QUAL); \
+	$(INSTALL_DATA) $(SHLIBGCOV_DIR)/$(SHLIBGCOV_SONAME) \
+	  $(DESTDIR)$(slibdir)$(SHLIBGCOV_SLIBDIR_QUAL)/$(SHLIBGCOV_SONAME); \
+	rm -f $(DESTDIR)$(slibdir)$(SHLIBGCOV_SLIBDIR_QUAL)/$(SHLIBGCOV_SOLINK); \
+	$(LN_S) $(SHLIBGCOV_SONAME) \
+	  $(DESTDIR)$(slibdir)$(SHLIBGCOV_SLIBDIR_QUAL)/$(SHLIBGCOV_SOLINK)

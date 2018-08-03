@@ -944,7 +944,7 @@ libgcc.a libgcov.a libunwind.a libgcc_eh.a:
 
 all: libgcc.a
 ifeq ($(enable_gcov),yes)
-all: libgcov.a
+all: libgcov.a libgcov$(SHLIB_EXT)
 endif
 
 ifneq ($(LIBUNWIND),)
@@ -1005,6 +1005,38 @@ libunwind$(SHLIB_EXT): $(libunwind-s-objects) $(extra-parts)
 		@shlib_objs@,$(objects),$(subst \
 		@shlib_base_name@,libunwind,$(subst \
 		@shlib_slibdir_qual@,$(MULTIOSSUBDIR),$(SHLIBUNWIND_LINK))))))
+
+# Map-file generation.
+libgcov.map.in: $(SHLIBGCOV_MAPFILES)
+	{ cat $(SHLIBGCOV_MAPFILES) \
+	    | sed -e '/^[ 	]*#/d' \
+		  -e 's/^%\(if\|else\|elif\|endif\|define\)/#\1/' \
+	    | $(gcc_compile_bare) -E -xassembler-with-cpp -; \
+	} > tmp-$@
+	mv tmp-$@ $@
+libgcov.map: $(SHLIBGCOV_MKMAP) libgcov.map.in $(libgcov-objects)
+	{ $(NM) $(SHLIBGCOV_NM_FLAGS) $(libgcov-objects); echo %%; \
+	  cat libgcov.map.in; \
+	} | $(AWK) -f $(SHLIBGCOV_MKMAP) $(SHLIBGCOV_MKMAP_OPTS) > tmp-$@
+	mv tmp-$@ $@
+libgcov$(SHLIB_EXT): libgcov.map
+libgcov_mapfile = libgcov.map
+
+libgcov-std.ver: $(srcdir)/libgcov-std.ver.in
+	cat < $< > $@
+
+libgcov$(SHLIB_EXT): $(libgcov-objects) libgcc_s$(SHLIB_EXT)
+	# @multilib_flags@ is still needed because this may use
+	# $(GCC_FOR_TARGET) and $(LIBGCC2_CFLAGS) directly.
+	# @multilib_dir@ is not really necessary, but sometimes it has
+	# more uses than just a directory name.
+	$(mkinstalldirs) $(MULTIDIR)
+	$(subst @multilib_flags@,$(CFLAGS) -B./,$(subst \
+		@multilib_dir@,$(MULTIDIR),$(subst \
+		@shlib_objs@,$(objects),$(subst \
+		@shlib_base_name@,libgcov,$(subst \
+		@shlib_map_file@,$(libgcov_mapfile),$(subst \
+		@shlib_slibdir_qual@,$(MULTIOSSUBDIR),$(SHLIBGCOV_LINK)))))))
 
 endif
 
@@ -1172,6 +1204,10 @@ ifeq ($(enable_gcov),yes)
 	$(INSTALL_DATA) libgcov.a $(DESTDIR)$(inst_libdir)/
 	chmod 644 $(DESTDIR)$(inst_libdir)/libgcov.a
 	$(RANLIB) $(DESTDIR)$(inst_libdir)/libgcov.a
+
+	$(subst @multilib_dir@,$(MULTIDIR),$(subst \
+		@shlib_base_name@,libgcov,$(subst \
+		@shlib_slibdir_qual@,$(MULTIOSSUBDIR),$(SHLIBGCOV_INSTALL))))
 endif
 
 	parts="$(INSTALL_PARTS)";				\

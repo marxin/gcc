@@ -1,0 +1,5 @@
+# Build a shared libgcov library for ELF with symbol versioning
+# with the GNU linker.
+
+SHLIBGCOV_LDFLAGS = -Wl,--soname=$(SHLIBGCOV_SONAME) \
+	-Wl,--version-script=$(SHLIBGCOV_MAP)
