@@ -28,7 +28,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #if defined(inhibit_libc)
 /* If libc and its header files are not available, provide dummy functions.  */
 
-#if defined(L_gcov)
+#if defined(L_gcov) || defined(L_gcov_shared)
 void __gcov_init (struct gcov_info *p __attribute__ ((unused))) {}
 #endif
 
@@ -41,7 +41,7 @@ void __gcov_init (struct gcov_info *p __attribute__ ((unused))) {}
 #include <sys/stat.h>
 #endif
 
-#ifdef L_gcov
+#if defined(L_gcov) || defined(L_gcov_shared)
 
 /* A utility function for outputting errors.  */
 static int gcov_error (const char *, ...);
