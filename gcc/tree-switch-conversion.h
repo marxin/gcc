@@ -396,7 +396,8 @@ struct bit_test_cluster: public group_cluster
    Returns the newly created basic block.  */
   static basic_block hoist_edge_and_branch_if_true (gimple_stmt_iterator *gsip,
 						    tree cond,
-						    basic_block case_bb);
+						    basic_block case_bb,
+						    profile_probability prob);
 
   /* Maximum number of different basic blocks that can be handled by
      a bit test.  */
