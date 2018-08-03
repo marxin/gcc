@@ -56,7 +56,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "backend.h"
 #include "tree.h"
+#include "cfganal.h"
 #include "gimple.h"
+#include "tree-cfg.h"
+#include "gimple-cfg.h"
 #include "alloc-pool.h"
 #include "tree-pass.h"
 #include "ssa.h"
@@ -68,9 +71,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-inline.h"
 #include "gimple-pretty-print.h"
 #include "params.h"
-#include "cfganal.h"
 #include "gimple-iterator.h"
-#include "tree-cfg.h"
 #include "tree-ssa-loop-niter.h"
 #include "tree-ssa-loop.h"
 #include "symbol-summary.h"
@@ -1291,7 +1292,7 @@ set_switch_stmt_execution_predicate (struct ipa_func_body_info *fbi,
       tree min, max;
       predicate p;
 
-      e = find_edge (bb, label_to_block (CASE_LABEL (cl)));
+      e = gimple_switch_edge (last, case_idx);
       min = CASE_LOW (cl);
       max = CASE_HIGH (cl);
 
