@@ -234,10 +234,10 @@ extern struct gcov_master __gcov_master;
 extern void __gcov_dump_one (struct gcov_root *) ATTRIBUTE_HIDDEN;
 
 /* Register a new object file module.  */
-extern void __gcov_init (struct gcov_info *) ATTRIBUTE_HIDDEN;
+extern void __gcov_init (struct gcov_info *);
 
 /* GCOV exit function registered via a static destructor.  */
-extern void __gcov_exit (void) ATTRIBUTE_HIDDEN;
+extern void __gcov_exit (void);
 
 /* Function to reset all counters to 0.  Both externally visible (and
    overridable) and internal version.  */
@@ -247,19 +247,19 @@ extern void __gcov_reset_int (void) ATTRIBUTE_HIDDEN;
 extern void __gcov_dump_int (void) ATTRIBUTE_HIDDEN;
 
 /* The merge function that just sums the counters.  */
-extern void __gcov_merge_add (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
+extern void __gcov_merge_add (gcov_type *, unsigned);
 
 /* The merge function to select the minimum valid counter value.  */
-extern void __gcov_merge_time_profile (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
+extern void __gcov_merge_time_profile (gcov_type *, unsigned);
 
 /* The merge function to choose the most common value.  */
-extern void __gcov_merge_single (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
+extern void __gcov_merge_single (gcov_type *, unsigned);
 
 /* The merge function that just ors the counters together.  */
-extern void __gcov_merge_ior (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
+extern void __gcov_merge_ior (gcov_type *, unsigned);
 
 /* The merge function is used for topn indirect call counters.  */
-extern void __gcov_merge_icall_topn (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
+extern void __gcov_merge_icall_topn (gcov_type *, unsigned);
 
 /* The profiler functions.  */
 extern void __gcov_interval_profiler (gcov_type *, gcov_type, int, unsigned);
