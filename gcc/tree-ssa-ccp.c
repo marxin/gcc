@@ -2596,9 +2596,7 @@ optimize_stack_restore (gimple_stmt_iterator i)
       if (is_gimple_call (stack_save))
 	{
 	  callee = gimple_call_fndecl (stack_save);
-	  if (callee
-	      && DECL_BUILT_IN_CLASS (callee) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (callee) == BUILT_IN_STACK_SAVE)
+	  if (DECL_BUILT_IN_P (callee, BUILT_IN_NORMAL, BUILT_IN_STACK_SAVE))
 	    {
 	      gimple_stmt_iterator stack_save_gsi;
 	      tree rhs;
@@ -3369,9 +3367,7 @@ pass_fold_builtins::execute (function *fun)
 	      continue;
 	    }
 	  callee = gimple_call_fndecl (stmt);
-	  if (!callee
-              || DECL_BUILT_IN_CLASS (callee) != BUILT_IN_NORMAL
-	      || DECL_FUNCTION_CODE (callee) == fcode)
+	  if (!DECL_BUILT_IN_P (callee, BUILT_IN_NORMAL, fcode))
 	    gsi_next (&i);
 	}
     }

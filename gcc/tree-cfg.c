@@ -8312,8 +8312,7 @@ stmt_can_terminate_bb_p (gimple *t)
          wrapping it in __gcov_fork() which calls __gcov_flush()
 	 and clears the counters before forking has the same
 	 effect as returning twice.  Force a fake edge.  */
-      && !(DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
-	   && DECL_FUNCTION_CODE (fndecl) == BUILT_IN_FORK))
+      && !DECL_BUILT_IN_P (fndecl, BUILT_IN_NORMAL, BUILT_IN_FORK))
     return false;
 
   if (is_gimple_call (t))

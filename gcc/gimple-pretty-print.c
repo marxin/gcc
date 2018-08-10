@@ -910,9 +910,7 @@ dump_gimple_call (pretty_printer *buffer, gcall *gs, int spc,
     fn = TREE_OPERAND (fn, 0);
   if (TREE_CODE (fn) == FUNCTION_DECL && decl_is_tm_clone (fn))
     pp_string (buffer, " [tm-clone]");
-  if (TREE_CODE (fn) == FUNCTION_DECL
-      && DECL_BUILT_IN_CLASS (fn) == BUILT_IN_NORMAL
-      && DECL_FUNCTION_CODE (fn) == BUILT_IN_TM_START
+  if (DECL_BUILT_IN_P (fn, BUILT_IN_NORMAL, BUILT_IN_TM_START)
       && gimple_call_num_args (gs) > 0)
     {
       tree t = gimple_call_arg (gs, 0);

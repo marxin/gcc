@@ -10752,9 +10752,7 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	{
 	  tree fndecl = get_callee_fndecl (arg0);
 
-	  if (fndecl
-	      && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (fndecl) == BUILT_IN_STRLEN
+	  if (DECL_BUILT_IN_P (fndecl, BUILT_IN_NORMAL, BUILT_IN_STRLEN)
 	      && call_expr_nargs (arg0) == 1
 	      && TREE_CODE (TREE_TYPE (CALL_EXPR_ARG (arg0, 0))) == POINTER_TYPE)
 	    {
