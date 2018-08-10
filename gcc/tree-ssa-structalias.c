@@ -4728,8 +4728,7 @@ find_func_aliases_for_call (struct function *fn, gcall *t)
   tree fndecl = gimple_call_fndecl (t);
   varinfo_t fi;
 
-  if (fndecl != NULL_TREE
-      && DECL_BUILT_IN (fndecl)
+  if (decl_built_in_p (fndecl)
       && find_func_aliases_for_builtin_call (fn, t))
     return;
 

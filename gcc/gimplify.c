@@ -3245,7 +3245,7 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
       default:
         ;
       }
-  if (fndecl && DECL_BUILT_IN (fndecl))
+  if (decl_built_in_p (fndecl))
     {
       tree new_tree = fold_call_expr (input_location, *expr_p, !want_value);
       if (new_tree && new_tree != *expr_p)
@@ -3296,10 +3296,7 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
       tree last_arg = CALL_EXPR_ARG (*expr_p, nargs - 1);
       tree last_arg_fndecl = get_callee_fndecl (last_arg);
 
-      if (last_arg_fndecl
-	  && TREE_CODE (last_arg_fndecl) == FUNCTION_DECL
-	  && DECL_BUILT_IN_CLASS (last_arg_fndecl) == BUILT_IN_NORMAL
-	  && DECL_FUNCTION_CODE (last_arg_fndecl) == BUILT_IN_VA_ARG_PACK)
+      if (decl_built_in_p (last_arg_fndecl, BUILT_IN_VA_ARG_PACK))
 	{
 	  tree call = *expr_p;
 
@@ -3772,9 +3769,7 @@ gimple_boolify (tree expr)
 
       /* For __builtin_expect ((long) (x), y) recurse into x as well
 	 if x is truth_value_p.  */
-      if (fn
-	  && DECL_BUILT_IN_CLASS (fn) == BUILT_IN_NORMAL
-	  && DECL_FUNCTION_CODE (fn) == BUILT_IN_EXPECT
+      if (decl_built_in_p (fn, BUILT_IN_EXPECT)
 	  && call_expr_nargs (call) == 2)
 	{
 	  tree arg = CALL_EXPR_ARG (call, 0);
@@ -5718,9 +5713,7 @@ gimplify_modify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  CALL_EXPR_FN (*from_p) = TREE_OPERAND (CALL_EXPR_FN (*from_p), 0);
 	  STRIP_USELESS_TYPE_CONVERSION (CALL_EXPR_FN (*from_p));
 	  tree fndecl = get_callee_fndecl (*from_p);
-	  if (fndecl
-	      && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (fndecl) == BUILT_IN_EXPECT
+	  if (decl_built_in_p (fndecl, BUILT_IN_EXPECT)
 	      && call_expr_nargs (*from_p) == 3)
 	    call_stmt = gimple_build_call_internal (IFN_BUILTIN_EXPECT, 3,
 						    CALL_EXPR_ARG (*from_p, 0),
