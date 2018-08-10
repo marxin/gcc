@@ -1702,7 +1702,7 @@ remap_gimple_stmt (gimple *stmt, copy_body_data *id)
 	  case GIMPLE_CALL:
 	    {
 	      tree r, fndecl = gimple_call_fndecl (copy);
-	      if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+	      if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 		switch (DECL_FUNCTION_CODE (fndecl))
 		  {
 		  case BUILT_IN_EH_COPY_VALUES:
@@ -1939,8 +1939,7 @@ copy_bb (copy_body_data *id, basic_block bb,
 	  else if (call_stmt
 		   && id->call_stmt
 		   && (decl = gimple_call_fndecl (stmt))
-		   && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL
-		   && DECL_FUNCTION_CODE (decl) == BUILT_IN_VA_ARG_PACK_LEN)
+		   && decl_built_in_p (decl, BUILT_IN_VA_ARG_PACK_LEN))
 	    {
 	      /* __builtin_va_arg_pack_len () should be replaced by
 		 the number of anonymous arguments.  */
@@ -4033,7 +4032,7 @@ estimate_num_insns (gimple *stmt, eni_weights *weights)
 	if (gimple_call_internal_p (stmt))
 	  return 0;
 	else if ((decl = gimple_call_fndecl (stmt))
-		 && DECL_BUILT_IN (decl))
+		 && decl_built_in_p (decl))
 	  {
 	    /* Do not special case builtins where we see the body.
 	       This just confuse inliner.  */
@@ -4897,7 +4896,7 @@ fold_marked_statements (int first, hash_set<gimple *> *statements)
 	      gimple *old_stmt = gsi_stmt (gsi);
 	      tree old_decl = is_gimple_call (old_stmt) ? gimple_call_fndecl (old_stmt) : 0;
 
-	      if (old_decl && DECL_BUILT_IN (old_decl))
+	      if (decl_built_in_p (old_decl))
 		{
 		  /* Folding builtins can create multiple instructions,
 		     we need to look at all of them.  */

@@ -2975,9 +2975,8 @@ scan_omp_1_op (tree *tp, int *walk_subtrees, void *data)
 static bool
 setjmp_or_longjmp_p (const_tree fndecl)
 {
-  if (DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
-      && (DECL_FUNCTION_CODE (fndecl) == BUILT_IN_SETJMP
-	  || DECL_FUNCTION_CODE (fndecl) == BUILT_IN_LONGJMP))
+  if (decl_built_in_p (fndecl, BUILT_IN_SETJMP)
+      || decl_built_in_p (fndecl, BUILT_IN_LONGJMP))
     return true;
 
   tree declname = DECL_NAME (fndecl);
@@ -8831,8 +8830,7 @@ lower_omp_1 (gimple_stmt_iterator *gsi_p, omp_context *ctx)
       tree fndecl;
       call_stmt = as_a <gcall *> (stmt);
       fndecl = gimple_call_fndecl (call_stmt);
-      if (fndecl
-	  && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+      if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 	switch (DECL_FUNCTION_CODE (fndecl))
 	  {
 	  case BUILT_IN_GOMP_BARRIER:
