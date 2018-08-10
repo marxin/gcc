@@ -796,10 +796,7 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       if (ret != GS_ERROR)
 	{
 	  tree decl = cp_get_callee_fndecl_nofold (*expr_p);
-	  if (decl
-	      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_FRONTEND
-	      && ((int) DECL_FUNCTION_CODE (decl)
-		  == CP_BUILT_IN_IS_CONSTANT_EVALUATED))
+	  if (DECL_FE_BUILT_IN_P (decl, CP_BUILT_IN_IS_CONSTANT_EVALUATED))
 	    *expr_p = boolean_false_node;
 	}
       break;
@@ -2493,10 +2490,7 @@ cp_fold (tree x)
 	  nw = 1;
 
 	/* Defer folding __builtin_is_constant_evaluated.  */
-	if (callee
-	    && DECL_BUILT_IN_CLASS (callee) == BUILT_IN_FRONTEND
-	    && ((int) DECL_FUNCTION_CODE (callee)
-		== CP_BUILT_IN_IS_CONSTANT_EVALUATED))
+	if (DECL_FE_BUILT_IN_P (callee,  CP_BUILT_IN_IS_CONSTANT_EVALUATED))
 	  break;
 
 	x = copy_node (x);

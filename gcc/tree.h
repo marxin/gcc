@@ -3011,8 +3011,20 @@ extern vec<tree, va_gc> **decl_debug_args_insert (tree);
 /* For a function declaration, return true if NODE is non-null and it is
    a builtin of a CLASS with requested NAME.  */
 #define DECL_BUILT_IN_P(NODE, CLASS, NAME) \
-  (NODE != NULL_TREE && DECL_BUILT_IN_CLASS (NODE) == CLASS \
+  (NODE != NULL_TREE \
+   && TREE_CODE (NODE) == FUNCTION_DECL \
+   && DECL_BUILT_IN_CLASS (NODE) == CLASS \
    && DECL_FUNCTION_CODE (NODE) == NAME)
+
+/* For a function declaration, return true if NODE is non-null and it is
+   a builtin of a BUILT_IN_NORMAL class with requested NAME.  */
+#define DECL_NORMAL_BUILT_IN_P(NODE, NAME) \
+  DECL_BUILT_IN_P (NODE, BUILT_IN_NORMAL, NAME)
+
+/* For a function declaration, return true if NODE is non-null and it is
+   a builtin of a BUILT_IN_FRONTEND class with requested NAME.  */
+#define DECL_FE_BUILT_IN_P(NODE, NAME) \
+  DECL_BUILT_IN_P (NODE, BUILT_IN_FRONTEND, NAME)
 
 /* In FUNCTION_DECL, a chain of ..._DECL nodes.  */
 #define DECL_ARGUMENTS(NODE) \

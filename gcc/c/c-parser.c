@@ -9168,9 +9168,7 @@ c_parser_postfix_expression_after_primary (c_parser *parser,
 					      expr.value, exprlist,
 					      sizeof_arg,
 					      sizeof_ptr_memacc_comptypes);
-	  if (TREE_CODE (expr.value) == FUNCTION_DECL
-	      && DECL_BUILT_IN_CLASS (expr.value) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (expr.value) == BUILT_IN_MEMSET
+	  if (DECL_NORMAL_BUILT_IN_P (expr.value, BUILT_IN_MEMSET)
 	      && vec_safe_length (exprlist) == 3)
 	    {
 	      tree arg0 = (*exprlist)[0];
@@ -9187,9 +9185,7 @@ c_parser_postfix_expression_after_primary (c_parser *parser,
 
 	  expr.original_code = ERROR_MARK;
 	  if (TREE_CODE (expr.value) == INTEGER_CST
-	      && TREE_CODE (orig_expr.value) == FUNCTION_DECL
-	      && DECL_BUILT_IN_CLASS (orig_expr.value) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (orig_expr.value) == BUILT_IN_CONSTANT_P)
+	      && DECL_NORMAL_BUILT_IN_P (orig_expr.value, BUILT_IN_CONSTANT_P))
 	    expr.original_code = C_MAYBE_CONST_EXPR;
 	  expr.original_type = NULL;
 	  if (exprlist)

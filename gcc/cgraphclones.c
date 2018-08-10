@@ -482,8 +482,7 @@ cgraph_node::create_clone (tree new_decl, profile_count prof_count,
 	 version.  The only exception is when the edge was proved to
 	 be unreachable during the clonning procedure.  */
       if (!e->callee
-	  || DECL_BUILT_IN_CLASS (e->callee->decl) != BUILT_IN_NORMAL
-	  || DECL_FUNCTION_CODE (e->callee->decl) != BUILT_IN_UNREACHABLE)
+	  || !DECL_NORMAL_BUILT_IN_P (e->callee->decl, BUILT_IN_UNREACHABLE))
         e->redirect_callee_duplicating_thunks (new_node);
     }
   new_node->expand_all_artificial_thunks ();

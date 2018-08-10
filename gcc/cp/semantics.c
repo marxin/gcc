@@ -2545,9 +2545,7 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 	    }
 
 	  if ((complain & tf_warning)
-	      && TREE_CODE (fn) == FUNCTION_DECL
-	      && DECL_BUILT_IN_CLASS (fn) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (fn) == BUILT_IN_MEMSET
+	      && DECL_NORMAL_BUILT_IN_P (fn, BUILT_IN_MEMSET)
 	      && vec_safe_length (*args) == 3
 	      && !any_type_dependent_arguments_p (*args))
 	    {
