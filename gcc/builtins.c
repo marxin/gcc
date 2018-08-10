@@ -8310,9 +8310,9 @@ fold_builtin_expect (location_t loc, tree arg0, tree arg1, tree arg2,
 
   if (TREE_CODE (inner) == CALL_EXPR
       && (fndecl = get_callee_fndecl (inner))
-      && (DECL_BUILT_IN_P (fndecl, BUILT_IN_NORMAL, BUILT_IN_EXPECT)
-	  || DECL_BUILT_IN_P (fndecl, BUILT_IN_NORMAL,
-			      BUILT_IN_EXPECT_WITH_PROBABILITY)))
+      && (DECL_NORMAL_BUILT_IN_P (fndecl, BUILT_IN_EXPECT)
+	  || DECL_NORMAL_BUILT_IN_P (fndecl,
+				     BUILT_IN_EXPECT_WITH_PROBABILITY)))
     return arg0;
 
   inner = inner_arg0;
@@ -9641,10 +9641,7 @@ fold_call_expr (location_t loc, tree exp, bool ignore)
       if (nargs && TREE_CODE (CALL_EXPR_ARG (exp, nargs - 1)) == CALL_EXPR)
 	{
 	  tree fndecl2 = get_callee_fndecl (CALL_EXPR_ARG (exp, nargs - 1));
-	  if (fndecl2
-	      && TREE_CODE (fndecl2) == FUNCTION_DECL
-	      && DECL_BUILT_IN_CLASS (fndecl2) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (fndecl2) == BUILT_IN_VA_ARG_PACK)
+	  if (DECL_NORMAL_BUILT_IN_P (fndecl2, BUILT_IN_VA_ARG_PACK))
 	    return NULL_TREE;
 	}
 
@@ -9687,10 +9684,7 @@ fold_builtin_call_array (location_t loc, tree,
       if (n && TREE_CODE (argarray[n - 1]) == CALL_EXPR)
 	{
 	  tree fndecl2 = get_callee_fndecl (argarray[n - 1]);
-	  if (fndecl2
-	      && TREE_CODE (fndecl2) == FUNCTION_DECL
-	      && DECL_BUILT_IN_CLASS (fndecl2) == BUILT_IN_NORMAL
-	      && DECL_FUNCTION_CODE (fndecl2) == BUILT_IN_VA_ARG_PACK)
+	  if (DECL_NORMAL_BUILT_IN_P (fndecl2, BUILT_IN_VA_ARG_PACK))
 	    return NULL_TREE;
 	}
       if (avoid_folding_inline_builtin (fndecl))
