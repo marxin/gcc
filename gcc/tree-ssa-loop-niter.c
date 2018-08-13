@@ -4061,6 +4061,50 @@ maybe_lower_iteration_bound (struct loop *loop)
   delete not_executed_last_iteration;
 }
 
+static bool
+estimate_numbers_of_iterations_by_hint (struct loop *loop, edge ex)
+{
+  gcond *cond = dyn_cast<gcond *> (last_stmt (ex->src));
+  if (cond == NULL)
+    return false;
+
+  tree lhs = gimple_cond_lhs (cond);
+  if (TREE_CODE (lhs) != SSA_NAME)
+    return false;
+
+  gimple *stmt = SSA_NAME_DEF_STMT (gimple_cond_lhs (cond));
+  gcall *def = dyn_cast<gcall *> (stmt);
+  if (def == NULL)
+    return false;
+
+  tree decl = gimple_call_fndecl (def);
+  if (!DECL_BUILT_IN_P (decl, BUILT_IN_NORMAL,
+		       BUILT_IN_EXPECT_WITH_PROBABILITY)
+      || gimple_call_num_args (stmt) != 3)
+    return false;
+
+  tree c = gimple_call_arg (def, 1);
+  tree condt = TREE_TYPE (lhs);
+  tree res = fold_build2 (gimple_cond_code (cond), condt, c,
+			  gimple_cond_rhs (cond));
+  if (TREE_CODE (res) != INTEGER_CST)
+    return false;
+
+  tree prob = gimple_call_arg (def, 2);
+  tree t = TREE_TYPE (prob);
+  tree one = build_real_from_int_cst (t, integer_one_node);
+  if (integer_zerop (res))
+    prob = fold_build2 (MINUS_EXPR, t, one, prob);
+  tree r = fold_build2_initializer_loc (UNKNOWN_LOCATION,
+					RDIV_EXPR, t, one, prob);
+  HOST_WIDE_INT probi = real_to_integer (TREE_REAL_CST_PTR (r));
+  tree niter_bound = build_int_cst (condt, probi);
+  widest_int max = derive_constant_upper_bound (niter_bound);
+  record_estimate (loop, niter_bound, max, cond, true, true, false);
+
+  return true;
+}
+
 /* Records estimates on numbers of iterations of LOOP.  If USE_UNDEFINED_P
    is true also use estimates derived from undefined behavior.  */
 
@@ -4109,6 +4153,10 @@ estimate_numbers_of_iterations (struct loop *loop)
   likely_exit = single_likely_exit (loop);
   FOR_EACH_VEC_ELT (exits, i, ex)
     {
+      if (ex == likely_exit)
+	if (estimate_numbers_of_iterations_by_hint (loop, ex))
+	  continue;
+
       if (!number_of_iterations_exit (loop, ex, &niter_desc, false, false))
 	continue;
 
