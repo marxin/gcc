@@ -1211,9 +1211,9 @@ install-leaf: $(install-shared) $(install-libunwind)
 	chmod 644 $(DESTDIR)$(inst_libdir)/libgcc.a
 	$(RANLIB) $(DESTDIR)$(inst_libdir)/libgcc.a
 ifeq ($(enable_gcov),yes)
-	$(INSTALL_DATA) libgcov.a $(DESTDIR)$(inst_slibdir)/
-	chmod 644 $(DESTDIR)$(inst_slibdir)/libgcov.a
-	$(RANLIB) $(DESTDIR)$(inst_slibdir)/libgcov.a
+	$(INSTALL_DATA) libgcov.a $(DESTDIR)$(inst_libdir)/
+	chmod 644 $(DESTDIR)$(inst_libdir)/libgcov.a
+	$(RANLIB) $(DESTDIR)$(inst_libdir)/libgcov.a
 
 	$(subst @multilib_dir@,$(MULTIDIR),$(subst \
 		@shlib_base_name@,libgcov,$(subst \
