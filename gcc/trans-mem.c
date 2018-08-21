@@ -234,7 +234,7 @@ is_tm_irrevocable (tree x)
      irrevocable.  */
   if (TREE_CODE (x) == ADDR_EXPR)
     x = TREE_OPERAND (x, 0);
-  if (DECL_NORMAL_BUILT_IN_P (x, BUILT_IN_TM_IRREVOCABLE))
+  if (decl_built_in_p (x, BUILT_IN_TM_IRREVOCABLE))
     return true;
 
   return false;
@@ -438,7 +438,7 @@ is_tm_simple_store (gimple *stmt)
 static bool
 is_tm_abort (tree fndecl)
 {
-  return DECL_NORMAL_BUILT_IN_P (fndecl, BUILT_IN_TM_ABORT);
+  return decl_built_in_p (fndecl, BUILT_IN_TM_ABORT);
 }
 
 /* Build a GENERIC tree for a user abort.  This is called by front ends

@@ -2975,8 +2975,8 @@ scan_omp_1_op (tree *tp, int *walk_subtrees, void *data)
 static bool
 setjmp_or_longjmp_p (const_tree fndecl)
 {
-  if (DECL_NORMAL_BUILT_IN_P (fndecl, BUILT_IN_SETJMP)
-      || DECL_NORMAL_BUILT_IN_P (fndecl, BUILT_IN_LONGJMP))
+  if (decl_built_in_p (fndecl, BUILT_IN_SETJMP)
+      || decl_built_in_p (fndecl, BUILT_IN_LONGJMP))
     return true;
 
   tree declname = DECL_NAME (fndecl);

@@ -5240,7 +5240,7 @@ need_assembler_name_p (tree decl)
     {
       /* Do not set assembler name on builtins.  Allow RTL expansion to
 	 decide whether to expand inline or via a regular call.  */
-      if (DECL_BUILT_IN (decl)
+      if (decl_built_in_p (decl)
 	  && DECL_BUILT_IN_CLASS (decl) != BUILT_IN_FRONTEND)
 	return false;
 
@@ -5373,8 +5373,7 @@ free_lang_data_in_decl (tree decl)
       while (*nextp)
         {
           tree var = *nextp;
-          if (TREE_CODE (var) == FUNCTION_DECL
-              && DECL_BUILT_IN (var))
+          if (decl_built_in_p (var))
 	    *nextp = TREE_CHAIN (var);
 	  else
 	    nextp = &TREE_CHAIN (var);

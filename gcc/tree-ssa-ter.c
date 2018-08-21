@@ -573,7 +573,7 @@ find_replaceable_in_bb (temp_expr_table *tab, basic_block bb)
 {
   gimple_stmt_iterator bsi;
   gimple *stmt;
-  tree def, use, fndecl;
+  tree def, use;
   int partition;
   var_map map = tab->map;
   ssa_op_iter iter;
@@ -682,8 +682,7 @@ find_replaceable_in_bb (temp_expr_table *tab, basic_block bb)
 	 replacement over BUILT_IN calls since many will expand to inline
 	 insns instead of a true call.  */
       if (is_gimple_call (stmt)
-	  && !((fndecl = gimple_call_fndecl (stmt))
-	       && DECL_BUILT_IN (fndecl)))
+	  && !decl_built_in_p (gimple_call_fndecl (stmt)))
 	cur_call_cnt++;
 
       /* Increment counter if this statement sets a local

@@ -2681,7 +2681,7 @@ gimple_call_builtin_p (const gimple *stmt, enum built_in_function code)
   tree fndecl;
   if (is_gimple_call (stmt)
       && (fndecl = gimple_call_fndecl (stmt)) != NULL_TREE
-      && DECL_NORMAL_BUILT_IN_P (fndecl, code))
+      && decl_built_in_p (fndecl, code))
     return gimple_builtin_call_types_compatible_p (stmt, fndecl);
   return false;
 }

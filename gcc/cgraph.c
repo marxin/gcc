@@ -1559,8 +1559,7 @@ cgraph_update_edges_for_call_stmt_node (cgraph_node *node,
 	{
 	  /* Keep calls marked as dead dead.  */
 	  if (new_stmt && is_gimple_call (new_stmt) && e->callee
-	      && DECL_NORMAL_BUILT_IN_P (e->callee->decl,
-					 BUILT_IN_UNREACHABLE))
+	      && decl_built_in_p (e->callee->decl, BUILT_IN_UNREACHABLE))
 	    {
               node->get_edge (old_stmt)->set_call_stmt
 		 (as_a <gcall *> (new_stmt));
@@ -3061,7 +3060,7 @@ cgraph_edge::verify_corresponds_to_fndecl (tree decl)
   /* Optimizers can redirect unreachable calls or calls triggering undefined
      behavior to builtin_unreachable.  */
 
-  if (DECL_NORMAL_BUILT_IN_P (callee->decl, BUILT_IN_UNREACHABLE))
+  if (decl_built_in_p (callee->decl, BUILT_IN_UNREACHABLE))
     return false;
 
   if (callee->former_clone_of != node->decl
@@ -3186,8 +3185,7 @@ cgraph_node::verify_node (void)
 	  && !e->speculative
 	  /* Optimized out calls are redirected to __builtin_unreachable.  */
 	  && (e->count.nonzero_p ()
-	      || !DECL_NORMAL_BUILT_IN_P (e->callee->decl,
-					  BUILT_IN_UNREACHABLE))
+	      || !decl_built_in_p (e->callee->decl, BUILT_IN_UNREACHABLE))
 	  && count
 	      == ENTRY_BLOCK_PTR_FOR_FN (DECL_STRUCT_FUNCTION (decl))->count
 	  && (!e->count.ipa_p ()

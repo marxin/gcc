@@ -1498,8 +1498,7 @@ scan_function (void)
 
 		  if (dest)
 		    {
-		      if (DECL_NORMAL_BUILT_IN_P (dest,
-						  BUILT_IN_APPLY_ARGS))
+		      if (decl_built_in_p (dest, BUILT_IN_APPLY_ARGS))
 			encountered_apply_args = true;
 		      if (recursive_call_p (current_function_decl, dest))
 			{

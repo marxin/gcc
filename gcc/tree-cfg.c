@@ -8304,15 +8304,14 @@ stmt_can_terminate_bb_p (gimple *t)
     }
 
   if (is_gimple_call (t)
-      && fndecl
-      && DECL_BUILT_IN (fndecl)
+      && decl_built_in_p (fndecl)
       && (call_flags & ECF_NOTHROW)
       && !(call_flags & ECF_RETURNS_TWICE)
       /* fork() doesn't really return twice, but the effect of
          wrapping it in __gcov_fork() which calls __gcov_flush()
 	 and clears the counters before forking has the same
 	 effect as returning twice.  Force a fake edge.  */
-      && !DECL_NORMAL_BUILT_IN_P (fndecl, BUILT_IN_FORK))
+      && !decl_built_in_p (fndecl, BUILT_IN_FORK))
     return false;
 
   if (is_gimple_call (t))

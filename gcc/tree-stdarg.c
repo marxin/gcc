@@ -866,8 +866,8 @@ optimize_va_list_gpr_fpr_size (function *fun)
 	    {
 	      tree callee = gimple_call_fndecl (stmt);
 
-	      if (DECL_NORMAL_BUILT_IN_P (callee, BUILT_IN_VA_START)
-		  || DECL_NORMAL_BUILT_IN_P (callee, BUILT_IN_VA_END))
+	      if (decl_built_in_p (callee, BUILT_IN_VA_START)
+		  || decl_built_in_p (callee, BUILT_IN_VA_END))
 		continue;
 	    }
 

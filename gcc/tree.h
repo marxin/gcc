@@ -2305,11 +2305,6 @@ extern machine_mode vector_type_mode (const_tree);
 #define DECL_SOURCE_FILE(NODE) LOCATION_FILE (DECL_SOURCE_LOCATION (NODE))
 #define DECL_SOURCE_LINE(NODE) LOCATION_LINE (DECL_SOURCE_LOCATION (NODE))
 #define DECL_SOURCE_COLUMN(NODE) LOCATION_COLUMN (DECL_SOURCE_LOCATION (NODE))
-/* This accessor returns TRUE if the decl it operates on was created
-   by a front-end or back-end rather than by user code.  In this case
-   builtin-ness is indicated by source location.  */
-#define DECL_IS_BUILTIN(DECL) \
-  (LOCATION_LOCUS (DECL_SOURCE_LOCATION (DECL)) <= BUILTINS_LOCATION)
 
 /*  For FIELD_DECLs, this is the RECORD_TYPE, UNION_TYPE, or
     QUAL_UNION_TYPE node that the field is a member of.  For VAR_DECL,
@@ -2995,36 +2990,15 @@ extern vec<tree, va_gc> **decl_debug_args_insert (tree);
 #define DECL_STRUCT_FUNCTION(NODE) \
   (FUNCTION_DECL_CHECK (NODE)->function_decl.f)
 
-/* In a FUNCTION_DECL, nonzero means a built in function of a
-   standard library or more generally a built in function that is
-   recognized by optimizers and expanders.
-
-   Note that it is different from the DECL_IS_BUILTIN accessor.  For
-   instance, user declared prototypes of C library functions are not
-   DECL_IS_BUILTIN but may be DECL_BUILT_IN.  */
-#define DECL_BUILT_IN(NODE) (DECL_BUILT_IN_CLASS (NODE) != NOT_BUILT_IN)
+/* This accessor returns TRUE if the decl it operates on was created
+   by a front-end or back-end rather than by user code.  In this case
+   builtin-ness is indicated by source location.  */
+#define DECL_IS_BUILTIN(DECL) \
+  (LOCATION_LOCUS (DECL_SOURCE_LOCATION (DECL)) <= BUILTINS_LOCATION)
 
 /* For a builtin function, identify which part of the compiler defined it.  */
 #define DECL_BUILT_IN_CLASS(NODE) \
    (FUNCTION_DECL_CHECK (NODE)->function_decl.built_in_class)
-
-/* For a function declaration, return true if NODE is non-null and it is
-   a builtin of a CLASS with requested NAME.  */
-#define DECL_BUILT_IN_P(NODE, CLASS, NAME) \
-  (NODE != NULL_TREE \
-   && TREE_CODE (NODE) == FUNCTION_DECL \
-   && DECL_BUILT_IN_CLASS (NODE) == CLASS \
-   && DECL_FUNCTION_CODE (NODE) == NAME)
-
-/* For a function declaration, return true if NODE is non-null and it is
-   a builtin of a BUILT_IN_NORMAL class with requested NAME.  */
-#define DECL_NORMAL_BUILT_IN_P(NODE, NAME) \
-  DECL_BUILT_IN_P (NODE, BUILT_IN_NORMAL, NAME)
-
-/* For a function declaration, return true if NODE is non-null and it is
-   a builtin of a BUILT_IN_FRONTEND class with requested NAME.  */
-#define DECL_FE_BUILT_IN_P(NODE, NAME) \
-  DECL_BUILT_IN_P (NODE, BUILT_IN_FRONTEND, NAME)
 
 /* In FUNCTION_DECL, a chain of ..._DECL nodes.  */
 #define DECL_ARGUMENTS(NODE) \
@@ -5858,6 +5832,35 @@ inline bool
 type_has_mode_precision_p (const_tree t)
 {
   return known_eq (TYPE_PRECISION (t), GET_MODE_PRECISION (TYPE_MODE (t)));
+}
+
+/* For a FUNCTION_DECL NODE, nonzero means a built in function of a
+   standard library or more generally a built in function that is
+   recognized by optimizers and expanders.
+
+   Note that it is different from the DECL_IS_BUILTIN accessor.  For
+   instance, user declared prototypes of C library functions are not
+   DECL_IS_BUILTIN but may be DECL_BUILT_IN.  */
+
+inline bool
+decl_built_in_p (const_tree node)
+{
+  return (node != NULL_TREE
+	  && TREE_CODE (node) == FUNCTION_DECL
+	  && DECL_BUILT_IN_CLASS (node) != NOT_BUILT_IN);
+}
+
+inline bool
+decl_built_in_p (const_tree node, built_in_class klass)
+{
+  return (decl_built_in_p (node) && DECL_BUILT_IN_CLASS (node) == klass);
+}
+
+inline bool
+decl_built_in_p (const_tree node, int name,
+		 built_in_class klass = BUILT_IN_NORMAL)
+{
+  return (decl_built_in_p (node, klass) && DECL_FUNCTION_CODE (node) == name);
 }
 
 #endif  /* GCC_TREE_H  */

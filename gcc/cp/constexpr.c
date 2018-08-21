@@ -720,7 +720,7 @@ constexpr_fn_retval (tree body)
     case CALL_EXPR:
 	{
 	  tree fun = get_function_named_in_call (body);
-	  if (DECL_NORMAL_BUILT_IN_P (fun, BUILT_IN_UNREACHABLE))
+	  if (decl_built_in_p (fun, BUILT_IN_UNREACHABLE))
 	    return NULL_TREE;
 	}
       /* Fallthru.  */
@@ -1196,7 +1196,8 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 
   /* For __builtin_is_constant_evaluated, defer it if not
      ctx->pretend_const_required, otherwise fold it to true.  */
-  if (DECL_FE_BUILT_IN_P (fun, CP_BUILT_IN_IS_CONSTANT_EVALUATED))
+  if (decl_built_in_p (fun, CP_BUILT_IN_IS_CONSTANT_EVALUATED,
+		       BUILT_IN_FRONTEND))
     {
       if (!ctx->pretend_const_required)
 	{
@@ -1239,7 +1240,7 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 	  /* Do not allow__builtin_unreachable in constexpr function.
 	     The __builtin_unreachable call with BUILTINS_LOCATION
 	     comes from cp_maybe_instrument_return.  */
-	  if (DECL_NORMAL_BUILT_IN_P (fun, BUILT_IN_UNREACHABLE)
+	  if (decl_built_in_p (fun, BUILT_IN_UNREACHABLE)
 	      && EXPR_LOCATION (t) == BUILTINS_LOCATION)
 	    error ("%<constexpr%> call flows off the end of the function");
 	  else
@@ -1524,7 +1525,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
   if (is_ubsan_builtin_p (fun))
     return void_node;
 
-  if (is_builtin_fn (fun))
+  if (decl_built_in_p (fun))
     return cxx_eval_builtin_function_call (ctx, t, fun,
 					   lval, non_constant_p, overflow_p);
   if (!DECL_DECLARED_CONSTEXPR_P (fun))
@@ -5518,7 +5519,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 		if (!DECL_DECLARED_CONSTEXPR_P (fun)
 		    /* Allow any built-in function; if the expansion
 		       isn't constant, we'll deal with that then.  */
-		    && !is_builtin_fn (fun))
+		    && !decl_built_in_p (fun))
 		  {
 		    if (flags & tf_error)
 		      {
