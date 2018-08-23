@@ -2559,8 +2559,7 @@ optimize_stack_restore (gimple_stmt_iterator i)
 	continue;
 
       callee = gimple_call_fndecl (stmt);
-      if (!callee
-	  || DECL_BUILT_IN_CLASS (callee) != BUILT_IN_NORMAL
+      if (!decl_built_in_p (callee, BUILT_IN_NORMAL)
 	  /* All regular builtins are ok, just obviously not alloca.  */
 	  || ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (callee)))
 	return NULL_TREE;
@@ -3193,7 +3192,7 @@ pass_fold_builtins::execute (function *fun)
 	    }
 
 	  callee = gimple_call_fndecl (stmt);
-	  if (!callee || DECL_BUILT_IN_CLASS (callee) != BUILT_IN_NORMAL)
+	  if (!decl_built_in_p (callee, BUILT_IN_NORMAL))
 	    {
 	      gsi_next (&i);
 	      continue;

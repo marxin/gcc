@@ -4074,8 +4074,7 @@ handle_lhs_call (gcall *stmt, tree lhs, int flags, vec<ce_s> rhsc,
       /* If this is not a real malloc call assume the memory was
 	 initialized and thus may point to global memory.  All
 	 builtin functions with the malloc attribute behave in a sane way.  */
-      if (!fndecl
-	  || DECL_BUILT_IN_CLASS (fndecl) != BUILT_IN_NORMAL)
+      if (!decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 	make_constraint_from (vi, nonlocal_id);
       tmpc.var = vi->id;
       tmpc.offset = 0;

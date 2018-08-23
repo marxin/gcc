@@ -1702,7 +1702,7 @@ remap_gimple_stmt (gimple *stmt, copy_body_data *id)
 	  case GIMPLE_CALL:
 	    {
 	      tree r, fndecl = gimple_call_fndecl (copy);
-	      if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+	      if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 		switch (DECL_FUNCTION_CODE (fndecl))
 		  {
 		  case BUILT_IN_EH_COPY_VALUES:

@@ -356,7 +356,7 @@ is_tm_load (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  return (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
+  return (decl_built_in_p (fndecl, BUILT_IN_NORMAL)
 	  && BUILTIN_TM_LOAD_P (DECL_FUNCTION_CODE (fndecl)));
 }
 
@@ -372,7 +372,7 @@ is_tm_simple_load (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     {
       enum built_in_function fcode = DECL_FUNCTION_CODE (fndecl);
       return (fcode == BUILT_IN_TM_LOAD_1
@@ -400,7 +400,7 @@ is_tm_store (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  return (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
+  return (decl_built_in_p (fndecl, BUILT_IN_NORMAL)
 	  && BUILTIN_TM_STORE_P (DECL_FUNCTION_CODE (fndecl)));
 }
 
@@ -416,7 +416,7 @@ is_tm_simple_store (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     {
       enum built_in_function fcode = DECL_FUNCTION_CODE (fndecl);
       return (fcode == BUILT_IN_TM_STORE_1
@@ -2003,7 +2003,7 @@ tm_region_init_1 (struct tm_region *region, basic_block bb)
       if (gimple_code (g) == GIMPLE_CALL)
 	{
 	  tree fn = gimple_call_fndecl (g);
-	  if (fn && DECL_BUILT_IN_CLASS (fn) == BUILT_IN_NORMAL)
+	  if (decl_built_in_p (fn, BUILT_IN_NORMAL))
 	    {
 	      if ((DECL_FUNCTION_CODE (fn) == BUILT_IN_TM_COMMIT
 		   || DECL_FUNCTION_CODE (fn) == BUILT_IN_TM_COMMIT_EH)

@@ -9099,7 +9099,7 @@ get_call_combined_fn (const_tree call)
     return as_combined_fn (CALL_EXPR_IFN (call));
 
   tree fndecl = get_callee_fndecl (call);
-  if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     return as_combined_fn (DECL_FUNCTION_CODE (fndecl));
 
   return CFN_LAST;

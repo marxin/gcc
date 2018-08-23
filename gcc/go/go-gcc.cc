@@ -1947,9 +1947,8 @@ Gcc_backend::call_expression(Bfunction*, // containing fcn for call
   // This is to support builtin math functions when using 80387 math.
   tree excess_type = NULL_TREE;
   if (optimize
-      && TREE_CODE(fndecl) == FUNCTION_DECL
-      && DECL_IS_BUILTIN(fndecl)
-      && DECL_BUILT_IN_CLASS(fndecl) == BUILT_IN_NORMAL
+      && decl_built_in_p (fndecl, BUILT_IN_NORMAL)
+      && DECL_IS_BUILTIN (fndecl)
       && nargs > 0
       && ((SCALAR_FLOAT_TYPE_P(rettype)
 	   && SCALAR_FLOAT_TYPE_P(TREE_TYPE(args[0])))

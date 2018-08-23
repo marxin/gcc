@@ -3427,7 +3427,7 @@ verify_gimple_call (gcall *stmt)
       return true;
     }
 
-  if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     {
       switch (DECL_FUNCTION_CODE (fndecl))
 	{
@@ -6884,7 +6884,7 @@ move_stmt_r (gimple_stmt_iterator *gsi_p, bool *handled_ops_p,
       /* Remap the region numbers for __builtin_eh_{pointer,filter}.  */
       {
 	tree r, fndecl = gimple_call_fndecl (stmt);
-	if (fndecl && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+	if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 	  switch (DECL_FUNCTION_CODE (fndecl))
 	    {
 	    case BUILT_IN_EH_COPY_VALUES:

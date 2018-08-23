@@ -563,8 +563,7 @@ mark_all_reaching_defs_necessary_1 (ao_ref *ref ATTRIBUTE_UNUSED,
   if (is_gimple_call (def_stmt))
     {
       tree callee = gimple_call_fndecl (def_stmt);
-      if (callee != NULL_TREE
-	  && DECL_BUILT_IN_CLASS (callee) == BUILT_IN_NORMAL)
+      if (decl_built_in_p (callee, BUILT_IN_NORMAL))
 	switch (DECL_FUNCTION_CODE (callee))
 	  {
 	  case BUILT_IN_MALLOC:

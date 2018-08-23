@@ -10834,8 +10834,7 @@ fold_call_stmt (gcall *stmt, bool ignore)
 void
 set_builtin_user_assembler_name (tree decl, const char *asmspec)
 {
-  gcc_assert (TREE_CODE (decl) == FUNCTION_DECL
-	      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL
+  gcc_assert (decl_built_in_p (decl, BUILT_IN_NORMAL)
 	      && asmspec != 0);
 
   tree builtin = builtin_decl_explicit (DECL_FUNCTION_CODE (decl));
@@ -10855,7 +10854,7 @@ set_builtin_user_assembler_name (tree decl, const char *asmspec)
 bool
 is_simple_builtin (tree decl)
 {
-  if (decl && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
+  if (decl_built_in_p (decl, BUILT_IN_NORMAL))
     switch (DECL_FUNCTION_CODE (decl))
       {
 	/* Builtins that expand to constants.  */

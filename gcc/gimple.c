@@ -2698,8 +2698,7 @@ gimple_call_combined_fn (const gimple *stmt)
 	return as_combined_fn (gimple_call_internal_fn (call));
 
       tree fndecl = gimple_call_fndecl (stmt);
-      if (fndecl
-	  && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL
+      if (decl_built_in_p (fndecl, BUILT_IN_NORMAL)
 	  && gimple_builtin_call_types_compatible_p (stmt, fndecl))
 	return as_combined_fn (DECL_FUNCTION_CODE (fndecl));
     }

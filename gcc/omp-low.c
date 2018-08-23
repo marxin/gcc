@@ -8830,8 +8830,7 @@ lower_omp_1 (gimple_stmt_iterator *gsi_p, omp_context *ctx)
       tree fndecl;
       call_stmt = as_a <gcall *> (stmt);
       fndecl = gimple_call_fndecl (call_stmt);
-      if (fndecl
-	  && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+      if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 	switch (DECL_FUNCTION_CODE (fndecl))
 	  {
 	  case BUILT_IN_GOMP_BARRIER:

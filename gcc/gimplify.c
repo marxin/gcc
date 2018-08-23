@@ -3209,8 +3209,7 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
      transform all calls in the same manner as the expanders do, but
      we do transform most of them.  */
   fndecl = get_callee_fndecl (*expr_p);
-  if (fndecl
-      && DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_NORMAL)
+  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     switch (DECL_FUNCTION_CODE (fndecl))
       {
       CASE_BUILT_IN_ALLOCA:
@@ -5970,8 +5969,7 @@ gimplify_addr_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       /* If we see a call to a declared builtin or see its address
 	 being taken (we can unify those cases here) then we can mark
 	 the builtin for implicit generation by GCC.  */
-      if (TREE_CODE (op0) == FUNCTION_DECL
-	  && DECL_BUILT_IN_CLASS (op0) == BUILT_IN_NORMAL
+      if (decl_built_in_p (op0, BUILT_IN_NORMAL)
 	  && builtin_decl_declared_p (DECL_FUNCTION_CODE (op0)))
 	set_builtin_decl_implicit_p (DECL_FUNCTION_CODE (op0), true);
 
