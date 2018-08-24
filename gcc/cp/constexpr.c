@@ -720,7 +720,8 @@ constexpr_fn_retval (tree body)
     case CALL_EXPR:
 	{
 	  tree fun = get_function_named_in_call (body);
-	  if (decl_built_in_p (fun, BUILT_IN_UNREACHABLE))
+	  if (fun != NULL_TREE
+	      && decl_built_in_p (fun, BUILT_IN_UNREACHABLE))
 	    return NULL_TREE;
 	}
       /* Fallthru.  */

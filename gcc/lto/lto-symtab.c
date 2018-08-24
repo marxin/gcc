@@ -1030,7 +1030,7 @@ lto_symtab_merge_symbols (void)
 	      /* Builtins are not merged via decl merging.  It is however
 		 possible that tree merging unified the declaration.  We
 		 do not want duplicate entries in symbol table.  */
-	      if (decl_built_in_p (node->decl)
+	      if (cnode && decl_built_in_p (node->decl)
 		  && (cnode2 = cgraph_node::get (node->decl))
 		  && cnode2 != cnode)
 		lto_cgraph_replace_node (cnode2, cnode);

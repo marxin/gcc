@@ -354,7 +354,8 @@ lower_stmt (gimple_stmt_iterator *gsi, struct lower_data *data)
 	      TREE_SET_BLOCK (arg, data->block);
 	  }
 
-	if (decl_built_in_p (decl, BUILT_IN_NORMAL))
+	if (decl
+	    && decl_built_in_p (decl, BUILT_IN_NORMAL))
 	  {
 	    if (DECL_FUNCTION_CODE (decl) == BUILT_IN_SETJMP)
 	      {

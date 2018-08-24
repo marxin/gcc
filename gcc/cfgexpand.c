@@ -2654,7 +2654,7 @@ expand_call_stmt (gcall *stmt)
   CALL_EXPR_TAILCALL (exp) = gimple_call_tail_p (stmt);
   CALL_EXPR_MUST_TAIL_CALL (exp) = gimple_call_must_tail_p (stmt);
   CALL_EXPR_RETURN_SLOT_OPT (exp) = gimple_call_return_slot_opt_p (stmt);
-  if (decl_built_in_p (decl, BUILT_IN_NORMAL)
+  if (decl && decl_built_in_p (decl, BUILT_IN_NORMAL)
       && ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (decl)))
     CALL_ALLOCA_FOR_VAR_P (exp) = gimple_call_alloca_for_var_p (stmt);
   else

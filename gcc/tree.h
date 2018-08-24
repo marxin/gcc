@@ -5834,7 +5834,7 @@ type_has_mode_precision_p (const_tree t)
   return known_eq (TYPE_PRECISION (t), GET_MODE_PRECISION (TYPE_MODE (t)));
 }
 
-/* For a tree NODE, nonzero means a built in function of a
+/* For a FUNCTION_DECL NODE, nonzero means a built in function of a
    standard library or more generally a built in function that is
    recognized by optimizers and expanders.
 
@@ -5849,7 +5849,6 @@ inline bool
 decl_built_in_p (const_tree node)
 {
   return (node != NULL_TREE
-	  && TREE_CODE (node) == FUNCTION_DECL
 	  && DECL_BUILT_IN_CLASS (node) != NOT_BUILT_IN);
 }
 
@@ -5866,10 +5865,19 @@ decl_built_in_p (const_tree node, built_in_class klass)
    a built-in of class KLASS with name equal to NAME.  */
 
 inline bool
-decl_built_in_p (const_tree node, int name,
-		 built_in_class klass = BUILT_IN_NORMAL)
+decl_built_in_p (const_tree node, int name, built_in_class klass)
 {
   return (decl_built_in_p (node, klass) && DECL_FUNCTION_CODE (node) == name);
+}
+
+/* For a FUNCTION_DECL NODE, return true when a function is
+   a built-in of class BUILT_IN_NORMAL class with name equal to NAME.  */
+
+inline bool
+decl_built_in_p (const_tree node, built_in_function name)
+{
+  return (decl_built_in_p (node, BUILT_IN_NORMAL)
+	  && DECL_FUNCTION_CODE (node) == name);
 }
 
 #endif  /* GCC_TREE_H  */

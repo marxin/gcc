@@ -33493,7 +33493,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 {
   gimple *stmt = gsi_stmt (*gsi);
   tree fndecl = gimple_call_fndecl (stmt);
-  gcc_checking_assert (decl_built_in_p (fndecl, BUILT_IN_MD));
+  gcc_checking_assert (fndecl && decl_built_in_p (fndecl, BUILT_IN_MD));
   int n_args = gimple_call_num_args (stmt);
   enum ix86_builtins fn_code = (enum ix86_builtins) DECL_FUNCTION_CODE (fndecl);
   tree decl = NULL_TREE;
@@ -38082,7 +38082,8 @@ rdseed_step:
 	      if (is_gimple_call (def_stmt))
 		{
 		  tree fndecl = gimple_call_fndecl (def_stmt);
-		  if (decl_built_in_p (fndecl, BUILT_IN_MD))
+		  if (fndecl
+		      && decl_built_in_p (fndecl, BUILT_IN_MD))
 		    switch ((unsigned int) DECL_FUNCTION_CODE (fndecl))
 		      {
 		      case IX86_BUILTIN_CMPPD:

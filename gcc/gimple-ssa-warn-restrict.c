@@ -1731,7 +1731,7 @@ wrestrict_dom_walker::check_call (gimple *call)
     return;
 
   tree func = gimple_call_fndecl (call);
-  if (!decl_built_in_p (func, BUILT_IN_NORMAL))
+  if (!func || !decl_built_in_p (func, BUILT_IN_NORMAL))
     return;
 
   /* Argument number to extract from the call (depends on the built-in

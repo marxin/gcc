@@ -2559,7 +2559,8 @@ optimize_stack_restore (gimple_stmt_iterator i)
 	continue;
 
       callee = gimple_call_fndecl (stmt);
-      if (!decl_built_in_p (callee, BUILT_IN_NORMAL)
+      if (!callee
+	  || !decl_built_in_p (callee, BUILT_IN_NORMAL)
 	  /* All regular builtins are ok, just obviously not alloca.  */
 	  || ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (callee)))
 	return NULL_TREE;
@@ -2595,7 +2596,7 @@ optimize_stack_restore (gimple_stmt_iterator i)
       if (is_gimple_call (stack_save))
 	{
 	  callee = gimple_call_fndecl (stack_save);
-	  if (decl_built_in_p (callee, BUILT_IN_STACK_SAVE))
+	  if (callee && decl_built_in_p (callee, BUILT_IN_STACK_SAVE))
 	    {
 	      gimple_stmt_iterator stack_save_gsi;
 	      tree rhs;
@@ -3192,7 +3193,7 @@ pass_fold_builtins::execute (function *fun)
 	    }
 
 	  callee = gimple_call_fndecl (stmt);
-	  if (!decl_built_in_p (callee, BUILT_IN_NORMAL))
+	  if (!callee || !decl_built_in_p (callee, BUILT_IN_NORMAL))
 	    {
 	      gsi_next (&i);
 	      continue;
@@ -3366,7 +3367,8 @@ pass_fold_builtins::execute (function *fun)
 	      continue;
 	    }
 	  callee = gimple_call_fndecl (stmt);
-	  if (!decl_built_in_p (callee, fcode))
+	  if (!callee
+	      || !decl_built_in_p (callee, fcode))
 	    gsi_next (&i);
 	}
     }

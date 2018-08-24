@@ -223,7 +223,8 @@ mark_stmt_if_obviously_necessary (gimple *stmt, bool aggressive)
     case GIMPLE_CALL:
       {
 	tree callee = gimple_call_fndecl (stmt);
-	if (decl_built_in_p (callee, BUILT_IN_NORMAL))
+	if (callee != NULL_TREE
+	    && decl_built_in_p (callee, BUILT_IN_NORMAL))
 	  switch (DECL_FUNCTION_CODE (callee))
 	    {
 	    case BUILT_IN_MALLOC:
@@ -563,7 +564,8 @@ mark_all_reaching_defs_necessary_1 (ao_ref *ref ATTRIBUTE_UNUSED,
   if (is_gimple_call (def_stmt))
     {
       tree callee = gimple_call_fndecl (def_stmt);
-      if (decl_built_in_p (callee, BUILT_IN_NORMAL))
+      if (callee != NULL_TREE
+	  && decl_built_in_p (callee, BUILT_IN_NORMAL))
 	switch (DECL_FUNCTION_CODE (callee))
 	  {
 	  case BUILT_IN_MALLOC:

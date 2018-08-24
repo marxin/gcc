@@ -1702,7 +1702,7 @@ remap_gimple_stmt (gimple *stmt, copy_body_data *id)
 	  case GIMPLE_CALL:
 	    {
 	      tree r, fndecl = gimple_call_fndecl (copy);
-	      if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
+	      if (fndecl && decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 		switch (DECL_FUNCTION_CODE (fndecl))
 		  {
 		  case BUILT_IN_EH_COPY_VALUES:
@@ -4896,7 +4896,7 @@ fold_marked_statements (int first, hash_set<gimple *> *statements)
 	      gimple *old_stmt = gsi_stmt (gsi);
 	      tree old_decl = is_gimple_call (old_stmt) ? gimple_call_fndecl (old_stmt) : 0;
 
-	      if (decl_built_in_p (old_decl))
+	      if (old_decl && decl_built_in_p (old_decl))
 		{
 		  /* Folding builtins can create multiple instructions,
 		     we need to look at all of them.  */

@@ -375,7 +375,8 @@ gimple_build_call_from_tree (tree t, tree fnptrtype)
   gimple_call_set_tail (call, CALL_EXPR_TAILCALL (t));
   gimple_call_set_must_tail (call, CALL_EXPR_MUST_TAIL_CALL (t));
   gimple_call_set_return_slot_opt (call, CALL_EXPR_RETURN_SLOT_OPT (t));
-  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL)
+  if (fndecl
+      && decl_built_in_p (fndecl, BUILT_IN_NORMAL)
       && ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (fndecl)))
     gimple_call_set_alloca_for_var (call, CALL_ALLOCA_FOR_VAR_P (t));
   else
@@ -2698,7 +2699,8 @@ gimple_call_combined_fn (const gimple *stmt)
 	return as_combined_fn (gimple_call_internal_fn (call));
 
       tree fndecl = gimple_call_fndecl (stmt);
-      if (decl_built_in_p (fndecl, BUILT_IN_NORMAL)
+      if (fndecl
+	  && decl_built_in_p (fndecl, BUILT_IN_NORMAL)
 	  && gimple_builtin_call_types_compatible_p (stmt, fndecl))
 	return as_combined_fn (DECL_FUNCTION_CODE (fndecl));
     }

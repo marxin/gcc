@@ -356,7 +356,8 @@ is_tm_load (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  return (decl_built_in_p (fndecl, BUILT_IN_NORMAL)
+  return (fndecl
+	  && decl_built_in_p (fndecl, BUILT_IN_NORMAL)
 	  && BUILTIN_TM_LOAD_P (DECL_FUNCTION_CODE (fndecl)));
 }
 
@@ -372,7 +373,7 @@ is_tm_simple_load (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
+  if (fndecl && decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     {
       enum built_in_function fcode = DECL_FUNCTION_CODE (fndecl);
       return (fcode == BUILT_IN_TM_LOAD_1
@@ -400,7 +401,8 @@ is_tm_store (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  return (decl_built_in_p (fndecl, BUILT_IN_NORMAL)
+  return (fndecl
+	  && decl_built_in_p (fndecl, BUILT_IN_NORMAL)
 	  && BUILTIN_TM_STORE_P (DECL_FUNCTION_CODE (fndecl)));
 }
 
@@ -416,7 +418,8 @@ is_tm_simple_store (gimple *stmt)
     return false;
 
   fndecl = gimple_call_fndecl (stmt);
-  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
+  if (fndecl
+      && decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     {
       enum built_in_function fcode = DECL_FUNCTION_CODE (fndecl);
       return (fcode == BUILT_IN_TM_STORE_1
@@ -438,7 +441,7 @@ is_tm_simple_store (gimple *stmt)
 static bool
 is_tm_abort (tree fndecl)
 {
-  return decl_built_in_p (fndecl, BUILT_IN_TM_ABORT);
+  return (fndecl && decl_built_in_p (fndecl, BUILT_IN_TM_ABORT));
 }
 
 /* Build a GENERIC tree for a user abort.  This is called by front ends
@@ -2003,7 +2006,7 @@ tm_region_init_1 (struct tm_region *region, basic_block bb)
       if (gimple_code (g) == GIMPLE_CALL)
 	{
 	  tree fn = gimple_call_fndecl (g);
-	  if (decl_built_in_p (fn, BUILT_IN_NORMAL))
+	  if (fn && decl_built_in_p (fn, BUILT_IN_NORMAL))
 	    {
 	      if ((DECL_FUNCTION_CODE (fn) == BUILT_IN_TM_COMMIT
 		   || DECL_FUNCTION_CODE (fn) == BUILT_IN_TM_COMMIT_EH)

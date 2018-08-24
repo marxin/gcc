@@ -6610,7 +6610,8 @@ make_rtl_for_nonlocal_decl (tree decl, tree init, const char* asmspec)
 	}
       else
 	{
-	  if (decl_built_in_p (decl, BUILT_IN_NORMAL))
+	  if (TREE_CODE (decl) == FUNCTION_DECL
+	      && decl_built_in_p (decl, BUILT_IN_NORMAL))
 	    set_builtin_user_assembler_name (decl, asmspec);
 	  set_user_assembler_name (decl, asmspec);
 	}

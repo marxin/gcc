@@ -796,8 +796,9 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       if (ret != GS_ERROR)
 	{
 	  tree decl = cp_get_callee_fndecl_nofold (*expr_p);
-	  if (decl_built_in_p (decl, CP_BUILT_IN_IS_CONSTANT_EVALUATED,
-			       BUILT_IN_FRONTEND))
+	  if (decl
+	      && decl_built_in_p (decl, CP_BUILT_IN_IS_CONSTANT_EVALUATED,
+				  BUILT_IN_FRONTEND))
 	    *expr_p = boolean_false_node;
 	}
       break;
@@ -2487,15 +2488,16 @@ cp_fold (tree x)
 	/* Some built-in function calls will be evaluated at compile-time in
 	   fold ().  Set optimize to 1 when folding __builtin_constant_p inside
 	   a constexpr function so that fold_builtin_1 doesn't fold it to 0.  */
-	if (decl_built_in_p (callee) && !optimize
+	if (callee && decl_built_in_p (callee) && !optimize
 	    && DECL_IS_BUILTIN_CONSTANT_P (callee)
 	    && current_function_decl
 	    && DECL_DECLARED_CONSTEXPR_P (current_function_decl))
 	  nw = 1;
 
 	/* Defer folding __builtin_is_constant_evaluated.  */
-	if (decl_built_in_p (callee, CP_BUILT_IN_IS_CONSTANT_EVALUATED,
-			     BUILT_IN_FRONTEND))
+	if (callee
+	    && decl_built_in_p (callee, CP_BUILT_IN_IS_CONSTANT_EVALUATED,
+				BUILT_IN_FRONTEND))
 	  break;
 
 	x = copy_node (x);

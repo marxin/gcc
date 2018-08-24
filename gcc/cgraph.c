@@ -3185,6 +3185,7 @@ cgraph_node::verify_node (void)
 	  && !e->speculative
 	  /* Optimized out calls are redirected to __builtin_unreachable.  */
 	  && (e->count.nonzero_p ()
+	      || ! e->callee->decl
 	      || !decl_built_in_p (e->callee->decl, BUILT_IN_UNREACHABLE))
 	  && count
 	      == ENTRY_BLOCK_PTR_FOR_FN (DECL_STRUCT_FUNCTION (decl))->count

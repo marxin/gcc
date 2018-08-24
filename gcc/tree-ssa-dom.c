@@ -1985,7 +1985,8 @@ dom_opt_dom_walker::optimize_stmt (basic_block bb, gimple_stmt_iterator si)
 	     folded to integer_one_node by now, it's fairly
 	     certain that the value simply isn't constant.  */
 	  tree callee = gimple_call_fndecl (stmt);
-	  if (decl_built_in_p (callee, BUILT_IN_CONSTANT_P))
+	  if (callee
+	      && decl_built_in_p (callee, BUILT_IN_CONSTANT_P))
 	    {
 	      propagate_tree_value_into_stmt (&si, integer_zero_node);
 	      stmt = gsi_stmt (si);

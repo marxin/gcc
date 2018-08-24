@@ -3108,7 +3108,7 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
   argarray = vec_safe_address (params);
 
   /* Check that arguments to builtin functions match the expectations.  */
-  if (decl_built_in_p (fundecl, BUILT_IN_NORMAL)
+  if (fundecl && decl_built_in_p (fundecl, BUILT_IN_NORMAL)
       && !check_builtin_function_arguments (loc, arg_loc, fundecl, nargs,
 					    argarray))
     return error_mark_node;

@@ -701,7 +701,8 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
   unsigned int idx = ~0;
   location_t loc;
 
-  if (!decl_built_in_p (callee, BUILT_IN_NORMAL)
+  if (TREE_CODE (callee) != FUNCTION_DECL
+      || !decl_built_in_p (callee, BUILT_IN_NORMAL)
       || vec_safe_length (params) <= 1)
     return;
 

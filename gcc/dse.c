@@ -2417,6 +2417,7 @@ scan_insn (bb_info_t bb_info, rtx_insn *insn)
 	  && (call = get_call_rtx_from (insn))
 	  && (sym = XEXP (XEXP (call, 0), 0))
 	  && GET_CODE (sym) == SYMBOL_REF
+	  && SYMBOL_REF_DECL (sym)
 	  && decl_built_in_p (SYMBOL_REF_DECL (sym), BUILT_IN_MEMSET))
 	memset_call = SYMBOL_REF_DECL (sym);
 

@@ -8142,7 +8142,7 @@ builtin_mathfn_code (const_tree t)
     return END_BUILTINS;
 
   fndecl = get_callee_fndecl (t);
-  if (!decl_built_in_p (fndecl, BUILT_IN_NORMAL))
+  if (fndecl == NULL_TREE || !decl_built_in_p (fndecl, BUILT_IN_NORMAL))
       return END_BUILTINS;
 
   parmlist = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
@@ -9612,7 +9612,7 @@ fold_call_expr (location_t loc, tree exp, bool ignore)
 {
   tree ret = NULL_TREE;
   tree fndecl = get_callee_fndecl (exp);
-  if (decl_built_in_p (fndecl)
+  if (fndecl && decl_built_in_p (fndecl)
       /* If CALL_EXPR_VA_ARG_PACK is set, the arguments aren't finalized
 	 yet.  Defer folding until we see all the arguments
 	 (after inlining).  */
@@ -9626,7 +9626,7 @@ fold_call_expr (location_t loc, tree exp, bool ignore)
       if (nargs && TREE_CODE (CALL_EXPR_ARG (exp, nargs - 1)) == CALL_EXPR)
 	{
 	  tree fndecl2 = get_callee_fndecl (CALL_EXPR_ARG (exp, nargs - 1));
-	  if (decl_built_in_p (fndecl2, BUILT_IN_VA_ARG_PACK))
+	  if (fndecl2 && decl_built_in_p (fndecl2, BUILT_IN_VA_ARG_PACK))
 	    return NULL_TREE;
 	}
 
@@ -9668,7 +9668,7 @@ fold_builtin_call_array (location_t loc, tree,
       if (n && TREE_CODE (argarray[n - 1]) == CALL_EXPR)
 	{
 	  tree fndecl2 = get_callee_fndecl (argarray[n - 1]);
-	  if (decl_built_in_p (fndecl2, BUILT_IN_VA_ARG_PACK))
+	  if (fndecl2 && decl_built_in_p (fndecl2, BUILT_IN_VA_ARG_PACK))
 	    return NULL_TREE;
 	}
       if (avoid_folding_inline_builtin (fndecl))
@@ -10787,7 +10787,7 @@ fold_call_stmt (gcall *stmt, bool ignore)
   tree ret = NULL_TREE;
   tree fndecl = gimple_call_fndecl (stmt);
   location_t loc = gimple_location (stmt);
-  if (decl_built_in_p (fndecl)
+  if (fndecl && decl_built_in_p (fndecl)
       && !gimple_call_va_arg_pack_p (stmt))
     {
       int nargs = gimple_call_num_args (stmt);
@@ -10854,7 +10854,7 @@ set_builtin_user_assembler_name (tree decl, const char *asmspec)
 bool
 is_simple_builtin (tree decl)
 {
-  if (decl_built_in_p (decl, BUILT_IN_NORMAL))
+  if (decl && decl_built_in_p (decl, BUILT_IN_NORMAL))
     switch (DECL_FUNCTION_CODE (decl))
       {
 	/* Builtins that expand to constants.  */

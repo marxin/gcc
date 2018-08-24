@@ -471,7 +471,7 @@ stmt_cost (gimple *stmt)
       /* Unless the call is a builtin_constant_p; this always folds to a
 	 constant, so moving it is useless.  */
       fndecl = gimple_call_fndecl (stmt);
-      if (decl_built_in_p (fndecl, BUILT_IN_CONSTANT_P))
+      if (fndecl && decl_built_in_p (fndecl, BUILT_IN_CONSTANT_P))
 	return 0;
 
       return LIM_EXPENSIVE;

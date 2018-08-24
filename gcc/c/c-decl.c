@@ -2948,7 +2948,8 @@ pushdecl (tree x)
 	      else
 		thistype = TREE_TYPE (b_use->decl);
 	      b_use->u.type = TREE_TYPE (b_use->decl);
-	      if (decl_built_in_p (b_use->decl))
+	      if (TREE_CODE (b_use->decl) == FUNCTION_DECL
+		  && decl_built_in_p (b_use->decl))
 		thistype
 		  = build_type_attribute_variant (thistype,
 						  TYPE_ATTRIBUTES
@@ -3052,7 +3053,7 @@ pushdecl (tree x)
 	  else
 	    thistype = type;
 	  b->u.type = TREE_TYPE (b->decl);
-	  if (decl_built_in_p (b->decl))
+	  if (TREE_CODE (b->decl) == FUNCTION_DECL && decl_built_in_p (b->decl))
 	    thistype
 	      = build_type_attribute_variant (thistype,
 					      TYPE_ATTRIBUTES (b->u.type));

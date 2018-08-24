@@ -3209,7 +3209,7 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
      transform all calls in the same manner as the expanders do, but
      we do transform most of them.  */
   fndecl = get_callee_fndecl (*expr_p);
-  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
+  if (fndecl && decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     switch (DECL_FUNCTION_CODE (fndecl))
       {
       CASE_BUILT_IN_ALLOCA:
@@ -3244,7 +3244,7 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
       default:
         ;
       }
-  if (decl_built_in_p (fndecl))
+  if (fndecl && decl_built_in_p (fndecl))
     {
       tree new_tree = fold_call_expr (input_location, *expr_p, !want_value);
       if (new_tree && new_tree != *expr_p)
@@ -3295,7 +3295,8 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
       tree last_arg = CALL_EXPR_ARG (*expr_p, nargs - 1);
       tree last_arg_fndecl = get_callee_fndecl (last_arg);
 
-      if (decl_built_in_p (last_arg_fndecl, BUILT_IN_VA_ARG_PACK))
+      if (last_arg_fndecl
+	  && decl_built_in_p (last_arg_fndecl, BUILT_IN_VA_ARG_PACK))
 	{
 	  tree call = *expr_p;
 
@@ -3768,7 +3769,8 @@ gimple_boolify (tree expr)
 
       /* For __builtin_expect ((long) (x), y) recurse into x as well
 	 if x is truth_value_p.  */
-      if (decl_built_in_p (fn, BUILT_IN_EXPECT)
+      if (fn
+	  && decl_built_in_p (fn, BUILT_IN_EXPECT)
 	  && call_expr_nargs (call) == 2)
 	{
 	  tree arg = CALL_EXPR_ARG (call, 0);
@@ -5712,7 +5714,8 @@ gimplify_modify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  CALL_EXPR_FN (*from_p) = TREE_OPERAND (CALL_EXPR_FN (*from_p), 0);
 	  STRIP_USELESS_TYPE_CONVERSION (CALL_EXPR_FN (*from_p));
 	  tree fndecl = get_callee_fndecl (*from_p);
-	  if (decl_built_in_p (fndecl, BUILT_IN_EXPECT)
+	  if (fndecl
+	      && decl_built_in_p (fndecl, BUILT_IN_EXPECT)
 	      && call_expr_nargs (*from_p) == 3)
 	    call_stmt = gimple_build_call_internal (IFN_BUILTIN_EXPECT, 3,
 						    CALL_EXPR_ARG (*from_p, 0),
@@ -5969,7 +5972,8 @@ gimplify_addr_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       /* If we see a call to a declared builtin or see its address
 	 being taken (we can unify those cases here) then we can mark
 	 the builtin for implicit generation by GCC.  */
-      if (decl_built_in_p (op0, BUILT_IN_NORMAL)
+      if (TREE_CODE (op0) == FUNCTION_DECL
+	  && decl_built_in_p (op0, BUILT_IN_NORMAL)
 	  && builtin_decl_declared_p (DECL_FUNCTION_CODE (op0)))
 	set_builtin_decl_implicit_p (DECL_FUNCTION_CODE (op0), true);
 

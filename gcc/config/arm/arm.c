@@ -30838,7 +30838,7 @@ arm_insert_attributes (tree fndecl, tree * attributes)
     return;
 
   if (TREE_CODE (fndecl) != FUNCTION_DECL || DECL_EXTERNAL(fndecl)
-      || DECL_BUILT_IN (fndecl) || DECL_ARTIFICIAL (fndecl))
+      || decl_built_in_p (fndecl) || DECL_ARTIFICIAL (fndecl))
    return;
 
   /* Nested definitions must inherit mode.  */

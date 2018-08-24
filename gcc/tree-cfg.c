@@ -3427,7 +3427,7 @@ verify_gimple_call (gcall *stmt)
       return true;
     }
 
-  if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
+  if (fndecl && decl_built_in_p (fndecl, BUILT_IN_NORMAL))
     {
       switch (DECL_FUNCTION_CODE (fndecl))
 	{
@@ -6884,7 +6884,7 @@ move_stmt_r (gimple_stmt_iterator *gsi_p, bool *handled_ops_p,
       /* Remap the region numbers for __builtin_eh_{pointer,filter}.  */
       {
 	tree r, fndecl = gimple_call_fndecl (stmt);
-	if (decl_built_in_p (fndecl, BUILT_IN_NORMAL))
+	if (fndecl && decl_built_in_p (fndecl, BUILT_IN_NORMAL))
 	  switch (DECL_FUNCTION_CODE (fndecl))
 	    {
 	    case BUILT_IN_EH_COPY_VALUES:
@@ -8304,6 +8304,7 @@ stmt_can_terminate_bb_p (gimple *t)
     }
 
   if (is_gimple_call (t)
+      && fndecl
       && decl_built_in_p (fndecl)
       && (call_flags & ECF_NOTHROW)
       && !(call_flags & ECF_RETURNS_TWICE)
