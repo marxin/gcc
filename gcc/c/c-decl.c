@@ -2839,7 +2839,8 @@ warn_if_shadowing (tree new_decl)
 				 "declaration",
 				 new_decl);
 	  }
-	else if (decl_built_in_p (old_decl))
+	else if (TREE_CODE (old_decl) == FUNCTION_DECL
+		 && decl_built_in_p (old_decl))
 	  {
 	    warning (OPT_Wshadow, "declaration of %q+D shadows "
 		     "a built-in function", new_decl);
