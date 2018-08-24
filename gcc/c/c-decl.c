@@ -1800,7 +1800,7 @@ validate_proto_after_old_defn (tree newdecl, tree newtype, tree oldtype)
 static void
 locate_old_decl (tree decl)
 {
-  if (decl_built_in_p (decl)
+  if (TREE_CODE (decl) == FUNCTION_DECL && decl_built_in_p (decl)
       && !C_DECL_DECLARED_BUILTIN (decl))
     ;
   else if (DECL_INITIAL (decl))
@@ -1842,8 +1842,9 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
      unless OLDDECL is a builtin.  OLDDECL will be discarded in any case.  */
   if (TREE_CODE (olddecl) != TREE_CODE (newdecl))
     {
-      if (!(decl_built_in_p (olddecl)
-	    && !C_DECL_DECLARED_BUILTIN (olddecl)))
+      if (!(TREE_CODE (olddecl) == FUNCTION_DECL
+	    && decl_built_in_p (olddecl))
+	    && !C_DECL_DECLARED_BUILTIN (olddecl))
 	{
 	  auto_diagnostic_group d;
 	  error ("%q+D redeclared as different kind of symbol", newdecl);
@@ -1875,7 +1876,8 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 
   if (!comptypes (oldtype, newtype))
     {
-      if (decl_built_in_p (olddecl) && !C_DECL_DECLARED_BUILTIN (olddecl))
+      if (TREE_CODE (olddecl) == FUNCTION_DECL
+	  && decl_built_in_p (olddecl) && !C_DECL_DECLARED_BUILTIN (olddecl))
 	{
 	  /* Accept harmless mismatch in function types.
 	     This is for the ffs and fprintf builtins.  */
