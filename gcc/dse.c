@@ -2418,6 +2418,7 @@ scan_insn (bb_info_t bb_info, rtx_insn *insn)
 	  && (sym = XEXP (XEXP (call, 0), 0))
 	  && GET_CODE (sym) == SYMBOL_REF
 	  && SYMBOL_REF_DECL (sym)
+	  && TREE_CODE (SYMBOL_REF_DECL (sym)) == FUNCTION_DECL
 	  && decl_built_in_p (SYMBOL_REF_DECL (sym), BUILT_IN_MEMSET))
 	memset_call = SYMBOL_REF_DECL (sym);
 

@@ -9661,7 +9661,8 @@ fold_builtin_call_array (location_t loc, tree,
     return NULL_TREE;
 
   tree fndecl = TREE_OPERAND (fn, 0);
-  if (decl_built_in_p (fndecl))
+  if (TREE_CODE (fndecl) == FUNCTION_DECL
+      && decl_built_in_p (fndecl))
     {
       /* If last argument is __builtin_va_arg_pack (), arguments to this
 	 function are not finalized yet.  Defer folding until they are.  */
