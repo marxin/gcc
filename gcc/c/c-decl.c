@@ -2296,7 +2296,8 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
       && !(TREE_CODE (newdecl) == FUNCTION_DECL
 	   && DECL_INITIAL (newdecl) && !DECL_INITIAL (olddecl))
       /* Don't warn about redundant redeclarations of builtins.  */
-      && !(!decl_built_in_p (newdecl)
+      && !(TREE_CODE (newdecl) == FUNCTION_DECL
+	   && !decl_built_in_p (newdecl)
 	   && decl_built_in_p (olddecl)
 	   && !C_DECL_DECLARED_BUILTIN (olddecl))
       /* Don't warn about an extern followed by a definition.  */
