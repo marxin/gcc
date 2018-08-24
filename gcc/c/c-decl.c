@@ -1843,8 +1843,8 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
   if (TREE_CODE (olddecl) != TREE_CODE (newdecl))
     {
       if (!(TREE_CODE (olddecl) == FUNCTION_DECL
-	    && decl_built_in_p (olddecl))
-	    && !C_DECL_DECLARED_BUILTIN (olddecl))
+	    && decl_built_in_p (olddecl)
+	    && !C_DECL_DECLARED_BUILTIN (olddecl)))
 	{
 	  auto_diagnostic_group d;
 	  error ("%q+D redeclared as different kind of symbol", newdecl);

@@ -234,7 +234,8 @@ is_tm_irrevocable (tree x)
      irrevocable.  */
   if (TREE_CODE (x) == ADDR_EXPR)
     x = TREE_OPERAND (x, 0);
-  if (decl_built_in_p (x, BUILT_IN_TM_IRREVOCABLE))
+  if (TREE_CODE (x) == FUNCTION_DECL
+      && decl_built_in_p (x, BUILT_IN_TM_IRREVOCABLE))
     return true;
 
   return false;
