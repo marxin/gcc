@@ -2443,17 +2443,14 @@ find_taken_edge_switch_expr (const gswitch *switch_stmt, tree val)
   edge e;
   tree taken_case;
 
-  if (gimple_switch_num_labels (switch_stmt) == 1)
-    taken_case = gimple_switch_default_label (switch_stmt);
+  gcc_assert (gimple_switch_num_labels (switch_stmt) >= 2);
+  if (val == NULL_TREE)
+    val = gimple_switch_index (switch_stmt);
+  if (TREE_CODE (val) != INTEGER_CST)
+    return NULL;
   else
-    {
-      if (val == NULL_TREE)
-	val = gimple_switch_index (switch_stmt);
-      if (TREE_CODE (val) != INTEGER_CST)
-	return NULL;
-      else
-	taken_case = find_case_label_for_value (switch_stmt, val);
-    }
+    taken_case = find_case_label_for_value (switch_stmt, val);
+
   dest_bb = label_to_block (cfun, CASE_LABEL (taken_case));
 
   e = find_edge (gimple_bb (switch_stmt), dest_bb);
