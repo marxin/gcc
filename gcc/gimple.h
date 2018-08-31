@@ -6404,6 +6404,10 @@ gimple_set_do_not_emit_location (gimple *g)
   gimple_set_plf (g, GF_PLF_1, true);
 }
 
+extern void report_match_pattern (const char *match_file,
+				  unsigned int match_file_line,
+				  const char *generated_file,
+				  unsigned int generate_file_line);
 
 /* Macros for showing usage statistics.  */
 #define SCALE(x) ((unsigned long) ((x) < 1024*10	\

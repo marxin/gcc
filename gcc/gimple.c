@@ -3190,6 +3190,20 @@ gimple_inexpensive_call_p (gcall *stmt)
   return false;
 }
 
+/* Report about a match of pattern that lives
+   in MATCH_FILE at MATCH_FILE_LINE.  The pattern is matched
+   in GENERATED_FILE at line GENERATE_FILE_LINE.  */
+
+void report_match_pattern (const char *match_file,
+			   unsigned int match_file_line,
+			   const char *generated_file,
+			   unsigned int generate_file_line)
+{
+  fprintf (dump_file, "Applying pattern %s:%d, %s:%d\n",
+	   match_file, match_file_line,
+	   generated_file, generate_file_line);
+}
+
 #if CHECKING_P
 
 namespace selftest {
