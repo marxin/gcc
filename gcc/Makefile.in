@@ -218,8 +218,16 @@ gengtype-lex.o-warn = -Wno-error
 libgcov-util.o-warn = -Wno-error
 libgcov-driver-tool.o-warn = -Wno-error
 libgcov-merge-tool.o-warn = -Wno-error
-gimple-match.o-warn = -Wno-unused
-generic-match.o-warn = -Wno-unused
+gimple-match-part-0.o-warn = -Wno-unused
+gimple-match-part-1.o-warn = -Wno-unused
+gimple-match-part-2.o-warn = -Wno-unused
+gimple-match-part-3.o-warn = -Wno-unused
+gimple-match-part-footer.o-warn = -Wno-unused
+generic-match-part-0.o-warn = -Wno-unused
+generic-match-part-1.o-warn = -Wno-unused
+generic-match-part-2.o-warn = -Wno-unused
+generic-match-part-3.o-warn = -Wno-unused
+generic-match-part-footer.o-warn = -Wno-unused
 dfp.o-warn = -Wno-strict-aliasing
 
 # All warnings have to be shut off in stage1 if the compiler used then
@@ -522,7 +530,7 @@ CROSS_SYSTEM_HEADER_DIR = @CROSS_SYSTEM_HEADER_DIR@
 # to directories that might not exist yet.
 # The sed idiom for this is to repeat the search-and-replace until it doesn't match, using :a ... ta.
 # Use single quotes here to avoid nested double- and backquotes, this
-# macro is also used in a double-quoted context.
+# macro is also used inmem_alloc_description a double-quoted context.
 SYSTEM_HEADER_DIR = `echo @SYSTEM_HEADER_DIR@ | sed -e :a -e 's,[^/]*/\.\.\/,,' -e ta`
 
 # Path to the system headers on the build machine.
@@ -1209,8 +1217,17 @@ C_COMMON_OBJS = c-family/c-common.o c-family/c-cppbuiltin.o c-family/c-dump.o \
 # will build them sooner, because they are large and otherwise tend to be
 # the last objects to finish building.
 OBJS = \
-	gimple-match.o \
-	generic-match.o \
+	gimple-match-part-0.o \
+	gimple-match-part-1.o \
+	gimple-match-part-2.o \
+	gimple-match-part-3.o \
+	gimple-match-part-footer.o \
+	gimple-match-head.o \
+	generic-match-part-0.o \
+	generic-match-part-1.o \
+	generic-match-part-2.o \
+	generic-match-part-3.o \
+	generic-match-part-footer.o \
 	insn-attrtab.o \
 	insn-automata.o \
 	insn-dfatab.o \
@@ -2507,10 +2524,19 @@ s-tm-texi: build/genhooks$(build_exeext) $(srcdir)/doc/tm.texi.in
 	  false; \
 	fi
 
-gimple-match.c: s-match gimple-match-head.c ; @true
-generic-match.c: s-match generic-match-head.c ; @true
+gimple-match-part-0.c: s-match gimple-match-head.c ; @true
+gimple-match-part-1.c: s-match gimple-match-head.c ; @true
+gimple-match-part-2.c: s-match gimple-match-head.c ; @true
+gimple-match-part-3.c: s-match gimple-match-head.c ; @true
+gimple-match-part-footer.c: s-match gimple-match-head.c ; @true
 
-s-match: build/genmatch$(build_exeext) $(srcdir)/match.pd cfn-operators.pd
+generic-match-part-0.c: s-match generic-match-head.c ; @true
+generic-match-part-1.c: s-match generic-match-head.c ; @true
+generic-match-part-2.c: s-match generic-match-head.c ; @true
+generic-match-part-3.c: s-match generic-match-head.c ; @true
+generic-match-part-footer.c: s-match generic-match-head.c ; @true
+
+s-match: build/genmatch$(build_exeext) $(srcdir)/match.pd cfn-operators.pd build/splitter$(build_exeext)
 	$(RUN_GEN) build/genmatch$(build_exeext) --gimple $(srcdir)/match.pd \
 	    > tmp-gimple-match.c
 	$(RUN_GEN) build/genmatch$(build_exeext) --generic $(srcdir)/match.pd \
@@ -2519,6 +2545,8 @@ s-match: build/genmatch$(build_exeext) $(srcdir)/match.pd cfn-operators.pd
 	    					gimple-match.c
 	$(SHELL) $(srcdir)/../move-if-change tmp-generic-match.c \
 	    					generic-match.c
+	build/splitter$(build_exeext) generic
+	build/splitter$(build_exeext) gimple
 	$(STAMP) s-match
 
 GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
@@ -2793,6 +2821,7 @@ build/genmatch.o : genmatch.c $(BCONFIG_H) $(SYSTEM_H) \
 build/gencfn-macros.o : gencfn-macros.c $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) errors.h $(HASH_TABLE_H) hash-set.h builtins.def	\
   internal-fn.def
+build/splitter.o: splitter.cc
 
 # Compile the programs that generate insn-* from the machine description.
 # They are compiled with $(COMPILER_FOR_BUILD), and associated libraries,
@@ -2835,6 +2864,10 @@ endif
 
 build/genmatch$(build_exeext) : $(BUILD_CPPLIB) \
   $(BUILD_ERRORS) build/vec.o build/hash-table.o build/sort.o
+
+build/splitter$(build_exeext) : $(BUILD_CPPLIB) \
+	$(BUILD_ERRORS) splitter.o
+	g++ -o $@ $^
 
 # These programs are not linked with the MD reader.
 build/gengtype$(build_exeext) : build/gengtype-lex.o build/gengtype-parse.o \

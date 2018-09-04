@@ -3551,6 +3551,7 @@ dt_simplify::gen (FILE *f, int indent, bool gimple)
   /* If we have a split-out function for the actual transform, call it.  */
   if (info && info->fname)
     {
+      fprintf (f, "// call-fn:%s\n", info->fname);
       if (gimple)
 	{
 	  fprintf_indent (f, indent, "if (%s (res_op, seq, "
@@ -3682,6 +3683,27 @@ sinfo_hashmap_traits::equal_keys (const key_type &v,
   return compare_op (v->s->result, v->s, candidate->s->result, candidate->s);
 }
 
+static void
+print_simplify_fnheader (FILE *f, bool gimple, const char *op, unsigned n, bool declaration)
+{
+  if (gimple)
+    fprintf (f, "%sbool\n"
+	     "gimple_simplify_%s (gimple_match_op *res_op,"
+	     " gimple_seq *seq,\n"
+	     "                 tree (*valueize)(tree) "
+	     "ATTRIBUTE_UNUSED,\n"
+	     "                 code_helper ARG_UNUSED (code), tree "
+	     "ARG_UNUSED (type)", declaration ? "extern " : "",
+	     op);
+  else
+    fprintf (f, "extern tree\n"
+	     "generic_simplify_%s (location_t ARG_UNUSED (loc), enum "
+	     "tree_code ARG_UNUSED (code), const tree ARG_UNUSED (type)",
+	     op);
+  for (unsigned i = 0; i < n; ++i)
+    fprintf (f, ", tree op%d", i);
+  fprintf (f, ")%s\n", declaration ? ";" : "");
+}
 
 /* Main entry to generate code for matching GIMPLE IL off the decision
    tree.  */
@@ -3719,8 +3741,10 @@ decision_tree::gen (FILE *f, bool gimple)
       /* Generate a split out function with the leaf transform code.  */
       s->fname = xasprintf ("%s_simplify_%u", gimple ? "gimple" : "generic",
 			    fcnt++);
+
+      fprintf (f, "\n// split-fn-begin:%s\n", s->fname);
       if (gimple)
-	fprintf (f, "\nstatic bool\n"
+	fprintf (f, "static bool\n"
 		 "%s (gimple_match_op *res_op, gimple_seq *seq,\n"
 		 "                 tree (*valueize)(tree) ATTRIBUTE_UNUSED,\n"
 		 "                 const tree ARG_UNUSED (type), tree *ARG_UNUSED "
@@ -3755,6 +3779,7 @@ decision_tree::gen (FILE *f, bool gimple)
       else
 	fprintf (f, "  return NULL_TREE;\n");
       fprintf (f, "}\n");
+      fprintf (f, "// split-fn-end\n");
     }
   fprintf (stderr, "removed %u duplicate tails\n", rcnt);
 
@@ -3774,23 +3799,10 @@ decision_tree::gen (FILE *f, bool gimple)
 		  && e->operation->kind != id_base::CODE))
 	    continue;
 
-	  if (gimple)
-	    fprintf (f, "\nstatic bool\n"
-		     "gimple_simplify_%s (gimple_match_op *res_op,"
-		     " gimple_seq *seq,\n"
-		     "                 tree (*valueize)(tree) "
-		     "ATTRIBUTE_UNUSED,\n"
-		     "                 code_helper ARG_UNUSED (code), tree "
-		     "ARG_UNUSED (type)\n",
-		     e->operation->id);
-	  else
-	    fprintf (f, "\nstatic tree\n"
-		     "generic_simplify_%s (location_t ARG_UNUSED (loc), enum "
-		     "tree_code ARG_UNUSED (code), const tree ARG_UNUSED (type)",
-		     e->operation->id);
-	  for (unsigned i = 0; i < n; ++i)
-	    fprintf (f, ", tree op%d", i);
-	  fprintf (f, ")\n");
+	  print_simplify_fnheader (f, gimple, e->operation->id, n, true);
+	  fprintf (f, "\n// split-fn-begin:%s_%s\n", gimple ? "gimple" : "generic",
+		   e->operation->id);
+	  print_simplify_fnheader (f, gimple, e->operation->id, n, false);
 	  fprintf (f, "{\n");
 	  dop->gen_kids (f, 2, gimple);
 	  if (gimple)
@@ -3798,13 +3810,14 @@ decision_tree::gen (FILE *f, bool gimple)
 	  else
 	    fprintf (f, "  return NULL_TREE;\n");
 	  fprintf (f, "}\n");
+	  fprintf (f, "// split-fn-end\n");
 	}
 
       /* Then generate the main entry with the outermost switch and
          tail-calls to the split-out functions.  */
       if (gimple)
-	fprintf (f, "\nstatic bool\n"
-		 "gimple_simplify (gimple_match_op *res_op, gimple_seq *seq,\n"
+	fprintf (f, "\nbool\n"
+		 "gimple_simplify_generated (gimple_match_op *res_op, gimple_seq *seq,\n"
 		 "                 tree (*valueize)(tree) ATTRIBUTE_UNUSED,\n"
 		 "                 code_helper code, const tree type");
       else
@@ -3868,7 +3881,7 @@ decision_tree::gen (FILE *f, bool gimple)
 void
 write_predicate (FILE *f, predicate_id *p, decision_tree &dt, bool gimple)
 {
-  fprintf (f, "\nbool\n"
+  fprintf (f, "\nstatic bool\n"
 	   "%s%s (tree t%s%s)\n"
 	   "{\n", gimple ? "gimple_" : "tree_", p->id,
 	   p->nargs > 0 ? ", tree *res_ops" : "",
@@ -5117,7 +5130,7 @@ add_operator (VIEW_CONVERT2, "view_convert2", "tcc_unary", 1);
   parser p (r);
 
   if (gimple)
-    write_header (stdout, "gimple-match-head.c");
+    write_header (stdout, "gimple-match-head-common.h");
   else
     write_header (stdout, "generic-match-head.c");
 
