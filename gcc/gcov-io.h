@@ -141,8 +141,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 	present: header int32:present
 	counts: header int64:count*
 	summary: int32:checksum int32:runs int32:sum_max
-        histogram: {int32:bitvector}8 histogram-buckets*
-        histogram-buckets: int32:num int64:min int64:sum
 
    The ANNOUNCE_FUNCTION record is the same as that in the note file,
    but without the source location.  The COUNTS gives the
@@ -241,9 +239,7 @@ typedef uint64_t gcov_type_unsigned;
 #define GCOV_TAG_COUNTER_NUM(LENGTH) ((LENGTH) / 2)
 #define GCOV_TAG_OBJECT_SUMMARY  ((gcov_unsigned_t)0xa1000000)
 #define GCOV_TAG_PROGRAM_SUMMARY ((gcov_unsigned_t)0xa3000000) /* Obsolete */
-#define GCOV_TAG_HISTOGRAM ((gcov_unsigned_t)0xa5000000)
 #define GCOV_TAG_SUMMARY_LENGTH (2)
-#define GCOV_TAG_HISTOGRAM_LENGTH(NUM) (2 + 8 + (NUM) * 5)
 #define GCOV_TAG_AFDO_FILE_NAMES ((gcov_unsigned_t)0xaa000000)
 #define GCOV_TAG_AFDO_FUNCTION ((gcov_unsigned_t)0xac000000)
 #define GCOV_TAG_AFDO_WORKING_SET ((gcov_unsigned_t)0xaf000000)
@@ -308,45 +304,12 @@ GCOV_COUNTERS
 #define GCOV_ARC_FAKE		(1 << 1)
 #define GCOV_ARC_FALLTHROUGH	(1 << 2)
 
-/* Structured records.  */
-
-/* Structure used for each bucket of the log2 histogram of counter values.  */
-typedef struct
-{
-  /* Number of counters whose profile count falls within the bucket.  */
-  gcov_unsigned_t num_counters;
-  /* Smallest profile count included in this bucket.  */
-  gcov_type min_value;
-  /* Cumulative value of the profile counts in this bucket.  */
-  gcov_type cum_value;
-} gcov_bucket_type;
-
-/* For a log2 scale histogram with each range split into 4
-   linear sub-ranges, there will be at most 64 (max gcov_type bit size) - 1 log2
-   ranges since the lowest 2 log2 values share the lowest 4 linear
-   sub-range (values 0 - 3).  This is 252 total entries (63*4).  */
-
-#define GCOV_HISTOGRAM_SIZE 252
-
-/* How many unsigned ints are required to hold a bit vector of non-zero
-   histogram entries when the histogram is written to the gcov file.
-   This is essentially a ceiling divide by 32 bits.  */
-#define GCOV_HISTOGRAM_BITVECTOR_SIZE (GCOV_HISTOGRAM_SIZE + 31) / 32
-
 /* Object & program summary record.  */
 
 struct gcov_summary
 {
   gcov_unsigned_t runs;		/* Number of program runs.  */
   gcov_type sum_max;    	/* Sum of individual run max values.  */
-};
-
-struct gcov_histogram
-{
-  gcov_unsigned_t runs;		/* Number of program runs.  */
-  gcov_type sum_all;            /* Sum of individual run max values.  */
-  gcov_bucket_type histogram[GCOV_HISTOGRAM_SIZE]; /* Histogram of
-						      counter values.  */
 };
 
 #if !defined(inhibit_libc)
@@ -379,7 +342,6 @@ char *mangle_path (char const *base);
 #if !IN_GCOV
 /* Available outside gcov */
 GCOV_LINKAGE void gcov_write_unsigned (gcov_unsigned_t) ATTRIBUTE_HIDDEN;
-GCOV_LINKAGE void gcov_read_histogram (struct gcov_histogram *) ATTRIBUTE_HIDDEN;
 #endif
 
 #if !IN_GCOV && !IN_LIBGCOV
@@ -388,28 +350,6 @@ GCOV_LINKAGE void gcov_write_string (const char *);
 GCOV_LINKAGE void gcov_write_filename (const char *);
 GCOV_LINKAGE gcov_position_t gcov_write_tag (gcov_unsigned_t);
 GCOV_LINKAGE void gcov_write_length (gcov_position_t /*position*/);
-#endif
-
-#if IN_GCOV <= 0 && !IN_LIBGCOV
-/* Available in gcov-dump and the compiler.  */
-
-/* Number of data points in the working set summary array. Using 128
-   provides information for at least every 1% increment of the total
-   profile size. The last entry is hardwired to 99.9% of the total.  */
-#define NUM_GCOV_WORKING_SETS 128
-
-/* Working set size statistics for a given percentage of the entire
-   profile (sum_all from the counter summary).  */
-typedef struct gcov_working_set_info
-{
-  /* Number of hot counters included in this working set.  */
-  unsigned num_counters;
-  /* Smallest counter included in this working set.  */
-  gcov_type min_counter;
-} gcov_working_set_t;
-
-GCOV_LINKAGE void compute_working_sets (gcov_histogram *histogram,
-                                        gcov_working_set_t *gcov_working_sets);
 #endif
 
 #if IN_GCOV > 0

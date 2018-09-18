@@ -131,10 +131,6 @@ gcov-tool overlap [overlap-options] @var{directory1} @var{directory2}
      [@option{-t}|@option{--hot_threshold}] @var{float}
      [@option{-v}|@option{--verbose}]
 
-gcov-tool compute_histogram [compute_histogram-options] @var{directory}
-     [@option{-o}|@option{--output} @var{directory}]
-     [@option{-v}|@option{--verbose}]
-
 @c man end
 @c man begin SEEALSO
 gpl(7), gfdl(7), fsf-funding(7), gcc(1), gcov(1) and the Info entry for
@@ -224,21 +220,6 @@ Print object level overlap score.
 @item -t @var{float}
 @itemx --hot_threshold <float>
 Set the threshold for hot counter value.
-
-@item -v
-@itemx --verbose
-Set the verbose mode.
-@end table
-
-@item compute_histogram
-Compute histogram for arcs profiles for all GCDA files that are in profile
-directory.  That leads to precise information for @option{-fprofile-use} option,
-where compiler can precisely decide about hotness of basic blocks.
-
-@table @gcctabopt
-@item -o @var{directory}
-@itemx --output @var{directory}
-Set the output profile directory.
 
 @item -v
 @itemx --verbose

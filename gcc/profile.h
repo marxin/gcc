@@ -73,23 +73,8 @@ extern void del_node_map (void);
 
 extern void get_working_sets (void);
 
-/* Counter histogram from the last set of coverage counts read by
+/* Counter summary from the last set of coverage counts read by
    profile.c.  */
-struct profile_info_tuple
-{
-  /* Return true if profile info is read from disk.  */
-  inline bool is_valid ()
-  {
-    return histogram != NULL || summary != NULL;
-  }
-
-  /* Return number of execution of a compilation unit.  */
-  gcov_type get_runs ();
-
-  struct gcov_histogram *histogram;
-  struct gcov_summary *summary;
-};
-
-extern struct profile_info_tuple profile_info;
+extern struct gcov_summary *profile_info;
 
 #endif /* PROFILE_H */

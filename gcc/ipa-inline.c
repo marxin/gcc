@@ -1871,7 +1871,7 @@ inline_small_functions (void)
 
   gcc_assert (in_lto_p
 	      || !(max_count > 0)
-	      || (profile_info.is_valid () && flag_branch_probabilities));
+	      || (profile_info && flag_branch_probabilities));
 
   while (!edge_heap.empty ())
     {

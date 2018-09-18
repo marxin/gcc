@@ -693,12 +693,12 @@ lto_output_ref (struct lto_simple_output_block *ob, struct ipa_ref *ref,
 static void
 output_profile_summary (struct lto_simple_output_block *ob)
 {
-  if (profile_info.is_valid ())
+  if (profile_info)
     {
       /* We do not output num and run_max, they are not used by
          GCC profile feedback and they are difficult to merge from multiple
          units.  */
-      unsigned runs = (profile_info.get_runs ());
+      unsigned runs = (profile_info->runs);
       streamer_write_uhwi_stream (ob->main_stream, runs);
 
       /* IPA-profile computes hot bb threshold based on cumulated
@@ -1614,8 +1614,8 @@ merge_profile_summaries (struct lto_file_decl_data **file_data_vec)
       return;
     }
 
-  profile_info.summary = XCNEW (gcov_summary);
-  profile_info.summary->runs = max_runs;
+  profile_info = XCNEW (gcov_summary);
+  profile_info->runs = max_runs;
 
   /* If merging already happent at WPA time, we are done.  */
   if (flag_ltrans)

@@ -1439,7 +1439,7 @@ sms_schedule (void)
 	    {
 	      dump_insn_location (tail);
 	      fprintf (dump_file, "\nSMS single-bb-loop\n");
-	      if (profile_info.is_valid () && flag_branch_probabilities)
+	      if (profile_info && flag_branch_probabilities)
 	    	{
 	      	  fprintf (dump_file, "SMS loop-count ");
 	      	  fprintf (dump_file, "%" PRId64,
@@ -1557,7 +1557,7 @@ sms_schedule (void)
 	{
 	  dump_insn_location (tail);
 	  fprintf (dump_file, "\nSMS single-bb-loop\n");
-	  if (profile_info.is_valid () && flag_branch_probabilities)
+	  if (profile_info && flag_branch_probabilities)
 	    {
 	      fprintf (dump_file, "SMS loop-count ");
 	      fprintf (dump_file, "%" PRId64,

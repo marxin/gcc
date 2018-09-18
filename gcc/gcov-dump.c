@@ -38,8 +38,6 @@ static void tag_arcs (const char *, unsigned, unsigned, unsigned);
 static void tag_lines (const char *, unsigned, unsigned, unsigned);
 static void tag_counters (const char *, unsigned, unsigned, unsigned);
 static void tag_summary (const char *, unsigned, unsigned, unsigned);
-static void tag_histogram (const char *, unsigned, unsigned, unsigned);
-static void dump_working_sets (const char *, gcov_histogram *, unsigned);
 extern int main (int, char **);
 
 typedef struct tag_format
@@ -51,7 +49,6 @@ typedef struct tag_format
 
 static int flag_dump_contents = 0;
 static int flag_dump_positions = 0;
-static int flag_dump_working_sets = 0;
 
 static const struct option options[] =
 {
@@ -59,7 +56,6 @@ static const struct option options[] =
   { "version",              no_argument,       NULL, 'v' },
   { "long",                 no_argument,       NULL, 'l' },
   { "positions",	    no_argument,       NULL, 'o' },
-  { "working-sets",	    no_argument,       NULL, 'w' },
   { 0, 0, 0, 0 }
 };
 
@@ -76,7 +72,6 @@ static const tag_format_t tag_table[] =
   {GCOV_TAG_ARCS, "ARCS", tag_arcs},
   {GCOV_TAG_LINES, "LINES", tag_lines},
   {GCOV_TAG_OBJECT_SUMMARY, "OBJECT_SUMMARY", tag_summary},
-  {GCOV_TAG_HISTOGRAM, "HISTOGRAM", tag_histogram},
   {0, NULL, NULL}
 };
 
@@ -116,9 +111,6 @@ main (int argc ATTRIBUTE_UNUSED, char **argv)
 	case 'p':
 	  flag_dump_positions = 1;
 	  break;
-	case 'w':
-	  flag_dump_working_sets = 1;
-	  break;
 	default:
 	  fprintf (stderr, "unknown flag `%c'\n", opt);
 	}
@@ -138,7 +130,6 @@ print_usage (void)
   printf ("  -l, --long           Dump record contents too\n");
   printf ("  -p, --positions      Dump record positions\n");
   printf ("  -v, --version        Print version number\n");
-  printf ("  -w, --working-sets   Dump working set computed from summary\n");
   printf ("\nFor bug reporting instructions, please see:\n%s.\n",
 	   bug_report_url);
 }
@@ -470,69 +461,4 @@ tag_summary (const char *filename ATTRIBUTE_UNUSED,
   gcov_read_summary (&summary);
   printf (" runs=%d, sum_max=%" PRId64,
 	  summary.runs, summary.sum_max);
-}
-
-static void
-tag_histogram (const char *filename ATTRIBUTE_UNUSED,
-	       unsigned tag ATTRIBUTE_UNUSED, unsigned length ATTRIBUTE_UNUSED,
-	       unsigned depth)
-{
-  unsigned h_ix;
-  gcov_bucket_type *histo_bucket;
-  gcov_histogram histogram;
-  gcov_read_histogram (&histogram);
-
-  printf (" runs=%u, sum_all=%" PRId64 "\n", histogram.runs,
-	  (int64_t)histogram.sum_all);
-
-  print_prefix (filename, depth, 0);
-  printf (VALUE_PADDING_PREFIX "counter histogram:");
-  for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
-    {
-      histo_bucket = &histogram.histogram[h_ix];
-      if (!histo_bucket->num_counters)
-	continue;
-      printf ("\n");
-      print_prefix (filename, depth, 0);
-      printf (VALUE_PADDING_PREFIX VALUE_PREFIX "num counts=%u, "
-	      "min counter=%" PRId64 ", cum_counter=%" PRId64,
-	      h_ix, histo_bucket->num_counters,
-	      (int64_t)histo_bucket->min_value,
-	      (int64_t)histo_bucket->cum_value);
-    }
-
-  if (flag_dump_working_sets)
-    dump_working_sets (filename, &histogram, depth);
-}
-
-static void
-dump_working_sets (const char *filename,
-		   gcov_histogram *histogram,
-		   unsigned depth)
-{
-  gcov_working_set_t gcov_working_sets[NUM_GCOV_WORKING_SETS];
-  unsigned ws_ix, pctinc, pct;
-  gcov_working_set_t *ws_info;
-
-  compute_working_sets (histogram, gcov_working_sets);
-
-  printf ("\n");
-  printf (VALUE_PADDING_PREFIX "counter working sets:");
-  /* Multiply the percentage by 100 to avoid float.  */
-  pctinc = 100 * 100 / NUM_GCOV_WORKING_SETS;
-  for (ws_ix = 0, pct = pctinc; ws_ix < NUM_GCOV_WORKING_SETS;
-       ws_ix++, pct += pctinc)
-    {
-      if (ws_ix == NUM_GCOV_WORKING_SETS - 1)
-        pct = 9990;
-      ws_info = &gcov_working_sets[ws_ix];
-      /* Print out the percentage using int arithmatic to avoid float.  */
-      printf ("\n");
-      print_prefix (filename, depth + 1, 0);
-      printf (VALUE_PADDING_PREFIX "%u.%02u%%: num counts=%u, min counter="
-               "%" PRId64,
-               pct / 100, pct - (pct / 100 * 100),
-               ws_info->num_counters,
-               (int64_t)ws_info->min_counter);
-    }
 }

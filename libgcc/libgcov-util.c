@@ -244,7 +244,6 @@ read_gcda_finalize (struct gcov_info *obj_info)
      and summary.  */
   obj_info->n_functions = num_fn_info;
   obj_info->functions = (const struct gcov_fn_info**) obstack_finish (&fn_info);
-  obj_info->summary = curr_object_summary;
 
   /* wrap all the counter array.  */
   for (i=0; i< GCOV_COUNTERS; i++)
@@ -871,126 +870,6 @@ gcov_profile_normalize (struct gcov_info *profile, gcov_type max_val)
 
   return gcov_profile_scale (profile, scale_factor, 0, 0);
 }
-
-/* Determine the index into histogram for VALUE. */
-
-static unsigned
-gcov_histo_index (gcov_type value)
-{
-  gcov_type_unsigned v = (gcov_type_unsigned)value;
-  unsigned r = 0;
-  unsigned prev2bits = 0;
-
-  /* Find index into log2 scale histogram, where each of the log2
-     sized buckets is divided into 4 linear sub-buckets for better
-     focus in the higher buckets.  */
-
-  /* Find the place of the most-significant bit set.  */
-  if (v > 0)
-    {
-      /* We use floor_log2 from hwint.c, which takes a HOST_WIDE_INT
-         that is 64 bits and gcov_type_unsigned is 64 bits.  */
-      r = floor_log2 (v);
-    }
-
-  /* If at most the 2 least significant bits are set (value is
-     0 - 3) then that value is our index into the lowest set of
-     four buckets.  */
-  if (r < 2)
-    return (unsigned)value;
-
-  gcov_nonruntime_assert (r < 64);
-
-  /* Find the two next most significant bits to determine which
-     of the four linear sub-buckets to select.  */
-  prev2bits = (v >> (r - 2)) & 0x3;
-  /* Finally, compose the final bucket index from the log2 index and
-     the next 2 bits. The minimum r value at this point is 2 since we
-     returned above if r was 2 or more, so the minimum bucket at this
-     point is 4.  */
-  return (r - 1) * 4 + prev2bits;
-}
-
-/* Insert counter VALUE into HISTOGRAM.  */
-
-static void
-gcov_histogram_insert (gcov_bucket_type *histogram, gcov_type value)
-{
-  unsigned i;
-
-  i = gcov_histo_index (value);
-  histogram[i].num_counters++;
-  histogram[i].cum_value += value;
-
-  if (histogram[i].min_value == 0
-      || value < histogram[i].min_value)
-    histogram[i].min_value = value;
-}
-
-/* Driver for computatation of precise profile histogram.  */
-
-int
-gcov_profile_compute_histogram (struct gcov_info *profile,
-				gcov_histogram *histogram)
-{
-  struct gcov_info *gi_ptr;
-  gcov_bucket_type *histo_bucket;
-  unsigned f_ix;
-
-  memset (histogram, 0, sizeof (*histogram));
-
-  /* Compute histogram for all files.  */
-  for (gi_ptr = profile; gi_ptr; gi_ptr = gi_ptr->next)
-    {
-      for (f_ix = 0; f_ix < gi_ptr->n_functions; f_ix++)
-	{
-	  const struct gcov_fn_info *gfi_ptr = gi_ptr->functions[f_ix];
-	  const struct gcov_ctr_info *ci_ptr;
-
-	  if (!gfi_ptr || gfi_ptr->key != gi_ptr)
-	    continue;
-
-	  ci_ptr = gfi_ptr->ctrs;
-	  gcov_merge_fn merge = gi_ptr->merge[GCOV_COUNTER_ARCS];
-
-	  if (merge)
-	    for (unsigned ix = 0; ix < ci_ptr->num; ix++)
-	      {
-		gcov_type value = ci_ptr->values[ix];
-		gcov_histogram_insert (histogram->histogram, value);
-		histogram->sum_all += value;
-	      }
-	}
-    }
-
-  /* Iterate all histograms to aggregate some values.  */
-  for (gi_ptr = profile; gi_ptr; gi_ptr = gi_ptr->next)
-    {
-      gcov_type runs = gi_ptr->summary->runs;
-      if (runs > histogram->runs)
-	histogram->runs = runs;
-    }
-
-  /* Write the calculated histogram to all profile files.  */
-  if (verbose)
-    {
-      fnotice (stdout, "\nComputed histogram:\n");
-      fnotice (stdout, "Runs: %d\n", histogram->runs);
-    }
-
-  for (unsigned h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
-    {
-      histo_bucket = &histogram->histogram[h_ix];
-      if (!histo_bucket->num_counters)
-	continue;
-
-      if (verbose)
-	fnotice (stdout, "  %3d: %10d\n", h_ix, histo_bucket->num_counters);
-    }
-
-  return 0;
-}
-
 
 /* The following variables are defined in gcc/gcov-tool.c.  */
 extern int overlap_func_level;

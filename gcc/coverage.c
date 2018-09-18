@@ -185,7 +185,6 @@ static void
 read_counts_file (void)
 {
   gcov_unsigned_t fn_ident = 0;
-  bool histogram_read = false;
   gcov_unsigned_t tag;
   int is_error = 0;
   unsigned lineno_checksum = 0;
@@ -236,18 +235,11 @@ read_counts_file (void)
 	  else
 	    fn_ident = lineno_checksum = cfg_checksum = 0;
 	}
-      else if (tag == GCOV_TAG_HISTOGRAM)
-	{
-	  gcc_assert (!histogram_read);
-	  histogram_read = true;
-	  profile_info.histogram = XNEW (gcov_histogram);
-	  gcov_read_histogram (profile_info.histogram);
-	}
       else if (tag == GCOV_TAG_OBJECT_SUMMARY)
 	{
-	  profile_info.summary = XCNEW (gcov_summary);
-	  profile_info.summary->runs = gcov_read_unsigned ();
-	  profile_info.summary->sum_max = gcov_read_unsigned ();
+	  profile_info = XCNEW (gcov_summary);
+	  profile_info->runs = gcov_read_unsigned ();
+	  profile_info->sum_max = gcov_read_unsigned ();
 	}
       else if (GCOV_TAG_IS_COUNTER (tag) && fn_ident)
 	{

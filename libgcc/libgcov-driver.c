@@ -221,17 +221,7 @@ merge_one_data (const char *filename,
   gcc_assert (length > 0);
   gcov_read_summary (summary);
 
-  /* We can read here histogram.  In that case, skip it during read.  */
   tag = gcov_read_unsigned ();
-  if (tag == GCOV_TAG_HISTOGRAM)
-    {
-      struct gcov_histogram histogram;
-      length = gcov_read_unsigned ();
-      gcc_assert (length > 0);
-      gcov_read_histogram (&histogram);
-      tag = gcov_read_unsigned ();
-    }
-
   /* Merge execution counts for each function.  */
   for (f_ix = 0; (unsigned)f_ix != gi_ptr->n_functions;
        f_ix++, tag = gcov_read_unsigned ())
@@ -318,8 +308,7 @@ read_error:
 
 static void
 write_one_data (const struct gcov_info *gi_ptr,
-		const struct gcov_summary *prg_p,
-		const struct gcov_histogram *histogram)
+		const struct gcov_summary *prg_p)
 {
   unsigned f_ix;
 
@@ -328,9 +317,6 @@ write_one_data (const struct gcov_info *gi_ptr,
 
   /* Generate whole program statistics.  */
   gcov_write_summary (GCOV_TAG_OBJECT_SUMMARY, prg_p);
-
-  if (histogram)
-    gcov_write_histogram (histogram);
 
   /* Write execution counts for each function.  */
   for (f_ix = 0; f_ix != gi_ptr->n_functions; f_ix++)
@@ -489,8 +475,7 @@ gcov_sort_topn_counter_arrays (const struct gcov_info *gi_ptr)
 
 static void
 dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
-	       unsigned run_counted, struct gcov_histogram *histogram,
-	       gcov_type run_max)
+	       unsigned run_counted, gcov_type run_max)
 {
   struct gcov_summary summary = {};
   int error;
@@ -520,16 +505,9 @@ dump_one_gcov (struct gcov_info *gi_ptr, struct gcov_filename *gf,
 
   gcov_rewrite ();
 
-  /* Merge summary only in runtime (not via gcov-tool).  */
-  if (histogram)
-    {
-      summary.runs = gi_ptr->summary->runs;
-      summary.sum_max = gi_ptr->summary->sum_max;
-    }
-  else
-    merge_summary (run_counted, &summary, run_max);
+  merge_summary (run_counted, &summary, run_max);
 
-  write_one_data (gi_ptr, &summary, histogram);
+  write_one_data (gi_ptr, &summary);
   /* fall through */
 
 read_fatal:;
@@ -546,15 +524,13 @@ read_fatal:;
 
 /* Dump all the coverage counts for the program. It first computes program
    summary and then traverses gcov_list list and dumps the gcov_info
-   objects one by one.  If SUMMARY is set, stream out SUMMARY instead of
-   computed summary, it's used in gcov-tool for compute_histogram command.  */
+   objects one by one.  */
 
 #if !IN_GCOV_TOOL
 static
 #endif
 void
-gcov_do_dump (struct gcov_info *list, int run_counted,
-	      struct gcov_histogram *histogram)
+gcov_do_dump (struct gcov_info *list, int run_counted)
 {
   struct gcov_info *gi_ptr;
   struct gcov_filename gf;
@@ -577,7 +553,7 @@ gcov_do_dump (struct gcov_info *list, int run_counted,
   /* Now merge each file.  */
   for (gi_ptr = list; gi_ptr; gi_ptr = gi_ptr->next)
     {
-      dump_one_gcov (gi_ptr, &gf, run_counted, histogram, run_max);
+      dump_one_gcov (gi_ptr, &gf, run_counted, run_max);
       free (gf.filename);
     }
 
@@ -600,7 +576,7 @@ __gcov_dump_one (struct gcov_root *root)
   if (root->dumped)
     return;
 
-  gcov_do_dump (root->list, root->run_counted, NULL);
+  gcov_do_dump (root->list, root->run_counted);
   
   root->dumped = 1;
   root->run_counted = 1;

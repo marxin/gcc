@@ -620,7 +620,7 @@ schedule_ebbs (void)
   if (n_basic_blocks_for_fn (cfun) == NUM_FIXED_BLOCKS)
     return;
 
-  if (profile_info.is_valid () && profile_status_for_fn (cfun) == PROFILE_READ)
+  if (profile_info && profile_status_for_fn (cfun) == PROFILE_READ)
     probability_cutoff = PARAM_VALUE (TRACER_MIN_BRANCH_PROBABILITY_FEEDBACK);
   else
     probability_cutoff = PARAM_VALUE (TRACER_MIN_BRANCH_PROBABILITY);

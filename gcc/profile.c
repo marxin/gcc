@@ -81,23 +81,10 @@ struct bb_profile_info {
 
 #define BB_INFO(b)  ((struct bb_profile_info *) (b)->aux)
 
-/* Return number of execution of a compilation unit.  */
 
-gcov_type
-profile_info_tuple::get_runs ()
-{
-  return histogram != NULL ? histogram->runs : summary->runs;
-}
+/* Counter summary from the last set of coverage counts read.  */
 
-/* Counter histogram from the last set of coverage counts read.  */
-
-profile_info_tuple profile_info;
-
-gcov_type profile_max_edge_count;
-
-/* Counter working set information computed from the current counter
-   summary. Not initialized unless profile_info summary is non-NULL.  */
-static gcov_working_set_t gcov_working_sets[NUM_GCOV_WORKING_SETS];
+gcov_summary *profile_info;
 
 /* Collect statistics on the performance of this pass for the entire source
    file.  */
@@ -111,14 +98,6 @@ static int total_num_passes;
 static int total_num_times_called;
 static int total_hist_br_prob[20];
 static int total_num_branches;
-
-/* Helper function to update gcov_working_sets.  */
-
-void add_working_set (gcov_working_set_t *set) {
-  int i = 0;
-  for (; i < NUM_GCOV_WORKING_SETS; i++)
-    gcov_working_sets[i] = set[i];
-}
 
 /* Forward declarations.  */
 static void find_spanning_tree (struct edge_list *);
@@ -216,60 +195,6 @@ instrument_values (histogram_values values)
 }
 
 
-/* Fill the working set information into the profile_info structure.  */
-
-void
-get_working_sets (void)
-{
-  unsigned ws_ix, pctinc, pct;
-  gcov_working_set_t *ws_info;
-
-  if (!profile_info.histogram)
-    return;
-
-  compute_working_sets (profile_info.histogram, gcov_working_sets);
-
-  if (dump_file)
-    {
-      fprintf (dump_file, "Counter working sets:\n");
-      /* Multiply the percentage by 100 to avoid float.  */
-      pctinc = 100 * 100 / NUM_GCOV_WORKING_SETS;
-      for (ws_ix = 0, pct = pctinc; ws_ix < NUM_GCOV_WORKING_SETS;
-           ws_ix++, pct += pctinc)
-        {
-          if (ws_ix == NUM_GCOV_WORKING_SETS - 1)
-            pct = 9990;
-          ws_info = &gcov_working_sets[ws_ix];
-          /* Print out the percentage using int arithmatic to avoid float.  */
-          fprintf (dump_file, "\t\t%u.%02u%%: num counts=%u, min counter="
-                   "%" PRId64 "\n",
-                   pct / 100, pct - (pct / 100 * 100),
-                   ws_info->num_counters,
-                   (int64_t)ws_info->min_counter);
-        }
-    }
-}
-
-/* Given a the desired percentage of the full profile (sum_all from the
-   summary), multiplied by 10 to avoid float in PCT_TIMES_10, returns
-   the corresponding working set information. If an exact match for
-   the percentage isn't found, the closest value is used.  */
-
-gcov_working_set_t *
-find_working_set (unsigned pct_times_10)
-{
-  unsigned i;
-  if (!profile_info.is_valid ())
-    return NULL;
-  gcc_assert (pct_times_10 <= 1000);
-  if (pct_times_10 >= 999)
-    return &gcov_working_sets[NUM_GCOV_WORKING_SETS - 1];
-  i = pct_times_10 * NUM_GCOV_WORKING_SETS / 1000;
-  if (!i)
-    return &gcov_working_sets[0];
-  return &gcov_working_sets[i - 1];
-}
-
 /* Computes hybrid profile for all matching entries in da_file.  
    
    CFG_CHECKSUM is the precomputed checksum for the CFG.  */
@@ -277,17 +202,28 @@ find_working_set (unsigned pct_times_10)
 static gcov_type *
 get_exec_counts (unsigned cfg_checksum, unsigned lineno_checksum)
 {
+  unsigned num_edges = 0;
+  basic_block bb;
   gcov_type *counts;
+
+  /* Count the edges to be (possibly) instrumented.  */
+  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR_FOR_FN (cfun), NULL, next_bb)
+    {
+      edge e;
+      edge_iterator ei;
+
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	if (!EDGE_INFO (e)->ignore && !EDGE_INFO (e)->on_tree)
+	  num_edges++;
+    }
 
   counts = get_coverage_counts (GCOV_COUNTER_ARCS, cfg_checksum,
 				lineno_checksum);
   if (!counts)
     return NULL;
 
-  get_working_sets ();
   return counts;
 }
-
 
 static bool
 is_edge_inconsistent (vec<edge, va_gc> *edges)
@@ -470,7 +406,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
   int inconsistent = 0;
 
   /* Very simple sanity checks so we catch bugs in our profiling code.  */
-  if (!profile_info.is_valid ())
+  if (!profile_info)
     {
       if (dump_file)
 	fprintf (dump_file, "Profile info is missing; giving up\n");
@@ -1381,7 +1317,7 @@ branch_prob (void)
   values.release ();
   free_edge_list (el);
   coverage_end_function (lineno_checksum, cfg_checksum);
-  if (flag_branch_probabilities && profile_info.is_valid ())
+  if (flag_branch_probabilities && profile_info)
     {
       struct loop *loop;
       if (dump_file && (dump_flags & TDF_DETAILS))
