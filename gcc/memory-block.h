@@ -28,6 +28,7 @@ class memory_block_pool
 public:
   /* Blocks have fixed size.  This is necessary for sharing.  */
   static const size_t block_size = 64 * 1024;
+  static const unsigned long magic_constant = 0xf51cbae7514eca03;
 
   memory_block_pool ();
 
@@ -41,6 +42,11 @@ private:
 
   struct block_list
   {
+    block_list (block_list *next)
+      : m_magic (magic_constant), m_next (next)
+    {}
+
+    unsigned long m_magic;
     block_list *m_next;
   };
 
@@ -56,6 +62,7 @@ memory_block_pool::allocate ()
     return XNEWVEC (char, block_size);
 
   void *result = instance.m_blocks;
+  gcc_checking_assert (instance.m_blocks->m_magic == magic_constant);
   instance.m_blocks = instance.m_blocks->m_next;
   VALGRIND_DISCARD (VALGRIND_MAKE_MEM_UNDEFINED (result, block_size));
   return result;
@@ -65,9 +72,13 @@ memory_block_pool::allocate ()
 inline void
 memory_block_pool::release (void *uncast_block)
 {
-  block_list *block = new (uncast_block) block_list;
-  block->m_next = instance.m_blocks;
+  block_list *block = new (uncast_block) block_list (instance.m_blocks);
   instance.m_blocks = block;
+
+  VALGRIND_DISCARD (VALGRIND_MAKE_MEM_NOACCESS ((char *)uncast_block
+						+ sizeof (block_list),
+						block_size
+						- sizeof (block_list)));
 }
 
 extern void *mempool_obstack_chunk_alloc (size_t) ATTRIBUTE_MALLOC;
