@@ -1395,7 +1395,7 @@ Complex floating point modes.  By default these are @code{QCmode},
 
 @findex MODE_FUNCTION
 @item MODE_FUNCTION
-Algol or Pascal function variables including a static chain.
+Algol function variables including a static chain.
 (These are not currently implemented).
 
 @findex MODE_CC
