@@ -11313,6 +11313,9 @@ Enable buffer overflow detection for stack objects.  This kind of
 protection is enabled by default when using @option{-fsanitize=address}.
 To disable stack protection use @option{--param asan-stack=0} option.
 
+@item asan-stack-small-redzone
+Emit smaller middle redzone for variables smaller or equal to 16 bytes.
+
 @item asan-instrument-reads
 Enable buffer overflow detection for memory reads.  This kind of
 protection is enabled by default when using @option{-fsanitize=address}.

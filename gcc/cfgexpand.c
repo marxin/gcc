@@ -1128,9 +1128,18 @@ expand_stack_vars (bool (*pred) (size_t), struct stack_vars_data *data)
 					MAX (alignb, ASAN_RED_ZONE_SIZE),
 					!FRAME_GROWS_DOWNWARD);
 	      tree repr_decl = NULL_TREE;
+	      poly_uint64 size = stack_vars[i].size;
+	      /* For small variables shrink middle redzone (including
+	       * variable store) just to ASAN_RED_ZONE_SIZE.  */
+	      if (ASAN_STACK_SMALL_REDZONE
+		  && i != n - 1
+		  && (stack_vars[i].size.to_constant ()
+		      <= (ASAN_RED_ZONE_SIZE / 2)))
+		;
+	      else
+		size += ASAN_RED_ZONE_SIZE;
 	      offset
-		= alloc_stack_frame_space (stack_vars[i].size
-					   + ASAN_RED_ZONE_SIZE,
+		= alloc_stack_frame_space (size,
 					   MAX (alignb, ASAN_RED_ZONE_SIZE));
 
 	      data->asan_vec.safe_push (prev_offset);

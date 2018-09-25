@@ -1201,6 +1201,12 @@ DEFPARAM (PARAM_ASAN_STACK,
          "Enable asan stack protection.",
          1, 0, 1)
 
+DEFPARAM (PARAM_ASAN_STACK_SMALL_REDZONE,
+	  "asan-stack-small-redzone",
+	  "Emit smaller middle redzone for variables smaller "
+	  "or equal to 16 bytes.",
+	  0, 0, 1)
+
 DEFPARAM (PARAM_ASAN_PROTECT_ALLOCAS,
 	"asan-instrument-allocas",
 	"Enable asan allocas/VLAs protection.",
