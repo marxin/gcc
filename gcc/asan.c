@@ -1155,18 +1155,34 @@ asan_pp_string (pretty_printer *pp)
   return build1 (ADDR_EXPR, shadow_ptr_types[0], ret);
 }
 
-/* Return a CONST_INT representing 4 subsequent shadow memory bytes.  */
+/* Emit red zones payload that started at SHADOW_MEM address.
+   SHADOW_BYTES contains payload that should be stored.  */
 
 static rtx
-asan_shadow_cst (unsigned char shadow_bytes[4])
+asan_emit_redzone_payload (rtx shadow_mem,
+			   auto_vec<unsigned char> &shadow_bytes)
 {
-  int i;
-  unsigned HOST_WIDE_INT val = 0;
-  gcc_assert (WORDS_BIG_ENDIAN == BYTES_BIG_ENDIAN);
-  for (i = 0; i < 4; i++)
-    val |= (unsigned HOST_WIDE_INT) shadow_bytes[BYTES_BIG_ENDIAN ? 3 - i : i]
-	   << (BITS_PER_UNIT * i);
-  return gen_int_mode (val, SImode);
+  while (!shadow_bytes.is_empty ())
+    {
+      unsigned l = shadow_bytes.length ();
+      unsigned chunk = l >= 4 ? 4 : (l >= 2 ? 2 : 1);
+      machine_mode mode = chunk == 4 ? SImode : (chunk == 2 ? HImode : QImode);
+      shadow_mem = adjust_address (shadow_mem, mode, 0);
+
+      unsigned HOST_WIDE_INT val = 0;
+      gcc_assert (WORDS_BIG_ENDIAN == BYTES_BIG_ENDIAN);
+      for (unsigned i = 0; i < chunk; i++)
+	{
+	  unsigned char v = shadow_bytes[BYTES_BIG_ENDIAN ? chunk - i : i];
+	  val |= (unsigned HOST_WIDE_INT)v << (BITS_PER_UNIT * i);
+	}
+      rtx c = gen_int_mode (val, mode);
+      emit_move_insn (shadow_mem, c);
+      shadow_mem = adjust_address (shadow_mem, VOIDmode, chunk);
+      shadow_bytes.block_remove (0, chunk);
+    }
+
+  return shadow_mem;
 }
 
 /* Clear shadow memory at SHADOW_MEM, LEN bytes.  Can't call a library call here
@@ -1256,7 +1272,6 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   rtx_code_label *lab;
   rtx_insn *insns;
   char buf[32];
-  unsigned char shadow_bytes[4];
   HOST_WIDE_INT base_offset = offsets[length - 1];
   HOST_WIDE_INT base_align_bias = 0, offset, prev_offset;
   HOST_WIDE_INT asan_frame_size = offsets[0] - base_offset;
@@ -1416,49 +1431,64 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 		     + (base_align_bias >> ASAN_SHADOW_SHIFT));
   gcc_assert (asan_shadow_set != -1
 	      && (ASAN_RED_ZONE_SIZE >> ASAN_SHADOW_SHIFT) == 4);
-  shadow_mem = gen_rtx_MEM (SImode, shadow_base);
+  shadow_mem = gen_rtx_MEM (QImode, shadow_base);
   set_mem_alias_set (shadow_mem, asan_shadow_set);
   if (STRICT_ALIGNMENT)
     set_mem_align (shadow_mem, (GET_MODE_ALIGNMENT (SImode)));
   prev_offset = base_offset;
+
+  auto_vec<unsigned char> shadow_bytes (64);
   for (l = length; l; l -= 2)
     {
       if (l == 2)
 	cur_shadow_byte = ASAN_STACK_MAGIC_RIGHT;
       offset = offsets[l - 1];
-      if ((offset - base_offset) & (ASAN_RED_ZONE_SIZE - 1))
+
+      bool merging_p = !shadow_bytes.is_empty ();
+      bool extra_byte = (offset - base_offset) & (ASAN_SHADOW_GRANULARITY - 1);
+      /* If a red-zone is not aligned to ASAN_SHADOW_GRANULARITY then
+	 the previous stack variable has size % ASAN_SHADOW_GRANULARITY != 0.
+	 In that case we have to emit one extra byte that will describe
+	 how many bytes (our of ASAN_SHADOW_GRANULARITY) can be accessed.  */
+      if (extra_byte)
 	{
-	  int i;
 	  HOST_WIDE_INT aoff
 	    = base_offset + ((offset - base_offset)
-			     & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1));
-	  shadow_mem = adjust_address (shadow_mem, VOIDmode,
-				       (aoff - prev_offset)
-				       >> ASAN_SHADOW_SHIFT);
-	  prev_offset = aoff;
-	  for (i = 0; i < 4; i++, aoff += ASAN_SHADOW_GRANULARITY)
-	    if (aoff < offset)
-	      {
-		if (aoff < offset - (HOST_WIDE_INT)ASAN_SHADOW_GRANULARITY + 1)
-		  shadow_bytes[i] = 0;
-		else
-		  shadow_bytes[i] = offset - aoff;
-	      }
-	    else
-	      shadow_bytes[i] = ASAN_STACK_MAGIC_MIDDLE;
-	  emit_move_insn (shadow_mem, asan_shadow_cst (shadow_bytes));
+			     & ~(ASAN_SHADOW_GRANULARITY - HOST_WIDE_INT_1));
+	  shadow_bytes.quick_push (offset - aoff);
 	  offset = aoff;
 	}
-      while (offset <= offsets[l - 2] - ASAN_RED_ZONE_SIZE)
+
+      /* Adjust shadow memory to beginning of shadow memory
+	 (or one byte earlier).  */
+      if (!merging_p)
+	shadow_mem = adjust_address (shadow_mem, VOIDmode,
+				     (offset - prev_offset)
+				     >> ASAN_SHADOW_SHIFT);
+
+      if (extra_byte)
+	offset += ASAN_SHADOW_GRANULARITY;
+
+      /* Calculate size of red zone payload.  */
+      while (offset < offsets[l - 2])
 	{
-	  shadow_mem = adjust_address (shadow_mem, VOIDmode,
-				       (offset - prev_offset)
-				       >> ASAN_SHADOW_SHIFT);
-	  prev_offset = offset;
-	  memset (shadow_bytes, cur_shadow_byte, 4);
-	  emit_move_insn (shadow_mem, asan_shadow_cst (shadow_bytes));
-	  offset += ASAN_RED_ZONE_SIZE;
+	  shadow_bytes.quick_push (cur_shadow_byte);
+	  offset += ASAN_SHADOW_GRANULARITY;
 	}
+
+      /* Do simple store merging for 2 adjacent small variables
+	 that will need 4 bytes in total to emit red zones.  */
+      if (shadow_bytes.length () == 2
+	  && l >= 3
+	  && ((unsigned HOST_WIDE_INT)(offsets[l - 3] - offsets[l - 2])
+	      < ASAN_SHADOW_GRANULARITY))
+	;
+      else
+	{
+	  shadow_mem = asan_emit_redzone_payload (shadow_mem, shadow_bytes);
+	  prev_offset = offset;
+	}
+
       cur_shadow_byte = ASAN_STACK_MAGIC_MIDDLE;
     }
   do_pending_stack_adjust ();
@@ -1519,7 +1549,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   for (l = length; l; l -= 2)
     {
       offset = base_offset + ((offsets[l - 1] - base_offset)
-			     & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1));
+			     & ~(ASAN_MIN_RED_ZONE_SIZE - HOST_WIDE_INT_1));
       if (last_offset + last_size != offset)
 	{
 	  shadow_mem = adjust_address (shadow_mem, VOIDmode,
@@ -1531,7 +1561,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 	  last_size = 0;
 	}
       last_size += base_offset + ((offsets[l - 2] - base_offset)
-				  & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1))
+				  & ~(ASAN_MIN_RED_ZONE_SIZE - HOST_WIDE_INT_1))
 		   - offset;
 
       /* Unpoison shadow memory that corresponds to a variable that is 
@@ -1552,7 +1582,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 			   "%s (%" PRId64 " B)\n", n, size);
 		}
 
-		last_size += size & ~(ASAN_RED_ZONE_SIZE - HOST_WIDE_INT_1);
+		last_size += size & ~(ASAN_MIN_RED_ZONE_SIZE - HOST_WIDE_INT_1);
 	    }
 	}
     }
