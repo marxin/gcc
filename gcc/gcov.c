@@ -44,6 +44,7 @@ along with Gcov; see the file COPYING3.  If not see
 #include "version.h"
 #include "demangle.h"
 #include "color-macros.h"
+#include "json.h"
 
 #include <getopt.h>
 
@@ -221,6 +222,10 @@ line_info::has_block (block_info *needle)
   return std::find (blocks.begin (), blocks.end (), needle) != blocks.end ();
 }
 
+/* Output demangled function names.  */
+
+static int flag_demangled_names = 0;
+
 /* Describes a single function. Contains an array of basic blocks.  */
 
 struct function_info
@@ -241,8 +246,8 @@ struct function_info
   }
 
   /* Name of function.  */
-  char *name;
-  char *demangled_name;
+  char *m_name;
+  char *m_demangled_name;
   unsigned ident;
   unsigned lineno_checksum;
   unsigned cfg_checksum;
@@ -284,6 +289,26 @@ struct function_info
 
   /* Next function.  */
   struct function_info *next;
+
+  /*  Get demangled name of a function.  The demangled name
+      is converted when it is used for the first time.  */
+  char *get_demangled_name ()
+  {
+    if (m_demangled_name == NULL)
+      {
+	m_demangled_name = cplus_demangle (m_name, DMGL_PARAMS);
+	if (!m_demangled_name)
+	  m_demangled_name = m_name;
+      }
+
+    return m_demangled_name;
+  }
+
+  /* Get name of the function based on flag_demangled_names.  */
+  char *get_name ()
+  {
+    return flag_demangled_names ? get_demangled_name () : m_name;
+  }
 };
 
 /* Function info comparer that will sort functions according to starting
@@ -481,9 +506,9 @@ static int flag_display_progress = 0;
 
 static int flag_intermediate_format = 0;
 
-/* Output demangled function names.  */
+/* Output *.gcov file in JSON intermediate format used by consumers.  */
 
-static int flag_demangled_names = 0;
+static int flag_json_format = 0;
 
 /* For included files, make the gcov output file name include the name
    of the input source file.  For example, if x.h is included in a.c,
@@ -576,7 +601,7 @@ static char *mangle_name (const char *, char *);
 static void release_structures (void);
 extern int main (int, char **);
 
-function_info::function_info (): name (NULL), demangled_name (NULL),
+function_info::function_info (): m_name (NULL), m_demangled_name (NULL),
   ident (0), lineno_checksum (0), cfg_checksum (0), has_catch (0),
   artificial (0), is_group (0),
   blocks (), blocks_executed (0), counts (),
@@ -596,9 +621,9 @@ function_info::~function_info ()
 	  free (arc);
 	}
     }
-  if (flag_demangled_names && demangled_name != name)
-    free (demangled_name);
-  free (name);
+  if (m_demangled_name != m_name)
+    free (m_demangled_name);
+  free (m_name);
 }
 
 bool function_info::group_line_p (unsigned n, unsigned src_idx)
@@ -794,6 +819,15 @@ main (int argc, char **argv)
   argno = process_args (argc, argv);
   if (optind == argc)
     print_usage (true);
+  else if (flag_intermediate_format && flag_json_format)
+    {
+      fnotice (stderr, "Error: --intermediate-format is incompatible "
+	       "with --json-format\n");
+      exit (2);
+    }
+  else if (flag_intermediate_format)
+    fnotice (stderr, "Warning: --intermediate-format is deprecated, please use "
+	     "--json-format\n");
 
   if (argc - argno > 1)
     multiple_files = 1;
@@ -807,7 +841,7 @@ main (int argc, char **argv)
 		argc - first_arg);
       process_file (argv[argno]);
 
-      if (flag_intermediate_format || argno == argc - 1)
+      if (flag_json_format || flag_intermediate_format || argno == argc - 1)
 	{
 	  process_all_functions ();
 	  generate_results (argv[argno]);
@@ -853,6 +887,7 @@ print_usage (int error_p)
   fnotice (file, "  -v, --version                   Print version number, then exit\n");
   fnotice (file, "  -w, --verbose                   Print verbose informations\n");
   fnotice (file, "  -x, --hash-filenames            Hash long pathnames\n");
+  fnotice (file, "  -z, --json-format		    Output JSON intermediate format into .gcov.json file\n");
   fnotice (file, "\nFor bug reporting instructions, please see:\n%s.\n",
 	   bug_report_url);
   exit (status);
@@ -898,6 +933,7 @@ static const struct option options[] =
   { "hash-filenames",	    no_argument,       NULL, 'x' },
   { "use-colors",	    no_argument,       NULL, 'k' },
   { "use-hotness-colors",   no_argument,       NULL, 'q' },
+  { "json-format",	    no_argument,       NULL, 'z' },
   { 0, 0, 0, 0 }
 };
 
@@ -908,7 +944,7 @@ process_args (int argc, char **argv)
 {
   int opt;
 
-  const char *opts = "abcdfhijklmno:pqrs:tuvwx";
+  const char *opts = "abcdfhijklmno:pqrs:tuvwxz";
   while ((opt = getopt_long (argc, argv, opts, options, NULL)) != -1)
     {
       switch (opt)
@@ -963,12 +999,16 @@ process_args (int argc, char **argv)
 	  flag_unconditional = 1;
 	  break;
 	case 'i':
-          flag_intermediate_format = 1;
-          flag_gcov_file = 1;
-          break;
-        case 'd':
-          flag_display_progress = 1;
-          break;
+	  flag_intermediate_format = 1;
+	  flag_gcov_file = 1;
+	  break;
+	case 'z':
+	  flag_json_format = 1;
+	  flag_gcov_file = 1;
+	  break;
+	case 'd':
+	  flag_display_progress = 1;
+	  break;
 	case 'x':
 	  flag_hash_filenames = 1;
 	  break;
@@ -1012,9 +1052,9 @@ output_intermediate_line (FILE *f, line_info *line, unsigned line_num)
 	    const char *branch_type;
 	    /* branch:<line_num>,<branch_coverage_infoype>
 	       branch_coverage_infoype
-	       : notexec (Branch not executed)
-	       : taken (Branch executed and taken)
-	       : nottaken (Branch executed, but not taken)
+	       : notexec (branch not executed)
+	       : taken (branch executed and taken)
+	       : nottaken (branch executed, but not taken)
 	       */
 	    if ((*it)->src->count)
 		 branch_type
@@ -1024,6 +1064,43 @@ output_intermediate_line (FILE *f, line_info *line, unsigned line_num)
 	    fprintf (f, "branch:%d,%s\n", line_num, branch_type);
 	  }
       }
+}
+
+/* Output intermediate LINE sitting on LINE_NUM to JSON OBJECT.  */
+
+static void
+output_intermediate_json_line (json::array *object,
+			       line_info *line, unsigned line_num)
+{
+  if (!line->exists)
+    return;
+
+  json::object *lineo = new json::object ();
+  lineo->set ("line_number", new json::number (line_num));
+  lineo->set ("count", new json::number (line->count));
+  lineo->set ("unexecuted_block",
+	      new json::literal (line->has_unexecuted_block));
+
+  json::array *branches = new json::array ();
+  lineo->set ("branches", branches);
+
+  vector<arc_info *>::const_iterator it;
+  if (flag_branches)
+    for (it = line->branches.begin (); it != line->branches.end ();
+	 it++)
+      {
+	if (!(*it)->is_unconditional && !(*it)->is_call_non_return)
+	  {
+	    json::object *branch = new json::object ();
+	    branch->set ("count", new json::number ((*it)->count));
+	    branch->set ("throw", new json::literal ((*it)->is_throw));
+	    branch->set ("fallthrough",
+			 new json::literal ((*it)->fall_through));
+	    branches->append (branch);
+	  }
+      }
+
+  object->append (lineo);
 }
 
 /* Get the name of the gcov file.  The return value must be free'd.
@@ -1038,7 +1115,7 @@ output_intermediate_line (FILE *f, line_info *line, unsigned line_num)
 static char *
 get_gcov_intermediate_filename (const char *file_name)
 {
-  const char *gcov = ".gcov";
+  const char *gcov = flag_json_format ? ".gcov.json" : ".gcov";
   char *result;
   const char *cptr;
 
@@ -1076,7 +1153,7 @@ output_intermediate_file (FILE *gcov_file, source_info *src)
       /* function:<name>,<line_number>,<execution_count> */
       fprintf (gcov_file, "function:%d,%d,%s,%s\n", (*it)->start_line,
 	       (*it)->end_line, format_gcov ((*it)->blocks[0].count, 0, -1),
-	       flag_demangled_names ? (*it)->demangled_name : (*it)->name);
+	       (*it)->get_name ());
     }
 
   for (unsigned line_num = 1; line_num <= src->lines.size (); line_num++)
@@ -1098,6 +1175,62 @@ output_intermediate_file (FILE *gcov_file, source_info *src)
       /* Follow with lines associated with the source file.  */
       if (line_num < src->lines.size ())
 	output_intermediate_line (gcov_file, &src->lines[line_num], line_num);
+    }
+}
+
+/* Output the result in JSON intermediate format.
+   Source info SRC is dumped into JSON_FILES which is JSON array.  */
+
+static void
+output_json_intermediate_file (json::array *json_files, source_info *src)
+{
+  json::object *root = new json::object ();
+  json_files->append (root);
+
+  root->set ("file", new json::string (src->name));
+
+  json::array *functions = new json::array ();
+  root->set ("functions", functions);
+
+  std::sort (src->functions.begin (), src->functions.end (),
+	     function_line_start_cmp ());
+  for (vector<function_info *>::iterator it = src->functions.begin ();
+       it != src->functions.end (); it++)
+    {
+      json::object *function = new json::object ();
+      function->set ("name", new json::string ((*it)->m_name));
+      function->set ("demangled_name",
+		     new json::string ((*it)->get_demangled_name ()));
+      function->set ("start_line", new json::number ((*it)->start_line));
+      function->set ("end_line", new json::number ((*it)->end_line));
+      function->set ("execution_count",
+		     new json::number ((*it)->blocks[0].count));
+
+      functions->append (function);
+    }
+
+  json::array *lineso = new json::array ();
+  root->set ("lines", lineso);
+
+  for (unsigned line_num = 1; line_num <= src->lines.size (); line_num++)
+    {
+      vector<function_info *> fns = src->get_functions_at_location (line_num);
+
+      /* Print first group functions that begin on the line.  */
+      for (vector<function_info *>::iterator it2 = fns.begin ();
+	   it2 != fns.end (); it2++)
+	{
+	  vector<line_info> &lines = (*it2)->lines;
+	  for (unsigned i = 0; i < lines.size (); i++)
+	    {
+	      line_info *line = &lines[i];
+	      output_intermediate_json_line (lineso, line, line_num + i);
+	    }
+	}
+
+      /* Follow with lines associated with the source file.  */
+      if (line_num < src->lines.size ())
+	output_intermediate_json_line (lineso, &src->lines[line_num], line_num);
     }
 }
 
@@ -1311,7 +1444,7 @@ generate_results (const char *file_name)
       coverage_info coverage;
 
       memset (&coverage, 0, sizeof (coverage));
-      coverage.name = flag_demangled_names ? fn->demangled_name : fn->name;
+      coverage.name = fn->get_name ();
       add_line_counts (flag_function_summary ? &coverage : NULL, fn);
       if (flag_function_summary)
 	{
@@ -1333,7 +1466,9 @@ generate_results (const char *file_name)
 	file_name = canonicalize_name (file_name);
     }
 
-  if (flag_gcov_file && flag_intermediate_format && !flag_use_stdout)
+  if (flag_gcov_file
+      && (flag_intermediate_format || flag_json_format)
+      && !flag_use_stdout)
     {
       /* Open the intermediate file.  */
       gcov_intermediate_filename = get_gcov_intermediate_filename (file_name);
@@ -1345,6 +1480,15 @@ generate_results (const char *file_name)
 	  return;
 	}
     }
+
+  json::object *root = new json::object ();
+  root->set ("version", new json::string (version_string));
+  root->set ("current_working_directory", new json::string (bbg_cwd));
+
+  json::array *json_files = new json::array ();
+  root->set ("files", json_files);
+
+  FILE *out = flag_use_stdout ? stdout : gcov_intermediate_file;
 
   for (vector<source_info>::iterator it = sources.begin ();
        it != sources.end (); it++)
@@ -1373,10 +1517,13 @@ generate_results (const char *file_name)
       if (flag_gcov_file)
 	{
 	  if (flag_intermediate_format)
-	    /* Output the intermediate format without requiring source
-	       files.  This outputs a section to a *single* file.  */
-	    output_intermediate_file ((flag_use_stdout
-				       ? stdout : gcov_intermediate_file), src);
+	    {
+	      /* Output the intermediate format without requiring source
+		 files.  This outputs a section to a *single* file.  */
+	      output_intermediate_file (out, src);
+	    }
+	  else if (flag_json_format)
+	    output_json_intermediate_file (json_files, src);
 	  else
 	    {
 	      if (flag_use_stdout)
@@ -1393,7 +1540,12 @@ generate_results (const char *file_name)
 	}
     }
 
-  if (flag_gcov_file && flag_intermediate_format && !flag_use_stdout)
+  if (flag_gcov_file && flag_json_format)
+    root->dump (out);
+
+  if (flag_gcov_file
+      && (flag_intermediate_format || flag_json_format)
+      && !flag_use_stdout)
     {
       /* Now we've finished writing the intermediate file.  */
       fclose (gcov_intermediate_file);
@@ -1634,13 +1786,7 @@ read_graph_file (void)
 
 	  fn = new function_info ();
 	  functions.push_back (fn);
-	  fn->name = function_name;
-	  if (flag_demangled_names)
-	    {
-	      fn->demangled_name = cplus_demangle (fn->name, DMGL_PARAMS);
-	      if (!fn->demangled_name)
-		fn->demangled_name = fn->name;
-	    }
+	  fn->m_name = function_name;
 	  fn->ident = ident;
 	  fn->lineno_checksum = lineno_checksum;
 	  fn->cfg_checksum = cfg_checksum;
@@ -1656,7 +1802,7 @@ read_graph_file (void)
 	{
 	  if (!fn->blocks.empty ())
 	    fnotice (stderr, "%s:already seen blocks for '%s'\n",
-		     bbg_file_name, fn->name);
+		     bbg_file_name, fn->get_name ());
 	  else
 	    fn->blocks.resize (gcov_read_unsigned ());
 	}
@@ -1862,7 +2008,7 @@ read_count_file (void)
 	    {
 	    mismatch:;
 	      fnotice (stderr, "%s:profile mismatch for '%s'\n",
-		       da_file_name, fn->name);
+		       da_file_name, fn->get_name ());
 	      goto cleanup;
 	    }
 	}
@@ -1927,12 +2073,12 @@ solve_flow_graph (function_info *fn)
 
   if (fn->blocks.size () < 2)
     fnotice (stderr, "%s:'%s' lacks entry and/or exit blocks\n",
-	     bbg_file_name, fn->name);
+	     bbg_file_name, fn->get_name ());
   else
     {
       if (fn->blocks[ENTRY_BLOCK].num_pred)
 	fnotice (stderr, "%s:'%s' has arcs to entry block\n",
-		 bbg_file_name, fn->name);
+		 bbg_file_name, fn->get_name ());
       else
 	/* We can't deduce the entry block counts from the lack of
 	   predecessors.  */
@@ -1940,7 +2086,7 @@ solve_flow_graph (function_info *fn)
 
       if (fn->blocks[EXIT_BLOCK].num_succ)
 	fnotice (stderr, "%s:'%s' has arcs from exit block\n",
-		 bbg_file_name, fn->name);
+		 bbg_file_name, fn->get_name ());
       else
 	/* Likewise, we can't deduce exit block counts from the lack
 	   of its successors.  */
@@ -2149,7 +2295,7 @@ solve_flow_graph (function_info *fn)
     if (!fn->blocks[i].count_valid)
       {
 	fnotice (stderr, "%s:graph is unsolvable for '%s'\n",
-		 bbg_file_name, fn->name);
+		 bbg_file_name, fn->get_name ());
 	break;
       }
 }
@@ -2553,7 +2699,8 @@ add_line_counts (coverage_info *coverage, function_info *fn)
     }
 
   if (!has_any_line)
-    fnotice (stderr, "%s:no lines for '%s'\n", bbg_file_name, fn->name);
+    fnotice (stderr, "%s:no lines for '%s'\n", bbg_file_name,
+	     fn->get_name ());
 }
 
 /* Accumulate info for LINE that belongs to SRC source file.  If ADD_COVERAGE
@@ -2633,7 +2780,7 @@ accumulate_line_counts (source_info *src)
 
   /* If not using intermediate mode, sum lines of group functions and
      add them to lines that live in a source file.  */
-  if (!flag_intermediate_format)
+  if (!(flag_intermediate_format || flag_json_format))
     for (vector<function_info *>::iterator it = src->functions.begin ();
 	 it != src->functions.end (); it++)
       {
@@ -2895,7 +3042,7 @@ output_line_details (FILE *f, const line_info *line, unsigned line_num)
 /* Output detail statistics about function FN to file F.  */
 
 static void
-output_function_details (FILE *f, const function_info *fn)
+output_function_details (FILE *f, function_info *fn)
 {
   if (!flag_branches)
     return;
@@ -2908,8 +3055,7 @@ output_function_details (FILE *f, const function_info *fn)
     if (arc->fake)
       return_count -= arc->count;
 
-  fprintf (f, "function %s",
-	   flag_demangled_names ? fn->demangled_name : fn->name);
+  fprintf (f, "function %s", fn->get_name ());
   fprintf (f, " called %s",
 	   format_gcov (called_count, 0, -1));
   fprintf (f, " returned %s",
@@ -3028,9 +3174,7 @@ output_lines (FILE *gcov_file, const source_info *src)
 
 	      fprintf (gcov_file, FN_SEPARATOR);
 
-	      string fn_name
-		= flag_demangled_names ? fn->demangled_name : fn->name;
-
+	      string fn_name = fn->get_name ();
 	      if (flag_use_colors)
 		{
 		  fn_name.insert (0, SGR_SEQ (COLOR_FG_CYAN));

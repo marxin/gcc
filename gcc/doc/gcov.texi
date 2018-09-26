@@ -138,6 +138,7 @@ gcov [@option{-v}|@option{--version}] [@option{-h}|@option{--help}]
      [@option{-t}|@option{--stdout}]
      [@option{-u}|@option{--unconditional-branches}]
      [@option{-x}|@option{--hash-filenames}]
+     [@option{-z}|@option{--json-format}]
      @var{files}
 @c man end
 @c man begin SEEALSO
@@ -254,6 +255,9 @@ branch:35,nottaken
 lcount:36,1,0
 @end smallexample
 
+The intermediate format option is deprecated, please use @option{--json-format}
+option.
+
 @item -j
 @itemx --human-readable
 Write counts in human readable format (like 24.6k).
@@ -353,6 +357,12 @@ filesystem limits.  This option creates names of the form
 where the @var{source-file} component is the final filename part and
 the @var{md5} component is calculated from the full mangled name that
 would have been used otherwise.
+
+@item -z
+@itemx --json-format
+Output gcov file in an easy-to-parse JSON intermediate format.
+The format itself is self-descriptive and output is a single
+@file{.gcov.json} file per @file{.gcda} file.  No source code is required.
 
 @end table
 
@@ -842,7 +852,7 @@ some summary information.
 
 It is not recommended to access the coverage files directly.
 Consumers should use the intermediate format that is provided
-by @command{gcov} tool via @option{--intermediate-format} option.
+by @command{gcov} tool via @option{--json-format} option.
 
 @node Cross-profiling
 @section Data File Relocation to Support Cross-Profiling
