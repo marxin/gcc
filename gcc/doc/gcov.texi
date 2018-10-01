@@ -362,7 +362,8 @@ would have been used otherwise.
 @itemx --json-format
 Output gcov file in an easy-to-parse JSON intermediate format.
 The format itself is self-descriptive and output is a single
-@file{.gcov.json} file per @file{.gcda} file.  No source code is required.
+@file{.gcov.json.gz} file per @file{.gcda} file.  The JSON file is compressed
+with gzip compression.  No source code is required.
 
 @end table
 

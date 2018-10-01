@@ -44,8 +44,10 @@ along with Gcov; see the file COPYING3.  If not see
 #include "version.h"
 #include "demangle.h"
 #include "color-macros.h"
+#include "pretty-print.h"
 #include "json.h"
 
+#include <zlib.h>
 #include <getopt.h>
 
 #include "md5.h"
@@ -308,6 +310,12 @@ struct function_info
   char *get_name ()
   {
     return flag_demangled_names ? get_demangled_name () : m_name;
+  }
+
+  /* Return number of basic blocks (without entry and exit block).  */
+  unsigned get_block_count ()
+  {
+    return blocks.size () - 2;
   }
 };
 
@@ -1115,7 +1123,7 @@ output_intermediate_json_line (json::array *object,
 static char *
 get_gcov_intermediate_filename (const char *file_name)
 {
-  const char *gcov = flag_json_format ? ".gcov.json" : ".gcov";
+  const char *gcov = flag_json_format ? ".gcov.json.gz" : ".gcov";
   char *result;
   const char *cptr;
 
@@ -1203,6 +1211,10 @@ output_json_intermediate_file (json::array *json_files, source_info *src)
 		     new json::string ((*it)->get_demangled_name ()));
       function->set ("start_line", new json::number ((*it)->start_line));
       function->set ("end_line", new json::number ((*it)->end_line));
+      function->set ("blocks",
+		     new json::number ((*it)->get_block_count ()));
+      function->set ("blocks_executed",
+		     new json::number ((*it)->blocks_executed));
       function->set ("execution_count",
 		     new json::number ((*it)->blocks[0].count));
 
@@ -1466,12 +1478,12 @@ generate_results (const char *file_name)
 	file_name = canonicalize_name (file_name);
     }
 
+  gcov_intermediate_filename = get_gcov_intermediate_filename (file_name);
   if (flag_gcov_file
-      && (flag_intermediate_format || flag_json_format)
+      && flag_intermediate_format
       && !flag_use_stdout)
     {
       /* Open the intermediate file.  */
-      gcov_intermediate_filename = get_gcov_intermediate_filename (file_name);
       gcov_intermediate_file = fopen (gcov_intermediate_filename, "w");
       if (!gcov_intermediate_file)
 	{
@@ -1487,8 +1499,6 @@ generate_results (const char *file_name)
 
   json::array *json_files = new json::array ();
   root->set ("files", json_files);
-
-  FILE *out = flag_use_stdout ? stdout : gcov_intermediate_file;
 
   for (vector<source_info>::iterator it = sources.begin ();
        it != sources.end (); it++)
@@ -1520,6 +1530,7 @@ generate_results (const char *file_name)
 	    {
 	      /* Output the intermediate format without requiring source
 		 files.  This outputs a section to a *single* file.  */
+	      FILE *out = flag_use_stdout ? stdout : gcov_intermediate_file;
 	      output_intermediate_file (out, src);
 	    }
 	  else if (flag_json_format)
@@ -1541,10 +1552,38 @@ generate_results (const char *file_name)
     }
 
   if (flag_gcov_file && flag_json_format)
-    root->dump (out);
+    {
+      if (flag_use_stdout)
+	{
+	  root->dump (stdout);
+	  printf ("\n");
+	}
+      else
+	{
+	  pretty_printer pp;
+	  root->print (&pp);
+	  pp_formatted_text (&pp);
+
+	  gzFile output = gzopen (gcov_intermediate_filename, "w");
+	  if (output == NULL)
+	    {
+	      fnotice (stderr, "Cannot open JSON output file %s\n",
+		       gcov_intermediate_filename);
+	      return;
+	    }
+
+	  if (gzputs (output, pp_formatted_text (&pp)) == EOF
+	      || gzclose (output))
+	    {
+	      fnotice (stderr, "Error writing JSON output file %s\n",
+		       gcov_intermediate_filename);
+	      return;
+	    }
+	}
+    }
 
   if (flag_gcov_file
-      && (flag_intermediate_format || flag_json_format)
+      && flag_intermediate_format
       && !flag_use_stdout)
     {
       /* Now we've finished writing the intermediate file.  */
@@ -3061,8 +3100,7 @@ output_function_details (FILE *f, function_info *fn)
   fprintf (f, " returned %s",
 	   format_gcov (return_count, called_count, 0));
   fprintf (f, " blocks executed %s",
-	   format_gcov (fn->blocks_executed, fn->blocks.size () - 2,
-			0));
+	   format_gcov (fn->blocks_executed, fn->get_block_count (), 0));
   fprintf (f, "\n");
 }
 
