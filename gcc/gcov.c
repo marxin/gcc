@@ -510,10 +510,6 @@ static int flag_use_stdout = 0;
 
 static int flag_display_progress = 0;
 
-/* Output *.gcov file in intermediate format used by 'lcov'.  */
-
-static int flag_intermediate_format = 0;
-
 /* Output *.gcov file in JSON intermediate format used by consumers.  */
 
 static int flag_json_format = 0;
@@ -827,15 +823,6 @@ main (int argc, char **argv)
   argno = process_args (argc, argv);
   if (optind == argc)
     print_usage (true);
-  else if (flag_intermediate_format && flag_json_format)
-    {
-      fnotice (stderr, "Error: --intermediate-format is incompatible "
-	       "with --json-format\n");
-      exit (2);
-    }
-  else if (flag_intermediate_format)
-    fnotice (stderr, "Warning: --intermediate-format is deprecated, please use "
-	     "--json-format\n");
 
   if (argc - argno > 1)
     multiple_files = 1;
@@ -849,7 +836,7 @@ main (int argc, char **argv)
 		argc - first_arg);
       process_file (argv[argno]);
 
-      if (flag_json_format || flag_intermediate_format || argno == argc - 1)
+      if (flag_json_format || argno == argc - 1)
 	{
 	  process_all_functions ();
 	  generate_results (argv[argno]);
@@ -878,7 +865,7 @@ print_usage (int error_p)
   fnotice (file, "  -d, --display-progress          Display progress information\n");
   fnotice (file, "  -f, --function-summaries        Output summaries for each function\n");
   fnotice (file, "  -h, --help                      Print this help, then exit\n");
-  fnotice (file, "  -i, --intermediate-format       Output .gcov file in intermediate text format\n");
+  fnotice (file, "  -i, --json-format		    Output JSON intermediate format into .gcov.json.gz file\n");
   fnotice (file, "  -j, --human-readable            Output human readable numbers\n");
   fnotice (file, "  -k, --use-colors                Emit colored output\n");
   fnotice (file, "  -l, --long-file-names           Use long output file names for included\n\
@@ -895,7 +882,6 @@ print_usage (int error_p)
   fnotice (file, "  -v, --version                   Print version number, then exit\n");
   fnotice (file, "  -w, --verbose                   Print verbose informations\n");
   fnotice (file, "  -x, --hash-filenames            Hash long pathnames\n");
-  fnotice (file, "  -z, --json-format		    Output JSON intermediate format into .gcov.json file\n");
   fnotice (file, "\nFor bug reporting instructions, please see:\n%s.\n",
 	   bug_report_url);
   exit (status);
@@ -924,7 +910,7 @@ static const struct option options[] =
   { "all-blocks",           no_argument,       NULL, 'a' },
   { "branch-probabilities", no_argument,       NULL, 'b' },
   { "branch-counts",        no_argument,       NULL, 'c' },
-  { "intermediate-format",  no_argument,       NULL, 'i' },
+  { "json-format",	    no_argument,       NULL, 'i' },
   { "human-readable",	    no_argument,       NULL, 'j' },
   { "no-output",            no_argument,       NULL, 'n' },
   { "long-file-names",      no_argument,       NULL, 'l' },
@@ -941,7 +927,6 @@ static const struct option options[] =
   { "hash-filenames",	    no_argument,       NULL, 'x' },
   { "use-colors",	    no_argument,       NULL, 'k' },
   { "use-hotness-colors",   no_argument,       NULL, 'q' },
-  { "json-format",	    no_argument,       NULL, 'z' },
   { 0, 0, 0, 0 }
 };
 
@@ -952,7 +937,7 @@ process_args (int argc, char **argv)
 {
   int opt;
 
-  const char *opts = "abcdfhijklmno:pqrs:tuvwxz";
+  const char *opts = "abcdfhijklmno:pqrs:tuvwx";
   while ((opt = getopt_long (argc, argv, opts, options, NULL)) != -1)
     {
       switch (opt)
@@ -1007,10 +992,6 @@ process_args (int argc, char **argv)
 	  flag_unconditional = 1;
 	  break;
 	case 'i':
-	  flag_intermediate_format = 1;
-	  flag_gcov_file = 1;
-	  break;
-	case 'z':
 	  flag_json_format = 1;
 	  flag_gcov_file = 1;
 	  break;
@@ -1036,42 +1017,6 @@ process_args (int argc, char **argv)
     }
 
   return optind;
-}
-
-/* Output intermediate LINE sitting on LINE_NUM to output file F.  */
-
-static void
-output_intermediate_line (FILE *f, line_info *line, unsigned line_num)
-{
-  if (!line->exists)
-    return;
-
-  fprintf (f, "lcount:%u,%s,%d\n", line_num,
-	   format_gcov (line->count, 0, -1),
-	   line->has_unexecuted_block);
-
-  vector<arc_info *>::const_iterator it;
-  if (flag_branches)
-    for (it = line->branches.begin (); it != line->branches.end ();
-	 it++)
-      {
-	if (!(*it)->is_unconditional && !(*it)->is_call_non_return)
-	  {
-	    const char *branch_type;
-	    /* branch:<line_num>,<branch_coverage_infoype>
-	       branch_coverage_infoype
-	       : notexec (branch not executed)
-	       : taken (branch executed and taken)
-	       : nottaken (branch executed, but not taken)
-	       */
-	    if ((*it)->src->count)
-		 branch_type
-			= ((*it)->count > 0) ? "taken" : "nottaken";
-	    else
-	      branch_type = "notexec";
-	    fprintf (f, "branch:%d,%s\n", line_num, branch_type);
-	  }
-      }
 }
 
 /* Output intermediate LINE sitting on LINE_NUM to JSON OBJECT.  */
@@ -1123,7 +1068,7 @@ output_intermediate_json_line (json::array *object,
 static char *
 get_gcov_intermediate_filename (const char *file_name)
 {
-  const char *gcov = flag_json_format ? ".gcov.json.gz" : ".gcov";
+  const char *gcov = ".gcov.json.gz";
   char *result;
   const char *cptr;
 
@@ -1134,56 +1079,6 @@ get_gcov_intermediate_filename (const char *file_name)
   sprintf (result, "%s%s", cptr, gcov);
 
   return result;
-}
-
-/* Output the result in intermediate format used by 'lcov'.
-
-The intermediate format contains a single file named 'foo.cc.gcov',
-with no source code included.
-
-The default gcov outputs multiple files: 'foo.cc.gcov',
-'iostream.gcov', 'ios_base.h.gcov', etc. with source code
-included. Instead the intermediate format here outputs only a single
-file 'foo.cc.gcov' similar to the above example. */
-
-static void
-output_intermediate_file (FILE *gcov_file, source_info *src)
-{
-  fprintf (gcov_file, "version:%s\n", version_string);
-  fprintf (gcov_file, "file:%s\n", src->name);    /* source file name */
-  fprintf (gcov_file, "cwd:%s\n", bbg_cwd);
-
-  std::sort (src->functions.begin (), src->functions.end (),
-	     function_line_start_cmp ());
-  for (vector<function_info *>::iterator it = src->functions.begin ();
-       it != src->functions.end (); it++)
-    {
-      /* function:<name>,<line_number>,<execution_count> */
-      fprintf (gcov_file, "function:%d,%d,%s,%s\n", (*it)->start_line,
-	       (*it)->end_line, format_gcov ((*it)->blocks[0].count, 0, -1),
-	       (*it)->get_name ());
-    }
-
-  for (unsigned line_num = 1; line_num <= src->lines.size (); line_num++)
-    {
-      vector<function_info *> fns = src->get_functions_at_location (line_num);
-
-      /* Print first group functions that begin on the line.  */
-      for (vector<function_info *>::iterator it2 = fns.begin ();
-	   it2 != fns.end (); it2++)
-	{
-	  vector<line_info> &lines = (*it2)->lines;
-	  for (unsigned i = 0; i < lines.size (); i++)
-	    {
-	      line_info *line = &lines[i];
-	      output_intermediate_line (gcov_file, line, line_num + i);
-	    }
-	}
-
-      /* Follow with lines associated with the source file.  */
-      if (line_num < src->lines.size ())
-	output_intermediate_line (gcov_file, &src->lines[line_num], line_num);
-    }
 }
 
 /* Output the result in JSON intermediate format.
@@ -1446,8 +1341,7 @@ output_gcov_file (const char *file_name, source_info *src)
 static void
 generate_results (const char *file_name)
 {
-  FILE *gcov_intermediate_file = NULL;
-  char *gcov_intermediate_filename = NULL;
+  char *gcov_intermediate_filename;
 
   for (vector<function_info *>::iterator it = functions.begin ();
        it != functions.end (); it++)
@@ -1479,22 +1373,10 @@ generate_results (const char *file_name)
     }
 
   gcov_intermediate_filename = get_gcov_intermediate_filename (file_name);
-  if (flag_gcov_file
-      && flag_intermediate_format
-      && !flag_use_stdout)
-    {
-      /* Open the intermediate file.  */
-      gcov_intermediate_file = fopen (gcov_intermediate_filename, "w");
-      if (!gcov_intermediate_file)
-	{
-	  fnotice (stderr, "Cannot open intermediate output file %s\n",
-		   gcov_intermediate_filename);
-	  return;
-	}
-    }
 
   json::object *root = new json::object ();
-  root->set ("version", new json::string (version_string));
+  root->set ("format_version", new json::string ("1"));
+  root->set ("gcc_version", new json::string (version_string));
   root->set ("current_working_directory", new json::string (bbg_cwd));
 
   json::array *json_files = new json::array ();
@@ -1526,14 +1408,7 @@ generate_results (const char *file_name)
       total_executed += src->coverage.lines_executed;
       if (flag_gcov_file)
 	{
-	  if (flag_intermediate_format)
-	    {
-	      /* Output the intermediate format without requiring source
-		 files.  This outputs a section to a *single* file.  */
-	      FILE *out = flag_use_stdout ? stdout : gcov_intermediate_file;
-	      output_intermediate_file (out, src);
-	    }
-	  else if (flag_json_format)
+	  if (flag_json_format)
 	    output_json_intermediate_file (json_files, src);
 	  else
 	    {
@@ -1580,15 +1455,6 @@ generate_results (const char *file_name)
 	      return;
 	    }
 	}
-    }
-
-  if (flag_gcov_file
-      && flag_intermediate_format
-      && !flag_use_stdout)
-    {
-      /* Now we've finished writing the intermediate file.  */
-      fclose (gcov_intermediate_file);
-      XDELETEVEC (gcov_intermediate_filename);
     }
 
   if (!file_name)
@@ -2819,7 +2685,7 @@ accumulate_line_counts (source_info *src)
 
   /* If not using intermediate mode, sum lines of group functions and
      add them to lines that live in a source file.  */
-  if (!(flag_intermediate_format || flag_json_format))
+  if (!flag_json_format)
     for (vector<function_info *>::iterator it = src->functions.begin ();
 	 it != src->functions.end (); it++)
       {
