@@ -574,7 +574,7 @@ haifa_classify_insn (const_rtx insn)
    MAX_STAGES provides us with a limit
    after which we give up scheduling; the caller must have unrolled at least
    as many copies of the loop body and recorded delay_pairs for them.
-   
+
    INSNS is the number of real (non-debug) insns in one iteration of
    the loop.  MAX_UID can be used to test whether an insn belongs to
    the first iteration of the loop; all of them have a uid lower than

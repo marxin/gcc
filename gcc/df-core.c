@@ -1967,15 +1967,6 @@ df_find_def (rtx_insn *insn, rtx reg)
 }
 
 
-/* Return true if REG is defined in INSN, zero otherwise.  */
-
-bool
-df_reg_defined (rtx_insn *insn, rtx reg)
-{
-  return df_find_def (insn, reg) != NULL;
-}
-
-
 /* Finds the reference corresponding to the use of REG in INSN.
    DF is the dataflow object.  */
 
@@ -1998,16 +1989,6 @@ df_find_use (rtx_insn *insn, rtx reg)
 	return use;
   return NULL;
 }
-
-
-/* Return true if REG is referenced in INSN, zero otherwise.  */
-
-bool
-df_reg_used (rtx_insn *insn, rtx reg)
-{
-  return df_find_use (insn, reg) != NULL;
-}
-
 
 /*----------------------------------------------------------------------------
    Debugging and printing functions.

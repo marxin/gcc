@@ -4566,27 +4566,6 @@ emit_insn_before_noloc (rtx x, rtx_insn *before, basic_block bb)
   return emit_pattern_before_noloc (x, before, before, bb, make_insn_raw);
 }
 
-/* Make an instruction with body X and code JUMP_INSN
-   and output it before the instruction BEFORE.  */
-
-rtx_jump_insn *
-emit_jump_insn_before_noloc (rtx x, rtx_insn *before)
-{
-  return as_a <rtx_jump_insn *> (
-		emit_pattern_before_noloc (x, before, NULL, NULL,
-					   make_jump_insn_raw));
-}
-
-/* Make an instruction with body X and code CALL_INSN
-   and output it before the instruction BEFORE.  */
-
-rtx_insn *
-emit_call_insn_before_noloc (rtx x, rtx_insn *before)
-{
-  return emit_pattern_before_noloc (x, before, NULL, NULL,
-				    make_call_insn_raw);
-}
-
 /* Make an instruction with body X and code DEBUG_INSN
    and output it before the instruction BEFORE.  */
 
@@ -4595,20 +4574,6 @@ emit_debug_insn_before_noloc (rtx x, rtx_insn *before)
 {
   return emit_pattern_before_noloc (x, before, NULL, NULL,
 				    make_debug_insn_raw);
-}
-
-/* Make an insn of code BARRIER
-   and output it before the insn BEFORE.  */
-
-rtx_barrier *
-emit_barrier_before (rtx_insn *before)
-{
-  rtx_barrier *insn = as_a <rtx_barrier *> (rtx_alloc (BARRIER));
-
-  INSN_UID (insn) = cur_insn_uid++;
-
-  add_insn_before (insn, before, NULL);
-  return insn;
 }
 
 /* Emit the label LABEL before the insn BEFORE.  */
@@ -4724,15 +4689,6 @@ emit_jump_insn_after_noloc (rtx x, rtx_insn *after)
 {
   return as_a <rtx_jump_insn *> (
 		emit_pattern_after_noloc (x, after, NULL, make_jump_insn_raw));
-}
-
-/* Make an instruction with body X and code CALL_INSN
-   and output it after the instruction AFTER.  */
-
-rtx_insn *
-emit_call_insn_after_noloc (rtx x, rtx_insn *after)
-{
-  return emit_pattern_after_noloc (x, after, NULL, make_call_insn_raw);
 }
 
 /* Make an instruction with body X and code CALL_INSN
@@ -4909,13 +4865,6 @@ emit_jump_insn_after (rtx pattern, rtx_insn *after)
 	emit_pattern_after (pattern, after, true, make_jump_insn_raw));
 }
 
-/* Like emit_call_insn_after_noloc, but set INSN_LOCATION according to LOC.  */
-rtx_insn *
-emit_call_insn_after_setloc (rtx pattern, rtx_insn *after, location_t loc)
-{
-  return emit_pattern_after_setloc (pattern, after, loc, make_call_insn_raw);
-}
-
 /* Like emit_call_insn_after_noloc, but set INSN_LOCATION according to AFTER.  */
 rtx_insn *
 emit_call_insn_after (rtx pattern, rtx_insn *after)
@@ -5010,15 +4959,6 @@ emit_insn_before (rtx pattern, rtx_insn *before)
   return emit_pattern_before (pattern, before, true, true, make_insn_raw);
 }
 
-/* like emit_insn_before_noloc, but set INSN_LOCATION according to LOC.  */
-rtx_jump_insn *
-emit_jump_insn_before_setloc (rtx pattern, rtx_insn *before, location_t loc)
-{
-  return as_a <rtx_jump_insn *> (
-	emit_pattern_before_setloc (pattern, before, loc, false,
-				    make_jump_insn_raw));
-}
-
 /* Like emit_jump_insn_before_noloc, but set INSN_LOCATION according to BEFORE.  */
 rtx_jump_insn *
 emit_jump_insn_before (rtx pattern, rtx_insn *before)
@@ -5026,23 +4966,6 @@ emit_jump_insn_before (rtx pattern, rtx_insn *before)
   return as_a <rtx_jump_insn *> (
 	emit_pattern_before (pattern, before, true, false,
 			     make_jump_insn_raw));
-}
-
-/* Like emit_insn_before_noloc, but set INSN_LOCATION according to LOC.  */
-rtx_insn *
-emit_call_insn_before_setloc (rtx pattern, rtx_insn *before, location_t loc)
-{
-  return emit_pattern_before_setloc (pattern, before, loc, false,
-				     make_call_insn_raw);
-}
-
-/* Like emit_call_insn_before_noloc,
-   but set insn_location according to BEFORE.  */
-rtx_insn *
-emit_call_insn_before (rtx pattern, rtx_insn *before)
-{
-  return emit_pattern_before (pattern, before, true, false,
-			      make_call_insn_raw);
 }
 
 /* Like emit_insn_before_noloc, but set INSN_LOCATION according to LOC.  */

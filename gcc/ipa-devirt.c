@@ -2818,27 +2818,6 @@ vtable_pointer_value_to_vtable (const_tree t, tree *v,
   return true;
 }
 
-/* T is known constant value of virtual table pointer.  Return BINFO of the
-   instance type.  */
-
-tree
-vtable_pointer_value_to_binfo (const_tree t)
-{
-  tree vtable;
-  unsigned HOST_WIDE_INT offset;
-
-  if (!vtable_pointer_value_to_vtable (t, &vtable, &offset))
-    return NULL_TREE;
-
-  /* FIXME: for stores of construction vtables we return NULL,
-     because we do not have BINFO for those. Eventually we should fix
-     our representation to allow this case to be handled, too.
-     In the case we see store of BINFO we however may assume
-     that standard folding will be able to cope with it.  */
-  return subbinfo_with_vtable_at_offset (TYPE_BINFO (DECL_CONTEXT (vtable)),
-					 offset, vtable);
-}
-
 /* Walk bases of OUTER_TYPE that contain OTR_TYPE at OFFSET.
    Look up their respective virtual methods for OTR_TOKEN and OTR_TYPE
    and insert them in NODES.

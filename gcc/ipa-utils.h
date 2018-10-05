@@ -74,7 +74,6 @@ bool possible_polymorphic_call_target_p (tree, HOST_WIDE_INT,
 tree polymorphic_ctor_dtor_p (tree, bool);
 tree inlined_polymorphic_ctor_dtor_block_p (tree, bool);
 bool decl_maybe_in_construction_p (tree, tree, gimple *, tree);
-tree vtable_pointer_value_to_binfo (const_tree);
 bool vtable_pointer_value_to_vtable (const_tree, tree *, unsigned HOST_WIDE_INT *);
 tree subbinfo_with_vtable_at_offset (tree, unsigned HOST_WIDE_INT, tree);
 void compare_virtual_tables (varpool_node *, varpool_node *);

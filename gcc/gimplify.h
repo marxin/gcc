@@ -53,7 +53,6 @@ extern void free_gimplify_stack (void);
 extern void push_gimplify_context (bool in_ssa = false,
 				   bool rhs_cond_ok = false);
 extern void pop_gimplify_context (gimple *);
-extern gbind *gimple_current_bind_expr (void);
 extern vec<gbind *> gimple_bind_expr_stack (void);
 extern void gimplify_and_add (tree, gimple_seq *);
 extern tree get_formal_tmp_var (tree, gimple_seq *);

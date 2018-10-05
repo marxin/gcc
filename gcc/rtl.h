@@ -3199,7 +3199,6 @@ extern rtx convert_memory_address_addr_space (scalar_int_mode, rtx,
 	convert_memory_address_addr_space ((to_mode), (x), ADDR_SPACE_GENERIC)
 extern const char *get_insn_name (int);
 extern rtx_insn *get_last_insn_anywhere (void);
-extern rtx_insn *get_first_nonnote_insn (void);
 extern rtx_insn *get_last_nonnote_insn (void);
 extern void start_sequence (void);
 extern void push_to_sequence (rtx_insn *);
@@ -3232,16 +3231,9 @@ extern rtx_insn *emit_insn_before (rtx, rtx_insn *);
 extern rtx_insn *emit_insn_before_noloc (rtx, rtx_insn *, basic_block);
 extern rtx_insn *emit_insn_before_setloc (rtx, rtx_insn *, location_t);
 extern rtx_jump_insn *emit_jump_insn_before (rtx, rtx_insn *);
-extern rtx_jump_insn *emit_jump_insn_before_noloc (rtx, rtx_insn *);
-extern rtx_jump_insn *emit_jump_insn_before_setloc (rtx, rtx_insn *,
-						    location_t);
-extern rtx_insn *emit_call_insn_before (rtx, rtx_insn *);
-extern rtx_insn *emit_call_insn_before_noloc (rtx, rtx_insn *);
-extern rtx_insn *emit_call_insn_before_setloc (rtx, rtx_insn *, location_t);
 extern rtx_insn *emit_debug_insn_before (rtx, rtx_insn *);
 extern rtx_insn *emit_debug_insn_before_noloc (rtx, rtx_insn *);
 extern rtx_insn *emit_debug_insn_before_setloc (rtx, rtx_insn *, location_t);
-extern rtx_barrier *emit_barrier_before (rtx_insn *);
 extern rtx_code_label *emit_label_before (rtx_code_label *, rtx_insn *);
 extern rtx_note *emit_note_before (enum insn_note, rtx_insn *);
 extern rtx_insn *emit_insn_after (rtx, rtx_insn *);
@@ -3251,8 +3243,6 @@ extern rtx_jump_insn *emit_jump_insn_after (rtx, rtx_insn *);
 extern rtx_jump_insn *emit_jump_insn_after_noloc (rtx, rtx_insn *);
 extern rtx_jump_insn *emit_jump_insn_after_setloc (rtx, rtx_insn *, location_t);
 extern rtx_insn *emit_call_insn_after (rtx, rtx_insn *);
-extern rtx_insn *emit_call_insn_after_noloc (rtx, rtx_insn *);
-extern rtx_insn *emit_call_insn_after_setloc (rtx, rtx_insn *, location_t);
 extern rtx_insn *emit_debug_insn_after (rtx, rtx_insn *);
 extern rtx_insn *emit_debug_insn_after_noloc (rtx, rtx_insn *);
 extern rtx_insn *emit_debug_insn_after_setloc (rtx, rtx_insn *, location_t);

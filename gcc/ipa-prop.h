@@ -680,8 +680,6 @@ extern GTY(()) function_summary <ipcp_transformation *> *ipcp_transformation_sum
 #define IS_VALID_JUMP_FUNC_INDEX(I) ((I) != -1)
 
 /* Creating and freeing ipa_node_params and ipa_edge_args.  */
-void ipa_create_all_node_params (void);
-void ipa_create_all_edge_args (void);
 void ipa_check_create_edge_args (void);
 void ipa_free_all_node_params (void);
 void ipa_free_all_edge_args (void);

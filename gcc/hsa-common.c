@@ -716,27 +716,6 @@ hsa_free_decl_kernel_mapping (void)
   ggc_free (hsa_decl_kernel_mapping);
 }
 
-/* Add new kernel dependency.  */
-
-void
-hsa_add_kernel_dependency (tree caller, const char *called_function)
-{
-  if (hsa_decl_kernel_dependencies == NULL)
-    hsa_decl_kernel_dependencies = new hash_map<tree, vec<const char *> *> ();
-
-  vec <const char *> *s = NULL;
-  vec <const char *> **slot = hsa_decl_kernel_dependencies->get (caller);
-  if (slot == NULL)
-    {
-      s = new vec <const char *> ();
-      hsa_decl_kernel_dependencies->put (caller, s);
-    }
-  else
-    s = *slot;
-
-  s->safe_push (called_function);
-}
-
 /* Expansion to HSA needs a few gc roots to hold types, constructors etc.  In
    order to minimize the number of GTY roots, we'll root them all in the
    following array.  The individual elements should only be accessed by the
@@ -770,22 +749,6 @@ hsa_sanitize_name (char *p)
   for (; *p; p++)
     if (*p == '.' || *p == '-')
       *p = '_';
-}
-
-/* Clone the name P, set trailing ampersand and sanitize the name.  */
-
-char *
-hsa_brig_function_name (const char *p)
-{
-  unsigned len = strlen (p);
-  char *buf = XNEWVEC (char, len + 2);
-
-  buf[0] = '&';
-  buf[len + 1] = '\0';
-  memcpy (buf + 1, p, len);
-
-  hsa_sanitize_name (buf);
-  return buf;
 }
 
 /* Add a flatten attribute and disable vectorization for gpu implementation

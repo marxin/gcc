@@ -225,7 +225,6 @@ extern void for_each_eh_label (void (*) (rtx));
 extern void init_eh_for_function (void);
 
 extern void remove_eh_landing_pad (eh_landing_pad);
-extern void remove_eh_handler (eh_region);
 extern void remove_unreachable_eh_regions (sbitmap);
 
 extern bool current_function_has_exception_handlers (void);
@@ -278,7 +277,6 @@ extern void add_type_for_runtime (tree);
 extern tree lookup_type_for_runtime (tree);
 extern void assign_filter_values (void);
 
-extern eh_region get_eh_region_from_rtx (const_rtx);
 extern eh_landing_pad get_eh_landing_pad_from_rtx (const_rtx);
 
 extern void finish_eh_generation (void);

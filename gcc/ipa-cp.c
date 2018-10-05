@@ -313,7 +313,6 @@ public:
   inline bool top_p () const;
   inline bool set_to_bottom ();
   bool meet_with (const value_range *p_vr);
-  bool meet_with (const ipcp_vr_lattice &other);
   void init () { m_vr.type = VR_UNDEFINED; }
   void print (FILE * f);
 
@@ -897,12 +896,6 @@ set_agg_lats_contain_variable (struct ipcp_param_lattices *plats)
   bool ret = !plats->aggs_contain_variable;
   plats->aggs_contain_variable = true;
   return ret;
-}
-
-bool
-ipcp_vr_lattice::meet_with (const ipcp_vr_lattice &other)
-{
-  return meet_with_1 (&other.m_vr);
 }
 
 /* Meet the current value of the lattice with value ranfge described by VR

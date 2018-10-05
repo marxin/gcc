@@ -125,7 +125,6 @@ struct alloca_type_and_limit {
   // integer_zero_node if unknown.  For any other alloca types, this
   // field is undefined.
   wide_int limit;
-  alloca_type_and_limit ();
   alloca_type_and_limit (enum alloca_type type,
 			 wide_int i) : type(type), limit(i) { }
   alloca_type_and_limit (enum alloca_type type) : type(type)

@@ -149,10 +149,6 @@ class sem_item
 {
 public:
   /* Semantic item constructor for a node of _TYPE, where STACK is used
-     for bitmap memory allocation.  */
-  sem_item (sem_item_type _type, bitmap_obstack *stack);
-
-  /* Semantic item constructor for a node of _TYPE, where STACK is used
      for bitmap memory allocation.  The item is based on symtab node _NODE.  */
   sem_item (sem_item_type _type, symtab_node *_node, bitmap_obstack *stack);
 
@@ -199,10 +195,6 @@ public:
      semantic items.  */
   void update_hash_by_local_refs (hash_map <symtab_node *,
 				  sem_item *> &m_symtab_node_map);
-
-  /* Return base tree that can be used for compatible_types_p and
-     contains_polymorphic_type_p comparison.  */
-  static bool get_base_types (tree *t1, tree *t2);
 
   /* Return true if target supports alias symbols.  */
   bool target_supports_symbol_aliases_p (void);
@@ -289,9 +281,6 @@ private:
 class sem_function: public sem_item
 {
 public:
-  /* Semantic function constructor that uses STACK as bitmap memory stack.  */
-  sem_function (bitmap_obstack *stack);
-
   /*  Constructor based on callgraph node _NODE.
       Bitmap STACK is used for memory allocation.  */
   sem_function (cgraph_node *_node, bitmap_obstack *stack);
@@ -384,9 +373,6 @@ private:
   /* Processes function equality comparison.  */
   bool equals_private (sem_item *item);
 
-  /* Returns true if tree T can be compared as a handled component.  */
-  static bool icf_handled_component_p (tree t);
-
   /* Function checker stores binding between functions.   */
   ipa_icf_gimple::func_checker *m_checker;
 
@@ -397,9 +383,6 @@ private:
 class sem_variable: public sem_item
 {
 public:
-  /* Semantic variable constructor that uses STACK as bitmap memory stack.  */
-  sem_variable (bitmap_obstack *stack);
-
   /*  Constructor based on callgraph node _NODE.
       Bitmap STACK is used for memory allocation.  */
 

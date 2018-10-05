@@ -273,16 +273,6 @@ lto_streamer_init (void)
 }
 
 
-/* Gate function for all LTO streaming passes.  */
-
-bool
-gate_lto_out (void)
-{
-  return ((flag_generate_lto || flag_generate_offload || in_lto_p)
-	  /* Don't bother doing anything if the program has errors.  */
-	  && !seen_error ());
-}
-
 /* Check that the version MAJOR.MINOR is the correct version number.  */
 
 void

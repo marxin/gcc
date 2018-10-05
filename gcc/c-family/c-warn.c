@@ -54,19 +54,6 @@ constant_expression_warning (tree value)
     pedwarn (input_location, OPT_Woverflow, "overflow in constant expression");
 }
 
-/* The same as above but print an unconditional error.  */
-
-void
-constant_expression_error (tree value)
-{
-  if ((TREE_CODE (value) == INTEGER_CST || TREE_CODE (value) == REAL_CST
-       || TREE_CODE (value) == FIXED_CST
-       || TREE_CODE (value) == VECTOR_CST
-       || TREE_CODE (value) == COMPLEX_CST)
-      && TREE_OVERFLOW (value))
-    error ("overflow in constant expression");
-}
-
 /* Print a warning if an expression result VALUE had an overflow
    in folding and its operands hadn't.  EXPR, which may be null, is
    the operand of the expression.

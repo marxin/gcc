@@ -365,13 +365,6 @@ control_dependences::set_control_dependence_map_bit (basic_block bb,
   bitmap_set_bit (control_dependence_map[bb->index], edge_index);
 }
 
-/* Clear all control dependences for block BB.  */
-void
-control_dependences::clear_control_dependence_bitmap (basic_block bb)
-{
-  bitmap_clear (control_dependence_map[bb->index]);
-}
-
 /* Find the immediate postdominator PDOM of the specified basic block BLOCK.
    This function is necessary because some blocks have negative numbers.  */
 
@@ -1506,45 +1499,6 @@ bitmap_intersection_of_preds (sbitmap dst, sbitmap *src, basic_block b)
 	r = dst->elms;
 	for (i = 0; i < set_size; i++)
 	  *r++ &= *p++;
-      }
-}
-
-/* Set the bitmap DST to the union of SRC of successors of
-   basic block B.  */
-
-void
-bitmap_union_of_succs (sbitmap dst, sbitmap *src, basic_block b)
-{
-  unsigned int set_size = dst->size;
-  edge e;
-  unsigned ix;
-
-  for (ix = 0; ix < EDGE_COUNT (b->succs); ix++)
-    {
-      e = EDGE_SUCC (b, ix);
-      if (e->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
-	continue;
-
-      bitmap_copy (dst, src[e->dest->index]);
-      break;
-    }
-
-  if (ix == EDGE_COUNT (b->succs))
-    bitmap_clear (dst);
-  else
-    for (ix++; ix < EDGE_COUNT (b->succs); ix++)
-      {
-	unsigned int i;
-	SBITMAP_ELT_TYPE *p, *r;
-
-	e = EDGE_SUCC (b, ix);
-	if (e->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
-	  continue;
-
-	p = src[e->dest->index]->elms;
-	r = dst->elms;
-	for (i = 0; i < set_size; i++)
-	  *r++ |= *p++;
       }
 }
 

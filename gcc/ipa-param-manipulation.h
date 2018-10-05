@@ -108,8 +108,6 @@ vec<tree> ipa_get_vector_of_formal_parm_types (tree fntype);
 void ipa_modify_formal_parameters (tree fndecl, ipa_parm_adjustment_vec);
 void ipa_modify_call_arguments (struct cgraph_edge *, gcall *,
 				ipa_parm_adjustment_vec);
-ipa_parm_adjustment_vec ipa_combine_adjustments (ipa_parm_adjustment_vec,
-						 ipa_parm_adjustment_vec);
 void ipa_dump_param_adjustments (FILE *, ipa_parm_adjustment_vec, tree);
 
 bool ipa_modify_expr (tree *, bool, ipa_parm_adjustment_vec);

@@ -171,7 +171,6 @@ class md_reader
   int read_char (void);
   void unread_char (int ch);
   file_location read_name (struct md_name *name);
-  file_location read_name_or_nil (struct md_name *);
   void read_escape ();
   char *read_quoted_string ();
   char *read_braced_string ();

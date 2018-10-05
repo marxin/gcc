@@ -137,12 +137,6 @@ sem_usage_pair::sem_usage_pair (sem_item *_item, unsigned int _index)
 {
 }
 
-sem_item::sem_item (sem_item_type _type, bitmap_obstack *stack)
-: type (_type), m_hash (-1), m_hash_set (false)
-{
-  setup (stack);
-}
-
 sem_item::sem_item (sem_item_type _type, symtab_node *_node,
 		    bitmap_obstack *stack)
 : type (_type), node (_node), m_hash (-1), m_hash_set (false)
@@ -228,15 +222,6 @@ void sem_item::set_hash (hashval_t hash)
 }
 
 hash_map<const_tree, hashval_t> sem_item::m_type_hash_cache;
-
-/* Semantic function constructor that uses STACK as bitmap memory stack.  */
-
-sem_function::sem_function (bitmap_obstack *stack)
-: sem_item (FUNC, stack), m_checker (NULL), m_compared_func (NULL)
-{
-  bb_sizes.create (0);
-  bb_sorted.create (0);
-}
 
 sem_function::sem_function (cgraph_node *node, bitmap_obstack *stack)
 : sem_item (FUNC, node, stack), m_checker (NULL), m_compared_func (NULL)
@@ -1791,17 +1776,6 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
   return true;
 }
 
-/* Returns true if tree T can be compared as a handled component.  */
-
-bool
-sem_function::icf_handled_component_p (tree t)
-{
-  tree_code tc = TREE_CODE (t);
-
-  return (handled_component_p (t)
-	  || tc == ADDR_EXPR || tc == MEM_REF || tc == OBJ_TYPE_REF);
-}
-
 /* Basic blocks dictionary BB_DICT returns true if SOURCE index BB
    corresponds to TARGET.  */
 
@@ -1821,10 +1795,6 @@ sem_function::bb_dict_test (vec<int> *bb_dict, int source, int target)
     }
   else
     return (*bb_dict)[source] == target;
-}
-
-sem_variable::sem_variable (bitmap_obstack *stack): sem_item (VAR, stack)
-{
 }
 
 sem_variable::sem_variable (varpool_node *node, bitmap_obstack *stack)

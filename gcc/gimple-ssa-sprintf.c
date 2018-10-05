@@ -228,44 +228,7 @@ struct format_result
      avoid issuing duplicate warnings while finishing the processing
      of a call.  WARNED also disables the return value optimization.  */
   bool warned;
-
-  /* Preincrement the number of output characters by 1.  */
-  format_result& operator++ ()
-  {
-    return *this += 1;
-  }
-
-  /* Postincrement the number of output characters by 1.  */
-  format_result operator++ (int)
-  {
-    format_result prev (*this);
-    *this += 1;
-    return prev;
-  }
-
-  /* Increment the number of output characters by N.  */
-  format_result& operator+= (unsigned HOST_WIDE_INT);
 };
-
-format_result&
-format_result::operator+= (unsigned HOST_WIDE_INT n)
-{
-  gcc_assert (n < HOST_WIDE_INT_MAX);
-
-  if (range.min < HOST_WIDE_INT_MAX)
-    range.min += n;
-
-  if (range.max < HOST_WIDE_INT_MAX)
-    range.max += n;
-
-  if (range.likely < HOST_WIDE_INT_MAX)
-    range.likely += n;
-
-  if (range.unlikely < HOST_WIDE_INT_MAX)
-    range.unlikely += n;
-
-  return *this;
-}
 
 /* Return the value of INT_MIN for the target.  */
 
@@ -725,14 +688,6 @@ struct directive
     unsigned char c = chr & 0xff;
     flags[c / (CHAR_BIT * sizeof *flags)]
       |= (1U << (c % (CHAR_BIT * sizeof *flags)));
-  }
-
-  /* Reset the format flag CHR.  */
-  void clear_flag (char chr)
-  {
-    unsigned char c = chr & 0xff;
-    flags[c / (CHAR_BIT * sizeof *flags)]
-      &= ~(1U << (c % (CHAR_BIT * sizeof *flags)));
   }
 
   /* Set both bounds of the width range to VAL.  */

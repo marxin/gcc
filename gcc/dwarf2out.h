@@ -312,7 +312,6 @@ extern void debug_dwarf_die (struct die_struct *);
 extern void debug_dwarf_loc_descr (dw_loc_descr_ref);
 extern void debug (die_struct &ref);
 extern void debug (die_struct *ptr);
-extern void dwarf2out_set_demangle_name_func (const char *(*) (const char *));
 #ifdef VMS_DEBUGGING_INFO
 extern void dwarf2out_vms_debug_main_pointer (void);
 #endif

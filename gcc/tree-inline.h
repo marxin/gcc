@@ -184,10 +184,6 @@ struct eni_weights
   bool time_based;
 };
 
-/* Weights that estimate_num_insns uses for heuristics in inlining.  */
-
-extern eni_weights eni_inlining_weights;
-
 /* Weights that estimate_num_insns uses to estimate the size of the
    produced code.  */
 

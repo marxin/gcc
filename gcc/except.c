@@ -1599,29 +1599,6 @@ remove_eh_handler_splicer (eh_region *pp)
   (*cfun->eh->region_array)[region->index] = NULL;
 }
 
-/* Splice a single EH region REGION from the region tree.
-
-   To unlink REGION, we need to find the pointer to it with a relatively
-   expensive search in REGION's outer region.  If you are going to
-   remove a number of handlers, using remove_unreachable_eh_regions may
-   be a better option.  */
-
-void
-remove_eh_handler (eh_region region)
-{
-  eh_region *pp, *pp_start, p, outer;
-
-  outer = region->outer;
-  if (outer)
-    pp_start = &outer->inner;
-  else
-    pp_start = &cfun->eh->region_tree;
-  for (pp = pp_start, p = *pp; p != region; pp = &p->next_peer, p = *pp)
-    continue;
-
-  remove_eh_handler_splicer (pp);
-}
-
 /* Worker for remove_unreachable_eh_regions.
    PP is a pointer to the region to start a region tree depth-first
    search from.  R_REACHABLE is the set of regions that have to be
@@ -1845,19 +1822,6 @@ get_eh_landing_pad_from_rtx (const_rtx insn)
 
   get_eh_region_and_lp_from_rtx (insn, &r, &lp);
   return lp;
-}
-
-/* Return the region to which INSN may go, or NULL if it does not
-   have a reachable region within this function.  */
-
-eh_region
-get_eh_region_from_rtx (const_rtx insn)
-{
-  eh_landing_pad lp;
-  eh_region r;
-
-  get_eh_region_and_lp_from_rtx (insn, &r, &lp);
-  return r;
 }
 
 /* Return true if INSN throws and is caught by something in this function.  */

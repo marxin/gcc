@@ -531,22 +531,6 @@ md_reader::read_name (struct md_name *name)
   return loc;
 }
 
-file_location
-md_reader::read_name_or_nil (struct md_name *name)
-{
-  file_location loc;
-  if (!read_name_1 (name, &loc))
-    {
-      file_location loc = get_current_location ();
-      read_skip_construct (0, loc);
-      /* Skip the ')'.  */
-      read_char ();
-      name->buffer[0] = 0;
-      name->string = name->buffer;
-    }
-  return loc;
-}
-
 /* Subroutine of the string readers.  Handles backslash escapes.
    Caller has read the backslash, but not placed it into the obstack.  */
 

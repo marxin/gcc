@@ -185,15 +185,6 @@ record_eh_tables (cgraph_node *node, function *fun)
     }
 }
 
-/* Computes the frequency of the call statement so that it can be stored in
-   cgraph_edge.  BB is the basic block of the call statement.  */
-int
-compute_call_stmt_bb_frequency (tree decl, basic_block bb)
-{
-  return bb->count.to_cgraph_frequency
-      (ENTRY_BLOCK_PTR_FOR_FN (DECL_STRUCT_FUNCTION (decl))->count);
-}
-
 /* Mark address taken in STMT.  */
 
 static bool

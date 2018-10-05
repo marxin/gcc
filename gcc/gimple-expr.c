@@ -613,47 +613,6 @@ is_gimple_condexpr (tree t)
 				&& is_gimple_val (TREE_OPERAND (t, 1))));
 }
 
-/* Return true if T is a gimple address.  */
-
-bool
-is_gimple_address (const_tree t)
-{
-  tree op;
-
-  if (TREE_CODE (t) != ADDR_EXPR)
-    return false;
-
-  op = TREE_OPERAND (t, 0);
-  while (handled_component_p (op))
-    {
-      if ((TREE_CODE (op) == ARRAY_REF
-	   || TREE_CODE (op) == ARRAY_RANGE_REF)
-	  && !is_gimple_val (TREE_OPERAND (op, 1)))
-	    return false;
-
-      op = TREE_OPERAND (op, 0);
-    }
-
-  if (CONSTANT_CLASS_P (op)
-      || TREE_CODE (op) == TARGET_MEM_REF
-      || TREE_CODE (op) == MEM_REF)
-    return true;
-
-  switch (TREE_CODE (op))
-    {
-    case PARM_DECL:
-    case RESULT_DECL:
-    case LABEL_DECL:
-    case FUNCTION_DECL:
-    case VAR_DECL:
-    case CONST_DECL:
-      return true;
-
-    default:
-      return false;
-    }
-}
-
 /* Return true if T is a gimple invariant address.  */
 
 bool

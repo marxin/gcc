@@ -3868,20 +3868,6 @@ df_hard_reg_used_p (unsigned int reg)
 }
 
 
-/* A count of the number of times REG is actually used in the some
-   instruction.  There are a fair number of conditions that affect the
-   setting of this array.  See the comment in df.h for
-   df->hard_regs_live_count for the conditions that this array is
-   set. */
-
-
-unsigned int
-df_hard_reg_used_count (unsigned int reg)
-{
-  return df->hard_regs_live_count[reg];
-}
-
-
 /* Get the value of regs_ever_live[REGNO].  */
 
 bool

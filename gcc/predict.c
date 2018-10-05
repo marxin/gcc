@@ -516,13 +516,6 @@ edge_predicted_by_p (edge e, enum br_predictor predictor, bool taken)
   return false;
 }
 
-/* Same predicate as above, working on edges.  */
-bool
-edge_probability_reliable_p (const_edge e)
-{
-  return e->probability.probably_reliable_p ();
-}
-
 /* Same predicate as edge_probability_reliable_p, working on notes.  */
 bool
 br_prob_note_reliable_p (const_rtx note)

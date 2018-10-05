@@ -1254,7 +1254,6 @@ extern bool valid_array_size_p (location_t, tree, tree, bool = true);
 
 /* In c-warn.c.  */
 extern void constant_expression_warning (tree);
-extern void constant_expression_error (tree);
 extern void overflow_warning (location_t, tree, tree = NULL_TREE);
 extern void warn_logical_operator (location_t, enum tree_code, tree,
 				   enum tree_code, tree, enum tree_code, tree);

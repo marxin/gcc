@@ -375,18 +375,6 @@ lto_new_in_decl_state (void)
   return ggc_cleared_alloc<lto_in_decl_state> ();
 }
 
-/* Delete STATE and its components. */
-
-void
-lto_delete_in_decl_state (struct lto_in_decl_state *state)
-{
-  int i;
-
-  for (i = 0; i < LTO_N_DECL_STREAMS; i++)
-    vec_free (state->streams[i]);
-  ggc_free (state);
-}
-
 /* Search the in-decl state of a function FUNC contained in the file
    associated with FILE_DATA.  Return NULL if not found.  */
 

@@ -2528,15 +2528,6 @@ gimple_signed_or_unsigned_type (bool unsignedp, tree type)
 }
 
 
-/* Return an unsigned type the same as TYPE in other respects.  */
-
-tree
-gimple_unsigned_type (tree type)
-{
-  return gimple_signed_or_unsigned_type (true, type);
-}
-
-
 /* Return a signed type the same as TYPE in other respects.  */
 
 tree
@@ -2645,19 +2636,6 @@ gimple_builtin_call_types_compatible_p (const gimple *stmt, tree fndecl)
   if (targs && !VOID_TYPE_P (TREE_VALUE (targs)))
     return false;
   return true;
-}
-
-/* Return true when STMT is builtins call.  */
-
-bool
-gimple_call_builtin_p (const gimple *stmt)
-{
-  tree fndecl;
-  if (is_gimple_call (stmt)
-      && (fndecl = gimple_call_fndecl (stmt)) != NULL_TREE
-      && DECL_BUILT_IN_CLASS (fndecl) != NOT_BUILT_IN)
-    return gimple_builtin_call_types_compatible_p (stmt, fndecl);
-  return false;
 }
 
 /* Return true when STMT is builtins call to CLASS.  */

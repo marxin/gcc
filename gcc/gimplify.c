@@ -332,14 +332,6 @@ gimple_pop_bind_expr (void)
   gimplify_ctxp->bind_expr_stack.pop ();
 }
 
-/* Return the first element of the stack of bindings.  */
-
-gbind *
-gimple_current_bind_expr (void)
-{
-  return gimplify_ctxp->bind_expr_stack.last ();
-}
-
 /* Return the stack of bindings created during gimplification.  */
 
 vec<gbind *>

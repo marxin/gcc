@@ -20,10 +20,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_DOJUMP_H
 #define GCC_DOJUMP_H
 
-/* At the start of a function, record that we have no previously-pushed
-   arguments waiting to be popped.  */
-extern void init_pending_stack_adjust (void);
-
 /* Discard any pending stack adjustment.  */
 extern void discard_pending_stack_adjust (void);
 

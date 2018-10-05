@@ -94,7 +94,6 @@ extern tree omit_two_operands_loc (location_t, tree, tree, tree, tree);
 #define invert_truthvalue(T)\
    invert_truthvalue_loc (UNKNOWN_LOCATION, T)
 extern tree invert_truthvalue_loc (location_t, tree);
-extern tree fold_unary_to_constant (enum tree_code, tree, tree);
 extern tree fold_binary_to_constant (enum tree_code, tree, tree, tree);
 extern tree fold_bit_and_mask (tree, tree, enum tree_code,
 			       tree, enum tree_code, tree, tree,
@@ -123,7 +122,6 @@ extern tree build_simple_mem_ref_loc (location_t, tree);
 extern poly_offset_int mem_ref_offset (const_tree);
 extern tree build_invariant_address (tree, tree, poly_int64);
 extern tree constant_boolean_node (bool, tree);
-extern tree div_if_zero_remainder (const_tree, const_tree);
 
 extern bool tree_swap_operands_p (const_tree, const_tree);
 extern enum tree_code swap_tree_comparison (enum tree_code);

@@ -81,19 +81,6 @@ lto_tag_check_set (enum LTO_tags actual, int ntags, ...)
 }
 
 
-/* Read LENGTH bytes from STREAM to ADDR.  */
-
-void
-lto_input_data_block (struct lto_input_block *ib, void *addr, size_t length)
-{
-  size_t i;
-  unsigned char *const buffer = (unsigned char *) addr;
-
-  for (i = 0; i < length; i++)
-    buffer[i] = streamer_read_uchar (ib);
-}
-
-
 /* Lookup STRING in file_name_hash_table.  If found, return the existing
    string, otherwise insert STRING as the canonical version.  */
 

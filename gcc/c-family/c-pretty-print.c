@@ -156,13 +156,6 @@ pp_c_complement (c_pretty_printer *pp)
   pp->padding = pp_none;
 }
 
-void
-pp_c_exclamation (c_pretty_printer *pp)
-{
-  pp_exclamation (pp);
-  pp->padding = pp_none;
-}
-
 /* Print out the external representation of QUALIFIERS.  */
 
 void
@@ -765,30 +758,6 @@ c_pretty_printer::declaration (tree t)
   pp_c_init_declarator (this, t);
 }
 
-/* Pretty-print ATTRIBUTES using GNU C extension syntax.  */
-
-void
-pp_c_attributes (c_pretty_printer *pp, tree attributes)
-{
-  if (attributes == NULL_TREE)
-    return;
-
-  pp_c_ws_string (pp, "__attribute__");
-  pp_c_left_paren (pp);
-  pp_c_left_paren (pp);
-  for (; attributes != NULL_TREE; attributes = TREE_CHAIN (attributes))
-    {
-      pp_tree_identifier (pp, TREE_PURPOSE (attributes));
-      if (TREE_VALUE (attributes))
-	pp_c_call_argument_list (pp, TREE_VALUE (attributes));
-
-      if (TREE_CHAIN (attributes))
-	pp_separate_with (pp, ',');
-    }
-  pp_c_right_paren (pp);
-  pp_c_right_paren (pp);
-}
-
 /* Pretty-print ATTRIBUTES using GNU C extension syntax for attributes
    marked to be displayed on disgnostic.  */
 
@@ -833,20 +802,6 @@ pp_c_attributes_display (c_pretty_printer *pp, tree a)
       pp_c_whitespace (pp);
     }
 }
-
-/* function-definition:
-      declaration-specifiers declarator compound-statement  */
-
-void
-pp_c_function_definition (c_pretty_printer *pp, tree t)
-{
-  pp->declaration_specifiers (t);
-  pp->declarator (t);
-  pp_needs_newline (pp) = true;
-  pp->statement (DECL_SAVED_TREE (t));
-  pp_newline_and_flush (pp);
-}
-
 
 /* Expressions.  */
 

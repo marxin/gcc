@@ -772,7 +772,6 @@ extern void lto_record_renamed_decl (struct lto_file_decl_data *,
 extern const char *lto_get_decl_name_mapping (struct lto_file_decl_data *,
 					      const char *);
 extern struct lto_in_decl_state *lto_new_in_decl_state (void);
-extern void lto_delete_in_decl_state (struct lto_in_decl_state *);
 extern struct lto_in_decl_state *lto_get_function_in_decl_state (
 				      struct lto_file_decl_data *, tree);
 extern void lto_free_function_in_decl_state (struct lto_in_decl_state *);
@@ -827,7 +826,6 @@ extern void lto_bitmap_free (bitmap);
 extern char *lto_get_section_name (int, const char *, struct lto_file_decl_data *);
 extern void print_lto_report (const char *);
 extern void lto_streamer_init (void);
-extern bool gate_lto_out (void);
 extern void lto_check_version (int, int, const char *);
 extern void lto_streamer_hooks_init (void);
 
@@ -848,7 +846,6 @@ extern struct data_in *lto_data_in_create (struct lto_file_decl_data *,
 				    const char *, unsigned,
 				    vec<ld_plugin_symbol_resolution_t> );
 extern void lto_data_in_delete (struct data_in *);
-extern void lto_input_data_block (struct lto_input_block *, void *, size_t);
 void lto_input_location (location_t *, struct bitpack_d *, struct data_in *);
 location_t stream_input_location_now (struct bitpack_d *bp,
 				      struct data_in *data);

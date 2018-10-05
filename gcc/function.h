@@ -596,7 +596,6 @@ extern void free_temp_slots (void);
 extern void push_temp_slots (void);
 extern void pop_temp_slots (void);
 extern void init_temp_slots (void);
-extern rtx get_hard_reg_initial_reg (rtx);
 extern rtx get_hard_reg_initial_val (machine_mode, unsigned int);
 extern rtx has_hard_reg_initial_val (machine_mode, unsigned int);
 
@@ -629,7 +628,6 @@ extern void push_cfun (struct function *new_cfun);
 extern void pop_cfun (void);
 
 extern int get_next_funcdef_no (void);
-extern int get_last_funcdef_no (void);
 extern void allocate_struct_function (tree, bool);
 extern void push_struct_function (tree fndecl);
 extern void push_dummy_function (bool);

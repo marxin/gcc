@@ -1259,25 +1259,6 @@ struct GTY(()) initial_value_struct {
   initial_value_pair * GTY ((length ("%h.num_entries"))) entries;
 };
 
-/* If a pseudo represents an initial hard reg (or expression), return
-   it, else return NULL_RTX.  */
-
-rtx
-get_hard_reg_initial_reg (rtx reg)
-{
-  struct initial_value_struct *ivs = crtl->hard_reg_initial_vals;
-  int i;
-
-  if (ivs == 0)
-    return NULL_RTX;
-
-  for (i = 0; i < ivs->num_entries; i++)
-    if (rtx_equal_p (ivs->entries[i].pseudo, reg))
-      return ivs->entries[i].hard_reg;
-
-  return NULL_RTX;
-}
-
 /* Make sure that there's a pseudo register of mode MODE that stores the
    initial value of hard register REGNO.  Return an rtx for such a pseudo.  */
 
@@ -4681,13 +4662,6 @@ int
 get_next_funcdef_no (void)
 {
   return funcdef_no++;
-}
-
-/* Return value of funcdef.  */
-int
-get_last_funcdef_no (void)
-{
-  return funcdef_no;
 }
 
 /* Allocate a function structure for FNDECL and set its contents

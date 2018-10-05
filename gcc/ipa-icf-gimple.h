@@ -200,9 +200,6 @@ public:
   /* Verification function for declaration trees T1 and T2.  */
   bool compare_decl (tree t1, tree t2);
 
-  /* Verifies that tree labels T1 and T2 correspond.  */
-  bool compare_tree_ssa_label (tree t1, tree t2);
-
   /* Function compare for equality given memory operands T1 and T2.  */
   bool compare_memory_operand (tree t1, tree t2);
 
@@ -218,10 +215,6 @@ public:
   /* Compares GIMPLE ASM inputs (or outputs) where we iterate tree chain
      and compare both TREE_PURPOSEs and TREE_VALUEs.  */
   bool compare_asm_inputs_outputs (tree t1, tree t2);
-
-  /* Verifies that trees T1 and T2, representing function declarations
-     are equivalent from perspective of ICF.  */
-  bool compare_function_decl (tree t1, tree t2);
 
   /* Verifies that trees T1 and T2 do correspond.  */
   bool compare_variable_decl (tree t1, tree t2);

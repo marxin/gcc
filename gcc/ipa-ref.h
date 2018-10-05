@@ -72,14 +72,6 @@ typedef struct ipa_ref *ipa_ref_ptr;
 struct GTY(()) ipa_ref_list
 {
 public:
-  /* Return first reference in list or NULL if empty.  */
-  struct ipa_ref *first_reference (void)
-  {
-    if (!vec_safe_length (references))
-      return NULL;
-    return &(*references)[0];
-  }
-
   /* Return first referring ref in list or NULL if empty.  */
   struct ipa_ref *first_referring (void)
   {
@@ -106,12 +98,6 @@ public:
 	break;
 
     return i == 0 ? NULL : referring[i - 1];
-  }
-
-  /* Return true if the symbol has an alias.  */
-  bool inline has_aliases_p (void)
-  {
-    return first_alias ();
   }
 
   /* Clear reference list.  */

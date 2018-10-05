@@ -42,7 +42,6 @@ public:
 
 private:
   void set_control_dependence_map_bit (basic_block, int);
-  void clear_control_dependence_bitmap (basic_block);
   void find_control_dependence (int);
   vec<bitmap> control_dependence_map;
   vec<std::pair<int, int> > m_el;
@@ -76,7 +75,6 @@ extern void compute_dominance_frontiers (struct bitmap_head *);
 extern bitmap compute_idf (bitmap, struct bitmap_head *);
 extern void bitmap_intersection_of_succs (sbitmap, sbitmap *, basic_block);
 extern void bitmap_intersection_of_preds (sbitmap, sbitmap *, basic_block);
-extern void bitmap_union_of_succs (sbitmap, sbitmap *, basic_block);
 extern void bitmap_union_of_preds (sbitmap, sbitmap *, basic_block);
 extern basic_block * single_pred_before_succ_order (void);
 extern edge single_incoming_edge_ignoring_loop_edges (basic_block, bool);

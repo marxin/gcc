@@ -78,7 +78,6 @@ extern void rtl_profile_for_edge (edge);
 extern void default_rtl_profile (void);
 extern bool rtl_predicted_by_p (const_basic_block, enum br_predictor);
 extern bool gimple_predicted_by_p (const_basic_block, enum br_predictor);
-extern bool edge_probability_reliable_p (const_edge);
 extern bool br_prob_note_reliable_p (const_rtx);
 extern void predict_insn_def (rtx_insn *, enum br_predictor, enum prediction);
 extern void rtl_predict_edge (edge, enum br_predictor, int);

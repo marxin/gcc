@@ -1562,24 +1562,6 @@ cselib_expand_value_rtx_cb (rtx orig, bitmap regs_active, int max_depth,
   return cselib_expand_value_rtx_1 (orig, &evd, max_depth);
 }
 
-/* Similar to cselib_expand_value_rtx_cb, but no rtxs are actually copied
-   or simplified.  Useful to find out whether cselib_expand_value_rtx_cb
-   would return NULL or non-NULL, without allocating new rtx.  */
-
-bool
-cselib_dummy_expand_value_rtx_cb (rtx orig, bitmap regs_active, int max_depth,
-				  cselib_expand_callback cb, void *data)
-{
-  struct expand_value_data evd;
-
-  evd.regs_active = regs_active;
-  evd.callback = cb;
-  evd.callback_arg = data;
-  evd.dummy = true;
-
-  return cselib_expand_value_rtx_1 (orig, &evd, max_depth) != NULL;
-}
-
 /* Internal implementation of cselib_expand_value_rtx and
    cselib_expand_value_rtx_cb.  */
 

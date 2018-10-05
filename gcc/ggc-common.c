@@ -164,37 +164,6 @@ ggc_realloc (void *x, size_t size MEM_STAT_DECL)
   return r;
 }
 
-void *
-ggc_cleared_alloc_htab_ignore_args (size_t c ATTRIBUTE_UNUSED,
-				    size_t n ATTRIBUTE_UNUSED)
-{
-  gcc_assert (c * n == sizeof (struct htab));
-  return ggc_cleared_alloc<htab> ();
-}
-
-/* TODO: once we actually use type information in GGC, create a new tag
-   gt_gcc_ptr_array and use it for pointer arrays.  */
-void *
-ggc_cleared_alloc_ptr_array_two_args (size_t c, size_t n)
-{
-  gcc_assert (sizeof (PTR *) == n);
-  return ggc_cleared_vec_alloc<PTR *> (c);
-}
-
-/* These are for splay_tree_new_ggc.  */
-void *
-ggc_splay_alloc (int sz, void *nl)
-{
-  gcc_assert (!nl);
-  return ggc_internal_alloc (sz);
-}
-
-void
-ggc_splay_dont_free (void * x ATTRIBUTE_UNUSED, void *nl)
-{
-  gcc_assert (!nl);
-}
-
 /* Print statistics that are independent of the collector in use.  */
 #define SCALE(x) ((unsigned long) ((x) < 1024*10 \
 		  ? (x) \

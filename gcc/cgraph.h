@@ -2395,7 +2395,6 @@ tree cgraph_build_function_type_skip_args (tree orig_type, bitmap args_to_skip,
 					   bool skip_return);
 
 /* In cgraphbuild.c  */
-int compute_call_stmt_bb_frequency (tree, basic_block bb);
 void record_references_in_initializer (tree, bool);
 
 /* In ipa.c  */

@@ -50,15 +50,6 @@ static void do_compare_and_jump	(tree, tree, enum rtx_code, enum rtx_code,
 				 rtx_code_label *, rtx_code_label *,
 				 profile_probability);
 
-/* At the start of a function, record that we have no previously-pushed
-   arguments waiting to be popped.  */
-
-void
-init_pending_stack_adjust (void)
-{
-  pending_stack_adjust = 0;
-}
-
 /* Discard any pending stack adjustment.  This avoid relying on the
    RTL optimizers to remove useless adjustments when we know the
    stack pointer value is dead.  */
