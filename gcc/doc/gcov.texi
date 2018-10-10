@@ -182,10 +182,139 @@ exit without doing any further processing.
 
 @item -i
 @itemx --json-format
-Output gcov file in an easy-to-parse JSON intermediate format.
-The format itself is self-descriptive and output is a single
-@file{.gcov.json.gz} file per @file{.gcda} file.  The JSON file is compressed
-with gzip compression.  No source code is required.
+Output gcov file in an easy-to-parse JSON intermediate format
+which does not require source code for generation.  The JSON
+file is compressed with gzip compression algorithm
+and the files have @file{.gcov.json.gz} extension.
+
+Structure of the JSON is following:
+
+@smallexample
+@{
+  "current_working_directory": @var{current_working_directory},
+  "format_version": @var{format_version},
+  "gcc_version": @var{gcc_version}
+  "files": [@var{file}]
+@}
+@end smallexample
+
+Fields of the root element have following semantics:
+
+@itemize @bullet
+@item
+@var{current_working_directory}: working directory where a compilation unit was compiled
+
+@item
+@var{format_version}: semantic version of the format
+
+@item
+@var{gcc_version}: version of the GCC compiler
+@end itemize
+
+Each @var{file} has the following form:
+
+@smallexample
+@{
+  "file": @var{file_name},
+  "functions": [@var{function}],
+  "lines": [@var{line}]
+@}
+@end smallexample
+
+Fields of the @var{file} element have following semantics:
+
+@itemize @bullet
+@item
+@var{file_name}: name of the source file
+@end itemize
+
+Each @var{function} has the following form:
+
+@smallexample
+@{
+  "blocks": @var{blocks},
+  "blocks_executed": @var{blocks_executed},
+  "demangled_name": "@var{demangled_name},
+  "end_line": @var{end_line},
+  "execution_count": @var{execution_count},
+  "name": @var{name},
+  "start_line": @var{start_line}
+@}
+@end smallexample
+
+Fields of the @var{function} element have following semantics:
+
+@itemize @bullet
+@item
+@var{blocks}: number of blocks that are in the function
+
+@item
+@var{blocks_executed}: number of executed blocks of the function
+
+@item
+@var{demangled_name}: demangled name of the function
+
+@item
+@var{end_line}: line in the source file where the function ends
+
+@item
+@var{execution_count}: number of executions of the function
+
+@item
+@var{name}: name of the function
+
+@item
+@var{start_line}: line in the source file where the function begins
+@end itemize
+
+Each @var{line} has the following form:
+
+@smallexample
+@{
+  "branches": [@var{branch}],
+  "count": @var{count},
+  "line_number": @var{line_number},
+  "unexecuted_block": @var{unexecuted_block}
+@}
+@end smallexample
+
+Branches are present only with @var{-b} option.
+Fields of the @var{line} element have following semantics:
+
+@itemize @bullet
+@item
+@var{count}: number of executions of the line
+
+@item
+@var{line_number}: line number
+
+@item
+@var{unexecuted_block}: flag whether the line contains an unexecuted block
+(not all statements on the line are executed)
+@end itemize
+
+Each @var{branch} has the following form:
+
+@smallexample
+@{
+  "count": @var{count},
+  "fallthrough": @var{fallthrough},
+  "throw": @var{throw}
+@}
+@end smallexample
+
+Fields of the @var{branch} element have following semantics:
+
+@itemize @bullet
+@item
+@var{count}: number of executions of the branch
+
+@item
+@var{fallthrough}: true when the branch is a fall through branch
+
+@item
+@var{throw}: true when the branch is an exceptional branch
+@end itemize
 
 @item -j
 @itemx --human-readable
