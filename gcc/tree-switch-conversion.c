@@ -439,25 +439,63 @@ switch_conversion::build_constructors ()
     }
 }
 
-/* If all values in the constructor vector are the same, return the value.
-   Otherwise return NULL_TREE.  Not supposed to be called for empty
-   vectors.  */
+/* If all values in the constructor vector are products of a linear function
+   a * x + b, then return true.  When true, COEFF_A and COEFF_B and
+   coefficients of the linear function.  Note that equal values are special
+   case of a linear function with a and b equal to zero.  */
 
-tree
-switch_conversion::contains_same_values_p (vec<constructor_elt, va_gc> *vec)
+bool
+switch_conversion::contains_linear_function_p (vec<constructor_elt, va_gc> *vec,
+					       wide_int *coeff_a,
+					       wide_int *coeff_b)
 {
   unsigned int i;
-  tree prev = NULL_TREE;
   constructor_elt *elt;
 
+  gcc_assert (vec->length () >= 2);
+
+  /* Let's try to find any linear function a.x + y that can apply to
+     given values. 'a' can be calculated as follows:
+
+     a = (y2 - y1) / (x2 - x1) where x2 - x1 = 1 (consecutive case indices)
+     a = y2 - y1
+
+     and
+
+     b = y2 - a * x2
+
+  */
+
+  tree elt0 = (*vec)[0].value;
+  tree elt1 = (*vec)[1].value;
+
+  if (TREE_CODE (elt0) != INTEGER_CST || TREE_CODE (elt1) != INTEGER_CST)
+    return false;
+
+  // TODO
+  wide_int range_min = wi::to_wide (fold_convert (TREE_TYPE (elt0), m_range_min));
+  wide_int y1 = wi::to_wide (elt0);
+  wide_int y2 = wi::to_wide (elt1);
+  wide_int a = y2 - y1;
+  wide_int b = y2 - a * (range_min + 1);
+
+  /* Verify that all values fulfill the linear function.  */
   FOR_EACH_VEC_SAFE_ELT (vec, i, elt)
     {
-      if (!prev)
-	prev = elt->value;
-      else if (!operand_equal_p (elt->value, prev, OEP_ONLY_CONST))
-	return NULL_TREE;
+      if (TREE_CODE (elt->value) != INTEGER_CST)
+	return false;
+
+      wide_int value = wi::to_wide (elt->value);
+      if (a * range_min + b != value)
+	return false;
+
+      ++range_min;
     }
-  return prev;
+
+  *coeff_a = a;
+  *coeff_b = b;
+
+  return true;
 }
 
 /* Return type which should be used for array elements, either TYPE's
@@ -551,7 +589,7 @@ void
 switch_conversion::build_one_array (int num, tree arr_index_type,
 				    gphi *phi, tree tidx)
 {
-  tree name, cst;
+  tree name;
   gimple *load;
   gimple_stmt_iterator gsi = gsi_for_stmt (m_switch);
   location_t loc = gimple_location (m_switch);
@@ -561,9 +599,29 @@ switch_conversion::build_one_array (int num, tree arr_index_type,
   name = copy_ssa_name (PHI_RESULT (phi));
   m_target_inbound_names[num] = name;
 
-  cst = contains_same_values_p (m_constructors[num]);
-  if (cst)
-    load = gimple_build_assign (name, cst);
+  wide_int coeff_a, coeff_b;
+  bool linear_p = contains_linear_function_p (m_constructors[num], &coeff_a,
+					      &coeff_b);
+  tree first = (*m_constructors[num])[0].value;
+
+  if (linear_p)
+    {
+      if (dump_file && coeff_a.to_uhwi () > 0)
+	{
+	  fprintf (dump_file, "LINEAR:%ld * x + %ld\n", coeff_a.to_shwi (),
+		   coeff_b.to_shwi ());
+	}
+      tree t = TREE_TYPE (first);
+      tree tmp = make_ssa_name (t);
+      tree value = fold_build2_loc (loc, MULT_EXPR, t,
+				    wide_int_to_tree (t, coeff_a),
+				    m_index_expr);
+
+      gsi_insert_before (&gsi, gimple_build_assign (tmp, value), GSI_SAME_STMT);
+      value = fold_build2_loc (loc, PLUS_EXPR, t,
+			       tmp, wide_int_to_tree (t, coeff_b));
+      load = gimple_build_assign (name, value);
+    }
   else
     {
       tree array_type, ctor, decl, value_type, fetch, default_type;
