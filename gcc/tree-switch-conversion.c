@@ -602,8 +602,6 @@ switch_conversion::build_one_array (int num, tree arr_index_type,
   wide_int coeff_a, coeff_b;
   bool linear_p = contains_linear_function_p (m_constructors[num], &coeff_a,
 					      &coeff_b);
-  tree first = (*m_constructors[num])[0].value;
-
   if (linear_p)
     {
       if (dump_file && coeff_a.to_uhwi () > 0)
@@ -611,7 +609,7 @@ switch_conversion::build_one_array (int num, tree arr_index_type,
 	  fprintf (dump_file, "LINEAR:%ld * x + %ld\n", coeff_a.to_shwi (),
 		   coeff_b.to_shwi ());
 	}
-      tree t = TREE_TYPE (first);
+      tree t = TREE_TYPE (m_index_expr);
       tree tmp = make_ssa_name (t);
       tree value = fold_build2_loc (loc, MULT_EXPR, t,
 				    wide_int_to_tree (t, coeff_a),
@@ -620,7 +618,9 @@ switch_conversion::build_one_array (int num, tree arr_index_type,
       gsi_insert_before (&gsi, gimple_build_assign (tmp, value), GSI_SAME_STMT);
       value = fold_build2_loc (loc, PLUS_EXPR, t,
 			       tmp, wide_int_to_tree (t, coeff_b));
-      load = gimple_build_assign (name, value);
+      tree tmp2 = make_ssa_name (t);
+      gsi_insert_before (&gsi, gimple_build_assign (tmp2, value), GSI_SAME_STMT);
+      load = gimple_build_assign (name, NOP_EXPR, fold_convert (t, tmp2));
     }
   else
     {
