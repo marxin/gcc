@@ -105,8 +105,8 @@ static int contains_pointers_p (tree);
 #ifdef ASM_OUTPUT_EXTERNAL
 static bool incorporeal_function_p (tree);
 #endif
-static void decode_addr_const (tree, struct addr_const *);
-static hashval_t const_hash_1 (const tree);
+static bool decode_addr_const (tree, struct addr_const *, bool build = true);
+static hashval_t const_hash_1 (const tree, bool build = true);
 static int compare_constant (const tree, const tree);
 static void output_constant_def_contents (rtx);
 static void output_addressed_constants (tree);
@@ -2882,15 +2882,17 @@ assemble_real (REAL_VALUE_TYPE d, scalar_float_mode mode, unsigned int align,
 /* Given an expression EXP with a constant value,
    reduce it to the sum of an assembler symbol and an integer.
    Store them both in the structure *VALUE.
-   EXP must be reducible.  */
+   EXP must be reducible.
+   If BUILD is false the function may fail if it is address expr of a constant
+   that is not in the constant pool.  */
 
 struct addr_const {
   rtx base;
   poly_int64 offset;
 };
 
-static void
-decode_addr_const (tree exp, struct addr_const *value)
+static bool
+decode_addr_const (tree exp, struct addr_const *value, bool build)
 {
   tree target = TREE_OPERAND (exp, 0);
   poly_int64 offset = 0;
@@ -2948,7 +2950,14 @@ decode_addr_const (tree exp, struct addr_const *value)
     case COMPLEX_CST:
     case CONSTRUCTOR:
     case INTEGER_CST:
-      x = output_constant_def (target, 1);
+      if (!build)
+	{
+          x = lookup_constant_def (target);
+	  if (!x)
+	    return false;
+	}
+      else
+        x = output_constant_def (target, 1);
       break;
 
     case INDIRECT_REF:
@@ -2967,6 +2976,7 @@ decode_addr_const (tree exp, struct addr_const *value)
 
   value->base = x;
   value->offset = offset;
+  return true;
 }
 
 static GTY(()) hash_table<tree_descriptor_hasher> *const_desc_htab;
@@ -2990,7 +3000,7 @@ tree_descriptor_hasher::hash (constant_descriptor_tree *ptr)
 }
 
 static hashval_t
-const_hash_1 (const tree exp)
+const_hash_1 (const tree exp, bool build)
 {
   const char *p;
   hashval_t hi;
@@ -3019,8 +3029,8 @@ const_hash_1 (const tree exp)
       break;
 
     case COMPLEX_CST:
-      return (const_hash_1 (TREE_REALPART (exp)) * 5
-	      + const_hash_1 (TREE_IMAGPART (exp)));
+      return (const_hash_1 (TREE_REALPART (exp), build) * 5
+	      + const_hash_1 (TREE_IMAGPART (exp), build));
 
     case VECTOR_CST:
       {
@@ -3028,7 +3038,7 @@ const_hash_1 (const tree exp)
 	hi = hi * 563 + VECTOR_CST_NELTS_PER_PATTERN (exp);
 	unsigned int count = vector_cst_encoded_nelts (exp);
 	for (unsigned int i = 0; i < count; ++i)
-	  hi = hi * 563 + const_hash_1 (VECTOR_CST_ENCODED_ELT (exp, i));
+	  hi = hi * 563 + const_hash_1 (VECTOR_CST_ENCODED_ELT (exp, i), build);
 	return hi;
       }
 
@@ -3041,7 +3051,7 @@ const_hash_1 (const tree exp)
 
 	FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (exp), idx, value)
 	  if (value)
-	    hi = hi * 603 + const_hash_1 (value);
+	    hi = hi * 603 + const_hash_1 (value, build);
 
 	return hi;
       }
@@ -3051,7 +3061,8 @@ const_hash_1 (const tree exp)
       {
 	struct addr_const value;
 
-	decode_addr_const (exp, &value);
+	if (!decode_addr_const (exp, &value, build))
+	  return 0;
 	switch (GET_CODE (value.base))
 	  {
 	  case SYMBOL_REF:
@@ -3077,11 +3088,11 @@ const_hash_1 (const tree exp)
     case PLUS_EXPR:
     case POINTER_PLUS_EXPR:
     case MINUS_EXPR:
-      return (const_hash_1 (TREE_OPERAND (exp, 0)) * 9
-	      + const_hash_1 (TREE_OPERAND (exp, 1)));
+      return (const_hash_1 (TREE_OPERAND (exp, 0), build) * 9
+	      + const_hash_1 (TREE_OPERAND (exp, 1), build));
 
     CASE_CONVERT:
-      return const_hash_1 (TREE_OPERAND (exp, 0)) * 7 + 2;
+      return const_hash_1 (TREE_OPERAND (exp, 0), build) * 7 + 2;
 
     default:
       /* A language specific constant. Just hash the code.  */
@@ -3554,7 +3565,7 @@ lookup_constant_def (tree exp)
   struct constant_descriptor_tree key;
 
   key.value = exp;
-  key.hash = const_hash_1 (exp);
+  key.hash = const_hash_1 (exp, false);
   constant_descriptor_tree *desc
     = const_desc_htab->find_with_hash (&key, key.hash);
 
