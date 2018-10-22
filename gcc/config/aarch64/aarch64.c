@@ -10521,19 +10521,16 @@ static enum aarch64_parse_opt_result
 aarch64_parse_arch (const char *to_parse, const struct processor **res,
 		    unsigned long *isa_flags, std::string *invalid_extension)
 {
-  char *ext;
+  const char *ext;
   const struct processor *arch;
-  char *str = (char *) alloca (strlen (to_parse) + 1);
   size_t len;
 
-  strcpy (str, to_parse);
-
-  ext = strchr (str, '+');
+  ext = strchr (to_parse, '+');
 
   if (ext != NULL)
-    len = ext - str;
+    len = ext - to_parse;
   else
-    len = strlen (str);
+    len = strlen (to_parse);
 
   if (len == 0)
     return AARCH64_PARSE_MISSING_ARG;
@@ -10542,7 +10539,8 @@ aarch64_parse_arch (const char *to_parse, const struct processor **res,
   /* Loop through the list of supported ARCHes to find a match.  */
   for (arch = all_architectures; arch->name != NULL; arch++)
     {
-      if (strlen (arch->name) == len && strncmp (arch->name, str, len) == 0)
+      if (strlen (arch->name) == len
+	  && strncmp (arch->name, to_parse, len) == 0)
 	{
 	  unsigned long isa_temp = arch->flags;
 
@@ -10578,19 +10576,16 @@ static enum aarch64_parse_opt_result
 aarch64_parse_cpu (const char *to_parse, const struct processor **res,
 		   unsigned long *isa_flags, std::string *invalid_extension)
 {
-  char *ext;
+  const char *ext;
   const struct processor *cpu;
-  char *str = (char *) alloca (strlen (to_parse) + 1);
   size_t len;
 
-  strcpy (str, to_parse);
-
-  ext = strchr (str, '+');
+  ext = strchr (to_parse, '+');
 
   if (ext != NULL)
-    len = ext - str;
+    len = ext - to_parse;
   else
-    len = strlen (str);
+    len = strlen (to_parse);
 
   if (len == 0)
     return AARCH64_PARSE_MISSING_ARG;
@@ -10599,7 +10594,7 @@ aarch64_parse_cpu (const char *to_parse, const struct processor **res,
   /* Loop through the list of supported CPUs to find a match.  */
   for (cpu = all_cores; cpu->name != NULL; cpu++)
     {
-      if (strlen (cpu->name) == len && strncmp (cpu->name, str, len) == 0)
+      if (strlen (cpu->name) == len && strncmp (cpu->name, to_parse, len) == 0)
 	{
 	  unsigned long isa_temp = cpu->flags;
 
@@ -10633,14 +10628,11 @@ static enum aarch64_parse_opt_result
 aarch64_parse_tune (const char *to_parse, const struct processor **res)
 {
   const struct processor *cpu;
-  char *str = (char *) alloca (strlen (to_parse) + 1);
-
-  strcpy (str, to_parse);
 
   /* Loop through the list of supported CPUs to find a match.  */
   for (cpu = all_cores; cpu->name != NULL; cpu++)
     {
-      if (strcmp (cpu->name, str) == 0)
+      if (strcmp (cpu->name, to_parse) == 0)
 	{
 	  *res = cpu;
 	  return AARCH64_PARSE_OK;
