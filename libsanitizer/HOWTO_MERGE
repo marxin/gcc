@@ -20,7 +20,7 @@ general list of actions required to perform the merge:
 * Update ASan testsuite with corresponding tests from lib/asan/tests directory.
   Not all tests can be migrated easily, so you don't need them all to be adapted.
 * Modify configure.ac file if needed (e.g. if you need to add link against new
-  library for sanitizer lilbs).
+  library for sanitizer libs).
 * Add new target platforms in configure.tgt script if needed.
 * Bump SONAME for sanitizer libraries in asan/tsan/ubsan libtool-version files
   if ABI has changed.
