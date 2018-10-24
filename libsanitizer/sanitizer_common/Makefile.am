@@ -46,8 +46,8 @@ sanitizer_common_files = \
 	sanitizer_posix.cc \
 	sanitizer_posix_libcdep.cc \
 	sanitizer_printf.cc \
+	sanitizer_procmaps_bsd.cc \
 	sanitizer_procmaps_common.cc \
-	sanitizer_procmaps_freebsd.cc \
 	sanitizer_procmaps_linux.cc \
 	sanitizer_procmaps_mac.cc \
 	sanitizer_stackdepot.cc \
