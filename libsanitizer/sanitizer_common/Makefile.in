@@ -94,7 +94,7 @@ am__objects_1 = sancov_flags.lo sanitizer_allocator.lo \
 	sanitizer_platform_limits_linux.lo \
 	sanitizer_platform_limits_posix.lo sanitizer_posix.lo \
 	sanitizer_posix_libcdep.lo sanitizer_printf.lo \
-	sanitizer_procmaps_common.lo sanitizer_procmaps_freebsd.lo \
+	sanitizer_procmaps_bsd.lo sanitizer_procmaps_common.lo \
 	sanitizer_procmaps_linux.lo sanitizer_procmaps_mac.lo \
 	sanitizer_stackdepot.lo sanitizer_stacktrace.lo \
 	sanitizer_stacktrace_libcdep.lo sanitizer_symbolizer_mac.lo \
@@ -331,8 +331,8 @@ sanitizer_common_files = \
 	sanitizer_posix.cc \
 	sanitizer_posix_libcdep.cc \
 	sanitizer_printf.cc \
+	sanitizer_procmaps_bsd.cc \
 	sanitizer_procmaps_common.cc \
-	sanitizer_procmaps_freebsd.cc \
 	sanitizer_procmaps_linux.cc \
 	sanitizer_procmaps_mac.cc \
 	sanitizer_stackdepot.cc \
@@ -477,8 +477,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_posix.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_posix_libcdep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_printf.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_procmaps_bsd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_procmaps_common.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_procmaps_freebsd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_procmaps_linux.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_procmaps_mac.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_stackdepot.Plo@am__quote@
