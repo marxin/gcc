@@ -98,7 +98,7 @@ am__objects_1 = sancov_flags.lo sanitizer_allocator.lo \
 	sanitizer_procmaps_linux.lo sanitizer_procmaps_mac.lo \
 	sanitizer_stackdepot.lo sanitizer_stacktrace.lo \
 	sanitizer_stacktrace_libcdep.lo sanitizer_symbolizer_mac.lo \
-	sanitizer_stacktrace_printer.lo \
+	sanitizer_symbolizer_report.lo sanitizer_stacktrace_printer.lo \
 	sanitizer_stoptheworld_linux_libcdep.lo \
 	sanitizer_stoptheworld_mac.lo sanitizer_suppressions.lo \
 	sanitizer_symbolizer.lo sanitizer_symbolizer_libbacktrace.lo \
@@ -339,6 +339,7 @@ sanitizer_common_files = \
 	sanitizer_stacktrace.cc \
 	sanitizer_stacktrace_libcdep.cc \
 	sanitizer_symbolizer_mac.cc \
+	sanitizer_symbolizer_report.cc \
 	sanitizer_stacktrace_printer.cc \
 	sanitizer_stoptheworld_linux_libcdep.cc \
 	sanitizer_stoptheworld_mac.cc \
@@ -493,6 +494,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_symbolizer_libcdep.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_symbolizer_mac.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_symbolizer_posix_libcdep.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_symbolizer_report.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_symbolizer_win.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_termination.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sanitizer_thread_registry.Plo@am__quote@

@@ -54,6 +54,7 @@ sanitizer_common_files = \
 	sanitizer_stacktrace.cc \
 	sanitizer_stacktrace_libcdep.cc \
 	sanitizer_symbolizer_mac.cc \
+	sanitizer_symbolizer_report.cc \
 	sanitizer_stacktrace_printer.cc \
 	sanitizer_stoptheworld_linux_libcdep.cc \
 	sanitizer_stoptheworld_mac.cc \
