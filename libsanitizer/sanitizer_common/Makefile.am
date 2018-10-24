@@ -24,6 +24,7 @@ sanitizer_common_files = \
 	sancov_flags.cc \
 	sanitizer_allocator.cc \
 	sanitizer_allocator_checks.cc \
+	sanitizer_allocator_report.cc \
 	sanitizer_common.cc \
 	sanitizer_common_libcdep.cc \
 	sanitizer_coverage_libcdep_new.cc \
