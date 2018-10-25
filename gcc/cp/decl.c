@@ -4445,14 +4445,12 @@ cp_fname_init (const char* name, tree *type_p)
   type = cp_build_qualified_type (char_type_node, TYPE_QUAL_CONST);
   type = build_cplus_array_type (type, domain);
 
-  *type_p = type_decays_to (type);
+  *type_p = type;
 
   if (init)
     TREE_TYPE (init) = type;
   else
     init = error_mark_node;
-
-  init = decay_conversion (init, tf_warning_or_error);
 
   return init;
 }
@@ -4482,6 +4480,7 @@ cp_make_fname_decl (location_t loc, tree id, int type_dep)
   TREE_READONLY (decl) = 1;
   DECL_ARTIFICIAL (decl) = 1;
   DECL_DECLARED_CONSTEXPR_P (decl) = 1;
+  TREE_STATIC (decl) = 1;
 
   TREE_USED (decl) = 1;
 
