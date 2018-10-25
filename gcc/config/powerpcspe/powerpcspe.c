@@ -39354,7 +39354,7 @@ rs6000_final_prescan_insn (rtx_insn *insn, rtx *operand ATTRIBUTE_UNUSED,
 static unsigned HOST_WIDE_INT
 rs6000_asan_shadow_offset (void)
 {
-  return (unsigned HOST_WIDE_INT) 1 << (TARGET_64BIT ? 41 : 29);
+  return (unsigned HOST_WIDE_INT) 1 << (TARGET_64BIT ? 44 : 29);
 }
 #endif
 
