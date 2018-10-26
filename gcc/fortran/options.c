@@ -642,6 +642,10 @@ gfc_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       gfc_add_intrinsic_modules_path (arg);
       break;
 
+    case OPT_module_include:
+      gfc_add_implicit_use (arg);
+      break;
+
     case OPT_fpreprocessed:
       gfc_option.flag_preprocessed = value;
       break;

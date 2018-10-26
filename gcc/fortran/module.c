@@ -195,6 +195,8 @@ static const char *submodule_name;
 
 static gfc_use_list *module_list;
 
+static const char *implicit_module_name = NULL;
+
 /* If we're reading an intrinsic module, this is its ID.  */
 static intmod_id current_intmod;
 
@@ -718,6 +720,11 @@ cleanup:
   return MATCH_ERROR;
 }
 
+void
+gfc_add_implicit_use (const char *module_name)
+{
+  implicit_module_name = module_name;
+}
 
 /* Match a SUBMODULE statement.
 
@@ -7242,6 +7249,15 @@ gfc_module_init_2 (void)
   last_atom = ATOM_LPAREN;
   gfc_rename_list = NULL;
   module_list = NULL;
+
+  if (implicit_module_name)
+    {
+      gfc_use_list *use_list;
+      use_list = gfc_get_use_list ();
+      use_list->module_name = gfc_get_string ("%s", implicit_module_name);
+      use_list->where = gfc_current_locus;
+      module_list = use_list;
+    }
 }
 
 
