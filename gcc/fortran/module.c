@@ -181,6 +181,12 @@ pointer_info;
 
 #define gfc_get_pointer_info() XCNEW (pointer_info)
 
+typedef struct string_list
+{
+  const char *name;
+  struct string_list *next;
+}
+string_list_t;
 
 /* Local variables */
 
@@ -194,6 +200,8 @@ static const char *module_name;
 static const char *submodule_name;
 
 static gfc_use_list *module_list;
+
+static string_list *implicit_module_names = NULL;
 
 /* If we're reading an intrinsic module, this is its ID.  */
 static intmod_id current_intmod;
@@ -718,6 +726,15 @@ cleanup:
   return MATCH_ERROR;
 }
 
+void
+gfc_add_implicit_use (const char *module_name)
+{
+  string_list_t *str = XNEW (string_list_t);
+
+  str->name = module_name;
+  str->next = implicit_module_names;
+  implicit_module_names = str;
+}
 
 /* Match a SUBMODULE statement.
 
@@ -7242,6 +7259,15 @@ gfc_module_init_2 (void)
   last_atom = ATOM_LPAREN;
   gfc_rename_list = NULL;
   module_list = NULL;
+
+  for (string_list_t *l = implicit_module_names; l; l = l->next)
+    {
+      gfc_use_list *use_list;
+      use_list = gfc_get_use_list ();
+      use_list->module_name = gfc_get_string ("%s", l->name);
+      use_list->where = gfc_current_locus;
+      module_list = use_list;
+    }
 }
 
 

@@ -822,6 +822,10 @@ undef
 Fortran
 ; Documented in C
 
+module-use
+Fortran Joined Separate
+Use implicitly a module
+
 v
 Fortran
 ; Documented in C

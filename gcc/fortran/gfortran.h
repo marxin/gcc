@@ -3385,6 +3385,7 @@ bool gfc_check_symbol_access (gfc_symbol *);
 void gfc_free_use_stmts (gfc_use_list *);
 const char *gfc_dt_lower_string (const char *);
 const char *gfc_dt_upper_string (const char *);
+void gfc_add_implicit_use (const char *);
 
 /* primary.c */
 symbol_attribute gfc_variable_attr (gfc_expr *, gfc_typespec *);
