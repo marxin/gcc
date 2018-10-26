@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "match.h"
 #include "parse.h"
 #include "constructor.h"
+#include "trans.h"
 
 /* Macros to access allocate memory for gfc_data_variable,
    gfc_data_value and gfc_data.  */
@@ -11114,13 +11115,14 @@ gfc_match_final_decl (void)
 
 
 const ext_attr_t ext_attr_list[] = {
-  { "dllimport",    EXT_ATTR_DLLIMPORT,    "dllimport" },
-  { "dllexport",    EXT_ATTR_DLLEXPORT,    "dllexport" },
-  { "cdecl",        EXT_ATTR_CDECL,        "cdecl"     },
-  { "stdcall",      EXT_ATTR_STDCALL,      "stdcall"   },
-  { "fastcall",     EXT_ATTR_FASTCALL,     "fastcall"  },
-  { "no_arg_check", EXT_ATTR_NO_ARG_CHECK, NULL        },
-  { NULL,           EXT_ATTR_LAST,         NULL        }
+  { "dllimport",	EXT_ATTR_DLLIMPORT,	   "dllimport"	       },
+  { "dllexport",	EXT_ATTR_DLLEXPORT,	   "dllexport"	       },
+  { "cdecl",		EXT_ATTR_CDECL,		   "cdecl"	       },
+  { "stdcall",		EXT_ATTR_STDCALL,	   "stdcall"	       },
+  { "fastcall",		EXT_ATTR_FASTCALL,	   "fastcall"	       },
+  { "no_arg_check",	EXT_ATTR_NO_ARG_CHECK,	   NULL		       },
+  { "simd_notinbranch",	EXT_ATTR_SIMD_NOTINBRANCH, NULL		       },
+  { NULL,		EXT_ATTR_LAST,		   NULL		       }
 };
 
 /* Match a !GCC$ ATTRIBUTES statement of the form:
@@ -11141,12 +11143,14 @@ match
 gfc_match_gcc_attributes (void)
 {
   symbol_attribute attr;
+  gfc_typespec ts;
   char name[GFC_MAX_SYMBOL_LEN + 1];
   unsigned id;
   gfc_symbol *sym;
   match m;
 
   gfc_clear_attr (&attr);
+  gfc_clear_ts (&ts);
   for(;;)
     {
       char ch;
@@ -11154,18 +11158,31 @@ gfc_match_gcc_attributes (void)
       if (gfc_match_name (name) != MATCH_YES)
 	return MATCH_ERROR;
 
-      for (id = 0; id < EXT_ATTR_LAST; id++)
-	if (strcmp (name, ext_attr_list[id].name) == 0)
-	  break;
-
-      if (id == EXT_ATTR_LAST)
+      if (strcmp (name, "type") == 0)
 	{
-	  gfc_error ("Unknown attribute in !GCC$ ATTRIBUTES statement at %C");
-	  return MATCH_ERROR;
-	}
+	  ch = gfc_next_ascii_char ();
+	  if (ch != '=')
+	    return MATCH_ERROR;
 
-      if (!gfc_add_ext_attribute (&attr, (ext_attr_id_t)id, &gfc_current_locus))
-	return MATCH_ERROR;
+	  m = gfc_match_type_spec (&ts);
+	  if (m != MATCH_YES)
+	    return MATCH_ERROR;
+	}
+      else
+	{
+	  for (id = 0; id < EXT_ATTR_LAST; id++)
+	    if (strcmp (name, ext_attr_list[id].name) == 0)
+	      break;
+
+	  if (id == EXT_ATTR_LAST)
+	    {
+	      gfc_error ("Unknown attribute in !GCC$ ATTRIBUTES statement at %C");
+	      return MATCH_ERROR;
+	    }
+
+	  if (!gfc_add_ext_attribute (&attr, (ext_attr_id_t)id, &gfc_current_locus))
+	    return MATCH_ERROR;
+	}
 
       gfc_gobble_whitespace ();
       ch = gfc_next_ascii_char ();
@@ -11193,6 +11210,24 @@ gfc_match_gcc_attributes (void)
 
       if (find_special (name, &sym, true))
 	return MATCH_ERROR;
+
+      if (attr.ext_attr & (1 << EXT_ATTR_SIMD_NOTINBRANCH)
+	  && ts.type != BT_UNKNOWN)
+	{
+	  /* Set SIMD flag if there is a intrinsic function with the
+	     same name.  */
+	  gfc_intrinsic_sym *isym = gfc_find_function (sym->name);
+	  if (isym != NULL)
+	    {
+	      tree fndecl = gfc_get_intrinsic_decl_type (isym, &ts);
+	      DECL_ATTRIBUTES (fndecl)
+		= tree_cons (get_identifier ("omp declare simd"),
+			     build_tree_list (NULL_TREE,
+					      build_omp_clause (UNKNOWN_LOCATION,
+								OMP_CLAUSE_NOTINBRANCH)),
+			     DECL_ATTRIBUTES (fndecl));
+	    }
+	}
 
       sym->attr.ext_attr |= attr.ext_attr;
 

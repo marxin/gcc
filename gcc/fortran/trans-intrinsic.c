@@ -718,21 +718,10 @@ gfc_build_intrinsic_lib_fndecls (void)
     }
 }
 
-
-/* Create a fndecl for a simple intrinsic library function.  */
-
-static tree
-gfc_get_intrinsic_lib_fndecl (gfc_intrinsic_map_t * m, gfc_expr * expr)
+static tree *
+gfc_get_intrinsic_decl_type (gfc_intrinsic_map_t *m, gfc_typespec *ts)
 {
-  tree type;
-  vec<tree, va_gc> *argtypes;
-  tree fndecl;
-  gfc_actual_arglist *actual;
   tree *pdecl;
-  gfc_typespec *ts;
-  char name[GFC_MAX_SYMBOL_LEN + 3];
-
-  ts = &expr->ts;
   if (ts->type == BT_REAL)
     {
       switch (ts->kind)
@@ -777,6 +766,46 @@ gfc_get_intrinsic_lib_fndecl (gfc_intrinsic_map_t * m, gfc_expr * expr)
     }
   else
     gcc_unreachable ();
+
+  return pdecl;
+}
+
+tree
+gfc_get_intrinsic_decl_type (gfc_intrinsic_sym *isym, gfc_typespec *ts)
+{
+  gfc_intrinsic_map_t *m;
+  gfc_isym_id id;
+
+  id = isym->id;
+  /* Find the entry for this function.  */
+  for (m = gfc_intrinsic_map;
+       m->id != GFC_ISYM_NONE || m->double_built_in != END_BUILTINS; m++)
+    {
+      if (id == m->id)
+	break;
+    }
+
+  if (m->id == GFC_ISYM_NONE)
+    return NULL_TREE;
+
+  return *gfc_get_intrinsic_decl_type (m, ts);
+}
+
+/* Create a fndecl for a simple intrinsic library function.  */
+
+static tree
+gfc_get_intrinsic_lib_fndecl (gfc_intrinsic_map_t * m, gfc_expr * expr)
+{
+  tree type;
+  vec<tree, va_gc> *argtypes;
+  tree fndecl;
+  gfc_actual_arglist *actual;
+  tree *pdecl;
+  gfc_typespec *ts;
+  char name[GFC_MAX_SYMBOL_LEN + 3];
+
+  ts = &expr->ts;
+  pdecl = gfc_get_intrinsic_decl_type (m, ts);
 
   if (*pdecl)
     return *pdecl;
