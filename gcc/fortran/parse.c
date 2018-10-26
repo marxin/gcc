@@ -3421,6 +3421,21 @@ parse_enum (void)
   pop_state ();
 }
 
+/* Set simd flag for an intrinsic symbol that has the same name
+   as SYMbol.  */
+
+static void
+mark_simd_attribute_in_interface (gfc_symbol *sym)
+{
+  if (sym->attr.ext_attr & (1 << EXT_ATTR_SIMD_NOTINBRANCH))
+    {
+      /* Set SIMD flag if there is a intrinsic function with the
+	 same name.  */
+      gfc_intrinsic_sym *isym = gfc_find_function (sym->name);
+      if (isym != NULL)
+	isym->simd = 1;
+    }
+}
 
 /* Parse an interface.  We must be able to deal with the possibility
    of recursive interfaces.  The parse_spec() subroutine is mutually
@@ -3562,6 +3577,12 @@ decl:
   /* Add EXTERNAL attribute to function or subroutine.  */
   if (current_interface.type != INTERFACE_ABSTRACT && !prog_unit->attr.dummy)
     gfc_add_external (&prog_unit->attr, &gfc_current_locus);
+
+
+  /* Mark all functions in the interface with simd attribute.  */
+  if (strcmp (current_interface.ns->sym_root->name, "vector_math") == 0)
+    gfc_traverse_ns (current_interface.ns,
+		     mark_simd_attribute_in_interface);
 
   current_interface = save;
   gfc_add_interface (prog_unit);

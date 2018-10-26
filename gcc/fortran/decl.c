@@ -11114,13 +11114,14 @@ gfc_match_final_decl (void)
 
 
 const ext_attr_t ext_attr_list[] = {
-  { "dllimport",    EXT_ATTR_DLLIMPORT,    "dllimport" },
-  { "dllexport",    EXT_ATTR_DLLEXPORT,    "dllexport" },
-  { "cdecl",        EXT_ATTR_CDECL,        "cdecl"     },
-  { "stdcall",      EXT_ATTR_STDCALL,      "stdcall"   },
-  { "fastcall",     EXT_ATTR_FASTCALL,     "fastcall"  },
-  { "no_arg_check", EXT_ATTR_NO_ARG_CHECK, NULL        },
-  { NULL,           EXT_ATTR_LAST,         NULL        }
+  { "dllimport",	EXT_ATTR_DLLIMPORT,	   "dllimport"	       },
+  { "dllexport",	EXT_ATTR_DLLEXPORT,	   "dllexport"	       },
+  { "cdecl",		EXT_ATTR_CDECL,		   "cdecl"	       },
+  { "stdcall",		EXT_ATTR_STDCALL,	   "stdcall"	       },
+  { "fastcall",		EXT_ATTR_FASTCALL,	   "fastcall"	       },
+  { "no_arg_check",	EXT_ATTR_NO_ARG_CHECK,	   NULL		       },
+  { "simd_notinbranch",	EXT_ATTR_SIMD_NOTINBRANCH, NULL		       },
+  { NULL,		EXT_ATTR_LAST,		   NULL		       }
 };
 
 /* Match a !GCC$ ATTRIBUTES statement of the form:
