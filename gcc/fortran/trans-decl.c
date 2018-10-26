@@ -1390,9 +1390,17 @@ add_attributes_to_decl (symbol_attribute sym_attr, tree list)
   for (id = 0; id < EXT_ATTR_NUM; id++)
     if (sym_attr.ext_attr & (1 << id))
       {
-	attr = build_tree_list (
-		 get_identifier (ext_attr_list[id].middle_end_name),
-				 NULL_TREE);
+	if (ext_attr_list[id].id == EXT_ATTR_SIMD_NOTINBRANCH)
+	  {
+	    tree t = get_identifier ("simd");
+	    attr = build_omp_clause (UNKNOWN_LOCATION,
+				     OMP_CLAUSE_NOTINBRANCH);
+	    attr = tree_cons (t, build_tree_list (NULL_TREE, attr), NULL_TREE);
+	  }
+	else
+	  attr = build_tree_list (
+				  get_identifier (ext_attr_list[id].middle_end_name),
+				  NULL_TREE);
 	list = chainon (list, attr);
       }
 

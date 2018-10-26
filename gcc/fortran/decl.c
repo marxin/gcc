@@ -11114,13 +11114,14 @@ gfc_match_final_decl (void)
 
 
 const ext_attr_t ext_attr_list[] = {
-  { "dllimport",    EXT_ATTR_DLLIMPORT,    "dllimport" },
-  { "dllexport",    EXT_ATTR_DLLEXPORT,    "dllexport" },
-  { "cdecl",        EXT_ATTR_CDECL,        "cdecl"     },
-  { "stdcall",      EXT_ATTR_STDCALL,      "stdcall"   },
-  { "fastcall",     EXT_ATTR_FASTCALL,     "fastcall"  },
-  { "no_arg_check", EXT_ATTR_NO_ARG_CHECK, NULL        },
-  { NULL,           EXT_ATTR_LAST,         NULL        }
+  { "dllimport",	EXT_ATTR_DLLIMPORT,	   "dllimport"	       },
+  { "dllexport",	EXT_ATTR_DLLEXPORT,	   "dllexport"	       },
+  { "cdecl",		EXT_ATTR_CDECL,		   "cdecl"	       },
+  { "stdcall",		EXT_ATTR_STDCALL,	   "stdcall"	       },
+  { "fastcall",		EXT_ATTR_FASTCALL,	   "fastcall"	       },
+  { "no_arg_check",	EXT_ATTR_NO_ARG_CHECK,	   NULL		       },
+  { "simd_notinbranch",	EXT_ATTR_SIMD_NOTINBRANCH, NULL		       },
+  { NULL,		EXT_ATTR_LAST,		   NULL		       }
 };
 
 /* Match a !GCC$ ATTRIBUTES statement of the form:
@@ -11193,6 +11194,15 @@ gfc_match_gcc_attributes (void)
 
       if (find_special (name, &sym, true))
 	return MATCH_ERROR;
+
+      if (attr.ext_attr & (1 << EXT_ATTR_SIMD_NOTINBRANCH))
+	{
+	  /* Set SIMD flag if there is a intrinsic function with the
+	     same name.  */
+	  gfc_intrinsic_sym *isym = gfc_find_function (sym->name);
+	  if (isym != NULL)
+	    isym->simd = 1;
+	}
 
       sym->attr.ext_attr |= attr.ext_attr;
 
