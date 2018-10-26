@@ -738,6 +738,7 @@ typedef enum
   EXT_ATTR_CDECL,
   EXT_ATTR_FASTCALL,
   EXT_ATTR_NO_ARG_CHECK,
+  EXT_ATTR_SIMD_NOTINBRANCH,
   EXT_ATTR_LAST, EXT_ATTR_NUM = EXT_ATTR_LAST
 }
 ext_attr_id_t;
@@ -2057,7 +2058,7 @@ typedef struct gfc_intrinsic_sym
   gfc_typespec ts;
   unsigned elemental:1, inquiry:1, transformational:1, pure:1,
     generic:1, specific:1, actual_ok:1, noreturn:1, conversion:1,
-    from_module:1, vararg:1;
+    from_module:1, vararg:1, simd:1;
 
   int standard;
 

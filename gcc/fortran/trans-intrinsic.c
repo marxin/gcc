@@ -863,6 +863,14 @@ gfc_conv_intrinsic_lib_function (gfc_se * se, gfc_expr * expr)
 
   gfc_conv_intrinsic_function_args (se, expr, args, num_args);
   fndecl = gfc_get_intrinsic_lib_fndecl (m, expr);
+
+  if (expr->value.function.isym->simd)
+    DECL_ATTRIBUTES (fndecl)
+      = tree_cons (get_identifier ("omp declare simd"),
+		   build_tree_list (NULL_TREE, build_omp_clause (UNKNOWN_LOCATION,
+								 OMP_CLAUSE_NOTINBRANCH)),
+		   DECL_ATTRIBUTES (fndecl));
+
   rettype = TREE_TYPE (TREE_TYPE (fndecl));
 
   fndecl = build_addr (fndecl);
