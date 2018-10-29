@@ -503,6 +503,7 @@ private:
 
   value_type *alloc_entries (size_t n CXX_MEM_STAT_INFO) const;
   value_type *find_empty_slot_for_expand (hashval_t);
+  void verify (const compare_type &comparable, hashval_t hash);
   bool too_empty_p (unsigned int);
   void expand ();
   static bool is_deleted (value_type &v)
@@ -882,8 +883,12 @@ hash_table<Descriptor, Allocator>
   if (insert == INSERT && m_size * 3 <= m_n_elements * 4)
     expand ();
 
-  m_searches++;
+#if ENABLE_EXTRA_CHECKING
+    if (insert == INSERT)
+      verify (comparable, hash);
+#endif
 
+  m_searches++;
   value_type *first_deleted_slot = NULL;
   hashval_t index = hash_table_mod1 (hash, m_size_prime_index);
   hashval_t hash2 = hash_table_mod2 (hash, m_size_prime_index);
@@ -929,6 +934,39 @@ hash_table<Descriptor, Allocator>
   m_n_elements++;
   return &m_entries[index];
 }
+
+#if ENABLE_EXTRA_CHECKING
+
+/* Report a hash table checking error.  */
+
+ATTRIBUTE_NORETURN ATTRIBUTE_COLD
+static void
+hashtab_chk_error ()
+{
+  fprintf (stderr, "hash table checking failed: "
+	   "equal operator returns true for a pair "
+	   "of values with a different hash value");
+  gcc_unreachable ();
+}
+
+/* Verify that all existing elements in th hash table which are
+   equal to COMPARABLE have an equal HASH value provided as argument.  */
+
+template<typename Descriptor, template<typename Type> class Allocator>
+void
+hash_table<Descriptor, Allocator>
+::verify (const compare_type &comparable, hashval_t hash)
+{
+  for (size_t i = 0; i < m_size; i++)
+    {
+      value_type *entry = &m_entries[i];
+      if (!is_empty (*entry) && !is_deleted (*entry)
+	  && Descriptor::equal (*entry, comparable)
+	  && hash != Descriptor::hash (*entry))
+	hashtab_chk_error ();
+    }
+}
+#endif
 
 /* This function deletes an element with the given COMPARABLE value
    from hash table starting with the given HASH.  If there is no
