@@ -121,3 +121,5 @@ void dump_hash_table_loc_statistics (void)
       hash_table_usage ().dump (origin);
     }
 }
+
+bool hash_table_verify_p = false;

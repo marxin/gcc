@@ -2289,6 +2289,9 @@ toplev::main (int argc, char **argv)
 
   handle_common_deferred_options ();
 
+  if (flag_checking > 2)
+    hash_table_verify_p = true;
+
   init_local_tick ();
 
   initialize_plugins ();

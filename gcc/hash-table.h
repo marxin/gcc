@@ -240,6 +240,10 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-traits.h"
 #include "hash-map-traits.h"
 
+#ifndef GENERATOR_FILE
+extern bool hash_table_verify_p;
+#endif
+
 template<typename, typename, typename> class hash_map;
 template<typename, typename> class hash_set;
 
@@ -883,12 +887,31 @@ hash_table<Descriptor, Allocator>
     expand ();
 
   m_searches++;
+  size_t size = m_size;
+
+#ifndef GENERATOR_FILE
+  if (hash_table_verify_p)
+    if (insert == INSERT)
+      for (size_t i = 0; i < size; i++)
+	{
+	  value_type *entry = &m_entries[i];
+	  if (!is_empty (*entry) && !is_deleted (*entry)
+	      && Descriptor::equal (*entry, comparable)
+	      && hash != Descriptor::hash (*entry))
+	    {
+	      fprintf (stderr, "hash table checking failed: "
+		       "equal operator returns true for a pair "
+		       "of values with a different hash value");
+	      gcc_unreachable ();
+	    }
+	}
+#endif
+// TODO: enable it also for generated files: there are failures!
 
   value_type *first_deleted_slot = NULL;
   hashval_t index = hash_table_mod1 (hash, m_size_prime_index);
   hashval_t hash2 = hash_table_mod2 (hash, m_size_prime_index);
   value_type *entry = &m_entries[index];
-  size_t size = m_size;
   if (is_empty (*entry))
     goto empty_entry;
   else if (is_deleted (*entry))
