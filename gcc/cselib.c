@@ -2858,6 +2858,7 @@ cselib_init (int record_what)
   used_regs = XNEWVEC (unsigned int, cselib_nregs);
   n_used_regs = 0;
   cselib_hash_table = new hash_table<cselib_hasher> (31);
+  cselib_hash_table->m_ignore_verification = true;
   if (cselib_preserve_constants)
     cselib_preserved_hash_table = new hash_table<cselib_hasher> (31);
   next_uid = 1;

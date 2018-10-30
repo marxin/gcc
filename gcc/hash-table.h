@@ -484,6 +484,7 @@ public:
       return m_searches ? static_cast <double> (m_collisions) / m_searches : 0;
     }
 
+
 private:
   template<typename T> friend void gt_ggc_mx (hash_table<T> *);
   template<typename T> friend void gt_pch_nx (hash_table<T> *);
@@ -554,6 +555,9 @@ private:
 
   /* If we should gather memory statistics for the table.  */
   bool m_gather_mem_stats;
+
+public:
+  bool m_ignore_verification;
 };
 
 /* As mem-stats.h heavily utilizes hash maps (hash tables), we have to include
@@ -573,7 +577,7 @@ hash_table<Descriptor, Allocator>::hash_table (size_t size, bool ggc, bool
 					       mem_alloc_origin origin
 					       MEM_STAT_DECL) :
   m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
-  m_ggc (ggc), m_gather_mem_stats (gather_mem_stats)
+  m_ggc (ggc), m_gather_mem_stats (gather_mem_stats), m_ignore_verification (false)
 {
   unsigned int size_prime_index;
 
@@ -596,7 +600,7 @@ hash_table<Descriptor, Allocator>::hash_table (const hash_table &h, bool ggc,
 					       MEM_STAT_DECL) :
   m_n_elements (h.m_n_elements), m_n_deleted (h.m_n_deleted),
   m_searches (0), m_collisions (0), m_ggc (ggc),
-  m_gather_mem_stats (gather_mem_stats)
+  m_gather_mem_stats (gather_mem_stats), m_ignore_verification (false)
 {
   size_t size = h.m_size;
 
@@ -884,7 +888,7 @@ hash_table<Descriptor, Allocator>
     expand ();
 
 #if ENABLE_EXTRA_CHECKING
-    if (insert == INSERT)
+    if (!m_ignore_verification && insert == INSERT)
       verify (comparable, hash);
 #endif
 
