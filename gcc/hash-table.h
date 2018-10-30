@@ -961,6 +961,9 @@ void
 hash_table<Descriptor, Allocator>
 ::verify (const compare_type &comparable, hashval_t hash)
 {
+  if (m_size > 1000)
+    return;
+
   for (size_t i = 0; i < m_size; i++)
     {
       value_type *entry = &m_entries[i];
