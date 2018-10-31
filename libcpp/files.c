@@ -1311,7 +1311,7 @@ _cpp_init_files (cpp_reader *pfile)
   pfile->dir_hash = htab_create_alloc (127, file_hash_hash, file_hash_eq,
 					NULL, xcalloc, free);
   allocate_file_hash_entries (pfile);
-  pfile->nonexistent_file_hash = htab_create_alloc (127, htab_hash_string,
+  pfile->nonexistent_file_hash = htab_create_alloc (127, htab_hash_string_vptr,
 						    nonexistent_file_hash_eq,
 						    NULL, xcalloc, free);
   obstack_specify_allocation (&pfile->nonexistent_file_ob, 0, 0,

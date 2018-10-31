@@ -2588,7 +2588,7 @@ read_state (const char *path)
   state_seen_types =
     htab_create (2017, hash_type_number, equals_type_number, NULL);
   state_ident_tab =
-    htab_create (4027, htab_hash_string, string_eq, NULL);
+    htab_create (4027, htab_hash_string_vptr, string_eq, NULL);
   read_state_version (version_string);
   read_state_srcdir ();
   read_state_languages ();

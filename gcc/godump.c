@@ -1377,11 +1377,11 @@ go_finish (const char *filename)
 
   real_debug_hooks->finish (filename);
 
-  container.type_hash = htab_create (100, htab_hash_string,
+  container.type_hash = htab_create (100, htab_hash_string_vptr,
                                      string_hash_eq, NULL);
-  container.invalid_hash = htab_create (10, htab_hash_string,
+  container.invalid_hash = htab_create (10, htab_hash_string_vptr,
 					string_hash_eq, NULL);
-  container.keyword_hash = htab_create (50, htab_hash_string,
+  container.keyword_hash = htab_create (50, htab_hash_string_vptr,
                                         string_hash_eq, NULL);
   obstack_init (&container.type_obstack);
 
