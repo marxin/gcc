@@ -4465,7 +4465,7 @@ cp_fname_init (const char* name, tree *type_p)
 static tree
 cp_make_fname_decl (location_t loc, tree id, int type_dep)
 {
-  const char *const name = (type_dep && processing_template_decl
+  const char *const name = (type_dep && in_template_function ()
 			    ? NULL : fname_as_string (type_dep));
   tree type;
   tree init = cp_fname_init (name, &type);
@@ -7064,8 +7064,9 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	    init = NULL_TREE;
 	  release_tree_vector (cleanups);
 	}
-      else if (!DECL_PRETTY_FUNCTION_P (decl))
+      else
 	{
+	  gcc_assert (!DECL_PRETTY_FUNCTION_P (decl));
 	  /* Deduce array size even if the initializer is dependent.  */
 	  maybe_deduce_size_from_array_init (decl, init);
 	  /* And complain about multiple initializers.  */
