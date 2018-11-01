@@ -639,6 +639,9 @@ htab_chk_error (void)
 static void
 htab_verify (htab_t htab, const PTR element, hashval_t hash)
 {
+  if (htab->size > 1000)
+    return;
+
   for (size_t i = 0; i < htab->size; i++)
     {
       PTR entry = htab->entries[i];
