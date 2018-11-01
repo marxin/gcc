@@ -621,6 +621,35 @@ htab_find (htab_t htab, const PTR element)
   return htab_find_with_hash (htab, element, (*htab->hash_f) (element));
 }
 
+/* Report a hash table checking error.  */
+
+ATTRIBUTE_NORETURN ATTRIBUTE_COLD
+static void
+htab_chk_error (void)
+{
+  fprintf (stderr, "hash table checking failed: "
+	   "equal operator returns true for a pair "
+	   "of values with a different hash value\n");
+  abort ();
+}
+
+/* Verify that all existing elements in the HTAB table which are
+   equal to ELEMENT have an equal HASH value provided as argument.  */
+
+static void
+htab_verify (htab_t htab, const PTR element, hashval_t hash)
+{
+  for (size_t i = 0; i < htab->size; i++)
+    {
+      PTR entry = htab->entries[i];
+      if (entry != HTAB_EMPTY_ENTRY
+	  && entry != HTAB_DELETED_ENTRY
+	  && (*htab->eq_f) (entry, element)
+	  && (*htab->hash_f) (entry) != hash)
+	htab_chk_error ();
+    }
+}
+
 /* This function searches for a hash table slot containing an entry
    equal to the given element.  To delete an entry, call this with
    insert=NO_INSERT, then call htab_clear_slot on the slot returned
@@ -645,6 +674,9 @@ htab_find_slot_with_hash (htab_t htab, const PTR element,
 	return NULL;
       size = htab_size (htab);
     }
+
+  if (insert)
+    htab_verify (htab, element, hash);
 
   index = htab_mod (hash, htab);
 
