@@ -964,12 +964,12 @@ dump_line_table_statistics (void)
 	   SIZE_AMOUNT (total_used_map_size));
   fprintf (stderr, "Ad-hoc table size:                   %5ld%c\n",
 	   SIZE_AMOUNT (s.adhoc_table_size));
-  fprintf (stderr, "Ad-hoc table entries used:           %5ld\n",
-	   s.adhoc_table_entries_used);
-  fprintf (stderr, "optimized_ranges: %i\n",
-	   line_table->num_optimized_ranges);
-  fprintf (stderr, "unoptimized_ranges: %i\n",
-	   line_table->num_unoptimized_ranges);
+  fprintf (stderr, "Ad-hoc table entries used:           %5ld%c\n",
+	   SIZE_AMOUNT (s.adhoc_table_entries_used));
+  fprintf (stderr, "optimized_ranges: %i%c\n",
+	   SIZE_AMOUNT (line_table->num_optimized_ranges));
+  fprintf (stderr, "unoptimized_ranges: %i%c\n",
+	   SIZE_AMOUNT (line_table->num_unoptimized_ranges));
 
   fprintf (stderr, "\n");
 }

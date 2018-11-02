@@ -2288,14 +2288,16 @@ ggc_print_statistics (void)
 	  overhead += (sizeof (page_entry) - sizeof (long)
 		       + BITMAP_SIZE (OBJECTS_IN_PAGE (p) + 1));
 	}
-      fprintf (stderr, "%-8lu %10lu%c %10lu%c %10lu%c\n",
-	       (unsigned long) OBJECT_SIZE (i),
+      fprintf (stderr, "%-8" PRIu64 " %10" PRIu64 "%c %10" PRIu64 "%c %10"
+	       PRIu64 "%c\n",
+	       OBJECT_SIZE (i),
 	       SIZE_AMOUNT (allocated),
 	       SIZE_AMOUNT (in_use),
 	       SIZE_AMOUNT (overhead));
       total_overhead += overhead;
     }
-  fprintf (stderr, "%-8s %10lu%c %10lu%c %10lu%c\n", "Total",
+  fprintf (stderr, "%-8s %10" PRIu64 "%c %10" PRIu64 "%c %10" PRIu64 "%c\n",
+	   "Total",
 	   SIZE_AMOUNT (G.bytes_mapped),
 	   SIZE_AMOUNT (G.allocated),
 	   SIZE_AMOUNT (total_overhead));
@@ -2334,13 +2336,13 @@ ggc_print_statistics (void)
       for (i = 0; i < NUM_ORDERS; i++)
 	if (G.stats.total_allocated_per_order[i])
 	  {
-	    fprintf (stderr, "Total Overhead  page size %9lu:     %9"
+	    fprintf (stderr, "Total Overhead  page size %9" PRIu64 ":     %9"
 		     HOST_LONG_LONG_FORMAT "d%c\n",
-		     (unsigned long) OBJECT_SIZE (i),
+		     OBJECT_SIZE (i),
 		     SIZE_AMOUNT (G.stats.total_overhead_per_order[i]));
-	    fprintf (stderr, "Total Allocated page size %9lu:     %9"
+	    fprintf (stderr, "Total Allocated page size %9" PRIu64 ":     %9"
 		     HOST_LONG_LONG_FORMAT "d%c\n",
-		     (unsigned long) OBJECT_SIZE (i),
+		     OBJECT_SIZE (i),
 		     SIZE_AMOUNT (G.stats.total_allocated_per_order[i]));
 	  }
   }

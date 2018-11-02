@@ -884,8 +884,8 @@ struct ggc_usage: public mem_usage
   {
     long balance = get_balance ();
     fprintf (stderr,
-	     "%-48s %9li%c:%5.1f%%%9li%c:%5.1f%%"
-	     "%9li%c:%5.1f%%%9li%c:%5.1f%%%9li%c\n",
+	     "%-48s %9" PRIu64 "%c:%5.1f%%%9" PRIu64 "%c:%5.1f%%"
+	     "%9" PRIu64 "%c:%5.1f%%%9" PRIu64 "%c:%5.1f%%%9" PRIu64 "%c\n",
 	     prefix, SIZE_AMOUNT (m_collected),
 	     get_percent (m_collected, total.m_collected),
 	     SIZE_AMOUNT (m_freed), get_percent (m_freed, total.m_freed),
