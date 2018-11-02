@@ -283,7 +283,7 @@ static hashval_t
 hash_name (const void *p)
 {
   const struct lto_renaming_slot *ds = (const struct lto_renaming_slot *) p;
-  return (hashval_t) htab_hash_string (ds->new_name);
+  return hash_string (ds->new_name);
 }
 
 /* Returns nonzero if P1 and P2 are equal.  */

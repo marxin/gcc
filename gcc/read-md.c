@@ -65,7 +65,7 @@ md_reader *md_reader_ptr;
 hashval_t
 leading_string_hash (const void *def)
 {
-  return htab_hash_string (*(const char *const *) def);
+  return hash_string (*(const char *const *) def);
 }
 
 /* Given two objects that start with char * name fields, return true if

@@ -192,7 +192,7 @@ static hashval_t
 hash_mode (const void *p)
 {
   const struct mode_data *m = (const struct mode_data *)p;
-  return htab_hash_string (m->name);
+  return hash_string (m->name);
 }
 
 static int

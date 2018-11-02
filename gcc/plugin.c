@@ -73,7 +73,7 @@ struct event_hasher : nofree_ptr_hash <const char *>
 inline hashval_t
 event_hasher::hash (const char **v)
 {
-  return htab_hash_string (*v);
+  return hash_string (*v);
 }
 
 /* Helper function for the event hash table that compares the name of an
@@ -131,7 +131,7 @@ static hashval_t
 htab_hash_plugin (const PTR p)
 {
   const struct plugin_name_args *plugin = (const struct plugin_name_args *) p;
-  return htab_hash_string (plugin->base_name);
+  return hash_string (plugin->base_name);
  }
 
 /* Helper function for the hash table that compares the base_name of the
@@ -222,7 +222,7 @@ add_new_plugin (const char* plugin_name)
                                         NULL);
 
   slot = htab_find_slot_with_hash (plugin_name_args_tab, base_name,
-				   htab_hash_string (base_name), INSERT);
+				   hash_string (base_name), INSERT);
 
   /* If the same plugin (name) has been specified earlier, either emit an
      error or a warning message depending on if they have identical full
@@ -310,7 +310,7 @@ parse_plugin_arg_opt (const char *arg)
      command-line.  */
   if (plugin_name_args_tab
       && ((slot = htab_find_slot_with_hash (plugin_name_args_tab, name,
-					    htab_hash_string (name), NO_INSERT))
+					    hash_string (name), NO_INSERT))
           != NULL))
     {
       struct plugin_name_args *plugin = (struct plugin_name_args *) *slot;
@@ -367,7 +367,7 @@ static void
 register_plugin_info (const char* name, struct plugin_info *info)
 {
   void **slot = htab_find_slot_with_hash (plugin_name_args_tab, name,
-					  htab_hash_string (name), NO_INSERT);
+					  hash_string (name), NO_INSERT);
   struct plugin_name_args *plugin;
 
   if (slot == NULL)
@@ -754,7 +754,7 @@ init_one_plugin (void **slot, void * ARG_UNUSED (info))
   if (!ok)
     {
       htab_remove_elt_with_hash (plugin_name_args_tab, plugin->base_name,
-				 htab_hash_string (plugin->base_name));
+				 hash_string (plugin->base_name));
       XDELETE (plugin);
     }
   return 1;

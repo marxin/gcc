@@ -183,7 +183,7 @@ struct comdat_entry_hasher : nofree_ptr_hash <comdat_entry>
 inline hashval_t
 comdat_entry_hasher::hash (const comdat_entry *entry)
 {
-  return htab_hash_string (entry->sig);
+  return hash_string (entry->sig);
 }
 
 inline bool

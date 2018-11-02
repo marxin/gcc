@@ -1755,7 +1755,7 @@ lra_rtx_hash (rtx x)
 
 	case 'S':
 	case 's':
-	  val += htab_hash_string (XSTR (x, i));
+	  val += hash_string (XSTR (x, i));
 	  break;
 
 	case 'u':

@@ -136,7 +136,7 @@ struct string_hasher : nofree_ptr_hash<const char>
 {
   static inline hashval_t hash (const char *s)
   {
-    return htab_hash_string (s);
+    return hash_string (s);
   }
 
   static inline bool equal (const char *p1, const char *p2)

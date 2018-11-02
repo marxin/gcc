@@ -879,6 +879,23 @@ extern void fancy_abort (const char *, int, const char *)
 #undef strerror
  #pragma GCC poison strerror
 
+/* Define new hash string wappers that will allow to poison
+   the implementation.  */
+
+static inline hashval_t
+hash_string_vptr (const void *p)
+{
+  return htab_hash_string (p);
+}
+
+static inline hashval_t
+hash_string (const char *str)
+{
+  return htab_hash_string ((const char *)str);
+}
+
+#pragma GCC poison htab_hash_string
+
 /* loc_t is defined on some systems and too inviting for some
    programmers to avoid.  */
 #undef loc_t

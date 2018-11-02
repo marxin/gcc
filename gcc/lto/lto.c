@@ -70,7 +70,7 @@ static hashval_t
 hash_name (const void *p)
 {
   const struct lto_section_slot *ds = (const struct lto_section_slot *) p;
-  return (hashval_t) htab_hash_string (ds->name);
+  return hash_string (ds->name);
 }
 
 

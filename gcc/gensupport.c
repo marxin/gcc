@@ -2434,7 +2434,7 @@ gen_mnemonic_attr (void)
   if (!mnemonic_attr)
     return;
 
-  mnemonic_htab = htab_create_alloc (MNEMONIC_HTAB_SIZE, htab_hash_string,
+  mnemonic_htab = htab_create_alloc (MNEMONIC_HTAB_SIZE, hash_string_vptr,
 				     htab_eq_string, 0, xcalloc, free);
 
   for (elem = define_insn_queue; elem; elem = elem->next)
@@ -2492,7 +2492,7 @@ check_define_attr_duplicates ()
   char * attr_name;
   void **slot;
 
-  attr_htab = htab_create (500, htab_hash_string, htab_eq_string, NULL);
+  attr_htab = htab_create (500, hash_string_vptr, htab_eq_string, NULL);
 
   for (elem = define_attr_queue; elem; elem = elem->next)
     {
@@ -2790,7 +2790,7 @@ static struct pred_data **last_predicate = &first_predicate;
 static hashval_t
 hash_struct_pred_data (const void *ptr)
 {
-  return htab_hash_string (((const struct pred_data *)ptr)->name);
+  return hash_string (((const struct pred_data *)ptr)->name);
 }
 
 static int

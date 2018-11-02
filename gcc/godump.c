@@ -85,7 +85,7 @@ static hashval_t
 macro_hash_hashval (const void *val)
 {
   const struct macro_hash_value *mhval = (const struct macro_hash_value *) val;
-  return htab_hash_string (mhval->name);
+  return hash_string (mhval->name);
 }
 
 /* Compare values in the macro hash table for equality.  */
@@ -158,7 +158,7 @@ go_define (unsigned int lineno, const char *buffer)
   mhval->name = copy;
   mhval->value = NULL;
 
-  hashval = htab_hash_string (copy);
+  hashval = hash_string (copy);
   slot = htab_find_slot_with_hash (macro_hash, mhval, hashval, NO_INSERT);
 
   /* For simplicity, we force all names to be hidden by adding an
@@ -1377,11 +1377,11 @@ go_finish (const char *filename)
 
   real_debug_hooks->finish (filename);
 
-  container.type_hash = htab_create (100, htab_hash_string,
+  container.type_hash = htab_create (100, hash_string_vptr,
                                      string_hash_eq, NULL);
-  container.invalid_hash = htab_create (10, htab_hash_string,
+  container.invalid_hash = htab_create (10, hash_string_vptr,
 					string_hash_eq, NULL);
-  container.keyword_hash = htab_create (50, htab_hash_string,
+  container.keyword_hash = htab_create (50, hash_string_vptr,
                                         string_hash_eq, NULL);
   obstack_init (&container.type_obstack);
 

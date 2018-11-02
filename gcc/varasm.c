@@ -215,7 +215,7 @@ section_hasher::equal (section *old, const char *new_name)
 hashval_t
 section_hasher::hash (section *old)
 {
-  return htab_hash_string (old->named.name);
+  return hash_string (old->named.name);
 }
 
 /* Return a hash value for section SECT.  */
@@ -224,7 +224,7 @@ static hashval_t
 hash_section (section *sect)
 {
   if (sect->common.flags & SECTION_NAMED)
-    return htab_hash_string (sect->named.name);
+    return hash_string (sect->named.name);
   return sect->common.flags & ~SECTION_DECLARED;
 }
 
@@ -282,7 +282,7 @@ get_section (const char *name, unsigned int flags, tree decl)
 {
   section *sect, **slot;
 
-  slot = section_htab->find_slot_with_hash (name, htab_hash_string (name),
+  slot = section_htab->find_slot_with_hash (name, hash_string (name),
 					    INSERT);
   flags |= SECTION_NAMED;
   if (*slot == NULL)
@@ -3716,7 +3716,7 @@ const_rtx_hash_1 (const_rtx x)
       break;
 
     case SYMBOL_REF:
-      h ^= htab_hash_string (XSTR (x, 0));
+      h ^= hash_string (XSTR (x, 0));
       break;
 
     case LABEL_REF:

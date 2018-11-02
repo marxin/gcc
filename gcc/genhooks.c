@@ -80,7 +80,7 @@ static hashval_t
 s_hook_hash (const void *p)
 {
   const struct s_hook *s_hook = (const struct s_hook *)p;
-  return htab_hash_string (s_hook->name);
+  return hash_string (s_hook->name);
 }
 
 static int

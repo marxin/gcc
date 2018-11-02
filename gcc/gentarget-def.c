@@ -40,7 +40,7 @@ struct insn_hasher : nofree_ptr_hash <rtx_def>
 hashval_t
 insn_hasher::hash (rtx x)
 {
-  return htab_hash_string (XSTR (x, 0));
+  return hash_string (XSTR (x, 0));
 }
 
 bool
@@ -155,7 +155,7 @@ def_target_insn (const char *name, const char *prototype)
   suffix[i] = 0;
 
   /* See whether we have an implementation of this pattern.  */
-  hashval_t hash = htab_hash_string (name);
+  hashval_t hash = hash_string (name);
   int truth = 0;
   const char *have_name = name;
   if (rtx insn = insns->find_with_hash (name, hash))
@@ -270,7 +270,7 @@ add_insn (md_rtx_info *info)
   if (name[0] == 0 || name[0] == '*')
     return;
 
-  hashval_t hash = htab_hash_string (name);
+  hashval_t hash = hash_string (name);
   rtx *slot = insns->find_slot_with_hash (name, hash, INSERT);
   if (*slot)
     error_at (info->loc, "duplicate definition of '%s'", name);

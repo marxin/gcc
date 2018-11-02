@@ -588,7 +588,7 @@ static hashval_t
 overloaded_name_hash (const void *uncast_oname)
 {
   const overloaded_name *oname = (const overloaded_name *) uncast_oname;
-  return htab_hash_string (oname->name);
+  return hash_string (oname->name);
 }
 
 /* Return true if two overloaded_names are similar enough to share

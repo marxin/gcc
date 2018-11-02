@@ -91,7 +91,7 @@ static hashval_t
 hash_string_hash (const void *s_p)
 {
   const char *const *s = (const char *const *) s_p;
-  return (*htab_hash_string) (*s);
+  return hash_string (*s);
 }
 
 static htab_t symbol_table;
@@ -122,7 +122,7 @@ symbol_hash_lookup (const char *string, int create)
 {
   void **e;
   e = htab_find_slot_with_hash (symbol_table, string,
-				(*htab_hash_string) (string),
+				hash_string (string),
 				create ? INSERT : NO_INSERT);
   if (e == NULL)
     return NULL;
@@ -144,7 +144,7 @@ file_hash_lookup (const char *string)
 {
   void **e;
   e = htab_find_slot_with_hash (file_table, string,
-				(*htab_hash_string) (string),
+				hash_string (string),
 				INSERT);
   if (*e == NULL)
     {
@@ -164,7 +164,7 @@ demangled_hash_lookup (const char *string, int create)
 {
   void **e;
   e = htab_find_slot_with_hash (demangled_table, string,
-				(*htab_hash_string) (string),
+				hash_string (string),
 				create ? INSERT : NO_INSERT);
   if (e == NULL)
     return NULL;

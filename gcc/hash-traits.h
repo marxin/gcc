@@ -212,7 +212,7 @@ struct string_hash : pointer_hash <const char>
 inline hashval_t
 string_hash::hash (const char *id)
 {
-  return htab_hash_string (id);
+  return hash_string (id);
 }
 
 inline bool

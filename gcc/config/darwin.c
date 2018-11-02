@@ -473,7 +473,7 @@ static GTY (()) hash_table<indirection_hasher> *machopic_indirections;
 hashval_t
 indirection_hasher::hash (machopic_indirection *p)
 {
-  return htab_hash_string (p->ptr_name);
+  return hash_string (p->ptr_name);
 }
 
 /* Returns true if the KEY is the same as that associated with
@@ -577,7 +577,7 @@ machopic_indirection_name (rtx sym_ref, bool stub_p)
 
   machopic_indirection **slot
     = machopic_indirections->find_slot_with_hash (buffer,
-						  htab_hash_string (buffer),
+						  hash_string (buffer),
 						  INSERT);
   if (*slot)
     {
@@ -614,7 +614,7 @@ void
 machopic_validate_stub_or_non_lazy_ptr (const char *name)
 {
   machopic_indirection *p
-    = machopic_indirections->find_with_hash (name, htab_hash_string (name));
+    = machopic_indirections->find_with_hash (name, hash_string (name));
   if (p && ! p->used)
     {
       const char *real_name;

@@ -4603,7 +4603,7 @@ add_AT_low_high_pc (dw_die_ref die, const char *lbl_low, const char *lbl_high,
 hashval_t
 indirect_string_hasher::hash (indirect_string_node *x)
 {
-  return htab_hash_string (x->str);
+  return hash_string (x->str);
 }
 
 bool
@@ -4621,7 +4621,7 @@ find_AT_string_in_table (const char *str,
   struct indirect_string_node *node;
 
   indirect_string_node **slot
-    = table->find_slot_with_hash (str, htab_hash_string (str), INSERT);
+    = table->find_slot_with_hash (str, hash_string (str), INSERT);
   if (*slot == NULL)
     {
       node = ggc_cleared_alloc<indirect_string_node> ();
@@ -4955,7 +4955,7 @@ addr_hasher::hash (addr_table_entry *a)
 	hstate.add_int (1);
 	break;
       case ate_kind_label:
-        return htab_hash_string (a->addr.label);
+	return hash_string (a->addr.label);
       default:
         gcc_unreachable ();
     }
@@ -8856,7 +8856,7 @@ external_ref_hasher::hash (const external_ref *r)
      that will make the order of the stub DIEs non-deterministic.  */
   if (! die->comdat_type_p)
     /* We have a symbol; use it to compute a hash.  */
-    h = htab_hash_string (die->die_id.die_symbol);
+    h = hash_string (die->die_id.die_symbol);
   else
     {
       /* We have a type signature; use a subset of the bits as the hash.
@@ -26861,7 +26861,7 @@ dwarf_file_hasher::equal (dwarf_file_data *p1, const char *p2)
 hashval_t
 dwarf_file_hasher::hash (dwarf_file_data *p)
 {
-  return htab_hash_string (p->filename);
+  return hash_string (p->filename);
 }
 
 /* Lookup FILE_NAME (in the list of filenames that we know about here in
@@ -26882,7 +26882,7 @@ lookup_filename (const char *file_name)
     return NULL;
 
   dwarf_file_data **slot
-    = file_table->find_slot_with_hash (file_name, htab_hash_string (file_name),
+    = file_table->find_slot_with_hash (file_name, hash_string (file_name),
 				       INSERT);
   if (*slot)
     return *slot;
@@ -28021,7 +28021,7 @@ struct macinfo_entry_hasher : nofree_ptr_hash <macinfo_entry>
 inline hashval_t
 macinfo_entry_hasher::hash (const macinfo_entry *entry)
 {
-  return htab_hash_string (entry->info);
+  return hash_string (entry->info);
 }
 
 inline bool
@@ -29259,7 +29259,7 @@ prune_unused_types_update_strings (dw_die_ref die)
 	  {
 	    indirect_string_node **slot
 	      = debug_str_hash->find_slot_with_hash (s->str,
-						     htab_hash_string (s->str),
+						     hash_string (s->str),
 						     INSERT);
 	    gcc_assert (*slot == NULL);
 	    *slot = s;

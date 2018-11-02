@@ -90,10 +90,10 @@ symbol_table::decl_assembler_name_hash (const_tree asmname)
       else if (strncmp (decl_str, user_label_prefix, ulp_len) == 0)
 	decl_str += ulp_len;
 
-      return htab_hash_string (decl_str);
+      return hash_string (decl_str);
     }
 
-  return htab_hash_string (IDENTIFIER_POINTER (asmname));
+  return hash_string (IDENTIFIER_POINTER (asmname));
 }
 
 /* Return true if assembler names NAME1 and NAME2 leads to the same symbol
@@ -357,7 +357,7 @@ symbol_table::change_decl_assembler_name (tree decl, tree name)
 hashval_t
 section_name_hasher::hash (section_hash_entry *n)
 {
-  return htab_hash_string (n->name);
+  return hash_string (n->name);
 }
 
 /* Return true if section P1 name equals to P2.  */
@@ -1502,7 +1502,7 @@ symtab_node::set_section_for_node (const char *section)
       x_section->ref_count--;
       if (!x_section->ref_count)
 	{
-	  hashval_t hash = htab_hash_string (x_section->name);
+	  hashval_t hash = hash_string (x_section->name);
 	  slot = symtab->section_hash->find_slot_with_hash (x_section->name,
 							    hash, INSERT);
 	  ggc_free (x_section);
@@ -1518,7 +1518,7 @@ symtab_node::set_section_for_node (const char *section)
   if (!symtab->section_hash)
     symtab->section_hash = hash_table<section_name_hasher>::create_ggc (10);
   slot = symtab->section_hash->find_slot_with_hash (section,
-						    htab_hash_string (section),
+						    hash_string (section),
 						    INSERT);
   if (*slot)
     x_section = (section_hash_entry *)*slot;

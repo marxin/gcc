@@ -1828,8 +1828,8 @@ struct excl_hash_traits: typed_noop_remove<excl_pair>
 
   static hashval_t hash (const value_type &x)
   {
-    hashval_t h1 = htab_hash_string (x.first);
-    hashval_t h2 = htab_hash_string (x.second);
+    hashval_t h1 = hash_string (x.first);
+    hashval_t h2 = hash_string (x.second);
     return h1 ^ h2;
   }
 

@@ -56,7 +56,7 @@ struct stats_counter_hasher : pointer_hash <statistics_counter>
 inline hashval_t
 stats_counter_hasher::hash (const statistics_counter *c)
 {
-  return htab_hash_string (c->id) + c->val;
+  return hash_string (c->id) + c->val;
 }
 
 /* Compare two statistic counters by their string IDs.  */

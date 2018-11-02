@@ -61,7 +61,7 @@ cp_ubsan_instrument_vptr (location_t loc, tree op, tree type, bool is_addr,
 {
   type = TYPE_MAIN_VARIANT (type);
   const char *mangled = mangle_type_string (type);
-  hashval_t str_hash1 = htab_hash_string (mangled);
+  hashval_t str_hash1 = hash_string (mangled);
   hashval_t str_hash2 = iterative_hash (mangled, strlen (mangled), 0);
   tree str_hash = wide_int_to_tree (uint64_type_node,
 				    wi::uhwi (((uint64_t) str_hash1 << 32)

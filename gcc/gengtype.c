@@ -5128,7 +5128,7 @@ htab_hash_inputfile (const void *p)
 {
   const input_file *inpf = (const input_file *) p;
   gcc_assert (inpf);
-  return htab_hash_string (get_input_file_name (inpf));
+  return hash_string (get_input_file_name (inpf));
 }
 
 static int

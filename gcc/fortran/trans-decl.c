@@ -4827,7 +4827,7 @@ struct module_hasher : ggc_ptr_hash<module_htab_entry>
 
   static hashval_t hash (module_htab_entry *s)
   {
-    return htab_hash_string (s->name);
+    return hash_string (s->name);
   }
 
   static bool
@@ -4847,7 +4847,7 @@ module_decl_hasher::hash (tree t)
   const_tree n = DECL_NAME (t);
   if (n == NULL_TREE)
     n = TYPE_NAME (TREE_TYPE (t));
-  return htab_hash_string (IDENTIFIER_POINTER (n));
+  return hash_string (IDENTIFIER_POINTER (n));
 }
 
 bool
@@ -4866,7 +4866,7 @@ gfc_find_module (const char *name)
     module_htab = hash_table<module_hasher>::create_ggc (10);
 
   module_htab_entry **slot
-    = module_htab->find_slot_with_hash (name, htab_hash_string (name), INSERT);
+    = module_htab->find_slot_with_hash (name, hash_string (name), INSERT);
   if (*slot == NULL)
     {
       module_htab_entry *entry = ggc_cleared_alloc<module_htab_entry> ();
@@ -4891,7 +4891,7 @@ gfc_module_add_decl (struct module_htab_entry *entry, tree decl)
       name = IDENTIFIER_POINTER (TYPE_NAME (TREE_TYPE (decl)));
     }
   tree *slot
-    = entry->decls->find_slot_with_hash (name, htab_hash_string (name),
+    = entry->decls->find_slot_with_hash (name, hash_string (name),
 					 INSERT);
   if (*slot == NULL)
     *slot = decl;
@@ -5079,7 +5079,7 @@ gfc_trans_use_stmts (gfc_namespace * ns)
 	  if (rent->op != INTRINSIC_NONE)
 	    continue;
 
-						 hashval_t hash = htab_hash_string (rent->use_name);
+	  hashval_t hash = hash_string (rent->use_name);
 	  tree *slot = entry->decls->find_slot_with_hash (rent->use_name, hash,
 							  INSERT);
 	  if (*slot == NULL)

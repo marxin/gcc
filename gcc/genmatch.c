@@ -388,7 +388,7 @@ id_base::id_base (id_kind kind_, const char *id_, int nargs_)
   kind = kind_;
   id = id_;
   nargs = nargs_;
-  hashval = htab_hash_string (id);
+  hashval = hash_string (id);
 }
 
 /* Identifier that maps to a tree code.  */
