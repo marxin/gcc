@@ -164,10 +164,14 @@ ht_lookup_with_hash (cpp_hash_table *table, const unsigned char *str,
       memcpy (chars, str, len);
       chars[len] = '\0';
       HT_STR (node) = (const unsigned char *) chars;
+      HT_GGC (node) = 1;
     }
   else
-    HT_STR (node) = (const unsigned char *) obstack_copy0 (&table->stack,
-							   str, len);
+    {
+      HT_STR (node) = (const unsigned char *) obstack_copy0 (&table->stack,
+							     str, len);
+      HT_GGC (node) = 1;
+    }
 
   if (++table->nelements * 4 >= table->nslots * 3)
     /* Must expand the string table.  */
@@ -274,7 +278,7 @@ void
 ht_dump_statistics (cpp_hash_table *table)
 {
   size_t nelts, nids, overhead, headers;
-  size_t total_bytes, longest, deleted = 0;
+  size_t total_bytes_obstack = 0, total_bytes_ggc = 0, longest, deleted = 0;
   double sum_of_squares, exp_len, exp_len2, exp2_len;
   hashnode *p, *limit;
 
@@ -285,7 +289,7 @@ ht_dump_statistics (cpp_hash_table *table)
 		     : (x) / (1024*1024))))
 #define LABEL(x) ((x) < 1024*10 ? ' ' : ((x) < 1024*1024*10 ? 'k' : 'M'))
 
-  total_bytes = longest = sum_of_squares = nids = 0;
+  longest = sum_of_squares = nids = 0;
   p = table->entries;
   limit = p + table->nslots;
   do
@@ -295,7 +299,11 @@ ht_dump_statistics (cpp_hash_table *table)
       {
 	size_t n = HT_LEN (*p);
 
-	total_bytes += n;
+	if (HT_GGC (*p))
+	  total_bytes_ggc += n;
+	else
+	  total_bytes_obstack += n;
+
 	sum_of_squares += (double) n * n;
 	if (n > longest)
 	  longest = n;
@@ -304,7 +312,7 @@ ht_dump_statistics (cpp_hash_table *table)
   while (++p < limit);
 
   nelts = table->nelements;
-  overhead = obstack_memory_used (&table->stack) - total_bytes;
+  overhead = obstack_memory_used (&table->stack) - total_bytes_obstack;
   headers = table->nslots * sizeof (hashnode);
 
   fprintf (stderr, "\nString pool\nentries\t\t%lu\n",
@@ -315,13 +323,15 @@ ht_dump_statistics (cpp_hash_table *table)
 	   (unsigned long) table->nslots);
   fprintf (stderr, "deleted\t\t%lu\n",
 	   (unsigned long) deleted);
-  fprintf (stderr, "bytes\t\t%lu%c (%lu%c overhead)\n",
-	   SCALE (total_bytes), LABEL (total_bytes),
+  fprintf (stderr, "GGC bytes\t%lu%c\n",
+	   SCALE (total_bytes_ggc), LABEL (total_bytes_ggc));
+  fprintf (stderr, "obstack bytes\t%lu%c (%lu%c overhead)\n",
+	   SCALE (total_bytes_obstack), LABEL (total_bytes_obstack),
 	   SCALE (overhead), LABEL (overhead));
   fprintf (stderr, "table size\t%lu%c\n",
 	   SCALE (headers), LABEL (headers));
 
-  exp_len = (double)total_bytes / (double)nelts;
+  exp_len = (double)total_bytes_obstack / (double)nelts;
   exp2_len = exp_len * exp_len;
   exp_len2 = (double) sum_of_squares / (double) nelts;
 

@@ -30,12 +30,14 @@ typedef struct ht_identifier ht_identifier;
 typedef struct ht_identifier *ht_identifier_ptr;
 struct GTY(()) ht_identifier {
   const unsigned char *str;
-  unsigned int len;
   unsigned int hash_value;
+  unsigned int len : 31;
+  unsigned int ggc : 1;
 };
 
 #define HT_LEN(NODE) ((NODE)->len)
 #define HT_STR(NODE) ((NODE)->str)
+#define HT_GGC(NODE) ((NODE)->ggc)
 
 typedef struct ht cpp_hash_table;
 typedef struct ht_identifier *hashnode;
