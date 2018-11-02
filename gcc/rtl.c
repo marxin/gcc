@@ -803,21 +803,23 @@ dump_rtx_statistics (void)
   for (i = 0; i < LAST_AND_UNUSED_RTX_CODE; i++)
     if (rtx_alloc_counts[i])
       {
-        fprintf (stderr, "%-20s %7d %10d\n", GET_RTX_NAME (i),
-                 rtx_alloc_counts[i], rtx_alloc_sizes[i]);
-        total_counts += rtx_alloc_counts[i];
-        total_sizes += rtx_alloc_sizes[i];
+	fprintf (stderr, "%-20s %6d%c %9d%c\n", GET_RTX_NAME (i),
+		 SIZE_AMOUNT (rtx_alloc_counts[i]),
+		 SIZE_AMOUNT (rtx_alloc_sizes[i]));
+	total_counts += rtx_alloc_counts[i];
+	total_sizes += rtx_alloc_sizes[i];
       }
   if (rtvec_alloc_counts)
     {
       fprintf (stderr, "%-20s %7d %10d\n", "rtvec",
-               rtvec_alloc_counts, rtvec_alloc_sizes);
+	       rtvec_alloc_counts, rtvec_alloc_sizes);
       total_counts += rtvec_alloc_counts;
       total_sizes += rtvec_alloc_sizes;
     }
   fprintf (stderr, "---------------------------------------\n");
-  fprintf (stderr, "%-20s %7d %10d\n",
-           "Total", total_counts, total_sizes);
+  fprintf (stderr, "%-20s %6d%c %9d%c\n",
+	   "Total", SIZE_AMOUNT (total_counts),
+	   SIZE_AMOUNT (total_sizes));
   fprintf (stderr, "---------------------------------------\n");
 }
 
