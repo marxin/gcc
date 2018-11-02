@@ -82,11 +82,15 @@ struct vec_usage: public mem_usage
 
     s[48] = '\0';
 
-    fprintf (stderr, "%-48s %10li%11li:%4.1f%%%10li%10li:%4.1f%%%11li%11li\n", s,
+    fprintf (stderr,
+	     "%-48s %10li%10li%c:%4.1f%%%9li%c%10li:%4.1f%%%10li%c%10li%c\n",
+	     s,
 	     (long)m_element_size,
-	     (long)m_allocated, m_allocated * 100.0 / total.m_allocated,
-	     (long)m_peak, (long)m_times, m_times * 100.0 / total.m_times,
-	     (long)m_items, (long)m_items_peak);
+	     SIZE_AMOUNT (m_allocated),
+	     m_allocated * 100.0 / total.m_allocated,
+	     SIZE_AMOUNT (m_peak), (long)m_times,
+	     m_times * 100.0 / total.m_times,
+	     SIZE_AMOUNT (m_items), SIZE_AMOUNT (m_items_peak));
   }
 
   /* Dump footer.  */
@@ -94,8 +98,9 @@ struct vec_usage: public mem_usage
   dump_footer ()
   {
     print_dash_line ();
-    fprintf (stderr, "%s%55li%25li%17li\n", "Total", (long)m_allocated,
-	     (long)m_times, (long)m_items);
+    fprintf (stderr, "%s%64li%c%25li%c%16li%c\n", "Total",
+	     SIZE_AMOUNT (m_allocated),
+	     SIZE_AMOUNT (m_times), SIZE_AMOUNT (m_items));
     print_dash_line ();
   }
 

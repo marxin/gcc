@@ -9243,21 +9243,22 @@ dump_tree_statistics (void)
       total_nodes = total_bytes = 0;
       for (i = 0; i < (int) all_kinds; i++)
 	{
-	  fprintf (stderr, "%-20s %7" PRIu64 " %10" PRIu64 "\n",
-		   tree_node_kind_names[i], tree_node_counts[i],
-		   tree_node_sizes[i]);
+	  fprintf (stderr, "%-20s %6" PRIu64 "%c %9" PRIu64 "%c\n",
+		   tree_node_kind_names[i], SIZE_AMOUNT (tree_node_counts[i]),
+		   SIZE_AMOUNT (tree_node_sizes[i]));
 	  total_nodes += tree_node_counts[i];
 	  total_bytes += tree_node_sizes[i];
 	}
       mem_usage::print_dash_line (TREE_MEM_USAGE_SPACES);
-      fprintf (stderr, "%-20s %7" PRIu64 " %10" PRIu64 "\n", "Total",
-	       total_nodes, total_bytes);
+      fprintf (stderr, "%-20s %6" PRIu64 "%c %9" PRIu64 "%c\n", "Total",
+	       SIZE_AMOUNT (total_nodes), SIZE_AMOUNT (total_bytes));
       mem_usage::print_dash_line (TREE_MEM_USAGE_SPACES);
-      fprintf (stderr, "Code                   Nodes\n");
+      fprintf (stderr, "Code                              Nodes\n");
       mem_usage::print_dash_line (TREE_MEM_USAGE_SPACES);
       for (i = 0; i < (int) MAX_TREE_CODES; i++)
-	fprintf (stderr, "%-32s %7" PRIu64 "\n",
-		 get_tree_code_name ((enum tree_code) i), tree_code_counts[i]);
+	fprintf (stderr, "%-32s %6" PRIu64 "%c\n",
+		 get_tree_code_name ((enum tree_code) i),
+		 SIZE_AMOUNT (tree_code_counts[i]));
       mem_usage::print_dash_line (TREE_MEM_USAGE_SPACES);
       fprintf (stderr, "\n");
       ssanames_print_statistics ();
