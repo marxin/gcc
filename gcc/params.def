@@ -42,6 +42,8 @@ along with GCC; see the file COPYING3.  If not see
 
    Be sure to add an entry to invoke.texi summarizing the parameter.  */
 
+# define DEFAULT_MAX_VALUE (1000 * 1000)
+
 /* When branch is predicted to be taken with probability lower than this
    threshold (in percent), then it is considered well predictable. */
 DEFPARAM (PARAM_PREDICTABLE_BRANCH_OUTCOME,
@@ -69,7 +71,7 @@ DEFPARAM (PARAM_INLINE_MIN_SPEEDUP,
 DEFPARAM (PARAM_MAX_INLINE_INSNS_SINGLE,
 	  "max-inline-insns-single",
 	  "The maximum number of instructions in a single function eligible for inlining.",
-	  400, 0, 0)
+	  400, 0, DEFAULT_MAX_VALUE)
 
 /* The single function inlining limit for functions that are
    inlined by virtue of -finline-functions (-O3).
@@ -120,7 +122,7 @@ DEFPARAM (PARAM_EARLY_INLINER_MAX_ITERATIONS,
 DEFPARAM (PARAM_COMDAT_SHARING_PROBABILITY,
 	  "comdat-sharing-probability",
 	  "Probability that COMDAT function will be shared with different compilation unit.",
-	  20, 0, 0)
+	  20, 0, 100)
 
 /* Limit on probability of entry BB.  */
 DEFPARAM (PARAM_PARTIAL_INLINING_ENTRY_PROBABILITY,
@@ -187,7 +189,7 @@ DEFPARAM(PARAM_LARGE_FUNCTION_INSNS,
 DEFPARAM(PARAM_LARGE_FUNCTION_GROWTH,
 	 "large-function-growth",
 	 "Maximal growth due to inlining of large function (in percent).",
-	 100, 0, 0)
+	 100, 0, DEFAULT_MAX_VALUE)
 DEFPARAM(PARAM_LARGE_UNIT_INSNS,
 	 "large-unit-insns",
 	 "The size of translation unit to be considered large.",
@@ -195,11 +197,11 @@ DEFPARAM(PARAM_LARGE_UNIT_INSNS,
 DEFPARAM(PARAM_INLINE_UNIT_GROWTH,
 	 "inline-unit-growth",
 	 "How much can given compilation unit grow because of the inlining (in percent).",
-	 20, 0, 0)
+	 20, 0, DEFAULT_MAX_VALUE)
 DEFPARAM(PARAM_IPCP_UNIT_GROWTH,
 	 "ipcp-unit-growth",
 	 "How much can given compilation unit grow because of the interprocedural constant propagation (in percent).",
-	 10, 0, 0)
+	 10, 0, DEFAULT_MAX_VALUE)
 DEFPARAM(PARAM_EARLY_INLINING_INSNS,
 	 "early-inlining-insns",
 	 "Maximal estimated growth of function body caused by early inlining of single call.",
@@ -268,7 +270,7 @@ DEFPARAM(PARAM_GCSE_COST_DISTANCE_RATIO,
 DEFPARAM(PARAM_GCSE_UNRESTRICTED_COST,
 	 "gcse-unrestricted-cost",
 	 "Cost at which GCSE optimizations will not constraint the distance an expression can travel.",
-	 3, 0, 0)
+	 3, 0, DEFAULT_MAX_VALUE)
 
 /* How deep from a given basic block the dominator tree should be searched
    for expressions to hoist to the block.  The value of 0 will avoid limiting
@@ -312,17 +314,17 @@ DEFPARAM(PARAM_MAX_UNROLL_TIMES,
 DEFPARAM(PARAM_MAX_PEELED_INSNS,
 	"max-peeled-insns",
 	"The maximum number of insns of a peeled loop.",
-	100, 0, 0)
+	100, 0, DEFAULT_MAX_VALUE)
 /* The maximum number of peelings of a single loop.  */
 DEFPARAM(PARAM_MAX_PEEL_TIMES,
 	"max-peel-times",
 	"The maximum number of peelings of a single loop.",
-	16, 0, 0)
+	16, 0, DEFAULT_MAX_VALUE)
 /* The maximum number of peelings of a single loop that is peeled completely.  */
 DEFPARAM(PARAM_MAX_PEEL_BRANCHES,
 	"max-peel-branches",
 	"The maximum number of branches on the path through the peeled sequence.",
-	32, 0, 0)
+	32, 0, DEFAULT_MAX_VALUE)
 /* The maximum number of insns of a peeled loop.  */
 DEFPARAM(PARAM_MAX_COMPLETELY_PEELED_INSNS,
 	"max-completely-peeled-insns",
@@ -332,7 +334,7 @@ DEFPARAM(PARAM_MAX_COMPLETELY_PEELED_INSNS,
 DEFPARAM(PARAM_MAX_COMPLETELY_PEEL_TIMES,
 	"max-completely-peel-times",
 	"The maximum number of peelings of a single loop that is peeled completely.",
-	16, 0, 0)
+	16, 0, DEFAULT_MAX_VALUE)
 /* The maximum number of insns of a peeled loop that rolls only once.  */
 DEFPARAM(PARAM_MAX_ONCE_PEELED_INSNS,
 	"max-once-peeled-insns",
@@ -467,7 +469,7 @@ DEFPARAM(TRACER_DYNAMIC_COVERAGE,
 DEFPARAM(TRACER_MAX_CODE_GROWTH,
 	 "tracer-max-code-growth",
 	 "Maximal code growth caused by tail duplication (in percent).",
-	 100, 0, 0)
+	 100, 0, DEFAULT_MAX_VALUE)
 DEFPARAM(TRACER_MIN_BRANCH_RATIO,
 	 "tracer-min-branch-ratio",
 	 "Stop reverse growth if the reverse probability of best edge is less than this threshold (in percent).",
@@ -497,19 +499,19 @@ DEFPARAM(PARAM_MIN_CROSSJUMP_INSNS,
 DEFPARAM(PARAM_MAX_GROW_COPY_BB_INSNS,
      "max-grow-copy-bb-insns",
      "The maximum expansion factor when copying basic blocks.",
-     8, 0, 0)
+     8, 0, DEFAULT_MAX_VALUE)
 
 /* The maximum number of insns to duplicate when unfactoring computed gotos.  */
 DEFPARAM(PARAM_MAX_GOTO_DUPLICATION_INSNS,
      "max-goto-duplication-insns",
      "The maximum number of insns to duplicate when unfactoring computed gotos.",
-     8, 0, 0)
+     8, 0, DEFAULT_MAX_VALUE)
 
 /* The maximum length of path considered in cse.  */
 DEFPARAM(PARAM_MAX_CSE_PATH_LENGTH,
 	 "max-cse-path-length",
 	 "The maximum length of path considered in cse.",
-	 10, 1, 0)
+	 10, 1, DEFAULT_MAX_VALUE)
 DEFPARAM(PARAM_MAX_CSE_INSNS,
 	 "max-cse-insns",
 	 "The maximum instructions CSE process before flushing.",
@@ -652,7 +654,7 @@ DEFPARAM(PARAM_MAX_PIPELINE_REGION_INSNS,
 DEFPARAM(PARAM_MIN_SPEC_PROB,
          "min-spec-prob",
          "The minimum probability of reaching a source block for interblock speculative scheduling.",
-         40, 0, 0)
+         40, 0, 100)
 
 DEFPARAM(PARAM_MAX_SCHED_EXTEND_REGIONS_ITERS,
          "max-sched-extend-regions-iters",
@@ -789,21 +791,21 @@ DEFPARAM (PARAM_SIMULTANEOUS_PREFETCHES,
 DEFPARAM (PARAM_L1_CACHE_SIZE,
 	  "l1-cache-size",
 	  "The size of L1 cache.",
-	  64, 0, 0)
+	  64, 0, DEFAULT_MAX_VALUE)
 
 /* The size of L1 cache line in bytes.  */
 
 DEFPARAM (PARAM_L1_CACHE_LINE_SIZE,
 	  "l1-cache-line-size",
 	  "The size of L1 cache line.",
-	  32, 0, 0)
+	  32, 0, DEFAULT_MAX_VALUE)
 
 /* The size of L2 cache in kB.  */
 
 DEFPARAM (PARAM_L2_CACHE_SIZE,
 	  "l2-cache-size",
 	  "The size of L2 cache.",
-	  512, 0, 0)
+	  512, 0, DEFAULT_MAX_VALUE)
 
 /* Whether software prefetch hints should be issued for non-constant
    strides.  */
@@ -828,14 +830,14 @@ DEFPARAM (PARAM_PREFETCH_MINIMUM_STRIDE,
 DEFPARAM (PARAM_LOOP_INTERCHANGE_MAX_NUM_STMTS,
 	  "loop-interchange-max-num-stmts",
 	  "The maximum number of stmts in loop nest for loop interchange.",
-	  64, 0, 0)
+	  64, 0, DEFAULT_MAX_VALUE)
 
 /* Minimum stride ratio for loop interchange to be profitiable.  */
 
 DEFPARAM (PARAM_LOOP_INTERCHANGE_STRIDE_RATIO,
 	  "loop-interchange-stride-ratio",
 	  "The minimum stride ratio for loop interchange to be profitable.",
-	  2, 0, 0)
+	  2, 0, DEFAULT_MAX_VALUE)
 
 /* Whether we should use canonical types rather than deep "structural"
    type checking.  Setting this value to 1 (the default) improves
@@ -887,7 +889,7 @@ DEFPARAM (PARAM_IRA_MAX_CONFLICT_TABLE_SIZE,
 DEFPARAM (PARAM_IRA_LOOP_RESERVED_REGS,
 	  "ira-loop-reserved-regs",
 	  "The number of registers in each class kept unused by loop invariant motion.",
-	  2, 0, 0)
+	  2, 0, DEFAULT_MAX_VALUE)
 
 DEFPARAM (PARAM_LRA_MAX_CONSIDERED_RELOAD_PSEUDOS,
 	  "lra-max-considered-reload-pseudos",
@@ -1078,7 +1080,7 @@ DEFPARAM (PARAM_IPA_MAX_AGG_ITEMS,
 	  "ipa-max-agg-items",
 	  "Maximum number of aggregate content items for a parameter in "
 	  "jump functions and lattices.",
-	  16, 0, 0)
+	  16, 0, DEFAULT_MAX_VALUE)
 
 DEFPARAM (PARAM_IPA_CP_LOOP_HINT_BONUS,
 	  "ipa-cp-loop-hint-bonus",
@@ -1150,7 +1152,7 @@ DEFPARAM (PARAM_TREE_REASSOC_WIDTH,
 	  "tree-reassoc-width",
 	  "Set the maximum number of instructions executed in parallel in "
 	  "reassociated tree.  If 0, use the target dependent heuristic.",
-	  0, 0, 0)
+	  0, 0, DEFAULT_MAX_VALUE)
 
 DEFPARAM (PARAM_MAX_TAIL_MERGE_COMPARISONS,
           "max-tail-merge-comparisons",
@@ -1359,6 +1361,8 @@ DEFPARAM(PARAM_AVOID_FMA_MAX_BITS,
 	 "avoid-fma-max-bits",
 	 "Maximum number of bits for which we avoid creating FMAs.",
 	 0, 0, 512)
+
+#undef DEFAULT_MAX_VALUE
 
 /*
 
