@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "options.h"
 #include "cpp.h"
 #include "scanner.h"
+#include "c-family/c-target.h"
 
 /* List of include file search directories.  */
 gfc_directorylist *include_dirs, *intrinsic_modules_dirs;
@@ -2363,6 +2364,16 @@ load_file (const char *realfilename, const char *displayedname, bool initial)
 	      preprocessor_line (line);
 	      continue;
 	    }
+	}
+
+      /* Make a guard to prevent recursive inclusion.  */
+      static bool preinclude_done = false;
+      if (!preinclude_done)
+	{
+	  const char *preinc = targetcm.c_preinclude ();
+	  preinclude_done = true;
+	  if (preinc != NULL && !load_file (preinc, NULL, false))
+	    exit (FATAL_EXIT_CODE);
 	}
 
       /* Preprocessed files have preprocessor lines added before the byte

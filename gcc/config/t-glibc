@@ -23,3 +23,7 @@ glibc-c.o: config/glibc-c.c
 glibc-d.o: config/glibc-d.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
+
+glibc-fortran.o: config/glibc-fortran.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)

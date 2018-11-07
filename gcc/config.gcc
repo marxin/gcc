@@ -836,6 +836,7 @@ case ${target} in
   c_target_objs="${c_target_objs} glibc-c.o"
   cxx_target_objs="${cxx_target_objs} glibc-c.o"
   d_target_objs="${d_target_objs} glibc-d.o"
+  fortran_target_objs="${fortran_target_objs} glibc-fortran.o"
   tmake_file="${tmake_file} t-glibc"
   target_has_targetcm=yes
   target_has_targetdm=yes
