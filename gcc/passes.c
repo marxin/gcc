@@ -440,7 +440,7 @@ const pass_data pass_data_local_optimization_passes =
   0, /* properties_provided */
   0, /* properties_destroyed */
   0, /* todo_flags_start */
-  0, /* todo_flags_finish */
+  TODO_remove_functions, /* todo_flags_finish */
 };
 
 class pass_local_optimization_passes : public simple_ipa_opt_pass
