@@ -547,3 +547,47 @@ make_pass_remove_cgraph_callee_edges (gcc::context *ctxt)
 {
   return new pass_remove_cgraph_callee_edges (ctxt);
 }
+
+namespace {
+
+const pass_data pass_data_ipa_remove_functions =
+{
+  IPA_PASS, /* type */
+  "*remove_functions", /* name */
+  OPTGROUP_INLINE, /* optinfo_flags */
+  TV_IPA_FNSUMMARY, /* tv_id */
+  0, /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  TODO_remove_functions /* todo_flags_finish */
+};
+
+class pass_ipa_remove_functions : public ipa_opt_pass_d
+{
+public:
+  pass_ipa_remove_functions (gcc::context *ctxt)
+    : ipa_opt_pass_d (pass_data_ipa_remove_functions, ctxt,
+		      NULL, /* generate_summary */
+		      NULL, /* write_summary */
+		      NULL, /* read_summary */
+		      NULL, /* write_optimization_summary */
+		      NULL, /* read_optimization_summary */
+		      NULL, /* stmt_fixup */
+		      0, /* function_transform_todo_flags_start */
+		      NULL, /* function_transform */
+		      NULL) /* variable_transform */
+  {}
+
+  /* opt_pass methods: */
+  virtual unsigned int execute (function *) { return 0; }
+
+}; // class pass_ipa_fn_summary
+
+} // anon namespace
+
+ipa_opt_pass_d *
+make_pass_remove_functions (gcc::context *ctxt)
+{
+  return new pass_ipa_remove_functions (ctxt);
+}

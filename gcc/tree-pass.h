@@ -514,6 +514,7 @@ extern ipa_opt_pass_d *make_pass_ipa_single_use (gcc::context *ctxt);
 extern ipa_opt_pass_d *make_pass_ipa_comdats (gcc::context *ctxt);
 extern simple_ipa_opt_pass *make_pass_materialize_all_clones (gcc::context *
 							      ctxt);
+extern ipa_opt_pass_d *make_pass_remove_functions (gcc::context *ctxt);
 
 extern gimple_opt_pass *make_pass_cleanup_cfg_post_optimizing (gcc::context
 							       *ctxt);
