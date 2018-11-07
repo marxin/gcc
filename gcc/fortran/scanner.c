@@ -2365,6 +2365,16 @@ load_file (const char *realfilename, const char *displayedname, bool initial)
 	    }
 	}
 
+      /* Make a guard to prevent recursive inclusion.  */
+      static bool preinclude_done = false;
+      if (!preinclude_done)
+	{
+	  preinclude_done = true;
+	  if (flag_pre_include != NULL && !load_file (flag_pre_include, NULL,
+						      false))
+	    exit (FATAL_EXIT_CODE);
+	}
+
       /* Preprocessed files have preprocessor lines added before the byte
          order mark, so first_line is not about the first line of the file
 	 but the first line that's not a preprocessor line.  */
