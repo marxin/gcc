@@ -597,7 +597,61 @@ define_quad_builtin (const char *name, tree type, bool is_const)
   return fndecl;
 }
 
+/* Add SIMD attribute for FNDECL built-in if the built-in
+   name is in VECTORIZED_BUILTINS.  */
+#include "print-tree.h"
+static void
+add_simd_flag_for_built_in (tree fndecl)
+{
+  if (fndecl == NULL_TREE)
+    return;
 
+  const char *name = IDENTIFIER_POINTER (DECL_NAME (fndecl));
+  for (unsigned i = 0; i < vectorized_builtins.length (); i++)
+    if (strcmp (vectorized_builtins[i].name, name) == 0)
+      {
+	int simd_type = vectorized_builtins[i].simd_type;
+	tree omp_clause = NULL_TREE;
+	if (simd_type == 0)
+	  ; /* No SIMD clause.  */
+	else
+	  {
+	    omp_clause_code code
+	      = (simd_type == 1 ? OMP_CLAUSE_INBRANCH : OMP_CLAUSE_NOTINBRANCH);
+	    omp_clause = build_omp_clause (UNKNOWN_LOCATION, code);
+	    omp_clause = build_tree_list (NULL_TREE, omp_clause);
+	  }
+
+	DECL_ATTRIBUTES (fndecl)
+	  = tree_cons (get_identifier ("omp declare simd"), omp_clause,
+		       DECL_ATTRIBUTES (fndecl));
+      }
+}
+
+/* Set SIMD attribute to all built-in functions that are mentioned
+   in vectorized_builtins vector.  */
+
+void
+gfc_adjust_builtins (void)
+{
+  gfc_intrinsic_map_t *m;
+  for (m = gfc_intrinsic_map;
+       m->id != GFC_ISYM_NONE || m->double_built_in != END_BUILTINS; m++)
+    {
+      add_simd_flag_for_built_in (m->real4_decl);
+      add_simd_flag_for_built_in (m->complex4_decl);
+      add_simd_flag_for_built_in (m->real8_decl);
+      add_simd_flag_for_built_in (m->complex8_decl);
+      add_simd_flag_for_built_in (m->real10_decl);
+      add_simd_flag_for_built_in (m->complex10_decl);
+      add_simd_flag_for_built_in (m->real16_decl);
+      add_simd_flag_for_built_in (m->complex16_decl);
+      add_simd_flag_for_built_in (m->real16_decl);
+      add_simd_flag_for_built_in (m->complex16_decl);
+    }
+
+  vectorized_builtins.truncate (0);
+}
 
 /* Initialize function decls for library functions.  The external functions
    are created as required.  Builtin functions are added here.  */

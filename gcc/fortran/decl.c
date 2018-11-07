@@ -98,6 +98,9 @@ bool gfc_matching_function;
 /* Set upon parsing a !GCC$ unroll n directive for use in the next loop.  */
 int directive_unroll = -1;
 
+/* List middle-end built-ins that should be vectorized.  */
+vec<vect_builtin_tuple> vectorized_builtins;
+
 /* If a kind expression of a component of a parameterized derived type is
    parameterized, temporarily store the expression here.  */
 static gfc_expr *saved_kind_expr = NULL;
@@ -11242,4 +11245,34 @@ gfc_match_gcc_unroll (void)
 
   gfc_error ("Syntax error in !GCC$ UNROLL directive at %C");
   return MATCH_ERROR;
+}
+
+/* Match a !GCC$ builtin (b) attributes simd flags form:
+
+   The parameter b is name of a middle-end built-in.
+   Flags are one of:
+     - (empty)
+     - inbranch
+     - notinbranch
+
+   When we come here, we have already matched the !GCC$ builtin string.  */
+match
+gfc_match_gcc_builtin (void)
+{
+  char builtin[GFC_MAX_SYMBOL_LEN + 1];
+
+  if (gfc_match (" (%n) attributes simd", builtin) != MATCH_YES)
+    return MATCH_ERROR;
+
+  int builtin_kind = 0;
+  if (gfc_match (" (notinbranch)") == MATCH_YES)
+    builtin_kind = -1;
+  else if (gfc_match (" (inbranch)") == MATCH_YES)
+    builtin_kind = 1;
+
+  char *r = XNEWVEC (char, strlen (builtin) + 32);
+  sprintf (r, "__builtin_%s", builtin);
+  vectorized_builtins.safe_push (vect_builtin_tuple (r, builtin_kind));
+
+  return MATCH_YES;
 }
