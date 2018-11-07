@@ -776,7 +776,7 @@ const pass_data pass_data_ipa_tree_profile =
   0, /* properties_required */
   0, /* properties_provided */
   0, /* properties_destroyed */
-  0, /* todo_flags_start */
+  TODO_remove_functions, /* todo_flags_start */
   TODO_dump_symtab, /* todo_flags_finish */
 };
 
