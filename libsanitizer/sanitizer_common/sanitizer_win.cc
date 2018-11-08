@@ -1047,12 +1047,6 @@ bool GetRandom(void *buffer, uptr length, bool blocking) {
   UNIMPLEMENTED();
 }
 
-u32 GetNumberOfCPUs() {
-  SYSTEM_INFO sysinfo = {};
-  GetNativeSystemInfo(&sysinfo);
-  return sysinfo.dwNumberOfProcessors;
-}
-
 }  // namespace __sanitizer
 
 #endif  // _WIN32

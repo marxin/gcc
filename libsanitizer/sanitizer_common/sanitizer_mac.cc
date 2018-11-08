@@ -1082,10 +1082,6 @@ bool GetRandom(void *buffer, uptr length, bool blocking) {
   return true;
 }
 
-u32 GetNumberOfCPUs() {
-  return (u32)sysconf(_SC_NPROCESSORS_ONLN);
-}
-
 }  // namespace __sanitizer
 
 #endif  // SANITIZER_MAC

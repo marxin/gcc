@@ -482,10 +482,6 @@ bool GetRandom(void *buffer, uptr length, bool blocking) {
   return true;
 }
 
-u32 GetNumberOfCPUs() {
-  return zx_system_get_num_cpus();
-}
-
 uptr GetRSS() { UNIMPLEMENTED(); }
 
 }  // namespace __sanitizer
