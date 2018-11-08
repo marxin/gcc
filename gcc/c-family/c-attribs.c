@@ -146,6 +146,7 @@ static tree handle_designated_init_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fallthrough_attribute (tree *, tree, tree, int, bool *);
 static tree handle_patchable_function_entry_attribute (tree *, tree, tree,
 						       int, bool *);
+static tree handle_symver_attribute (tree *, tree, tree, int, bool *);
 
 /* Helper to define attribute exclusions.  */
 #define ATTR_EXCL(name, function, type, variable)	\
@@ -455,6 +456,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      NULL },
   { "nocf_check",	      0, 0, false, true, true, true,
 			      handle_nocf_check_attribute, NULL },
+  { "symver",	              1, 1, true, false, false, false,
+		              handle_symver_attribute, NULL},
   { NULL,                     0, 0, false, false, false, false, NULL, NULL }
 };
 
@@ -2017,6 +2020,54 @@ handle_noplt_attribute (tree *node, tree name,
       *no_add_attrs = true;
       return NULL_TREE;
     }
+  return NULL_TREE;
+}
+
+static tree
+handle_symver_attribute (tree *node, tree name, tree args,
+			 int ARG_UNUSED (flags), bool *no_add_attrs)
+{
+  tree symver;
+  const char *symver_str;
+  int n;
+
+  /* TODO: handle this attribute for VAR_DECL */
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    {
+      warning (OPT_Wattributes,
+      	       "symver attribute is only applicable on functions", name);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  if (!TREE_PUBLIC (*node))
+    {
+      warning (OPT_Wattributes,
+      	       "symver attribute is ignored on static function", name);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  symver = TREE_VALUE (args);
+  if (TREE_CODE (symver) != STRING_CST)
+    {
+      error ("symver attribute argument not a string constant");
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
+  symver_str = TREE_STRING_POINTER (symver);
+  for (n = 0; n < 4; n++)
+    if (symver_str[n] != '@')
+      break;
+
+  if (n == 0 || n == 4)
+    {
+      error ("symver attribute argument must begin with 1, 2, or 3 %<@%>");
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
   return NULL_TREE;
 }
 

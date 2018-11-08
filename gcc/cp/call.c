@@ -426,7 +426,8 @@ enum rejection_reason_code {
   rr_template_unification,
   rr_invalid_copy,
   rr_inherited_ctor,
-  rr_constraint_failure
+  rr_constraint_failure,
+  rr_old_symbol_version
 };
 
 struct conversion_info {
@@ -736,6 +737,13 @@ constraint_failure (tree fn)
       r->u.template_instantiation.tmpl = fn;
       r->u.template_instantiation.targs = NULL_TREE;
     }
+  return r;
+}
+
+static struct rejection_reason *
+old_symbol_version_rejection (void)
+{
+  struct rejection_reason *r = alloc_rejection (rr_old_symbol_version);
   return r;
 }
 
@@ -2061,6 +2069,7 @@ add_function_candidate (struct z_candidate **candidates,
   int i, len;
   tree parmnode;
   tree orig_first_arg = first_arg;
+  tree symver;
   int skip;
   int viable = 1;
   struct rejection_reason *reason = NULL;
@@ -2114,6 +2123,18 @@ add_function_candidate (struct z_candidate **candidates,
       int remaining = remaining_arguments (parmnode);
       viable = 0;
       reason = arity_rejection (first_arg, i + remaining, len);
+    }
+
+  symver = lookup_attribute ("symver", DECL_ATTRIBUTES (fn));
+  if (symver)
+    {
+      const char *symver_string =
+      	TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver)));
+      if (symver_string[1] != '@')
+        {
+          viable = 0;
+          reason = old_symbol_version_rejection ();
+	}
     }
 
   /* An inherited constructor (12.6.3 [class.inhctor.init]) that has a first
@@ -3626,6 +3647,10 @@ print_z_candidate (location_t loc, const char *msgstr,
 	  inform (cloc, "  an inherited constructor is not a candidate for "
 		  "initialization from an expression of the same or derived "
 		  "type");
+	  break;
+	case rr_old_symbol_version:
+	  inform (cloc, "  function with non-default symbol version "
+	  	  "is not a candidate");
 	  break;
 	case rr_none:
 	default:

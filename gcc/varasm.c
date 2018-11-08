@@ -124,6 +124,7 @@ static void asm_output_aligned_bss (FILE *, tree, const char *,
 static void mark_weak (tree);
 static void output_constant_pool (const char *, tree);
 static void handle_vtv_comdat_section (section *, const_tree);
+static char *strip_symver_in_name (const char *, const char *);
 
 /* Well-known sections, each one associated with some sort of *_ASM_OP.  */
 section *text_section;
@@ -1912,12 +1913,30 @@ assemble_start_function (tree decl, const char *fnname)
 void
 assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
 {
+  tree symver;
+
 #ifdef ASM_DECLARE_FUNCTION_SIZE
   /* We could have switched section in the middle of the function.  */
   if (crtl->has_bb_partition)
     switch_to_section (function_section (decl));
   ASM_DECLARE_FUNCTION_SIZE (asm_out_file, fnname, decl);
 #endif
+
+  symver = lookup_attribute ("symver", DECL_ATTRIBUTES (decl));
+  if (symver)
+    {
+#ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
+      const char *symver_string =
+      	TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver)));
+      char *name = strip_symver_in_name (fnname, symver_string);
+      ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file, fnname, name,
+      				   symver_string);
+      XDELETEVEC (name);
+#else
+      error ("symver is only supported on ELF platforms");
+#endif
+    }
+
   if (! CONSTANT_POOL_BEFORE_FUNCTION)
     {
       output_constant_pool (fnname, decl);
@@ -5928,6 +5947,24 @@ do_assemble_alias (tree decl, tree target)
       }
   }
 #endif
+
+  tree symver_attr = lookup_attribute ("symver", DECL_ATTRIBUTES (decl));
+  if (symver_attr)
+    {
+#ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
+      const char *symver_string
+      	= TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver_attr)));
+      char *name = strip_symver_in_name (IDENTIFIER_POINTER (id),
+      					 symver_string);
+      ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file,
+      				   IDENTIFIER_POINTER (id), name,
+      				   symver_string);
+      XDELETEVEC (name);
+#else
+      error ("symver is only supported on ELF platforms");
+#endif
+    }
+
 }
 
 /* Emit an assembler directive to make the symbol for DECL an alias to
@@ -8111,6 +8148,24 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
   else
     switch_to_section (sect);
 #endif
+}
+
+static char *
+strip_symver_in_name (const char *name, const char *symver)
+{
+  const char *pos;
+  char *ret;
+
+  while (*symver == '@')
+    symver++;
+
+  pos = strstr (name, ".symver.");
+  gcc_assert (pos);
+
+  ret = XNEWVEC (char, strlen (name) - strlen (symver) - 7);
+  strncpy (ret, name, pos - name);
+  strcat (ret, pos + 8 + strlen (symver));
+  return ret;
 }
 
 #include "gt-varasm.h"
