@@ -1918,6 +1918,23 @@ assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
     switch_to_section (function_section (decl));
   ASM_DECLARE_FUNCTION_SIZE (asm_out_file, fnname, decl);
 #endif
+
+  tree symver = lookup_attribute ("symver", DECL_ATTRIBUTES (decl));
+  if (symver)
+    {
+      for (symver = TREE_VALUE (symver); symver; symver = TREE_CHAIN (symver))
+	{
+#ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
+	  const char *symver_string
+	    = TREE_STRING_POINTER (TREE_VALUE (symver));
+	  ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file, fnname, fnname,
+				       symver_string);
+	}
+#else
+      error ("symver is only supported on ELF platforms");
+#endif
+    }
+
   if (! CONSTANT_POOL_BEFORE_FUNCTION)
     {
       output_constant_pool (fnname, decl);
@@ -5928,6 +5945,25 @@ do_assemble_alias (tree decl, tree target)
       }
   }
 #endif
+
+  tree symver = lookup_attribute ("symver", DECL_ATTRIBUTES (decl));
+  if (symver)
+    {
+      for (symver = TREE_VALUE (symver); symver; symver = TREE_CHAIN (symver))
+	{
+#ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
+	  const char *symver_string
+	    = TREE_STRING_POINTER (TREE_VALUE (symver));
+	  ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file,
+				       IDENTIFIER_POINTER (target),
+				       IDENTIFIER_POINTER (id),
+				       symver_string);
+	}
+#else
+      error ("symver is only supported on ELF platforms");
+#endif
+    }
+
 }
 
 /* Emit an assembler directive to make the symbol for DECL an alias to
