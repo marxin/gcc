@@ -3759,34 +3759,12 @@ mangle_decl_string (const tree decl)
   return result;
 }
 
-static tree
-get_id_with_symver (tree decl, tree id)
-{
-  const char *orig_name, *symver;
-  char *asm_name;
-
-  tree symver_attr = lookup_attribute ("symver", DECL_ATTRIBUTES (decl));
-  if (symver_attr)
-    {
-      orig_name = IDENTIFIER_POINTER (id);
-      symver = TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver_attr)));
-      while (*symver == '@')
-      	symver++;
-      asm_name = XNEWVEC (char, strlen (orig_name) + strlen (symver) + 9);
-      sprintf (asm_name, "%s.symver.%s", orig_name, symver);
-      tree ret = get_identifier (asm_name);
-      XDELETEVEC (asm_name);
-      return ret;
-    }
-  return id;
-}
-
 /* Return an identifier for the external mangled name of DECL.  */
 
 static tree
 get_mangled_id (tree decl)
 {
-  tree id = get_id_with_symver (decl, mangle_decl_string (decl));
+  tree id = mangle_decl_string (decl);
   return targetm.mangle_decl_assembler_name (decl, id);
 }
 

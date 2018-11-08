@@ -1928,10 +1928,8 @@ assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
 #ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
       const char *symver_string
 	= TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver)));
-      char *name = strip_symver_in_name (fnname, symver_string);
-      ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file, fnname, name,
-      				   symver_string);
-      XDELETEVEC (name);
+      ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file, fnname, fnname,
+				   symver_string);
 #else
       error ("symver is only supported on ELF platforms");
 #endif
@@ -5953,12 +5951,12 @@ do_assemble_alias (tree decl, tree target)
     {
 #ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
       const char *symver_string
-      	= TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver_attr)));
+	= TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver_attr)));
       char *name = strip_symver_in_name (IDENTIFIER_POINTER (id),
-      					 symver_string);
+					 symver_string);
       ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file,
-      				   IDENTIFIER_POINTER (id), name,
-      				   symver_string);
+				   IDENTIFIER_POINTER (id), name,
+				   symver_string);
       XDELETEVEC (name);
 #else
       error ("symver is only supported on ELF platforms");
@@ -8148,24 +8146,6 @@ handle_vtv_comdat_section (section *sect, const_tree decl ATTRIBUTE_UNUSED)
   else
     switch_to_section (sect);
 #endif
-}
-
-static char *
-strip_symver_in_name (const char *name, const char *symver)
-{
-  const char *pos;
-  char *ret;
-
-  while (*symver == '@')
-    symver++;
-
-  pos = strstr (name, ".symver.");
-  gcc_assert (pos);
-
-  ret = XNEWVEC (char, strlen (name) - strlen (symver) - 7);
-  strncpy (ret, name, pos - name);
-  strcat (ret, pos + 8 + strlen (symver));
-  return ret;
 }
 
 #include "gt-varasm.h"
