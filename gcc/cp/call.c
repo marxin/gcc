@@ -2128,12 +2128,12 @@ add_function_candidate (struct z_candidate **candidates,
   symver = lookup_attribute ("symver", DECL_ATTRIBUTES (fn));
   if (symver)
     {
-      const char *symver_string =
-      	TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver)));
+      const char *symver_string
+	= TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver)));
       if (symver_string[1] != '@')
-        {
-          viable = 0;
-          reason = old_symbol_version_rejection ();
+	{
+	  viable = 0;
+	  reason = old_symbol_version_rejection ();
 	}
     }
 

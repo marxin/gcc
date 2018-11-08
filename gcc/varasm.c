@@ -1926,8 +1926,8 @@ assemble_end_function (tree decl, const char *fnname ATTRIBUTE_UNUSED)
   if (symver)
     {
 #ifdef ASM_OUTPUT_SYMVER_DIRECTIVE
-      const char *symver_string =
-      	TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver)));
+      const char *symver_string
+	= TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver)));
       char *name = strip_symver_in_name (fnname, symver_string);
       ASM_OUTPUT_SYMVER_DIRECTIVE (asm_out_file, fnname, name,
       				   symver_string);

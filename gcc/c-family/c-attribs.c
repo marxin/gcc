@@ -456,8 +456,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      NULL },
   { "nocf_check",	      0, 0, false, true, true, true,
 			      handle_nocf_check_attribute, NULL },
-  { "symver",	              1, 1, true, false, false, false,
-		              handle_symver_attribute, NULL},
+  { "symver",		      1, 1, true, false, false, false,
+			      handle_symver_attribute, NULL},
   { NULL,                     0, 0, false, false, false, false, NULL, NULL }
 };
 
@@ -2035,7 +2035,7 @@ handle_symver_attribute (tree *node, tree name, tree args,
   if (TREE_CODE (*node) != FUNCTION_DECL)
     {
       warning (OPT_Wattributes,
-      	       "symver attribute is only applicable on functions", name);
+	       "symver attribute is only applicable on functions", name);
       *no_add_attrs = true;
       return NULL_TREE;
     }
@@ -2043,7 +2043,7 @@ handle_symver_attribute (tree *node, tree name, tree args,
   if (!TREE_PUBLIC (*node))
     {
       warning (OPT_Wattributes,
-      	       "symver attribute is ignored on static function", name);
+	       "symver attribute is ignored on static function", name);
       *no_add_attrs = true;
       return NULL_TREE;
     }

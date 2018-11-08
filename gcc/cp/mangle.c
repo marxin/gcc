@@ -3772,7 +3772,7 @@ get_id_with_symver (tree decl, tree id)
       symver = TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (symver_attr)));
       while (*symver == '@')
       	symver++;
-      asm_name = XNEWVEC (char, strlen(orig_name) + strlen(symver) + 9);
+      asm_name = XNEWVEC (char, strlen (orig_name) + strlen (symver) + 9);
       sprintf (asm_name, "%s.symver.%s", orig_name, symver);
       tree ret = get_identifier (asm_name);
       XDELETEVEC (asm_name);
