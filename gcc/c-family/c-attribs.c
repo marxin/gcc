@@ -456,7 +456,7 @@ const struct attribute_spec c_common_attribute_table[] =
 			      NULL },
   { "nocf_check",	      0, 0, false, true, true, true,
 			      handle_nocf_check_attribute, NULL },
-  { "symver",		      1, 1, true, false, false, false,
+  { "symver",		      1, -1, true, false, false, false,
 			      handle_symver_attribute, NULL},
   { NULL,                     0, 0, false, false, false, false, NULL, NULL }
 };

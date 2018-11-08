@@ -101,7 +101,6 @@ static tree build_cp_library_fn (tree, enum tree_code, tree, int);
 static void store_parm_decls (tree);
 static void initialize_local_var (tree, tree);
 static void expand_static_init (tree, tree);
-static bool maybe_symver_decls (tree, tree);
 
 /* The following symbols are subsumed in the cp_global_trees array, and
    listed here individually for documentation purposes.
@@ -1011,8 +1010,6 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
 				      (!DECL_FUNCTION_VERSIONED (newdecl)
 				       || !DECL_FUNCTION_VERSIONED (olddecl))))
 	return 0;
-      if (types_match && maybe_symver_decls (newdecl, olddecl))
-      	return 0;
     }
   else if (TREE_CODE (newdecl) == TEMPLATE_DECL)
     {
@@ -1096,38 +1093,6 @@ maybe_version_functions (tree newdecl, tree olddecl, bool record)
     cgraph_node::record_function_versions (olddecl, newdecl);
 
   return true;
-}
-
-static inline bool
-is_default_symver (const char *ver)
-{
-  return ver[0] == 0 || (ver[0] == '@' && ver[1] == '@');
-}
-
-static bool
-maybe_symver_decls (tree newdecl, tree olddecl)
-{
-  tree attr1, attr2;
-  const char *ver1, *ver2;
-
-  attr1 = lookup_attribute ("symver", DECL_ATTRIBUTES (newdecl));
-  attr2 = lookup_attribute ("symver", DECL_ATTRIBUTES (olddecl));
-
-  if (attr1 == NULL_TREE && attr2 == NULL_TREE)
-    return false;
-
-  ver1 = attr1 ? TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr1))) : "";
-  ver2 = attr2 ? TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr2))) : "";
-
-  if (is_default_symver (ver1) && is_default_symver (ver2))
-    return false;
-
-  while (*ver1 == '@')
-    ver1++;
-  while (*ver2 == '@')
-    ver2++;
-
-  return strcmp (ver1, ver2) != 0;
 }
 
 /* If NEWDECL is `static' and an `extern' was seen previously,
@@ -1729,7 +1694,6 @@ next_arg:;
 	     are not ambiguous.  */
 	  else if ((!DECL_FUNCTION_VERSIONED (newdecl)
 		    && !DECL_FUNCTION_VERSIONED (olddecl))
-		    && !maybe_symver_decls (newdecl, olddecl)
                    // The functions have the same parameter types.
 		   && compparms (TYPE_ARG_TYPES (TREE_TYPE (newdecl)),
 				 TYPE_ARG_TYPES (TREE_TYPE (olddecl)))
