@@ -408,6 +408,7 @@ static const char *pass_through_libs_spec_func (int, const char **);
 static const char *replace_extension_spec_func (int, const char **);
 static const char *greater_than_spec_func (int, const char **);
 static const char *debug_level_greater_than_spec_func (int, const char **);
+static const char *find_fortran_header_file (int, const char **);
 static char *convert_white_space (char *);
 
 /* The Specs Language
@@ -1647,6 +1648,7 @@ static const struct spec_function static_spec_functions[] =
   { "replace-extension",	replace_extension_spec_func },
   { "gt",			greater_than_spec_func },
   { "debug-level-gt",		debug_level_greater_than_spec_func },
+  { "fortran-header-file",	find_fortran_header_file},
 #ifdef EXTRA_SPEC_FUNCTIONS
   EXTRA_SPEC_FUNCTIONS
 #endif
@@ -9888,6 +9890,30 @@ debug_level_greater_than_spec_func (int argc, const char **argv)
 
   return NULL;
 }
+
+/* Return  */
+
+static const char *
+find_fortran_header_file (int argc, const char **argv)
+{
+  if (argc != 1)
+    return NULL;
+
+  char *path = xstrdup (argv[0]);
+  if (strcmp (find_file (path), path) == 0)
+    {
+      /* Now strip filename.  */
+      for (int i = strlen (path) - 1; i >= 0; i--)
+	if (IS_DIR_SEPARATOR (path[i]))
+	  {
+	    path[i] = '\0';
+	    return concat ("-fintrinsic-modules-path ", path, NULL);
+	  }
+    }
+
+  return NULL;
+}
+
 
 /* Insert backslash before spaces in ORIG (usually a file path), to 
    avoid being broken by spec parser.

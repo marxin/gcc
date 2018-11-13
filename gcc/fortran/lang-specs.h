@@ -33,7 +33,7 @@
 			     %{E|M|MM:%(cpp_debug_options) " CPP_ONLY_OPTIONS \
 			     " -fsyntax-only};: " CPP_FORWARD_OPTIONS "}"
 #define F951_OPTIONS        "%(cc1_options) %{J*} \
-			     %{!nostdinc:-fintrinsic-modules-path finclude%s}\
+			     %{!nostdinc:%:fortran-header-file(/usr/include/finclude/math-vector-fortran.h) -fintrinsic-modules-path finclude%s}\
 			     %{!fsyntax-only:%(invoke_as)}"
 #define F951_SOURCE_FORM    "%{!ffree-form:-ffixed-form}"
 
