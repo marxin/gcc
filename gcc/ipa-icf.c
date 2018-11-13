@@ -84,6 +84,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "dbgcnt.h"
 #include "tree-vector-builder.h"
+#include "streamer-hooks.h"
 
 using namespace ipa_icf_gimple;
 
@@ -236,6 +237,7 @@ sem_function::sem_function (bitmap_obstack *stack)
 {
   bb_sizes.create (0);
   bb_sorted.create (0);
+  used_memory_types.create (0);
 }
 
 sem_function::sem_function (cgraph_node *node, bitmap_obstack *stack)
@@ -243,6 +245,7 @@ sem_function::sem_function (cgraph_node *node, bitmap_obstack *stack)
 {
   bb_sizes.create (0);
   bb_sorted.create (0);
+  used_memory_types.create (0);
 }
 
 sem_function::~sem_function ()
@@ -252,6 +255,7 @@ sem_function::~sem_function ()
 
   bb_sizes.release ();
   bb_sorted.release ();
+  used_memory_types.release ();
 }
 
 /* Calculates hash value based on a BASIC_BLOCK.  */
@@ -652,6 +656,17 @@ sem_function::equals_wpa (sem_item *item,
       /* Perform additional checks for used parameters.  */
       if (!compatible_parm_types_p (parm1, parm2))
 	return false;
+    }
+
+  if (used_memory_types.length () !=
+      m_compared_func->used_memory_types.length())
+    return return_false_with_msg ("Mismatched number of used memory types");
+
+  for (unsigned i = 0; i < used_memory_types.length (); i++)
+    {
+      if (!func_checker::compatible_types_p (used_memory_types[i],
+					     m_compared_func->used_memory_types[i]))
+      return return_false_with_msg ("used memory types types are not compatible");
     }
 
   if (list1 || list2)
@@ -1567,6 +1582,37 @@ sem_item::add_type (const_tree type, inchash::hash &hstate)
     }
 }
 
+bool
+sem_function::append_type (tree t, inchash::hash &hstate)
+{
+  if (t == NULL_TREE)
+    return false;
+
+  ao_ref r;
+  ao_ref_init (&r, t);
+  tree base = ao_ref_base (&r);
+
+  bool is_memop = (DECL_P (base) || INDIRECT_REF_P (base)
+		   || TREE_CODE (base) == MEM_REF
+		   || TREE_CODE (base) == TARGET_MEM_REF
+		   || TREE_CODE (base) == ADDR_EXPR);
+  // TODO: make it faster
+  if (!is_memop)
+    return false;
+
+  unsigned HOST_WIDE_INT offset = r.offset.coeffs[0];
+  hstate.add_hwi (offset);
+
+  tree type = TREE_TYPE (base);
+
+  for (unsigned i = 0; i < used_memory_types.length (); i++)
+    if (used_memory_types[i] == type)
+      return true;
+
+  used_memory_types.safe_push (type);
+  return true;
+}
+
 /* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
 
 void
@@ -1583,6 +1629,11 @@ sem_function::hash_stmt (gimple *stmt, inchash::hash &hstate)
       break;
     case GIMPLE_ASSIGN:
       hstate.add_int (gimple_assign_rhs_code (stmt));
+
+      // TODO: remove the aforementioned code then
+      for (unsigned i = 0; i < gimple_num_ops (stmt); i++)
+	append_type (gimple_op (stmt, i), hstate);
+
       if (commutative_tree_code (gimple_assign_rhs_code (stmt))
 	  || commutative_ternary_tree_code (gimple_assign_rhs_code (stmt)))
 	{
@@ -1601,6 +1652,7 @@ sem_function::hash_stmt (gimple *stmt, inchash::hash &hstate)
 	  add_type (TREE_TYPE (gimple_assign_lhs (stmt)), two);
 	  break;
 	}
+
       /* fall through */
     case GIMPLE_CALL:
     case GIMPLE_ASM:
@@ -1610,6 +1662,9 @@ sem_function::hash_stmt (gimple *stmt, inchash::hash &hstate)
       /* All these statements are equivalent if their operands are.  */
       for (unsigned i = 0; i < gimple_num_ops (stmt); ++i)
 	{
+	  if (code == GIMPLE_CALL)
+	    append_type (gimple_op (stmt, i), hstate);
+
 	  add_expr (gimple_op (stmt, i), hstate);
 	  if (gimple_op (stmt, i))
 	    add_type (TREE_TYPE (gimple_op (stmt, i)), hstate);
@@ -2300,8 +2355,19 @@ sem_item_optimizer::write_summary (void)
 	{
 	  int node_ref = lto_symtab_encoder_encode (encoder, node);
 	  streamer_write_uhwi_stream (ob->main_stream, node_ref);
-
 	  streamer_write_uhwi (ob, (*item)->get_hash ());
+	  unsigned used_memory_types_count = 0;	  
+	  sem_function *fn = NULL;
+	  if ((*item)->type == FUNC)
+	    {
+	      fn = static_cast<sem_function *> (*item);
+	      used_memory_types_count = fn->used_memory_types.length ();
+	    }
+	  streamer_write_uhwi (ob, used_memory_types_count);
+
+	 if (fn != NULL)
+	   for (unsigned i = 0; i < fn->used_memory_types.length (); i++)
+	     stream_write_tree (ob, fn->used_memory_types[i], true);
 	}
     }
 
@@ -2346,12 +2412,15 @@ sem_item_optimizer::read_section (lto_file_decl_data *file_data,
       node = lto_symtab_encoder_deref (encoder, index);
 
       hashval_t hash = streamer_read_uhwi (&ib_main);
+      unsigned used_memory_types_count = streamer_read_uhwi (&ib_main);
 
       gcc_assert (node->definition);
 
       if (dump_file)
-	fprintf (dump_file, "Symbol added: %s (tree: %p)\n",
-		 node->dump_asm_name (), (void *) node->decl);
+	fprintf (dump_file, "Symbol added: %s (tree: %p), "
+		 "used_memory_types_count: %d\n",
+		 node->dump_asm_name (), (void *) node->decl,
+		 used_memory_types_count);
 
       if (is_a<cgraph_node *> (node))
 	{
@@ -2359,6 +2428,11 @@ sem_item_optimizer::read_section (lto_file_decl_data *file_data,
 
 	  sem_function *fn = new sem_function (cnode, &m_bmstack);
 	  fn->set_hash (hash);
+
+	  for (unsigned i = 0; i < used_memory_types_count; i++)
+	    fn->used_memory_types.safe_push (stream_read_tree (&ib_main,
+							       data_in));
+
 	  m_items.safe_push (fn);
 	}
       else
@@ -2664,17 +2738,16 @@ sem_item_optimizer::update_hash_by_addr_refs ()
       m_items[i]->update_hash_by_addr_refs (m_symtab_node_map);
       if (m_items[i]->type == FUNC)
 	{
-	  if (TREE_CODE (TREE_TYPE (m_items[i]->decl)) == METHOD_TYPE
+	  sem_function *fn = static_cast<sem_function *> (m_items[i]);
+	  if (TREE_CODE (TREE_TYPE (fn->decl)) == METHOD_TYPE
 	      && contains_polymorphic_type_p
-		   (TYPE_METHOD_BASETYPE (TREE_TYPE (m_items[i]->decl)))
-	      && (DECL_CXX_CONSTRUCTOR_P (m_items[i]->decl)
-		  || (static_cast<sem_function *> (m_items[i])->param_used_p (0)
-		      && static_cast<sem_function *> (m_items[i])
-			   ->compare_polymorphic_p ())))
+		   (TYPE_METHOD_BASETYPE (TREE_TYPE (fn->decl)))
+	      && (DECL_CXX_CONSTRUCTOR_P (fn->decl)
+		  || (fn->param_used_p (0)
+		      && fn->compare_polymorphic_p ())))
 	     {
-	        tree class_type
-		  = TYPE_METHOD_BASETYPE (TREE_TYPE (m_items[i]->decl));
-		inchash::hash hstate (m_items[i]->get_hash ());
+	        tree class_type = TYPE_METHOD_BASETYPE (TREE_TYPE (fn->decl));
+		inchash::hash hstate (fn->get_hash ());
 
 		if (TYPE_NAME (class_type)
 		     && DECL_ASSEMBLER_NAME_SET_P (TYPE_NAME (class_type)))
@@ -2682,7 +2755,7 @@ sem_item_optimizer::update_hash_by_addr_refs ()
 		    (IDENTIFIER_HASH_VALUE
 		       (DECL_ASSEMBLER_NAME (TYPE_NAME (class_type))));
 
-		m_items[i]->set_hash (hstate.end ());
+		fn->set_hash (hstate.end ());
 	     }
 	}
     }

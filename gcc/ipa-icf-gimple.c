@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-utils.h"
 #include "tree-eh.h"
 #include "builtins.h"
+#include "print-tree.h"
 
 #include "ipa-icf-gimple.h"
 
@@ -241,7 +242,16 @@ func_checker::compatible_types_p (tree t1, tree t2)
      having alias sets defined at all.  */
   if (type_with_alias_set_p (t1) && type_with_alias_set_p (t2)
       && get_alias_set (t1) != get_alias_set (t2))
-    return return_false_with_msg ("alias sets are different");
+    {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  print_node (dump_file, "", t1, 0);
+	  fprintf (dump_file, "\n");
+	  print_node (dump_file, "", t2, 0);
+	  fprintf (dump_file, "\n");
+	}
+      return return_false_with_msg ("alias sets are different");
+    }
 
   return true;
 }
@@ -823,7 +833,6 @@ func_checker::compare_gimple_assign (gimple *s1, gimple *s2)
       if (!compare_memory_operand (arg1, arg2))
 	return return_false_with_msg ("memory operands are different");
     }
-
 
   return true;
 }

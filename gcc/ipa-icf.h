@@ -323,6 +323,8 @@ public:
   /* Improve accumulated hash for HSTATE based on a gimple statement STMT.  */
   void hash_stmt (gimple *stmt, inchash::hash &inchash);
 
+  bool append_type (tree t, inchash::hash &hstate);
+
   /* Return true if polymorphic comparison must be processed.  */
   bool compare_polymorphic_p (void);
 
@@ -360,6 +362,8 @@ public:
 
   /* Return true if parameter I may be used.  */
   bool param_used_p (unsigned int i);
+
+  vec<tree> used_memory_types;
 
 private:
   /* Calculates hash value based on a BASIC_BLOCK.  */
