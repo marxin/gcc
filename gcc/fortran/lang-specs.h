@@ -33,14 +33,14 @@
 			     %{E|M|MM:%(cpp_debug_options) " CPP_ONLY_OPTIONS \
 			     " -fsyntax-only};: " CPP_FORWARD_OPTIONS "}"
 
-#ifndef TARGET_F951_NOSTDINC_OPTIONS
-#define TARGET_F951_NOSTDINC_OPTIONS
+#ifndef TARGET_F951_OPTIONS
+#define TARGET_F951_OPTIONS
 #endif
 
 #define F951_OPTIONS        "%(cc1_options) %{J*} \
-			     %{!nostdinc:-fintrinsic-modules-path finclude%s " \
-			       TARGET_F951_NOSTDINC_OPTIONS "}\
-			     %{!fsyntax-only:%(invoke_as)}"
+			     %{!nostdinc:-fintrinsic-modules-path finclude%s} " \
+			     TARGET_F951_OPTIONS \
+			     "%{!fsyntax-only:%(invoke_as)}"
 #define F951_SOURCE_FORM    "%{!ffree-form:-ffixed-form}"
 
 

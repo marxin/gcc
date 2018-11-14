@@ -171,5 +171,5 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
   LD_DYNAMIC_OPTION "}}%{!static-liblsan:-llsan}"
 #endif
 
-#undef TARGET_F951_NOSTDINC_OPTIONS
-#define TARGET_F951_NOSTDINC_OPTIONS "%:fortran-header-file(-fpre-include= math-vector-fortran.h)"
+#undef TARGET_F951_OPTIONS
+#define TARGET_F951_OPTIONS "%{!nostdinc:%:fortran-preinclude-file(-fpre-include= math-vector-fortran.h)}"

@@ -11251,7 +11251,7 @@ gfc_match_gcc_unroll (void)
 
    The parameter b is name of a middle-end built-in.
    Flags are one of:
-     - omp-simd-notinbranch.
+     - omp_simd_notinbranch.
 
    When we come here, we have already matched the !GCC$ builtin string.  */
 match
@@ -11259,15 +11259,7 @@ gfc_match_gcc_builtin (void)
 {
   char builtin[GFC_MAX_SYMBOL_LEN + 1];
 
-  if (gfc_match_name (builtin) != MATCH_YES)
-    return MATCH_ERROR;
-
-  gfc_gobble_whitespace ();
-  if (gfc_match ("attributes") != MATCH_YES)
-    return MATCH_ERROR;
-
-  gfc_gobble_whitespace ();
-  if (gfc_match ("omp_simd_notinbranch") != MATCH_YES)
+  if (gfc_match (" (%n) attributes simd", builtin) != MATCH_YES)
     return MATCH_ERROR;
 
   char *r = XNEWVEC (char, strlen (builtin) + 32);
