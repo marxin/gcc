@@ -2763,7 +2763,18 @@ gfc_finalizer;
 bool gfc_in_match_data (void);
 match gfc_match_char_spec (gfc_typespec *);
 extern int directive_unroll;
-extern vec<const char *> vectorized_builtins;
+
+/* Tuple for parsing of vectorized built-ins.  */
+struct vect_builtin_tuple
+{
+  vect_builtin_tuple (const char *n, int t): name (n), simd_type (t)
+  {}
+
+  const char *name;
+  int simd_type;
+};
+
+extern vec<vect_builtin_tuple> vectorized_builtins;
 
 /* Handling Parameterized Derived Types  */
 bool gfc_insert_kind_parameter_exprs (gfc_expr *);

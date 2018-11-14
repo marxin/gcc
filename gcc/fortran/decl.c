@@ -99,7 +99,7 @@ bool gfc_matching_function;
 int directive_unroll = -1;
 
 /* List middle-end built-ins that should be vectorized.  */
-vec<const char *> vectorized_builtins;
+vec<vect_builtin_tuple> vectorized_builtins;
 
 /* If a kind expression of a component of a parameterized derived type is
    parameterized, temporarily store the expression here.  */
@@ -11247,11 +11247,13 @@ gfc_match_gcc_unroll (void)
   return MATCH_ERROR;
 }
 
-/* Match a !GCC$ builtin b attributes flags form:
+/* Match a !GCC$ builtin (b) attributes simd flags form:
 
    The parameter b is name of a middle-end built-in.
    Flags are one of:
-     - omp_simd_notinbranch.
+     - (empty)
+     - inbranch
+     - notinbranch
 
    When we come here, we have already matched the !GCC$ builtin string.  */
 match
@@ -11262,9 +11264,15 @@ gfc_match_gcc_builtin (void)
   if (gfc_match (" (%n) attributes simd", builtin) != MATCH_YES)
     return MATCH_ERROR;
 
+  int builtin_kind = 0;
+  if (gfc_match (" (notinbranch)") == MATCH_YES)
+    builtin_kind = -1;
+  else if (gfc_match (" (inbranch)") == MATCH_YES)
+    builtin_kind = 1;
+
   char *r = XNEWVEC (char, strlen (builtin) + 32);
   sprintf (r, "__builtin_%s", builtin);
-  vectorized_builtins.safe_push (r);
+  vectorized_builtins.safe_push (vect_builtin_tuple (r, builtin_kind));
 
   return MATCH_YES;
 }

@@ -38,7 +38,7 @@
 #endif
 
 #define F951_OPTIONS        "%(cc1_options) %{J*} \
-			     %{!nostdinc:-fintrinsic-modules-path finclude%s} " \
+			     %{!nostdinc:-fintrinsic-modules-path finclude%s}" \
 			     TARGET_F951_OPTIONS \
 			     "%{!fsyntax-only:%(invoke_as)}"
 #define F951_SOURCE_FORM    "%{!ffree-form:-ffixed-form}"
