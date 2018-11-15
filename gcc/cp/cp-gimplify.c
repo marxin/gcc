@@ -2674,4 +2674,46 @@ cp_fold (tree x)
   return x;
 }
 
+/* Look up either "hot" or "cold" in attribute list LIST.  */
+
+tree
+lookup_hotness_attribute (tree list)
+{
+  tree attr = lookup_attribute ("hot", list);
+  if (attr)
+    return attr;
+  return lookup_attribute ("cold", list);
+}
+
+/* Remove both "hot" and "cold" attributes from LIST.  */
+
+static tree
+remove_hotness_attribute (tree list)
+{
+  return remove_attribute ("hot", remove_attribute ("cold", list));
+}
+
+/* If [[likely]] or [[unlikely]] appear on this statement, turn it into a
+   PREDICT_EXPR.  */
+
+tree
+process_stmt_hotness_attribute (tree std_attrs)
+{
+  if (std_attrs == error_mark_node)
+    return std_attrs;
+  if (tree attr = lookup_hotness_attribute (std_attrs))
+    {
+      tree name = get_attribute_name (attr);
+      bool hot = is_attribute_p ("hot", name);
+      tree pred = build_predict_expr (hot ? PRED_HOT_LABEL : PRED_COLD_LABEL,
+				      hot ? TAKEN : NOT_TAKEN);
+      add_stmt (pred);
+      if (tree other = lookup_hotness_attribute (TREE_CHAIN (attr)))
+	warning (OPT_Wattributes, "ignoring attribute %qE after earlier %qE",
+		 get_attribute_name (other), name);
+      std_attrs = remove_hotness_attribute (std_attrs);
+    }
+  return std_attrs;
+}
+
 #include "gt-cp-cp-gimplify.h"
