@@ -702,6 +702,65 @@ default_options_optimization (struct gcc_options *opts,
 			 lang_mask, handlers, loc, dc);
 }
 
+/* Control IPA optimizations based on different live patching LEVEL.  */
+static void
+control_optimizations_for_live_patching (struct gcc_options *opts,
+					 struct gcc_options *opts_set,
+					 enum live_patching_level level)
+{
+  gcc_assert (level > LIVE_PATCHING_NONE);
+
+  switch (level)
+    {
+    case LIVE_PATCHING_INLINE_ONLY_STATIC:
+      if (!opts_set->x_flag_ipa_cp_clone)
+	opts->x_flag_ipa_cp_clone = 0;
+      if (!opts_set->x_flag_ipa_sra)
+	opts->x_flag_ipa_sra = 0;
+      if (!opts_set->x_flag_partial_inlining)
+	opts->x_flag_partial_inlining = 0;
+      if (!opts_set->x_flag_ipa_cp)
+	opts->x_flag_ipa_cp = 0;
+      /* FALLTHROUGH.  */
+    case LIVE_PATCHING_INLINE_CLONE:
+      /* live patching should disable whole-program optimization.  */
+      if (!opts_set->x_flag_whole_program)
+	opts->x_flag_whole_program = 0;
+      /* visibility change should be excluded by !flag_whole_program
+	 && !in_lto_p && !flag_ipa_cp_clone && !flag_ipa_sra
+	 && !flag_partial_inlining.  */
+      if (!opts_set->x_flag_ipa_pta)
+	opts->x_flag_ipa_pta = 0;
+      if (!opts_set->x_flag_ipa_reference)
+	opts->x_flag_ipa_reference = 0;
+      if (!opts_set->x_flag_ipa_ra)
+	opts->x_flag_ipa_ra = 0;
+      if (!opts_set->x_flag_ipa_icf)
+	opts->x_flag_ipa_icf = 0;
+      if (!opts_set->x_flag_ipa_icf_functions)
+	opts->x_flag_ipa_icf_functions = 0;
+      if (!opts_set->x_flag_ipa_icf_variables)
+	opts->x_flag_ipa_icf_variables = 0;
+      if (!opts_set->x_flag_ipa_bit_cp)
+	opts->x_flag_ipa_bit_cp = 0;
+      if (!opts_set->x_flag_ipa_vrp)
+	opts->x_flag_ipa_vrp = 0;
+      if (!opts_set->x_flag_ipa_pure_const)
+	opts->x_flag_ipa_pure_const = 0;
+      /* FIXME: disable unreachable code removal.  */
+
+      /* discovery of functions/variables with no address taken.  */
+      if (!opts_set->x_flag_ipa_reference_addressable)
+	opts->x_flag_ipa_reference_addressable = 0;
+      /* ipa stack alignment propagation.  */
+      if (!opts_set->x_flag_ipa_stack_alignment)
+	opts->x_flag_ipa_stack_alignment = 0;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+}
+
 /* After all options at LOC have been read into OPTS and OPTS_SET,
    finalize settings of those options and diagnose incompatible
    combinations.  */
@@ -1051,6 +1110,10 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
   if ((opts->x_flag_sanitize & SANITIZE_KERNEL_ADDRESS) && opts->x_flag_tm)
     sorry ("transactional memory is not supported with "
 	   "%<-fsanitize=kernel-address%>");
+
+  /* Currently live patching is not support for LTO.  */
+  if (opts->x_flag_live_patching && opts->x_flag_lto)
+    sorry ("live patching is not supported with LTO");
 }
 
 #define LEFT_COLUMN	27
@@ -2280,6 +2343,12 @@ common_handle_option (struct gcc_options *opts,
     case OPT_finstrument_functions_exclude_file_list_:
       add_comma_separated_to_vector
 	(&opts->x_flag_instrument_functions_exclude_files, arg);
+      break;
+
+    case OPT_flive_patching_:
+      if (value)
+    	control_optimizations_for_live_patching (opts, opts_set,
+						 opts->x_flag_live_patching);
       break;
 
     case OPT_fmessage_length_:
