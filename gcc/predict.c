@@ -1222,7 +1222,8 @@ combine_predictions_for_bb (basic_block bb, bool dry_run)
       if (preds)
 	for (pred = *preds; pred; pred = pred->ep_next)
 	  {
-	    if (pred->ep_probability <= PROB_VERY_UNLIKELY)
+	    if (pred->ep_probability <= PROB_VERY_UNLIKELY
+		|| pred->ep_predictor == PRED_COLD_LABEL)
 	      unlikely_edges.add (pred->ep_edge);
 	    if (pred->ep_probability >= PROB_VERY_LIKELY
 		|| pred->ep_predictor == PRED_BUILTIN_EXPECT
