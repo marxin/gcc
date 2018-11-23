@@ -4046,9 +4046,24 @@ extern void expand_null_return (void);
 extern void expand_naked_return (void);
 extern void emit_jump (rtx);
 
+/* Memory operation built-ins differ by return value.  Mapping
+   of the enum values is following:
+   - POINTER_START - return destination, e.g. memcpy
+   - POINTER_END - return destination + n, e.g. mempcpy
+   - POINTER_END_MINUS_ONE - return pointer to end of string (address
+			     of the terminating null byte), e.g. strcpy
+*/
+
+enum memop_ret
+{
+  POINTER_START,
+  POINTER_END,
+  POINTER_END_MINUS_ONE
+};
+
 /* In expr.c */
 extern rtx move_by_pieces (rtx, rtx, unsigned HOST_WIDE_INT,
-			   unsigned int, int);
+			   unsigned int, memop_ret);
 extern poly_int64 find_args_size_adjust (rtx_insn *);
 extern poly_int64 fixup_args_size_notes (rtx_insn *, rtx_insn *, poly_int64);
 
