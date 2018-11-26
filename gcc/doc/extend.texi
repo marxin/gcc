@@ -20536,6 +20536,9 @@ Intel Core i7 Ice Lake Client CPU.
 @item icelake-server
 Intel Core i7 Ice Lake Server CPU.
 
+@item cascadelake
+Intel Core i7 Cascade Lake CPU.
+
 @item bonnell
 Intel Atom Bonnell CPU.
 

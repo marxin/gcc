@@ -119,7 +119,8 @@ get_amd_cpu (unsigned int family, unsigned int model)
 /* Get the specific type of Intel CPU.  */
 
 static void
-get_intel_cpu (unsigned int family, unsigned int model, unsigned int brand_id)
+get_intel_cpu (unsigned int family, unsigned int model,
+	       unsigned int brand_id)
 {
   /* Parse family and model only if brand ID is 0. */
   if (brand_id == 0)
@@ -215,9 +216,17 @@ get_intel_cpu (unsigned int family, unsigned int model, unsigned int brand_id)
 	      __cpu_model.__cpu_subtype = INTEL_COREI7_SKYLAKE;
 	      break;
 	    case 0x55:
-	      /* Skylake with AVX-512 support.  */
 	      __cpu_model.__cpu_type = INTEL_COREI7;
-	      __cpu_model.__cpu_subtype = INTEL_COREI7_SKYLAKE_AVX512;
+	      if (stepping == 4)
+		{
+		  /* Skylake with AVX-512 support.  */
+		  __cpu_model.__cpu_subtype = INTEL_COREI7_SKYLAKE_AVX512;
+		}
+	      else
+		{
+		  /* Cascade Lake with AVX-512 support.  */
+		  __cpu_model.__cpu_subtype = INTEL_COREI7_CASCADELAKE;
+		}
 	      break;
 	    case 0x66:
 	      /* Cannon Lake.  */
@@ -246,7 +255,7 @@ get_intel_cpu (unsigned int family, unsigned int model, unsigned int brand_id)
    the max possible level of CPUID insn.  */
 static void
 get_available_features (unsigned int ecx, unsigned int edx,
-			int max_cpuid_level)
+			int max_cpuid_level, bool *avx512_vnni)
 {
   unsigned int eax, ebx;
   unsigned int ext_level;
@@ -456,6 +465,7 @@ __cpu_indicator_init (void)
 
   if (vendor == signature_INTEL_ebx)
     {
+      bool avx512_vnni;
       /* Adjust model and family for Intel CPUS. */
       if (family == 0x0f)
 	{
@@ -466,9 +476,9 @@ __cpu_indicator_init (void)
 	model += extended_model;
 
       /* Get CPU type.  */
-      get_intel_cpu (family, model, brand_id);
+      get_intel_cpu (family, model, stepping, brand_id);
       /* Find available features. */
-      get_available_features (ecx, edx, max_level);
+      get_available_features (ecx, edx, max_level, &avx512_vnni);
       __cpu_model.__cpu_vendor = VENDOR_INTEL;
     }
   else if (vendor == signature_AMD_ebx)

@@ -32283,6 +32283,7 @@ fold_builtin_cpu (tree fndecl, tree *args)
     M_INTEL_COREI7_CANNONLAKE,
     M_INTEL_COREI7_ICELAKE_CLIENT,
     M_INTEL_COREI7_ICELAKE_SERVER,
+    M_INTEL_COREI7_CASCADELAKE,
     M_AMDFAM17H_ZNVER2
   };
 
@@ -32310,6 +32311,7 @@ fold_builtin_cpu (tree fndecl, tree *args)
       {"cannonlake", M_INTEL_COREI7_CANNONLAKE},
       {"icelake-client", M_INTEL_COREI7_ICELAKE_CLIENT},
       {"icelake-server", M_INTEL_COREI7_ICELAKE_SERVER},
+      {"cascadelake", M_INTEL_COREI7_CASCADELAKE},
       {"bonnell", M_INTEL_BONNELL},
       {"silvermont", M_INTEL_SILVERMONT},
       {"goldmont", M_INTEL_GOLDMONT},

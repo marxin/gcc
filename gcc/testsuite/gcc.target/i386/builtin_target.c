@@ -108,9 +108,17 @@ check_intel_cpu_model (unsigned int family, unsigned int model,
 	      assert (__builtin_cpu_is ("skylake"));
 	      break;
 	    case 0x55:
-	      /* Skylake with AVX-512 support.  */
 	      assert (__builtin_cpu_is ("corei7"));
-	      assert (__builtin_cpu_is ("skylake-avx512"));
+	      if (!__builtin_cpu_supports ("avx512vnni"))
+		{
+		  /* Skylake with AVX-512 support.  */
+		  assert (__builtin_cpu_is ("skylake-avx512"));
+		}
+	      else
+		{
+		  /* Cascade Lake with AVX-512 support.  */
+		  assert (__builtin_cpu_is ("cascadelake"));
+		}
 	      break;
 	    case 0x66:
 	      /* Cannon Lake.  */

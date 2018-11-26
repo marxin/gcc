@@ -832,8 +832,16 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	  cpu = "skylake";
 	  break;
 	case 0x55:
-	  /* Skylake with AVX-512.  */
-	  cpu = "skylake-avx512";
+	  if (!has_avx512vnni)
+	    {
+	      /* Skylake with AVX-512.  */
+	      cpu = "skylake-avx512";
+	    }
+	  else
+	    {
+	      /* Cascade Lake with AVX512.  */
+	      cpu = "cascadelake";
+	    }
 	  break;
 	case 0x57:
 	  /* Knights Landing.  */
