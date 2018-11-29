@@ -1220,7 +1220,7 @@ move_by_pieces (rtx to, rtx from, unsigned HOST_WIDE_INT len,
 
   data.run ();
 
-  if (retmode)
+  if (retmode != RETURN_BEGIN)
     return data.finish_retmode (retmode);
   else
     return to;
@@ -1388,7 +1388,7 @@ store_by_pieces (rtx to, unsigned HOST_WIDE_INT len,
   store_by_pieces_d data (to, constfun, constfundata, len, align);
   data.run ();
 
-  if (retmode)
+  if (retmode != RETURN_BEGIN)
     return data.finish_retmode (retmode);
   else
     return to;
