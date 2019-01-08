@@ -100,6 +100,7 @@ switch_conversion::collect (gswitch *swtch)
   max_case = gimple_switch_label (swtch, branch_num - 1);
 
   m_range_min = CASE_LOW (min_case);
+  gcc_assert (operand_equal_p (TYPE_SIZE (TREE_TYPE (m_range_min)), TYPE_SIZE (TREE_TYPE (m_index_expr)), 0));
   if (CASE_HIGH (max_case) != NULL_TREE)
     m_range_max = CASE_HIGH (max_case);
   else
