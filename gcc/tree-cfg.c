@@ -5108,6 +5108,17 @@ verify_node_sharing_1 (tree *tp, int *walk_subtrees, void *data)
 {
   hash_set<void *> *visited = (hash_set<void *> *) data;
 
+  if (DECL_P (*tp)
+      && VECTOR_TYPE_P (TREE_TYPE (*tp))
+      && DECL_MODE (*tp) != TYPE_MODE (TREE_TYPE (*tp)))
+    {
+      fprintf (stderr, "DECL_MODE %s vs TYPE_MODE %s [%s]: ",
+              mode_name[DECL_MODE (*tp)],
+              mode_name[TYPE_MODE (TREE_TYPE (*tp))],
+              mode_name[TYPE_MODE_RAW (TREE_TYPE (*tp))]);
+      print_generic_expr (stderr, *tp);
+      fprintf (stderr, "\n");
+    }
   if (tree_node_can_be_shared (*tp))
     {
       *walk_subtrees = false;
