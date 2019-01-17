@@ -245,7 +245,7 @@ thread_return_t AsanThread::ThreadStart(
   asanThreadRegistry().StartThread(tid(), os_id, /*workerthread*/ false,
                                    nullptr);
   if (signal_thread_is_registered)
-    atomic_store(signal_thread_is_registered, 1, memory_order_release);
+    atomic_store(signal_thread_is_registered, 1, memory_order_seq_cst);
 
   if (common_flags()->use_sigaltstack) SetAlternateSignalStack();
 
