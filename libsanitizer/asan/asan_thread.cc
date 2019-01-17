@@ -218,7 +218,7 @@ FakeStack *AsanThread::AsyncSignalSafeLazyInitFakeStack() {
 
 void AsanThread::Init(const InitOptions *options) {
   next_stack_top_ = next_stack_bottom_ = 0;
-  atomic_store(&stack_switching_, false, memory_order_release);
+  atomic_store(&stack_switching_, false, memory_order_seq_cst);
   CHECK_EQ(this->stack_size(), 0U);
   SetThreadStackAndTls(options);
   CHECK_GT(this->stack_size(), 0U);
