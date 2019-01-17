@@ -193,7 +193,7 @@ static thread_return_t THREAD_CALLING_CONV asan_thread_start(void *arg) {
   ThreadStartParam *param = reinterpret_cast<ThreadStartParam *>(arg);
   AsanThread *t = nullptr;
   while ((t = reinterpret_cast<AsanThread *>(
-              atomic_load(&param->t, memory_order_acquire))) == nullptr)
+              atomic_load(&param->t, memory_order_seq_cst))) == nullptr)
     internal_sched_yield();
   SetCurrentThread(t);
   return t->ThreadStart(GetTid(), &param->is_registered);
@@ -210,8 +210,8 @@ INTERCEPTOR(int, pthread_create, void *thread,
   if (attr)
     REAL(pthread_attr_getdetachstate)(attr, &detached);
   ThreadStartParam param;
-  atomic_store(&param.t, 0, memory_order_relaxed);
-  atomic_store(&param.is_registered, 0, memory_order_relaxed);
+  atomic_store(&param.t, 0, memory_order_seq_cst);
+  atomic_store(&param.is_registered, 0, memory_order_seq_cst);
   int result;
   {
     // Ignore all allocations made by pthread_create: thread stack/TLS may be
@@ -227,14 +227,14 @@ INTERCEPTOR(int, pthread_create, void *thread,
     u32 current_tid = GetCurrentTidOrInvalid();
     AsanThread *t =
         AsanThread::Create(start_routine, arg, current_tid, &stack, detached);
-    atomic_store(&param.t, reinterpret_cast<uptr>(t), memory_order_release);
+    atomic_store(&param.t, reinterpret_cast<uptr>(t), memory_order_seq_cst);
     // Wait until the AsanThread object is initialized and the ThreadRegistry
     // entry is in "started" state. One reason for this is that after this
     // interceptor exits, the child thread's stack may be the only thing holding
     // the |arg| pointer. This may cause LSan to report a leak if leak checking
     // happens at a point when the interceptor has already exited, but the stack
     // range for the child thread is not yet known.
-    while (atomic_load(&param.is_registered, memory_order_acquire) == 0)
+    while (atomic_load(&param.is_registered, memory_order_seq_cst) == 0)
       internal_sched_yield();
   }
   return result;
