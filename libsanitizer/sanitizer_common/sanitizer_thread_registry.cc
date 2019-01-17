@@ -133,6 +133,7 @@ uptr ThreadRegistry::GetMaxAliveThreads() {
 
 u32 ThreadRegistry::CreateThread(uptr user_id, bool detached, u32 parent_tid,
                                  void *arg) {
+  VReport(1, "Entering ThreadRegistry::CreateThread\n");
   BlockingMutexLock l(&mtx_);
   u32 tid = kUnknownTid;
   ThreadContextBase *tctx = QuarantinePop();
@@ -164,6 +165,7 @@ u32 ThreadRegistry::CreateThread(uptr user_id, bool detached, u32 parent_tid,
   }
   tctx->SetCreated(user_id, total_threads_++, detached,
                    parent_tid, arg);
+  VReport(1, "Leaving ThreadRegistry::CreateThread\n");
   return tid;
 }
 
