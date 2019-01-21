@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "match.h"
 #include "parse.h"
 #include "constructor.h"
+#include "target.h"
 
 /* Macros to access allocate memory for gfc_data_variable,
    gfc_data_value and gfc_data.  */
@@ -11338,7 +11339,7 @@ gfc_match_gcc_unroll (void)
   return MATCH_ERROR;
 }
 
-/* Match a !GCC$ builtin (b) attributes simd flags form:
+/* Match a !GCC$ builtin (b) attributes simd if(target) flags form:
 
    The parameter b is name of a middle-end built-in.
    Flags are one of:
@@ -11346,11 +11347,16 @@ gfc_match_gcc_unroll (void)
      - inbranch
      - notinbranch
 
+   Target must be one of:
+     - lp64
+     - ilp32
+
    When we come here, we have already matched the !GCC$ builtin string.  */
 match
 gfc_match_gcc_builtin (void)
 {
   char builtin[GFC_MAX_SYMBOL_LEN + 1];
+  char target[GFC_MAX_SYMBOL_LEN + 1];
 
   if (gfc_match (" ( %n ) attributes simd", builtin) != MATCH_YES)
     return MATCH_ERROR;
@@ -11360,6 +11366,26 @@ gfc_match_gcc_builtin (void)
     clause = SIMD_NOTINBRANCH;
   else if (gfc_match (" ( inbranch ) ") == MATCH_YES)
     clause = SIMD_INBRANCH;
+
+  if (gfc_match (" if ( %n ) ", target) == MATCH_YES)
+    {
+      if (strcmp (target, "lp64") == 0)
+	{
+	  if (TYPE_PRECISION (long_integer_type_node) != 64
+	      || POINTER_SIZE != 64
+	      || TYPE_PRECISION (integer_type_node) != 32)
+	    return MATCH_YES;
+	}
+      else if (strcmp (target, "ilp32") == 0)
+	{
+	  if (TYPE_PRECISION (long_integer_type_node) != 32
+	      || POINTER_SIZE != 32
+	      || TYPE_PRECISION (integer_type_node) != 32)
+	    return MATCH_YES;
+	}
+      else
+	return MATCH_ERROR;
+    }
 
   if (gfc_vectorized_builtins == NULL)
     gfc_vectorized_builtins = new hash_map<nofree_string_hash, int> ();
