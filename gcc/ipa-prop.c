@@ -5174,7 +5174,14 @@ ipcp_transform_function (struct cgraph_node *node)
   if (!something_changed)
     return 0;
   else if (cfg_changed)
-    return TODO_update_ssa_only_virtuals | TODO_cleanup_cfg;
+    {
+      /* Basic block merging can simplify CFG and so that
+	 count of a basic block can adjust.  In order to prevent
+	 cgraph_node::verify_node, TODO_rebuild_cgraph_edges must
+	 be set.  */
+      return (TODO_update_ssa_only_virtuals
+	      | TODO_cleanup_cfg | TODO_rebuild_cgraph_edges);
+    }
   else
     return TODO_update_ssa_only_virtuals;
 }
