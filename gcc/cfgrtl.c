@@ -4396,6 +4396,25 @@ cfg_layout_redirect_edge_and_branch (edge e, basic_block dest)
 	  	 "Removing crossing jump while redirecting edge form %i to %i\n",
 		 e->src->index, dest->index);
       delete_insn (BB_END (src));
+
+      /* Unlink a BARRIER that can be still in BB_FOOTER.  */
+      rtx_insn *insn = BB_FOOTER (src);
+      while (insn != NULL_RTX && !BARRIER_P (insn))
+	insn = NEXT_INSN (insn);
+
+      if (insn != NULL_RTX)
+	{
+	  if (insn == BB_FOOTER (src))
+	    BB_FOOTER (src) = NULL;
+	  else
+	    {
+	      if (PREV_INSN (insn))
+		SET_NEXT_INSN (PREV_INSN (insn)) = NEXT_INSN (insn);
+	      if (NEXT_INSN (insn))
+		SET_PREV_INSN (NEXT_INSN (insn)) = PREV_INSN (insn);
+	    }
+	}
+
       e->flags |= EDGE_FALLTHRU;
     }
 
