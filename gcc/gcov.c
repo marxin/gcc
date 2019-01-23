@@ -2527,14 +2527,13 @@ mangle_name (char const *base, char *ptr)
 
   /* Generate the source filename part.  */
   if (!flag_preserve_paths)
-    {
-      base = lbasename (base);
-      len = strlen (base);
-      memcpy (ptr, base, len);
-      ptr += len;
-    }
+    base = lbasename (base);
   else
-    ptr = mangle_path (base);
+    base = mangle_path (base);
+
+  len = strlen (base);
+  memcpy (ptr, base, len);
+  ptr += len;
 
   return ptr;
 }
