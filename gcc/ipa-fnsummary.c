@@ -2581,7 +2581,7 @@ estimate_edge_devirt_benefit (struct cgraph_edge *ie,
   callee = callee->function_symbol (&avail);
   if (avail < AVAIL_AVAILABLE)
     return false;
-  isummary = ipa_fn_summaries->get (callee);
+  isummary = ipa_fn_summaries->get_create (callee);
   return isummary->inlinable;
 }
 
