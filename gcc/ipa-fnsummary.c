@@ -85,7 +85,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 
 /* Summaries.  */
-function_summary <ipa_fn_summary *> *ipa_fn_summaries;
+function_vector_summary <ipa_fn_summary *> *ipa_fn_summaries;
 call_summary <ipa_call_summary *> *ipa_call_summaries;
 
 /* Edge predicates goes here.  */
