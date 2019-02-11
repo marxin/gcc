@@ -263,5 +263,3 @@ odr_type_p (const_tree t)
 }
 
 #endif  /* GCC_IPA_UTILS_H  */
-
-

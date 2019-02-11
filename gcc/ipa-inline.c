@@ -1751,6 +1751,16 @@ sum_callers (struct cgraph_node *node, void *data)
   return false;
 }
 
+/* We only propagate across edges with non-interposable callee.  */
+
+inline bool
+ignore_edge_p (struct cgraph_edge *e)
+{
+  enum availability avail;
+  e->callee->function_or_virtual_thunk_symbol (&avail, e->caller);
+  return (avail <= AVAIL_INTERPOSABLE);
+}
+
 /* We use greedy algorithm for inlining of small functions:
    All inline candidates are put into prioritized heap ordered in
    increasing badness.
@@ -1778,7 +1788,7 @@ inline_small_functions (void)
      metrics.  */
 
   max_count = profile_count::uninitialized ();
-  ipa_reduced_postorder (order, true, NULL);
+  ipa_reduced_postorder (order, true, ignore_edge_p);
   free (order);
 
   FOR_EACH_DEFINED_FUNCTION (node)
