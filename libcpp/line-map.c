@@ -742,6 +742,8 @@ linemap_line_start (struct line_maps *set, linenum_type to_line,
       if (line_delta < 0
 	  || last_line != ORDINARY_MAP_STARTING_LINE_NUMBER (map)
 	  || SOURCE_COLUMN (map, highest) >= (1U << (column_bits - range_bits))
+	  || ((to_line - ORDINARY_MAP_STARTING_LINE_NUMBER (map))
+	      >= (1U << (CHAR_BIT * sizeof (linenum_type) - column_bits)))
 	  || range_bits < map->m_range_bits)
 	map = linemap_check_ordinary
 	        (const_cast <line_map *>
