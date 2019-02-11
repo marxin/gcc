@@ -278,11 +278,22 @@ gt_pch_nx(function_summary<T *>* const& summary, gt_pointer_operator op,
   gt_pch_nx (&summary->m_map, op, cookie);
 }
 
+template<typename T, typename U>
+struct is_same 
+{
+    static const bool value = false; 
+};
+
+template<typename T>
+struct is_same<T,T>  //specialization
+{ 
+   static const bool value = true; 
+};
 
 /* We want to pass just pointer types as argument for function_summary
    template class.  */
 
-template <class T>
+template <class T, class V>
 class function_vector_summary
 {
 private:
@@ -300,12 +311,12 @@ private:
    The function summary class can work both with a heap-allocated memory and
    a memory gained by garbage collected memory.  */
 
-template <class T>
-class GTY((user)) function_vector_summary <T *>
+template <class T, class V>
+class GTY((user)) function_vector_summary <T *, V>
 {
 public:
   /* Default construction takes SYMTAB as an argument.  */
-  function_vector_summary (symbol_table *symtab, bool ggc = false);
+  function_vector_summary (symbol_table *symtab);
 
   /* Destructor.  */
   virtual ~function_vector_summary ()
@@ -340,7 +351,7 @@ public:
   {
     /* Call gcc_internal_because we do not want to call finalizer for
        a type T.  We call dtor explicitly.  */
-    return m_ggc ? new (ggc_internal_alloc (sizeof (T))) T () : new T () ;
+    return is_ggc () ? new (ggc_internal_alloc (sizeof (T))) T () : new T () ;
   }
 
   /* Release an item that is stored within vector.  */
@@ -409,18 +420,16 @@ public:
   static void symtab_duplication (cgraph_node *node, cgraph_node *node2,
 				  void *data);
 
-protected:
-  /* Indication if we use ggc summary.  */
-  bool m_ggc;
-
 private:
+  bool is_ggc ();
+
   /* Indicates if insertion hook is enabled.  */
   bool m_insertion_enabled;
   /* Indicates if the summary is released.  */
   bool m_released;
 
   /* Summary is stored in the vector.  */
-  vec <T *, va_gc> *m_vector;
+  vec <T *, V> *m_vector;
   /* Internal summary insertion hook pointer.  */
   cgraph_node_hook_list *m_symtab_insertion_hook;
   /* Internal summary removal hook pointer.  */
@@ -430,15 +439,15 @@ private:
   /* Symbol table the summary is registered to.  */
   symbol_table *m_symtab;
 
-  template <typename U> friend void gt_ggc_mx (function_vector_summary <U *> * const &);
-  template <typename U> friend void gt_pch_nx (function_vector_summary <U *> * const &);
-  template <typename U> friend void gt_pch_nx (function_vector_summary <U *> * const &,
+  template <typename U> friend void gt_ggc_mx (function_vector_summary <U *, va_gc> * const &);
+  template <typename U> friend void gt_pch_nx (function_vector_summary <U *, va_gc> * const &);
+  template <typename U> friend void gt_pch_nx (function_vector_summary <U *, va_gc> * const &,
       gt_pointer_operator, void *);
 };
 
-template <typename T>
-function_vector_summary<T *>::function_vector_summary (symbol_table *symtab, bool ggc):
-  m_ggc (ggc), m_insertion_enabled (true), m_released (false), m_vector (NULL),
+template <typename T, typename V>
+function_vector_summary<T *, V>::function_vector_summary (symbol_table *symtab):
+  m_insertion_enabled (true), m_released (false), m_vector (NULL),
   m_symtab (symtab)
 {
   vec_alloc (m_vector, 13);
@@ -453,9 +462,9 @@ function_vector_summary<T *>::function_vector_summary (symbol_table *symtab, boo
 					   this);
 }
 
-template <typename T>
+template <typename T, typename V>
 void
-function_vector_summary<T *>::release ()
+function_vector_summary<T *, V>::release ()
 {
   if (m_released)
     return;
@@ -472,11 +481,11 @@ function_vector_summary<T *>::release ()
   m_released = true;
 }
 
-template <typename T>
+template <typename T, typename V>
 void
-function_vector_summary<T *>::release (T *item)
+function_vector_summary<T *, V>::release (T *item)
 {
-  if (m_ggc)
+  if (is_ggc ())
     {
       item->~T ();
       ggc_free (item);
@@ -485,34 +494,34 @@ function_vector_summary<T *>::release (T *item)
     delete item;
 }
 
-template <typename T>
+template <typename T, typename V>
 void
-function_vector_summary<T *>::symtab_insertion (cgraph_node *node, void *data)
+function_vector_summary<T *, V>::symtab_insertion (cgraph_node *node, void *data)
 {
   gcc_checking_assert (node->get_uid ());
-  function_vector_summary *summary = (function_vector_summary <T *> *) (data);
+  function_vector_summary *summary = (function_vector_summary <T *, V> *) (data);
 
   if (summary->m_insertion_enabled)
     summary->insert (node, summary->get_create (node));
 }
 
-template <typename T>
+template <typename T, typename V>
 void
-function_vector_summary<T *>::symtab_removal (cgraph_node *node, void *data)
+function_vector_summary<T *, V>::symtab_removal (cgraph_node *node, void *data)
 {
   gcc_checking_assert (node->get_uid ());
-  function_vector_summary *summary = (function_vector_summary <T *> *) (data);
+  function_vector_summary *summary = (function_vector_summary <T *, V> *) (data);
 
   if (summary->exists (node))
     summary->remove (node);
 }
 
-template <typename T>
+template <typename T, typename V>
 void
-function_vector_summary<T *>::symtab_duplication (cgraph_node *node,
-					   cgraph_node *node2, void *data)
+function_vector_summary<T *, V>::symtab_duplication (cgraph_node *node,
+						     cgraph_node *node2, void *data)
 {
-  function_vector_summary *summary = (function_vector_summary <T *> *) (data);
+  function_vector_summary *summary = (function_vector_summary <T *, V> *) (data);
   T *v = summary->get (node);
 
   if (v)
@@ -522,32 +531,54 @@ function_vector_summary<T *>::symtab_duplication (cgraph_node *node,
     }
 }
 
+template <typename T, typename V>
+inline bool
+function_vector_summary<T *, V>::is_ggc ()
+{
+  return is_same<V, va_gc>::value;
+}
+
 template <typename T>
 void
-gt_ggc_mx(function_vector_summary<T *>* const &summary)
+gt_ggc_mx(function_vector_summary<T *, va_heap>* const &)
 {
-  gcc_checking_assert (summary->m_ggc);;
+}
+
+template <typename T>
+void
+gt_pch_nx(function_vector_summary<T *, va_heap>* const &)
+{
+}
+
+template <typename T>
+void
+gt_pch_nx(function_vector_summary<T *, va_heap>* const&, gt_pointer_operator,
+	  void *)
+{
+}
+
+template <typename T>
+void
+gt_ggc_mx(function_vector_summary<T *, va_gc>* const &summary)
+{
   ggc_test_and_set_mark (summary->m_vector);
   gt_ggc_mx (summary->m_vector);
 }
 
 template <typename T>
 void
-gt_pch_nx(function_vector_summary<T *>* const &summary)
+gt_pch_nx(function_vector_summary<T *, va_gc>* const &summary)
 {
-  gcc_checking_assert (summary->m_ggc);
   gt_pch_nx (summary->m_vector);
 }
 
 template <typename T>
 void
-gt_pch_nx(function_vector_summary<T *>* const& summary, gt_pointer_operator op,
+gt_pch_nx(function_vector_summary<T *, va_gc>* const& summary, gt_pointer_operator op,
 	  void *cookie)
 {
-  gcc_checking_assert (summary->m_ggc);
   gt_pch_nx (summary->m_vector, op, cookie);
 }
-
 
 /* An impossible class templated by non-pointers so, which makes sure that only
    summaries gathering pointers can be created.  */
