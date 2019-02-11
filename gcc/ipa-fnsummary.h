@@ -173,11 +173,11 @@ struct GTY(()) ipa_fn_summary
   static const int size_scale = 2;
 };
 
-class GTY((user)) ipa_fn_summary_t: public function_summary <ipa_fn_summary *>
+class GTY((user)) ipa_fn_summary_t: public function_vector_summary <ipa_fn_summary *>
 {
 public:
   ipa_fn_summary_t (symbol_table *symtab, bool ggc):
-    function_summary <ipa_fn_summary *> (symtab, ggc) {}
+    function_vector_summary <ipa_fn_summary *> (symtab, ggc) {}
 
   static ipa_fn_summary_t *create_ggc (symbol_table *symtab)
   {
@@ -200,7 +200,7 @@ public:
 			  ipa_fn_summary *src_data, ipa_fn_summary *dst_data);
 };
 
-extern GTY(()) function_summary <ipa_fn_summary *> *ipa_fn_summaries;
+extern GTY(()) function_vector_summary <ipa_fn_summary *> *ipa_fn_summaries;
 
 /* Information kept about callgraph edges.  */
 struct ipa_call_summary

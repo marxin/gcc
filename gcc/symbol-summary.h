@@ -278,6 +278,279 @@ gt_pch_nx(function_summary<T *>* const& summary, gt_pointer_operator op,
   gt_pch_nx (&summary->m_map, op, cookie);
 }
 
+
+/* We want to pass just pointer types as argument for function_summary
+   template class.  */
+
+template <class T>
+class function_vector_summary
+{
+private:
+  function_vector_summary();
+};
+
+/* Function summary is a helper class that is used to associate a data structure
+   related to a callgraph node.  Typical usage can be seen in IPA passes which
+   create a temporary pass-related structures.  The summary class registers
+   hooks that are triggered when a new node is inserted, duplicated and deleted.
+   A user of a summary class can ovewrite virtual methods than are triggered by
+   the summary if such hook is triggered.  Apart from a callgraph node, the user
+   is given a data structure tied to the node.
+
+   The function summary class can work both with a heap-allocated memory and
+   a memory gained by garbage collected memory.  */
+
+template <class T>
+class GTY((user)) function_vector_summary <T *>
+{
+public:
+  /* Default construction takes SYMTAB as an argument.  */
+  function_vector_summary (symbol_table *symtab, bool ggc = false);
+
+  /* Destructor.  */
+  virtual ~function_vector_summary ()
+  {
+    release ();
+  }
+
+  /* Destruction method that can be called for GGT purpose.  */
+  void release ();
+
+  /* Traverses all summarys with a function F called with
+     ARG as argument.  */
+  template<typename Arg, bool (*f)(const T &, Arg)>
+  void traverse (Arg a) const
+  {
+    for (unsigned i = 0; i < m_vector->length (); i++)
+      if ((*m_vector[i]) != NULL)
+	f ((*m_vector)[i]);
+  }
+
+  /* Basic implementation of insert operation.  */
+  virtual void insert (cgraph_node *, T *) {}
+
+  /* Basic implementation of removal operation.  */
+  virtual void remove (cgraph_node *, T *) {}
+
+  /* Basic implementation of duplication operation.  */
+  virtual void duplicate (cgraph_node *, cgraph_node *, T *, T *) {}
+
+  /* Allocates new data that are stored within vector.  */
+  T* allocate_new ()
+  {
+    /* Call gcc_internal_because we do not want to call finalizer for
+       a type T.  We call dtor explicitly.  */
+    return m_ggc ? new (ggc_internal_alloc (sizeof (T))) T () : new T () ;
+  }
+
+  /* Release an item that is stored within vector.  */
+  void release (T *item);
+
+  /* Getter for summary callgraph node pointer.  If a summary for a node
+     does not exist it will be created.  */
+  T* get_create (cgraph_node *node)
+  {
+    int id = node->get_summary_id ();
+    if (id == -1)
+      id = m_symtab->assign_summary_id (node);
+
+    if ((unsigned int)id >= m_vector->length ())
+      vec_safe_grow_cleared (m_vector, m_symtab->cgraph_max_summary_id);
+
+    if ((*m_vector)[id] == NULL)
+      (*m_vector)[id] = allocate_new ();
+
+    return (*m_vector)[id];
+  }
+
+  /* Getter for summary callgraph node pointer.  */
+  T* get (cgraph_node *node) ATTRIBUTE_PURE
+  {
+    return exists (node) ? (*m_vector)[node->get_summary_id ()] : NULL;
+  }
+
+  /* Remove node from summary.  */
+  void remove (cgraph_node *node)
+  {
+    if (exists (node))
+      {
+	int id = node->get_summary_id ();
+	release ((*m_vector)[id]);
+	(*m_vector)[id] = NULL;
+      }
+  }
+
+  /* Return true if a summary for the given NODE already exists.  */
+  bool exists (cgraph_node *node)
+  {
+    int id = node->get_summary_id ();
+    return (id != -1
+	    && (unsigned int)id < m_vector->length ()
+	    && (*m_vector)[id] != NULL);
+  }
+
+  /* Enable insertion hook invocation.  */
+  void enable_insertion_hook ()
+  {
+    m_insertion_enabled = true;
+  }
+
+  /* Enable insertion hook invocation.  */
+  void disable_insertion_hook ()
+  {
+    m_insertion_enabled = false;
+  }
+
+  /* Symbol insertion hook that is registered to symbol table.  */
+  static void symtab_insertion (cgraph_node *node, void *data);
+
+  /* Symbol removal hook that is registered to symbol table.  */
+  static void symtab_removal (cgraph_node *node, void *data);
+
+  /* Symbol duplication hook that is registered to symbol table.  */
+  static void symtab_duplication (cgraph_node *node, cgraph_node *node2,
+				  void *data);
+
+protected:
+  /* Indication if we use ggc summary.  */
+  bool m_ggc;
+
+private:
+  /* Indicates if insertion hook is enabled.  */
+  bool m_insertion_enabled;
+  /* Indicates if the summary is released.  */
+  bool m_released;
+
+  /* Summary is stored in the vector.  */
+  vec <T *, va_gc> *m_vector;
+  /* Internal summary insertion hook pointer.  */
+  cgraph_node_hook_list *m_symtab_insertion_hook;
+  /* Internal summary removal hook pointer.  */
+  cgraph_node_hook_list *m_symtab_removal_hook;
+  /* Internal summary duplication hook pointer.  */
+  cgraph_2node_hook_list *m_symtab_duplication_hook;
+  /* Symbol table the summary is registered to.  */
+  symbol_table *m_symtab;
+
+  template <typename U> friend void gt_ggc_mx (function_vector_summary <U *> * const &);
+  template <typename U> friend void gt_pch_nx (function_vector_summary <U *> * const &);
+  template <typename U> friend void gt_pch_nx (function_vector_summary <U *> * const &,
+      gt_pointer_operator, void *);
+};
+
+template <typename T>
+function_vector_summary<T *>::function_vector_summary (symbol_table *symtab, bool ggc):
+  m_ggc (ggc), m_insertion_enabled (true), m_released (false), m_vector (NULL),
+  m_symtab (symtab)
+{
+  vec_alloc (m_vector, 13);
+  m_symtab_insertion_hook
+    = symtab->add_cgraph_insertion_hook (function_vector_summary::symtab_insertion,
+					 this);
+
+  m_symtab_removal_hook
+    = symtab->add_cgraph_removal_hook (function_vector_summary::symtab_removal, this);
+  m_symtab_duplication_hook
+    = symtab->add_cgraph_duplication_hook (function_vector_summary::symtab_duplication,
+					   this);
+}
+
+template <typename T>
+void
+function_vector_summary<T *>::release ()
+{
+  if (m_released)
+    return;
+
+  m_symtab->remove_cgraph_insertion_hook (m_symtab_insertion_hook);
+  m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
+  m_symtab->remove_cgraph_duplication_hook (m_symtab_duplication_hook);
+
+  /* Release all summaries.  */
+  for (unsigned i = 0; i < m_vector->length (); i++)
+    if ((*m_vector)[i] != NULL)
+      release ((*m_vector)[i]);
+
+  m_released = true;
+}
+
+template <typename T>
+void
+function_vector_summary<T *>::release (T *item)
+{
+  if (m_ggc)
+    {
+      item->~T ();
+      ggc_free (item);
+    }
+  else
+    delete item;
+}
+
+template <typename T>
+void
+function_vector_summary<T *>::symtab_insertion (cgraph_node *node, void *data)
+{
+  gcc_checking_assert (node->get_uid ());
+  function_vector_summary *summary = (function_vector_summary <T *> *) (data);
+
+  if (summary->m_insertion_enabled)
+    summary->insert (node, summary->get_create (node));
+}
+
+template <typename T>
+void
+function_vector_summary<T *>::symtab_removal (cgraph_node *node, void *data)
+{
+  gcc_checking_assert (node->get_uid ());
+  function_vector_summary *summary = (function_vector_summary <T *> *) (data);
+
+  if (summary->exists (node))
+    summary->remove (node);
+}
+
+template <typename T>
+void
+function_vector_summary<T *>::symtab_duplication (cgraph_node *node,
+					   cgraph_node *node2, void *data)
+{
+  function_vector_summary *summary = (function_vector_summary <T *> *) (data);
+  T *v = summary->get (node);
+
+  if (v)
+    {
+      T *duplicate = summary->get_create (node2);
+      summary->duplicate (node, node2, v, duplicate);
+    }
+}
+
+template <typename T>
+void
+gt_ggc_mx(function_vector_summary<T *>* const &summary)
+{
+  gcc_checking_assert (summary->m_ggc);;
+  ggc_test_and_set_mark (summary->m_vector);
+  gt_ggc_mx (summary->m_vector);
+}
+
+template <typename T>
+void
+gt_pch_nx(function_vector_summary<T *>* const &summary)
+{
+  gcc_checking_assert (summary->m_ggc);
+  gt_pch_nx (summary->m_vector);
+}
+
+template <typename T>
+void
+gt_pch_nx(function_vector_summary<T *>* const& summary, gt_pointer_operator op,
+	  void *cookie)
+{
+  gcc_checking_assert (summary->m_ggc);
+  gt_pch_nx (summary->m_vector, op, cookie);
+}
+
+
 /* An impossible class templated by non-pointers so, which makes sure that only
    summaries gathering pointers can be created.  */
 
