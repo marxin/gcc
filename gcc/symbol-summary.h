@@ -117,12 +117,6 @@ public:
       }
   }
 
-  /* Return number of elements handled by data structure.  */
-  size_t elements ()
-  {
-    return m_map.elements ();
-  }
-
   /* Return true if a summary for the given NODE already exists.  */
   bool exists (cgraph_node *node)
   {
@@ -244,19 +238,7 @@ function_summary<T *>::symtab_removal (cgraph_node *node, void *data)
 {
   gcc_checking_assert (node->get_uid ());
   function_summary *summary = (function_summary <T *> *) (data);
-
-  int uid = node->get_uid ();
-  T **v = summary->m_map.get (uid);
-
-  if (v)
-    {
-      summary->remove (node, *v);
-
-      if (!summary->m_ggc)
-	delete (*v);
-
-      summary->m_map.remove (uid);
-    }
+  summary->remove (node);
 }
 
 template <typename T>
@@ -268,12 +250,7 @@ function_summary<T *>::symtab_duplication (cgraph_node *node,
   T *v = summary->get (node);
 
   if (v)
-    {
-      /* This load is necessary, because we insert a new value!  */
-      T *duplicate = summary->allocate_new ();
-      summary->m_map.put (node2->get_uid (), duplicate);
-      summary->duplicate (node, node2, v, duplicate);
-    }
+    summary->duplicate (node, node2, v, summary->get_create (node2));
 }
 
 template <typename T>
@@ -395,12 +372,6 @@ public:
       }
   }
 
-  /* Return number of elements handled by data structure.  */
-  size_t elements ()
-  {
-    return m_map.elements ();
-  }
-
   /* Return true if a summary for the given EDGE already exists.  */
   bool exists (cgraph_edge *edge)
   {
@@ -477,16 +448,7 @@ void
 call_summary<T *>::symtab_removal (cgraph_edge *edge, void *data)
 {
   call_summary *summary = (call_summary <T *> *) (data);
-
-  int h_uid = edge->get_uid ();
-  T **v = summary->m_map.get (h_uid);
-
-  if (v)
-    {
-      summary->remove (edge, *v);
-      summary->release (*v);
-      summary->m_map.remove (h_uid);
-    }
+  summary->remove (edge);
 }
 
 template <typename T>
@@ -510,11 +472,8 @@ call_summary<T *>::symtab_duplication (cgraph_edge *edge1,
     }
 
   if (edge1_summary)
-    {
-      T *duplicate = summary->allocate_new ();
-      summary->m_map.put (edge2->get_uid (), duplicate);
-      summary->duplicate (edge1, edge2, edge1_summary, duplicate);
-    }
+    summary->duplicate (edge1, edge2, edge1_summary,
+			summary->get_create (edge2));
 }
 
 template <typename T>
