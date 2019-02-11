@@ -677,14 +677,21 @@ get_read_write_all_from_node (struct cgraph_node *node,
       }
 }
 
-/* Skip edges from and to nodes without ipa_reference enables.  This leave
-   them out of strongy connected coponents and makes them easyto skip in the
+/* Skip edges from and to nodes without ipa_reference enabled.
+   Ignore not available symbols.  This leave
+   them out of strongly connected components and makes them easy to skip in the
    propagation loop bellow.  */
 
 static bool
 ignore_edge_p (cgraph_edge *e)
 {
-  return (!opt_for_fn (e->caller->decl, flag_ipa_reference)
+  enum availability avail;
+  e->callee->function_or_virtual_thunk_symbol (&avail, e->caller);
+
+  return (avail < AVAIL_INTERPOSABLE
+	  || (avail == AVAIL_INTERPOSABLE
+	      && !(flags_from_decl_or_type (e->callee->decl) & ECF_LEAF))
+	  || !opt_for_fn (e->caller->decl, flag_ipa_reference)
           || !opt_for_fn (e->callee->function_symbol ()->decl,
 			  flag_ipa_reference));
 }

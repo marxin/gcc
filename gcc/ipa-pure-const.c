@@ -1395,17 +1395,6 @@ cdtor_p (cgraph_node *n, void *)
   return false;
 }
 
-/* We only propagate across edges with non-interposable callee.  */
-
-static bool
-ignore_edge_for_pure_const (struct cgraph_edge *e)
-{
-  enum availability avail;
-  e->callee->function_or_virtual_thunk_symbol (&avail, e->caller);
-  return (avail <= AVAIL_INTERPOSABLE);
-}
-
-
 /* Produce transitive closure over the callgraph and compute pure/const
    attributes.  */
 
@@ -1423,7 +1412,7 @@ propagate_pure_const (void)
   bool has_cdtor;
 
   order_pos = ipa_reduced_postorder (order, true,
-				     ignore_edge_for_pure_const);
+				     ignore_edge_if_not_available);
   if (dump_file)
     {
       cgraph_node::dump_cgraph (dump_file);

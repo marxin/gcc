@@ -1778,7 +1778,7 @@ inline_small_functions (void)
      metrics.  */
 
   max_count = profile_count::uninitialized ();
-  ipa_reduced_postorder (order, true, NULL);
+  ipa_reduced_postorder (order, true, ignore_edge_if_not_available);
   free (order);
 
   FOR_EACH_DEFINED_FUNCTION (node)

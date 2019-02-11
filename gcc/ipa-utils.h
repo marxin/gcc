@@ -262,6 +262,16 @@ odr_type_p (const_tree t)
   return false;
 }
 
+/* We only propagate across edges with non-interposable callee.  */
+
+inline bool
+ignore_edge_if_not_available (struct cgraph_edge *e)
+{
+  enum availability avail;
+  e->callee->function_or_virtual_thunk_symbol (&avail, e->caller);
+  return (avail <= AVAIL_INTERPOSABLE);
+}
+
 #endif  /* GCC_IPA_UTILS_H  */
 
 

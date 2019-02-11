@@ -815,7 +815,8 @@ build_toporder_info (struct ipa_topo_info *topo)
   topo->stack = XCNEWVEC (struct cgraph_node *, symtab->cgraph_count);
 
   gcc_checking_assert (topo->stack_top == 0);
-  topo->nnodes = ipa_reduced_postorder (topo->order, true, NULL);
+  topo->nnodes = ipa_reduced_postorder (topo->order, true,
+					ignore_edge_if_not_available);
 }
 
 /* Free information about strongly connected components and the arrays in
