@@ -546,6 +546,72 @@ gt_pch_nx(function_vector_summary<T *, va_gc>* const& summary, gt_pointer_operat
   gt_pch_nx (summary->m_vector, op, cookie);
 }
 
+/* Base class for call_summary and call_vector_summary classes.  */
+
+template <class T>
+class call_summary_base
+{
+public:
+  /* Default construction takes SYMTAB as an argument.  */
+  call_summary_base (symbol_table *symtab): m_symtab (symtab),
+  m_initialize_when_cloning (true), m_released (false)
+  {}
+
+  /* Basic implementation of removal operation.  */
+  virtual void remove (cgraph_edge *, T *) {}
+
+  /* Basic implementation of duplication operation.  */
+  virtual void duplicate (cgraph_edge *, cgraph_edge *, T *, T *) {}
+
+protected:
+  /* Allocates new data that are stored within map.  */
+  T* allocate_new ()
+  {
+    /* Call gcc_internal_because we do not want to call finalizer for
+       a type T.  We call dtor explicitly.  */
+    return is_ggc () ? new (ggc_internal_alloc (sizeof (T))) T () : new T () ;
+  }
+
+  /* Release an item that is stored within map.  */
+  void release (T *item)
+  {
+    if (is_ggc ())
+      {
+	item->~T ();
+	ggc_free (item);
+      }
+    else
+      delete item;
+  }
+
+  /* Unregister all call-graph hooks.  */
+  void unregister_hooks ();
+
+  /* Symbol table the summary is registered to.  */
+  symbol_table *m_symtab;
+
+  /* Internal summary removal hook pointer.  */
+  cgraph_edge_hook_list *m_symtab_removal_hook;
+  /* Internal summary duplication hook pointer.  */
+  cgraph_2edge_hook_list *m_symtab_duplication_hook;
+  /* Initialize summary for an edge that is cloned.  */
+  bool m_initialize_when_cloning;
+  /* Indicates if the summary is released.  */
+  bool m_released;
+
+private:
+  /* Return true when the summary uses GGC memory for allocation.  */
+  virtual bool is_ggc () = 0;
+};
+
+template <typename T>
+void
+call_summary_base<T>::unregister_hooks ()
+{
+  m_symtab->remove_edge_removal_hook (m_symtab_removal_hook);
+  m_symtab->remove_edge_duplication_hook (m_symtab_duplication_hook);
+}
+
 /* An impossible class templated by non-pointers so, which makes sure that only
    summaries gathering pointers can be created.  */
 
@@ -559,19 +625,18 @@ private:
 /* Class to store auxiliary information about call graph edges.  */
 
 template <class T>
-class GTY((user)) call_summary <T *>
+class GTY((user)) call_summary <T *>: public call_summary_base<T>
 {
 public:
   /* Default construction takes SYMTAB as an argument.  */
-  call_summary (symbol_table *symtab, bool ggc = false): m_ggc (ggc),
-    m_initialize_when_cloning (false), m_map (13, ggc), m_released (false),
-    m_symtab (symtab)
+  call_summary (symbol_table *symtab, bool ggc = false)
+  : call_summary_base<T> (symtab), m_ggc (ggc), m_map (13, ggc)
   {
-    m_symtab_removal_hook =
-      symtab->add_edge_removal_hook
+    this->m_symtab_removal_hook =
+      this->m_symtab->add_edge_removal_hook
       (call_summary::symtab_removal, this);
-    m_symtab_duplication_hook =
-      symtab->add_edge_duplication_hook
+    this->m_symtab_duplication_hook =
+      this->m_symtab->add_edge_duplication_hook
       (call_summary::symtab_duplication, this);
   }
 
@@ -581,7 +646,8 @@ public:
     release ();
   }
 
-  /* Destruction method that can be called for GGT purpose.  */
+  /* Destruction method that can be called for GGC purpose.  */
+  using call_summary_base<T>::release;
   void release ();
 
   /* Traverses all summarys with a function F called with
@@ -592,23 +658,6 @@ public:
     m_map.traverse <f> (a);
   }
 
-  /* Basic implementation of removal operation.  */
-  virtual void remove (cgraph_edge *, T *) {}
-
-  /* Basic implementation of duplication operation.  */
-  virtual void duplicate (cgraph_edge *, cgraph_edge *, T *, T *) {}
-
-  /* Allocates new data that are stored within map.  */
-  T* allocate_new ()
-  {
-    /* Call gcc_internal_because we do not want to call finalizer for
-       a type T.  We call dtor explicitly.  */
-    return m_ggc ? new (ggc_internal_alloc (sizeof (T))) T () : new T () ;
-  }
-
-  /* Release an item that is stored within map.  */
-  void release (T *item);
-
   /* Getter for summary callgraph edge pointer.
      If a summary for an edge does not exist, it will be created.  */
   T* get_create (cgraph_edge *edge)
@@ -616,7 +665,7 @@ public:
     bool existed;
     T **v = &m_map.get_or_insert (edge->get_uid (), &existed);
     if (!existed)
-      *v = allocate_new ();
+      *v = this->allocate_new ();
 
     return *v;
   }
@@ -629,6 +678,7 @@ public:
   }
 
   /* Remove edge from summary.  */
+  using call_summary_base<T>::remove;
   void remove (cgraph_edge *edge)
   {
     int uid = edge->get_uid ();
@@ -636,7 +686,7 @@ public:
     if (v)
       {
 	m_map.remove (uid);
-	release (*v);
+	this->release (*v);
       }
   }
 
@@ -657,22 +707,17 @@ protected:
   /* Indication if we use ggc summary.  */
   bool m_ggc;
 
-  /* Initialize summary for an edge that is cloned.  */
-  bool m_initialize_when_cloning;
-
 private:
+  /* Indication if we use ggc summary.  */
+  virtual bool is_ggc ()
+  {
+    return m_ggc;
+  }
+
   typedef int_hash <int, 0, -1> map_hash;
 
   /* Main summary store, where summary ID is used as key.  */
   hash_map <map_hash, T *> m_map;
-  /* Internal summary removal hook pointer.  */
-  cgraph_edge_hook_list *m_symtab_removal_hook;
-  /* Internal summary duplication hook pointer.  */
-  cgraph_2edge_hook_list *m_symtab_duplication_hook;
-  /* Indicates if the summary is released.  */
-  bool m_released;
-  /* Symbol table the summary is registered to.  */
-  symbol_table *m_symtab;
 
   template <typename U> friend void gt_ggc_mx (call_summary <U *> * const &);
   template <typename U> friend void gt_pch_nx (call_summary <U *> * const &);
@@ -684,31 +729,17 @@ template <typename T>
 void
 call_summary<T *>::release ()
 {
-  if (m_released)
+  if (this->m_released)
     return;
 
-  m_symtab->remove_edge_removal_hook (m_symtab_removal_hook);
-  m_symtab->remove_edge_duplication_hook (m_symtab_duplication_hook);
+  this->unregister_hooks ();
 
   /* Release all summaries.  */
   typedef typename hash_map <map_hash, T *>::iterator map_iterator;
   for (map_iterator it = m_map.begin (); it != m_map.end (); ++it)
-    release ((*it).second);
+    this->release ((*it).second);
 
-  m_released = true;
-}
-
-template <typename T>
-void
-call_summary<T *>::release (T *item)
-{
-  if (m_ggc)
-    {
-      item->~T ();
-      ggc_free (item);
-    }
-  else
-    delete item;
+  this->m_released = true;
 }
 
 template <typename T>
