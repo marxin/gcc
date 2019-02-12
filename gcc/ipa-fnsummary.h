@@ -236,11 +236,11 @@ struct ipa_call_summary
   bool is_return_callee_uncaptured;
 };
 
-class ipa_call_summary_t: public call_summary <ipa_call_summary *>
+class ipa_call_summary_t: public call_vector_summary <ipa_call_summary *, va_heap>
 {
 public:
-  ipa_call_summary_t (symbol_table *symtab, bool ggc):
-    call_summary <ipa_call_summary *> (symtab, ggc) {}
+  ipa_call_summary_t (symbol_table *symtab):
+    call_vector_summary <ipa_call_summary *, va_heap> (symtab) {}
 
   /* Hook that is called by summary when an edge is duplicated.  */
   virtual void duplicate (cgraph_edge *src, cgraph_edge *dst,
@@ -248,7 +248,7 @@ public:
 			  ipa_call_summary *dst_data);
 };
 
-extern call_summary <ipa_call_summary *> *ipa_call_summaries;
+extern call_vector_summary <ipa_call_summary *, va_heap> *ipa_call_summaries;
 
 /* In ipa-fnsummary.c  */
 void ipa_debug_fn_summary (struct cgraph_node *);
