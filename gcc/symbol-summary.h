@@ -372,7 +372,8 @@ public:
       id = this->m_symtab->assign_summary_id (node);
 
     if ((unsigned int)id >= m_vector->length ())
-      vec_safe_grow_cleared (m_vector, m_symtab->cgraph_max_summary_id);
+      vec_safe_grow_cleared (m_vector,
+			     this->m_symtab->cgraph_max_summary_id);
 
     if ((*m_vector)[id] == NULL)
       (*m_vector)[id] = this->allocate_new ();
@@ -650,7 +651,7 @@ public:
   using call_summary_base<T>::release;
   void release ();
 
-  /* Traverses all summarys with a function F called with
+  /* Traverses all summarys with an edge E called with
      ARG as argument.  */
   template<typename Arg, bool (*f)(const T &, Arg)>
   void traverse (Arg a) const
@@ -761,14 +762,7 @@ call_summary<T *>::symtab_duplication (cgraph_edge *edge1,
   if (summary->m_initialize_when_cloning)
     edge1_summary = summary->get_create (edge1);
   else
-    {
-      T **v = summary->m_map.get (edge1->get_uid ());
-      if (v)
-	{
-	  /* This load is necessary, because we insert a new value!  */
-	  edge1_summary = *v;
-	}
-    }
+    edge1_summary = summary->get (edge1);
 
   if (edge1_summary)
     summary->duplicate (edge1, edge2, edge1_summary,
@@ -798,6 +792,212 @@ gt_pch_nx(call_summary<T *>* const& summary, gt_pointer_operator op,
 {
   gcc_checking_assert (summary->m_ggc);
   gt_pch_nx (&summary->m_map, op, cookie);
+}
+
+/* We want to pass just pointer types as argument for call_vector_summary
+   template class.  */
+
+template <class T, class V>
+class call_vector_summary
+{
+private:
+  call_vector_summary();
+};
+
+/* Call vector summary is a fast implementation of call_summary that
+   utilizes vector as primary storage of summaries.  */
+
+template <class T, class V>
+class GTY((user)) call_vector_summary <T *, V>: public call_summary_base<T>
+{
+public:
+  /* Default construction takes SYMTAB as an argument.  */
+  call_vector_summary (symbol_table *symtab)
+  : call_summary_base<T> (symtab), m_vector (NULL)
+  {
+    vec_alloc (m_vector, 13);
+    this->m_symtab_removal_hook =
+      this->m_symtab->add_edge_removal_hook
+      (call_vector_summary::symtab_removal, this);
+    this->m_symtab_duplication_hook =
+      this->m_symtab->add_edge_duplication_hook
+      (call_vector_summary::symtab_duplication, this);
+  }
+
+  /* Destructor.  */
+  virtual ~call_vector_summary ()
+  {
+    release ();
+  }
+
+  /* Destruction method that can be called for GGC purpose.  */
+  using call_summary_base<T>::release;
+  void release ();
+
+  /* Traverses all summarys with an edge F called with
+     ARG as argument.  */
+  template<typename Arg, bool (*f)(const T &, Arg)>
+  void traverse (Arg a) const
+  {
+    for (unsigned i = 0; i < m_vector->length (); i++)
+      if ((*m_vector[i]) != NULL)
+	f ((*m_vector)[i]);
+  }
+
+  /* Getter for summary callgraph edge pointer.
+     If a summary for an edge does not exist, it will be created.  */
+  T* get_create (cgraph_edge *edge)
+  {
+    int id = edge->get_summary_id ();
+    if (id == -1)
+      id = this->m_symtab->assign_summary_id (edge);
+
+    if ((unsigned)id >= m_vector->length ())
+      vec_safe_grow_cleared (m_vector, this->m_symtab->edges_max_summary_id);
+
+    if ((*m_vector)[id] == NULL)
+      (*m_vector)[id] = this->allocate_new ();
+
+    return (*m_vector)[id];
+  }
+
+  /* Getter for summary callgraph edge pointer.  */
+  T* get (cgraph_edge *edge) ATTRIBUTE_PURE
+  {
+    return exists (edge) ? (*m_vector)[edge->get_summary_id ()] : NULL;
+  }
+
+  /* Remove edge from summary.  */
+  using call_summary_base<T>::remove;
+  void remove (cgraph_edge *edge)
+  {
+    if (exists (edge))
+      {
+	int id = edge->get_summary_id ();
+	this->release ((*m_vector)[id]);
+	(*m_vector)[id] = NULL;
+      }
+  }
+
+  /* Return true if a summary for the given EDGE already exists.  */
+  bool exists (cgraph_edge *edge)
+  {
+    int id = edge->get_summary_id ();
+    return (id != -1
+	    && (unsigned)id < m_vector->length ()
+	    && (*m_vector)[id] != NULL);
+  }
+
+  /* Symbol removal hook that is registered to symbol table.  */
+  static void symtab_removal (cgraph_edge *edge, void *data);
+
+  /* Symbol duplication hook that is registered to symbol table.  */
+  static void symtab_duplication (cgraph_edge *edge1, cgraph_edge *edge2,
+				  void *data);
+
+private:
+  virtual bool is_ggc ();
+
+  /* Summary is stored in the vector.  */
+  vec <T *, V> *m_vector;
+
+  template <typename U> friend void gt_ggc_mx (call_vector_summary <U *, va_gc> * const &);
+  template <typename U> friend void gt_pch_nx (call_vector_summary <U *, va_gc> * const &);
+  template <typename U> friend void gt_pch_nx (call_vector_summary <U *, va_gc> * const &,
+      gt_pointer_operator, void *);
+};
+
+template <typename T, typename V>
+void
+call_vector_summary<T *, V>::release ()
+{
+  if (this->m_released)
+    return;
+
+  this->unregister_hooks ();
+
+  /* Release all summaries.  */
+  for (unsigned i = 0; i < m_vector->length (); i++)
+    if ((*m_vector)[i] != NULL)
+      this->release ((*m_vector)[i]);
+
+  this->m_released = true;
+}
+
+template <typename T, typename V>
+void
+call_vector_summary<T *, V>::symtab_removal (cgraph_edge *edge, void *data)
+{
+  call_vector_summary *summary = (call_vector_summary <T *, V> *) (data);
+  summary->remove (edge);
+}
+
+template <typename T, typename V>
+void
+call_vector_summary<T *, V>::symtab_duplication (cgraph_edge *edge1,
+						 cgraph_edge *edge2, void *data)
+{
+  call_vector_summary *summary = (call_vector_summary <T *, V> *) (data);
+  T *edge1_summary = NULL;
+
+  if (summary->m_initialize_when_cloning)
+    edge1_summary = summary->get_create (edge1);
+  else
+    edge1_summary = summary->get (edge1);
+
+  if (edge1_summary)
+    {
+      T *duplicate = summary->get_create (edge2);
+      summary->duplicate (edge1, edge2, edge1_summary, duplicate);
+    }
+}
+
+template <typename T, typename V>
+inline bool
+call_vector_summary<T *, V>::is_ggc ()
+{
+  return is_same<V, va_gc>::value;
+}
+
+template <typename T>
+void
+gt_ggc_mx(call_vector_summary<T *, va_heap>* const &summary)
+{
+}
+
+template <typename T>
+void
+gt_pch_nx(call_vector_summary<T *, va_heap>* const &summary)
+{
+}
+
+template <typename T>
+void
+gt_pch_nx(call_vector_summary<T *, va_heap>* const& summary, gt_pointer_operator op,
+	  void *cookie)
+{
+}
+
+template <typename T>
+void
+gt_ggc_mx(call_vector_summary<T *, va_gc>* const &summary)
+{
+  gt_ggc_mx (&summary->m_vector);
+}
+
+template <typename T>
+void
+gt_pch_nx(call_vector_summary<T *, va_gc>* const &summary)
+{
+  gt_pch_nx (&summary->m_vector);
+}
+
+template <typename T>
+void
+gt_pch_nx(call_vector_summary<T *, va_gc>* const& summary, gt_pointer_operator op,
+	  void *cookie)
+{
+  gt_pch_nx (&summary->m_vector, op, cookie);
 }
 
 #endif  /* GCC_SYMBOL_SUMMARY_H  */

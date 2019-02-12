@@ -1740,6 +1740,12 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"),
     return m_uid;
   }
 
+  /* Get summary id of the edge.  */
+  inline int get_summary_id ()
+  {
+    return m_summary_id;
+  }
+
   /* Rebuild cgraph edges for current function node.  This needs to be run after
      passes that don't update the cgraph.  */
   static unsigned int rebuild_edges (void);
@@ -1816,6 +1822,9 @@ struct GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"),
 private:
   /* Unique id of the edge.  */
   int m_uid;
+
+  /* Summary id that is recycled.  */
+  int m_summary_id;
 
   /* Remove the edge from the list of the callers of the callee.  */
   void remove_caller (void);
@@ -2068,7 +2077,7 @@ public:
   friend class cgraph_edge;
 
   symbol_table (): cgraph_max_uid (1), cgraph_max_summary_id (0),
-  edges_max_uid (1)
+  edges_max_uid (1), edges_max_summary_id (0)
   {
   }
 
@@ -2278,6 +2287,13 @@ public:
     return node->m_summary_id;
   }
 
+  /* Allocate new callgraph node.  */
+  inline unsigned int assign_summary_id (cgraph_edge *edge)
+  {
+    edge->m_summary_id = edges_max_summary_id++;
+    return edge->m_summary_id;
+  }
+
   /* Return true if assembler names NAME1 and NAME2 leads to the same symbol
      name.  */
   static bool assembler_names_equal_p (const char *name1, const char *name2);
@@ -2288,6 +2304,7 @@ public:
 
   int edges_count;
   int edges_max_uid;
+  int edges_max_summary_id;
 
   symtab_node* GTY(()) nodes;
   asm_node* GTY(()) asmnodes;
