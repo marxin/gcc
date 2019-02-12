@@ -192,13 +192,13 @@ protected:
   bool m_ggc;
 
 private:
-  typedef int_hash <int, 0, -1> map_hash;
-
   /* Indication if we use ggc summary.  */
   virtual bool is_ggc ()
   {
     return m_ggc;
   }
+
+  typedef int_hash <int, 0, -1> map_hash;
 
   /* Main summary store, where summary ID is used as key.  */
   hash_map <map_hash, T *> m_map;
@@ -327,7 +327,7 @@ private:
    utilizes vector as primary storage of summaries.  */
 
 template <class T, class V>
-class GTY((user)) function_vector_summary <T *, V>
+class GTY((user)) function_vector_summary <T *, V>: public function_summary_base<T>
 {
 public:
   /* Default construction takes SYMTAB as an argument.  */
@@ -340,6 +340,7 @@ public:
   }
 
   /* Destruction method that can be called for GGC purpose.  */
+  using function_summary_base<T>::release;
   void release ();
 
   /* Traverses all summarys with a function F called with
@@ -352,39 +353,19 @@ public:
 	f ((*m_vector)[i]);
   }
 
-  /* Basic implementation of insert operation.  */
-  virtual void insert (cgraph_node *, T *) {}
-
-  /* Basic implementation of removal operation.  */
-  virtual void remove (cgraph_node *, T *) {}
-
-  /* Basic implementation of duplication operation.  */
-  virtual void duplicate (cgraph_node *, cgraph_node *, T *, T *) {}
-
-  /* Allocates new data that are stored within vector.  */
-  T* allocate_new ()
-  {
-    /* Call gcc_internal_because we do not want to call finalizer for
-       a type T.  We call dtor explicitly.  */
-    return is_ggc () ? new (ggc_internal_alloc (sizeof (T))) T () : new T () ;
-  }
-
-  /* Release an item that is stored within vector.  */
-  void release (T *item);
-
   /* Getter for summary callgraph node pointer.  If a summary for a node
      does not exist it will be created.  */
   T* get_create (cgraph_node *node)
   {
     unsigned int id = node->get_summary_id ();
     if (id == 0)
-      id = m_symtab->assign_summary_id (node);
+      id = this->m_symtab->assign_summary_id (node);
 
     if (id >= m_vector->length ())
       vec_safe_grow_cleared (m_vector, id + 1);
 
     if ((*m_vector)[id] == NULL)
-      (*m_vector)[id] = allocate_new ();
+      (*m_vector)[id] = this->allocate_new ();
 
     return (*m_vector)[id];
   }
@@ -395,13 +376,13 @@ public:
     return exists (node) ? (*m_vector)[node->get_summary_id ()] : NULL;
   }
 
-  /* Remove node from summary.  */
+  using function_summary_base<T>::remove;
   void remove (cgraph_node *node)
   {
     if (exists (node))
       {
 	unsigned int id = node->get_summary_id ();
-	release ((*m_vector)[id]);
+	this->release ((*m_vector)[id]);
 	(*m_vector)[id] = NULL;
       }
   }
@@ -411,18 +392,6 @@ public:
   {
     unsigned int id = node->get_summary_id ();
     return id != 0 && id < m_vector->length () && (*m_vector)[id] != NULL;
-  }
-
-  /* Enable insertion hook invocation.  */
-  void enable_insertion_hook ()
-  {
-    m_insertion_enabled = true;
-  }
-
-  /* Enable insertion hook invocation.  */
-  void disable_insertion_hook ()
-  {
-    m_insertion_enabled = false;
   }
 
   /* Symbol insertion hook that is registered to symbol table.  */
@@ -436,23 +405,10 @@ public:
 				  void *data);
 
 private:
-  bool is_ggc ();
-
-  /* Indicates if insertion hook is enabled.  */
-  bool m_insertion_enabled;
-  /* Indicates if the summary is released.  */
-  bool m_released;
+  virtual bool is_ggc ();
 
   /* Summary is stored in the vector.  */
   vec <T *, V> *m_vector;
-  /* Internal summary insertion hook pointer.  */
-  cgraph_node_hook_list *m_symtab_insertion_hook;
-  /* Internal summary removal hook pointer.  */
-  cgraph_node_hook_list *m_symtab_removal_hook;
-  /* Internal summary duplication hook pointer.  */
-  cgraph_2node_hook_list *m_symtab_duplication_hook;
-  /* Symbol table the summary is registered to.  */
-  symbol_table *m_symtab;
 
   template <typename U> friend void gt_ggc_mx (function_vector_summary <U *, va_gc> * const &);
   template <typename U> friend void gt_pch_nx (function_vector_summary <U *, va_gc> * const &);
@@ -462,51 +418,36 @@ private:
 
 template <typename T, typename V>
 function_vector_summary<T *, V>::function_vector_summary (symbol_table *symtab):
-  m_insertion_enabled (true), m_released (false), m_vector (NULL),
-  m_symtab (symtab)
+  function_summary_base<T> (symtab), m_vector (NULL)
 {
   vec_alloc (m_vector, 13);
-  m_symtab_insertion_hook
-    = symtab->add_cgraph_insertion_hook (function_vector_summary::symtab_insertion,
-					 this);
-
-  m_symtab_removal_hook
-    = symtab->add_cgraph_removal_hook (function_vector_summary::symtab_removal, this);
-  m_symtab_duplication_hook
-    = symtab->add_cgraph_duplication_hook (function_vector_summary::symtab_duplication,
-					   this);
+  this->m_symtab_insertion_hook
+    = this->m_symtab->add_cgraph_insertion_hook (function_vector_summary::symtab_insertion,
+						 this);
+  this->m_symtab_removal_hook
+    = this->m_symtab->add_cgraph_removal_hook (function_vector_summary::symtab_removal, this);
+  this->m_symtab_duplication_hook
+    = this->m_symtab->add_cgraph_duplication_hook (function_vector_summary::symtab_duplication,
+						   this);
 }
 
 template <typename T, typename V>
 void
 function_vector_summary<T *, V>::release ()
 {
-  if (m_released)
+  if (this->m_released)
     return;
 
-  m_symtab->remove_cgraph_insertion_hook (m_symtab_insertion_hook);
-  m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
-  m_symtab->remove_cgraph_duplication_hook (m_symtab_duplication_hook);
+  this->m_symtab->remove_cgraph_insertion_hook (this->m_symtab_insertion_hook);
+  this->m_symtab->remove_cgraph_removal_hook (this->m_symtab_removal_hook);
+  this->m_symtab->remove_cgraph_duplication_hook (this->m_symtab_duplication_hook);
 
   /* Release all summaries.  */
   for (unsigned i = 0; i < m_vector->length (); i++)
     if ((*m_vector)[i] != NULL)
-      release ((*m_vector)[i]);
+      this->release ((*m_vector)[i]);
 
-  m_released = true;
-}
-
-template <typename T, typename V>
-void
-function_vector_summary<T *, V>::release (T *item)
-{
-  if (is_ggc ())
-    {
-      item->~T ();
-      ggc_free (item);
-    }
-  else
-    delete item;
+  this->m_released = true;
 }
 
 template <typename T, typename V>
