@@ -74,6 +74,9 @@ protected:
       delete item;
   }
 
+  /* Unregister all call-graph hooks.  */
+  void unregister_hooks ();
+
   /* Internal summary insertion hook pointer.  */
   cgraph_node_hook_list *m_symtab_insertion_hook;
   /* Internal summary removal hook pointer.  */
@@ -92,6 +95,15 @@ private:
   /* Return true when the summary uses GGC memory for allocation.  */
   virtual bool is_ggc () = 0;
 };
+
+template <typename T>
+void
+function_summary_base<T>::unregister_hooks ()
+{
+  m_symtab->remove_cgraph_insertion_hook (m_symtab_insertion_hook);
+  m_symtab->remove_cgraph_removal_hook (m_symtab_removal_hook);
+  m_symtab->remove_cgraph_duplication_hook (m_symtab_duplication_hook);
+}
 
 /* We want to pass just pointer types as argument for function_summary
    template class.  */
@@ -230,9 +242,7 @@ function_summary<T *>::release ()
   if (this->m_released)
     return;
 
-  this->m_symtab->remove_cgraph_insertion_hook (this->m_symtab_insertion_hook);
-  this->m_symtab->remove_cgraph_removal_hook (this->m_symtab_removal_hook);
-  this->m_symtab->remove_cgraph_duplication_hook (this->m_symtab_duplication_hook);
+  this->unregister_hooks ();
 
   /* Release all summaries.  */
   typedef typename hash_map <map_hash, T *>::iterator map_iterator;
@@ -440,9 +450,7 @@ function_vector_summary<T *, V>::release ()
   if (this->m_released)
     return;
 
-  this->m_symtab->remove_cgraph_insertion_hook (this->m_symtab_insertion_hook);
-  this->m_symtab->remove_cgraph_removal_hook (this->m_symtab_removal_hook);
-  this->m_symtab->remove_cgraph_duplication_hook (this->m_symtab_duplication_hook);
+  this->unregister_hooks ();
 
   /* Release all summaries.  */
   for (unsigned i = 0; i < m_vector->length (); i++)
