@@ -173,11 +173,11 @@ struct GTY(()) ipa_fn_summary
   static const int size_scale = 2;
 };
 
-class GTY((user)) ipa_fn_summary_t: public function_vector_summary <ipa_fn_summary *, va_gc>
+class GTY((user)) ipa_fn_summary_t: public fast_function_summary <ipa_fn_summary *, va_gc>
 {
 public:
   ipa_fn_summary_t (symbol_table *symtab):
-    function_vector_summary <ipa_fn_summary *, va_gc> (symtab) {}
+    fast_function_summary <ipa_fn_summary *, va_gc> (symtab) {}
 
   static ipa_fn_summary_t *create_ggc (symbol_table *symtab)
   {
@@ -200,7 +200,7 @@ public:
 			  ipa_fn_summary *src_data, ipa_fn_summary *dst_data);
 };
 
-extern GTY(()) function_vector_summary <ipa_fn_summary *, va_gc> *ipa_fn_summaries;
+extern GTY(()) fast_function_summary <ipa_fn_summary *, va_gc> *ipa_fn_summaries;
 
 /* Information kept about callgraph edges.  */
 struct ipa_call_summary
@@ -236,11 +236,11 @@ struct ipa_call_summary
   bool is_return_callee_uncaptured;
 };
 
-class ipa_call_summary_t: public call_vector_summary <ipa_call_summary *, va_heap>
+class ipa_call_summary_t: public fast_call_summary <ipa_call_summary *, va_heap>
 {
 public:
   ipa_call_summary_t (symbol_table *symtab):
-    call_vector_summary <ipa_call_summary *, va_heap> (symtab) {}
+    fast_call_summary <ipa_call_summary *, va_heap> (symtab) {}
 
   /* Hook that is called by summary when an edge is duplicated.  */
   virtual void duplicate (cgraph_edge *src, cgraph_edge *dst,
@@ -248,7 +248,7 @@ public:
 			  ipa_call_summary *dst_data);
 };
 
-extern call_vector_summary <ipa_call_summary *, va_heap> *ipa_call_summaries;
+extern fast_call_summary <ipa_call_summary *, va_heap> *ipa_call_summaries;
 
 /* In ipa-fnsummary.c  */
 void ipa_debug_fn_summary (struct cgraph_node *);

@@ -85,8 +85,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 
 /* Summaries.  */
-function_vector_summary <ipa_fn_summary *, va_gc> *ipa_fn_summaries;
-call_vector_summary <ipa_call_summary *, va_heap> *ipa_call_summaries;
+fast_function_summary <ipa_fn_summary *, va_gc> *ipa_fn_summaries;
+fast_call_summary <ipa_call_summary *, va_heap> *ipa_call_summaries;
 
 /* Edge predicates goes here.  */
 static object_allocator<predicate> edge_predicate_pool ("edge predicates");
