@@ -2016,12 +2016,6 @@ is_a_helper <varpool_node *>::test (symtab_node *p)
   return p && p->type == SYMTAB_VARIABLE;
 }
 
-/* Macros to access the next item in the list of free cgraph nodes and
-   edges. */
-#define NEXT_FREE_NODE(NODE) dyn_cast<cgraph_node *> ((NODE)->next)
-#define SET_NEXT_FREE_NODE(NODE,NODE2) ((NODE))->next = NODE2
-#define NEXT_FREE_EDGE(EDGE) (EDGE)->prev_caller
-
 typedef void (*cgraph_edge_hook)(cgraph_edge *, void *);
 typedef void (*cgraph_node_hook)(cgraph_node *, void *);
 typedef void (*varpool_node_hook)(varpool_node *, void *);
@@ -2077,7 +2071,8 @@ public:
   friend class cgraph_edge;
 
   symbol_table (): cgraph_max_uid (1), cgraph_max_summary_id (0),
-  edges_max_uid (1), edges_max_summary_id (0)
+  free_cgraph_node_summary_ids (),
+  edges_max_uid (1), edges_max_summary_id (0), free_cgraph_edge_summary_ids ()
   {
   }
 
@@ -2302,18 +2297,19 @@ public:
   int cgraph_max_uid;
   int cgraph_max_summary_id;
 
+  /* Vector of free cgraph_node summary IDs.  */
+  vec<int> GTY ((skip)) free_cgraph_node_summary_ids;
+
   int edges_count;
   int edges_max_uid;
   int edges_max_summary_id;
 
+  /* Vector of free cgraph_node summary IDs.  */
+  vec<int> GTY ((skip)) free_cgraph_edge_summary_ids;
+
   symtab_node* GTY(()) nodes;
   asm_node* GTY(()) asmnodes;
   asm_node* GTY(()) asm_last_node;
-  cgraph_node* GTY(()) free_nodes;
-
-  /* Head of a linked list of unused (freed) call graph edges.
-     Do not GTY((delete)) this list so UIDs gets reliably recycled.  */
-  cgraph_edge * GTY(()) free_edges;
 
   /* The order index of the next symtab node to be created.  This is
      used so that we can sort the cgraph nodes in order by when we saw
@@ -2673,15 +2669,8 @@ inline void
 symbol_table::release_symbol (cgraph_node *node)
 {
   cgraph_count--;
-
-  /* Clear out the node to NULL all pointers and add the node to the free
-     list.  */
-  int summary_id = node->m_summary_id;
-  memset (node, 0, sizeof (*node));
-  node->type = SYMTAB_FUNCTION;
-  node->m_summary_id = summary_id;
-  SET_NEXT_FREE_NODE (node, free_nodes);
-  free_nodes = node;
+  free_cgraph_node_summary_ids.safe_push (node->m_summary_id);
+  ggc_free (node);
 }
 
 /* Allocate new callgraph node.  */
@@ -2691,16 +2680,11 @@ symbol_table::allocate_cgraph_symbol (void)
 {
   cgraph_node *node;
 
-  if (free_nodes)
-    {
-      node = free_nodes;
-      free_nodes = NEXT_FREE_NODE (node);
-    }
+  node = ggc_cleared_alloc<cgraph_node> ();
+  if (free_cgraph_node_summary_ids.is_empty ())
+    node->m_summary_id = -1;
   else
-    {
-      node = ggc_cleared_alloc<cgraph_node> ();
-      node->m_summary_id = -1;
-    }
+    node->m_summary_id = free_cgraph_node_summary_ids.pop ();
 
   node->m_uid = cgraph_max_uid++;
   return node;
