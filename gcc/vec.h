@@ -732,10 +732,12 @@ vec_safe_grow_cleared (vec<T, A, vl_embed> *&v, unsigned len CXX_MEM_STAT_INFO)
 }
 
 
-/* Assumbe V is not NULL.  */
+/* Assume V is not NULL.  */
+
 template<typename T>
 inline void
-vec_safe_grow_cleared (vec<T, va_heap, vl_ptr> *&v, unsigned len CXX_MEM_STAT_INFO)
+vec_safe_grow_cleared (vec<T, va_heap, vl_ptr> *&v,
+		       unsigned len CXX_MEM_STAT_INFO)
 {
   v->safe_grow_cleared (len);
 }

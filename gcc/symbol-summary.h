@@ -229,7 +229,8 @@ function_summary<T *>::function_summary (symbol_table *symtab, bool ggc):
     = this->m_symtab->add_cgraph_insertion_hook (function_summary::symtab_insertion,
 						 this);
   this->m_symtab_removal_hook
-    = this->m_symtab->add_cgraph_removal_hook (function_summary::symtab_removal, this);
+    = this->m_symtab->add_cgraph_removal_hook (function_summary::symtab_removal,
+					       this);
   this->m_symtab_duplication_hook
     = this->m_symtab->add_cgraph_duplication_hook (function_summary::symtab_duplication,
 						   this);
@@ -312,15 +313,15 @@ gt_pch_nx(function_summary<T *>* const& summary, gt_pointer_operator op,
 /* Help template from std c++11.  */
 
 template<typename T, typename U>
-struct is_same 
+struct is_same
 {
-    static const bool value = false; 
+    static const bool value = false;
 };
 
 template<typename T>
 struct is_same<T,T>  //specialization
-{ 
-   static const bool value = true; 
+{
+   static const bool value = true;
 };
 
 /* We want to pass just pointer types as argument for fast_function_summary
@@ -330,14 +331,15 @@ template <class T, class V>
 class fast_function_summary
 {
 private:
-  fast_function_summary();
+  fast_function_summary ();
 };
 
 /* Function vector summary is a fast implementation of function_summary that
    utilizes vector as primary storage of summaries.  */
 
 template <class T, class V>
-class GTY((user)) fast_function_summary <T *, V>: public function_summary_base<T>
+class GTY((user)) fast_function_summary <T *, V>
+  : public function_summary_base<T>
 {
 public:
   /* Default construction takes SYMTAB as an argument.  */
@@ -438,7 +440,8 @@ fast_function_summary<T *, V>::fast_function_summary (symbol_table *symtab):
     = this->m_symtab->add_cgraph_insertion_hook (fast_function_summary::symtab_insertion,
 						 this);
   this->m_symtab_removal_hook
-    = this->m_symtab->add_cgraph_removal_hook (fast_function_summary::symtab_removal, this);
+    = this->m_symtab->add_cgraph_removal_hook (fast_function_summary::symtab_removal,
+					       this);
   this->m_symtab_duplication_hook
     = this->m_symtab->add_cgraph_duplication_hook (fast_function_summary::symtab_duplication,
 						   this);
@@ -486,7 +489,8 @@ fast_function_summary<T *, V>::symtab_removal (cgraph_node *node, void *data)
 template <typename T, typename V>
 void
 fast_function_summary<T *, V>::symtab_duplication (cgraph_node *node,
-						     cgraph_node *node2, void *data)
+						   cgraph_node *node2,
+						   void *data)
 {
   fast_function_summary *summary = (fast_function_summary <T *, V> *) (data);
   T *v = summary->get (node);
@@ -507,26 +511,26 @@ fast_function_summary<T *, V>::is_ggc ()
 
 template <typename T>
 void
-gt_ggc_mx(fast_function_summary<T *, va_heap>* const &)
+gt_ggc_mx (fast_function_summary<T *, va_heap>* const &)
 {
 }
 
 template <typename T>
 void
-gt_pch_nx(fast_function_summary<T *, va_heap>* const &)
+gt_pch_nx (fast_function_summary<T *, va_heap>* const &)
 {
 }
 
 template <typename T>
 void
-gt_pch_nx(fast_function_summary<T *, va_heap>* const&, gt_pointer_operator,
-	  void *)
+gt_pch_nx (fast_function_summary<T *, va_heap>* const&, gt_pointer_operator,
+	   void *)
 {
 }
 
 template <typename T>
 void
-gt_ggc_mx(fast_function_summary<T *, va_gc>* const &summary)
+gt_ggc_mx (fast_function_summary<T *, va_gc>* const &summary)
 {
   ggc_test_and_set_mark (summary->m_vector);
   gt_ggc_mx (summary->m_vector);
@@ -534,15 +538,16 @@ gt_ggc_mx(fast_function_summary<T *, va_gc>* const &summary)
 
 template <typename T>
 void
-gt_pch_nx(fast_function_summary<T *, va_gc>* const &summary)
+gt_pch_nx (fast_function_summary<T *, va_gc>* const &summary)
 {
   gt_pch_nx (summary->m_vector);
 }
 
 template <typename T>
 void
-gt_pch_nx(fast_function_summary<T *, va_gc>* const& summary, gt_pointer_operator op,
-	  void *cookie)
+gt_pch_nx (fast_function_summary<T *, va_gc>* const& summary,
+	   gt_pointer_operator op,
+	   void *cookie)
 {
   gt_pch_nx (summary->m_vector, op, cookie);
 }
@@ -620,7 +625,7 @@ template <class T>
 class call_summary
 {
 private:
-  call_summary();
+  call_summary ();
 };
 
 /* Class to store auxiliary information about call graph edges.  */
@@ -633,12 +638,12 @@ public:
   call_summary (symbol_table *symtab, bool ggc = false)
   : call_summary_base<T> (symtab), m_ggc (ggc), m_map (13, ggc)
   {
-    this->m_symtab_removal_hook =
-      this->m_symtab->add_edge_removal_hook
-      (call_summary::symtab_removal, this);
-    this->m_symtab_duplication_hook =
-      this->m_symtab->add_edge_duplication_hook
-      (call_summary::symtab_duplication, this);
+    this->m_symtab_removal_hook
+      = this->m_symtab->add_edge_removal_hook (call_summary::symtab_removal,
+					       this);
+    this->m_symtab_duplication_hook
+      = this->m_symtab->add_edge_duplication_hook (call_summary::symtab_duplication,
+						   this);
   }
 
   /* Destructor.  */
@@ -801,7 +806,7 @@ template <class T, class V>
 class fast_call_summary
 {
 private:
-  fast_call_summary();
+  fast_call_summary ();
 };
 
 /* Call vector summary is a fast implementation of call_summary that
@@ -816,12 +821,12 @@ public:
   : call_summary_base<T> (symtab), m_vector (NULL)
   {
     vec_alloc (m_vector, 13);
-    this->m_symtab_removal_hook =
-      this->m_symtab->add_edge_removal_hook
-      (fast_call_summary::symtab_removal, this);
-    this->m_symtab_duplication_hook =
-      this->m_symtab->add_edge_duplication_hook
-      (fast_call_summary::symtab_duplication, this);
+    this->m_symtab_removal_hook
+      = this->m_symtab->add_edge_removal_hook (fast_call_summary::symtab_removal,
+					       this);
+    this->m_symtab_duplication_hook
+      = this->m_symtab->add_edge_duplication_hook (fast_call_summary::symtab_duplication,
+						   this);
   }
 
   /* Destructor.  */
@@ -961,41 +966,43 @@ fast_call_summary<T *, V>::is_ggc ()
 
 template <typename T>
 void
-gt_ggc_mx(fast_call_summary<T *, va_heap>* const &summary)
+gt_ggc_mx (fast_call_summary<T *, va_heap>* const &summary)
 {
 }
 
 template <typename T>
 void
-gt_pch_nx(fast_call_summary<T *, va_heap>* const &summary)
+gt_pch_nx (fast_call_summary<T *, va_heap>* const &summary)
 {
 }
 
 template <typename T>
 void
-gt_pch_nx(fast_call_summary<T *, va_heap>* const& summary, gt_pointer_operator op,
-	  void *cookie)
+gt_pch_nx (fast_call_summary<T *, va_heap>* const& summary,
+	   gt_pointer_operator op,
+	   void *cookie)
 {
 }
 
 template <typename T>
 void
-gt_ggc_mx(fast_call_summary<T *, va_gc>* const &summary)
+gt_ggc_mx (fast_call_summary<T *, va_gc>* const &summary)
 {
   gt_ggc_mx (&summary->m_vector);
 }
 
 template <typename T>
 void
-gt_pch_nx(fast_call_summary<T *, va_gc>* const &summary)
+gt_pch_nx (fast_call_summary<T *, va_gc>* const &summary)
 {
   gt_pch_nx (&summary->m_vector);
 }
 
 template <typename T>
 void
-gt_pch_nx(fast_call_summary<T *, va_gc>* const& summary, gt_pointer_operator op,
-	  void *cookie)
+gt_pch_nx (fast_call_summary<T *, va_gc>* const& summary,
+	   gt_pointer_operator op,
+	   void *cookie)
 {
   gt_pch_nx (&summary->m_vector, op, cookie);
 }

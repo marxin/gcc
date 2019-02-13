@@ -128,7 +128,8 @@ typedef struct funct_state_d * funct_state;
    possibility that it may be desirable to move this to the cgraph
    local info.  */
 
-class funct_state_summary_t: public fast_function_summary <funct_state_d *, va_heap>
+class funct_state_summary_t:
+  public fast_function_summary <funct_state_d *, va_heap>
 {
 public:
   funct_state_summary_t (symbol_table *symtab):
