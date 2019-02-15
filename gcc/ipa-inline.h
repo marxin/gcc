@@ -52,7 +52,9 @@ void free_growth_caches (void);
 /* In ipa-inline.c  */
 unsigned int early_inliner (function *fun);
 bool inline_account_function_p (struct cgraph_node *node);
-
+enum cgraph_inline_failed_t call_not_inlinable_p (cgraph_node *caller,
+						  cgraph_node *callee,
+						  bool early);
 
 /* In ipa-inline-transform.c  */
 bool inline_call (struct cgraph_edge *, bool, vec<cgraph_edge *> *, int *, bool,

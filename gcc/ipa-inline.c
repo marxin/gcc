@@ -299,12 +299,60 @@ sanitize_attrs_match_for_inline_p (const_tree caller, const_tree callee)
       (opts_for_fn (caller->decl)->x_##flag		\
        != opts_for_fn (callee->decl)->x_##flag)
 
+/* Return CIF_OK if a call from CALLER to CALLEE is or would be inlineable.
+   Otherwise, return the reason why it cannot.  EARLY should be set when
+   deciding about early inlining.  */
+
+enum cgraph_inline_failed_t
+call_not_inlinable_p (cgraph_node *caller, cgraph_node *callee,
+		      bool early)
+{
+  enum availability avail;
+  caller = caller->global.inlined_to ? caller->global.inlined_to : caller;
+  callee = callee->ultimate_alias_target (&avail, caller);
+
+  if (!callee->definition)
+    return CIF_BODY_NOT_AVAILABLE;
+  if (!early && (!opt_for_fn (callee->decl, optimize)
+		 || !opt_for_fn (caller->decl, optimize)))
+    return CIF_FUNCTION_NOT_OPTIMIZED;
+  else if (callee->calls_comdat_local)
+    return CIF_USES_COMDAT_LOCAL;
+  else if (avail <= AVAIL_INTERPOSABLE)
+    return CIF_OVERWRITABLE;
+  /* Don't inline if the functions have different EH personalities.  */
+  else if (DECL_FUNCTION_PERSONALITY (caller->decl)
+	   && DECL_FUNCTION_PERSONALITY (callee->decl)
+	   && (DECL_FUNCTION_PERSONALITY (caller->decl)
+	       != DECL_FUNCTION_PERSONALITY (callee->decl)))
+    return CIF_EH_PERSONALITY;
+  /* TM pure functions should not be inlined into non-TM_pure
+     functions.  */
+  else if (is_tm_pure (callee->decl) && !is_tm_pure (caller->decl))
+    return CIF_UNSPECIFIED;
+  /* Check compatibility of target optimization options.  */
+  else if (!targetm.target_option.can_inline_p (caller->decl,
+						callee->decl))
+    return CIF_TARGET_OPTION_MISMATCH;
+  else if (ipa_fn_summaries->get (callee) == NULL
+	   || !ipa_fn_summaries->get (callee)->inlinable)
+    return CIF_FUNCTION_NOT_INLINABLE;
+  /* Don't inline a function with mismatched sanitization attributes. */
+  else if (!sanitize_attrs_match_for_inline_p (caller->decl, callee->decl))
+    return CIF_ATTRIBUTE_MISMATCH;
+  else if (callee->externally_visible
+	   && flag_live_patching == LIVE_PATCHING_INLINE_ONLY_STATIC)
+    return CIF_EXTERN_LIVE_ONLY_STATIC;
+  return CIF_OK;
+}
+
 /* Decide if we can inline the edge and possibly update
    inline_failed reason.  
    We check whether inlining is possible at all and whether
    caller growth limits allow doing so.  
 
-   if REPORT is true, output reason to the dump file. */
+   If REPORT is true, output reason to the dump file.  EARLY should be set when
+   deciding about early inlining.  */
 
 static bool
 can_inline_edge_p (struct cgraph_edge *e, bool report,
@@ -319,81 +367,22 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
       return false;
     }
 
-  bool inlinable = true;
-  enum availability avail;
-  cgraph_node *caller = e->caller->global.inlined_to
-		        ? e->caller->global.inlined_to : e->caller;
-  cgraph_node *callee = e->callee->ultimate_alias_target (&avail, caller);
+  enum cgraph_inline_failed_t fail_reason
+    = call_not_inlinable_p (e->caller, e->callee, early);
 
-  if (!callee->definition)
+
+  if (fail_reason != CIF_OK)
     {
-      e->inline_failed = CIF_BODY_NOT_AVAILABLE;
-      inlinable = false;
-    }
-  if (!early && (!opt_for_fn (callee->decl, optimize)
-		 || !opt_for_fn (caller->decl, optimize)))
-    {
-      e->inline_failed = CIF_FUNCTION_NOT_OPTIMIZED;
-      inlinable = false;
-    }
-  else if (callee->calls_comdat_local)
-    {
-      e->inline_failed = CIF_USES_COMDAT_LOCAL;
-      inlinable = false;
-    }
-  else if (avail <= AVAIL_INTERPOSABLE)
-    {
-      e->inline_failed = CIF_OVERWRITABLE;
-      inlinable = false;
+      e->inline_failed = fail_reason;
+      if (report)
+	report_inline_failed_reason (e);
     }
   /* All edges with call_stmt_cannot_inline_p should have inline_failed
      initialized to one of FINAL_ERROR reasons.  */
   else if (e->call_stmt_cannot_inline_p)
     gcc_unreachable ();
-  /* Don't inline if the functions have different EH personalities.  */
-  else if (DECL_FUNCTION_PERSONALITY (caller->decl)
-	   && DECL_FUNCTION_PERSONALITY (callee->decl)
-	   && (DECL_FUNCTION_PERSONALITY (caller->decl)
-	       != DECL_FUNCTION_PERSONALITY (callee->decl)))
-    {
-      e->inline_failed = CIF_EH_PERSONALITY;
-      inlinable = false;
-    }
-  /* TM pure functions should not be inlined into non-TM_pure
-     functions.  */
-  else if (is_tm_pure (callee->decl) && !is_tm_pure (caller->decl))
-    {
-      e->inline_failed = CIF_UNSPECIFIED;
-      inlinable = false;
-    }
-  /* Check compatibility of target optimization options.  */
-  else if (!targetm.target_option.can_inline_p (caller->decl,
-						callee->decl))
-    {
-      e->inline_failed = CIF_TARGET_OPTION_MISMATCH;
-      inlinable = false;
-    }
-  else if (ipa_fn_summaries->get (callee) == NULL
-	   || !ipa_fn_summaries->get (callee)->inlinable)
-    {
-      e->inline_failed = CIF_FUNCTION_NOT_INLINABLE;
-      inlinable = false;
-    }
-  /* Don't inline a function with mismatched sanitization attributes. */
-  else if (!sanitize_attrs_match_for_inline_p (caller->decl, callee->decl))
-    {
-      e->inline_failed = CIF_ATTRIBUTE_MISMATCH;
-      inlinable = false;
-    }
-  else if (callee->externally_visible
-	   && flag_live_patching == LIVE_PATCHING_INLINE_ONLY_STATIC)
-    {
-      e->inline_failed = CIF_EXTERN_LIVE_ONLY_STATIC;
-      inlinable = false;
-    }
-  if (!inlinable && report)
-    report_inline_failed_reason (e);
-  return inlinable;
+
+  return fail_reason == CIF_OK;
 }
 
 /* Decide if we can inline the edge and possibly update
@@ -1627,6 +1616,7 @@ add_new_edges_to_heap (edge_heap_t *heap, vec<cgraph_edge *> new_edges)
     {
       struct cgraph_edge *edge = new_edges.pop ();
 
+      gcc_assert (edge->callee);
       gcc_assert (!edge->aux);
       if (edge->inline_failed
 	  && can_inline_edge_p (edge, true)
