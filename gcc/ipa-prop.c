@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "domwalk.h"
 #include "builtins.h"
 #include "tree-cfgcleanup.h"
+#include "ipa-inline.h"
 
 /* Function summary where the parameter infos are actually stored. */
 ipa_node_params_t *ipa_node_params_sum = NULL;
@@ -3346,13 +3347,16 @@ try_make_edge_direct_virtual_call (struct cgraph_edge *ie,
 
   if (target)
     {
-      if (!possible_polymorphic_call_target_p
-	  (ie, cgraph_node::get_create (target)))
+      cgraph_node *target_node = cgraph_node::get_create (target);
+      if (!possible_polymorphic_call_target_p (ie, target_node))
 	{
 	  if (speculative)
 	    return NULL;
 	  target = ipa_impossible_devirt_target (ie, target);
 	}
+      if (speculative
+	  && call_not_inlinable_p (ie->caller, target_node, false))
+	return NULL;
       return ipa_make_edge_direct_to_target (ie, target, speculative);
     }
   else
