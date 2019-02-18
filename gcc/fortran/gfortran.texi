@@ -3505,6 +3505,7 @@ as this requires the new array descriptor.
 @menu
 * ATTRIBUTES directive::
 * UNROLL directive::
+* BUILTIN directive::
 @end menu
 
 @node ATTRIBUTES directive
@@ -3596,6 +3597,25 @@ loop that follows.  N is an integer constant specifying the unrolling factor.
 The values of 0 and 1 block any unrolling of the loop.
 
 
+@node BUILTIN directive
+@subsection BUILTIN directive
+
+The syntax of the directive is
+
+@code{!GCC$ BUILTIN (B) attributes simd FLAGS IF('target')}
+
+You can used this directive to define which middle-end built-ins have vector
+implementation.  B is name of the middle-end built-in.  FLAGS are optional
+and must have be either "(inbranch)" or "(notinbranch)".  IF statement
+is optional and is used to filter multilib ABIs for that
+the built-in should be vectorized.  Example usage:
+
+@smallexample
+!GCC$ builtin (sinf) attributes simd (notinbranch) if('x86_64')
+@end smallexample
+
+The purpose of the directive is to provide an API among the GCC compiler and
+the GNU C Library which would define vector implementation of math routines.
 
 @node Non-Fortran Main Program
 @section Non-Fortran Main Program
