@@ -48,6 +48,15 @@ register_overhead (bitmap b, size_t amount)
     bitmap_mem_desc.register_instance_overhead (amount, b);
 }
 
+/* Release the overhead.  */
+static void
+release_overhead (bitmap b, size_t amount, bool remove_from_map)
+{
+  if (bitmap_mem_desc.contains_descriptor_for_instance (b))
+    bitmap_mem_desc.release_instance_overhead (b, amount, remove_from_map);
+}
+
+
 /* Global data */
 bitmap_element bitmap_zero_bits;  /* An element of all zero bits.  */
 bitmap_obstack bitmap_default_obstack;    /* The default bitmap obstack.  */
@@ -65,7 +74,7 @@ bitmap_elem_to_freelist (bitmap head, bitmap_element *elt)
   bitmap_obstack *bit_obstack = head->obstack;
 
   if (GATHER_STATISTICS)
-    register_overhead (head, -((int)sizeof (bitmap_element)));
+    release_overhead (head, sizeof (bitmap_element), false);
 
   elt->next = NULL;
   elt->indx = -1;
@@ -153,7 +162,7 @@ bitmap_elt_clear_from (bitmap head, bitmap_element *elt)
       int n = 0;
       for (prev = elt; prev; prev = prev->next)
 	n++;
-      register_overhead (head, -sizeof (bitmap_element) * n);
+      release_overhead (head, sizeof (bitmap_element) * n, false);
     }
 
   prev = elt->prev;
@@ -798,7 +807,7 @@ bitmap_obstack_free (bitmap map)
       map->first = (bitmap_element *) map->obstack->heads;
 
       if (GATHER_STATISTICS)
-	register_overhead (map, -((int)sizeof (bitmap_head)));
+	release_overhead (map, sizeof (bitmap_head), true);
 
       map->obstack->heads = map;
     }
@@ -880,7 +889,7 @@ bitmap_move (bitmap to, bitmap from)
       for (bitmap_element *e = to->first; e; e = e->next)
 	sz += sizeof (bitmap_element);
       register_overhead (to, sz);
-      register_overhead (from, -sz);
+      release_overhead (from, sz, false);
     }
 }
 
