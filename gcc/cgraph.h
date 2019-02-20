@@ -1918,7 +1918,7 @@ public:
      Unlike finalize_decl function is intended to be used
      by middle end and allows insertion of new variable at arbitrary point
      of compilation.  */
-  static void add (tree decl);
+  static varpool_node *add (tree decl);
 
   /* Return varpool node for given symbol and check it is a function. */
   static inline varpool_node *get (const_tree decl);

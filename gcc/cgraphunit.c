@@ -205,6 +205,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-section-names.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "asan.h"
 
 /* Queue of cgraph nodes scheduled to be added into cgraph.  This is a
    secondary queue used during optimization to accommodate passes that
@@ -2418,6 +2419,9 @@ output_in_order (void)
       nodes[i].kind = pv->definition ? ORDER_VAR : ORDER_VAR_UNDEF;
       nodes[i].u.v = pv;
     }
+
+  if (flag_sanitize & SANITIZE_ADDRESS)
+    asan_emit_globals_protector ();
 
   for (pa = symtab->first_asm_symbol (); pa; pa = pa->next)
     {

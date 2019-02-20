@@ -3610,6 +3610,88 @@ gate_asan (void)
   return sanitize_flags_p (SANITIZE_ADDRESS);
 }
 
+/* Build a dummy ASAN global variable declaration.
+   ID is a name of the variable,
+   SHOULD_INIT drives variable initialization and IS_READONLY is used
+   to set TREE_READONLY flag.  */
+
+static tree
+build_globals_protector_decl (tree id, bool should_init, bool is_readonly)
+{
+  static tree type = char_type_node;
+  tree decl = build_decl (BUILTINS_LOCATION, VAR_DECL, id, type);
+
+  SET_DECL_ASSEMBLER_NAME (decl, id);
+  TREE_ADDRESSABLE (decl) = 1;
+  DECL_ARTIFICIAL (decl) = 1;
+  TREE_STATIC (decl) = 1;
+  TREE_USED (decl) = 1;
+  if (should_init)
+    {
+      tree init = build_one_cst (type);
+      TREE_STATIC (init) = 1;
+      DECL_INITIAL (decl) = init;
+    }
+  if (is_readonly)
+    TREE_READONLY (decl) = 1;
+
+  return decl;
+}
+
+/* Emit dummy global variables that will help to handle an access to a negative
+   offset of a first global variable in a translation unit (PR82501).  */
+
+void
+asan_emit_globals_protector (void)
+{
+  varpool_node *pv;
+
+  hash_set<int_hash<int, -1, -2> > dummy_sections;
+
+  FOR_EACH_DEFINED_VARIABLE (pv)
+    if (asan_protect_global (pv->decl), true)
+      {
+	section_category sc = categorize_decl_for_section (pv->decl, 0);
+	if (dummy_sections.contains ((int)sc))
+	  continue;
+	dummy_sections.add ((int)sc);
+	tree decl = NULL_TREE;
+
+	switch (sc)
+	  {
+	  case SECCAT_BSS:
+	    {
+	      const char *name = "__asan_bss_dummy_global";
+	      decl = build_globals_protector_decl (get_identifier (name),
+						   false, false);
+	      break;
+	    }
+	  case SECCAT_RODATA:
+	    {
+	      const char *name = "__asan_rodata_dummy_global";
+	      decl = build_globals_protector_decl (get_identifier (name),
+						   true, true);
+	      break;
+	    }
+	  case SECCAT_DATA:
+	    {
+	      const char *name = "__asan_data_dummy_global";
+	      decl = build_globals_protector_decl (get_identifier (name),
+						   true, false);
+	      break;
+	    }
+	  default:
+	    break;
+	  }
+
+	if (decl != NULL_TREE)
+	  {
+	    varpool_node *v = varpool_node::add (decl);
+	    v->force_output = 1;
+	  }
+      }
+}
+
 namespace {
 
 const pass_data pass_data_asan =

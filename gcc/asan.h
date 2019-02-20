@@ -137,6 +137,8 @@ extern bool asan_sanitize_allocas_p (void);
 
 extern hash_set<tree> *asan_handled_variables;
 
+extern void asan_emit_globals_protector (void);
+
 /* Return TRUE if builtin with given FCODE will be intercepted by
    libasan.  */
 

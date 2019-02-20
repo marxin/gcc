@@ -460,8 +460,8 @@ ctor_for_folding (tree decl)
 /* Add the variable DECL to the varpool.
    Unlike finalize_decl function is intended to be used
    by middle end and allows insertion of new variable at arbitrary point
-   of compilation.  */
-void
+   of compilation.  Return newly created varpool_node.  */
+varpool_node *
 varpool_node::add (tree decl)
 {
   varpool_node *node;
@@ -472,6 +472,8 @@ varpool_node::add (tree decl)
     node->externally_visible = true;
   if (lookup_attribute ("no_reorder", DECL_ATTRIBUTES (decl)))
     node->no_reorder = 1;
+
+  return node;
 }
 
 /* Return variable availability.  See cgraph.h for description of individual
