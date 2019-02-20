@@ -205,6 +205,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-section-names.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "asan.h"
 
 /* Queue of cgraph nodes scheduled to be added into cgraph.  This is a
    secondary queue used during optimization to accommodate passes that
@@ -2373,6 +2374,67 @@ struct cgraph_order_sort
   } u;
 };
 
+static int
+detect_reloc_for_decl (const_tree decl)
+{
+  // TODO: figure out how to properly detect relocations.
+  return 0;
+}
+
+static tree
+build_globals_protector_decl (tree id, bool should_init, bool is_readonly)
+{
+  static tree type = asan_globals_protector_type();
+  tree decl = build_decl (BUILTINS_LOCATION, VAR_DECL, id, type);
+
+  SET_DECL_ASSEMBLER_NAME (decl, id);
+  TREE_ADDRESSABLE (decl) = 1;
+  DECL_ARTIFICIAL (decl) = 1;
+  TREE_STATIC (decl) = 1;
+  TREE_PUBLIC (decl) = 1;
+  TREE_USED (decl) = 1;
+  if (should_init)
+    {
+      tree init = build_one_cst (type);
+      TREE_STATIC (init) = 1;
+      DECL_INITIAL (decl) = init;
+    }
+  if (is_readonly)
+    TREE_READONLY (decl) = 1;
+
+  return decl;
+}
+
+static void
+emit_globals_protector (void)
+{
+  varpool_node *pv;
+
+  // Bitmap for enum section_category.
+  // HOST_WIDE_INT is always 64 bits, which should be sufficient
+  // to hold all the sections. Anyway, we check this at compile time.
+  STATIC_ASSERT(HOST_BITS_PER_WIDE_INT > SECCAT_MAX);
+  HOST_WIDE_INT sections_bitmap = 0;
+
+  FOR_EACH_DEFINED_VARIABLE (pv)
+    if (asan_protect_global(pv->decl), true)
+      sections_bitmap |= (0x1 << categorize_decl_for_section(pv->decl,
+                                       detect_reloc_for_decl(pv->decl)));
+
+  if (sections_bitmap & (0x1 << SECCAT_BSS))
+    varpool_node::add(build_globals_protector_decl(
+			get_identifier("__asan_bss_dummy_global"),
+			false, false));
+  if (sections_bitmap & (0x1 << SECCAT_RODATA))
+    varpool_node::add(build_globals_protector_decl(
+			get_identifier("__asan_rodata_dummy_global"),
+			true, true));
+  if (sections_bitmap & (0x1 << SECCAT_DATA))
+    varpool_node::add(build_globals_protector_decl(
+			get_identifier("__asan_data_dummy_global"),
+			true, false));
+}
+
 /* Output all functions, variables, and asm statements in the order
    according to their order fields, which is the order in which they
    appeared in the file.  This implements -fno-toplevel-reorder.  In
@@ -2418,6 +2480,9 @@ output_in_order (void)
       nodes[i].kind = pv->definition ? ORDER_VAR : ORDER_VAR_UNDEF;
       nodes[i].u.v = pv;
     }
+
+  if (flag_sanitize & SANITIZE_ADDRESS)
+    emit_globals_protector();
 
   for (pa = symtab->first_asm_symbol (); pa; pa = pa->next)
     {

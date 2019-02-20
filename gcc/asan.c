@@ -2832,6 +2832,25 @@ asan_add_global (tree decl, tree type, vec<constructor_elt, va_gc> *v)
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, init);
 }
 
+/* Choose type for globals protection (integer with
+   width <= ASAN_SHADOW_GRANULARITY). */
+tree
+asan_globals_protector_type (void)
+{
+  const enum integer_type_kind ind[] = {itk_long_long, itk_long,
+					itk_int, itk_short, itk_char};
+  const int n = sizeof (ind) / sizeof (enum integer_type_kind);
+  int i = 0;
+
+  while (i + 1 < n && ASAN_SHADOW_GRANULARITY >
+		      tree_to_uhwi (TYPE_SIZE_UNIT (integer_types[ind[i]])))
+    {
+      i++;
+    }
+
+  return integer_types[ind[i]];
+}
+
 /* Initialize sanitizer.def builtins if the FE hasn't initialized them.  */
 void
 initialize_sanitizer_builtins (void)
