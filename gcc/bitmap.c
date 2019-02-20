@@ -32,31 +32,6 @@ bitmap_obstack bitmap_head::crashme;
 
 static bitmap_element *bitmap_tree_listify_from (bitmap, bitmap_element *);
 
-/* Register new bitmap.  */
-void
-bitmap_register (bitmap b MEM_STAT_DECL)
-{
-  bitmap_mem_desc.register_descriptor (b, BITMAP_ORIGIN, false
-				       FINAL_PASS_MEM_STAT);
-}
-
-/* Account the overhead.  */
-static void
-register_overhead (bitmap b, size_t amount)
-{
-  if (bitmap_mem_desc.contains_descriptor_for_instance (b))
-    bitmap_mem_desc.register_instance_overhead (amount, b);
-}
-
-/* Release the overhead.  */
-static void
-release_overhead (bitmap b, size_t amount, bool remove_from_map)
-{
-  if (bitmap_mem_desc.contains_descriptor_for_instance (b))
-    bitmap_mem_desc.release_instance_overhead (b, amount, remove_from_map);
-}
-
-
 /* Global data */
 bitmap_element bitmap_zero_bits;  /* An element of all zero bits.  */
 bitmap_obstack bitmap_default_obstack;    /* The default bitmap obstack.  */
@@ -774,9 +749,6 @@ bitmap_alloc (bitmap_obstack *bit_obstack MEM_STAT_DECL)
     map = XOBNEW (&bit_obstack->obstack, bitmap_head);
   bitmap_initialize (map, bit_obstack PASS_MEM_STAT);
 
-  if (GATHER_STATISTICS)
-    register_overhead (map, sizeof (bitmap_head));
-
   return map;
 }
 
@@ -789,9 +761,6 @@ bitmap_gc_alloc (ALONE_MEM_STAT_DECL)
 
   map = ggc_alloc<bitmap_head> ();
   bitmap_initialize (map, NULL PASS_MEM_STAT);
-
-  if (GATHER_STATISTICS)
-    register_overhead (map, sizeof (bitmap_head));
 
   return map;
 }
@@ -806,8 +775,8 @@ bitmap_obstack_free (bitmap map)
       bitmap_clear (map);
       map->first = (bitmap_element *) map->obstack->heads;
 
-      if (GATHER_STATISTICS)
-	release_overhead (map, sizeof (bitmap_head), true);
+//      if (GATHER_STATISTICS)
+//	release_overhead (map, sizeof (bitmap_head), true);
 
       map->obstack->heads = map;
     }

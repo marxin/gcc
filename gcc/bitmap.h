@@ -430,8 +430,33 @@ extern void bitmap_print (FILE *, const_bitmap, const char *, const char *);
 /* Initialize and release a bitmap obstack.  */
 extern void bitmap_obstack_initialize (bitmap_obstack *);
 extern void bitmap_obstack_release (bitmap_obstack *);
-extern void bitmap_register (bitmap MEM_STAT_DECL);
 extern void dump_bitmap_statistics (void);
+
+/* Register new bitmap.  */
+static inline void
+bitmap_register (bitmap b MEM_STAT_DECL)
+{
+  bitmap_mem_desc.register_descriptor (b, BITMAP_ORIGIN, false
+				       FINAL_PASS_MEM_STAT);
+}
+
+/* Account the overhead.  */
+static inline void
+register_overhead (bitmap b, size_t amount)
+{
+//  __builtin_printf ("register: %p, size: %d\n", b, amount);
+  if (bitmap_mem_desc.contains_descriptor_for_instance (b))
+    bitmap_mem_desc.register_instance_overhead (amount, b);
+}
+
+/* Release the overhead.  */
+static inline void
+release_overhead (bitmap b, size_t amount, bool remove_from_map)
+{
+//  __builtin_printf ("release: %p, size: %d\n", b, amount);
+  if (bitmap_mem_desc.contains_descriptor_for_instance (b))
+    bitmap_mem_desc.release_instance_overhead (b, amount, remove_from_map);
+}
 
 /* Initialize a bitmap header.  OBSTACK indicates the bitmap obstack
    to allocate from, NULL for GC'd bitmap.  */

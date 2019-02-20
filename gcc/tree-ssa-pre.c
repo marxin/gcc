@@ -3537,7 +3537,7 @@ do_hoist_insertion (basic_block block)
   /* Now finally construct the topological-ordered expression set.  */
   vec<pre_expr> exprs = sorted_array_from_bitmap_set (&hoistable_set);
 
-  bitmap_clear (&hoistable_set.values);
+  bitmap_clear (&availout_in_some);
 
   /* If there are candidate values for hoisting, insert expressions
      strategically to make the hoistable expressions fully redundant.  */
