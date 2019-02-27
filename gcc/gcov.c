@@ -1041,17 +1041,21 @@ process_args (int argc, char **argv)
   return optind;
 }
 
-/* Output intermediate LINE sitting on LINE_NUM to JSON OBJECT.  */
+/* Output intermediate LINE sitting on LINE_NUM to JSON OBJECT.
+   When FUNCTION_NAME is non null, add the name to the LINE.  */
 
 static void
 output_intermediate_json_line (json::array *object,
-			       line_info *line, unsigned line_num)
+			       line_info *line, unsigned line_num,
+			       const char *function_name)
 {
   if (!line->exists)
     return;
 
   json::object *lineo = new json::object ();
   lineo->set ("line_number", new json::number (line_num));
+  if (function_name != NULL)
+    lineo->set ("function_name", new json::string (function_name));
   lineo->set ("count", new json::number (line->count));
   lineo->set ("unexecuted_block",
 	      new json::literal (line->has_unexecuted_block));
@@ -1154,13 +1158,15 @@ output_json_intermediate_file (json::array *json_files, source_info *src)
 	    for (unsigned i = 0; i < lines.size (); i++)
 	      {
 		line_info *line = &lines[i];
-		output_intermediate_json_line (lineso, line, line_num + i);
+		output_intermediate_json_line (lineso, line, line_num + i,
+					       (*it2)->m_name);
 	      }
 	  }
 
       /* Follow with lines associated with the source file.  */
       if (line_num < src->lines.size ())
-	output_intermediate_json_line (lineso, &src->lines[line_num], line_num);
+	output_intermediate_json_line (lineso, &src->lines[line_num], line_num,
+				       NULL);
     }
 }
 
