@@ -170,7 +170,7 @@ rs6000_handle_option (struct gcc_options *opts, struct gcc_options *opts_set,
 	  else if (! strcmp (q, "builtin"))
 	    mask = MASK_DEBUG_BUILTIN;
 	  else
-	    error_at (loc, "unknown -mdebug-%s switch", q);
+	    error_at (loc, "unknown %<-mdebug-%s%> switch", q);
 
 	  if (invert)
 	    opts->x_rs6000_debug &= ~mask;

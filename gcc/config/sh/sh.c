@@ -8279,7 +8279,7 @@ sh_fix_range (const char *const_str)
       char* dash = strchr (str, '-');
       if (!dash)
 	{
-	  warning (0, "value of -mfixed-range must have form REG1-REG2");
+	  warning (0, "value of %<-mfixed-range%> must have form REG1-REG2");
 	  return;
 	}
       *dash = '\0';
