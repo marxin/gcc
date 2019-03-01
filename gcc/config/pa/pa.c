@@ -453,7 +453,7 @@ fix_range (const char *const_str)
       dash = strchr (str, '-');
       if (!dash)
 	{
-	  warning (0, "value of -mfixed-range must have form REG1-REG2");
+	  warning (0, "value of %<-mfixed-range%> must have form REG1-REG2");
 	  return;
 	}
       *dash = '\0';
@@ -554,7 +554,7 @@ pa_option_override (void)
   if (flag_reorder_blocks_and_partition)
     {
       inform (input_location,
-              "-freorder-blocks-and-partition does not work "
+              "%<-freorder-blocks-and-partition%> does not work "
               "on this architecture");
       flag_reorder_blocks_and_partition = 0;
       flag_reorder_blocks = 1;

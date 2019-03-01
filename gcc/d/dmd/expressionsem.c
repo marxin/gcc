@@ -2320,7 +2320,7 @@ public:
 
         if (!global.params.fileImppath)
         {
-            e->error("need -Jpath switch to import text file %s", name);
+            e->error("need %<-Jpath%> switch to import text file %s", name);
             goto Lerror;
         }
 
@@ -2332,7 +2332,7 @@ public:
         name = FileName::safeSearchPath(global.filePath, name);
         if (!name)
         {
-            e->error("file %s cannot be found or not in a path specified with -J", se->toChars());
+            e->error("file %s cannot be found or not in a path specified with %<-J%>", se->toChars());
             goto Lerror;
         }
 

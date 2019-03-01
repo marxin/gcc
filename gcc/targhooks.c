@@ -2031,9 +2031,9 @@ default_pch_valid_p (const void *data_p, size_t len)
 
   /* -fpic and -fpie also usually make a PCH invalid.  */
   if (data[0] != flag_pic)
-    return _("created and used with different settings of -fpic");
+    return _("created and used with different settings of %<-fpic%>");
   if (data[1] != flag_pie)
-    return _("created and used with different settings of -fpie");
+    return _("created and used with different settings of %<-fpie%>");
   data += 2;
 
   /* Check target_flags.  */

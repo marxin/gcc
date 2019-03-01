@@ -2642,7 +2642,7 @@ rx_expand_builtin (tree exp,
       if (rx_allow_string_insns)
 	emit_insn (gen_rmpa ());
       else
-	error ("-mno-allow-string-insns forbids the generation of the RMPA instruction");
+	error ("%<-mno-allow-string-insns%> forbids the generation of the RMPA instruction");
       return NULL_RTX;
     case RX_BUILTIN_MVFC:    return rx_expand_builtin_mvfc (arg, target);
     case RX_BUILTIN_MVTC:    return rx_expand_builtin_mvtc (exp);

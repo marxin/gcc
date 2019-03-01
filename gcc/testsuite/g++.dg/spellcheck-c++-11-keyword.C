@@ -4,7 +4,7 @@
 
 constexpr int a = 1; // { dg-bogus "did you mean" }
 // { dg-error ".constexpr. does not name a type" "" { target *-*-* } .-1 }
-// { dg-message "C\\+\\+11 .constexpr. only available with -std=c\\+\\+11 or -std=gnu\\+\\+11" "" { target *-*-* } .-2 }
+// { dg-message "C\\+\\+11 .constexpr. only available with .-std=c\\+\\+11. or .-std=gnu\\+\\+11." "" { target *-*-* } .-2 }
 
 /* If the user typos "constexpr" (here as "consexpr"), don't offer it as a
    spelling suggestion in C++98 mode.  */

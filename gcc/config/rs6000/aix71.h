@@ -37,7 +37,7 @@ do {									\
     }									\
   if (TARGET_POWERPC64 && ! TARGET_64BIT)				\
     {									\
-      error ("-maix64 required: 64-bit computation with 32-bit addressing not yet supported"); \
+      error ("%<-maix64%> required: 64-bit computation with 32-bit addressing not yet supported"); \
     }									\
   if ((rs6000_isa_flags_explicit					\
        & OPTION_MASK_MINIMAL_TOC) != 0)					\
