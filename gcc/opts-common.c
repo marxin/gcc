@@ -1615,7 +1615,7 @@ control_warning_option (unsigned int opt_index, int kind, const char *arg,
 			const struct cl_option_handlers *handlers,
 			struct gcc_options *opts,
 			struct gcc_options *opts_set,
-			diagnostic_context *dc)
+			diagnostic_context *dc, bool in_pragma)
 {
   if (cl_options[opt_index].alias_target != N_OPTS)
     {
@@ -1631,6 +1631,9 @@ control_warning_option (unsigned int opt_index, int kind, const char *arg,
     diagnostic_classify_diagnostic (dc, opt_index, (diagnostic_t) kind, loc);
 
   const struct cl_option *option = &cl_options[opt_index];
+
+  if (!value && in_pragma)
+    return;
 
   /* -Werror=foo implies -Wfoo.  */
   if (option->var_type == CLVC_BOOLEAN
