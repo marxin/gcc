@@ -933,10 +933,10 @@ arc_init (void)
 
   /* MPY instructions valid only for ARC700 or ARCv2.  */
   if (TARGET_NOMPY_SET && TARGET_ARC600_FAMILY)
-      error ("-mno-mpy supported only for ARC700 or ARCv2");
+      error ("%<-mno-mpy%> supported only for ARC700 or ARCv2");
 
   if (!TARGET_DPFP && TARGET_DPFP_DISABLE_LRSR)
-      error ("-mno-dpfp-lrsr supported only with -mdpfp");
+      error ("%<-mno-dpfp-lrsr%> supported only with %<-mdpfp%>");
 
   /* FPX-1. No fast and compact together.  */
   if ((TARGET_DPFP_FAST_SET && TARGET_DPFP_COMPACT_SET)
@@ -945,7 +945,7 @@ arc_init (void)
 
   /* FPX-2. No fast-spfp for arc600 or arc601.  */
   if (TARGET_SPFP_FAST_SET && TARGET_ARC600_FAMILY)
-    error ("-mspfp_fast not available on ARC600 or ARC601");
+    error ("%<-mspfp%>_fast not available on ARC600 or ARC601");
 
   /* FPX-4.  No FPX extensions mixed with FPU extensions.  */
   if ((TARGET_DPFP_FAST_SET || TARGET_DPFP_COMPACT_SET || TARGET_SPFP)
@@ -1110,7 +1110,7 @@ parse_mrgf_banked_regs_option (const char *arg)
   if (errno != 0 || *arg == '\0' || *end_ptr != '\0'
       || (val != 0 && val != 4 && val != 8 && val != 16 && val != 32))
     {
-      error ("invalid number in -mrgf-banked-regs=%s "
+      error ("invalid number in %<-mrgf-banked-regs%>=%s "
 	     "valid values are 0, 4, 8, 16, or 32", arg);
       return;
     }

@@ -8645,7 +8645,7 @@ gfc_match_pointer (void)
     {
       if (!flag_cray_pointer)
 	{
-	  gfc_error ("Cray pointer declaration at %C requires -fcray-pointer "
+	  gfc_error ("Cray pointer declaration at %C requires %<-fcray-pointer%> "
 		     "flag");
 	  return MATCH_ERROR;
 	}

@@ -27,7 +27,7 @@ do {									\
   if (TARGET_64BIT && ! TARGET_POWERPC64)				\
     {									\
       rs6000_isa_flags |= OPTION_MASK_POWERPC64;			\
-      warning (0, "-maix64 requires PowerPC64 architecture remain enabled"); \
+      warning (0, "%<-maix64%> requires PowerPC64 architecture remain enabled"); \
     }									\
   if (TARGET_SOFT_FLOAT && TARGET_LONG_DOUBLE_128)			\
     {									\
@@ -37,7 +37,7 @@ do {									\
     }									\
   if (TARGET_POWERPC64 && ! TARGET_64BIT)				\
     {									\
-      error ("-maix64 required: 64-bit computation with 32-bit addressing not yet supported"); \
+      error ("%<-maix64%> required: 64-bit computation with 32-bit addressing not yet supported"); \
     }									\
   if ((rs6000_isa_flags_explicit					\
        & OPTION_MASK_MINIMAL_TOC) != 0)					\

@@ -244,7 +244,7 @@ rs6000_handle_option (struct gcc_options *opts, struct gcc_options *opts_set,
 
     case OPT_msimple_fpu:
       if (!TARGET_SINGLE_FPU) 
-	warning_at (loc, 0, "-msimple-fpu option ignored");
+	warning_at (loc, 0, "%<-msimple-fpu%> option ignored");
       break;
 
     case OPT_mhard_float:

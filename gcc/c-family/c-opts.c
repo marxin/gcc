@@ -796,7 +796,7 @@ c_common_post_options (const char **pfilename)
   if (c_dialect_cxx ())
     {
       if (flag_excess_precision_cmdline == EXCESS_PRECISION_STANDARD)
-	sorry ("-fexcess-precision=standard for C++");
+	sorry ("%<-fexcess-precision=standard%> for C++");
       flag_excess_precision_cmdline = EXCESS_PRECISION_FAST;
     }
   else if (flag_excess_precision_cmdline == EXCESS_PRECISION_DEFAULT)
@@ -831,7 +831,7 @@ c_common_post_options (const char **pfilename)
   if (flag_gnu89_inline == -1)
     flag_gnu89_inline = !flag_isoc99;
   else if (!flag_gnu89_inline && !flag_isoc99)
-    error ("-fno-gnu89-inline is only supported in GNU99 or C99 mode");
+    error ("%<-fno-gnu89-inline%> is only supported in GNU99 or C99 mode");
 
   /* Default to ObjC sjlj exception handling if NeXT runtime.  */
   if (flag_objc_sjlj_exceptions < 0)
@@ -944,7 +944,7 @@ c_common_post_options (const char **pfilename)
       if (flag_abi_version == latest_abi_version)
 	{
 	  auto_diagnostic_group d;
-	  if (warning (OPT_Wabi, "-Wabi won't warn about anything"))
+	  if (warning (OPT_Wabi, "%<-Wabi%> won't warn about anything"))
 	    {
 	      inform (input_location, "-Wabi warns about differences "
 		      "from the most up-to-date ABI, which is also used "
@@ -1360,9 +1360,9 @@ sanitize_cpp_opts (void)
   if (cpp_opts->directives_only)
     {
       if (cpp_warn_unused_macros)
-	error ("-fdirectives-only is incompatible with -Wunused_macros");
+	error ("%<-fdirectives-only%> is incompatible with %<-Wunused%>_macros");
       if (cpp_opts->traditional)
-	error ("-fdirectives-only is incompatible with -traditional");
+	error ("%<-fdirectives-only%> is incompatible with -traditional");
     }
 }
 

@@ -4267,7 +4267,7 @@ cxx_init_decl_processing (void)
   if (aligned_new_threshold > 1
       && !pow2p_hwi (aligned_new_threshold))
     {
-      error ("-faligned-new=%d is not a power of two", aligned_new_threshold);
+      error ("%<-faligned-new=%d%> is not a power of two", aligned_new_threshold);
       aligned_new_threshold = 1;
     }
   if (aligned_new_threshold == -1)

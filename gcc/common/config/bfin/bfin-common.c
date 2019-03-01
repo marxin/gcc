@@ -320,7 +320,7 @@ bfin_handle_option (struct gcc_options *opts,
 
 	if (p == NULL)
 	  {
-	    error_at (loc, "-mcpu=%s is not valid", arg);
+	    error_at (loc, "%<-mcpu=%s%> is not valid", arg);
 	    return false;
 	  }
 
@@ -356,7 +356,7 @@ bfin_handle_option (struct gcc_options *opts,
 		|| si_major > 0xff || si_minor > 0xff)
 	      {
 	      invalid_silicon_revision:
-		error_at (loc, "-mcpu=%s has invalid silicon revision", arg);
+		error_at (loc, "%<-mcpu=%s%> has invalid silicon revision", arg);
 		return false;
 	      }
 

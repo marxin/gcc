@@ -933,7 +933,7 @@ sh_option_override (void)
       else if (flag_exceptions)
 	{
 	  if (flag_schedule_insns && global_options_set.x_flag_schedule_insns)
-	    warning (0, "ignoring -fschedule-insns because of exception "
+	    warning (0, "ignoring %<-fschedule-insns%> because of exception "
 			"handling bug");
 	  flag_schedule_insns = 0;
 	}

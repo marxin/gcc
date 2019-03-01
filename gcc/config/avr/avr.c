@@ -766,9 +766,9 @@ avr_option_override (void)
   if (flag_pic == 2)
     warning (OPT_fPIC, "-fPIC is not supported");
   if (flag_pie == 1)
-    warning (OPT_fpie, "-fpie is not supported");
+    warning (OPT_fpie, "%<-fpie%> is not supported");
   if (flag_pie == 2)
-    warning (OPT_fPIE, "-fPIE is not supported");
+    warning (OPT_fPIE, "%<-fPIE%> is not supported");
 
 #if !defined (HAVE_AS_AVR_MGCCISR_OPTION)
   avr_gasisr_prologues = 0;

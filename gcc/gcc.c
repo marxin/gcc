@@ -7243,7 +7243,7 @@ compare_files (char *cmpfile[])
 
     if (!ret && length[0] != length[1])
       {
-	error ("%s: -fcompare-debug failure (length)", gcc_input_filename);
+	error ("%s: %<-fcompare-debug%> failure (length)", gcc_input_filename);
 	ret = 1;
       }
 
@@ -7273,7 +7273,7 @@ compare_files (char *cmpfile[])
       {
 	if (memcmp (map[0], map[1], length[0]) != 0)
 	  {
-	    error ("%s: -fcompare-debug failure", gcc_input_filename);
+	    error ("%s: %<-fcompare-debug%> failure", gcc_input_filename);
 	    ret = 1;
 	  }
       }
@@ -7310,7 +7310,7 @@ compare_files (char *cmpfile[])
 
 	if (c0 != c1)
 	  {
-	    error ("%s: -fcompare-debug failure",
+	    error ("%s: %<-fcompare-debug%> failure",
 		   gcc_input_filename);
 	    ret = 1;
 	    break;
@@ -8168,7 +8168,7 @@ driver::do_spec_on_infiles () const
 
 		  if (value < 0)
 		    {
-		      error ("during -fcompare-debug recompilation");
+		      error ("during %<-fcompare-debug%> recompilation");
 		      this_file_error = 1;
 		    }
 
