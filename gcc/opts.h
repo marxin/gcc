@@ -387,7 +387,7 @@ extern void read_cmdline_option (struct gcc_options *opts,
 				 const struct cl_option_handlers *handlers,
 				 diagnostic_context *dc);
 extern void control_warning_option (unsigned int opt_index, int kind,
-				    const char *arg, bool imply, location_t loc,
+				    const char *arg, HOST_WIDE_INT value, location_t loc,
 				    unsigned int lang_mask,
 				    const struct cl_option_handlers *handlers,
 				    struct gcc_options *opts,

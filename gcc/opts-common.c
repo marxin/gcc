@@ -1605,13 +1605,13 @@ get_option_state (struct gcc_options *opts, int option,
    handlers HANDLERS) to have diagnostic kind KIND for option
    structures OPTS and OPTS_SET and diagnostic context DC (possibly
    NULL), at location LOC (UNKNOWN_LOCATION for -Werror=).  ARG is the
-   argument of the option for joined options, or NULL otherwise.  If IMPLY,
+   argument of the option for joined options, or NULL otherwise.  If VALUE,
    the warning option in question is implied at this point.  This is
    used by -Werror= and #pragma GCC diagnostic.  */
 
 void
 control_warning_option (unsigned int opt_index, int kind, const char *arg,
-			bool imply, location_t loc, unsigned int lang_mask,
+			HOST_WIDE_INT value, location_t loc, unsigned int lang_mask,
 			const struct cl_option_handlers *handlers,
 			struct gcc_options *opts,
 			struct gcc_options *opts_set,
@@ -1629,65 +1629,62 @@ control_warning_option (unsigned int opt_index, int kind, const char *arg,
     return;
   if (dc)
     diagnostic_classify_diagnostic (dc, opt_index, (diagnostic_t) kind, loc);
-  if (imply)
+
+  const struct cl_option *option = &cl_options[opt_index];
+
+  /* -Werror=foo implies -Wfoo.  */
+  if (option->var_type == CLVC_BOOLEAN
+      || option->var_type == CLVC_ENUM
+      || option->var_type == CLVC_SIZE)
     {
-      const struct cl_option *option = &cl_options[opt_index];
 
-      /* -Werror=foo implies -Wfoo.  */
-      if (option->var_type == CLVC_BOOLEAN
-	  || option->var_type == CLVC_ENUM
-	  || option->var_type == CLVC_SIZE)
+      if (arg && *arg == '\0' && !option->cl_missing_ok)
+	arg = NULL;
+
+      if ((option->flags & CL_JOINED) && arg == NULL)
 	{
-	  HOST_WIDE_INT value = 1;
+	  cmdline_handle_error (loc, option, option->opt_text, arg,
+				CL_ERR_MISSING_ARG, lang_mask);
+	  return;
+	}
 
-	  if (arg && *arg == '\0' && !option->cl_missing_ok)
-	    arg = NULL;
-
-	  if ((option->flags & CL_JOINED) && arg == NULL)
+      /* If the switch takes an integer argument, convert it.  */
+      if (arg && (option->cl_uinteger || option->cl_host_wide_int))
+	{
+	  int error = 0;
+	  value = *arg ? integral_argument (arg, &error,
+					    option->cl_byte_size) : 0;
+	  if (error)
 	    {
 	      cmdline_handle_error (loc, option, option->opt_text, arg,
-				    CL_ERR_MISSING_ARG, lang_mask);
+				    CL_ERR_UINT_ARG, lang_mask);
 	      return;
 	    }
-
-	  /* If the switch takes an integer argument, convert it.  */
-	  if (arg && (option->cl_uinteger || option->cl_host_wide_int))
-	    {
-	      int error = 0;
-	      value = *arg ? integral_argument (arg, &error,
-						option->cl_byte_size) : 0;
-	      if (error)
-		{
-		  cmdline_handle_error (loc, option, option->opt_text, arg,
-					CL_ERR_UINT_ARG, lang_mask);
-		  return;
-		}
-	    }
-
-	  /* If the switch takes an enumerated argument, convert it.  */
-	  if (arg && option->var_type == CLVC_ENUM)
-	    {
-	      const struct cl_enum *e = &cl_enums[option->var_enum];
-
-	      if (enum_arg_to_value (e->values, arg, &value, lang_mask))
-		{
-		  const char *carg = NULL;
-
-		  if (enum_value_to_arg (e->values, &carg, value, lang_mask))
-		    arg = carg;
-		  gcc_assert (carg != NULL);
-		}
-	      else
-		{
-		  cmdline_handle_error (loc, option, option->opt_text, arg,
-					CL_ERR_ENUM_ARG, lang_mask);
-		  return;
-		}
-	    }
-
-	  handle_generated_option (opts, opts_set,
-				   opt_index, arg, value, lang_mask,
-				   kind, loc, handlers, false, dc);
 	}
+
+      /* If the switch takes an enumerated argument, convert it.  */
+      if (arg && option->var_type == CLVC_ENUM)
+	{
+	  const struct cl_enum *e = &cl_enums[option->var_enum];
+
+	  if (enum_arg_to_value (e->values, arg, &value, lang_mask))
+	    {
+	      const char *carg = NULL;
+
+	      if (enum_value_to_arg (e->values, &carg, value, lang_mask))
+		arg = carg;
+	      gcc_assert (carg != NULL);
+	    }
+	  else
+	    {
+	      cmdline_handle_error (loc, option, option->opt_text, arg,
+				    CL_ERR_ENUM_ARG, lang_mask);
+	      return;
+	    }
+	}
+
+      handle_generated_option (opts, opts_set,
+			       opt_index, arg, value, lang_mask,
+			       kind, loc, handlers, false, dc);
     }
 }
