@@ -2298,7 +2298,7 @@ public:
         const char *name = (char *)se->string;
         if (!global.params.fileImppath)
         {
-            e->error("need -Jpath switch to import text file %s", name);
+            e->error("need %<-Jpath%> switch to import text file %s", name);
             return setError();
         }
 
@@ -2310,7 +2310,7 @@ public:
         name = FileName::safeSearchPath(global.filePath, name);
         if (!name)
         {
-            e->error("file %s cannot be found or not in a path specified with -J", se->toChars());
+            e->error("file %s cannot be found or not in a path specified with %<-J%>", se->toChars());
             return setError();
         }
 
