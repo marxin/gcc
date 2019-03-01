@@ -2401,7 +2401,7 @@ bfin_option_override (void)
   /* Don't allow the user to specify -mid-shared-library and -msep-data
      together, as it makes little sense from a user's point of view...  */
   if (TARGET_SEP_DATA && TARGET_ID_SHARED_LIBRARY)
-    error ("cannot specify both -msep-data and %<-mid-shared-library%>");
+    error ("cannot specify both %<-msep-data%> and %<-mid-shared-library%>");
   /* ... internally, however, it's nearly the same.  */
   if (TARGET_SEP_DATA)
     target_flags |= MASK_ID_SHARED_LIBRARY | MASK_LEAF_ID_SHARED_LIBRARY;

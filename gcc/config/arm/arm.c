@@ -3518,7 +3518,7 @@ arm_option_override (void)
   if (flag_reorder_blocks_and_partition)
     {
       inform (input_location,
-	      "-freorder-blocks-and-partition not supported on this architecture");
+	      "%<-freorder-blocks-and-partition%> not supported on this architecture");
       flag_reorder_blocks_and_partition = 0;
       flag_reorder_blocks = 1;
     }

@@ -809,7 +809,7 @@ s390_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       if (((bflags & B_VX) || (bflags & B_VXE)) && !TARGET_VX)
 	{
 	  error ("builtin %qF requires %<-mvx%> "
-		 "(default with -march=z13 and higher).", fndecl);
+		 "(default with %<-march=z13%> and higher).", fndecl);
 	  return const0_rtx;
 	}
 
@@ -12653,7 +12653,7 @@ s390_function_profiler (FILE *file, int labelno)
 	output_asm_nops ("-mnop-mcount", /* brasl */ 3);
       else if (cfun->static_chain_decl)
 	warning (OPT_Wcannot_profile, "nested functions cannot be profiled "
-		 "with -mfentry on s390");
+		 "with %<-mfentry%> on s390");
       else
 	output_asm_insn ("brasl\t0,%4", op);
     }

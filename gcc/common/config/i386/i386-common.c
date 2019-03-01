@@ -1356,7 +1356,7 @@ ix86_handle_option (struct gcc_options *opts,
 
     case OPT_malign_functions_:
       warning_at (loc, 0,
-		  "-malign-functions is obsolete, use -falign-functions");
+		  "%<-malign-functions%> is obsolete, use %<-falign-functions%>");
       if (value > MAX_CODE_ALIGN)
 	error_at (loc, "%<-malign-functions=%d%> is not between 0 and %d",
 		  value, MAX_CODE_ALIGN);

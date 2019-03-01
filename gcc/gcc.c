@@ -8152,7 +8152,7 @@ driver::do_spec_on_infiles () const
 		{
 		  if (verbose_flag)
 		    inform (UNKNOWN_LOCATION,
-			    "recompiling with -fcompare-debug");
+			    "recompiling with %<-fcompare-debug%>");
 
 		  compare_debug = -compare_debug;
 		  n_switches = n_switches_debug_check[1];
@@ -8294,7 +8294,7 @@ driver::maybe_run_linker (const char *argv0) const
 					     false);
 	      if (!temp_spec)
 		fatal_error (input_location,
-			     "-fuse-linker-plugin, but %s not found",
+			     "%<-fuse-linker-plugin%>, but %s not found",
 			     LTOPLUGINSONAME);
 	      linker_plugin_file_spec = convert_white_space (temp_spec);
 	    }

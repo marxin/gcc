@@ -1927,13 +1927,13 @@ parse_sanitizer_options (const char *p, location_t loc, int scode,
 
 	  if (hint)
 	    error_at (loc,
-		      "unrecognized argument to -f%ssanitize%s= option: %q.*s;"
+		      "unrecognized argument to %<-f%ssanitize%s=%> option: %q.*s;"
 		      " did you mean %qs?",
 		      value ? "" : "no-",
 		      suffix, (int) len, p, hint);
 	  else
 	    error_at (loc,
-		      "unrecognized argument to -f%ssanitize%s= option: %q.*s",
+		      "unrecognized argument to %<-f%ssanitize%s=%> option: %q.*s",
 		      value ? "" : "no-",
 		      suffix, (int) len, p);
 	}

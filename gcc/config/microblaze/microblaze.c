@@ -1820,7 +1820,7 @@ microblaze_option_override (void)
     {
       if (TARGET_MULTIPLY_HIGH)
 	warning (0,
-		 "-mxl-multiply-high can be used only with -mcpu=v6.00.a or greater");
+		 "%<-mxl-multiply-high%> can be used only with %<-mcpu=v6.00.a%> or greater");
     }
 
   ver = MICROBLAZE_VERSION_COMPARE (microblaze_select_cpu, "v8.10.a");

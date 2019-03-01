@@ -3434,7 +3434,7 @@ match_record_decl (char *name)
             {
                 gfc_current_locus = old_loc;
                 gfc_error ("RECORD at %C is an extension, enable it with "
-                           "-fdec-structure");
+                           "%<-fdec-structure%>");
                 return MATCH_ERROR;
             }
           m = gfc_match (" %n/", name);

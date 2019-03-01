@@ -348,13 +348,13 @@ h8300_option_override (void)
 
   if (!TARGET_H8300S && TARGET_MAC)
     {
-      error ("%<-ms2600%> is used without -ms");
+      error ("%<-ms2600%> is used without %<-ms%>");
       target_flags |= MASK_H8300S_1;
     }
 
   if (TARGET_H8300 && TARGET_NORMAL_MODE)
     {
-      error ("%<-mn%> is used without -mh or -ms or %<-msx%>");
+      error ("%<-mn%> is used without %<-mh%> or %<-ms%> or %<-msx%>");
       target_flags ^= MASK_NORMAL_MODE;
     }
 
@@ -372,13 +372,13 @@ h8300_option_override (void)
 
  if ((!TARGET_H8300S  &&  TARGET_EXR) && (!TARGET_H8300SX && TARGET_EXR))
    {
-      error ("%<-mexr%> is used without -ms or %<-msx%>");
+      error ("%<-mexr%> is used without %<-ms%> or %<-msx%>");
       target_flags |= MASK_H8300S_1;
    }
 
  if ((!TARGET_H8300S  &&  TARGET_NEXR) && (!TARGET_H8300SX && TARGET_NEXR))
    {
-      warning (OPT_mno_exr, "%<-mn%>o-exr valid only with -ms or %<-msx%>    \
+      warning (OPT_mno_exr, "%<-mno-exr%> valid only with %<-ms%> or %<-msx%>    \
                - Option ignored!");
    }
 

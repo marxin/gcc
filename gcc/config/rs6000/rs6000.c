@@ -3992,7 +3992,7 @@ rs6000_option_override_internal (bool global_init_p)
       if (!TARGET_HARD_FLOAT)
 	{
 	  if (rs6000_isa_flags_explicit & OPTION_MASK_VSX)
-	    msg = N_("-mvsx requires hardware floating point");
+	    msg = N_("%<-mvsx%> requires hardware floating point");
 	  else
 	    {
 	      rs6000_isa_flags &= ~ OPTION_MASK_VSX;
@@ -4000,14 +4000,14 @@ rs6000_option_override_internal (bool global_init_p)
 	    }
 	}
       else if (TARGET_AVOID_XFORM > 0)
-	msg = N_("-mvsx needs indexed addressing");
+	msg = N_("%<-mvsx%> needs indexed addressing");
       else if (!TARGET_ALTIVEC && (rs6000_isa_flags_explicit
 				   & OPTION_MASK_ALTIVEC))
         {
 	  if (rs6000_isa_flags_explicit & OPTION_MASK_VSX)
-	    msg = N_("-mvsx and -mno-altivec are incompatible");
+	    msg = N_("%<-mvsx%> and %<-mno-altivec%> are incompatible");
 	  else
-	    msg = N_("-mno-altivec disables vsx");
+	    msg = N_("%<-mno-altivec%> disables vsx");
         }
 
       if (msg)
@@ -4133,10 +4133,10 @@ rs6000_option_override_internal (bool global_init_p)
   if ((TARGET_QUAD_MEMORY || TARGET_QUAD_MEMORY_ATOMIC) && !TARGET_POWERPC64)
     {
       if ((rs6000_isa_flags_explicit & OPTION_MASK_QUAD_MEMORY) != 0)
-	warning (0, N_("-mquad-memory requires 64-bit mode"));
+	warning (0, N_("%<-mquad-memory%> requires 64-bit mode"));
 
       if ((rs6000_isa_flags_explicit & OPTION_MASK_QUAD_MEMORY_ATOMIC) != 0)
-	warning (0, N_("-mquad-memory-atomic requires 64-bit mode"));
+	warning (0, N_("%<-mquad-memory-atomic%> requires 64-bit mode"));
 
       rs6000_isa_flags &= ~(OPTION_MASK_QUAD_MEMORY
 			    | OPTION_MASK_QUAD_MEMORY_ATOMIC);
@@ -4148,7 +4148,7 @@ rs6000_option_override_internal (bool global_init_p)
   if (TARGET_QUAD_MEMORY && !WORDS_BIG_ENDIAN)
     {
       if ((rs6000_isa_flags_explicit & OPTION_MASK_QUAD_MEMORY) != 0)
-	warning (0, N_("-mquad-memory is not available in little endian "
+	warning (0, N_("%<-mquad-memory%> is not available in little endian "
 		       "mode"));
 
       rs6000_isa_flags &= ~OPTION_MASK_QUAD_MEMORY;

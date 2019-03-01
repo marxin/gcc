@@ -1172,7 +1172,7 @@ arc_override_options (void)
 	      irq_range (opt->arg);
 	    else
 	      warning (OPT_mirq_ctrl_saved_,
-		       "option -mirq-ctrl-saved valid only for ARC v2 processors");
+		       "option %<-mirq-ctrl-saved%> valid only for ARC v2 processors");
 	    break;
 
 	  case OPT_mrgf_banked_regs_:
@@ -1180,7 +1180,7 @@ arc_override_options (void)
 	      parse_mrgf_banked_regs_option (opt->arg);
 	    else
 	      warning (OPT_mrgf_banked_regs_,
-		       "option -mrgf-banked-regs valid only for ARC v2 processors");
+		       "option %<-mrgf-banked-regs%> valid only for ARC v2 processors");
 	    break;
 
 	  default:

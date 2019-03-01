@@ -4684,7 +4684,7 @@ ix86_option_override_internal (bool main_args_p,
       if (!TARGET_64BIT_P (opts->x_ix86_isa_flags) && opts->x_flag_pic
 	  && opts->x_flag_fentry)
 	sorry ("%<-mfentry%> isn%'t supported for 32-bit in combination "
-	       "with -fpic");
+	       "with %<-fpic%>");
       else if (TARGET_SEH && !opts->x_flag_fentry)
 	sorry ("%<-mno-fentry%> isn%'t compatible with SEH");
     }
@@ -4815,12 +4815,12 @@ ix86_option_override_internal (bool main_args_p,
 
       if (!*str || *endp || errno)
 	error ("%qs is not a valid number "
-	       "in -mstack-protector-guard-offset=", str);
+	       "in %<-mstack-protector-guard-offset=%>", str);
 
       if (!IN_RANGE (offset, HOST_WIDE_INT_C (-0x80000000),
 		     HOST_WIDE_INT_C (0x7fffffff)))
 	error ("%qs is not a valid offset "
-	       "in -mstack-protector-guard-offset=", str);
+	       "in %<-mstack-protector-guard-offset=%>", str);
 
       opts->x_ix86_stack_protector_guard_offset = offset;
     }
@@ -4848,7 +4848,7 @@ ix86_option_override_internal (bool main_args_p,
 
       if (seg == ADDR_SPACE_GENERIC)
 	error ("%qs is not a valid base register "
-	       "in -mstack-protector-guard-reg=",
+	       "in %<-mstack-protector-guard-reg=%>",
 	       opts->x_ix86_stack_protector_guard_reg_str);
 
       opts->x_ix86_stack_protector_guard_reg = seg;
@@ -13327,7 +13327,7 @@ ix86_expand_prologue (void)
          prologue variant. If so sorry.  */
       if (crtl->profile && flag_fentry != 0)
         sorry ("ms_hook_prologue attribute isn%'t compatible "
-	       "with -mfentry for 32-bit");
+	       "with %<-mfentry%> for 32-bit");
 
       /* In ix86_asm_output_function_label we emitted:
 	 8b ff     movl.s %edi,%edi

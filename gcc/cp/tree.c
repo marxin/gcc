@@ -4003,7 +4003,7 @@ maybe_warn_parm_abi (tree t, location_t loc)
 
   auto_diagnostic_group d;
   if (warning_at (loc, OPT_Wabi, "the calling convention for %qT changes in "
-		  "-fabi-version=13 (GCC 8.2)", t))
+		  "%<-fabi-version=13%> (GCC 8.2)", t))
     inform (location_of (t), " because all of its copy and move "
 	    "constructors are deleted");
 }

@@ -554,7 +554,7 @@ pa_option_override (void)
   if (flag_reorder_blocks_and_partition)
     {
       inform (input_location,
-              "-freorder-blocks-and-partition does not work "
+              "%<-freorder-blocks-and-partition%> does not work "
               "on this architecture");
       flag_reorder_blocks_and_partition = 0;
       flag_reorder_blocks = 1;

@@ -8262,7 +8262,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	      pedwarn (DECL_SOURCE_LOCATION (cand->fn), 0,
 		       "  in call to %qD", cand->fn);
 	      pedwarn (input_location, 0,
-		       "  (you can disable this with -fno-deduce-init-list)");
+		       "  (you can disable this with %<-fno-deduce-init-list%>)");
 	    }
 	}
 

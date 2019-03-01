@@ -4143,11 +4143,11 @@ layout_nonempty_base_or_field (record_layout_info rli,
 	    {
 	      if (abi_version_at_least (9))
 		warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wabi,
-			    "alignment of %qD increased in -fabi-version=9 "
+			    "alignment of %qD increased in %<-fabi-version=9%> "
 			    "(GCC 5.2)", decl);
 	      else
 		warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wabi, "alignment "
-			    "of %qD will increase in -fabi-version=9", decl);
+			    "of %qD will increase in %<-fabi-version=9%>", decl);
 	    }
 	  break;
 	}

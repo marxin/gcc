@@ -3332,7 +3332,7 @@ cp_parser_diagnose_invalid_type_name (cp_parser *parser, tree id,
 	inform (location, "C++11 %<thread_local%> only available with "
 		"-std=c++11 or -std=gnu++11");
       else if (!flag_concepts && id == ridpointers[(int)RID_CONCEPT])
-	inform (location, "%<concept%> only available with -fconcepts");
+	inform (location, "%<concept%> only available with %<-fconcepts%>");
       else if (processing_template_decl && current_class_type
 	       && TYPE_BINFO (current_class_type))
 	{
@@ -4551,7 +4551,7 @@ cp_parser_userdef_numeric_literal (cp_parser *parser)
 		"GNU built-in suffix");
     }
   else if (!ext)
-    inform (token->location, "use -fext-numeric-literals "
+    inform (token->location, "use %<-fext-numeric-literals%> "
 	    "to enable more built-in suffixes");
 
   if (kind == DK_ERROR)
@@ -17652,7 +17652,7 @@ cp_parser_simple_type_specifier (cp_parser* parser,
 	  else if (!flag_concepts)
 	    pedwarn (token->location, 0,
 		     "use of %<auto%> in parameter declaration "
-		     "only available with -fconcepts");
+		     "only available with %<-fconcepts%>");
 	}
       else
 	type = make_auto ();
@@ -26554,7 +26554,7 @@ cp_parser_requires_clause_opt (cp_parser *parser)
 	  && tok->u.value == ridpointers[RID_REQUIRES])
 	{
 	  error_at (cp_lexer_peek_token (parser->lexer)->location,
-		    "%<requires%> only available with -fconcepts");
+		    "%<requires%> only available with %<-fconcepts%>");
 	  /* Parse and discard the requires-clause.  */
 	  cp_lexer_consume_token (parser->lexer);
 	  cp_parser_requires_clause (parser);
