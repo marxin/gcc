@@ -259,7 +259,7 @@ spu_option_override (void)
       else if (strcmp (&spu_arch_string[0], "celledp") == 0)
         spu_arch = PROCESSOR_CELLEDP;
       else
-        error ("bad value (%s) for %<-march=%> switch", spu_arch_string);
+	error ("bad value (%s) for %<-march=%> switch", spu_arch_string);
     }
 
   /* Determine processor to tune for.  */
@@ -270,7 +270,7 @@ spu_option_override (void)
       else if (strcmp (&spu_tune_string[0], "celledp") == 0)
         spu_tune = PROCESSOR_CELLEDP;
       else
-        error ("bad value (%s) for %<-mtune=%> switch", spu_tune_string);
+	error ("bad value (%s) for %<-mtune=%> switch", spu_tune_string);
     }
 
   /* Change defaults according to the processor architecture.  */

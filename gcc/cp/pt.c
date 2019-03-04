@@ -2616,8 +2616,8 @@ check_template_variable (tree decl)
     {
       if (cxx_dialect < cxx14)
         pedwarn (DECL_SOURCE_LOCATION (decl), 0,
-                 "variable templates only available with "
-                 "%<-std=c++14%> or %<-std=gnu++14%>");
+		 "variable templates only available with "
+		 "%<-std=c++14%> or %<-std=gnu++14%>");
 
       // Namespace-scope variable templates should have a template header.
       ++wanted;
@@ -10191,7 +10191,7 @@ push_tinst_level_loc (tree tldcl, tree targs, location_t loc)
       at_eof = 2;
       fatal_error (input_location,
 		   "template instantiation depth exceeds maximum of %d"
-                   " (use %<-ftemplate-depth=%> to increase the maximum)",
+		   " (use %<-ftemplate-depth=%> to increase the maximum)",
                    max_tinst_depth);
       return false;
     }
@@ -24727,9 +24727,9 @@ instantiate_pending_templates (int retries)
 
       fatal_error (input_location,
 		   "template instantiation depth exceeds maximum of %d"
-                   " instantiating %q+D, possibly from virtual table generation"
-                   " (use %<-ftemplate-depth=%> to increase the maximum)",
-                   max_tinst_depth, decl);
+		   " instantiating %q+D, possibly from virtual table generation"
+		   " (use %<-ftemplate-depth=%> to increase the maximum)",
+		   max_tinst_depth, decl);
       if (TREE_CODE (decl) == FUNCTION_DECL)
 	/* Pretend that we defined it.  */
 	DECL_INITIAL (decl) = error_mark_node;

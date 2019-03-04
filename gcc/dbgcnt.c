@@ -98,15 +98,15 @@ dbg_cnt_set_limit_by_name (const char *name, int low, int high)
 
   if (low < 0)
     {
-      error ("Lower limit %d of %<-fdbg-cnt=%s%> must be a non-negative number", low,
-	     name);
+      error ("Lower limit %d of %<-fdbg-cnt=%s%> must be a non-negative "
+	     "number", low, name);
       return false;
     }
 
   if (high < 0)
     {
-      error ("Upper limit %d of %<-fdbg-cnt=%s%> must be a non-negative number", high,
-	     name);
+      error ("Upper limit %d of %<-fdbg-cnt=%s%> must be a non-negative "
+	     "number", high, name);
       return false;
     }
 

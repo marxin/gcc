@@ -417,7 +417,8 @@ alpha_option_override (void)
       else if (! strcmp (alpha_tp_string, "i"))
 	alpha_tp = ALPHA_TP_INSN;
       else
-	error ("bad value %qs for %<-mtrap-precision%> switch", alpha_tp_string);
+	error ("bad value %qs for %<-mtrap-precision%> switch",
+	       alpha_tp_string);
     }
 
   if (alpha_fprm_string)
@@ -446,7 +447,8 @@ alpha_option_override (void)
       else if (strcmp (alpha_fptm_string, "sui") == 0)
 	alpha_fptm = ALPHA_FPTM_SUI;
       else
-	error ("bad value %qs for %<-mfp-trap-mode%> switch", alpha_fptm_string);
+	error ("bad value %qs for %<-mfp-trap-mode%> switch",
+	       alpha_fptm_string);
     }
 
   if (alpha_cpu_string)
@@ -567,7 +569,8 @@ alpha_option_override (void)
       }
     else
       {
-	warning (0, "bad value %qs for %<-mmemory-latency%>", alpha_mlat_string);
+	warning (0, "bad value %qs for %<-mmemory-latency%>",
+		 alpha_mlat_string);
 	lat = 3;
       }
 

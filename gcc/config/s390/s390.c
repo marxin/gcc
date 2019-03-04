@@ -14864,7 +14864,8 @@ s390_option_override_internal (struct gcc_options *opts,
 	    error ("hardware vector support not available on %s",
 		   processor_table[(int)opts->x_s390_arch].name);
 	  if (TARGET_SOFT_FLOAT_P (opts->x_target_flags))
-	    error ("hardware vector support not available with %<-msoft-float%>");
+	    error ("hardware vector support not available with "
+		   "%<-msoft-float%>");
 	}
     }
   else
@@ -14908,7 +14909,8 @@ s390_option_override_internal (struct gcc_options *opts,
     {
       if (TARGET_HARD_DFP_P (opts_set->x_target_flags)
 	  && TARGET_HARD_DFP_P (opts->x_target_flags))
-	error ("%<-mhard-dfp%> can%'t be used in conjunction with %<-msoft-float%>");
+	error ("%<-mhard-dfp%> can%'t be used in conjunction with "
+	       "%<-msoft-float%>");
 
       opts->x_target_flags &= ~MASK_HARD_DFP;
     }
@@ -14916,8 +14918,8 @@ s390_option_override_internal (struct gcc_options *opts,
   if (TARGET_BACKCHAIN_P (opts->x_target_flags)
       && TARGET_PACKED_STACK_P (opts->x_target_flags)
       && TARGET_HARD_FLOAT_P (opts->x_target_flags))
-    error ("%<-mbackchain%> %<-mpacked-stack%> %<-mhard-float%> are not supported "
-	   "in combination");
+    error ("%<-mbackchain%> %<-mpacked-stack%> %<-mhard-float%> are not "
+	   "supported in combination");
 
   if (opts->x_s390_stack_size)
     {
@@ -15077,7 +15079,8 @@ s390_option_override (void)
     flag_prefetch_loop_arrays = 1;
 
   if (!s390_pic_data_is_text_relative && !flag_pic)
-    error ("%<-mno-pic-data-is-text-relative%> cannot be used without %<-fpic%>/%<-fPIC%>");
+    error ("%<-mno-pic-data-is-text-relative%> cannot be used without "
+	   "%<-fpic%>/%<-fPIC%>");
 
   if (TARGET_TPF)
     {

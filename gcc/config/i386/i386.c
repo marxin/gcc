@@ -3553,8 +3553,8 @@ parse_mtune_ctrl_str (bool dump)
             }
         }
       if (i == X86_TUNE_LAST)
-        error ("unknown parameter to option %<-mtune-ctrl%>: %s",
-               clear ? curr_feature_string - 1 : curr_feature_string);
+	error ("unknown parameter to option %<-mtune-ctrl%>: %s",
+	       clear ? curr_feature_string - 1 : curr_feature_string);
       curr_feature_string = next_feature_string;
     }
   while (curr_feature_string);

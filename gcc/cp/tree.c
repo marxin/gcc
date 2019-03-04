@@ -3990,9 +3990,9 @@ maybe_warn_parm_abi (tree t, location_t loc)
       bool w;
       auto_diagnostic_group d;
       if (flag_abi_version > 12)
-	w = warning_at (loc, OPT_Wabi, "%<-fabi-version=13%> (GCC 8.2) fixes the "
-			"calling convention for %qT, which was accidentally "
-			"changed in 8.1", t);
+	w = warning_at (loc, OPT_Wabi, "%<-fabi-version=13%> (GCC 8.2) fixes "
+			"the calling convention for %qT, which was "
+			"accidentally changed in 8.1", t);
       else
 	w = warning_at (loc, OPT_Wabi, "%<-fabi-version=12%> (GCC 8.1) accident"
 			"ally changes the calling convention for %qT", t);

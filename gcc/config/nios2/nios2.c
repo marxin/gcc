@@ -1193,7 +1193,8 @@ nios2_custom_check_insns (void)
     for (i = 0; i < ARRAY_SIZE (nios2_fpu_insn); i++)
       if (N2FPU_ENABLED_P (i) && N2FPU_UNSAFE_P (i))
 	warning (0, "switch %<-mcustom-%s%> has no effect unless "
-		 "%<-funsafe-math-optimizations%> is specified", N2FPU_NAME (i));
+		 "%<-funsafe-math-optimizations%> is specified",
+		 N2FPU_NAME (i));
 
   /* Warn if the user is trying to use -mcustom-fmins et. al, that won't
      get used without -ffinite-math-only.  See fold_builtin_fmin_fmax ()

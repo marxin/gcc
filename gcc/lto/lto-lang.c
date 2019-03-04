@@ -898,7 +898,8 @@ lto_post_options (const char **pfilename ATTRIBUTE_UNUSED)
       lang_hooks.lto.append_data = lhd_append_data;
       lang_hooks.lto.end_section = lhd_end_section;
       if (flag_ltrans)
-	error ("%<-flinker-output=rel%> and %<-fltrans%> are mutually exclussive");
+	error ("%<-flinker-output=rel%> and %<-fltrans%> are mutually "
+	       "exclussive");
       break;
 
     case LTO_LINKER_OUTPUT_NOLTOREL: /* .o: incremental link producing asm  */

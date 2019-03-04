@@ -10890,7 +10890,8 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
 	    = lambda_specs.locations[ds_constexpr];
 	else
 	  error_at (lambda_specs.locations[ds_constexpr], "%<constexpr%> "
-		    "lambda only available with %<-std=c++17%> or %<-std=gnu++17%>");
+		    "lambda only available with %<-std=c++17%> or "
+		    "%<-std=gnu++17%>");
       }
 
     p = obstack_alloc (&declarator_obstack, 0);
@@ -19207,8 +19208,8 @@ cp_parser_namespace_definition (cp_parser* parser)
   
       if (!nested_definition_count && cxx_dialect < cxx17)
         pedwarn (input_location, OPT_Wpedantic,
-                 "nested namespace definitions only available with "
-                 "%<-std=c++17%> or %<-std=gnu++17%>");
+		 "nested namespace definitions only available with "
+		 "%<-std=c++17%> or %<-std=gnu++17%>");
 
       /* Nested namespace names can create new namespaces (unlike
 	 other qualified-ids).  */

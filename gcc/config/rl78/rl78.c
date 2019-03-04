@@ -390,8 +390,10 @@ rl78_option_override (void)
 	{
 	case MUL_UNINIT: rl78_mul_type = MUL_NONE; break;
 	case MUL_NONE:   break;
-	case MUL_G13:  	 error ("%<-mmul=g13%> cannot be used with %<-mcpu=g10%>"); break;
-	case MUL_G14:  	 error ("%<-mmul=g14%> cannot be used with %<-mcpu=g10%>"); break;
+	case MUL_G13:  	 error ("%<-mmul=g13%> cannot be used with "
+				"%<-mcpu=g10%>"); break;
+	case MUL_G14:  	 error ("%<-mmul=g14%> cannot be used with "
+				"%<-mcpu=g10%>"); break;
 	}
       break;
 
@@ -402,7 +404,8 @@ rl78_option_override (void)
 	case MUL_NONE:   break;
 	case MUL_G13:  	break;
 	  /* The S2 core does not have mul/div instructions.  */
-	case MUL_G14: 	error ("%<-mmul=g14%> cannot be used with %<-mcpu=g13%>"); break;
+	case MUL_G14: 	error ("%<-mmul=g14%> cannot be used with "
+			       "%<-mcpu=g13%>"); break;
 	}
       break;
 
@@ -414,7 +417,8 @@ rl78_option_override (void)
 	case MUL_G14:  	break;
 	/* The G14 core does not have the hardware multiply peripheral used by the
 	   G13 core, hence you cannot use G13 multipliy routines on G14 hardware.  */
-	case MUL_G13: 	error ("%<-mmul=g13%> cannot be used with %<-mcpu=g14%>"); break;
+	case MUL_G13: 	error ("%<-mmul=g13%> cannot be used with "
+			       "%<-mcpu=g14%>"); break;
 	}
       break;
     }

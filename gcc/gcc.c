@@ -8086,7 +8086,8 @@ driver::prepare_infiles ()
 
   if (!combine_inputs && have_c && have_o && lang_n_infiles > 1)
     fatal_error (input_location,
-		 "cannot specify %<-o%> with %<-c%>, %<-S%> or %<-E%> with multiple files");
+		 "cannot specify %<-o%> with %<-c%>, %<-S%> or %<-E%> "
+		 "with multiple files");
 
   /* No early exit needed from main; we can continue.  */
   return false;

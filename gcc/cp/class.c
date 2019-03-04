@@ -4147,7 +4147,8 @@ layout_nonempty_base_or_field (record_layout_info rli,
 			    "(GCC 5.2)", decl);
 	      else
 		warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wabi, "alignment "
-			    "of %qD will increase in %<-fabi-version=9%>", decl);
+			    "of %qD will increase in %<-fabi-version=9%>",
+			    decl);
 	    }
 	  break;
 	}

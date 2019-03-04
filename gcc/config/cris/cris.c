@@ -2651,7 +2651,8 @@ cris_option_override (void)
 
       /* Do some sanity checking.  */
       if (cris_max_stackframe < 0 || cris_max_stackframe > 0x20000000)
-	internal_error ("%<-max-stackframe=%d%> is not usable, not between 0 and %d",
+	internal_error ("%<-max-stackframe=%d%> is not usable, "
+			"not between 0 and %d",
 			cris_max_stackframe, 0x20000000);
     }
 
@@ -2679,8 +2680,8 @@ cris_option_override (void)
 	cris_cpu_version = 10;
 
       if (cris_cpu_version < 0 || cris_cpu_version > 32)
-	error ("unknown CRIS version specification in %<-march=%> or %<-mcpu=%> : %s",
-	       cris_cpu_str);
+	error ("unknown CRIS version specification in %<-march=%> or "
+	       "%<-mcpu=%> : %s", cris_cpu_str);
 
       /* Set the target flags.  */
       if (cris_cpu_version >= CRIS_CPU_ETRAX4)
@@ -2736,7 +2737,8 @@ cris_option_override (void)
 	 further errors.  */
       if (! TARGET_LINUX)
 	{
-	  error ("%<-fPIC%> and %<-fpic%> are not supported in this configuration");
+	  error ("%<-fPIC%> and %<-fpic%> are not supported "
+		 "in this configuration");
 	  flag_pic = 0;
 	}
 

@@ -4167,11 +4167,13 @@ maybe_warn_cpp0x (cpp0x_warn_str str)
 	break;
       case CPP0X_AUTO:
 	pedwarn (input_location, 0,
-		 "C++11 auto only available with %<-std=c++11%> or %<-std=gnu++11%>");
+		 "C++11 auto only available with %<-std=c++11%> or "
+		 "%<-std=gnu++11%>");
 	break;
       case CPP0X_SCOPED_ENUMS:
 	pedwarn (input_location, 0,
-		 "scoped enums only available with %<-std=c++11%> or %<-std=gnu++11%>");
+		 "scoped enums only available with %<-std=c++11%> or "
+		 "%<-std=gnu++11%>");
 	break;
       case CPP0X_DEFAULTED_DELETED:
 	pedwarn (input_location, 0,

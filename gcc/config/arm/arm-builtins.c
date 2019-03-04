@@ -2612,7 +2612,8 @@ arm_expand_builtin (tree exp,
     {
       fatal_error (input_location,
 		   "You must enable crypto instructions"
-		   " (e.g. include %<-mfloat-abi=softfp%> %<-mfpu=crypto-neon...%>)"
+		   " (e.g. include %<-mfloat-abi=softfp%> "
+		   "%<-mfpu=crypto-neon...%>)"
 		   " to use these intrinsics.");
       return const0_rtx;
     }

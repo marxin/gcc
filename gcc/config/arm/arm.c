@@ -3181,7 +3181,8 @@ arm_configure_build_target (struct arm_build_target *target,
 	  if (!bitmap_empty_p (isa_delta))
 	    {
 	      if (warn_compatible)
-		warning (0, "switch %<-mcpu=%s%> conflicts with %<-march=%s%> switch",
+		warning (0, "switch %<-mcpu=%s%> conflicts "
+			 "with %<-march=%s%> switch",
 			 arm_selected_cpu->common.name,
 			 arm_selected_arch->common.name);
 	      /* -march wins for code generation.
@@ -3406,7 +3407,8 @@ arm_option_override (void)
 
   if (TARGET_APCS_STACK && !TARGET_APCS_FRAME)
     {
-      warning (0, "%<-mapcs-stack-check%> incompatible with %<-mno-apcs-frame%>");
+      warning (0, "%<-mapcs-stack-check%> incompatible with "
+	       "%<-mno-apcs-frame%>");
       target_flags |= MASK_APCS_FRAME;
     }
 
@@ -3518,7 +3520,8 @@ arm_option_override (void)
   if (flag_reorder_blocks_and_partition)
     {
       inform (input_location,
-	      "%<-freorder-blocks-and-partition%> not supported on this architecture");
+	      "%<-freorder-blocks-and-partition%> not supported "
+	      "on this architecture");
       flag_reorder_blocks_and_partition = 0;
       flag_reorder_blocks = 1;
     }
@@ -7039,8 +7042,8 @@ arm_handle_cmse_nonsecure_entry (tree *node, tree name,
   if (!use_cmse)
     {
       *no_add_attrs = true;
-      warning (OPT_Wattributes, "%qE attribute ignored without %<-mcmse%> option.",
-	       name);
+      warning (OPT_Wattributes, "%qE attribute ignored without %<-mcmse%> "
+	       "option.", name);
       return NULL_TREE;
     }
 
@@ -7091,8 +7094,8 @@ arm_handle_cmse_nonsecure_call (tree *node, tree name,
   if (!use_cmse)
     {
       *no_add_attrs = true;
-      warning (OPT_Wattributes, "%qE attribute ignored without %<-mcmse%> option.",
-	       name);
+      warning (OPT_Wattributes, "%qE attribute ignored without %<-mcmse%> "
+	       "option.", name);
       return NULL_TREE;
     }
 

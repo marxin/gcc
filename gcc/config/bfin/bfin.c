@@ -2379,16 +2379,19 @@ bfin_option_override (void)
 
 #ifdef SUBTARGET_FDPIC_NOT_SUPPORTED
   if (TARGET_FDPIC)
-    error ("%<-mfdpic%> is not supported, please use a bfin-linux-uclibc target");
+    error ("%<-mfdpic%> is not supported, please use a bfin-linux-uclibc "
+	   "target");
 #endif
 
   /* Library identification */
   if (global_options_set.x_bfin_library_id && ! TARGET_ID_SHARED_LIBRARY)
-    error ("%<-mshared-library-id=%> specified without %<-mid-shared-library%>");
+    error ("%<-mshared-library-id=%> specified without "
+	   "%<-mid-shared-library%>");
 
   if (stack_limit_rtx && TARGET_FDPIC)
     {
-      warning (0, "%<-fstack-limit-%> options are ignored with %<-mfdpic%>; use %<-mstack-check-l1%>");
+      warning (0, "%<-fstack-limit-%> options are ignored with %<-mfdpic%>; "
+	       "use %<-mstack-check-l1%>");
       stack_limit_rtx = NULL_RTX;
     }
 

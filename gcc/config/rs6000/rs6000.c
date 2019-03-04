@@ -13418,7 +13418,8 @@ rs6000_expand_mtfsb_builtin (enum insn_code icode, tree exp)
 
   if (rs6000_isa_flags & OPTION_MASK_SOFT_FLOAT)
     {
-      error ("__builtin_mtfsb0 and __builtin_mtfsb1 not supported with %<-msoft-float%>");
+      error ("__builtin_mtfsb0 and __builtin_mtfsb1 not supported with "
+	     "%<-msoft-float%>");
       return const0_rtx;
     }
 
@@ -15236,7 +15237,8 @@ rs6000_invalid_builtin (enum rs6000_builtins fncode)
     error ("builtin function %qs requires ISA 3.0 IEEE 128-bit floating point",
 	   name);
   else if ((fnmask & RS6000_BTM_FLOAT128) != 0)
-    error ("builtin function %qs requires the %qs option", name, "%<-mfloat128%>");
+    error ("builtin function %qs requires the %qs option", name,
+	   "%<-mfloat128%>");
   else if ((fnmask & (RS6000_BTM_POPCNTD | RS6000_BTM_POWERPC64))
 	   == (RS6000_BTM_POPCNTD | RS6000_BTM_POWERPC64))
     error ("builtin function %qs requires the %qs (or newer), and "
@@ -29328,7 +29330,8 @@ rs6000_expand_split_stack_prologue (void)
   allocate = info->total_size;
   if (allocate > (unsigned HOST_WIDE_INT) 1 << 31)
     {
-      sorry ("Stack frame larger than 2G is not supported for %<-fsplit-stack%>");
+      sorry ("Stack frame larger than 2G is not supported for "
+	     "%<-fsplit-stack%>");
       return;
     }
   if (morestack_ref == NULL_RTX)

@@ -797,26 +797,31 @@ msp430_option_override (void)
 	    if (msp430_warn_mcu)
 	      {
 		if (target_cpu&& msp430x != xisa)
-		  warning (0, "MCU '%s' supports %s ISA but %<-mcpu%> option is set to %s",
+		  warning (0, "MCU '%s' supports %s ISA but %<-mcpu%> option "
+			   "is set to %s",
 			   target_mcu, xisa ? "430X" : "430", msp430x ? "430X" : "430");
 
 		if (msp430_mcu_data[i].hwmpy == 0
 		    && msp430_hwmult_type != MSP430_HWMULT_AUTO
 		    && msp430_hwmult_type != MSP430_HWMULT_NONE)
-		  warning (0, "MCU '%s' does not have hardware multiply support, but %<-mhwmult%> is set to %s",
+		  warning (0, "MCU '%s' does not have hardware multiply "
+			   "support, but %<-mhwmult%> is set to %s",
 			   target_mcu,
 			   msp430_hwmult_type == MSP430_HWMULT_SMALL ? "16-bit"
 			   : msp430_hwmult_type == MSP430_HWMULT_LARGE ? "32-bit" : "f5series");
 		else if (msp430_hwmult_type == MSP430_HWMULT_SMALL
 		    && msp430_mcu_data[i].hwmpy != 1
 		    && msp430_mcu_data[i].hwmpy != 2 )
-		  warning (0, "MCU '%s' supports %s hardware multiply, but %<-mhwmult%> is set to 16-bit",
+		  warning (0, "MCU '%s' supports %s hardware multiply, "
+			   "but %<-mhwmult%> is set to 16-bit",
 			   target_mcu, hwmult_name (msp430_mcu_data[i].hwmpy));
 		else if (msp430_hwmult_type == MSP430_HWMULT_LARGE && msp430_mcu_data[i].hwmpy != 4)
-		  warning (0, "MCU '%s' supports %s hardware multiply, but %<-mhwmult%> is set to 32-bit",
+		  warning (0, "MCU '%s' supports %s hardware multiply, "
+			   "but %<-mhwmult%> is set to 32-bit",
 			   target_mcu, hwmult_name (msp430_mcu_data[i].hwmpy));
 		else if (msp430_hwmult_type == MSP430_HWMULT_F5SERIES && msp430_mcu_data[i].hwmpy != 8)
-		  warning (0, "MCU '%s' supports %s hardware multiply, but %<-mhwmult%> is set to f5series",
+		  warning (0, "MCU '%s' supports %s hardware multiply, "
+			   "but %<-mhwmult%> is set to f5series",
 			   target_mcu, hwmult_name (msp430_mcu_data[i].hwmpy));
 	      }
 
@@ -834,8 +839,8 @@ msp430_option_override (void)
 		    warning (0,
 			     "Unrecognized MCU name '%s', assuming that it is "
 			     "just a MSP430 with no hardware multiply.\n"
-			     "Use the %<-mcpu%> and %<-mhwmult%> options to set "
-			     "these explicitly.",
+			     "Use the %<-mcpu%> and %<-mhwmult%> options to "
+			     "set these explicitly.",
 			     target_mcu);
 		  else
 		    warning (0,
@@ -852,8 +857,8 @@ msp430_option_override (void)
 	      if (msp430_warn_mcu)
 		warning (0,
 			 "Unrecognized MCU name '%s', assuming that it just "
-			 "supports the MSP430 ISA.\nUse the %<-mcpu%> option to "
-			 "set the ISA explicitly.",
+			 "supports the MSP430 ISA.\nUse the %<-mcpu%> option "
+			 "to set the ISA explicitly.",
 			 target_mcu);
 
 	      msp430x = false;

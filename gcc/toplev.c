@@ -1367,8 +1367,8 @@ process_options (void)
       || flag_graphite_identity
       || flag_loop_parallelize_all)
     sorry ("Graphite loop optimizations cannot be used (isl is not available) "
-	   "(%<-fgraphite%>, %<-fgraphite-identity%>, %<-floop-nest-optimize%>, "
-	   "%<-floop-parallelize-all%>)");
+	   "(%<-fgraphite%>, %<-fgraphite-identity%>, "
+	   "%<-floop-nest-optimize%>, %<-floop-parallelize-all%>)");
 #endif
 
   if (flag_cf_protection != CF_NONE
@@ -1619,7 +1619,8 @@ process_options (void)
   else if (debug_variable_location_views == -1 && dwarf_version != 5)
     {
       warning_at (UNKNOWN_LOCATION, 0,
-		  "without %<-gdwarf-5%>, %<-gvariable-location-views=incompat5%> "
+		  "without %<-gdwarf-5%>, "
+		  "%<-gvariable-location-views=incompat5%> "
 		  "is equivalent to %<-gvariable-location-views%>");
       debug_variable_location_views = 1;
     }

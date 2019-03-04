@@ -326,8 +326,8 @@ riscv_subset_list::parse_std_ext (const char *p)
 
       if (m_xlen > 32)
 	{
-	  error_at (m_loc, "%<-march=%s%>: rv%de is not a valid base ISA", m_arch,
-		    m_xlen);
+	  error_at (m_loc, "%<-march=%s%>: rv%de is not a valid base ISA",
+		    m_arch, m_xlen);
 	  return NULL;
 	}
       break;
@@ -348,8 +348,8 @@ riscv_subset_list::parse_std_ext (const char *p)
       break;
 
     default:
-      error_at (m_loc, "%<-march=%s%>: first ISA subset must be `e', `i' or `g'",
-		m_arch);
+      error_at (m_loc, "%<-march=%s%>: first ISA subset must be `e', "
+		"`i' or `g'", m_arch);
       return NULL;
     }
 
@@ -379,8 +379,8 @@ riscv_subset_list::parse_std_ext (const char *p)
 		      m_arch, *p);
 	  else
 	    error_at (m_loc,
-		      "%<-march=%s%>: ISA string is not in canonical order. `%c'",
-		      m_arch, *p);
+		      "%<-march=%s%>: ISA string is not in canonical order. "
+		      "`%c'", m_arch, *p);
 	  return NULL;
 	}
 

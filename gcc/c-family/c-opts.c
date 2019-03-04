@@ -327,7 +327,8 @@ c_common_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 	    error ("-I- specified twice");
 	  quote_chain_split = true;
 	  split_quote_chain ();
-	  inform (input_location, "obsolete option %<-I-%> used, please use %<-iquote%> instead");
+	  inform (input_location, "obsolete option %<-I-%> used, "
+		  "please use %<-iquote%> instead");
 	}
       break;
 
@@ -1304,7 +1305,8 @@ sanitize_cpp_opts (void)
   /* If we don't know what style of dependencies to output, complain
      if any other dependency switches have been given.  */
   if (deps_seen && cpp_opts->deps.style == DEPS_NONE)
-    error ("to generate dependencies you must specify either %<-M%> or %<-MM%>");
+    error ("to generate dependencies you must specify either %<-M%> "
+	   "or %<-MM%>");
 
   /* -dM and dependencies suppress normal output; do it here so that
      the last -d[MDN] switch overrides earlier ones.  */
@@ -1360,7 +1362,8 @@ sanitize_cpp_opts (void)
   if (cpp_opts->directives_only)
     {
       if (cpp_warn_unused_macros)
-	error ("%<-fdirectives-only%> is incompatible with %<-Wunused-macros%>");
+	error ("%<-fdirectives-only%> is incompatible "
+	       "with %<-Wunused-macros%>");
       if (cpp_opts->traditional)
 	error ("%<-fdirectives-only%> is incompatible with %<-traditional%>");
     }
