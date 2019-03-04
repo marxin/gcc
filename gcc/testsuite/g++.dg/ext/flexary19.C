@@ -1,5 +1,5 @@
 // { dg-do compile }
-// { dg-additional-options "-Wpedantic -Wno-error=pedantic" }
+// { dg-options "-Wpedantic" }
 
 // Verify that flexible array members are recognized as either valid
 // or invalid in anonymous structs (a G++ extension) and C++ anonymous

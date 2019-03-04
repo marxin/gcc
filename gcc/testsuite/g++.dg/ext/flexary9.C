@@ -1,5 +1,5 @@
 // { dg-do compile }
-// { dg-options "-Wpedantic -Wno-error=pedantic" }
+// { dg-options "-Wpedantic" }
 
 #include "flexary.h"
 

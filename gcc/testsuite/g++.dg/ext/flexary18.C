@@ -1,6 +1,6 @@
 // PR c++/71912 - [6/7 regression] flexible array in struct in union rejected
 // { dg-do compile }
-// { dg-additional-options "-Wpedantic -Wno-error=pedantic" }
+// { dg-options "-Wpedantic" }
 
 #if __cplusplus
 

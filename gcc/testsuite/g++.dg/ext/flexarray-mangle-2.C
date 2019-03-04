@@ -1,6 +1,6 @@
 // PR c++/69277 - [6 Regression] ICE mangling a flexible array member
 // { dg-do compile { target c++11 } }
-// { dg-additional-options "-Wno-error=pedantic" }
+// { dg-options "-Wpedantic" }
 
 struct A {
   int n;

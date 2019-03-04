@@ -1,7 +1,7 @@
 // PR c++/68613 - initializer-string for array of chars is too long error
 // on flexible array member
 // { dg-do compile }
-// { dg-options "-Wpedantic -Wno-error=pedantic" }
+// { dg-options "-Wpedantic" }
 
 struct FlexChar {
     int n;

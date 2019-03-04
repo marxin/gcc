@@ -1,7 +1,7 @@
 // PR c++/71147 - [6 Regression] Flexible array member wrongly rejected
 //   in template
 // { dg-do compile }
-// { dg-options "-Wpedantic -Wno-error=pedantic" }
+// { dg-options "-Wpedantic" }
 
 template <typename>
 struct container
