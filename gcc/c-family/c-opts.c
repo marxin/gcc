@@ -1360,9 +1360,9 @@ sanitize_cpp_opts (void)
   if (cpp_opts->directives_only)
     {
       if (cpp_warn_unused_macros)
-	error ("%<-fdirectives-only%> is incompatible with %<-Wunused%>_macros");
+	error ("%<-fdirectives-only%> is incompatible with %<-Wunused-macros%>");
       if (cpp_opts->traditional)
-	error ("%<-fdirectives-only%> is incompatible with -traditional");
+	error ("%<-fdirectives-only%> is incompatible with %<-traditional%>");
     }
 }
 
