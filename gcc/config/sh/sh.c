@@ -951,7 +951,7 @@ sh_option_override (void)
       && flag_omit_frame_pointer && !TARGET_ACCUMULATE_OUTGOING_ARGS)
     {
       warning (0, "unwind tables currently require either a frame pointer "
-	       "or -maccumulate-outgoing-args for correctness");
+	       "or %<-maccumulate-outgoing-args%> for correctness");
       TARGET_ACCUMULATE_OUTGOING_ARGS = 1;
     }
 

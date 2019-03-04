@@ -802,8 +802,8 @@ s390_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       bflags = bflags_for_builtin (fcode);
       if ((bflags & B_HTM) && !TARGET_HTM)
 	{
-	  error ("builtin %qF is not supported without -mhtm "
-		 "(default with -march=zEC12 and higher).", fndecl);
+	  error ("builtin %qF is not supported without %<-mhtm%> "
+		 "(default with %<-march=zEC12%> and higher).", fndecl);
 	  return const0_rtx;
 	}
       if (((bflags & B_VX) || (bflags & B_VXE)) && !TARGET_VX)
@@ -14916,7 +14916,7 @@ s390_option_override_internal (struct gcc_options *opts,
   if (TARGET_BACKCHAIN_P (opts->x_target_flags)
       && TARGET_PACKED_STACK_P (opts->x_target_flags)
       && TARGET_HARD_FLOAT_P (opts->x_target_flags))
-    error ("-mbackchain -mpacked-stack -mhard-float are not supported "
+    error ("%<-mbackchain%> %<-mpacked-stack%> %<-mhard-float%> are not supported "
 	   "in combination");
 
   if (opts->x_s390_stack_size)

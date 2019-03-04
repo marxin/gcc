@@ -11454,8 +11454,8 @@ aarch64_override_options_internal (struct gcc_options *opts)
   if (aarch64_stack_protector_guard == SSP_GLOBAL
       && opts->x_aarch64_stack_protector_guard_offset_str)
     {
-      error ("incompatible options -mstack-protector-guard=global and"
-	     "-mstack-protector-guard-offset=%qs",
+      error ("incompatible options %<-mstack-protector-guard=global%> and"
+	     "%<-mstack-protector-guard-offset=%qs%>",
 	     aarch64_stack_protector_guard_offset_str);
     }
 
@@ -11463,9 +11463,9 @@ aarch64_override_options_internal (struct gcc_options *opts)
       && !(opts->x_aarch64_stack_protector_guard_offset_str
 	   && opts->x_aarch64_stack_protector_guard_reg_str))
     {
-      error ("both -mstack-protector-guard-offset and "
-	     "-mstack-protector-guard-reg must be used "
-	     "with -mstack-protector-guard=sysreg");
+      error ("both %<-mstack-protector-guard-offset%> and "
+	     "%<-mstack-protector-guard-reg%> must be used "
+	     "with %<-mstack-protector-guard=sysreg%>");
     }
 
   if (opts->x_aarch64_stack_protector_guard_reg_str)
@@ -11482,7 +11482,7 @@ aarch64_override_options_internal (struct gcc_options *opts)
       long offs = strtol (aarch64_stack_protector_guard_offset_str, &end, 0);
       if (!*str || *end || errno)
 	error ("%qs is not a valid offset in %qs", str,
-	       "-mstack-protector-guard-offset=");
+	       "%<-mstack-protector-guard-offset=%>");
       aarch64_stack_protector_guard_offset = offs;
     }
 

@@ -3075,7 +3075,7 @@ execute (void)
     if (arg && strcmp (arg, "|") == 0)
       {				/* each command.  */
 #if defined (__MSDOS__) || defined (OS2) || defined (VMS)
-	fatal_error (input_location, "-pipe not supported");
+	fatal_error (input_location, "%<-pipe%> not supported");
 #endif
 	argbuf[i] = 0; /* Termination of
 						     command args.  */
@@ -4148,7 +4148,7 @@ driver_handle_option (struct gcc_options *opts,
 	       || strcmp (arg, "object") == 0)
 	save_temps_flag = SAVE_TEMPS_OBJ;
       else
-	fatal_error (input_location, "%qs is an unknown -save-temps option",
+	fatal_error (input_location, "%qs is an unknown %<-save-temps%> option",
 		     decoded->orig_option_with_args_text);
       break;
 
@@ -4651,7 +4651,7 @@ process_command (unsigned int decoded_options_count,
     {
       /* -save-temps overrides -pipe, so that temp files are produced */
       if (save_temps_flag)
-	warning (0, "-pipe ignored because -save-temps specified");
+	warning (0, "%<-pipe%> ignored because %<-save-temps%> specified");
       use_pipes = 0;
     }
 
@@ -8086,7 +8086,7 @@ driver::prepare_infiles ()
 
   if (!combine_inputs && have_c && have_o && lang_n_infiles > 1)
     fatal_error (input_location,
-		 "cannot specify -o with -c, -S or -E with multiple files");
+		 "cannot specify %<-o%> with %<-c%>, %<-S%> or %<-E%> with multiple files");
 
   /* No early exit needed from main; we can continue.  */
   return false;

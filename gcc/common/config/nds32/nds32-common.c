@@ -67,7 +67,7 @@ nds32_handle_option (struct gcc_options *opts ATTRIBUTE_UNUSED,
       /* Check valid value: 4 8 16 32 64 128 256 512.  */
       if (exact_log2 (value) < 2 || exact_log2 (value) > 9)
 	{
-	  error_at (loc, "for the option -mcache-block-size=X, the valid X "
+	  error_at (loc, "for the option %<-mcache-block-size=X%>, the valid X "
 			 "must be: 4, 8, 16, 32, 64, 128, 256, or 512");
 	  return false;
 	}

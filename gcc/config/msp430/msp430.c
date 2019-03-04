@@ -834,13 +834,13 @@ msp430_option_override (void)
 		    warning (0,
 			     "Unrecognized MCU name '%s', assuming that it is "
 			     "just a MSP430 with no hardware multiply.\n"
-			     "Use the -mcpu and -mhwmult options to set "
+			     "Use the %<-mcpu%> and %<-mhwmult%> options to set "
 			     "these explicitly.",
 			     target_mcu);
 		  else
 		    warning (0,
 			     "Unrecognized MCU name '%s', assuming that it "
-			     "has no hardware multiply.\nUse the -mhwmult "
+			     "has no hardware multiply.\nUse the %<-mhwmult%> "
 			     "option to set this explicitly.",
 			     target_mcu);
 		}
@@ -852,7 +852,7 @@ msp430_option_override (void)
 	      if (msp430_warn_mcu)
 		warning (0,
 			 "Unrecognized MCU name '%s', assuming that it just "
-			 "supports the MSP430 ISA.\nUse the -mcpu option to "
+			 "supports the MSP430 ISA.\nUse the %<-mcpu%> option to "
 			 "set the ISA explicitly.",
 			 target_mcu);
 

@@ -95,7 +95,7 @@ extern int dot_symbols;
 	    {							\
 	      rs6000_current_abi = ABI_ELFv2;			\
 	      if (dot_symbols)					\
-		error ("-mcall-aixdesc incompatible with -mabi=elfv2"); \
+		error ("%<-mcall-aixdesc%> incompatible with %<-mabi=elfv2%>"); \
 	    }							\
 	  if (rs6000_isa_flags & OPTION_MASK_EABI)		\
 	    {							\

@@ -3202,7 +3202,7 @@ darwin_override_options (void)
 	       && !global_options_set.x_flag_asynchronous_unwind_tables)))
     {
       inform (input_location,
-	      "-freorder-blocks-and-partition does not work with exceptions "
+	      "%<-freorder-blocks-and-partition%> does not work with exceptions "
 	      "on this architecture");
       flag_reorder_blocks_and_partition = 0;
       flag_reorder_blocks = 1;

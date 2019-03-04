@@ -8882,7 +8882,7 @@ arm_tls_referenced_p (rtx x)
 	     currently implement these if a literal pool is disabled.  */
 	  if (arm_disable_literal_pool)
 	    sorry ("accessing thread-local storage is not currently supported "
-		   "with -mpure-code or -mslow-flash-data");
+		   "with %<-mpure-code%> or %<-mslow-flash-data%>");
 
 	  return true;
 	}

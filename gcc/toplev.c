@@ -1367,8 +1367,8 @@ process_options (void)
       || flag_graphite_identity
       || flag_loop_parallelize_all)
     sorry ("Graphite loop optimizations cannot be used (isl is not available) "
-	   "(-fgraphite, -fgraphite-identity, -floop-nest-optimize, "
-	   "-floop-parallelize-all)");
+	   "(%<-fgraphite%>, %<-fgraphite-identity%>, %<-floop-nest-optimize%>, "
+	   "%<-floop-parallelize-all%>)");
 #endif
 
   if (flag_cf_protection != CF_NONE
@@ -1619,8 +1619,8 @@ process_options (void)
   else if (debug_variable_location_views == -1 && dwarf_version != 5)
     {
       warning_at (UNKNOWN_LOCATION, 0,
-		  "without -gdwarf-5, -gvariable-location-views=incompat5 "
-		  "is equivalent to -gvariable-location-views");
+		  "without %<-gdwarf-5%>, %<-gvariable-location-views=incompat5%> "
+		  "is equivalent to %<-gvariable-location-views%>");
       debug_variable_location_views = 1;
     }
 
@@ -1634,8 +1634,8 @@ process_options (void)
 	   && !debug_variable_location_views)
     {
       warning_at (UNKNOWN_LOCATION, 0,
-		  "-ginternal-reset-location-views is forced disabled "
-		  "without -gvariable-location-views");
+		  "%<-ginternal-reset-location-views%> is forced disabled "
+		  "without %<-gvariable-location-views%>");
       debug_internal_reset_location_views = 0;
     }
 
@@ -1644,8 +1644,8 @@ process_options (void)
   else if (debug_inline_points && !debug_nonbind_markers_p)
     {
       warning_at (UNKNOWN_LOCATION, 0,
-		  "-ginline-points is forced disabled without "
-		  "-gstatement-frontiers");
+		  "%<-ginline-points%> is forced disabled without "
+		  "%<-gstatement-frontiers%>");
       debug_inline_points = 0;
     }
 
@@ -1703,7 +1703,7 @@ process_options (void)
   if (flag_prefetch_loop_arrays > 0 && optimize_size)
     {
       warning_at (UNKNOWN_LOCATION, 0,
-		  "%<-fprefetch-loop-arrays%> is not supported with -Os");
+		  "%<-fprefetch-loop-arrays%> is not supported with %<-Os%>");
       flag_prefetch_loop_arrays = 0;
     }
 
@@ -2255,7 +2255,7 @@ toplev::run_self_tests ()
 {
   if (no_backend)
     {
-      error_at (UNKNOWN_LOCATION, "self-tests incompatible with -E");
+      error_at (UNKNOWN_LOCATION, "self-tests incompatible with %<-E%>");
       return;
     }
 #if CHECKING_P

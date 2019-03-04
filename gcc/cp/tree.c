@@ -3994,7 +3994,7 @@ maybe_warn_parm_abi (tree t, location_t loc)
 			"calling convention for %qT, which was accidentally "
 			"changed in 8.1", t);
       else
-	w = warning_at (loc, OPT_Wabi, "-fabi-version=12 (GCC 8.1) accident"
+	w = warning_at (loc, OPT_Wabi, "%<-fabi-version=12%> (GCC 8.1) accident"
 			"ally changes the calling convention for %qT", t);
       if (w)
 	inform (location_of (t), " declared here");

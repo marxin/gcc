@@ -3798,7 +3798,7 @@ tree_inlinable_function_p (tree fn)
     {
       if (do_warning)
         warning (OPT_Winline, "function %q+F can never be inlined because it "
-                 "is suppressed using -fno-inline", fn);
+                 "is suppressed using %<-fno-inline%>", fn);
       inlinable = false;
     }
 

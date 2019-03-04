@@ -4387,8 +4387,8 @@ riscv_option_override (void)
     riscv_emit_attribute_p = 0;
 
   if (riscv_emit_attribute_p)
-    error ("-mriscv-attribute RISC-V ELF attribute requires GNU as 2.32"
-	   " [-mriscv-attribute]");
+    error ("%<-mriscv-attribute%> RISC-V ELF attribute requires GNU as 2.32"
+	   " [%<-mriscv-attribute%>]");
 #endif
 }
 

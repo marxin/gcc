@@ -2679,7 +2679,7 @@ common_handle_option (struct gcc_options *opts,
         {
           error_at (loc, "%<-gdwarf%s%> is ambiguous; "
                     "use %<-gdwarf-%s%> for DWARF version "
-                    "or %<-gdwarf -g%s%> for debug level", arg, arg, arg);
+                    "or %<-gdwarf%> %<-g%s%> for debug level", arg, arg, arg);
           break;
         }
       else

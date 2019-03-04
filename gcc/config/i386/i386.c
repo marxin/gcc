@@ -29770,7 +29770,7 @@ ix86_warn_parameter_passing_abi (cumulative_args_t cum_v, tree type)
     return;
 
   warning (OPT_Wabi, "empty class %qT parameter passing ABI "
-	   "changes in -fabi-version=12 (GCC 8)", type);
+	   "changes in %<-fabi-version=12%> (GCC 8)", type);
 
   /* Only warn once.  */
   cum->warn_empty = false;

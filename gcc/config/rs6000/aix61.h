@@ -37,14 +37,14 @@ do {									\
     }									\
   if (TARGET_POWERPC64 && ! TARGET_64BIT)				\
     {									\
-      error ("-maix64 required: 64-bit computation with 32-bit addressing not yet supported"); \
+      error ("%<-maix64%> required: 64-bit computation with 32-bit addressing not yet supported"); \
     }									\
   if ((rs6000_isa_flags_explicit					\
        & OPTION_MASK_MINIMAL_TOC) != 0)					\
     {									\
       if (global_options_set.x_rs6000_current_cmodel			\
 	  && rs6000_current_cmodel != CMODEL_SMALL)			\
-	error ("-mcmodel incompatible with other toc options"); 	\
+	error ("%<-mcmodel%> incompatible with other toc options"); 	\
       SET_CMODEL (CMODEL_SMALL);					\
     }									\
   if (rs6000_current_cmodel != CMODEL_SMALL)				\
