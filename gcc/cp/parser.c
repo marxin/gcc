@@ -6069,7 +6069,7 @@ cp_parser_unqualified_id (cp_parser* parser,
 	    if (cxx_dialect < cxx14)
 	      pedwarn (loc, 0,
 		       "%<~auto%> only available with "
-		       "-std=c++14 or -std=gnu++14");
+		       "%<-std=c++14%> or %<-std=gnu++14%>");
 	    cp_lexer_consume_token (parser->lexer);
 	    return cp_expr (build_nt (BIT_NOT_EXPR, make_auto (), loc));
 	  }
@@ -8003,7 +8003,7 @@ cp_parser_pseudo_destructor_name (cp_parser* parser,
       if (cxx_dialect < cxx14)
 	pedwarn (input_location, 0,
 		 "%<~auto%> only available with "
-		 "-std=c++14 or -std=gnu++14");
+		 "%<-std=c++14%> or %<-std=gnu++14%>");
       cp_lexer_consume_token (parser->lexer);
       cp_lexer_consume_token (parser->lexer);
       *scope = NULL_TREE;
@@ -22606,7 +22606,7 @@ cp_parser_ctor_initializer_opt_and_function_body (cp_parser *parser,
       else
 	pedwarn (input_location, 0,
 		 "function-try-block body of %<constexpr%> function only "
-		 "available with %<-std=c++2a%> or -std=gnu++2a");
+		 "available with %<-std=c++2a%> or %<-std=gnu++2a%>");
     }
 
   /* Begin the function body.  */
