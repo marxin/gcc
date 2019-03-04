@@ -2593,9 +2593,9 @@ valid_psw_flag (rtx op, const char *which)
 	return 1;
       }
 
-  error ("__builtin_rx_%s takes 'C', 'Z', 'S', 'O', 'I', or 'U'", which);
+  error ("%<__builtin_rx_%s%> takes 'C', 'Z', 'S', 'O', 'I', or 'U'", which);
   if (!mvtc_inform_done)
-    error ("use __builtin_rx_mvtc (0, ... ) to write arbitrary values to PSW");
+    error ("use %<__builtin_rx_mvtc%> (0, ... ) to write arbitrary values to PSW");
   mvtc_inform_done = 1;
 
   return 0;

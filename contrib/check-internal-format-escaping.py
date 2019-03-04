@@ -44,6 +44,8 @@ for i, l in enumerate(lines):
         j = 0
         while not lines[i + j].startswith('msgstr'):
             l = lines[i + j]
+            if l.startswith(s):
+                l = l[len(s):]
             text = l.strip('"').strip()
             if text:
                 parts = text.split(' ')
@@ -51,6 +53,8 @@ for i, l in enumerate(lines):
                     if p.startswith('-'):
                         if len(p) >= 2 and (p[1].isalpha() and p != '-INF'):
                             print('%s: %s' % (origin, text))
+                    elif p.startswith('__builtin_'):
+                        print('%s: %s' % (origin, text))
             j += 1
 
         origin = None

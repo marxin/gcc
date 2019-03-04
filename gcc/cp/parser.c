@@ -10100,7 +10100,7 @@ cp_parser_builtin_offsetof (cp_parser *parser)
   {
     const char *saved_message = parser->type_definition_forbidden_message;
     parser->type_definition_forbidden_message
-      = G_("types may not be defined within __builtin_offsetof");
+      = G_("types may not be defined within %<__builtin_offsetof%>");
     type = cp_parser_type_id (parser);
     parser->type_definition_forbidden_message = saved_message;
   }

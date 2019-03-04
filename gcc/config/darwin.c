@@ -3172,7 +3172,7 @@ darwin_override_options (void)
   if (global_options_set.x_dwarf_split_debug_info)
     {
       inform (input_location,
-	      "-gsplit-dwarf is not supported on this platform, ignored");
+	      "%<-gsplit-dwarf%> is not supported on this platform, ignored");
       dwarf_split_debug_info = 0;
       global_options_set.x_dwarf_split_debug_info = 0;
     }

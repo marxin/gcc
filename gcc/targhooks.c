@@ -188,7 +188,7 @@ default_const_not_ok_for_debug_p (rtx x)
 rtx
 default_expand_builtin_saveregs (void)
 {
-  error ("__builtin_saveregs not supported by this target");
+  error ("%<__builtin_saveregs%> not supported by this target");
   return const0_rtx;
 }
 

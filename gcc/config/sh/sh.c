@@ -7413,7 +7413,7 @@ sh_builtin_saveregs (void)
 
   if (!TARGET_FPU_ANY)
     {
-      error ("__builtin_saveregs not supported by this subtarget");
+      error ("%<__builtin_saveregs%> not supported by this subtarget");
       return const0_rtx;
     }
 

@@ -44,7 +44,7 @@ do {									\
     {									\
       if (global_options_set.x_rs6000_current_cmodel			\
 	  && rs6000_current_cmodel != CMODEL_SMALL)			\
-	error ("-mcmodel incompatible with other toc options"); 	\
+	error ("%<-mcmodel%> incompatible with other toc options"); 	\
       SET_CMODEL (CMODEL_SMALL);					\
     }									\
   if (rs6000_current_cmodel != CMODEL_SMALL)				\

@@ -27,7 +27,7 @@ do {									\
   if (TARGET_64BIT && ! TARGET_POWERPC64)				\
     {									\
       rs6000_isa_flags |= OPTION_MASK_POWERPC64;			\
-      warning (0, "-maix64 requires PowerPC64 architecture remain enabled"); \
+      warning (0, "%<-maix64%> requires PowerPC64 architecture remain enabled"); \
     }									\
   if (TARGET_SOFT_FLOAT && TARGET_LONG_DOUBLE_128)			\
     {									\
@@ -44,7 +44,7 @@ do {									\
     {									\
       if (global_options_set.x_rs6000_current_cmodel			\
 	  && rs6000_current_cmodel != CMODEL_SMALL)			\
-	error ("-mcmodel incompatible with other toc options"); 	\
+	error ("%<-mcmodel%> incompatible with other toc options"); 	\
       SET_CMODEL (CMODEL_SMALL);					\
     }									\
   if (rs6000_current_cmodel != CMODEL_SMALL)				\

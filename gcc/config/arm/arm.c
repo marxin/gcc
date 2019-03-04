@@ -2884,7 +2884,8 @@ arm_option_check_internal (struct gcc_options *opts)
       && write_symbols != NO_DEBUG
       && !TARGET_APCS_FRAME
       && (TARGET_DEFAULT & MASK_APCS_FRAME))
-    warning (0, "-g with %<-mno-apcs-frame%> may not give sensible debugging");
+    warning (0, "%<-g%> with %<-mno-apcs-frame%> may not give sensible "
+	     "debugging");
 
   /* iWMMXt unsupported under Thumb mode.  */
   if (TARGET_THUMB_P (flags) && TARGET_IWMMXT)

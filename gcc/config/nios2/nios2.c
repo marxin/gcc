@@ -1217,7 +1217,7 @@ nios2_custom_check_insns (void)
   if (errors || custom_code_conflict)
     fatal_error (input_location,
 		 "conflicting use of %<-mcustom%> switches, target attributes, "
-		 "and/or __builtin_custom_ functions");
+		 "and/or %<__builtin_custom_%> functions");
 }
 
 static void
@@ -3700,7 +3700,7 @@ nios2_expand_custom_builtin (tree exp, unsigned int index, rtx target)
 	{
 	  if (!custom_insn_opcode (value, VOIDmode))
 	    error ("custom instruction opcode must be compile time "
-		   "constant in the range 0-255 for __builtin_custom_%s",
+		   "constant in the range 0-255 for %<__builtin_custom_%s%>",
 		   custom_builtin_name[index]);
 	}
       else

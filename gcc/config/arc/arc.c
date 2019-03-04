@@ -6793,7 +6793,7 @@ arc_expand_builtin_aligned (tree exp)
       /* If we can't fold the alignment to a constant integer
 	 whilst optimizing, this is probably a user error.  */
       if (optimize)
-	warning (0, "__builtin_arc_aligned with non-constant alignment");
+	warning (0, "%<__builtin_arc_aligned%> with non-constant alignment");
     }
   else
     {
@@ -6801,7 +6801,7 @@ arc_expand_builtin_aligned (tree exp)
       /* Check alignTest is positive, and a power of two.  */
       if (alignTest <= 0 || alignTest != (alignTest & -alignTest))
 	{
-	  error ("invalid alignment value for __builtin_arc_aligned");
+	  error ("invalid alignment value for %<__builtin_arc_aligned%>");
 	  return NULL_RTX;
 	}
 
