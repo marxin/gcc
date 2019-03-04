@@ -2729,7 +2729,7 @@ common_handle_option (struct gcc_options *opts,
       control_warning_option (OPT_Wpedantic, DK_ERROR, NULL, value,
 			      loc, lang_mask,
 			      handlers, opts, opts_set,
-                              dc);
+                              dc, false);
       break;
 
     case OPT_flto:
@@ -3092,7 +3092,7 @@ enable_warning_as_error (const char *arg, int value, unsigned int lang_mask,
 	arg = new_option + cl_options[option_index].opt_len;
       control_warning_option (option_index, (int) kind, arg, value,
 			      loc, lang_mask,
-			      handlers, opts, opts_set, dc);
+			      handlers, opts, opts_set, dc, false);
     }
   free (new_option);
 }

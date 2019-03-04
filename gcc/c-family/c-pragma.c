@@ -838,7 +838,7 @@ handle_pragma_diagnostic(cpp_reader *ARG_UNUSED(dummy))
 			  arg, kind != DK_IGNORED,
 			  input_location, lang_mask, &handlers,
 			  &global_options, &global_options_set,
-			  global_dc);
+			  global_dc, true);
 }
 
 /*  Parse #pragma GCC target (xxx) to set target specific options.  */

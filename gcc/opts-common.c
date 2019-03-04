@@ -1611,11 +1611,12 @@ get_option_state (struct gcc_options *opts, int option,
 
 void
 control_warning_option (unsigned int opt_index, int kind, const char *arg,
-			bool imply, location_t loc, unsigned int lang_mask,
+			HOST_WIDE_INT value, location_t loc, unsigned int lang_mask,
 			const struct cl_option_handlers *handlers,
 			struct gcc_options *opts,
 			struct gcc_options *opts_set,
-			diagnostic_context *dc)
+			diagnostic_context *dc,
+			bool in_pragma)
 {
   if (cl_options[opt_index].alias_target != N_OPTS)
     {
@@ -1629,7 +1630,11 @@ control_warning_option (unsigned int opt_index, int kind, const char *arg,
     return;
   if (dc)
     diagnostic_classify_diagnostic (dc, opt_index, (diagnostic_t) kind, loc);
-  if (imply)
+
+  if (!value && in_pragma)
+    return;
+
+  if (true)
     {
       const struct cl_option *option = &cl_options[opt_index];
 
