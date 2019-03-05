@@ -12044,6 +12044,9 @@ considered for SLP vectorization.
 @item avoid-fma-max-bits
 Maximum number of bits for which we avoid creating FMAs.
 
+@item logical-op-non-short-circuit
+True if a non-short-circuit operation is optimal.
+
 @item sms-loop-average-count-threshold
 A threshold on the average loop count considered by the swing modulo scheduler.
 
