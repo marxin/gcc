@@ -4894,6 +4894,10 @@ ix86_option_override_internal (bool main_args_p,
 			   opts->x_param_values,
 			   opts_set->x_param_values);
 
+  if (ix86_indirect_branch != indirect_branch_keep
+      && !opts_set->x_flag_jump_tables)
+    opts->x_flag_jump_tables = 0;
+
   return true;
 }
 
