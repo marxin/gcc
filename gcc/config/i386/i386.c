@@ -3856,6 +3856,12 @@ ix86_option_override_internal (bool main_args_p)
   if (main_args_p)
     target_option_default_node = target_option_current_node
       = build_target_option_node ();
+
+  /* PR86952: jump table usage with retpolines is slow.
+     The PR provides some numbers about the slowness.  */
+  if (ix86_indirect_branch != indirect_branch_keep
+      && !global_options_set.x_flag_jump_tables)
+    flag_jump_tables = 0;
 }
 
 /* Implement the TARGET_OPTION_OVERRIDE hook.  */
