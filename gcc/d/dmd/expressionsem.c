@@ -1366,7 +1366,7 @@ public:
         }
         else
         {
-            exp->error("new can only create structs, dynamic arrays or class objects, not %s's", exp->type->toChars());
+            exp->error("new can only create structs, dynamic arrays or class objects, not %s%'s", exp->type->toChars());
             return setError();
         }
 
@@ -2298,7 +2298,7 @@ public:
         const char *name = (char *)se->string;
         if (!global.params.fileImppath)
         {
-            e->error("need -Jpath switch to import text file %s", name);
+            e->error("need %<-Jpath%> switch to import text file %s", name);
             return setError();
         }
 
@@ -2310,7 +2310,7 @@ public:
         name = FileName::safeSearchPath(global.filePath, name);
         if (!name)
         {
-            e->error("file %s cannot be found or not in a path specified with -J", se->toChars());
+            e->error("file %s cannot be found or not in a path specified with %<-J%>", se->toChars());
             return setError();
         }
 
@@ -6444,7 +6444,7 @@ public:
                 e = scaleFactor(exp, sc);
             else
             {
-                exp->error("can't subtract %s from pointer", t2->toChars());
+                exp->error("can%'t subtract %s from pointer", t2->toChars());
                 e = new ErrorExp();
             }
             result = e;
@@ -6453,7 +6453,7 @@ public:
         if (t2->ty == Tpointer)
         {
             exp->type = exp->e2->type;
-            exp->error("can't subtract pointer from %s", exp->e1->type->toChars());
+            exp->error("can%'t subtract pointer from %s", exp->e1->type->toChars());
             return setError();
         }
 
@@ -8702,6 +8702,6 @@ Expression *semanticY(DotTemplateInstanceExp *exp, Scope *sc, int flag)
         return e;
     }
 Lerr:
-    e->error("%s isn't a template", e->toChars());
+    e->error("%s isn%'t a template", e->toChars());
     return new ErrorExp();
 }
