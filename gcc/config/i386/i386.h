@@ -2856,6 +2856,8 @@ extern void debug_dispatch_window (int);
 
 #define TARGET_SUPPORTS_WIDE_INT 1
 
+extern const struct attribute_spec ix86_attribute_table[];
+
 /*
 Local variables:
 version-control: t
