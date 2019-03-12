@@ -2884,6 +2884,9 @@ extern unsigned int ix86_incoming_stack_boundary;
 extern char *ix86_offload_options (void);
 extern void ix86_option_override (void);
 extern void ix86_override_options_after_change (void);
+void ix86_set_current_function (tree fndecl);
+bool ix86_function_naked (const_tree fn);
+void ix86_simd_clone_adjust (struct cgraph_node *node);
 
 #include "tree-core.h"
 

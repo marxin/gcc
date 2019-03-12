@@ -100,7 +100,6 @@ static rtx legitimize_pe_coff_extern_decl (rtx, bool);
 static rtx legitimize_pe_coff_symbol (rtx, bool);
 static void ix86_print_operand_address_as (FILE *, rtx, addr_space_t, bool);
 static bool ix86_save_reg (unsigned int, bool, bool);
-static bool ix86_function_naked (const_tree);
 static bool ix86_notrack_prefixed_insn_p (rtx);
 static void ix86_emit_restore_reg_using_pop (rtx);
 
@@ -726,7 +725,6 @@ static unsigned int split_stack_prologue_scratch_regno (void);
 static bool i386_asm_output_addr_const_extra (FILE *, rtx);
 
 static bool ix86_can_inline_p (tree, tree);
-static void ix86_set_current_function (tree);
 static unsigned int ix86_minimum_incoming_stack_boundary (bool);
 
 static enum calling_abi ix86_function_abi (const_tree);
@@ -3037,267 +3035,6 @@ ix86_can_inline_p (tree caller, tree callee)
 
   return ret;
 }
-
-
-/* Remember the last target of ix86_set_current_function.  */
-static GTY(()) tree ix86_previous_fndecl;
-
-/* Set targets globals to the default (or current #pragma GCC target
-   if active).  Invalidate ix86_previous_fndecl cache.  */
-
-void
-ix86_reset_previous_fndecl (void)
-{
-  tree new_tree = target_option_current_node;
-  cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
-  if (TREE_TARGET_GLOBALS (new_tree))
-    restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
-  else if (new_tree == target_option_default_node)
-    restore_target_globals (&default_target_globals);
-  else
-    TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
-  ix86_previous_fndecl = NULL_TREE;
-}
-
-/* Set the func_type field from the function FNDECL.  */
-
-static void
-ix86_set_func_type (tree fndecl)
-{
-  if (cfun->machine->func_type == TYPE_UNKNOWN)
-    {
-      if (lookup_attribute ("interrupt",
-			    TYPE_ATTRIBUTES (TREE_TYPE (fndecl))))
-	{
-	  if (ix86_function_naked (fndecl))
-	    error_at (DECL_SOURCE_LOCATION (fndecl),
-		      "interrupt and naked attributes are not compatible");
-
-	  int nargs = 0;
-	  for (tree arg = DECL_ARGUMENTS (fndecl);
-	       arg;
-	       arg = TREE_CHAIN (arg))
-	    nargs++;
-	  cfun->machine->no_caller_saved_registers = true;
-	  cfun->machine->func_type
-	    = nargs == 2 ? TYPE_EXCEPTION : TYPE_INTERRUPT;
-
-	  ix86_optimize_mode_switching[X86_DIRFLAG] = 1;
-
-	  /* Only dwarf2out.c can handle -WORD(AP) as a pointer argument.  */
-	  if (write_symbols != NO_DEBUG && write_symbols != DWARF2_DEBUG)
-	    sorry ("only DWARF debug format is supported for interrupt "
-		   "service routine");
-	}
-      else
-	{
-	  cfun->machine->func_type = TYPE_NORMAL;
-	  if (lookup_attribute ("no_caller_saved_registers",
-				TYPE_ATTRIBUTES (TREE_TYPE (fndecl))))
-	    cfun->machine->no_caller_saved_registers = true;
-	}
-    }
-}
-
-/* Set the indirect_branch_type field from the function FNDECL.  */
-
-static void
-ix86_set_indirect_branch_type (tree fndecl)
-{
-  if (cfun->machine->indirect_branch_type == indirect_branch_unset)
-    {
-      tree attr = lookup_attribute ("indirect_branch",
-				    DECL_ATTRIBUTES (fndecl));
-      if (attr != NULL)
-	{
-	  tree args = TREE_VALUE (attr);
-	  if (args == NULL)
-	    gcc_unreachable ();
-	  tree cst = TREE_VALUE (args);
-	  if (strcmp (TREE_STRING_POINTER (cst), "keep") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_keep;
-	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_thunk;
-	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-inline") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_thunk_inline;
-	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-extern") == 0)
-	    cfun->machine->indirect_branch_type = indirect_branch_thunk_extern;
-	  else
-	    gcc_unreachable ();
-	}
-      else
-	cfun->machine->indirect_branch_type = ix86_indirect_branch;
-
-      /* -mcmodel=large is not compatible with -mindirect-branch=thunk
-	 nor -mindirect-branch=thunk-extern.  */
-      if ((ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
-	  && ((cfun->machine->indirect_branch_type
-	       == indirect_branch_thunk_extern)
-	      || (cfun->machine->indirect_branch_type
-		  == indirect_branch_thunk)))
-	error ("%<-mindirect-branch=%s%> and %<-mcmodel=large%> are not "
-	       "compatible",
-	       ((cfun->machine->indirect_branch_type
-		 == indirect_branch_thunk_extern)
-		? "thunk-extern" : "thunk"));
-
-      if (cfun->machine->indirect_branch_type != indirect_branch_keep
-	  && (flag_cf_protection & CF_RETURN))
-	error ("%<-mindirect-branch%> and %<-fcf-protection%> are not "
-	       "compatible");
-    }
-
-  if (cfun->machine->function_return_type == indirect_branch_unset)
-    {
-      tree attr = lookup_attribute ("function_return",
-				    DECL_ATTRIBUTES (fndecl));
-      if (attr != NULL)
-	{
-	  tree args = TREE_VALUE (attr);
-	  if (args == NULL)
-	    gcc_unreachable ();
-	  tree cst = TREE_VALUE (args);
-	  if (strcmp (TREE_STRING_POINTER (cst), "keep") == 0)
-	    cfun->machine->function_return_type = indirect_branch_keep;
-	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk") == 0)
-	    cfun->machine->function_return_type = indirect_branch_thunk;
-	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-inline") == 0)
-	    cfun->machine->function_return_type = indirect_branch_thunk_inline;
-	  else if (strcmp (TREE_STRING_POINTER (cst), "thunk-extern") == 0)
-	    cfun->machine->function_return_type = indirect_branch_thunk_extern;
-	  else
-	    gcc_unreachable ();
-	}
-      else
-	cfun->machine->function_return_type = ix86_function_return;
-
-      /* -mcmodel=large is not compatible with -mfunction-return=thunk
-	 nor -mfunction-return=thunk-extern.  */
-      if ((ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
-	  && ((cfun->machine->function_return_type
-	       == indirect_branch_thunk_extern)
-	      || (cfun->machine->function_return_type
-		  == indirect_branch_thunk)))
-	error ("%<-mfunction-return=%s%> and %<-mcmodel=large%> are not "
-	       "compatible",
-	       ((cfun->machine->function_return_type
-		 == indirect_branch_thunk_extern)
-		? "thunk-extern" : "thunk"));
-
-      if (cfun->machine->function_return_type != indirect_branch_keep
-	  && (flag_cf_protection & CF_RETURN))
-	error ("%<-mfunction-return%> and %<-fcf-protection%> are not "
-	       "compatible");
-    }
-}
-
-/* Establish appropriate back-end context for processing the function
-   FNDECL.  The argument might be NULL to indicate processing at top
-   level, outside of any function scope.  */
-static void
-ix86_set_current_function (tree fndecl)
-{
-  /* Only change the context if the function changes.  This hook is called
-     several times in the course of compiling a function, and we don't want to
-     slow things down too much or call target_reinit when it isn't safe.  */
-  if (fndecl == ix86_previous_fndecl)
-    {
-      /* There may be 2 function bodies for the same function FNDECL,
-	 one is extern inline and one isn't.  Call ix86_set_func_type
-	 to set the func_type field.  */
-      if (fndecl != NULL_TREE)
-	{
-	  ix86_set_func_type (fndecl);
-	  ix86_set_indirect_branch_type (fndecl);
-	}
-      return;
-    }
-
-  tree old_tree;
-  if (ix86_previous_fndecl == NULL_TREE)
-    old_tree = target_option_current_node;
-  else if (DECL_FUNCTION_SPECIFIC_TARGET (ix86_previous_fndecl))
-    old_tree = DECL_FUNCTION_SPECIFIC_TARGET (ix86_previous_fndecl);
-  else
-    old_tree = target_option_default_node;
-
-  if (fndecl == NULL_TREE)
-    {
-      if (old_tree != target_option_current_node)
-	ix86_reset_previous_fndecl ();
-      return;
-    }
-
-  ix86_set_func_type (fndecl);
-  ix86_set_indirect_branch_type (fndecl);
-
-  tree new_tree = DECL_FUNCTION_SPECIFIC_TARGET (fndecl);
-  if (new_tree == NULL_TREE)
-    new_tree = target_option_default_node;
-
-  if (old_tree != new_tree)
-    {
-      cl_target_option_restore (&global_options, TREE_TARGET_OPTION (new_tree));
-      if (TREE_TARGET_GLOBALS (new_tree))
-	restore_target_globals (TREE_TARGET_GLOBALS (new_tree));
-      else if (new_tree == target_option_default_node)
-	restore_target_globals (&default_target_globals);
-      else
-	TREE_TARGET_GLOBALS (new_tree) = save_target_globals_default_opts ();
-    }
-  ix86_previous_fndecl = fndecl;
-
-  static bool prev_no_caller_saved_registers;
-
-  /* 64-bit MS and SYSV ABI have different set of call used registers.
-     Avoid expensive re-initialization of init_regs each time we switch
-     function context.  */
-  if (TARGET_64BIT
-      && (call_used_regs[SI_REG]
-	  == (cfun->machine->call_abi == MS_ABI)))
-    reinit_regs ();
-  /* Need to re-initialize init_regs if caller-saved registers are
-     changed.  */
-  else if (prev_no_caller_saved_registers
-	   != cfun->machine->no_caller_saved_registers)
-    reinit_regs ();
-
-  if (cfun->machine->func_type != TYPE_NORMAL
-      || cfun->machine->no_caller_saved_registers)
-    {
-      /* Don't allow SSE, MMX nor x87 instructions since they
-	 may change processor state.  */
-      const char *isa;
-      if (TARGET_SSE)
-	isa = "SSE";
-      else if (TARGET_MMX)
-	isa = "MMX/3Dnow";
-      else if (TARGET_80387)
-	isa = "80387";
-      else
-	isa = NULL;
-      if (isa != NULL)
-	{
-	  if (cfun->machine->func_type != TYPE_NORMAL)
-	    sorry (cfun->machine->func_type == TYPE_EXCEPTION
-		   ? G_("%s instructions aren%'t allowed in an"
-			" exception service routine")
-		   : G_("%s instructions aren%'t allowed in an"
-			" interrupt service routine"),
-		   isa);
-	  else
-	    sorry ("%s instructions aren%'t allowed in a function with "
-		   "the %<no_caller_saved_registers%> attribute", isa);
-	  /* Don't issue the same error twice.  */
-	  cfun->machine->func_type = TYPE_NORMAL;
-	  cfun->machine->no_caller_saved_registers = false;
-	}
-    }
-
-  prev_no_caller_saved_registers
-    = cfun->machine->no_caller_saved_registers;
-}
-
 
 /* Return true if this goes in large data/bss.  */
 
@@ -4224,7 +3961,7 @@ ix86_function_ms_hook_prologue (const_tree fn)
   return false;
 }
 
-static bool
+bool
 ix86_function_naked (const_tree fn)
 {
   if (fn && lookup_attribute ("naked", DECL_ATTRIBUTES (fn)))
@@ -47512,50 +47249,6 @@ ix86_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
 	}
       }
   return ret;
-}
-
-/* Add target attribute to SIMD clone NODE if needed.  */
-
-static void
-ix86_simd_clone_adjust (struct cgraph_node *node)
-{
-  const char *str = NULL;
-
-  /* Attributes need to be adjusted for definitions, not declarations.  */
-  if (!node->definition)
-    return;
-
-  gcc_assert (node->decl == cfun->decl);
-  switch (node->simdclone->vecsize_mangle)
-    {
-    case 'b':
-      if (!TARGET_SSE2)
-	str = "sse2";
-      break;
-    case 'c':
-      if (!TARGET_AVX)
-	str = "avx";
-      break;
-    case 'd':
-      if (!TARGET_AVX2)
-	str = "avx2";
-      break;
-    case 'e':
-      if (!TARGET_AVX512F)
-	str = "avx512f";
-      break;
-    default:
-      gcc_unreachable ();
-    }
-  if (str == NULL)
-    return;
-  push_cfun (NULL);
-  tree args = build_tree_list (NULL_TREE, build_string (strlen (str), str));
-  bool ok = ix86_valid_target_attribute_p (node->decl, NULL, args, 0);
-  gcc_assert (ok);
-  pop_cfun ();
-  ix86_reset_previous_fndecl ();
-  ix86_set_current_function (node->decl);
 }
 
 /* If SIMD clone NODE can't be used in a vectorized loop
