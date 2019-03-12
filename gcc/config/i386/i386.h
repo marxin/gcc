@@ -2856,11 +2856,13 @@ extern void debug_dispatch_window (int);
 
 #define TARGET_SUPPORTS_WIDE_INT 1
 
-
+#if !defined(GENERATOR_FILE) && !defined(IN_LIBGCC2)
 char *ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
 			  int flags, int flags2,
 			  const char *arch, const char *tune,
 			  enum fpmath_unit fpmath, bool add_nl_p);
+
+extern enum attr_cpu ix86_schedule;
 
 extern enum processor_type ix86_tune;
 extern enum processor_type ix86_arch;
@@ -2870,6 +2872,40 @@ extern const struct processor_costs *ix86_tune_cost;
 extern int ix86_tune_defaulted;
 extern int ix86_arch_specified;
 
+extern unsigned int ix86_default_incoming_stack_boundary;
+extern HOST_WIDE_INT deferred_isa_values;
+extern HOST_WIDE_INT deferred_isa_values2;
+
+extern unsigned int ix86_preferred_stack_boundary;
+extern unsigned int ix86_user_incoming_stack_boundary;
+extern unsigned int ix86_default_incoming_stack_boundary;
+extern unsigned int ix86_incoming_stack_boundary;
+
+extern char *ix86_offload_options (void);
+extern void ix86_option_override (void);
+extern void ix86_override_options_after_change (void);
+
+#include "tree-core.h"
+
+extern tree (*ix86_veclib_handler) (combined_fn, tree, tree);
+extern tree ix86_veclibabi_svml (combined_fn, tree, tree);
+extern tree ix86_veclibabi_acml (combined_fn, tree, tree);
+
+extern rtx (*ix86_gen_leave) (void);
+extern rtx (*ix86_gen_add3) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_sub3) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_sub3_carry) (rtx, rtx, rtx, rtx, rtx);
+extern rtx (*ix86_gen_one_cmpl2) (rtx, rtx);
+extern rtx (*ix86_gen_monitor) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_monitorx) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_clzero) (rtx);
+extern rtx (*ix86_gen_andsp) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_allocate_stack_worker) (rtx, rtx);
+extern rtx (*ix86_gen_adjust_stack_and_probe) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_probe_stack_range) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_tls_global_dynamic_64) (rtx, rtx, rtx);
+extern rtx (*ix86_gen_tls_local_dynamic_base_64) (rtx, rtx);
+
 enum ix86_function_specific_strings
 {
   IX86_FUNCTION_SPECIFIC_ARCH,
@@ -2877,6 +2913,9 @@ enum ix86_function_specific_strings
   IX86_FUNCTION_SPECIFIC_MAX
 };
 
+extern const char *stringop_alg_names[];
+
+void ix86_add_new_builtins (HOST_WIDE_INT isa, HOST_WIDE_INT isa2);
 void ix86_function_specific_save (struct cl_target_option *,
 				  struct gcc_options *opts);
 void ix86_function_specific_restore (struct gcc_options *opts,
@@ -2891,6 +2930,7 @@ bool ix86_valid_target_attribute_inner_p (tree, char *[],
 					  struct gcc_options *);
 
 extern const struct attribute_spec ix86_attribute_table[];
+#endif
 
 /*
 Local variables:
