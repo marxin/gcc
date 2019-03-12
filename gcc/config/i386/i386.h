@@ -2856,6 +2856,40 @@ extern void debug_dispatch_window (int);
 
 #define TARGET_SUPPORTS_WIDE_INT 1
 
+
+char *ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
+			  int flags, int flags2,
+			  const char *arch, const char *tune,
+			  enum fpmath_unit fpmath, bool add_nl_p);
+
+extern enum processor_type ix86_tune;
+extern enum processor_type ix86_arch;
+extern unsigned char x86_prefetch_sse;
+extern const struct processor_costs *ix86_tune_cost;
+
+extern int ix86_tune_defaulted;
+extern int ix86_arch_specified;
+
+enum ix86_function_specific_strings
+{
+  IX86_FUNCTION_SPECIFIC_ARCH,
+  IX86_FUNCTION_SPECIFIC_TUNE,
+  IX86_FUNCTION_SPECIFIC_MAX
+};
+
+void ix86_function_specific_save (struct cl_target_option *,
+				  struct gcc_options *opts);
+void ix86_function_specific_restore (struct gcc_options *opts,
+				     struct cl_target_option *);
+void ix86_function_specific_post_stream_in (struct cl_target_option *);
+void ix86_function_specific_print (FILE *, int,
+				   struct cl_target_option *);
+bool ix86_valid_target_attribute_p (tree, tree, tree, int);
+bool ix86_valid_target_attribute_inner_p (tree, char *[],
+					  struct gcc_options *,
+					  struct gcc_options *,
+					  struct gcc_options *);
+
 extern const struct attribute_spec ix86_attribute_table[];
 
 /*
