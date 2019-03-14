@@ -50,7 +50,6 @@ struct symbol_entry
       return xstrdup (node->name ());
     else
       return xstrdup (node->asm_name ());
-
   }
 
   virtual size_t get_size () const = 0;
@@ -161,8 +160,8 @@ void dump_list_functions (void)
 
   printf ("Type   Visibility  Size  Name");
   if (flag_lto_print_value)
-    printf("  Value");
-  printf("\n");
+    printf ("  Value");
+  printf ("\n");
   int i=0;
   symbol_entry* e;
   FOR_EACH_VEC_ELT (v, i, e)
@@ -256,7 +255,8 @@ void dump_tool_help ()
   printf ("  -list [options]           Dump the symbol list.\n");
   printf ("    -demangle               Dump the demangled output.\n");
   printf ("    -defined-only           Dump only the defined symbols.\n");
-  printf ("    -print-value            Dump initial values of the variables.\n");
+  printf ("    -print-value            Dump initial values of the "
+	  "variables.\n");
   printf ("    -name-sort              Sort the symbols alphabetically.\n");
   printf ("    -size-sort              Sort the symbols according to size.\n");
   printf ("    -reverse-sort           Dump the symbols in reverse order.\n");
@@ -264,9 +264,11 @@ void dump_tool_help ()
   printf ("  -objects                  Dump the details of LTO objects.\n");
   printf ("  -type-stats               Dump statistics of tree types.\n");
   printf ("  -tree-stats               Dump statistics of trees.\n");
-  printf ("  -gimple-stats             Dump statistics of gimple statements.\n");
+  printf ("  -gimple-stats             Dump statistics of gimple "
+	  "statements.\n");
   printf ("  -dump-body=               Dump the specific gimple body.\n");
-  printf ("  -dump-level=              Deciding the optimization level of body.\n");
+  printf ("  -dump-level=              Deciding the optimization level "
+	  "of body.\n");
   printf ("  -help                     Display the dump tool help.\n");
   return;
 }

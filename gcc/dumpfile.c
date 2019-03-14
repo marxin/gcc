@@ -1837,7 +1837,7 @@ parse_dump_option (const char *option_value, const char **pos_p)
   return flags;
 }
 
-/* Parse ARG as a dump switch. Return nonzero if it is, and store the
+/* Parse ARG as a dump switch.  Return nonzero if it is, and store the
    relevant details in the dump_files array.  */
 
 int

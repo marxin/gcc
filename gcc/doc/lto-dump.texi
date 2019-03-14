@@ -26,7 +26,7 @@ included in the gfdl(7) man page.
 @c man end
 @c Set file name and title for the man page.
 @setfilename lto-dump
-@settitle Tool for dumping LTO object files. 
+@settitle Tool for dumping LTO object files.
 @end ignore
 
 @node lto-dump
