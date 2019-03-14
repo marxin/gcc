@@ -307,49 +307,38 @@ lto_main (void)
 
   /* Dump symbol list.  */
   if (flag_lto_dump_list)
-  {
     dump_list ();
-    return;
-  }
-
-  /* Dump specific variables and functions used in IL.  */
-  if (flag_lto_dump_symbol)
-  {
-    dump_symbol ();
-    return;
-  }
-
-  /* Dump gimple statement statistics.  */
-  if (flag_lto_gimple_stats)
-  {
-    cgraph_node *node;
-    FOR_EACH_DEFINED_FUNCTION (node)
-      node->get_untransformed_body ();
-    if (!GATHER_STATISTICS)
-      warning_at (input_location, 0, "Not configured with --enable-gather-detailed-mem-stats.");
-    else
-      dump_gimple_statistics ();
-    return;
-  }
-
-  /* Dump tree statistics.  */
-  if (flag_lto_tree_stats)
-  {
-    if (!GATHER_STATISTICS)
-      warning_at (input_location, 0, "Not configured with --enable-gather-detailed-mem-stats.");
-    else
+  else if (flag_lto_dump_symbol)
     {
-      printf ("Tree Statistics\n");
-      dump_tree_statistics ();
+      /* Dump specific variables and functions used in IL.  */
+      dump_symbol ();
     }
-    return;
-  }
-
-  /* Dump specific gimple body of specified function.  */
-  if (flag_dump_body)
-  {
-    dump_body ();
-    return;
-  }
-
+  else if (flag_lto_gimple_stats)
+    {
+      /* Dump gimple statement statistics.  */
+      cgraph_node *node;
+      FOR_EACH_DEFINED_FUNCTION (node)
+	node->get_untransformed_body ();
+      if (!GATHER_STATISTICS)
+	warning_at (input_location, 0, "Not configured with --enable-gather-detailed-mem-stats.");
+      else
+	dump_gimple_statistics ();
+    }
+  else if (flag_lto_tree_stats)
+    {
+      /* Dump tree statistics.  */
+      if (!GATHER_STATISTICS)
+	warning_at (input_location, 0, "Not configured with --enable-gather-detailed-mem-stats.");
+      else
+	{
+	  printf ("Tree Statistics\n");
+	  dump_tree_statistics ();
+	}
+    }
+  else if (flag_dump_body)
+    {
+      /* Dump specific gimple body of specified function.  */
+      dump_body ();
+      return;
+    }
 }
