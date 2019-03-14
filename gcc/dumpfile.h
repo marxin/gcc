@@ -194,7 +194,7 @@ enum dump_flag
   TDF_COMPARE_DEBUG = (1 << 28),
 
   /* For error.  */
-  TDF_ERROR = (1<<26),
+  TDF_ERROR = (1 << 26),
 
   /* All values.  */
   TDF_ALL_VALUES = (1 << 29) - 1

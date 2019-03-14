@@ -809,12 +809,12 @@ symtab_node::dump_referring (FILE *file)
 static const char * const symtab_type_names[] = {"symbol", "function", "variable"};
 
 /* Dump the visibility of the symbol.  */
+
 const char *
 symtab_node::dump_visibility () const
 {
-  static const char * const visibility_types[] = {
-      "default", "protected", "hidden", "internal"
-  };
+  static const char * const visibility_types[]
+    = { "default", "protected", "hidden", "internal" };
   return visibility_types[DECL_VISIBILITY (decl)];
 }
 
