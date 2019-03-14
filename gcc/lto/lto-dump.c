@@ -255,23 +255,23 @@ void dump_body ()
 /* List of command line options for dumping.  */
 void dump_tool_help ()
 {
-  printf ("\nLTO dump tool command line options.\n\n");
-  printf("Usage: lto-dump [OPTION]... SUB_COMMAND [OPTION]...\n\n");
-  printf ("-list [options] : Dump the symbol list.\n");
-  printf ("  -demangle : Dump the demangled output.\n");
-  printf ("  -defined-only : Dump only the defined symbols.\n");
-  printf ("  -print-value : Dump initial values of the variables.\n");
-  printf ("  -name-sort : Sort the symbols alphabetically.\n");
-  printf ("  -size-sort : Sort the symbols according to size.\n");
-  printf ("  -reverse-sort : Dump the symbols in reverse order.\n");
-  printf ("-symbol= : Dump the details of specific symbol.\n");
-  printf ("-objects : Dump the details of LTO objects.\n");
-  printf ("-type-stats : Dump statistics of tree types.\n");
-  printf ("-tree-stats : Dump statistics of trees.\n");
-  printf ("-gimple-stats : Dump statistics of gimple statements.\n");
-  printf ("-dump-level= : Deciding the optimization level of body.\n");
-  printf ("-dump-body= : Dump the specific gimple body.\n");
-  printf ("-help : Display the dump tool help.\n");
+  printf ("Usage: lto-dump [OPTION]... SUB_COMMAND [OPTION]...\n\n");
+  printf ("LTO dump tool command line options.\n\n");
+  printf ("  -list [options]           Dump the symbol list.\n");
+  printf ("    -demangle               Dump the demangled output.\n");
+  printf ("    -defined-only           Dump only the defined symbols.\n");
+  printf ("    -print-value            Dump initial values of the variables.\n");
+  printf ("    -name-sort              Sort the symbols alphabetically.\n");
+  printf ("    -size-sort              Sort the symbols according to size.\n");
+  printf ("    -reverse-sort           Dump the symbols in reverse order.\n");
+  printf ("  -symbol=                  Dump the details of specific symbol.\n");
+  printf ("  -objects                  Dump the details of LTO objects.\n");
+  printf ("  -type-stats               Dump statistics of tree types.\n");
+  printf ("  -tree-stats               Dump statistics of trees.\n");
+  printf ("  -gimple-stats             Dump statistics of gimple statements.\n");
+  printf ("  -dump-body=               Dump the specific gimple body.\n");
+  printf ("  -dump-level=              Deciding the optimization level of body.\n");
+  printf ("  -help                     Display the dump tool help.\n");
   return;
 }
 
