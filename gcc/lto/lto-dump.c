@@ -44,7 +44,7 @@ struct symbol_entry
   symbol_entry (symtab_node *node_): node (node_)
   {}
 
-  char* get_name ()
+  char* get_name () const
   {
     if (flag_lto_dump_demangle)
       return xstrdup (node->name ());
@@ -53,7 +53,7 @@ struct symbol_entry
 
   }
 
-  virtual size_t get_size () = 0;
+  virtual size_t get_size () const = 0;
 
   virtual void dump ()
   {
@@ -61,7 +61,7 @@ struct symbol_entry
     const char *type_name = node->dump_type_name ();
     const char *visibility = node->dump_visibility ();
     size_t sz = get_size ();
-    printf ("%s  %s  %0.4zu  %s  ", type_name, visibility, sz, name);
+    printf ("%s  %s  %4lu  %s  ", type_name, visibility, sz, name);
   }
 };
 
@@ -72,7 +72,7 @@ struct variable_entry: public symbol_entry
   variable_entry (varpool_node *node_): symbol_entry (node_)
   {}
 
-  virtual size_t get_size ()
+  virtual size_t get_size () const
   {
     varpool_node *vnode = dyn_cast<varpool_node *> (node);
     if (DECL_SIZE (vnode->decl) && tree_fits_shwi_p (DECL_SIZE (vnode->decl)))
@@ -105,7 +105,7 @@ struct function_entry: public symbol_entry
     printf ("\n");
   }
 
-  virtual size_t get_size ()
+  virtual size_t get_size () const
   {
     cgraph_node *cnode = dyn_cast<cgraph_node *> (node);
     gcc_assert (cnode);
@@ -120,8 +120,8 @@ struct function_entry: public symbol_entry
 
 int size_compare (const void *a, const void *b)
 {
-  symbol_entry *e1 = *(symbol_entry **) a;
-  symbol_entry *e2 = *(symbol_entry **) b;
+  const symbol_entry *e1 = *(const symbol_entry * const*) a;
+  const symbol_entry *e2 = *(const symbol_entry * const*) b;
 
   return e1->get_size () - e2->get_size ();
 }
@@ -130,8 +130,8 @@ int size_compare (const void *a, const void *b)
 
 int name_compare (const void *a, const void *b)
 {
-  symbol_entry *e1 = *(symbol_entry **) a;
-  symbol_entry *e2 = *(symbol_entry **) b;
+  const symbol_entry *e1 = *(const symbol_entry * const*) a;
+  const symbol_entry *e2 = *(const symbol_entry * const*) b;
 
   return strcmp (e1->get_name (), e2->get_name ());
 }
@@ -213,14 +213,16 @@ void dump_symbol ()
   symtab_node *node;
   printf ("Symbol: %s\n", flag_lto_dump_symbol);
   FOR_EACH_SYMBOL (node)
-    if (!strcmp (flag_lto_dump_symbol, node->name ()))
     {
-      node->debug ();
-      printf ("\n");
-      flag = 1;
+      if (!strcmp (flag_lto_dump_symbol, node->name ()))
+	{
+	  node->debug ();
+	  printf ("\n");
+	  flag = 1;
+	}
+      if (!flag)
+	error_at (input_location, "Symbol not found.");
     }
-    if (!flag)
-      error_at (input_location, "Symbol not found.");
   return;
 }
 
@@ -228,10 +230,9 @@ void dump_symbol ()
 void dump_body ()
 {
   int flag = 0;
-  dump_flags_t flags;
-  flags = (flag_dump_level)
-   ? parse_dump_option (flag_dump_level, 0, 0)
-   : TDF_NONE;
+  dump_flags_t flags = TDF_NONE;
+  if (flag_dump_level)
+    flags = parse_dump_option (flag_dump_level, NULL);
   if (flags == TDF_ERROR)
   {
     error_at (input_location, "Level not found, use none, slim, blocks, vops.");

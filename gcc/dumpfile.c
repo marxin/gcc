@@ -1775,8 +1775,7 @@ gcc::dump_manager::update_dfi_for_opt_info (dump_file_info *dfi) const
    and return the corresponding dump flag.  */
 
 dump_flags_t
-parse_dump_option (const char *option_value, const char **pos_p,
-		   const char *swtch)
+parse_dump_option (const char *option_value, const char **pos_p)
 {
   const char *ptr;
   dump_flags_t flags;
@@ -1859,7 +1858,7 @@ dump_switch_p_1 (const char *arg, struct dump_file_info *dfi, bool doglob)
     return 0;
 
   const char *filename;
-  flags = parse_dump_option (option_value, &filename, dfi->swtch);
+  flags = parse_dump_option (option_value, &filename);
   if (filename)
     {
       if (dfi->pfilename)
