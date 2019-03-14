@@ -2074,6 +2074,17 @@ lto_file_read (lto_file *file, FILE *resolution_file, int *count)
   memset (&section_list, 0, sizeof (struct lto_section_list)); 
   section_hash_table = lto_obj_build_section_table (file, &section_list);
 
+  /* Dump the details of LTO objects.  */
+  if (flag_lto_dump_objects)
+  {
+    int i=0;
+    fprintf (stdout, "\n    LTO Object Name: %s\n", file->filename);
+    fprintf (stdout, "\nNo.    Offset    Size       Section Name\n\n");
+    for (section = section_list.first; section != NULL; section = section->next)
+      fprintf (stdout, "%2d %8ld %8ld   %s\n",
+	       ++i, section->start, section->len, section->name);
+  }
+
   /* Find all sub modules in the object and put their sections into new hash
      tables in a splay tree. */
   file_ids = lto_splay_tree_new ();
