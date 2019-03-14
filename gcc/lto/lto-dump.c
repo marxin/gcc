@@ -275,6 +275,12 @@ void dump_tool_help ()
   return;
 }
 
+unsigned int
+lto_option_lang_mask (void)
+{
+  return CL_LTODump;
+}
+
 /* Functions for dumping various details in LTO dump tool are called
    in lto_main(). The purpose of this dump tool is to analyze the LTO
    object files.  */
