@@ -1772,7 +1772,8 @@ gcc::dump_manager::update_dfi_for_opt_info (dump_file_info *dfi) const
 }
 
 /* Helper routine to parse -<dump format>[=filename]
-   and return the corresponding dump flag.  */
+   and return the corresponding dump flag.  If POS_P is non-NULL,
+   assign start of filename into *POS_P.  */
 
 dump_flags_t
 parse_dump_option (const char *option_value, const char **pos_p)
@@ -1781,6 +1782,8 @@ parse_dump_option (const char *option_value, const char **pos_p)
   dump_flags_t flags;
 
   ptr = option_value;
+  if (pos_p)
+    *pos_p = NULL;
 
   /* Retain "user-facing" and "internals" messages, but filter out
      those from an opt_problem being re-emitted at the top level
@@ -1794,10 +1797,6 @@ parse_dump_option (const char *option_value, const char **pos_p)
       const char *end_ptr;
       const char *eq_ptr;
       unsigned length;
-
-      if (pos_p)
-	*pos_p = NULL;
-
       while (*ptr == '-')
 	ptr++;
       end_ptr = strchr (ptr, '-');
@@ -1820,6 +1819,8 @@ parse_dump_option (const char *option_value, const char **pos_p)
 
       if (*ptr == '=')
 	{
+          /* Interpret rest of the argument as a dump filename.  This
+             filename overrides other command line filenames.  */
 	  if (pos_p)
 	    *pos_p = ptr + 1;
 	  break;
