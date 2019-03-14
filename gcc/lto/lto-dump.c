@@ -209,7 +209,6 @@ void dump_list (void)
 /* Dump specific variables and functions used in IL.  */
 void dump_symbol ()
 {
-  int flag = 0;
   symtab_node *node;
   printf ("Symbol: %s\n", flag_lto_dump_symbol);
   FOR_EACH_SYMBOL (node)
@@ -218,10 +217,7 @@ void dump_symbol ()
 	{
 	  node->debug ();
 	  printf ("\n");
-	  flag = 1;
 	}
-      if (!flag)
-	error_at (input_location, "Symbol not found.");
     }
   return;
 }
