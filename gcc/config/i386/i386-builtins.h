@@ -6,9 +6,6 @@
 
 #include "i386-builtin-types.inc"
 
-/* Table for the ix86 builtin non-function types.  */
-extern GTY(()) tree ix86_builtin_type_tab[(int) IX86_BT_LAST_CPTR + 1];
-
 /* Codes for all the SSE/MMX builtins.  Builtins not mentioned in any
    bdesc_* arrays below should come first, then builtins for each bdesc_*
    array in ascending order, so that we can use direct array accesses.  */
@@ -223,8 +220,6 @@ struct builtin_isa {
   bool set_and_not_built_p;
 };
 
-extern struct builtin_isa ix86_builtins_isa[(int) IX86_BUILTIN_MAX];
-
 /* Bits for builtin_description.flag.  */
 
 /* Set when we don't support the comparison natively, and should
@@ -334,5 +329,18 @@ BDESC_VERIFYS (IX86_BUILTIN__BDESC_CET_NORMAL_FIRST,
 	       IX86_BUILTIN__BDESC_CET_LAST, 1);
 BDESC_VERIFYS (IX86_BUILTIN_MAX,
 	       IX86_BUILTIN__BDESC_CET_NORMAL_LAST, 1);
+
+extern builtin_isa ix86_builtins_isa[(int) IX86_BUILTIN_MAX];
+extern GTY(()) tree sysv_va_list_type_node;
+extern GTY(()) tree ms_va_list_type_node;
+
+tree ix86_builtin_vectorized_function (unsigned int fn, tree type_out,
+					      tree type_in);
+void ix86_init_builtins (void);
+tree ix86_vectorize_builtin_gather (const_tree mem_vectype,
+					   const_tree index_type, int scale);
+tree ix86_builtin_decl (unsigned code, bool);
+tree ix86_builtin_reciprocal (tree fndecl);
+unsigned int get_builtin_code_for_version (tree decl, tree *predicate_list);
 
 #endif  /* GCC_I386_BUILTINS_H */
