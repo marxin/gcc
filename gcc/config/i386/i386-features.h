@@ -170,5 +170,10 @@ class timode_scalar_chain : public scalar_chain
 };
 
 bool ix86_save_reg (unsigned int regno, bool maybe_eh_return, bool ignore_outlined);
+int ix86_compare_version_priority (tree decl1, tree decl2);
+tree ix86_generate_version_dispatcher_body (void *node_p);
+tree ix86_get_function_versions_dispatcher (void *decl);
+tree ix86_mangle_decl_assembler_name (tree decl, tree id);
+
 
 #endif  /* GCC_I386_FEATURES_H */
