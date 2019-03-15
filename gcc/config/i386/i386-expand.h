@@ -15,8 +15,6 @@ struct expand_vec_perm_d
   bool testing_p;
 };
 
-#define NUM_X86_64_MS_CLOBBERED_REGS 12
-
 rtx legitimize_tls_address (rtx x, enum tls_model model, bool for_mov);
 alias_set_type ix86_GOT_alias_set (void);
 rtx legitimize_pic_address (rtx orig, rtx reg);

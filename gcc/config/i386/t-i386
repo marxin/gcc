@@ -56,6 +56,10 @@ i386-expand.o: $(srcdir)/config/i386/i386-expand.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
+i386-features.o: $(srcdir)/config/i386/i386-features.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
 i386.o: i386-builtin-types.inc
 
 i386-builtin-types.inc: s-i386-bt ; @true

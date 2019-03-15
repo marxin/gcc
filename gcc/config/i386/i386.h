@@ -2858,6 +2858,8 @@ extern void debug_dispatch_window (int);
 
 #if !defined(GENERATOR_FILE) && !defined(IN_LIBGCC2)
 extern enum attr_cpu ix86_schedule;
+
+#define NUM_X86_64_MS_CLOBBERED_REGS 12
 #endif
 
 /*
