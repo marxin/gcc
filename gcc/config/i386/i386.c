@@ -91,6 +91,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-vector-builder.h"
 #include "debug.h"
 #include "dwarf2out.h"
+#include "i386-options.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
