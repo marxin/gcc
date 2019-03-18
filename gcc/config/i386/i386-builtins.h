@@ -301,35 +301,6 @@ static const struct builtin_description bdesc_##kind[] =		    \
 
 #include "i386-builtin.def"
 
-#undef BDESC
-#undef BDESC_FIRST
-#undef BDESC_END
-
-/* Macros for verification of enum ix86_builtins order.  */
-#define BDESC_VERIFY(x, y, z) \
-  gcc_checking_assert ((x) == (enum ix86_builtins) ((y) + (z)))
-#define BDESC_VERIFYS(x, y, z) \
-  STATIC_ASSERT ((x) == (enum ix86_builtins) ((y) + (z)))
-
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_PCMPESTR_FIRST,
-	       IX86_BUILTIN__BDESC_COMI_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_PCMPISTR_FIRST,
-	       IX86_BUILTIN__BDESC_PCMPESTR_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_SPECIAL_ARGS_FIRST,
-	       IX86_BUILTIN__BDESC_PCMPISTR_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_ARGS_FIRST,
-	       IX86_BUILTIN__BDESC_SPECIAL_ARGS_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_ROUND_ARGS_FIRST,
-	       IX86_BUILTIN__BDESC_ARGS_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_MULTI_ARG_FIRST,
-	       IX86_BUILTIN__BDESC_ROUND_ARGS_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_CET_FIRST,
-	       IX86_BUILTIN__BDESC_MULTI_ARG_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_CET_NORMAL_FIRST,
-	       IX86_BUILTIN__BDESC_CET_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN_MAX,
-	       IX86_BUILTIN__BDESC_CET_NORMAL_LAST, 1);
-
 extern builtin_isa ix86_builtins_isa[(int) IX86_BUILTIN_MAX];
 extern GTY(()) tree sysv_va_list_type_node;
 extern GTY(()) tree ms_va_list_type_node;

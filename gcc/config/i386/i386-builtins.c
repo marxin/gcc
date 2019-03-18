@@ -93,6 +93,36 @@ along with GCC; see the file COPYING3.  If not see
 #include "dwarf2out.h"
 #include "i386-builtins.h"
 
+#undef BDESC
+#undef BDESC_FIRST
+#undef BDESC_END
+
+/* Macros for verification of enum ix86_builtins order.  */
+#define BDESC_VERIFY(x, y, z) \
+  gcc_checking_assert ((x) == (enum ix86_builtins) ((y) + (z)))
+#define BDESC_VERIFYS(x, y, z) \
+  STATIC_ASSERT ((x) == (enum ix86_builtins) ((y) + (z)))
+
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_PCMPESTR_FIRST,
+	       IX86_BUILTIN__BDESC_COMI_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_PCMPISTR_FIRST,
+	       IX86_BUILTIN__BDESC_PCMPESTR_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_SPECIAL_ARGS_FIRST,
+	       IX86_BUILTIN__BDESC_PCMPISTR_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_ARGS_FIRST,
+	       IX86_BUILTIN__BDESC_SPECIAL_ARGS_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_ROUND_ARGS_FIRST,
+	       IX86_BUILTIN__BDESC_ARGS_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_MULTI_ARG_FIRST,
+	       IX86_BUILTIN__BDESC_ROUND_ARGS_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_CET_FIRST,
+	       IX86_BUILTIN__BDESC_MULTI_ARG_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_CET_NORMAL_FIRST,
+	       IX86_BUILTIN__BDESC_CET_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN_MAX,
+	       IX86_BUILTIN__BDESC_CET_NORMAL_LAST, 1);
+
+
 /* Table for the ix86 builtin non-function types.  */
 static GTY(()) tree ix86_builtin_type_tab[(int) IX86_BT_LAST_CPTR + 1];
 
@@ -1197,7 +1227,6 @@ ix86_init_mmx_sse_builtins (void)
 		 ARRAY_SIZE (bdesc_cet_rdssp) - 1);
 }
 
-// TODO: remove?
 #undef BDESC_VERIFY
 #undef BDESC_VERIFYS
 

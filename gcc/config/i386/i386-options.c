@@ -3280,7 +3280,6 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args, int,
   return NULL_TREE;
 }
 
-// TODO: remove from i386.c?
 #ifndef CHECK_STACK_LIMIT
 #define CHECK_STACK_LIMIT (-1)
 #endif
