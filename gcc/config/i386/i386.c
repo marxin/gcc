@@ -15076,15 +15076,6 @@ ix86_fp_compare_code_to_integer (enum rtx_code code)
     }
 }
 
-/* Predict just emitted jump instruction to be taken with probability PROB.  */
-void
-predict_jump (int prob)
-{
-  rtx_insn *insn = get_last_insn ();
-  gcc_assert (JUMP_P (insn));
-  add_reg_br_prob_note (insn, profile_probability::from_reg_br_prob_base (prob));
-}
-
 /* Zero extend possibly SImode EXP to Pmode register.  */
 rtx
 ix86_zero_extend_to_Pmode (rtx exp)
@@ -20567,19 +20558,6 @@ x86_emit_floatuns (rtx operands[2])
   emit_insn (gen_rtx_SET (out, gen_rtx_PLUS (mode, f0, f0)));
 
   emit_label (donelab);
-}
-
-/* Get a vector mode of the same size as the original but with elements
-   twice as wide.  This is only guaranteed to apply to integral vectors.  */
-
-machine_mode
-get_mode_wider_vector (machine_mode o)
-{
-  /* ??? Rely on the ordering that genmodes.c gives to vectors.  */
-  machine_mode n = GET_MODE_WIDER_MODE (o).require ();
-  gcc_assert (GET_MODE_NUNITS (o) == GET_MODE_NUNITS (n) * 2);
-  gcc_assert (GET_MODE_SIZE (o) == GET_MODE_SIZE (n));
-  return n;
 }
 
 /* Target hook for scalar_mode_supported_p.  */

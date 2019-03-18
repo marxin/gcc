@@ -342,5 +342,6 @@ tree ix86_vectorize_builtin_gather (const_tree mem_vectype,
 tree ix86_builtin_decl (unsigned code, bool);
 tree ix86_builtin_reciprocal (tree fndecl);
 unsigned int get_builtin_code_for_version (tree decl, tree *predicate_list);
+tree fold_builtin_cpu (tree fndecl, tree *args);
 
 #endif  /* GCC_I386_BUILTINS_H */

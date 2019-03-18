@@ -970,6 +970,16 @@ ix86_expand_unary_operator (enum rtx_code code, machine_mode mode,
     emit_move_insn (operands[0], dst);
 }
 
+/* Predict just emitted jump instruction to be taken with probability PROB.  */
+
+static void
+predict_jump (int prob)
+{
+  rtx_insn *insn = get_last_insn ();
+  gcc_assert (JUMP_P (insn));
+  add_reg_br_prob_note (insn, profile_probability::from_reg_br_prob_base (prob));
+}
+
 /* Split 32bit/64bit divmod with 8bit unsigned divmod if dividend and
    divisor are within the range [0-255].  */
 
@@ -1314,6 +1324,10 @@ ix86_split_convert_uns_si_sse (rtx operands[])
 
   emit_insn (gen_xorv4si3 (value, value, large));
 }
+
+static bool ix86_expand_vector_init_one_nonzero (bool mmx_ok,
+						 machine_mode mode, rtx target,
+						 rtx var, int one_var);
 
 /* Convert an unsigned DImode value into a DFmode, using only SSE.
    Expects the 64-bit DImode to be supplied in a pair of integral
@@ -1838,6 +1852,8 @@ ix86_split_xorsign (rtx operands[])
   emit_insn (gen_rtx_SET (dest, x));
 }
 
+static rtx ix86_expand_compare (enum rtx_code code, rtx op0, rtx op1);
+
 void
 ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
 {
@@ -2082,7 +2098,7 @@ ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
 
 /* Figure out whether to use unordered fp comparisons.  */
 
-bool
+static bool
 ix86_unordered_fp_compare (enum rtx_code code)
 {
   if (!TARGET_IEEE_FP)
@@ -2449,7 +2465,7 @@ ix86_expand_int_compare (enum rtx_code code, rtx op0, rtx op1)
   return gen_rtx_fmt_ee (code, VOIDmode, flags, const0_rtx);
 }
 
-rtx
+static rtx
 ix86_expand_compare (enum rtx_code code, rtx op0, rtx op1)
 {
   rtx ret;
@@ -3250,7 +3266,7 @@ ix86_expand_sse_fp_minmax (rtx dest, enum rtx_code code, rtx cmp_op0,
 
 /* Expand an SSE comparison.  Return the register with the result.  */
 
-rtx
+static rtx
 ix86_expand_sse_cmp (rtx dest, enum rtx_code code, rtx cmp_op0, rtx cmp_op1,
 		     rtx op_true, rtx op_false)
 {
@@ -4277,7 +4293,7 @@ ix86_expand_int_vcond (rtx operands[])
   return true;
 }
 
-bool
+static bool
 ix86_expand_vec_perm_vpermt2 (rtx target, rtx mask, rtx op0, rtx op1,
 			      struct expand_vec_perm_d *d)
 {
@@ -12837,6 +12853,22 @@ ix86_vector_duplicate_value (machine_mode mode, rtx target, rtx val)
   return true;
 }
 
+/* Get a vector mode of the same size as the original but with elements
+   twice as wide.  This is only guaranteed to apply to integral vectors.  */
+
+static machine_mode
+get_mode_wider_vector (machine_mode o)
+{
+  /* ??? Rely on the ordering that genmodes.c gives to vectors.  */
+  machine_mode n = GET_MODE_WIDER_MODE (o).require ();
+  gcc_assert (GET_MODE_NUNITS (o) == GET_MODE_NUNITS (n) * 2);
+  gcc_assert (GET_MODE_SIZE (o) == GET_MODE_SIZE (n));
+  return n;
+}
+
+static bool expand_vec_perm_broadcast_1 (struct expand_vec_perm_d *d);
+static bool expand_vec_perm_1 (struct expand_vec_perm_d *d);
+
 /* A subroutine of ix86_expand_vector_init.  Store into TARGET a vector
    with all elements equal to VAR.  Return true if successful.  */
 
@@ -12995,7 +13027,7 @@ ix86_expand_vector_init_duplicate (bool mmx_ok, machine_mode mode,
    whose ONE_VAR element is VAR, and other elements are zero.  Return true
    if successful.  */
 
-bool
+static bool
 ix86_expand_vector_init_one_nonzero (bool mmx_ok, machine_mode mode,
 				     rtx target, rtx var, int one_var)
 {
@@ -15237,7 +15269,7 @@ void ix86_emit_swsqrtsf (rtx res, rtx a, machine_mode mode, bool recip)
    mask for masking out the sign-bit is stored in *SMASK, if that is
    non-null.  */
 
-rtx
+static rtx
 ix86_expand_sse_fabs (rtx op0, rtx *smask)
 {
   machine_mode vmode, mode = GET_MODE (op0);
@@ -15271,7 +15303,7 @@ ix86_expand_sse_fabs (rtx op0, rtx *smask)
    swapping the operands if SWAP_OPERANDS is true.  The expanded
    code is a forward jump to a newly created label in case the
    comparison is true.  The generated label rtx is returned.  */
-rtx_code_label *
+static rtx_code_label *
 ix86_expand_sse_compare_and_jump (enum rtx_code code, rtx op0, rtx op1,
                                   bool swap_operands)
 {
@@ -15300,7 +15332,7 @@ ix86_expand_sse_compare_and_jump (enum rtx_code code, rtx op0, rtx op1,
 /* Expand a mask generating SSE comparison instruction comparing OP0 with OP1
    using comparison code CODE.  Operands are swapped for the comparison if
    SWAP_OPERANDS is true.  Returns a rtx for the generated mask.  */
-rtx
+static rtx
 ix86_expand_sse_compare_mask (enum rtx_code code, rtx op0, rtx op1,
 			      bool swap_operands)
 {
@@ -16626,7 +16658,7 @@ static bool expand_vec_perm_palignr (struct expand_vec_perm_d *d, bool);
 /* A subroutine of ix86_expand_vec_perm_builtin_1.  Try to instantiate D
    in a single instruction.  */
 
-bool
+static bool
 expand_vec_perm_1 (struct expand_vec_perm_d *d)
 {
   unsigned i, nelt = d->nelt;
@@ -18362,7 +18394,7 @@ expand_vec_perm_even_odd (struct expand_vec_perm_d *d)
 /* A subroutine of ix86_expand_vec_perm_builtin_1.  Implement broadcast
    permutations.  We assume that expand_vec_perm_1 has already failed.  */
 
-bool
+static bool
 expand_vec_perm_broadcast_1 (struct expand_vec_perm_d *d)
 {
   unsigned elt = d->perm[0], nelt2 = d->nelt / 2;
@@ -18441,7 +18473,7 @@ expand_vec_perm_broadcast_1 (struct expand_vec_perm_d *d)
 /* A subroutine of ix86_expand_vec_perm_builtin_1.  Pattern match
    broadcast permutations.  */
 
-bool
+static bool
 expand_vec_perm_broadcast (struct expand_vec_perm_d *d)
 {
   unsigned i, elt, nelt = d->nelt;
