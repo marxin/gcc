@@ -69,10 +69,6 @@ void ix86_function_specific_post_stream_in (struct cl_target_option *);
 void ix86_function_specific_print (FILE *, int,
 				   struct cl_target_option *);
 bool ix86_valid_target_attribute_p (tree, tree, tree, int);
-bool ix86_valid_target_attribute_inner_p (tree, char *[],
-					  struct gcc_options *,
-					  struct gcc_options *,
-					  struct gcc_options *);
 
 extern const struct attribute_spec ix86_attribute_table[];
 

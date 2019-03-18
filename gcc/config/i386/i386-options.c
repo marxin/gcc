@@ -806,7 +806,7 @@ ix86_function_specific_print (FILE *file, int indent,
    set the current options from the argument. If we have a list, recursively go
    over the list.  */
 
-bool
+static bool
 ix86_valid_target_attribute_inner_p (tree args, char *p_strings[],
 				     struct gcc_options *opts,
 				     struct gcc_options *opts_set,
