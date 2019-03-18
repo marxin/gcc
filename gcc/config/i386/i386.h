@@ -2759,6 +2759,9 @@ struct GTY(()) machine_function {
   /* During SEH output, this is non-null.  */
   struct seh_frame_state * GTY((skip(""))) seh;
 };
+
+extern GTY(()) tree sysv_va_list_type_node;
+extern GTY(()) tree ms_va_list_type_node;
 #endif
 
 #define ix86_stack_locals (cfun->machine->stack_locals)

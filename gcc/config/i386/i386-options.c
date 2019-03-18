@@ -3674,3 +3674,5 @@ const struct attribute_spec ix86_attribute_table[] =
   /* End element.  */
   { NULL, 0, 0, false, false, false, false, NULL, NULL }
 };
+
+#include "gt-i386-options.h"

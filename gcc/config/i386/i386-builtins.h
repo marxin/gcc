@@ -204,9 +204,6 @@ enum ix86_builtins
   IX86_BUILTIN__BDESC_MAX_LAST = IX86_BUILTIN__BDESC_MAX_FIRST
 };
 
-/* Table for the ix86 builtin decls.  */
-extern GTY(()) tree ix86_builtins[(int) IX86_BUILTIN_MAX];
-
 /* Table of all of the builtin functions that are possible with different ISA's
    but are waiting to be built until a function is declared to use that
    ISA.  */
@@ -302,8 +299,6 @@ static const struct builtin_description bdesc_##kind[] =		    \
 #include "i386-builtin.def"
 
 extern builtin_isa ix86_builtins_isa[(int) IX86_BUILTIN_MAX];
-extern GTY(()) tree sysv_va_list_type_node;
-extern GTY(()) tree ms_va_list_type_node;
 
 tree ix86_builtin_vectorized_function (unsigned int fn, tree type_out,
 					      tree type_in);
@@ -314,5 +309,6 @@ tree ix86_builtin_decl (unsigned code, bool);
 tree ix86_builtin_reciprocal (tree fndecl);
 unsigned int get_builtin_code_for_version (tree decl, tree *predicate_list);
 tree fold_builtin_cpu (tree fndecl, tree *args);
+tree get_ix86_builtin (enum ix86_builtins c);
 
 #endif  /* GCC_I386_BUILTINS_H */

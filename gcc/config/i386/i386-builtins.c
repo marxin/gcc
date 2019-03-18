@@ -220,9 +220,14 @@ ix86_get_builtin_func_type (enum ix86_builtin_func_type tcode)
 }
 
 /* Table for the ix86 builtin decls.  */
-GTY(()) tree ix86_builtins[(int) IX86_BUILTIN_MAX];
+static GTY(()) tree ix86_builtins[(int) IX86_BUILTIN_MAX];
 
 struct builtin_isa ix86_builtins_isa[(int) IX86_BUILTIN_MAX];
+
+tree get_ix86_builtin (enum ix86_builtins c)
+{
+  return ix86_builtins[c];
+}
 
 /* Bits that can still enable any inclusion of a builtin.  */
 HOST_WIDE_INT deferred_isa_values = 0;
@@ -2555,4 +2560,4 @@ fold_builtin_cpu (tree fndecl, tree *args)
   gcc_unreachable ();
 }
 
-
+#include "gt-i386-builtins.h"

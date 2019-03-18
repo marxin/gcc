@@ -2492,8 +2492,8 @@ dispatch_function_versions (tree dispatch_decl,
   gseq = bb_seq (*empty_bb);
   /* Function version dispatch is via IFUNC.  IFUNC resolvers fire before
      constructors, so explicity call __builtin_cpu_init here.  */
-  ifunc_cpu_init_stmt = gimple_build_call_vec (
-                     ix86_builtins [(int) IX86_BUILTIN_CPU_INIT], vNULL);
+  ifunc_cpu_init_stmt
+    = gimple_build_call_vec (get_ix86_builtin (IX86_BUILTIN_CPU_INIT), vNULL);
   gimple_seq_add_stmt (&gseq, ifunc_cpu_init_stmt);
   gimple_set_bb (ifunc_cpu_init_stmt, *empty_bb);
   set_bb_seq (*empty_bb, gseq);

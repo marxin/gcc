@@ -19865,4 +19865,4 @@ ix86_expand_divmod_libfunc (rtx libfunc, machine_mode mode,
   *rem_p = rem;
 }
 
-
+#include "gt-i386-expand.h"

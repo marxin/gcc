@@ -17851,7 +17851,7 @@ ix86_vectorize_builtin_scatter (const_tree vectype,
       return NULL_TREE;
     }
 
-  return ix86_builtins[code];
+  return get_ix86_builtin (code);
 }
 
 /* Return true if it is safe to use the rsqrt optabs to optimize
@@ -21922,10 +21922,10 @@ ix86_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
       tree fenv_ptr = build_pointer_type (fenv_type);
       tree fenv_addr = build1 (ADDR_EXPR, fenv_ptr, fenv_var);
       fenv_addr = fold_convert (ptr_type_node, fenv_addr);
-      tree fnstenv = ix86_builtins[IX86_BUILTIN_FNSTENV];
-      tree fldenv = ix86_builtins[IX86_BUILTIN_FLDENV];
-      tree fnstsw = ix86_builtins[IX86_BUILTIN_FNSTSW];
-      tree fnclex = ix86_builtins[IX86_BUILTIN_FNCLEX];
+      tree fnstenv = get_ix86_builtin (IX86_BUILTIN_FNSTENV);
+      tree fldenv = get_ix86_builtin (IX86_BUILTIN_FLDENV);
+      tree fnstsw = get_ix86_builtin (IX86_BUILTIN_FNSTSW);
+      tree fnclex = get_ix86_builtin (IX86_BUILTIN_FNCLEX);
       tree hold_fnstenv = build_call_expr (fnstenv, 1, fenv_addr);
       tree hold_fnclex = build_call_expr (fnclex, 0);
       fenv_var = build4 (TARGET_EXPR, fenv_type, fenv_var, hold_fnstenv,
@@ -21949,8 +21949,8 @@ ix86_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
     {
       tree mxcsr_orig_var = create_tmp_var_raw (unsigned_type_node);
       tree mxcsr_mod_var = create_tmp_var_raw (unsigned_type_node);
-      tree stmxcsr = ix86_builtins[IX86_BUILTIN_STMXCSR];
-      tree ldmxcsr = ix86_builtins[IX86_BUILTIN_LDMXCSR];
+      tree stmxcsr = get_ix86_builtin (IX86_BUILTIN_STMXCSR);
+      tree ldmxcsr = get_ix86_builtin (IX86_BUILTIN_LDMXCSR);
       tree stmxcsr_hold_call = build_call_expr (stmxcsr, 0);
       tree hold_assign_orig = build2 (MODIFY_EXPR, unsigned_type_node,
 				      mxcsr_orig_var, stmxcsr_hold_call);
