@@ -20107,164 +20107,6 @@ ix86_min_insn_size (rtx_insn *insn)
     return 2;
 }
 
-#ifdef ASM_OUTPUT_MAX_SKIP_PAD
-
-/* AMD K8 core mispredicts jumps when there are more than 3 jumps in 16 byte
-   window.  */
-
-static void
-ix86_avoid_jump_mispredicts (void)
-{
-  rtx_insn *insn, *start = get_insns ();
-  int nbytes = 0, njumps = 0;
-  bool isjump = false;
-
-  /* Look for all minimal intervals of instructions containing 4 jumps.
-     The intervals are bounded by START and INSN.  NBYTES is the total
-     size of instructions in the interval including INSN and not including
-     START.  When the NBYTES is smaller than 16 bytes, it is possible
-     that the end of START and INSN ends up in the same 16byte page.
-
-     The smallest offset in the page INSN can start is the case where START
-     ends on the offset 0.  Offset of INSN is then NBYTES - sizeof (INSN).
-     We add p2align to 16byte window with maxskip 15 - NBYTES + sizeof (INSN).
-
-     Don't consider asm goto as jump, while it can contain a jump, it doesn't
-     have to, control transfer to label(s) can be performed through other
-     means, and also we estimate minimum length of all asm stmts as 0.  */
-  for (insn = start; insn; insn = NEXT_INSN (insn))
-    {
-      int min_size;
-
-      if (LABEL_P (insn))
-	{
-	  align_flags alignment = label_to_alignment (insn);
-	  int align = alignment.levels[0].log;
-	  int max_skip = alignment.levels[0].maxskip;
-
-	  if (max_skip > 15)
-	    max_skip = 15;
-	  /* If align > 3, only up to 16 - max_skip - 1 bytes can be
-	     already in the current 16 byte page, because otherwise
-	     ASM_OUTPUT_MAX_SKIP_ALIGN could skip max_skip or fewer
-	     bytes to reach 16 byte boundary.  */
-	  if (align <= 0
-	      || (align <= 3 && max_skip != (1 << align) - 1))
-	    max_skip = 0;
-	  if (dump_file)
-	    fprintf (dump_file, "Label %i with max_skip %i\n",
-		     INSN_UID (insn), max_skip);
-	  if (max_skip)
-	    {
-	      while (nbytes + max_skip >= 16)
-		{
-		  start = NEXT_INSN (start);
-		  if ((JUMP_P (start) && asm_noperands (PATTERN (start)) < 0)
-		      || CALL_P (start))
-		    njumps--, isjump = true;
-		  else
-		    isjump = false;
-		  nbytes -= ix86_min_insn_size (start);
-		}
-	    }
-	  continue;
-	}
-
-      min_size = ix86_min_insn_size (insn);
-      nbytes += min_size;
-      if (dump_file)
-	fprintf (dump_file, "Insn %i estimated to %i bytes\n",
-		 INSN_UID (insn), min_size);
-      if ((JUMP_P (insn) && asm_noperands (PATTERN (insn)) < 0)
-	  || CALL_P (insn))
-	njumps++;
-      else
-	continue;
-
-      while (njumps > 3)
-	{
-	  start = NEXT_INSN (start);
-	  if ((JUMP_P (start) && asm_noperands (PATTERN (start)) < 0)
-	      || CALL_P (start))
-	    njumps--, isjump = true;
-	  else
-	    isjump = false;
-	  nbytes -= ix86_min_insn_size (start);
-	}
-      gcc_assert (njumps >= 0);
-      if (dump_file)
-        fprintf (dump_file, "Interval %i to %i has %i bytes\n",
-		 INSN_UID (start), INSN_UID (insn), nbytes);
-
-      if (njumps == 3 && isjump && nbytes < 16)
-	{
-	  int padsize = 15 - nbytes + ix86_min_insn_size (insn);
-
-	  if (dump_file)
-	    fprintf (dump_file, "Padding insn %i by %i bytes!\n",
-		     INSN_UID (insn), padsize);
-          emit_insn_before (gen_pad (GEN_INT (padsize)), insn);
-	}
-    }
-}
-#endif
-
-/* AMD Athlon works faster
-   when RET is not destination of conditional jump or directly preceded
-   by other jump instruction.  We avoid the penalty by inserting NOP just
-   before the RET instructions in such cases.  */
-static void
-ix86_pad_returns (void)
-{
-  edge e;
-  edge_iterator ei;
-
-  FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
-    {
-      basic_block bb = e->src;
-      rtx_insn *ret = BB_END (bb);
-      rtx_insn *prev;
-      bool replace = false;
-
-      if (!JUMP_P (ret) || !ANY_RETURN_P (PATTERN (ret))
-	  || optimize_bb_for_size_p (bb))
-	continue;
-      for (prev = PREV_INSN (ret); prev; prev = PREV_INSN (prev))
-	if (active_insn_p (prev) || LABEL_P (prev))
-	  break;
-      if (prev && LABEL_P (prev))
-	{
-	  edge e;
-	  edge_iterator ei;
-
-	  FOR_EACH_EDGE (e, ei, bb->preds)
-	    if (EDGE_FREQUENCY (e) && e->src->index >= 0
-		&& !(e->flags & EDGE_FALLTHRU))
-	      {
-		replace = true;
-		break;
-	      }
-	}
-      if (!replace)
-	{
-	  prev = prev_active_insn (ret);
-	  if (prev
-	      && ((JUMP_P (prev) && any_condjump_p (prev))
-		  || CALL_P (prev)))
-	    replace = true;
-	  /* Empty functions get branch mispredict even when
-	     the jump destination is not visible to us.  */
-	  if (!prev && !optimize_function_for_size_p (cfun))
-	    replace = true;
-	}
-      if (replace)
-	{
-	  emit_jump_insn_before (gen_simple_return_internal_long (), ret);
-	  delete_insn (ret);
-	}
-    }
-}
-
 /* Count the minimum number of instructions in BB.  Return 4 if the
    number of instructions >= 4.  */
 
@@ -20417,8 +20259,8 @@ ix86_seh_fixup_eh_fallthru (void)
     }
 }
 
-/* Implement machine specific optimizations.  We implement padding of returns
-   for K8 CPUs and pass to avoid 4 jumps in the single 16 byte window.  */
+/* Implement machine specific optimizations.  */
+
 static void
 ix86_reorg (void)
 {
@@ -20433,12 +20275,6 @@ ix86_reorg (void)
     {
       if (TARGET_PAD_SHORT_FUNCTION)
 	ix86_pad_short_function ();
-      else if (TARGET_PAD_RETURNS)
-	ix86_pad_returns ();
-#ifdef ASM_OUTPUT_MAX_SKIP_PAD
-      if (TARGET_FOUR_JUMP_LIMIT)
-	ix86_avoid_jump_mispredicts ();
-#endif
     }
 }
 
