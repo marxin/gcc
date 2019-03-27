@@ -24,6 +24,7 @@ See dbgcnt.def for usage information.  */
 #include "coretypes.h"
 #include "diagnostic-core.h"
 #include "dumpfile.h"
+#include "options.h"
 
 #include "dbgcnt.h"
 
@@ -87,8 +88,11 @@ dbg_cnt_set_limit_by_index (enum debug_counter index, int low, int high)
 }
 
 static bool
-dbg_cnt_set_limit_by_name (const char *name, int low, int high)
+dbg_cnt_set_limit_by_name (const char *name, int low, int high, char *aux_base)
 {
+  if (aux_base != NULL && strcmp (aux_base_name, aux_base) != 0)
+    return true;
+
   if (high < low)
     {
       error ("%<-fdbg-cnt=%s:%d:%d%> has smaller upper limit than the lower",
@@ -123,7 +127,7 @@ dbg_cnt_set_limit_by_name (const char *name, int low, int high)
 }
 
 
-/* Process a single "name:value" pair.
+/* Process a single "name:value1[:value2][:aux_base]" tuple.
    Returns NULL if there's no valid pair is found.
    Otherwise returns a pointer to the end of the pair. */
 
@@ -134,6 +138,7 @@ dbg_cnt_process_single_pair (const char *arg)
   char *name = strtok (str, ":");
   char *value1 = strtok (NULL, ":");
   char *value2 = strtok (NULL, ":");
+  char *aux_base = strtok (NULL, ":");
 
   int high, low;
 
@@ -151,7 +156,7 @@ dbg_cnt_process_single_pair (const char *arg)
       high = strtol (value2, NULL, 10);
     }
 
-  return dbg_cnt_set_limit_by_name (name, low, high);
+  return dbg_cnt_set_limit_by_name (name, low, high, aux_base);
 }
 
 void

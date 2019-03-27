@@ -15386,10 +15386,14 @@ Print the name and the counter upper bound for all debug counters.
 @item -fdbg-cnt=@var{counter-value-list}
 @opindex fdbg-cnt
 Set the internal debug counter lower and upper bound.  @var{counter-value-list}
-is a comma-separated list of @var{name}:@var{lower_bound}:@var{upper_bound}
+is a comma-separated list of
+@var{name}:@var{lower_bound}:@var{upper_bound}:@var{aux_base_name}
 tuples which sets the lower and the upper bound of each debug
 counter @var{name}.  The @var{lower_bound} is optional and is zero
-initialized if not set.
+initialized if not set.  When @var{aux_base_name} is set, the debug counter
+is only applied to source files that match by @option{-auxbase}.
+The @var{aux_base_name} is also optional.
+
 All debug counters have the initial upper bound of @code{UINT_MAX};
 thus @code{dbg_cnt} returns true always unless the upper bound
 is set by this option.
