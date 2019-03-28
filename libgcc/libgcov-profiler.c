@@ -112,14 +112,10 @@ __gcov_pow2_profiler_atomic (gcov_type *counters, gcov_type value)
    COUNTERS[1] is decremented.  Otherwise COUNTERS[1] is set to one and
    VALUE is stored to COUNTERS[0].  This algorithm guarantees that if this
    function is called more than 50% of the time with one value, this value
-   will be in COUNTERS[0] in the end.
-
-   In any case, COUNTERS[2] is incremented.  If USE_ATOMIC is set to 1,
-   COUNTERS[2] is updated with an atomic instruction.  */
+   will be in COUNTERS[0] in the end.  */
 
 static inline void
-__gcov_one_value_profiler_body (gcov_type *counters, gcov_type value,
-				int use_atomic)
+__gcov_one_value_profiler_body (gcov_type *counters, gcov_type value)
 {
   if (value == counters[0])
     counters[1]++;
@@ -130,40 +126,17 @@ __gcov_one_value_profiler_body (gcov_type *counters, gcov_type value,
     }
   else
     counters[1]--;
-
-  if (use_atomic)
-    __atomic_fetch_add (&counters[2], 1, __ATOMIC_RELAXED);
-  else
-    counters[2]++;
 }
 
-#ifdef L_gcov_one_value_profiler
+#ifdef L_gcov_one_value_profiler_v2
 void
-__gcov_one_value_profiler (gcov_type *counters, gcov_type value)
+__gcov_one_value_profiler_v2 (gcov_type *counters, gcov_type value)
 {
-  __gcov_one_value_profiler_body (counters, value, 0);
+  __gcov_one_value_profiler_body (counters, value);
 }
 #endif
 
-#if defined(L_gcov_one_value_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
-
-/* Update one value profilers (COUNTERS) for a given VALUE.
-
-   CAVEAT: Following function is not thread-safe, only total number
-   of executions (COUNTERS[2]) is update with an atomic instruction.
-   Problem is that one cannot atomically update two counters
-   (COUNTERS[0] and COUNTERS[1]), for more information please read
-   following email thread:
-   https://gcc.gnu.org/ml/gcc-patches/2016-08/msg00024.html.  */
-
-void
-__gcov_one_value_profiler_atomic (gcov_type *counters, gcov_type value)
-{
-  __gcov_one_value_profiler_body (counters, value, 1);
-}
-#endif
-
-#ifdef L_gcov_indirect_call_profiler_v3
+#ifdef L_gcov_indirect_call_profiler_v4
 
 /* These two variables are used to actually track caller and callee.  Keep
    them in TLS memory so races are not common (they are written to often).
@@ -185,7 +158,7 @@ struct indirect_call_tuple __gcov_indirect_call;
 
 /* Tries to determine the most common value among its inputs. */
 void
-__gcov_indirect_call_profiler_v3 (gcov_type value, void* cur_func)
+__gcov_indirect_call_profiler_v4 (gcov_type value, void* cur_func)
 {
   /* If the C++ virtual tables contain function descriptors then one
      function may have multiple descriptors and we need to dereference
@@ -193,7 +166,7 @@ __gcov_indirect_call_profiler_v3 (gcov_type value, void* cur_func)
   if (cur_func == __gcov_indirect_call.callee
       || (__LIBGCC_VTABLE_USES_DESCRIPTORS__
 	  && *(void **) cur_func == *(void **) __gcov_indirect_call.callee))
-    __gcov_one_value_profiler_body (__gcov_indirect_call.counters, value, 0);
+    __gcov_one_value_profiler_body (__gcov_indirect_call.counters, value);
 
   __gcov_indirect_call.callee = NULL;
 }
