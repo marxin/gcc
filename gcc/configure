@@ -795,6 +795,7 @@ AR
 NM
 BISON
 FLEX
+GENERATOR_EXTRA_FLAGS
 GENERATED_MANPAGES
 BUILD_INFO
 MAKEINFO
@@ -8353,6 +8354,11 @@ else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
   GENERATED_MANPAGES=
+fi
+
+
+if test X"$BUILD_CONFIG" = X"bootstrap-lto-lean"; then
+  GENERATOR_EXTRA_FLAGS=-flto=jobserver
 fi
 
 
@@ -18646,7 +18652,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 18649 "configure"
+#line 18655 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -18752,7 +18758,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 18755 "configure"
+#line 18761 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -31669,5 +31675,4 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-
 
