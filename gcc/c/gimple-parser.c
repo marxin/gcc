@@ -81,20 +81,22 @@ struct gimple_parser
     int src;
     int dest;
     int flags;
+    int frequency;
   };
   auto_vec<gimple_parser_edge> edges;
   basic_block current_bb;
 
-  void push_edge (int, int, int);
+  void push_edge (int, int, int, int);
 };
 
 void
-gimple_parser::push_edge (int src, int dest, int flags)
+gimple_parser::push_edge (int src, int dest, int flags, int frequency)
 {
   gimple_parser_edge e;
   e.src = src;
   e.dest = dest;
   e.flags = flags;
+  e.frequency = frequency;
   edges.safe_push (e);
 }
 
@@ -120,10 +122,12 @@ static void c_parser_gimple_expr_list (gimple_parser &, vec<tree> *);
 
 
 /* See if VAL is an identifier matching __BB<num> and return <num>
-   in *INDEX.  Return true if so.  */
+   in *INDEX.  Return true if so and parse also FREQUENCY of
+   the edge.  */
 
 static bool
-c_parser_gimple_parse_bb_spec (tree val, int *index)
+c_parser_gimple_parse_bb_spec (tree val, gimple_parser &parser,
+			       int *index, int *frequency)
 {
   if (strncmp (IDENTIFIER_POINTER (val), "__BB", 4) != 0)
     return false;
@@ -131,7 +135,33 @@ c_parser_gimple_parse_bb_spec (tree val, int *index)
     if (!ISDIGIT (*p))
       return false;
   *index = atoi (IDENTIFIER_POINTER (val) + 4);
-  return *index > 0;
+
+  if (*index > 0)
+    {
+      *frequency = -1;
+      /* Parse frequency if provided.  */
+      if (c_parser_next_token_is (parser, CPP_OPEN_PAREN))
+	{
+	  tree f;
+	  c_parser_consume_token (parser);
+	  if (!c_parser_next_token_is (parser, CPP_NUMBER)
+	      || (TREE_CODE (f = c_parser_peek_token (parser)->value)
+		  != INTEGER_CST))
+	    {
+	      c_parser_error (parser, "expected frequency value");
+	      return false;
+	    }
+
+	  *frequency = TREE_INT_CST_LOW (f);
+	  c_parser_consume_token (parser);
+	  if (!c_parser_require (parser, CPP_CLOSE_PAREN, "expected %<)%>"))
+	    return false;
+	}
+
+      return true;
+    }
+
+  return false;
 }
 
 /* Parse the body of a function declaration marked with "__GIMPLE".  */
@@ -209,9 +239,14 @@ c_parser_parse_gimple_body (c_parser *cparser, char *gimple_pass,
 	  add_local_decl (cfun, var);
       /* We have a CFG.  Build the edges.  */
       for (unsigned i = 0; i < parser.edges.length (); ++i)
-	make_edge (BASIC_BLOCK_FOR_FN (cfun, parser.edges[i].src),
-		   BASIC_BLOCK_FOR_FN (cfun, parser.edges[i].dest),
-		   parser.edges[i].flags);
+	{
+	  edge e = make_edge (BASIC_BLOCK_FOR_FN (cfun, parser.edges[i].src),
+			      BASIC_BLOCK_FOR_FN (cfun, parser.edges[i].dest),
+			      parser.edges[i].flags);
+	  if (parser.edges[i].frequency != -1)
+	    e->probability
+	      = profile_probability::from_raw_value (parser.edges[i].frequency);
+	}
       /* Add edges for case labels.  */
       basic_block bb;
       FOR_EACH_BB_FN (bb, cfun)
@@ -274,6 +309,8 @@ c_parser_parse_gimple_body (c_parser *cparser, char *gimple_pass,
       fix_loop_structure (NULL);
     }
 
+  if (cfun->curr_properties & PROP_cfg)
+    update_max_bb_count ();
   dump_function (TDI_gimple, current_function_decl);
 }
 
@@ -337,11 +374,9 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 		c_parser_consume_token (parser);
 		if (c_parser_next_token_is (parser, CPP_NAME))
 		  {
-		    c_parser_gimple_goto_stmt (parser, loc,
-					       c_parser_peek_token
-					       (parser)->value,
-					       seq);
+		    tree label = c_parser_peek_token (parser)->value;
 		    c_parser_consume_token (parser);
+		    c_parser_gimple_goto_stmt (parser, loc, label, seq);
 		    if (! c_parser_require (parser, CPP_SEMICOLON,
 					    "expected %<;%>"))
 		      return return_p;
@@ -355,7 +390,7 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 				      "expected %<;%>"))
 		return return_p;
 	      if (cfun->curr_properties & PROP_cfg)
-		parser.push_edge (parser.current_bb->index, EXIT_BLOCK, 0);
+		parser.push_edge (parser.current_bb->index, EXIT_BLOCK, 0, -1);
 	      break;
 	    default:
 	      goto expr_stmt;
@@ -397,6 +432,7 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 		  return return_p;
 		}
 	      int is_loop_header_of = -1;
+	      int bb_count = -1;
 	      c_parser_consume_token (parser);
 	      while (c_parser_next_token_is (parser, CPP_COMMA))
 		{
@@ -426,6 +462,30 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 			}
 		      c_parser_consume_token (parser);
 		      is_loop_header_of = TREE_INT_CST_LOW (loop_num);
+		      if (! c_parser_require (parser, CPP_CLOSE_PAREN,
+					      "expected %<)%>"))
+			return return_p;
+		    }
+		  /* count (NUM) */
+		  else if (!strcmp (IDENTIFIER_POINTER
+				    (c_parser_peek_token (parser)->value),
+				    "count"))
+		    {
+		      c_parser_consume_token (parser);
+		      if (! c_parser_require (parser, CPP_OPEN_PAREN,
+					      "expected %<(%>"))
+			return return_p;
+		      tree count;
+		      if (! c_parser_next_token_is (parser, CPP_NUMBER)
+			  || TREE_CODE (count
+					  = c_parser_peek_token (parser)->value)
+			       != INTEGER_CST)
+			{
+			  c_parser_error (parser, "expected count value");
+			  return return_p;
+			}
+		      c_parser_consume_token (parser);
+		      bb_count = TREE_INT_CST_LOW (count);
 		      if (! c_parser_require (parser, CPP_CLOSE_PAREN,
 					      "expected %<)%>"))
 			return return_p;
@@ -470,7 +530,7 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 		last_basic_block_for_fn (cfun) = index + 1;
 	      n_basic_blocks_for_fn (cfun)++;
 	      if (!parser.current_bb)
-		parser.push_edge (ENTRY_BLOCK, bb->index, EDGE_FALLTHRU);
+		parser.push_edge (ENTRY_BLOCK, bb->index, EDGE_FALLTHRU, -1);
 
 	      /* We leave the proper setting to fixup.  */
 	      struct loop *loop_father = loops_for_fn (cfun)->tree_root;
@@ -498,6 +558,10 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 		  loop_father = get_loop (cfun, is_loop_header_of);
 		}
 	      bb->loop_father = loop_father;
+
+	      if (bb_count != -1)
+		bb->count
+		  = profile_count::from_gcov_type (bb_count).guessed_local ();
 
 	      /* Stmts now go to the new block.  */
 	      parser.current_bb = bb;
@@ -688,7 +752,9 @@ c_parser_gimple_statement (gimple_parser &parser, gimple_seq *seq)
 	      if (c_parser_next_token_is (parser, CPP_COLON))
 		c_parser_consume_token (parser);
 	      int src_index = -1;
-	      if (!c_parser_gimple_parse_bb_spec (arg, &src_index))
+	      int frequency;
+	      if (!c_parser_gimple_parse_bb_spec (arg, parser, &src_index,
+						  &frequency))
 		c_parser_error (parser, "invalid source block specification");
 	      vargs.safe_push (size_int (src_index));
 	    }
@@ -1757,10 +1823,12 @@ c_parser_gimple_goto_stmt (gimple_parser &parser,
   if (cfun->curr_properties & PROP_cfg)
     {
       int dest_index;
-      if (c_parser_gimple_parse_bb_spec (label, &dest_index))
+      int frequency;
+      if (c_parser_gimple_parse_bb_spec (label, parser, &dest_index,
+					 &frequency))
 	{
 	  parser.push_edge (parser.current_bb->index, dest_index,
-			    EDGE_FALLTHRU);
+			    EDGE_FALLTHRU, frequency);
 	  return;
 	}
     }
@@ -1811,10 +1879,12 @@ c_parser_gimple_if_stmt (gimple_parser &parser, gimple_seq *seq)
       label = c_parser_peek_token (parser)->value;
       c_parser_consume_token (parser);
       int dest_index;
+      int frequency;
       if ((cfun->curr_properties & PROP_cfg)
-	  && c_parser_gimple_parse_bb_spec (label, &dest_index))
+	  && c_parser_gimple_parse_bb_spec (label, parser, &dest_index,
+					    &frequency))
 	parser.push_edge (parser.current_bb->index, dest_index,
-			  EDGE_TRUE_VALUE);
+			  EDGE_TRUE_VALUE, frequency);
       else
 	t_label = lookup_label_for_goto (loc, label);
       if (! c_parser_require (parser, CPP_SEMICOLON, "expected %<;%>"))
@@ -1844,14 +1914,16 @@ c_parser_gimple_if_stmt (gimple_parser &parser, gimple_seq *seq)
 	  return;
 	}
       label = c_parser_peek_token (parser)->value;
+      c_parser_consume_token (parser);
       int dest_index;
+      int frequency;
       if ((cfun->curr_properties & PROP_cfg)
-	  && c_parser_gimple_parse_bb_spec (label, &dest_index))
+	  && c_parser_gimple_parse_bb_spec (label, parser, &dest_index,
+					    &frequency))
 	parser.push_edge (parser.current_bb->index, dest_index,
-			  EDGE_FALSE_VALUE);
+			  EDGE_FALSE_VALUE, frequency);
       else
 	f_label = lookup_label_for_goto (loc, label);
-      c_parser_consume_token (parser);
       if (! c_parser_require (parser, CPP_SEMICOLON, "expected %<;%>"))
 	return;
     }

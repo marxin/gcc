@@ -564,6 +564,21 @@ public:
   /* Print THIS to stderr.  */
   void debug () const;
 
+  /* Get m_val for GIMPLE FE.  */
+  uint32_t get_raw_value () const
+  {
+    return m_val;
+  }
+
+  /* Build guessed profiled based on VALUE (in GIMPLE FE).  */
+  static profile_probability from_raw_value (uint32_t value)
+  {
+    profile_probability ret;
+    ret.m_val = value;
+    ret.m_quality = profile_guessed;
+    return ret;
+  }
+
   /* Return true if THIS is known to differ significantly from OTHER.  */
   bool differs_from_p (profile_probability other) const;
   /* Return if difference is greater than 50%.  */

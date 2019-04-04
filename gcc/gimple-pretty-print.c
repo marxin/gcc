@@ -2704,6 +2704,8 @@ dump_gimple_bb_header (FILE *outf, basic_block bb, int indent,
 	  fprintf (outf, "%*s__BB(%d", indent, "", bb->index);
 	  if (bb->loop_father->header == bb)
 	    fprintf (outf, ",loop_header(%d)", bb->loop_father->num);
+	  if (bb->count.initialized_p ())
+	    fprintf (outf, ",count(%" PRId64 ")", bb->count.to_gcov_type ());
 	  fprintf (outf, "):\n");
 	}
       else
@@ -2760,6 +2762,12 @@ pp_cfg_jump (pretty_printer *buffer, edge e, dump_flags_t flags)
     {
       pp_string (buffer, "goto __BB");
       pp_decimal_int (buffer, e->dest->index);
+      if (e->probability.initialized_p ())
+	{
+	  pp_string (buffer, "(");
+	  pp_decimal_int (buffer, e->probability.get_raw_value ());
+	  pp_string (buffer, ")");
+	}
       pp_semicolon (buffer);
     }
   else
