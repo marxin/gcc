@@ -4,6 +4,7 @@ STAGE2_CFLAGS += -frandom-seed=1
 STAGE3_CFLAGS += -frandom-seed=1
 STAGEprofile_CFLAGS += -frandom-seed=1
 STAGEtrain_CFLAGS += -frandom-seed=1
+STAGEtrain_GENERATOR_CFLAGS += -flto=jobserver
 STAGEfeedback_CFLAGS += -flto=jobserver -frandom-seed=1
 
 # assumes the host supports the linker plugin

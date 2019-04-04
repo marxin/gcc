@@ -837,30 +837,39 @@ BASE_FLAGS_TO_PASS = \
 	"LEAN=$(LEAN)" \
 	"STAGE1_CFLAGS=$(STAGE1_CFLAGS)" \
 	"STAGE1_CXXFLAGS=$(STAGE1_CXXFLAGS)" \
+	"STAGE1_GENERATOR_CFLAGS=$(STAGE1_GENERATOR_CFLAGS)" \
 	"STAGE1_TFLAGS=$(STAGE1_TFLAGS)" \
 	"STAGE2_CFLAGS=$(STAGE2_CFLAGS)" \
 	"STAGE2_CXXFLAGS=$(STAGE2_CXXFLAGS)" \
+	"STAGE2_GENERATOR_CFLAGS=$(STAGE2_GENERATOR_CFLAGS)" \
 	"STAGE2_TFLAGS=$(STAGE2_TFLAGS)" \
 	"STAGE3_CFLAGS=$(STAGE3_CFLAGS)" \
 	"STAGE3_CXXFLAGS=$(STAGE3_CXXFLAGS)" \
+	"STAGE3_GENERATOR_CFLAGS=$(STAGE3_GENERATOR_CFLAGS)" \
 	"STAGE3_TFLAGS=$(STAGE3_TFLAGS)" \
 	"STAGE4_CFLAGS=$(STAGE4_CFLAGS)" \
 	"STAGE4_CXXFLAGS=$(STAGE4_CXXFLAGS)" \
+	"STAGE4_GENERATOR_CFLAGS=$(STAGE4_GENERATOR_CFLAGS)" \
 	"STAGE4_TFLAGS=$(STAGE4_TFLAGS)" \
 	"STAGEprofile_CFLAGS=$(STAGEprofile_CFLAGS)" \
 	"STAGEprofile_CXXFLAGS=$(STAGEprofile_CXXFLAGS)" \
+	"STAGEprofile_GENERATOR_CFLAGS=$(STAGEprofile_GENERATOR_CFLAGS)" \
 	"STAGEprofile_TFLAGS=$(STAGEprofile_TFLAGS)" \
 	"STAGEtrain_CFLAGS=$(STAGEtrain_CFLAGS)" \
 	"STAGEtrain_CXXFLAGS=$(STAGEtrain_CXXFLAGS)" \
+	"STAGEtrain_GENERATOR_CFLAGS=$(STAGEtrain_GENERATOR_CFLAGS)" \
 	"STAGEtrain_TFLAGS=$(STAGEtrain_TFLAGS)" \
 	"STAGEfeedback_CFLAGS=$(STAGEfeedback_CFLAGS)" \
 	"STAGEfeedback_CXXFLAGS=$(STAGEfeedback_CXXFLAGS)" \
+	"STAGEfeedback_GENERATOR_CFLAGS=$(STAGEfeedback_GENERATOR_CFLAGS)" \
 	"STAGEfeedback_TFLAGS=$(STAGEfeedback_TFLAGS)" \
 	"STAGEautoprofile_CFLAGS=$(STAGEautoprofile_CFLAGS)" \
 	"STAGEautoprofile_CXXFLAGS=$(STAGEautoprofile_CXXFLAGS)" \
+	"STAGEautoprofile_GENERATOR_CFLAGS=$(STAGEautoprofile_GENERATOR_CFLAGS)" \
 	"STAGEautoprofile_TFLAGS=$(STAGEautoprofile_TFLAGS)" \
 	"STAGEautofeedback_CFLAGS=$(STAGEautofeedback_CFLAGS)" \
 	"STAGEautofeedback_CXXFLAGS=$(STAGEautofeedback_CXXFLAGS)" \
+	"STAGEautofeedback_GENERATOR_CFLAGS=$(STAGEautofeedback_GENERATOR_CFLAGS)" \
 	"STAGEautofeedback_TFLAGS=$(STAGEautofeedback_TFLAGS)" \
 	$(CXX_FOR_TARGET_FLAG_TO_PASS) \
 	"TFLAGS=$(TFLAGS)" \
@@ -3249,6 +3258,7 @@ configure-stage1-bfd:
 	test ! -f $(HOST_SUBDIR)/bfd/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/bfd; \
@@ -3282,6 +3292,7 @@ configure-stage2-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/bfd; \
@@ -3315,6 +3326,7 @@ configure-stage3-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/bfd; \
@@ -3348,6 +3360,7 @@ configure-stage4-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/bfd; \
@@ -3381,6 +3394,7 @@ configure-stageprofile-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/bfd; \
@@ -3414,6 +3428,7 @@ configure-stagetrain-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/bfd; \
@@ -3447,6 +3462,7 @@ configure-stagefeedback-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/bfd; \
@@ -3480,6 +3496,7 @@ configure-stageautoprofile-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/bfd; \
@@ -3513,6 +3530,7 @@ configure-stageautofeedback-bfd:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/bfd; \
@@ -4354,6 +4372,7 @@ configure-stage1-opcodes:
 	test ! -f $(HOST_SUBDIR)/opcodes/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/opcodes; \
@@ -4387,6 +4406,7 @@ configure-stage2-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/opcodes; \
@@ -4420,6 +4440,7 @@ configure-stage3-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/opcodes; \
@@ -4453,6 +4474,7 @@ configure-stage4-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/opcodes; \
@@ -4486,6 +4508,7 @@ configure-stageprofile-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/opcodes; \
@@ -4519,6 +4542,7 @@ configure-stagetrain-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/opcodes; \
@@ -4552,6 +4576,7 @@ configure-stagefeedback-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/opcodes; \
@@ -4585,6 +4610,7 @@ configure-stageautoprofile-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/opcodes; \
@@ -4618,6 +4644,7 @@ configure-stageautofeedback-opcodes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/opcodes; \
@@ -5459,6 +5486,7 @@ configure-stage1-binutils:
 	test ! -f $(HOST_SUBDIR)/binutils/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/binutils; \
@@ -5492,6 +5520,7 @@ configure-stage2-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/binutils; \
@@ -5525,6 +5554,7 @@ configure-stage3-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/binutils; \
@@ -5558,6 +5588,7 @@ configure-stage4-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/binutils; \
@@ -5591,6 +5622,7 @@ configure-stageprofile-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/binutils; \
@@ -5624,6 +5656,7 @@ configure-stagetrain-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/binutils; \
@@ -5657,6 +5690,7 @@ configure-stagefeedback-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/binutils; \
@@ -5690,6 +5724,7 @@ configure-stageautoprofile-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/binutils; \
@@ -5723,6 +5758,7 @@ configure-stageautofeedback-binutils:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/binutils; \
@@ -8775,6 +8811,7 @@ configure-stage1-fixincludes:
 	test ! -f $(HOST_SUBDIR)/fixincludes/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/fixincludes; \
@@ -8808,6 +8845,7 @@ configure-stage2-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/fixincludes; \
@@ -8841,6 +8879,7 @@ configure-stage3-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/fixincludes; \
@@ -8874,6 +8913,7 @@ configure-stage4-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/fixincludes; \
@@ -8907,6 +8947,7 @@ configure-stageprofile-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/fixincludes; \
@@ -8940,6 +8981,7 @@ configure-stagetrain-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/fixincludes; \
@@ -8973,6 +9015,7 @@ configure-stagefeedback-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/fixincludes; \
@@ -9006,6 +9049,7 @@ configure-stageautoprofile-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/fixincludes; \
@@ -9039,6 +9083,7 @@ configure-stageautofeedback-fixincludes:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/fixincludes; \
@@ -10309,6 +10354,7 @@ configure-stage1-gas:
 	test ! -f $(HOST_SUBDIR)/gas/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/gas; \
@@ -10342,6 +10388,7 @@ configure-stage2-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/gas; \
@@ -10375,6 +10422,7 @@ configure-stage3-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/gas; \
@@ -10408,6 +10456,7 @@ configure-stage4-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/gas; \
@@ -10441,6 +10490,7 @@ configure-stageprofile-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/gas; \
@@ -10474,6 +10524,7 @@ configure-stagetrain-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/gas; \
@@ -10507,6 +10558,7 @@ configure-stagefeedback-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/gas; \
@@ -10540,6 +10592,7 @@ configure-stageautoprofile-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/gas; \
@@ -10573,6 +10626,7 @@ configure-stageautofeedback-gas:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/gas; \
@@ -11414,6 +11468,7 @@ configure-stage1-gcc:
 	test ! -f $(HOST_SUBDIR)/gcc/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/gcc; \
@@ -11447,6 +11502,7 @@ configure-stage2-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/gcc; \
@@ -11480,6 +11536,7 @@ configure-stage3-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/gcc; \
@@ -11513,6 +11570,7 @@ configure-stage4-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/gcc; \
@@ -11546,6 +11604,7 @@ configure-stageprofile-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/gcc; \
@@ -11579,6 +11638,7 @@ configure-stagetrain-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/gcc; \
@@ -11612,6 +11672,7 @@ configure-stagefeedback-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/gcc; \
@@ -11645,6 +11706,7 @@ configure-stageautoprofile-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/gcc; \
@@ -11678,6 +11740,7 @@ configure-stageautofeedback-gcc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/gcc; \
@@ -12519,6 +12582,7 @@ configure-stage1-gmp:
 	test ! -f $(HOST_SUBDIR)/gmp/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/gmp; \
@@ -12553,6 +12617,7 @@ configure-stage2-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/gmp; \
@@ -12587,6 +12652,7 @@ configure-stage3-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/gmp; \
@@ -12621,6 +12687,7 @@ configure-stage4-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/gmp; \
@@ -12655,6 +12722,7 @@ configure-stageprofile-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/gmp; \
@@ -12689,6 +12757,7 @@ configure-stagetrain-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/gmp; \
@@ -12723,6 +12792,7 @@ configure-stagefeedback-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/gmp; \
@@ -12757,6 +12827,7 @@ configure-stageautoprofile-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/gmp; \
@@ -12791,6 +12862,7 @@ configure-stageautofeedback-gmp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/gmp; \
@@ -13621,6 +13693,7 @@ configure-stage1-mpfr:
 	test ! -f $(HOST_SUBDIR)/mpfr/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/mpfr; \
@@ -13655,6 +13728,7 @@ configure-stage2-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/mpfr; \
@@ -13689,6 +13763,7 @@ configure-stage3-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/mpfr; \
@@ -13723,6 +13798,7 @@ configure-stage4-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/mpfr; \
@@ -13757,6 +13833,7 @@ configure-stageprofile-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/mpfr; \
@@ -13791,6 +13868,7 @@ configure-stagetrain-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/mpfr; \
@@ -13825,6 +13903,7 @@ configure-stagefeedback-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/mpfr; \
@@ -13859,6 +13938,7 @@ configure-stageautoprofile-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/mpfr; \
@@ -13893,6 +13973,7 @@ configure-stageautofeedback-mpfr:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/mpfr; \
@@ -14723,6 +14804,7 @@ configure-stage1-mpc:
 	test ! -f $(HOST_SUBDIR)/mpc/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/mpc; \
@@ -14757,6 +14839,7 @@ configure-stage2-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/mpc; \
@@ -14791,6 +14874,7 @@ configure-stage3-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/mpc; \
@@ -14825,6 +14909,7 @@ configure-stage4-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/mpc; \
@@ -14859,6 +14944,7 @@ configure-stageprofile-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/mpc; \
@@ -14893,6 +14979,7 @@ configure-stagetrain-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/mpc; \
@@ -14927,6 +15014,7 @@ configure-stagefeedback-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/mpc; \
@@ -14961,6 +15049,7 @@ configure-stageautoprofile-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/mpc; \
@@ -14995,6 +15084,7 @@ configure-stageautofeedback-mpc:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/mpc; \
@@ -15825,6 +15915,7 @@ configure-stage1-isl:
 	test ! -f $(HOST_SUBDIR)/isl/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/isl; \
@@ -15859,6 +15950,7 @@ configure-stage2-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/isl; \
@@ -15893,6 +15985,7 @@ configure-stage3-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/isl; \
@@ -15927,6 +16020,7 @@ configure-stage4-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/isl; \
@@ -15961,6 +16055,7 @@ configure-stageprofile-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/isl; \
@@ -15995,6 +16090,7 @@ configure-stagetrain-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/isl; \
@@ -16029,6 +16125,7 @@ configure-stagefeedback-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/isl; \
@@ -16063,6 +16160,7 @@ configure-stageautoprofile-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/isl; \
@@ -16097,6 +16195,7 @@ configure-stageautofeedback-isl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/isl; \
@@ -16927,6 +17026,7 @@ configure-stage1-libelf:
 	test ! -f $(HOST_SUBDIR)/libelf/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/libelf; \
@@ -16961,6 +17061,7 @@ configure-stage2-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/libelf; \
@@ -16995,6 +17096,7 @@ configure-stage3-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/libelf; \
@@ -17029,6 +17131,7 @@ configure-stage4-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/libelf; \
@@ -17063,6 +17166,7 @@ configure-stageprofile-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/libelf; \
@@ -17097,6 +17201,7 @@ configure-stagetrain-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/libelf; \
@@ -17131,6 +17236,7 @@ configure-stagefeedback-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/libelf; \
@@ -17165,6 +17271,7 @@ configure-stageautoprofile-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/libelf; \
@@ -17199,6 +17306,7 @@ configure-stageautofeedback-libelf:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/libelf; \
@@ -18029,6 +18137,7 @@ configure-stage1-gold:
 	test ! -f $(HOST_SUBDIR)/gold/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/gold; \
@@ -18062,6 +18171,7 @@ configure-stage2-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/gold; \
@@ -18095,6 +18205,7 @@ configure-stage3-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/gold; \
@@ -18128,6 +18239,7 @@ configure-stage4-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/gold; \
@@ -18161,6 +18273,7 @@ configure-stageprofile-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/gold; \
@@ -18194,6 +18307,7 @@ configure-stagetrain-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/gold; \
@@ -18227,6 +18341,7 @@ configure-stagefeedback-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/gold; \
@@ -18260,6 +18375,7 @@ configure-stageautoprofile-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/gold; \
@@ -18293,6 +18409,7 @@ configure-stageautofeedback-gold:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/gold; \
@@ -19575,6 +19692,7 @@ configure-stage1-intl:
 	test ! -f $(HOST_SUBDIR)/intl/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/intl; \
@@ -19608,6 +19726,7 @@ configure-stage2-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/intl; \
@@ -19641,6 +19760,7 @@ configure-stage3-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/intl; \
@@ -19674,6 +19794,7 @@ configure-stage4-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/intl; \
@@ -19707,6 +19828,7 @@ configure-stageprofile-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/intl; \
@@ -19740,6 +19862,7 @@ configure-stagetrain-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/intl; \
@@ -19773,6 +19896,7 @@ configure-stagefeedback-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/intl; \
@@ -19806,6 +19930,7 @@ configure-stageautoprofile-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/intl; \
@@ -19839,6 +19964,7 @@ configure-stageautofeedback-intl:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/intl; \
@@ -21547,6 +21673,7 @@ configure-stage1-ld:
 	test ! -f $(HOST_SUBDIR)/ld/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/ld; \
@@ -21580,6 +21707,7 @@ configure-stage2-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/ld; \
@@ -21613,6 +21741,7 @@ configure-stage3-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/ld; \
@@ -21646,6 +21775,7 @@ configure-stage4-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/ld; \
@@ -21679,6 +21809,7 @@ configure-stageprofile-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/ld; \
@@ -21712,6 +21843,7 @@ configure-stagetrain-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/ld; \
@@ -21745,6 +21877,7 @@ configure-stagefeedback-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/ld; \
@@ -21778,6 +21911,7 @@ configure-stageautoprofile-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/ld; \
@@ -21811,6 +21945,7 @@ configure-stageautofeedback-ld:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/ld; \
@@ -22652,6 +22787,7 @@ configure-stage1-libbacktrace:
 	test ! -f $(HOST_SUBDIR)/libbacktrace/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/libbacktrace; \
@@ -22685,6 +22821,7 @@ configure-stage2-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/libbacktrace; \
@@ -22718,6 +22855,7 @@ configure-stage3-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/libbacktrace; \
@@ -22751,6 +22889,7 @@ configure-stage4-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/libbacktrace; \
@@ -22784,6 +22923,7 @@ configure-stageprofile-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/libbacktrace; \
@@ -22817,6 +22957,7 @@ configure-stagetrain-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/libbacktrace; \
@@ -22850,6 +22991,7 @@ configure-stagefeedback-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/libbacktrace; \
@@ -22883,6 +23025,7 @@ configure-stageautoprofile-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/libbacktrace; \
@@ -22916,6 +23059,7 @@ configure-stageautofeedback-libbacktrace:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/libbacktrace; \
@@ -23757,6 +23901,7 @@ configure-stage1-libcpp:
 	test ! -f $(HOST_SUBDIR)/libcpp/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/libcpp; \
@@ -23790,6 +23935,7 @@ configure-stage2-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/libcpp; \
@@ -23823,6 +23969,7 @@ configure-stage3-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/libcpp; \
@@ -23856,6 +24003,7 @@ configure-stage4-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/libcpp; \
@@ -23889,6 +24037,7 @@ configure-stageprofile-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/libcpp; \
@@ -23922,6 +24071,7 @@ configure-stagetrain-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/libcpp; \
@@ -23955,6 +24105,7 @@ configure-stagefeedback-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/libcpp; \
@@ -23988,6 +24139,7 @@ configure-stageautoprofile-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/libcpp; \
@@ -24021,6 +24173,7 @@ configure-stageautofeedback-libcpp:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/libcpp; \
@@ -24862,6 +25015,7 @@ configure-stage1-libdecnumber:
 	test ! -f $(HOST_SUBDIR)/libdecnumber/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/libdecnumber; \
@@ -24895,6 +25049,7 @@ configure-stage2-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/libdecnumber; \
@@ -24928,6 +25083,7 @@ configure-stage3-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/libdecnumber; \
@@ -24961,6 +25117,7 @@ configure-stage4-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/libdecnumber; \
@@ -24994,6 +25151,7 @@ configure-stageprofile-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/libdecnumber; \
@@ -25027,6 +25185,7 @@ configure-stagetrain-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/libdecnumber; \
@@ -25060,6 +25219,7 @@ configure-stagefeedback-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/libdecnumber; \
@@ -25093,6 +25253,7 @@ configure-stageautoprofile-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/libdecnumber; \
@@ -25126,6 +25287,7 @@ configure-stageautofeedback-libdecnumber:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/libdecnumber; \
@@ -26408,6 +26570,7 @@ configure-stage1-libiberty:
 	test ! -f $(HOST_SUBDIR)/libiberty/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/libiberty; \
@@ -26442,6 +26605,7 @@ configure-stage2-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/libiberty; \
@@ -26476,6 +26640,7 @@ configure-stage3-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/libiberty; \
@@ -26510,6 +26675,7 @@ configure-stage4-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/libiberty; \
@@ -26544,6 +26710,7 @@ configure-stageprofile-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/libiberty; \
@@ -26578,6 +26745,7 @@ configure-stagetrain-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/libiberty; \
@@ -26612,6 +26780,7 @@ configure-stagefeedback-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/libiberty; \
@@ -26646,6 +26815,7 @@ configure-stageautoprofile-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/libiberty; \
@@ -26680,6 +26850,7 @@ configure-stageautofeedback-libiberty:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/libiberty; \
@@ -27522,6 +27693,7 @@ configure-stage1-libiberty-linker-plugin:
 	test ! -f $(HOST_SUBDIR)/libiberty-linker-plugin/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27556,6 +27728,7 @@ configure-stage2-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27590,6 +27763,7 @@ configure-stage3-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27624,6 +27798,7 @@ configure-stage4-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27658,6 +27833,7 @@ configure-stageprofile-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27692,6 +27868,7 @@ configure-stagetrain-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27726,6 +27903,7 @@ configure-stagefeedback-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27760,6 +27938,7 @@ configure-stageautoprofile-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -27794,6 +27973,7 @@ configure-stageautofeedback-libiberty-linker-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/libiberty-linker-plugin; \
@@ -28636,6 +28816,7 @@ configure-stage1-libiconv:
 	test ! -f $(HOST_SUBDIR)/libiconv/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/libiconv; \
@@ -28670,6 +28851,7 @@ configure-stage2-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/libiconv; \
@@ -28704,6 +28886,7 @@ configure-stage3-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/libiconv; \
@@ -28738,6 +28921,7 @@ configure-stage4-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/libiconv; \
@@ -28772,6 +28956,7 @@ configure-stageprofile-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/libiconv; \
@@ -28806,6 +28991,7 @@ configure-stagetrain-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/libiconv; \
@@ -28840,6 +29026,7 @@ configure-stagefeedback-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/libiconv; \
@@ -28874,6 +29061,7 @@ configure-stageautoprofile-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/libiconv; \
@@ -28908,6 +29096,7 @@ configure-stageautofeedback-libiconv:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/libiconv; \
@@ -31838,6 +32027,7 @@ configure-stage1-zlib:
 	test ! -f $(HOST_SUBDIR)/zlib/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/zlib; \
@@ -31872,6 +32062,7 @@ configure-stage2-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/zlib; \
@@ -31906,6 +32097,7 @@ configure-stage3-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/zlib; \
@@ -31940,6 +32132,7 @@ configure-stage4-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/zlib; \
@@ -31974,6 +32167,7 @@ configure-stageprofile-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/zlib; \
@@ -32008,6 +32202,7 @@ configure-stagetrain-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/zlib; \
@@ -32042,6 +32237,7 @@ configure-stagefeedback-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/zlib; \
@@ -32076,6 +32272,7 @@ configure-stageautoprofile-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/zlib; \
@@ -32110,6 +32307,7 @@ configure-stageautofeedback-zlib:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/zlib; \
@@ -35949,6 +36147,7 @@ configure-stage1-lto-plugin:
 	test ! -f $(HOST_SUBDIR)/lto-plugin/Makefile || exit 0; \
 	$(HOST_EXPORTS) \
 	CFLAGS="$(STAGE1_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE1_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE1_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 1 in $(HOST_SUBDIR)/lto-plugin; \
@@ -35983,6 +36182,7 @@ configure-stage2-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE2_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE2_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE2_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE2_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 2 in $(HOST_SUBDIR)/lto-plugin; \
@@ -36017,6 +36217,7 @@ configure-stage3-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE3_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE3_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE3_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE3_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 3 in $(HOST_SUBDIR)/lto-plugin; \
@@ -36051,6 +36252,7 @@ configure-stage4-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGE4_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGE4_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGE4_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGE4_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage 4 in $(HOST_SUBDIR)/lto-plugin; \
@@ -36085,6 +36287,7 @@ configure-stageprofile-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage profile in $(HOST_SUBDIR)/lto-plugin; \
@@ -36119,6 +36322,7 @@ configure-stagetrain-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEtrain_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEtrain_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEtrain_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEtrain_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage train in $(HOST_SUBDIR)/lto-plugin; \
@@ -36153,6 +36357,7 @@ configure-stagefeedback-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEfeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEfeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEfeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEfeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage feedback in $(HOST_SUBDIR)/lto-plugin; \
@@ -36187,6 +36392,7 @@ configure-stageautoprofile-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautoprofile_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautoprofile_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautoprofile_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautoprofile_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autoprofile in $(HOST_SUBDIR)/lto-plugin; \
@@ -36221,6 +36427,7 @@ configure-stageautofeedback-lto-plugin:
 	$(HOST_EXPORTS) \
 	$(POSTSTAGE1_HOST_EXPORTS) \
 	CFLAGS="$(STAGEautofeedback_CFLAGS)"; export CFLAGS; \
+	GENERATOR_CFLAGS="$(STAGEautofeedback_GENERATOR_CFLAGS)"; export GENERATOR_CFLAGS; \
 	CXXFLAGS="$(STAGEautofeedback_CXXFLAGS)"; export CXXFLAGS; \
 	LIBCFLAGS="$(STAGEautofeedback_CFLAGS)"; export LIBCFLAGS;  \
 	echo Configuring stage autofeedback in $(HOST_SUBDIR)/lto-plugin; \

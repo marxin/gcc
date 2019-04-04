@@ -1089,11 +1089,7 @@ else
 fi
 AC_SUBST(GENERATED_MANPAGES)
 
-if test X"$BUILD_CONFIG" = X"bootstrap-lto-lean"; then
-  GENERATOR_EXTRA_FLAGS=-flto=jobserver
-fi
-AC_SUBST(GENERATOR_EXTRA_FLAGS)
-
+AC_SUBST(GENERATOR_CFLAGS)
 MISSING="${CONFIG_SHELL-/bin/sh} $ac_aux_dir/missing"
 
 # How about lex?
@@ -6672,3 +6668,4 @@ done
 ], 
 [subdirs='$subdirs'])
 AC_OUTPUT
+
