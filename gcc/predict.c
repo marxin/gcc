@@ -132,12 +132,23 @@ get_hot_bb_threshold ()
 {
   if (min_count == -1)
     {
-      min_count
-	= profile_info->sum_max / PARAM_VALUE (HOT_BB_COUNT_FRACTION);
+      if (flag_gimple)
+	min_count = PARAM_VALUE (PARAM_GIMPLE_FE_COMPUTED_HOT_BB_THRESHOLD);
+      else
+	min_count
+	  = profile_info->sum_max / PARAM_VALUE (HOT_BB_COUNT_FRACTION);
       if (dump_file)
 	fprintf (dump_file, "Setting hotness threshold to %" PRId64 ".\n",
 		 min_count);
     }
+  return min_count;
+}
+
+/* Determine the threshold for hot BB counts and do not set the value.  */
+
+gcov_type
+get_current_hot_bb_threshold ()
+{
   return min_count;
 }
 
