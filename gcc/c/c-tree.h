@@ -317,6 +317,10 @@ struct c_declspecs {
   tree attrs;
   /* The pass to start compiling a __GIMPLE or __RTL function with.  */
   char *gimple_or_rtl_pass;
+  /* Hotness threshold for __GIMPLE FE.  */
+  gcov_type hot_bb_threshold;
+  /* ENTRY BB count.  */
+  profile_count entry_bb_count;
   /* The base-2 log of the greatest alignment required by an _Alignas
      specifier, in bytes, or -1 if no such specifiers with nonzero
      alignment.  */

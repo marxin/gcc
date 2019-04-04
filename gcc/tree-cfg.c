@@ -7874,11 +7874,16 @@ dump_function_to_file (tree fndecl, FILE *file, dump_flags_t flags)
     {
       print_generic_expr (file, TREE_TYPE (TREE_TYPE (fndecl)),
 			  dump_flags | TDF_SLIM);
-      fprintf (file, " __GIMPLE (%s)\n%s (",
+      fprintf (file, " __GIMPLE (%s",
 	       (fun->curr_properties & PROP_ssa) ? "ssa"
 	       : (fun->curr_properties & PROP_cfg) ? "cfg"
-	       : "",
-	       function_name (fun));
+	       : "");
+      basic_block bb = ENTRY_BLOCK_PTR_FOR_FN (cfun);
+      if (bb->count.initialized_p ())
+	fprintf (file, ",%s(%d)",
+		 profile_quality_as_string (bb->count.quality ()),
+		 bb->count.value ());
+      fprintf (file, ")\n%s (", function_name (fun));
     }
   else
     fprintf (file, "%s %s(", function_name (fun), tmclone ? "[tm-clone] " : "");
