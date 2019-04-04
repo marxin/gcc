@@ -52,6 +52,7 @@ enum prediction
 extern profile_probability split_branch_probability;
 
 extern gcov_type get_hot_bb_threshold (void);
+extern gcov_type get_current_hot_bb_threshold (void);
 extern void set_hot_bb_threshold (gcov_type);
 extern bool maybe_hot_count_p (struct function *, profile_count);
 extern bool maybe_hot_bb_p (struct function *, const_basic_block);
