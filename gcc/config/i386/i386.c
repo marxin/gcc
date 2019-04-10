@@ -31883,6 +31883,22 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
     P_AVX2,
     P_PROC_AVX2,
     P_AVX512F,
+    P_AVX512VL,
+    P_AVX512BW,
+    P_AVX512DQ,
+    P_AVX512CD,
+    P_AVX512ER,
+    P_AVX512PF,
+    P_AVX512VBMI,
+    P_AVX512IFMA,
+    P_AVX5124VNNIW,
+    P_AVX5124FMAPS,
+    P_AVX512VPOPCNTDQ,
+    P_AVX512VBMI2,
+    P_GFNI,
+    P_VPCLMULQDQ,
+    P_AVX512VNNI,
+    P_AVX512BITALG,
     P_PROC_AVX512F
   };
 
@@ -31916,7 +31932,23 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
       {"fma", P_FMA},
       {"bmi2", P_BMI2},
       {"avx2", P_AVX2},
-      {"avx512f", P_AVX512F}
+      {"avx512f", P_AVX512F},
+      {"avx512vl", P_AVX512VL},
+      {"avx512bw", P_AVX512BW},
+      {"avx512dq", P_AVX512DQ},
+      {"avx512cd", P_AVX512CD},
+      {"avx512er", P_AVX512ER},
+      {"avx512pf", P_AVX512PF},
+      {"avx512vbmi", P_AVX512VBMI},
+      {"avx512ifma", P_AVX512IFMA},
+      {"avx5124vnniw", P_AVX5124VNNIW},
+      {"avx5124fmaps", P_AVX5124FMAPS},
+      {"avx512vpopcntdq", P_AVX512VPOPCNTDQ},
+      {"avx512vbmi2", P_AVX512VBMI2},
+      {"gfni", P_GFNI},
+      {"vpclmulqdq", P_VPCLMULQDQ},
+      {"avx512vnni", P_AVX512VNNI},
+      {"avx512bitalg", P_AVX512BITALG}
     };
 
 
