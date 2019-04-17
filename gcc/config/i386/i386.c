@@ -31930,6 +31930,24 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
       {"avx512f", P_AVX512F}
     };
 
+  static const char * avx512_warning_isas[] = {
+      "avx5124fmaps",
+      "avx5124vnniw",
+      "avx512vpopcntdq",
+      "avx512vbmi2",
+      "avx512vnni",
+      "avx512bitalg",
+      "avx512vbmi",
+      "avx512ifma",
+      "avx512vl",
+      "avx512bw",
+      "avx512dq",
+      "avx512er",
+      "avx512pf",
+      "avx512cd",
+      "gfni",
+      "vpclmulqdq",
+  };
 
   static unsigned int NUM_FEATURES
     = sizeof (feature_list) / sizeof (struct _feature_list);
@@ -32150,6 +32168,15 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 	}
       if (predicate_list && i == NUM_FEATURES)
 	{
+	  for (unsigned i = 0; i < ARRAY_SIZE (avx512_warning_isas); i++)
+	    if (strcmp (token, avx512_warning_isas[i]) == 0)
+	      {
+		error_at (DECL_SOURCE_LOCATION (decl),
+			  "AVX512 ISA %qs is not supported in "
+			  "%<target%> attribute, use %<arch=%> syntax", token);
+		return 0;
+	      }
+
 	  error_at (DECL_SOURCE_LOCATION (decl),
 		    "no dispatcher found for %s", token);
 	  return 0;
