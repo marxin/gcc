@@ -122,6 +122,8 @@ private:
   static const xlogue_layout s_instances[XLOGUE_SET_COUNT];
 };
 
+namespace {
+
 class scalar_chain
 {
  public:
@@ -186,6 +188,8 @@ class timode_scalar_chain : public scalar_chain
   /* We don't convert registers to difference size.  */
   void convert_registers () {}
 };
+
+} // anon namespace
 
 bool ix86_save_reg (unsigned int regno, bool maybe_eh_return, bool ignore_outlined);
 int ix86_compare_version_priority (tree decl1, tree decl2);
