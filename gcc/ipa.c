@@ -166,7 +166,7 @@ process_references (symtab_node *snode,
    devirtualization happens.  After inlining still keep their declarations
    around, so we can devirtualize to a direct call.
 
-   Also try to make trivial devirutalization when no or only one target is
+   Also try to make trivial devirtualization when no or only one target is
    possible.  */
 
 static void

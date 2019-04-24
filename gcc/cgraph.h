@@ -24,6 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "profile-count.h"
 #include "ipa-ref.h"
 #include "plugin-api.h"
+#include "gcov-io.h"
 
 extern void debuginfo_early_init (void);
 extern void debuginfo_init (void);
@@ -1630,6 +1631,16 @@ private:
   void make_speculative (tree otr_type = NULL);
 };
 
+/* Structure containing indirect target information from profile.  */
+
+struct GTY (()) indirect_target_info
+{
+  /* Profile_id of common target obtained from profile.  */
+  int common_target_id;
+  /* Probability that call will land in function with COMMON_TARGET_ID.  */
+  int common_target_probability;
+};
+
 /* Structure containing additional information about an indirect call.  */
 
 struct GTY(()) cgraph_indirect_call_info
@@ -1647,10 +1658,11 @@ struct GTY(()) cgraph_indirect_call_info
   int param_index;
   /* ECF flags determined from the caller.  */
   int ecf_flags;
-  /* Profile_id of common target obtrained from profile.  */
-  int common_target_id;
-  /* Probability that call will land in function with COMMON_TARGET_ID.  */
-  int common_target_probability;
+
+  /* An indirect call may contain one or multiple call targets.  */
+  vec<indirect_target_info, va_gc> *indirect_call_targets;
+
+  unsigned num_of_ics;
 
   /* Set when the call is a virtual call with the parameter being the
      associated object pointer rather than a simple direct call.  */

@@ -1110,6 +1110,7 @@ cgraph_edge::speculative_call_info (cgraph_edge *&direct,
   int i;
   cgraph_edge *e2;
   cgraph_edge *e = this;
+  cgraph_node *referred_node;
 
   if (!e->indirect_unknown_callee)
     for (e2 = e->caller->indirect_calls;
@@ -1142,8 +1143,35 @@ cgraph_edge::speculative_call_info (cgraph_edge *&direct,
 	&& ((ref->stmt && ref->stmt == e->call_stmt)
 	    || (!ref->stmt && ref->lto_stmt_uid == e->lto_stmt_uid)))
       {
-	reference = ref;
-	break;
+	if (e2->indirect_info && e2->indirect_info->num_of_ics > 1)
+	  {
+	    referred_node = dyn_cast<cgraph_node *> (ref->referred);
+	    if (strstr (e->callee->name (), referred_node->name ()))
+	      {
+		reference = ref;
+		break;
+	      }
+	    else if (e->callee->icf_merged)
+	      {
+		referred_node = dyn_cast<cgraph_node *> (ref->referred);
+		if (referred_node->callees
+		    && e->callee == referred_node->callees->callee)
+		  {
+		    reference = ref;
+		    break;
+		  }
+	      }
+	    if (dump_file)
+	      fprintf (dump_file,
+		       "multiple speculative call %s => %s, ref: %s\n",
+		       e->caller->dump_name (), e->callee->dump_name (),
+		       referred_node->dump_name ());
+	  }
+	else
+	  {
+	    reference = ref;
+	    break;
+	  }
       }
 
   /* Speculative edge always consist of all three components - direct edge,
@@ -1199,7 +1227,14 @@ cgraph_edge::resolve_speculation (tree callee_decl)
          in the functions inlined through it.  */
     }
   edge->count += e2->count;
-  edge->speculative = false;
+  if (edge->indirect_info && edge->indirect_info->num_of_ics)
+    {
+      edge->indirect_info->num_of_ics--;
+      if (edge->indirect_info->num_of_ics == 0)
+	edge->speculative = false;
+    }
+  else
+    edge->speculative = false;
   e2->speculative = false;
   ref->remove_reference ();
   if (e2->indirect_unknown_callee || e2->inline_failed)
@@ -1333,7 +1368,14 @@ cgraph_edge::redirect_call_stmt_to_callee (void)
 	  e->caller->set_call_stmt_including_clones (e->call_stmt, new_stmt,
 						     false);
 	  e->count = gimple_bb (e->call_stmt)->count;
-	  e2->speculative = false;
+	  if (e2->indirect_info && e2->indirect_info->num_of_ics)
+	    {
+	      e2->indirect_info->num_of_ics--;
+	      if (e2->indirect_info->num_of_ics == 0)
+		e2->speculative = false;
+	    }
+	  else
+	    e2->speculative = false;
 	  e2->count = gimple_bb (e2->call_stmt)->count;
 	  ref->speculative = false;
 	  ref->stmt = NULL;
@@ -3434,7 +3476,7 @@ cgraph_node::verify_node (void)
 
       for (e = callees; e; e = e->next_callee)
 	{
-	  if (!e->aux)
+	  if (!e->aux && !e->speculative)
 	    {
 	      error ("edge %s->%s has no corresponding call_stmt",
 		     identifier_to_locale (e->caller->name ()),

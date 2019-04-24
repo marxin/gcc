@@ -2167,6 +2167,22 @@ copy_bb (copy_body_data *id, basic_block bb,
 
 			  gcc_assert (!edge->indirect_unknown_callee);
 			  old_edge->speculative_call_info (direct, indirect, ref);
+			  while (old_edge->next_callee
+				 && old_edge->next_callee->speculative
+				 && indirect->indirect_info
+				 && indirect->indirect_info->num_of_ics > 1)
+			    {
+			      id->dst_node->clone_reference (ref, stmt);
+
+			      edge = old_edge->next_callee;
+			      edge = edge->clone (id->dst_node, call_stmt,
+						  gimple_uid (stmt), num, den,
+						  true);
+			      old_edge = old_edge->next_callee;
+			      gcc_assert (!edge->indirect_unknown_callee);
+			      old_edge->speculative_call_info (direct, indirect,
+							       ref);
+			    }
 
 			  profile_count indir_cnt = indirect->count;
 			  indirect = indirect->clone (id->dst_node, call_stmt,

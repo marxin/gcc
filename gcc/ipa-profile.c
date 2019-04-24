@@ -191,26 +191,40 @@ ipa_profile_generate_summary (void)
 		     takes away bad histograms.  */
 		  if (h)
 		    {
-		      gcov_type val, count, all;
-		      if (get_most_common_single_value (NULL, "indirect call",
-							h, &val, &count, &all))
+		      unsigned j;
+		      struct cgraph_edge *e = node->get_edge (stmt);
+		      if (e && !e->indirect_unknown_callee)
+			continue;
+
+		      e->indirect_info->num_of_ics = 0;
+		      for (j = 1; j < h->n_counters; j += 2)
 			{
-			  struct cgraph_edge * e = node->get_edge (stmt);
-			  if (e && !e->indirect_unknown_callee)
+			  if (h->hvalue.counters[j] == 0)
 			    continue;
 
-			  e->indirect_info->common_target_id = val;
-			  e->indirect_info->common_target_probability
-			    = GCOV_COMPUTE_SCALE (count, all);
-			  if (e->indirect_info->common_target_probability > REG_BR_PROB_BASE)
+			  struct indirect_target_info item;
+			  item.common_target_id = h->hvalue.counters[j];
+			  item.common_target_probability = GCOV_COMPUTE_SCALE (
+			    h->hvalue.counters[j + 1],
+			    gimple_bb (stmt)->count.ipa ().to_gcov_type ());
+			  vec_safe_push (
+			    e->indirect_info->indirect_call_targets, item);
+
+			  if (item.common_target_probability > REG_BR_PROB_BASE)
 			    {
 			      if (dump_file)
-				fprintf (dump_file, "Probability capped to 1\n");
-			      e->indirect_info->common_target_probability = REG_BR_PROB_BASE;
+				fprintf (dump_file,
+					 "Probability capped to 1\n");
+			      item.common_target_probability = REG_BR_PROB_BASE;
 			    }
+			  e->indirect_info->num_of_ics++;
 			}
-		      gimple_remove_histogram_value (DECL_STRUCT_FUNCTION (node->decl),
-						      stmt, h);
+		      gcc_assert (e->indirect_info->num_of_ics
+				  <= GCOV_DISK_SINGLE_VALUES);
+
+		      gimple_remove_histogram_value (DECL_STRUCT_FUNCTION (
+						       node->decl),
+						     stmt, h);
 		    }
 		}
 	      time += estimate_num_insns (stmt, &eni_time_weights);
@@ -492,6 +506,7 @@ ipa_profile (void)
   int nindirect = 0, ncommon = 0, nunknown = 0, nuseless = 0, nconverted = 0;
   int nmismatch = 0, nimpossible = 0;
   bool node_map_initialized = false;
+  gcov_type threshold;
 
   if (dump_file)
     dump_histogram (dump_file, histogram);
@@ -500,14 +515,12 @@ ipa_profile (void)
       overall_time += histogram[i]->count * histogram[i]->time;
       overall_size += histogram[i]->size;
     }
+  threshold = 0;
   if (overall_time)
     {
-      gcov_type threshold;
-
       gcc_assert (overall_size);
 
       cutoff = (overall_time * PARAM_VALUE (HOT_BB_COUNT_WS_PERMILLE) + 500) / 1000;
-      threshold = 0;
       for (i = 0; cumulated < cutoff; i++)
 	{
 	  cumulated += histogram[i]->count * histogram[i]->time;
@@ -543,7 +556,7 @@ ipa_profile (void)
   histogram.release ();
   histogram_pool.release ();
 
-  /* Produce speculative calls: we saved common traget from porfiling into
+  /* Produce speculative calls: we saved common target from profiling into
      e->common_target_id.  Now, at link time, we can look up corresponding
      function node and produce speculative call.  */
 
@@ -558,104 +571,131 @@ ipa_profile (void)
 	{
 	  if (n->count.initialized_p ())
 	    nindirect++;
-	  if (e->indirect_info->common_target_id)
+	  if (e->indirect_info && e->indirect_info->num_of_ics)
 	    {
-	      if (!node_map_initialized)
-	        init_node_map (false);
-	      node_map_initialized = true;
-	      ncommon++;
-	      n2 = find_func_by_profile_id (e->indirect_info->common_target_id);
-	      if (n2)
+	      if (in_lto_p)
 		{
 		  if (dump_file)
 		    {
-		      fprintf (dump_file, "Indirect call -> direct call from"
-			       " other module %s => %s, prob %3.2f\n",
-			       n->dump_name (),
-			       n2->dump_name (),
-			       e->indirect_info->common_target_probability
-			       / (float)REG_BR_PROB_BASE);
+		      fprintf (dump_file,
+			       "Updating hotness threshold in LTO mode.\n");
+		      fprintf (dump_file, "Updated min count: %" PRId64 "\n",
+			       (int64_t) threshold);
 		    }
-		  if (e->indirect_info->common_target_probability
-		      < REG_BR_PROB_BASE / 2)
+		  set_hot_bb_threshold (threshold
+					/ e->indirect_info->num_of_ics);
+		}
+	      if (!node_map_initialized)
+		init_node_map (false);
+	      node_map_initialized = true;
+	      ncommon++;
+	      unsigned speculative = 0;
+	      struct indirect_target_info *item;
+	      FOR_EACH_VEC_SAFE_ELT (e->indirect_info->indirect_call_targets, i,
+				     item)
+		{
+		  if (i > e->indirect_info->num_of_ics)
+		    break;
+		  n2 = find_func_by_profile_id (item->common_target_id);
+		  if (n2)
 		    {
-		      nuseless++;
 		      if (dump_file)
-			fprintf (dump_file,
-				 "Not speculating: probability is too low.\n");
-		    }
-		  else if (!e->maybe_hot_p ())
-		    {
-		      nuseless++;
-		      if (dump_file)
-			fprintf (dump_file,
-				 "Not speculating: call is cold.\n");
-		    }
-		  else if (n2->get_availability () <= AVAIL_INTERPOSABLE
-			   && n2->can_be_discarded_p ())
-		    {
-		      nuseless++;
-		      if (dump_file)
-			fprintf (dump_file,
-				 "Not speculating: target is overwritable "
-				 "and can be discarded.\n");
-		    }
-		  else if (ipa_node_params_sum && ipa_edge_args_sum
-			   && (!vec_safe_is_empty
-			       (IPA_NODE_REF (n2)->descriptors))
-			   && ipa_get_param_count (IPA_NODE_REF (n2))
-			      != ipa_get_cs_argument_count (IPA_EDGE_REF (e))
-			    && (ipa_get_param_count (IPA_NODE_REF (n2))
-				>= ipa_get_cs_argument_count (IPA_EDGE_REF (e))
-				|| !stdarg_p (TREE_TYPE (n2->decl))))
-		    {
-		      nmismatch++;
-		      if (dump_file)
-			fprintf (dump_file,
-				 "Not speculating: "
-				 "parameter count mistmatch\n");
-		    }
-		  else if (e->indirect_info->polymorphic
-			   && !opt_for_fn (n->decl, flag_devirtualize)
-			   && !possible_polymorphic_call_target_p (e, n2))
-		    {
-		      nimpossible++;
-		      if (dump_file)
-			fprintf (dump_file,
-				 "Not speculating: "
-				 "function is not in the polymorphic "
-				 "call target list\n");
+			{
+			  fprintf (dump_file,
+				   "Indirect call -> direct call from"
+				   " other module %s => %s, prob %3.2f\n",
+				   n->dump_name (), n2->dump_name (),
+				   item->common_target_probability
+				     / (float) REG_BR_PROB_BASE);
+			}
+		      if (item->common_target_probability
+			  < REG_BR_PROB_BASE / 2)
+			{
+			  nuseless++;
+			  if (dump_file)
+			    fprintf (
+			      dump_file,
+			      "Not speculating: probability is too low.\n");
+			}
+		      else if (!e->maybe_hot_p ())
+			{
+			  nuseless++;
+			  if (dump_file)
+			    fprintf (dump_file,
+				     "Not speculating: call is cold.\n");
+			}
+		      else if (n2->get_availability () <= AVAIL_INTERPOSABLE
+			       && n2->can_be_discarded_p ())
+			{
+			  nuseless++;
+			  if (dump_file)
+			    fprintf (dump_file,
+				     "Not speculating: target is overwritable "
+				     "and can be discarded.\n");
+			}
+		      else if (ipa_node_params_sum && ipa_edge_args_sum
+			       && (!vec_safe_is_empty (
+				 IPA_NODE_REF (n2)->descriptors))
+			       && ipa_get_param_count (IPA_NODE_REF (n2))
+				    != ipa_get_cs_argument_count (
+				      IPA_EDGE_REF (e))
+			       && (ipa_get_param_count (IPA_NODE_REF (n2))
+				     >= ipa_get_cs_argument_count (
+				       IPA_EDGE_REF (e))
+				   || !stdarg_p (TREE_TYPE (n2->decl))))
+			{
+			  nmismatch++;
+			  if (dump_file)
+			    fprintf (dump_file, "Not speculating: "
+						"parameter count mismatch\n");
+			}
+		      else if (e->indirect_info->polymorphic
+			       && !opt_for_fn (n->decl, flag_devirtualize)
+			       && !possible_polymorphic_call_target_p (e, n2))
+			{
+			  nimpossible++;
+			  if (dump_file)
+			    fprintf (dump_file,
+				     "Not speculating: "
+				     "function is not in the polymorphic "
+				     "call target list\n");
+			}
+		      else
+			{
+			  /* Target may be overwritable, but profile says that
+			     control flow goes to this particular implementation
+			     of N2.  Speculate on the local alias to allow
+			     inlining.
+			     */
+			  if (!n2->can_be_discarded_p ())
+			    {
+			      cgraph_node *alias;
+			      alias = dyn_cast<cgraph_node *> (
+				n2->noninterposable_alias ());
+			      if (alias)
+				n2 = alias;
+			    }
+			  nconverted++;
+			  e->make_speculative (
+			    n2, e->count.apply_probability (
+				    item->common_target_probability));
+			  update = true;
+			  speculative++;
+			}
 		    }
 		  else
 		    {
-		      /* Target may be overwritable, but profile says that
-			 control flow goes to this particular implementation
-			 of N2.  Speculate on the local alias to allow inlining.
-		       */
-		      if (!n2->can_be_discarded_p ())
-			{
-			  cgraph_node *alias;
-			  alias = dyn_cast<cgraph_node *> (n2->noninterposable_alias ());
-			  if (alias)
-			    n2 = alias;
-			}
-		      nconverted++;
-		      e->make_speculative
-			(n2,
-			 e->count.apply_probability
-				     (e->indirect_info->common_target_probability));
-		      update = true;
+		      if (dump_file)
+			fprintf (dump_file,
+				 "Function with profile-id %i not found.\n",
+				 item->common_target_id);
+		      nunknown++;
 		    }
 		}
-	      else
-		{
-		  if (dump_file)
-		    fprintf (dump_file, "Function with profile-id %i not found.\n",
-			     e->indirect_info->common_target_id);
-		  nunknown++;
-		}
+	      if (speculative < e->indirect_info->num_of_ics)
+		e->indirect_info->num_of_ics = speculative;
 	    }
-	 }
+	}
        if (update)
 	 ipa_update_overall_fn_summary (n);
      }

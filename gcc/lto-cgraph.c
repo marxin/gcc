@@ -238,6 +238,8 @@ lto_output_edge (struct lto_simple_output_block *ob, struct cgraph_edge *edge,
   unsigned int uid;
   intptr_t ref;
   struct bitpack_d bp;
+  unsigned i;
+  unsigned len;
 
   if (edge->indirect_unknown_callee)
     streamer_write_enum (ob->main_stream, LTO_symtab_tags, LTO_symtab_last_tag,
@@ -291,11 +293,27 @@ lto_output_edge (struct lto_simple_output_block *ob, struct cgraph_edge *edge,
   streamer_write_bitpack (&bp);
   if (edge->indirect_unknown_callee)
     {
-      streamer_write_hwi_stream (ob->main_stream,
-			         edge->indirect_info->common_target_id);
-      if (edge->indirect_info->common_target_id)
-	streamer_write_hwi_stream
-	   (ob->main_stream, edge->indirect_info->common_target_probability);
+      struct indirect_target_info *item;
+      int i;
+      len = edge->indirect_info->num_of_ics;
+      gcc_assert (len <= GCOV_DISK_SINGLE_VALUES);
+
+      streamer_write_hwi_stream (ob->main_stream, edge->indirect_info->num_of_ics);
+
+      if (len)
+	{
+	  FOR_EACH_VEC_SAFE_ELT (edge->indirect_info->indirect_call_targets, i,
+				 item)
+	    {
+	      if (i == edge->indirect_info->num_of_ics)
+		break;
+	      streamer_write_hwi_stream (ob->main_stream,
+					 item->common_target_id);
+	      if (item->common_target_id)
+		streamer_write_hwi_stream (ob->main_stream,
+					   item->common_target_probability);
+	    }
+	}
     }
 }
 
@@ -1438,6 +1456,7 @@ input_edge (struct lto_input_block *ib, vec<symtab_node *> nodes,
   cgraph_inline_failed_t inline_failed;
   struct bitpack_d bp;
   int ecf_flags = 0;
+  unsigned i, len;
 
   caller = dyn_cast<cgraph_node *> (nodes[streamer_read_hwi (ib)]);
   if (caller == NULL || caller->decl == NULL_TREE)
@@ -1485,9 +1504,22 @@ input_edge (struct lto_input_block *ib, vec<symtab_node *> nodes,
       if (bp_unpack_value (&bp, 1))
 	ecf_flags |= ECF_RETURNS_TWICE;
       edge->indirect_info->ecf_flags = ecf_flags;
-      edge->indirect_info->common_target_id = streamer_read_hwi (ib);
-      if (edge->indirect_info->common_target_id)
-        edge->indirect_info->common_target_probability = streamer_read_hwi (ib);
+
+      len = streamer_read_hwi (ib);
+      edge->indirect_info->num_of_ics = len;
+
+      gcc_assert (len <= GCOV_SINGLE_VALUE_COUNTERS);
+
+      if (len)
+	{
+	  for (i = 0; i < len; i++)
+	    {
+	      indirect_target_info item;
+	      item.common_target_id = streamer_read_hwi (ib);
+	      item.common_target_probability = streamer_read_hwi (ib);
+	      vec_safe_push (edge->indirect_info->indirect_call_targets, item);
+	    }
+	}
     }
 }
 

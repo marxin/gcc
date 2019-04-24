@@ -1877,12 +1877,15 @@ inline_small_functions (void)
 	}
       if (has_speculative)
 	for (edge = node->callees; edge; edge = next)
+	{
+	  next = edge->next_callee;
 	  if (edge->speculative && !speculation_useful_p (edge,
 							  edge->aux != NULL))
 	    {
 	      edge->resolve_speculation ();
 	      update = true;
 	    }
+	}
       if (update)
 	{
 	  struct cgraph_node *where = node->global.inlined_to

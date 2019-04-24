@@ -543,8 +543,8 @@ free_histograms (struct function *fn)
    somehow.  */
 
 static bool
-check_counter (gimple *stmt, const char * name,
-	       gcov_type *count, gcov_type *all, profile_count bb_count_d)
+check_counter (gimple *stmt, const char *name, gcov_type *count, gcov_type *all,
+	       profile_count bb_count_d, float ratio = 1.0f)
 {
   gcov_type bb_count = bb_count_d.ipa ().to_gcov_type ();
   if (*all != bb_count || *count > *all)
@@ -563,7 +563,7 @@ check_counter (gimple *stmt, const char * name,
                              "count (%d)\n", name, (int)*all, (int)bb_count);
 	  *all = bb_count;
 	  if (*count > *all)
-            *count = *all;
+	    *count = *all * ratio;
 	  return false;
 	}
       else
@@ -736,7 +736,7 @@ get_most_common_single_value (gimple *stmt, const char *counter_type,
       gcov_type v = hist->hvalue.counters[2 * i + 1];
       gcov_type c = hist->hvalue.counters[2 * i + 2];
 
-      /* Indirect calls can't be vereified.  */
+      /* Indirect calls can't be verified.  */
       if (stmt && check_counter (stmt, counter_type, &c, &read_all,
 				 gimple_bb (stmt)->count))
 	return false;
@@ -1411,19 +1411,21 @@ gimple_ic (gcall *icall_stmt, struct cgraph_node *direct_call,
   return dcall_stmt;
 }
 
-/*
-  For every checked indirect/virtual call determine if most common pid of
-  function/class method has probability more than 50%. If yes modify code of
-  this call to:
- */
+/* There maybe multiple indirect targets in histogram.  Check every
+   indirect/virtual call if callee function exists, if not exist, leave it to LTO
+   stage for later process.  Modify code of this indirect call to an if-else
+   structure in ipa-profile finally.  */
 
 static bool
 gimple_ic_transform (gimple_stmt_iterator *gsi)
 {
   gcall *stmt;
   histogram_value histogram;
-  gcov_type val, count, all;
+  gcov_type val, count, all, count_all, bb_all;
+  profile_count bb_count;
   struct cgraph_node *direct_call;
+  enum hist_type type;
+  unsigned j;
 
   stmt = dyn_cast <gcall *> (gsi_stmt (*gsi));
   if (!stmt)
@@ -1435,58 +1437,94 @@ gimple_ic_transform (gimple_stmt_iterator *gsi)
   if (gimple_call_internal_p (stmt))
     return false;
 
-  histogram = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_INDIR_CALL);
+  histogram
+    = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_INDIR_CALL);
   if (!histogram)
     return false;
 
-  if (!get_most_common_single_value (NULL, "indirect call", histogram, &val,
-				     &count, &all))
-    return false;
+  count = 0;
+  all = histogram->hvalue.counters[0];
+  bb_all = gimple_bb (stmt)->count.ipa ().to_gcov_type ();
+  bb_count = gimple_bb (stmt)->count;
 
-  if (4 * count <= 3 * all)
-    return false;
+  /* n_counters need be odd to avoid access violation.  */
+  gcc_assert (histogram->n_counters % 2 == 1);
 
-  direct_call = find_func_by_profile_id ((int)val);
-
-  if (direct_call == NULL)
+  count_all = all;
+  /* Do the indirect call conversion if function body exists, or else leave it
+     to LTO stage.  */
+  for (j = 1; j < histogram->n_counters; j += 2)
     {
-      if (val)
+      val = histogram->hvalue.counters[j];
+      count = histogram->hvalue.counters[j + 1];
+      if (val & count > 0)
 	{
-	  if (dump_file)
+	  /* The order of CHECK_COUNTER calls is important
+	     since check_counter can correct the third parameter
+	     and we want to make count <= all <= bb_count.  */
+	  if (check_counter (stmt, "ic", &all, &bb_all, bb_count)
+	      || check_counter (stmt, "ic", &count, &all,
+				profile_count::from_gcov_type (all),
+				(float) count / count_all))
 	    {
-	      fprintf (dump_file, "Indirect call -> direct call from other module");
-	      print_generic_expr (dump_file, gimple_call_fn (stmt), TDF_SLIM);
-	      fprintf (dump_file, "=> %i (will resolve only with LTO)\n", (int)val);
+	      gimple_remove_histogram_value (cfun, stmt, histogram);
+	      return false;
 	    }
-	}
-      return false;
-    }
 
-  if (!check_ic_target (stmt, direct_call))
-    {
-      if (dump_file)
-	{
-	  fprintf (dump_file, "Indirect call -> direct call ");
-	  print_generic_expr (dump_file, gimple_call_fn (stmt), TDF_SLIM);
-	  fprintf (dump_file, "=> ");
-	  print_generic_expr (dump_file, direct_call->decl, TDF_SLIM);
-	  fprintf (dump_file, " transformation skipped because of type mismatch");
-	  print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
-	}
-      gimple_remove_histogram_value (cfun, stmt, histogram);
-      return false;
-    }
+	  if (4 * count <= all)
+	    continue;
 
-  if (dump_file)
-    {
-      fprintf (dump_file, "Indirect call -> direct call ");
-      print_generic_expr (dump_file, gimple_call_fn (stmt), TDF_SLIM);
-      fprintf (dump_file, "=> ");
-      print_generic_expr (dump_file, direct_call->decl, TDF_SLIM);
-      fprintf (dump_file, " transformation on insn postponned to ipa-profile");
-      print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
-      fprintf (dump_file, "hist->count %" PRId64
-	       " hist->all %" PRId64"\n", count, all);
+	  direct_call = find_func_by_profile_id ((int) val);
+
+	  if (direct_call == NULL)
+	    {
+	      if (val)
+		{
+		  if (dump_file)
+		    {
+		      fprintf (
+			dump_file,
+			"Indirect call -> direct call from other module");
+		      print_generic_expr (dump_file, gimple_call_fn (stmt),
+					  TDF_SLIM);
+		      fprintf (dump_file,
+			       "=> %i (will resolve only with LTO)\n",
+			       (int) val);
+		    }
+		}
+	      return false;
+	    }
+
+	  if (!check_ic_target (stmt, direct_call))
+	    {
+	      if (dump_file)
+		{
+		  fprintf (dump_file, "Indirect call -> direct call ");
+		  print_generic_expr (dump_file, gimple_call_fn (stmt),
+				      TDF_SLIM);
+		  fprintf (dump_file, "=> ");
+		  print_generic_expr (dump_file, direct_call->decl, TDF_SLIM);
+		  fprintf (dump_file,
+			   " transformation skipped because of type mismatch");
+		  print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
+		}
+	      gimple_remove_histogram_value (cfun, stmt, histogram);
+	      return false;
+	    }
+
+	  if (dump_file)
+	  {
+	    fprintf (dump_file, "Indirect call -> direct call ");
+	    print_generic_expr (dump_file, gimple_call_fn (stmt), TDF_SLIM);
+	    fprintf (dump_file, "=> ");
+	    print_generic_expr (dump_file, direct_call->decl, TDF_SLIM);
+	    fprintf (dump_file,
+		     " transformation on insn postponed to ipa-profile");
+	    print_gimple_stmt (dump_file, stmt, 0, TDF_SLIM);
+	    fprintf (dump_file, "hist->count %" PRId64
+		" hist->all %" PRId64"\n", count, all);
+	  }
+	}
     }
 
   return true;

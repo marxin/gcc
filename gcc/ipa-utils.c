@@ -586,6 +586,11 @@ ipa_merge_profiles (struct cgraph_node *dst,
       update_max_bb_count ();
       compute_function_frequency ();
       pop_cfun ();
+      /* When src is speculative, clone the referrings.  */
+      if (src->indirect_call_target)
+	for (e = src->callers; e; e = e->next_caller)
+	  if (e->callee == src && e->speculative)
+	    dst->clone_referring (src);
       for (e = dst->callees; e; e = e->next_callee)
 	{
 	  if (e->speculative)
