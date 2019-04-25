@@ -10815,8 +10815,13 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
     isa |= (OPTION_MASK_ISA_FMA | OPTION_MASK_ISA_FMA4);
   if ((bisa & isa) != bisa || (bisa2 & isa2) != bisa2)
     {
+      bool add_abi_p = bisa & OPTION_MASK_ISA_64BIT;
+      if (TARGET_ABI_X32)
+	bisa |= OPTION_MASK_ABI_X32;
+      else
+	bisa |= OPTION_MASK_ABI_64;
       char *opts = ix86_target_string (bisa, bisa2, 0, 0, NULL, NULL,
-				       (enum fpmath_unit) 0, false);
+				       (enum fpmath_unit) 0, false, add_abi_p);
       if (!opts)
 	error ("%qE needs unknown isa option", fndecl);
       else

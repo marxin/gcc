@@ -22,7 +22,8 @@ along with GCC; see the file COPYING3.  If not see
 char *ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
 			  int flags, int flags2,
 			  const char *arch, const char *tune,
-			  enum fpmath_unit fpmath, bool add_nl_p);
+			  enum fpmath_unit fpmath, bool add_nl_p,
+			  bool add_abi_p);
 
 extern enum attr_cpu ix86_schedule;
 
