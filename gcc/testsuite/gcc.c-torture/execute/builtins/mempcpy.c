@@ -56,9 +56,8 @@ main_test (void)
   if (__builtin_mempcpy (p, "ABCDE", 6) != p + 6 || memcmp (p, "ABCDE", 6))
     abort ();
 
-  /* If the result of mempcpy is ignored, gcc should use memcpy.
-     This should be optimized always, so set inside_main again.  */
-  inside_main = 1;
+  /* Set inside main in order to not abort because of usafe of mempcpy.  */
+  inside_main = 0;
   mempcpy (p + 5, s3, 1);
   if (memcmp (p, "ABCDEFg", 8))
     abort ();

@@ -6735,6 +6735,11 @@ optimized for speed rather than size.
 If you don't define this, it defaults to the value of @code{MOVE_RATIO}.
 @end defmac
 
+@defmac TARGET_HAS_FAST_MEMPCPY_ROUTINE
+By default do not generate libcall to mempcpy and rather use
+libcall to memcpy and adjustment of return value.
+@end defmac
+
 @defmac USE_LOAD_POST_INCREMENT (@var{mode})
 A C expression used to determine whether a load postincrement is a good
 thing to use for a given mode.  Defaults to the value of
