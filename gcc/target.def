@@ -5798,6 +5798,12 @@ DEFHOOK
  hook_constcharptr_void_null)
 
 DEFHOOK
+(has_fast_mempcpy_routine,
+ "Return true if a target has a fast mempcpy routine.",
+ bool, (void),
+ hook_bool_void_false)
+
+DEFHOOK
 (remove_extra_call_preserved_regs,
  "This hook removes registers from the set of call-clobbered registers\n\
  in @var{used_regs} if, contrary to the default rules, something guarantees\n\

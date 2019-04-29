@@ -1713,6 +1713,8 @@ of @code{CALL_USED_REGISTERS}.
 
 @hook TARGET_GET_MULTILIB_ABI_NAME
 
+@hook TARGET_HAS_FAST_MEMPCPY_ROUTINE
+
 @findex fixed_regs
 @findex call_used_regs
 @findex global_regs
