@@ -29,11 +29,13 @@ class profile_count;
 enum profile_quality {
   /* Uninitialized value.  */
   UNINITIALIZED_PROFILE,
+
   /* Profile is based on static branch prediction heuristics and may
      or may not match reality.  It is local to function and cannot be compared
      inter-procedurally.  Never used by probabilities (they are always local).
    */
   GUESSED_LOCAL,
+
   /* Profile was read by feedback and was 0, we used local heuristics to guess
      better.  This is the case of functions not run in profile fedback.
      Never used by probabilities.  */
@@ -48,12 +50,15 @@ enum profile_quality {
       with feedback and propagated from that).
      Never used by probablities.  */
   GUESSED,
+
   /* Profile was determined by autofdo.  */
   AFDO,
+
   /* Profile was originally based on feedback but it was adjusted
      by code duplicating optimization.  It may not precisely reflect the
      particular code path.  */
   ADJUSTED,
+
   /* Profile was read from profile feedback or determined by accurate static
      method.  */
   PRECISE
@@ -158,6 +163,7 @@ public:
       ret.m_quality = PRECISE;
       return ret;
     }
+
   static profile_probability guessed_never ()
     {
       profile_probability ret;
@@ -165,6 +171,7 @@ public:
       ret.m_quality = GUESSED;
       return ret;
     }
+
   static profile_probability very_unlikely ()
     {
       /* Be consistent with PROB_VERY_UNLIKELY in predict.h.  */
@@ -172,6 +179,7 @@ public:
       r.m_val--;
       return r;
     }
+
   static profile_probability unlikely ()
     {
       /* Be consistent with PROB_VERY_LIKELY in predict.h.  */
@@ -179,18 +187,22 @@ public:
       r.m_val--;
       return r;
     }
+
   static profile_probability even ()
     {
       return guessed_always ().apply_scale (1, 2);
     }
+
   static profile_probability very_likely ()
     {
       return always () - very_unlikely ();
     }
+
   static profile_probability likely ()
     {
       return always () - unlikely ();
     }
+
   static profile_probability guessed_always ()
     {
       profile_probability ret;
@@ -198,6 +210,7 @@ public:
       ret.m_quality = GUESSED;
       return ret;
     }
+
   static profile_probability always ()
     {
       profile_probability ret;
@@ -205,6 +218,7 @@ public:
       ret.m_quality = PRECISE;
       return ret;
     }
+
   /* Probabilities which has not been initialized. Either because
      initialization did not happen yet or because profile is unknown.  */
   static profile_probability uninitialized ()
@@ -215,12 +229,12 @@ public:
       return c;
     }
 
-
   /* Return true if value has been initialized.  */
   bool initialized_p () const
     {
       return m_val != uninitialized_probability;
     }
+
   /* Return true if value can be trusted.  */
   bool reliable_p () const
     {
@@ -237,6 +251,7 @@ public:
       ret.m_quality = GUESSED;
       return ret;
     }
+
   int to_reg_br_prob_base () const
     {
       gcc_checking_assert (initialized_p ());
@@ -251,6 +266,7 @@ public:
       ret.m_quality = (enum profile_quality)(v & 7);
       return ret;
     }
+
   int to_reg_br_prob_note () const
     {
       gcc_checking_assert (initialized_p ());
@@ -283,6 +299,7 @@ public:
     {
       return m_val == other.m_val && m_quality == other.m_quality;
     }
+
   profile_probability operator+ (const profile_probability &other) const
     {
       if (other == never ())
@@ -297,6 +314,7 @@ public:
       ret.m_quality = MIN (m_quality, other.m_quality);
       return ret;
     }
+
   profile_probability &operator+= (const profile_probability &other)
     {
       if (other == never ())
@@ -315,6 +333,7 @@ public:
 	}
       return *this;
     }
+
   profile_probability operator- (const profile_probability &other) const
     {
       if (*this == never ()
@@ -327,6 +346,7 @@ public:
       ret.m_quality = MIN (m_quality, other.m_quality);
       return ret;
     }
+
   profile_probability &operator-= (const profile_probability &other)
     {
       if (*this == never ()
@@ -341,6 +361,7 @@ public:
 	}
       return *this;
     }
+
   profile_probability operator* (const profile_probability &other) const
     {
       if (*this == never ()
@@ -353,6 +374,7 @@ public:
       ret.m_quality = MIN (MIN (m_quality, other.m_quality), ADJUSTED);
       return ret;
     }
+
   profile_probability &operator*= (const profile_probability &other)
     {
       if (*this == never ()
@@ -367,6 +389,7 @@ public:
 	}
       return *this;
     }
+
   profile_probability operator/ (const profile_probability &other) const
     {
       if (*this == never ())
@@ -394,6 +417,7 @@ public:
       ret.m_quality = MIN (MIN (m_quality, other.m_quality), ADJUSTED);
       return ret;
     }
+
   profile_probability &operator/= (const profile_probability &other)
     {
       if (*this == never ())
@@ -513,7 +537,6 @@ public:
      noreturn heuristic that is only one giving probability over 99% or bellow
      1%.  In future we might want to propagate reliability information across the
      CFG if we find this information useful on multiple places.   */
-
   bool probably_reliable_p () const
     {
       if (m_quality >= ADJUSTED)
@@ -541,6 +564,7 @@ public:
     {
       return initialized_p () && other.initialized_p () && m_val < other.m_val;
     }
+
   bool operator> (const profile_probability &other) const
     {
       return initialized_p () && other.initialized_p () && m_val > other.m_val;
@@ -550,6 +574,7 @@ public:
     {
       return initialized_p () && other.initialized_p () && m_val <= other.m_val;
     }
+
   bool operator>= (const profile_probability &other) const
     {
       return initialized_p () && other.initialized_p () && m_val >= other.m_val;
@@ -563,8 +588,10 @@ public:
 
   /* Return true if THIS is known to differ significantly from OTHER.  */
   bool differs_from_p (profile_probability other) const;
+
   /* Return if difference is greater than 50%.  */
   bool differs_lot_from_p (profile_probability other) const;
+
   /* COUNT1 times event happens with *THIS probability, COUNT2 times OTHER
      happens with COUNT2 probablity. Return probablity that either *THIS or
      OTHER happens.  */
@@ -678,6 +705,7 @@ public:
     {
       return from_gcov_type (0);
     }
+
   static profile_count adjusted_zero ()
     {
       profile_count c;
@@ -685,6 +713,7 @@ public:
       c.m_quality = ADJUSTED;
       return c;
     }
+
   static profile_count guessed_zero ()
     {
       profile_count c;
@@ -692,10 +721,12 @@ public:
       c.m_quality = GUESSED;
       return c;
     }
+
   static profile_count one ()
     {
       return from_gcov_type (1);
     }
+
   /* Value of counters which has not been initialized. Either because
      initialization did not happen yet or because profile is unknown.  */
   static profile_count uninitialized ()
@@ -718,16 +749,19 @@ public:
     {
       return m_val != uninitialized_count;
     }
+
   /* Return true if value can be trusted.  */
   bool reliable_p () const
     {
       return m_quality >= ADJUSTED;
     }
+
   /* Return true if vlaue can be operated inter-procedurally.  */
   bool ipa_p () const
     {
       return !initialized_p () || m_quality >= GUESSED_GLOBAL0;
     }
+
   /* Return true if quality of profile is precise.  */
   bool precise_p () const
     {
@@ -767,6 +801,7 @@ public:
     {
       return m_val == other.m_val && m_quality == other.m_quality;
     }
+
   profile_count operator+ (const profile_count &other) const
     {
       if (other == zero ())
@@ -782,6 +817,7 @@ public:
       ret.m_quality = MIN (m_quality, other.m_quality);
       return ret;
     }
+
   profile_count &operator+= (const profile_count &other)
     {
       if (other == zero ())
@@ -801,6 +837,7 @@ public:
 	}
       return *this;
     }
+
   profile_count operator- (const profile_count &other) const
     {
       if (*this == zero () || other == zero ())
@@ -813,6 +850,7 @@ public:
       ret.m_quality = MIN (m_quality, other.m_quality);
       return ret;
     }
+
   profile_count &operator-= (const profile_count &other)
     {
       if (*this == zero () || other == zero ())
@@ -848,6 +886,7 @@ public:
       gcc_checking_assert (compatible_p (other));
       return m_val < other.m_val;
     }
+
   bool operator> (const profile_count &other) const
     {
       if (!initialized_p () || !other.initialized_p ())
@@ -859,12 +898,14 @@ public:
       gcc_checking_assert (compatible_p (other));
       return initialized_p () && other.initialized_p () && m_val > other.m_val;
     }
+
   bool operator< (const gcov_type other) const
     {
       gcc_checking_assert (ipa_p ());
       gcc_checking_assert (other >= 0);
       return initialized_p () && m_val < (uint64_t) other;
     }
+
   bool operator> (const gcov_type other) const
     {
       gcc_checking_assert (ipa_p ());
@@ -883,6 +924,7 @@ public:
       gcc_checking_assert (compatible_p (other));
       return m_val <= other.m_val;
     }
+
   bool operator>= (const profile_count &other) const
     {
       if (!initialized_p () || !other.initialized_p ())
@@ -894,18 +936,21 @@ public:
       gcc_checking_assert (compatible_p (other));
       return m_val >= other.m_val;
     }
+
   bool operator<= (const gcov_type other) const
     {
       gcc_checking_assert (ipa_p ());
       gcc_checking_assert (other >= 0);
       return initialized_p () && m_val <= (uint64_t) other;
     }
+
   bool operator>= (const gcov_type other) const
     {
       gcc_checking_assert (ipa_p ());
       gcc_checking_assert (other >= 0);
       return initialized_p () && m_val >= (uint64_t) other;
     }
+
   /* Return true when value is not zero and can be used for scaling. 
      This is different from *this > 0 because that requires counter to
      be IPA.  */
@@ -977,6 +1022,7 @@ public:
       ret.m_quality = MIN (m_quality, prob.m_quality);
       return ret;
     }
+
   /* Return *THIS * NUM / DEN.  */
   profile_count apply_scale (int64_t num, int64_t den) const
     {
@@ -993,6 +1039,7 @@ public:
       ret.m_quality = MIN (m_quality, ADJUSTED);
       return ret;
     }
+
   profile_count apply_scale (profile_count num, profile_count den) const
     {
       if (*this == zero ())
