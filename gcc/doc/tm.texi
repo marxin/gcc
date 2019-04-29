@@ -1935,6 +1935,10 @@ call_2 may be NULL or a call insn.
 This hook returns name of multilib ABI name.
 @end deftypefn
 
+@deftypefn {Target Hook} bool TARGET_HAS_FAST_MEMPCPY_ROUTINE (void)
+Return true if a target has a fast mempcpy routine.
+@end deftypefn
+
 @findex fixed_regs
 @findex call_used_regs
 @findex global_regs
