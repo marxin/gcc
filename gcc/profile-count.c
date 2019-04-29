@@ -42,21 +42,21 @@ profile_quality_as_string (enum profile_quality quality)
     {
     default:
       gcc_unreachable ();
-    case profile_uninitialized:
+    case UNINITIALIZED_PROFILE:
       return "uninitialized";
-    case profile_guessed_local:
+    case GUESSED_LOCAL:
       return "guessed_local";
-    case profile_guessed_global0:
+    case GUESSED_GLOBAL0:
       return "guessed_global0";
-    case profile_guessed_global0adjusted:
+    case GUESSED_GLOBAL0_ADJUSTED:
       return "guessed_global0adjusted";
-    case profile_guessed:
+    case GUESSED:
       return "guessed";
-    case profile_afdo:
+    case AFDO:
       return "afdo";
-    case profile_adjusted:
+    case ADJUSTED:
       return "adjusted";
-    case profile_precise:
+    case PRECISE:
       return "precise";
     }
 }
@@ -71,19 +71,19 @@ profile_count::dump (FILE *f) const
   else
     {
       fprintf (f, "%" PRId64, m_val);
-      if (m_quality == profile_guessed_local)
+      if (m_quality == GUESSED_LOCAL)
 	fprintf (f, " (estimated locally)");
-      else if (m_quality == profile_guessed_global0)
+      else if (m_quality == GUESSED_GLOBAL0)
 	fprintf (f, " (estimated locally, globally 0)");
-      else if (m_quality == profile_guessed_global0adjusted)
+      else if (m_quality == GUESSED_GLOBAL0_ADJUSTED)
 	fprintf (f, " (estimated locally, globally 0 adjusted)");
-      else if (m_quality == profile_adjusted)
+      else if (m_quality == ADJUSTED)
 	fprintf (f, " (adjusted)");
-      else if (m_quality == profile_afdo)
+      else if (m_quality == AFDO)
 	fprintf (f, " (auto FDO)");
-      else if (m_quality == profile_guessed)
+      else if (m_quality == GUESSED)
 	fprintf (f, " (guessed)");
-      else if (m_quality == profile_precise)
+      else if (m_quality == PRECISE)
 	fprintf (f, " (precise)");
     }
 }
@@ -160,11 +160,11 @@ profile_probability::dump (FILE *f) const
         fprintf (f, "always");
       else
         fprintf (f, "%3.1f%%", (double)m_val * 100 / max_probability);
-      if (m_quality == profile_adjusted)
+      if (m_quality == ADJUSTED)
 	fprintf (f, " (adjusted)");
-      else if (m_quality == profile_afdo)
+      else if (m_quality == AFDO)
 	fprintf (f, " (auto FDO)");
-      else if (m_quality == profile_guessed)
+      else if (m_quality == GUESSED)
 	fprintf (f, " (guessed)");
     }
 }
@@ -371,7 +371,7 @@ profile_count::from_gcov_type (gcov_type v)
 	       "Capping gcov count %" PRId64 " to max_count %" PRId64 "\n",
 	       (int64_t) v, (int64_t) max_count);
     ret.m_val = MIN (v, (gcov_type)max_count);
-    ret.m_quality = profile_precise;
+    ret.m_quality = PRECISE;
     return ret;
   }
 
