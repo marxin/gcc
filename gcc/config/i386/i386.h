@@ -1904,6 +1904,9 @@ typedef struct ix86_args {
 
 #define CLEAR_RATIO(speed) ((speed) ? MIN (6, ix86_cost->move_ratio) : 2)
 
+/* C library provides fast implementation of mempcpy function.  */
+#define TARGET_HAS_FAST_MEMPCPY_ROUTINE 1
+
 /* Define if shifts truncate the shift count which implies one can
    omit a sign-extension or zero-extension of a shift count.
 
