@@ -123,12 +123,10 @@ static void c_parser_gimple_expr_list (gimple_parser &, vec<tree> *);
 
 
 /* See if VAL is an identifier matching __BB<num> and return <num>
-   in *INDEX.  Return true if so and parse also FREQUENCY of
-   the edge.  */
+   in *INDEX.  */
 
 static bool
-c_parser_gimple_parse_bb_spec (tree val, gimple_parser &parser,
-			       int *index, profile_probability *probablity)
+c_parser_gimple_parse_bb_spec (tree val, int *index)
 {
   if (strncmp (IDENTIFIER_POINTER (val), "__BB", 4) != 0)
     return false;
@@ -136,8 +134,22 @@ c_parser_gimple_parse_bb_spec (tree val, gimple_parser &parser,
     if (!ISDIGIT (*p))
       return false;
   *index = atoi (IDENTIFIER_POINTER (val) + 4);
+  return *index > 0;
+}
 
-  if (*index > 0)
+/* See if VAL is an identifier matching __BB<num> and return <num>
+   in *INDEX.  Return true if so and parse also FREQUENCY of
+   the edge.  */
+
+
+static bool
+c_parser_gimple_parse_bb_spec_edge_probability (tree val,
+						gimple_parser &parser,
+						int *index,
+						profile_probability *probablity)
+{
+  bool return_p = c_parser_gimple_parse_bb_spec (val, index);
+  if (return_p)
     {
       *probablity = profile_probability::uninitialized ();
       /* Parse frequency if provided.  */
@@ -187,6 +199,7 @@ c_parser_gimple_parse_bb_spec (tree val, gimple_parser &parser,
     }
 
   return false;
+
 }
 
 /* Parse the body of a function declaration marked with "__GIMPLE".  */
@@ -335,9 +348,9 @@ c_parser_parse_gimple_body (c_parser *cparser, char *gimple_pass,
 
   if (cfun->curr_properties & PROP_cfg)
     {
-      update_max_bb_count ();
       set_hot_bb_threshold (hot_bb_threshold);
       ENTRY_BLOCK_PTR_FOR_FN (cfun)->count = entry_bb_count;
+      update_max_bb_count ();
     }
   dump_function (TDI_gimple, current_function_decl);
 }
@@ -784,9 +797,7 @@ c_parser_gimple_statement (gimple_parser &parser, gimple_seq *seq)
 	      if (c_parser_next_token_is (parser, CPP_COLON))
 		c_parser_consume_token (parser);
 	      int src_index = -1;
-	      profile_probability prob;
-	      if (!c_parser_gimple_parse_bb_spec (arg, parser, &src_index,
-						  &prob))
+	      if (!c_parser_gimple_parse_bb_spec (arg, &src_index))
 		c_parser_error (parser, "invalid source block specification");
 	      vargs.safe_push (size_int (src_index));
 	    }
@@ -1897,8 +1908,8 @@ c_parser_gimple_goto_stmt (gimple_parser &parser,
     {
       int dest_index;
       profile_probability prob;
-      if (c_parser_gimple_parse_bb_spec (label, parser, &dest_index,
-					 &prob))
+      if (c_parser_gimple_parse_bb_spec_edge_probability (label, parser,
+							  &dest_index, &prob))
 	{
 	  parser.push_edge (parser.current_bb->index, dest_index,
 			    EDGE_FALLTHRU, prob);
@@ -1954,8 +1965,8 @@ c_parser_gimple_if_stmt (gimple_parser &parser, gimple_seq *seq)
       int dest_index;
       profile_probability prob;
       if ((cfun->curr_properties & PROP_cfg)
-	  && c_parser_gimple_parse_bb_spec (label, parser, &dest_index,
-					    &prob))
+	  && c_parser_gimple_parse_bb_spec_edge_probability (label, parser,
+							     &dest_index, &prob))
 	parser.push_edge (parser.current_bb->index, dest_index,
 			  EDGE_TRUE_VALUE, prob);
       else
@@ -1991,8 +2002,8 @@ c_parser_gimple_if_stmt (gimple_parser &parser, gimple_seq *seq)
       int dest_index;
       profile_probability prob;
       if ((cfun->curr_properties & PROP_cfg)
-	  && c_parser_gimple_parse_bb_spec (label, parser, &dest_index,
-					    &prob))
+	  && c_parser_gimple_parse_bb_spec_edge_probability (label, parser,
+							     &dest_index, &prob))
 	parser.push_edge (parser.current_bb->index, dest_index,
 			  EDGE_FALSE_VALUE, prob);
       else
