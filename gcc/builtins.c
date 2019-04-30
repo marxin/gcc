@@ -3899,6 +3899,12 @@ expand_builtin_memory_copy_args (tree dest, tree src, tree len,
 				     && retmode == RETURN_END,
 				     &is_move_done);
 
+  /* Bail out when a mempcpy call would be expanded as libcall and when
+     we have a target that provides a fast implementation
+     of mempcpy routine.  */
+  if (!is_move_done)
+    return NULL_RTX;
+
   if (dest_addr == pc_rtx)
     return NULL_RTX;
 
