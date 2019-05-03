@@ -117,9 +117,9 @@ gmtime_r (const time_t * timep, struct tm * result)
    TODO :
    - Check year boundaries.
 */
-#define DATE_LEN 8
+#define DATE_LEN 24
 #define TIME_LEN 10   
-#define ZONE_LEN 5
+#define ZONE_LEN 11
 #define VALUES_SIZE 8
 
 extern void date_and_time (char *, char *, char *, gfc_array_i4 *,
