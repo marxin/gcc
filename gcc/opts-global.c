@@ -317,8 +317,8 @@ decode_options (struct gcc_options *opts, struct gcc_options *opts_set,
   finish_options (opts, opts_set, loc);
 
   /* Print --help=* if used.  */
-  if (help_option_argument != NULL)
-    print_help (opts, lang_mask);
+  for (unsigned i = 0; i < help_option_arguments.length (); i++)
+    print_help (opts, lang_mask, help_option_arguments[i]);
 }
 
 /* Hold command-line options associated with stack limitation.  */
