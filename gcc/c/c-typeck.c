@@ -12193,6 +12193,16 @@ build_binary_op (location_t location, enum tree_code code,
 	maybe_warn_bool_compare (location, code, orig_op0, orig_op1);
       break;
 
+    case MIN_EXPR:
+    case MAX_EXPR:
+      if (flag_gimple)
+	{
+	  result_type = c_common_type (type0, type1);
+	  break;
+	}
+      else
+	gcc_unreachable ();
+
     default:
       gcc_unreachable ();
     }

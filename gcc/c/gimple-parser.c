@@ -747,7 +747,9 @@ c_parser_gimple_statement (gimple_parser &parser, gimple_seq *seq)
       {
 	tree id = c_parser_peek_token (parser)->value;
 	if (strcmp (IDENTIFIER_POINTER (id), "__ABS") == 0
-	    || strcmp (IDENTIFIER_POINTER (id), "__ABSU") == 0)
+	    || strcmp (IDENTIFIER_POINTER (id), "__ABSU") == 0
+	    || strcmp (IDENTIFIER_POINTER (id), "__MIN") == 0
+	    || strcmp (IDENTIFIER_POINTER (id), "__MAX") == 0)
 	  goto build_unary_expr;
 	break;
       }
@@ -1062,6 +1064,7 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
 	}
     case CPP_NAME:
 	{
+	  bool is_min;
 	  tree id = c_parser_peek_token (parser)->value;
 	  if (strcmp (IDENTIFIER_POINTER (id), "__ABS") == 0)
 	    {
@@ -1074,6 +1077,22 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
 	      c_parser_consume_token (parser);
 	      op = c_parser_gimple_postfix_expression (parser);
 	      return parser_build_unary_op (op_loc, ABSU_EXPR, op);
+	    }
+	  else if ((is_min = strcmp (IDENTIFIER_POINTER (id), "__MIN") == 0)
+		   || strcmp (IDENTIFIER_POINTER (id), "__MAX") == 0)
+	    {
+	      c_parser_consume_token (parser);
+	      if (!c_parser_require (parser, CPP_OPEN_PAREN, "expected %<(%>"))
+		return ret;
+	      c_expr op1 = c_parser_gimple_postfix_expression (parser);
+	      if (!c_parser_require (parser, CPP_COMMA, "expected %<,%>"))
+		return ret;
+	      c_expr op2 = c_parser_gimple_postfix_expression (parser);
+	      if (!c_parser_require (parser, CPP_CLOSE_PAREN, "expected %<)%>"))
+		return ret;
+	      return parser_build_binary_op (op_loc,
+					     is_min ? MIN_EXPR : MAX_EXPR,
+					     op1, op2);
 	    }
 	  else
 	    return c_parser_gimple_postfix_expression (parser);
