@@ -742,7 +742,9 @@ circuit (block_info *v, arc_vector_t &path, block_info *start,
   for (arc_info *arc = v->succ; arc; arc = arc->succ_next)
     {
       block_info *w = arc->dst;
-      if (w < start || !linfo.has_block (w))
+      if (w < start
+	  || arc->count == 0
+	  || !linfo.has_block (w))
 	continue;
 
       path.push_back (arc);
@@ -765,7 +767,9 @@ circuit (block_info *v, arc_vector_t &path, block_info *start,
     for (arc_info *arc = v->succ; arc; arc = arc->succ_next)
       {
 	block_info *w = arc->dst;
-	if (w < start || !linfo.has_block (w))
+	if (w < start
+	    || arc->count == 0
+	    || !linfo.has_block (w))
 	  continue;
 
 	size_t index
