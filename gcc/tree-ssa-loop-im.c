@@ -2565,6 +2565,8 @@ tree_ssa_lim_initialize (void)
   alloc_aux_for_edges (0);
 
   memory_accesses.refs = new hash_table<mem_ref_hasher> (100);
+  /* FIXME: enable sanitization */
+  memory_accesses.refs->disable_sanitize_eq_and_hash ();
   memory_accesses.refs_list.create (100);
   /* Allocate a special, unanalyzable mem-ref with ID zero.  */
   memory_accesses.refs_list.quick_push

@@ -28320,7 +28320,11 @@ void
 init_template_processing (void)
 {
   decl_specializations = hash_table<spec_hasher>::create_ggc (37);
+  /* FIXME: enable sanitization */
+  decl_specializations->disable_sanitize_eq_and_hash ();
   type_specializations = hash_table<spec_hasher>::create_ggc (37);
+  /* FIXME: enable sanitization */
+  type_specializations->disable_sanitize_eq_and_hash ();
 
   if (cxx_dialect >= cxx11)
     declare_integer_pack ();

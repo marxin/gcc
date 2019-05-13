@@ -405,6 +405,9 @@ public:
   /* Return true when there are no elements in this hash table.  */
   bool is_empty () const { return elements () == 0; }
 
+  /* Disable equal and hash function sanitization.  */
+  void disable_sanitize_eq_and_hash (void) { m_sanitize_eq_and_hash = false; }
+
   /* This function clears a specified SLOT in a hash table.  It is
      useful when you've already done the lookup and don't want to do it
      again. */
@@ -516,6 +519,7 @@ private:
 
   value_type *alloc_entries (size_t n CXX_MEM_STAT_INFO) const;
   value_type *find_empty_slot_for_expand (hashval_t);
+  void verify (const compare_type &comparable, hashval_t hash);
   bool too_empty_p (unsigned int);
   void expand ();
   static bool is_deleted (value_type &v)
@@ -564,6 +568,9 @@ private:
   /* if m_entries is stored in ggc memory.  */
   bool m_ggc;
 
+  /* True if the table should be sanitized for equal and hash functions.  */
+  bool m_sanitize_eq_and_hash;
+
   /* If we should gather memory statistics for the table.  */
 #if GATHER_STATISTICS
   bool m_gather_mem_stats;
@@ -591,7 +598,7 @@ hash_table<Descriptor, Lazy, Allocator>::hash_table (size_t size, bool ggc,
 						     mem_alloc_origin origin
 						     MEM_STAT_DECL) :
   m_n_elements (0), m_n_deleted (0), m_searches (0), m_collisions (0),
-  m_ggc (ggc)
+  m_ggc (ggc), m_sanitize_eq_and_hash (true)
 #if GATHER_STATISTICS
   , m_gather_mem_stats (gather_mem_stats)
 #endif
@@ -941,8 +948,12 @@ hash_table<Descriptor, Lazy, Allocator>
   if (insert == INSERT && m_size * 3 <= m_n_elements * 4)
     expand ();
 
-  m_searches++;
+#if ENABLE_EXTRA_CHECKING
+  if (m_sanitize_eq_and_hash && insert == INSERT)
+    verify (comparable, hash);
+#endif
 
+  m_searches++;
   value_type *first_deleted_slot = NULL;
   hashval_t index = hash_table_mod1 (hash, m_size_prime_index);
   hashval_t hash2 = hash_table_mod2 (hash, m_size_prime_index);
@@ -988,6 +999,44 @@ hash_table<Descriptor, Lazy, Allocator>
   m_n_elements++;
   return &m_entries[index];
 }
+
+#if ENABLE_EXTRA_CHECKING
+
+/* Report a hash table checking error.  */
+
+ATTRIBUTE_NORETURN ATTRIBUTE_COLD
+static void
+hashtab_chk_error ()
+{
+  fprintf (stderr, "hash table checking failed: "
+	   "equal operator returns true for a pair "
+	   "of values with a different hash value\n");
+#ifndef GENERATOR_FILE
+  gcc_unreachable ();
+#else
+  exit (1);
+#endif
+}
+
+/* Verify that all existing elements in th hash table which are
+   equal to COMPARABLE have an equal HASH value provided as argument.  */
+
+template<typename Descriptor, bool Lazy,
+	 template<typename Type> class Allocator>
+void
+hash_table<Descriptor, Lazy, Allocator>
+::verify (const compare_type &comparable, hashval_t hash)
+{
+  for (size_t i = 0; i < m_size; i++)
+    {
+      value_type *entry = &m_entries[i];
+      if (!is_empty (*entry) && !is_deleted (*entry)
+	  && hash != Descriptor::hash (*entry)
+	  && Descriptor::equal (*entry, comparable))
+	hashtab_chk_error ();
+    }
+}
+#endif
 
 /* This function deletes an element with the given COMPARABLE value
    from hash table starting with the given HASH.  If there is no
