@@ -3890,16 +3890,15 @@ expand_builtin_memory_copy_args (tree dest, tree src, tree len,
   if (CALL_EXPR_TAILCALL (exp)
       && (retmode == RETURN_BEGIN || target == const0_rtx))
     method = BLOCK_OP_TAILCALL;
-  if (targetm.has_fast_mempcpy_routine ()
-      && retmode == RETURN_END
-      && target != const0_rtx)
+  bool use_mempcpy_call = (targetm.has_fast_mempcpy_routine ()
+			   && retmode == RETURN_END
+			   && target != const0_rtx);
+  if (use_mempcpy_call)
     method = BLOCK_OP_NO_LIBCALL_RET;
   dest_addr = emit_block_move_hints (dest_mem, src_mem, len_rtx, method,
 				     expected_align, expected_size,
 				     min_size, max_size, probable_max_size,
-				     targetm.has_fast_mempcpy_routine ()
-				     && retmode == RETURN_END,
-				     &is_move_done);
+				     use_mempcpy_call, &is_move_done);
 
   /* Bail out when a mempcpy call would be expanded as libcall and when
      we have a target that provides a fast implementation
