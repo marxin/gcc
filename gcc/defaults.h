@@ -1348,13 +1348,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define SET_RATIO(speed) MOVE_RATIO (speed)
 #endif
 
-/* By default do not generate libcall to mempcpy and rather use
-   libcall to memcpy and adjustment of return value.  */
-
-#ifndef TARGET_HAS_FAST_MEMPCPY_ROUTINE
-#define TARGET_HAS_FAST_MEMPCPY_ROUTINE 0
-#endif
-
 /* Supply a default definition of STACK_SAVEAREA_MODE for emit_stack_save.
    Normally move_insn, so Pmode stack pointer.  */
 

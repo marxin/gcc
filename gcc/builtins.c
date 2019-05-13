@@ -3890,14 +3890,14 @@ expand_builtin_memory_copy_args (tree dest, tree src, tree len,
   if (CALL_EXPR_TAILCALL (exp)
       && (retmode == RETURN_BEGIN || target == const0_rtx))
     method = BLOCK_OP_TAILCALL;
-  if (TARGET_HAS_FAST_MEMPCPY_ROUTINE
+  if (targetm.has_fast_mempcpy_routine ()
       && retmode == RETURN_END
       && target != const0_rtx)
     method = BLOCK_OP_NO_LIBCALL_RET;
   dest_addr = emit_block_move_hints (dest_mem, src_mem, len_rtx, method,
 				     expected_align, expected_size,
 				     min_size, max_size, probable_max_size,
-				     TARGET_HAS_FAST_MEMPCPY_ROUTINE
+				     targetm.has_fast_mempcpy_routine ()
 				     && retmode == RETURN_END,
 				     &is_move_done);
 

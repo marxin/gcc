@@ -23056,6 +23056,16 @@ ix86_run_selftests (void)
 #define TARGET_GET_MULTILIB_ABI_NAME \
   ix86_get_multilib_abi_name
 
+#if DEFAULT_LIBC == LIBC_GLIBC
+static bool glibc_has_fast_mempcpy_routine (void)
+{
+  return true;
+}
+
+#undef TARGET_HAS_FAST_MEMPCPY_ROUTINE
+#define TARGET_HAS_FAST_MEMPCPY_ROUTINE glibc_has_fast_mempcpy_routine
+#endif
+
 #if CHECKING_P
 #undef TARGET_RUN_TARGET_SELFTESTS
 #define TARGET_RUN_TARGET_SELFTESTS selftest::ix86_run_selftests
