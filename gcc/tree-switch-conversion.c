@@ -1267,24 +1267,28 @@ jump_table_cluster::can_be_handled (const vec<cluster *> &clusters,
   if (start == end)
     return true;
 
-  unsigned HOST_WIDE_INT max_ratio
+  HOST_WIDE_INT max_ratio
     = (optimize_insn_for_size_p ()
        ? PARAM_VALUE (PARAM_JUMP_TABLE_MAX_GROWTH_RATIO_FOR_SIZE)
        : PARAM_VALUE (PARAM_JUMP_TABLE_MAX_GROWTH_RATIO_FOR_SPEED));
-  unsigned HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
-					    clusters[end]->get_high ());
+  HOST_WIDE_INT range = get_range (clusters[start]->get_low (),
+				   clusters[end]->get_high ());
   /* Check overflow.  */
   if (range == 0)
     return false;
 
-  unsigned HOST_WIDE_INT comparison_count = 0;
+  HOST_WIDE_INT comparison_count = 0;
   for (unsigned i = start; i <= end; i++)
     {
       simple_cluster *sc = static_cast<simple_cluster *> (clusters[i]);
       comparison_count += sc->m_range_p ? 2 : 1;
     }
 
-  return 100 * range <= max_ratio * comparison_count;
+  HOST_WIDE_INT lhs = 100 * range;
+  if (lhs < range)
+    return false;
+
+  return lhs <= max_ratio * comparison_count;
 }
 
 /* Return true if cluster starting at START and ending at END (inclusive)
