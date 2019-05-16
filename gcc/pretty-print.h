@@ -355,11 +355,12 @@ extern void pp_newline_and_indent (pretty_printer *, int);
 extern void pp_separate_with (pretty_printer *, char);
 
 /* If we haven't already defined a front-end-specific diagnostics
-   style, use the generic one.  */
-#ifdef GCC_DIAG_STYLE
-#define GCC_PPDIAG_STYLE GCC_DIAG_STYLE
+   style, use the generic one for "raw" formatting (i.e., with no
+   checking of punctuation and quoting issues in the format string).  */
+#ifdef GCC_DIAG_RAW_STYLE
+#define GCC_PPDIAG_STYLE   GCC_DIAG_RAW_STYLE
 #else
-#define GCC_PPDIAG_STYLE __gcc_diag__
+#define GCC_PPDIAG_STYLE __gcc_diag_raw__
 #endif
 
 /* This header may be included before diagnostics-core.h, hence the duplicate

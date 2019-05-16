@@ -415,11 +415,11 @@ convert_to_real_1 (tree type, tree expr, bool fold_p)
 
     case POINTER_TYPE:
     case REFERENCE_TYPE:
-      error ("pointer value used where a floating point value was expected");
+      error ("pointer value used where a floating point was expected");
       return convert_to_real_1 (type, integer_zero_node, fold_p);
 
     default:
-      error ("aggregate value used where a float was expected");
+      error ("aggregate value used where a floating point was expected");
       return convert_to_real_1 (type, integer_zero_node, fold_p);
     }
 }

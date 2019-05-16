@@ -701,7 +701,8 @@ maybe_run_lto_and_relink (char **lto_ld_argv, char **object_lst,
       size_t num_files;
 
       if (!lto_wrapper)
-	fatal_error (input_location, "COLLECT_LTO_WRAPPER must be set");
+	fatal_error (input_location, "environment variable "
+		     "%<COLLECT_LTO_WRAPPER%> must be set");
 
       num_lto_c_args++;
 
@@ -2382,7 +2383,7 @@ is_lto_object_file (const char *prog_name)
     return true;
 
   if (errmsg)
-    fatal_error (0, "%s: %s\n", errmsg, xstrerror (err));
+    fatal_error (0, "%s: %s", errmsg, xstrerror (err));
   return false;
 }
 
@@ -2448,7 +2449,7 @@ scan_prog_file (const char *prog_name, scanpass which_pass,
 
   pex = pex_init (PEX_USE_PIPES, "collect2", NULL);
   if (pex == NULL)
-    fatal_error (input_location, "pex_init failed: %m");
+    fatal_error (input_location, "%<pex_init%> failed: %m");
 
   errmsg = pex_run (pex, 0, nm_file_name, real_nm_argv, NULL, HOST_BIT_BUCKET,
 		    &err);

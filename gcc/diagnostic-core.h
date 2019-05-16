@@ -52,7 +52,10 @@ extern const char *trim_filename (const char *);
 /* If we haven't already defined a front-end-specific diagnostics
    style, use the generic one.  */
 #ifndef GCC_DIAG_STYLE
-#define GCC_DIAG_STYLE __gcc_tdiag__
+#  define GCC_DIAG_STYLE __gcc_tdiag__
+#endif
+#ifndef GCC_DIAG_RAW_STYLE
+#  define GCC_DIAG_RAW_STYLE __gcc_tdiag_raw__
 #endif
 /* None of these functions are suitable for ATTRIBUTE_PRINTF, because
    each language front end can extend them with its own set of format
