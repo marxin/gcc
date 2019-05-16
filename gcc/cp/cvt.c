@@ -1060,14 +1060,14 @@ maybe_warn_nodiscard (tree expr, impl_conv_void implicit)
 	  auto_diagnostic_group d;
 	  if (warning_at (loc, OPT_Wunused_result,
 			  "ignoring return value of %qD, "
-			  "declared with attribute warn_unused_result",
+			  "declared with attribute %<warn_unused_result%>",
 			  fn))
 	    inform (DECL_SOURCE_LOCATION (fn), "declared here");
 	}
       else
 	warning_at (loc, OPT_Wunused_result,
 		    "ignoring return value of function "
-		    "declared with attribute warn_unused_result");
+		    "declared with attribute %<warn_unused_result%>");
     }
 }
 
@@ -1920,7 +1920,7 @@ type_promotes_to (tree type)
 	{
 	  if (abi_version_crosses (6)
 	      && TYPE_MODE (prom) != TYPE_MODE (type))
-	    warning (OPT_Wabi, "scoped enum %qT passed through ... as "
+	    warning (OPT_Wabi, "scoped enum %qT passed through %<...%> as "
 		     "%qT before %<-fabi-version=6%>, %qT after",
 		     type, prom, ENUM_UNDERLYING_TYPE (type));
 	  if (!abi_version_at_least (6))

@@ -2249,7 +2249,7 @@ defaulted_late_check (tree fn)
 	{
 	  error ("explicitly defaulted function %q+D cannot be declared "
 		 "as %<constexpr%> because the implicit declaration is not "
-		 "%<constexpr%>:", fn);
+		 "%qs:", fn, "constexpr");
 	  explain_implicit_non_constexpr (fn);
 	}
       DECL_DECLARED_CONSTEXPR_P (fn) = false;

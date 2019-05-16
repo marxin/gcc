@@ -1058,10 +1058,11 @@ maybe_process_partial_specialization (tree type)
 	  if (current_namespace
 	      != decl_namespace_context (tmpl))
 	    {
-	      permerror (input_location,
-			 "specializing %q#T in different namespace", type);
-	      permerror (DECL_SOURCE_LOCATION (tmpl),
-			 "  from definition of %q#D", tmpl);
+	      if (permerror (input_location,
+			     "specialization of %qD in different namespace",
+			     type))
+		inform (DECL_SOURCE_LOCATION (tmpl),
+			"from definition of %q#D", tmpl);
 	    }
 
 	  /* Check for invalid specialization after instantiation:
@@ -3606,7 +3607,8 @@ expand_integer_pack (tree call, tree args, tsubst_flags_t complain,
 	{
 	  if ((complain & tf_error)
 	      && hi != error_mark_node)
-	    error ("argument to __integer_pack must be between 0 and %d", max);
+	    error ("argument to %<__integer_pack%> must be between 0 and %d",
+		   max);
 	  return error_mark_node;
 	}
 
