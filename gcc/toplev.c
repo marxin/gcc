@@ -1737,7 +1737,7 @@ process_options (void)
     {
       warning_at (UNKNOWN_LOCATION, 0,
 		  "%<-fstack-check=%> and %<-fstack-clash_protection%> are "
-		  "mutually exclusive.  Disabling %<-fstack-check=%>");
+		  "mutually exclusive; disabling %<-fstack-check=%>");
       flag_stack_check = NO_STACK_CHECK;
     }
 
@@ -2180,7 +2180,7 @@ do_compile ()
 	 on the squared numbers.  */
       if (mpfr_set_emin (2 * (min_exp - 1))
 	  || mpfr_set_emax (2 * (max_exp + 1)))
-	sorry ("mpfr not configured to handle all float modes");
+	sorry ("mpfr not configured to handle all floating modes");
 
       /* Set up the back-end if requested.  */
       if (!no_backend)
