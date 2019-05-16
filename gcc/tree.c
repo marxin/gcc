@@ -10009,7 +10009,7 @@ void
 omp_clause_check_failed (const_tree node, const char *file, int line,
                          const char *function, enum omp_clause_code code)
 {
-  internal_error ("tree check: expected %<omp_clause %s%>, have %qk "
+  internal_error ("tree check: expected %<omp_clause %s%>, have %d "
 		  "in %s, at %s:%d",
 		  omp_clause_code_name[code], TREE_CODE (node),
 		  function, trim_filename (file), line);
