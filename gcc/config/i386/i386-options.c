@@ -3462,7 +3462,8 @@ ix86_handle_abi_attribute (tree *node, tree name, tree, int,
     {
       if (lookup_attribute ("sysv_abi", TYPE_ATTRIBUTES (*node)))
         {
-	  error ("ms_abi and sysv_abi attributes are not compatible");
+	  error ("%qs and %qs attributes are not compatible",
+		 "ms_abi", "sysv_abi");
 	}
 
       return NULL_TREE;
@@ -3471,7 +3472,8 @@ ix86_handle_abi_attribute (tree *node, tree name, tree, int,
     {
       if (lookup_attribute ("ms_abi", TYPE_ATTRIBUTES (*node)))
         {
-	  error ("ms_abi and sysv_abi attributes are not compatible");
+	  error ("%qs and %qs attributes are not compatible",
+		 "ms_abi", "sysv_abi");
 	}
 
       return NULL_TREE;
