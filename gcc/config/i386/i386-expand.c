@@ -10761,7 +10761,8 @@ get_element_number (tree vec_type, tree arg)
   if (!tree_fits_uhwi_p (arg)
       || (elt = tree_to_uhwi (arg), elt > max))
     {
-      error ("selector must be an integer constant in the range 0..%wi", max);
+      error ("selector must be an integer constant in the range "
+	     "[0, %wi]", max);
       return 0;
     }
 
