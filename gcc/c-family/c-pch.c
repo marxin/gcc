@@ -406,9 +406,9 @@ c_common_pch_pragma (cpp_reader *pfile, const char *name)
 
   if (!cpp_get_options (pfile)->preprocessed)
     {
-      error ("pch_preprocess pragma should only be used "
+      error ("%<pch_preprocess%> pragma should only be used "
 	     "with %<-fpreprocessed%>");
-      inform (input_location, "use #include instead");
+      inform (input_location, "use %<#include%> instead");
       return;
     }
 
