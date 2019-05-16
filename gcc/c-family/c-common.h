@@ -39,7 +39,10 @@ framework extensions, you must include this file before diagnostic-core.h \
 never after.
 #endif
 #ifndef GCC_DIAG_STYLE
-#define GCC_DIAG_STYLE __gcc_cdiag__
+#  define GCC_DIAG_STYLE       __gcc_cdiag__
+#endif
+#ifndef GCC_DIAG_RAW_STYLE
+#  define GCC_DIAG_RAW_STYLE   __gcc_cdiag_raw__
 #endif
 #include "diagnostic-core.h"
 
