@@ -30,7 +30,10 @@ along with GCC; see the file COPYING3.  If not see
    diagnostic-core.h, not after.  We override the definition of GCC_DIAG_STYLE
    in c-common.h.  */
 #undef GCC_DIAG_STYLE
-#define GCC_DIAG_STYLE __gcc_cxxdiag__
+#define GCC_DIAG_STYLE     __gcc_cxxdiag__
+#undef GCC_DIAG_RAW_STYLE
+#define GCC_DIAG_RAW_STYLE __gcc_cxxdiag_raw__
+
 #if defined(GCC_DIAGNOSTIC_CORE_H) || defined (GCC_C_COMMON_H)
 #error \
 In order for the format checking to accept the C++ front end diagnostic \
