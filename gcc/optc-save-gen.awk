@@ -213,7 +213,7 @@ for (i = 0; i < n_opt_other; i++) {
 	print "    fprintf (file, \"%*s%s (%#lx)\\n\",";
 	print "             indent_to, \"\",";
 	print "             \"" var_opt_other[i] "\",";
-	print "             (unsigned long)ptr->x_" var_opt_other[i] ");";
+	print "             (uintptr_t)ptr->x_" var_opt_other[i] ");";
 	print "";
 }
 
@@ -278,8 +278,8 @@ for (i = 0; i < n_opt_other; i++) {
 	print "    fprintf (file, \"%*s%s (%#lx/%#lx)\\n\",";
 	print "             indent_to, \"\",";
 	print "             \"" var_opt_other[i] "\",";
-	print "             (unsigned long)ptr1->x_" var_opt_other[i] ",";
-	print "             (unsigned long)ptr2->x_" var_opt_other[i] ");";
+	print "             (uintptr_t)ptr1->x_" var_opt_other[i] ",";
+	print "             (uintptr_t)ptr2->x_" var_opt_other[i] ");";
 	print "";
 }
 
@@ -490,7 +490,7 @@ for (i = 0; i < n_target_other; i++) {
 	if (hwi == "yes")
 		print "             ptr->x_" var_target_other[i] ");";
 	else
-		print "             (unsigned long)ptr->x_" var_target_other[i] ");";
+		print "             (uintptr_t)ptr->x_" var_target_other[i] ");";
 	print "";
 }
 
@@ -559,8 +559,8 @@ for (i = 0; i < n_target_other; i++) {
 		print "             ptr2->x_" var_target_other[i] ");";
 	}
 	else {
-		print "             (unsigned long)ptr1->x_" var_target_other[i] ",";
-		print "             (unsigned long)ptr2->x_" var_target_other[i] ");";
+		print "             (uintptr_t)ptr1->x_" var_target_other[i] ",";
+		print "             (uintptr_t)ptr2->x_" var_target_other[i] ");";
 	}
 	print "";
 }
