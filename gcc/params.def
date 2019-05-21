@@ -1439,6 +1439,12 @@ DEFPARAM(PARAM_GIMPLE_FE_COMPUTED_HOT_BB_THRESHOLD,
 	 " The parameter is used only in GIMPLE FE.",
 	 0, 0, 0)
 
+DEFPARAM(PARAM_LOOP_BUNDLE,
+	 "loop-bundle",
+	 "",
+	 0, 0, 1)
+
+
 /*
 
 Local variables:

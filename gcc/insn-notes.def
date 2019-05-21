@@ -95,4 +95,8 @@ INSN_NOTE (CFI_LABEL)
    the Setjmp/Longjmp exception mechanism is used.  */
 INSN_NOTE (UPDATE_SJLJ_CONTEXT)
 
+INSN_NOTE (BUNDLE_LOCK)
+
+INSN_NOTE (BUNDLE_UNLOCK)
+
 #undef INSN_NOTE

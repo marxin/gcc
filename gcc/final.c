@@ -231,6 +231,9 @@ static int alter_cond (rtx);
 static int align_fuzz (rtx, rtx, int, unsigned);
 static void collect_fn_hard_reg_usage (void);
 static tree get_call_fndecl (rtx_insn *);
+
+static unsigned int bundle_align_mode = 0;
+static bool bundle_align_mode_emitted = false;
 
 /* Initialize data in final at the beginning of a compilation.  */
 
@@ -745,10 +748,55 @@ compute_alignments (void)
 	      > fallthru_count.apply_scale
 		    (PARAM_VALUE (PARAM_ALIGN_LOOP_ITERATIONS), 1)))
 	{
-	  align_flags alignment = LOOP_ALIGN (label);
-	  if (dump_file)
-	    fprintf (dump_file, "  internal loop alignment added.\n");
-	  max_alignment = align_flags::max (max_alignment, alignment);
+	  if (!PARAM_VALUE (PARAM_LOOP_BUNDLE))
+	    {
+	      align_flags alignment = LOOP_ALIGN (label);
+	      if (dump_file)
+		fprintf (dump_file, "  internal loop alignment added.\n");
+	      max_alignment = align_flags::max (max_alignment, alignment);
+	    }
+	  else
+	    {
+	      unsigned bb_length = 0;
+	      rtx_insn *end = BB_END (bb);
+	      for (rtx_insn *insn = BB_HEAD (bb); insn != end;
+		   insn = NEXT_INSN (insn))
+		bb_length += get_attr_length (insn);
+
+	      unsigned int cache_line = PARAM_VALUE (PARAM_L1_CACHE_LINE_SIZE);
+	      cache_line = 32;
+	      if (bb_length <= cache_line)
+		{
+		  rtx_insn *next_end = BB_END (bb->next_bb);
+		  if (next_end == NULL)
+		    {
+		      warning (OPT_Wframe_larger_than_, "next_bb == NULL");
+		      break;
+		    }
+
+		  for (rtx_insn *insn = BB_HEAD (bb); insn != end;
+		       insn = NEXT_INSN (insn))
+		    if (NOTE_INSN_BASIC_BLOCK_P (insn))
+		      {
+			emit_note_after (NOTE_INSN_BUNDLE_LOCK, insn);
+			break;
+		      }
+
+		  for (rtx_insn *insn = BB_HEAD (bb->next_bb); insn != next_end;
+		       insn = NEXT_INSN (insn))
+		    if (NOTE_INSN_BASIC_BLOCK_P (insn))
+		      {
+			emit_note_after (NOTE_INSN_BUNDLE_UNLOCK, insn);
+			break;
+		      }
+		  bundle_align_mode = cache_line;
+		}
+
+	      if (dump_file)
+		fprintf (dump_file,
+			 "  bundle_lock used for an internal loop.\n");
+	      break;
+	    }
 	}
       LABEL_TO_ALIGNMENT (label) = max_alignment;
     }
@@ -2437,6 +2485,20 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 					    (NOTE_MARKER_LOCATION (insn)));
 	      goto output_source_line;
 	    }
+	  break;
+
+	case NOTE_INSN_BUNDLE_LOCK:
+	  if (!bundle_align_mode_emitted)
+	    {
+	      fprintf (asm_out_file, "\t.bundle_align_mode %d, 16, 0\n",
+		       exact_log2 (bundle_align_mode));
+	      bundle_align_mode_emitted = true;
+	    }
+	  fprintf (asm_out_file, ".bundle_lock\n");
+	  break;
+
+	case NOTE_INSN_BUNDLE_UNLOCK:
+	  fprintf (asm_out_file, ".bundle_unlock\n");
 	  break;
 
 	default:
