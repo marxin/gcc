@@ -186,21 +186,6 @@ DEF_TUNE (X86_TUNE_DOUBLE_POP, "double_pop", m_PENT | m_LAKEMONT)
    instructions long.  */
 DEF_TUNE (X86_TUNE_PAD_SHORT_FUNCTION, "pad_short_function", m_BONNELL)
 
-/* X86_TUNE_PAD_RETURNS: Place NOP before every RET that is a destination
-   of conditional jump or directly preceded by other jump instruction.
-   This is important for AND K8-AMDFAM10 because the branch prediction
-   architecture expect at most one jump per 2 byte window.  Failing to
-   pad returns leads to misaligned return stack.  */
-DEF_TUNE (X86_TUNE_PAD_RETURNS, "pad_returns",
-          m_ATHLON_K8 | m_AMDFAM10)
-
-/* X86_TUNE_FOUR_JUMP_LIMIT: Some CPU cores are not able to predict more
-   than 4 branch instructions in the 16 byte window.  */
-DEF_TUNE (X86_TUNE_FOUR_JUMP_LIMIT, "four_jump_limit",
-          m_PPRO | m_P4_NOCONA | m_BONNELL | m_SILVERMONT | m_KNL | m_KNM
-	  | m_GOLDMONT | m_GOLDMONT_PLUS | m_TREMONT | m_INTEL | m_ATHLON_K8
-	  | m_AMDFAM10)
-
 /*****************************************************************************/
 /* Integer instruction selection tuning                                      */
 /*****************************************************************************/
