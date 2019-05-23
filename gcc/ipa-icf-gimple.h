@@ -226,6 +226,9 @@ public:
   /* Verifies that trees T1 and T2 do correspond.  */
   bool compare_variable_decl (tree t1, tree t2);
 
+  /* Compare significant loop information.  */
+  bool compare_loops (void);
+
   /* Return true if types are compatible for polymorphic call analysis.
      COMPARE_PTR indicates if polymorphic type comparsion should be
      done for pointers, too.  */

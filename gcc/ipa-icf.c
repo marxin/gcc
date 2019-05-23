@@ -926,6 +926,9 @@ sem_function::equals_private (sem_item *item)
     if (!compare_phi_node (bb_sorted[i]->bb, m_compared_func->bb_sorted[i]->bb))
       return return_false_with_msg ("PHI node comparison returns false");
 
+  if (!m_checker->compare_loops ())
+    return return_false_with_msg ("loops are different");
+
   return result;
 }
 
