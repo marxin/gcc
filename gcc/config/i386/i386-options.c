@@ -1520,7 +1520,7 @@ ix86_default_align (struct gcc_options *opts)
     opts->x_str_align_functions = processor_cost_table[ix86_tune]->align_func;
 
 #ifdef HAVE_GAS_BUNDLE_ALIGN_MODE_EXTENDED
-  if (opts->x_flag_align_loops_bundle && !opts->x_align_loops_bundle)
+  if (!opts->x_align_loops_bundle)
     opts->x_align_loops_bundle
       = processor_cost_table[ix86_tune]->align_loop_bundle_size;
 #else
