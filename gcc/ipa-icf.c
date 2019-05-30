@@ -80,6 +80,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "print-tree.h"
 #include "ipa-utils.h"
 #include "ipa-icf-gimple.h"
+#include "fibonacci_heap.h"
 #include "ipa-icf.h"
 #include "stor-layout.h"
 #include "dbgcnt.h"
@@ -2626,6 +2627,7 @@ sem_item_optimizer::add_item_to_class (congruence_class *cls, sem_item *item)
 {
   item->index_in_class = cls->members.length ();
   cls->members.safe_push (item);
+  cls->referenced_by_count += item->referenced_by_count;
   item->cls = cls;
 }
 
@@ -3187,7 +3189,8 @@ sem_item_optimizer::do_congruence_step (congruence_class *cls)
   {
     if (dump_file)
       fprintf (dump_file, "  processing congruence step for class: %u "
-	       "(%u items), index: %u\n", cls->id, cls->members.length (), i);
+	       "(%u items, %u references), index: %u\n", cls->id,
+	       cls->referenced_by_count, cls->members.length (), i);
     do_congruence_step_for_index (cls, i);
 
     if (splitter_class_removed)
@@ -3207,7 +3210,7 @@ sem_item_optimizer::worklist_push (congruence_class *cls)
     return;
 
   cls->in_worklist = true;
-  worklist.push_back (cls);
+  worklist.insert (cls->referenced_by_count, cls);
 }
 
 /* Pops a class from worklist. */
@@ -3219,8 +3222,7 @@ sem_item_optimizer::worklist_pop (void)
 
   while (!worklist.empty ())
     {
-      cls = worklist.front ();
-      worklist.pop_front ();
+      cls = worklist.extract_min ();
       if (cls->in_worklist)
 	{
 	  cls->in_worklist = false;
@@ -3252,7 +3254,7 @@ sem_item_optimizer::process_cong_reduction (void)
 
   if (dump_file)
     fprintf (dump_file, "Worklist has been filled with: %lu\n",
-	     (unsigned long) worklist.size ());
+	     (unsigned long) worklist.nodes ());
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file, "Congruence class reduction\n");
