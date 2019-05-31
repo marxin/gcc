@@ -397,6 +397,224 @@ func_checker::operand_equal_valueize (const_tree ct1, const_tree ct2, unsigned i
   return -1;
 }
 
+bool
+func_checker::compare_cst_or_decl (tree t1, tree t2)
+{
+  bool ret;
+
+  switch (TREE_CODE (t1))
+    {
+    case INTEGER_CST:
+    case COMPLEX_CST:
+    case VECTOR_CST:
+    case STRING_CST:
+    case REAL_CST:
+      {
+	ret = compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2))
+	      && operand_equal_p (t1, t2, OEP_ONLY_CONST);
+	return return_with_debug (ret);
+      }
+    case FUNCTION_DECL:
+      /* All function decls are in the symbol table and known to match
+	 before we start comparing bodies.  */
+      return true;
+    case VAR_DECL:
+      return return_with_debug (compare_variable_decl (t1, t2));
+    case FIELD_DECL:
+      {
+	tree offset1 = DECL_FIELD_OFFSET (t1);
+	tree offset2 = DECL_FIELD_OFFSET (t2);
+
+	tree bit_offset1 = DECL_FIELD_BIT_OFFSET (t1);
+	tree bit_offset2 = DECL_FIELD_BIT_OFFSET (t2);
+
+	ret = compare_operand_legacy (offset1, offset2)
+	      && compare_operand_legacy (bit_offset1, bit_offset2);
+
+	return return_with_debug (ret);
+      }
+    case LABEL_DECL:
+      {
+	if (t1 == t2)
+	  return true;
+
+	int *bb1 = m_label_bb_map.get (t1);
+	int *bb2 = m_label_bb_map.get (t2);
+
+	/* Labels can point to another function (non-local GOTOs).  */
+	return return_with_debug (bb1 != NULL && bb2 != NULL && *bb1 == *bb2);
+      }
+    case PARM_DECL:
+    case RESULT_DECL:
+    case CONST_DECL:
+      {
+	ret = compare_decl (t1, t2);
+	return return_with_debug (ret);
+      }
+    default:
+      gcc_unreachable ();
+    }
+}
+
+
+bool
+func_checker::compare_operand_legacy (tree t1, tree t2)
+{
+  tree x1, x2, y1, y2, z1, z2;
+  bool ret;
+
+  if (!t1 && !t2)
+    return true;
+  else if (!t1 || !t2)
+    return false;
+
+  tree tt1 = TREE_TYPE (t1);
+  tree tt2 = TREE_TYPE (t2);
+
+  if (!func_checker::compatible_types_p (tt1, tt2))
+    return false;
+
+  if (TREE_CODE (t1) != TREE_CODE (t2))
+    return return_false ();
+
+  switch (TREE_CODE (t1))
+    {
+    case CONSTRUCTOR:
+      {
+	unsigned length1 = CONSTRUCTOR_NELTS (t1);
+	unsigned length2 = CONSTRUCTOR_NELTS (t2);
+
+	if (length1 != length2)
+	  return return_false ();
+
+	for (unsigned i = 0; i < length1; i++)
+	  if (!compare_operand_legacy (CONSTRUCTOR_ELT (t1, i)->value,
+				CONSTRUCTOR_ELT (t2, i)->value))
+	    return return_false ();
+
+	return true;
+      }
+    case ARRAY_REF:
+    case ARRAY_RANGE_REF:
+      /* First argument is the array, second is the index.  */
+      x1 = TREE_OPERAND (t1, 0);
+      x2 = TREE_OPERAND (t2, 0);
+      y1 = TREE_OPERAND (t1, 1);
+      y2 = TREE_OPERAND (t2, 1);
+
+      if (!compare_operand_legacy (array_ref_low_bound (t1),
+			    array_ref_low_bound (t2)))
+	return return_false_with_msg ("");
+      if (!compare_operand_legacy (array_ref_element_size (t1),
+			    array_ref_element_size (t2)))
+	return return_false_with_msg ("");
+
+      if (!compare_operand_legacy (x1, x2))
+	return return_false_with_msg ("");
+      return compare_operand_legacy (y1, y2);
+    case MEM_REF:
+      {
+	x1 = TREE_OPERAND (t1, 0);
+	x2 = TREE_OPERAND (t2, 0);
+	y1 = TREE_OPERAND (t1, 1);
+	y2 = TREE_OPERAND (t2, 1);
+
+	/* See if operand is an memory access (the test originate from
+	 gimple_load_p).
+
+	In this case the alias set of the function being replaced must
+	be subset of the alias set of the other function.  At the moment
+	we seek for equivalency classes, so simply require inclussion in
+	both directions.  */
+
+	if (!func_checker::compatible_types_p (TREE_TYPE (x1), TREE_TYPE (x2)))
+	  return return_false ();
+
+	if (!compare_operand_legacy (x1, x2))
+	  return return_false_with_msg ("");
+
+	/* Type of the offset on MEM_REF does not matter.  */
+	return known_eq (wi::to_poly_offset (y1), wi::to_poly_offset (y2));
+      }
+    case COMPONENT_REF:
+      {
+	x1 = TREE_OPERAND (t1, 0);
+	x2 = TREE_OPERAND (t2, 0);
+	y1 = TREE_OPERAND (t1, 1);
+	y2 = TREE_OPERAND (t2, 1);
+
+	ret = compare_operand_legacy (x1, x2)
+	      && compare_cst_or_decl (y1, y2);
+
+	return return_with_debug (ret);
+      }
+    /* Virtual table call.  */
+    case OBJ_TYPE_REF:
+      {
+	if (!compare_ssa_name (OBJ_TYPE_REF_EXPR (t1), OBJ_TYPE_REF_EXPR (t2)))
+	  return return_false ();
+	if (opt_for_fn (m_source_func_decl, flag_devirtualize)
+	    && virtual_method_call_p (t1))
+	  {
+	    if (tree_to_uhwi (OBJ_TYPE_REF_TOKEN (t1))
+		!= tree_to_uhwi (OBJ_TYPE_REF_TOKEN (t2)))
+	      return return_false_with_msg ("OBJ_TYPE_REF token mismatch");
+	    if (!types_same_for_odr (obj_type_ref_class (t1),
+				     obj_type_ref_class (t2)))
+	      return return_false_with_msg ("OBJ_TYPE_REF OTR type mismatch");
+	    if (!compare_operand_legacy (OBJ_TYPE_REF_OBJECT (t1),
+				  OBJ_TYPE_REF_OBJECT (t2)))
+	      return return_false_with_msg ("OBJ_TYPE_REF object mismatch");
+	  }
+
+	return return_with_debug (true);
+      }
+    case IMAGPART_EXPR:
+    case REALPART_EXPR:
+    case ADDR_EXPR:
+      {
+	x1 = TREE_OPERAND (t1, 0);
+	x2 = TREE_OPERAND (t2, 0);
+
+	ret = compare_operand_legacy (x1, x2);
+	return return_with_debug (ret);
+      }
+    case BIT_FIELD_REF:
+      {
+	x1 = TREE_OPERAND (t1, 0);
+	x2 = TREE_OPERAND (t2, 0);
+	y1 = TREE_OPERAND (t1, 1);
+	y2 = TREE_OPERAND (t2, 1);
+	z1 = TREE_OPERAND (t1, 2);
+	z2 = TREE_OPERAND (t2, 2);
+
+	ret = compare_operand_legacy (x1, x2)
+	      && compare_cst_or_decl (y1, y2)
+	      && compare_cst_or_decl (z1, z2);
+
+	return return_with_debug (ret);
+      }
+    case SSA_NAME:
+	return compare_ssa_name (t1, t2);
+    case INTEGER_CST:
+    case COMPLEX_CST:
+    case VECTOR_CST:
+    case STRING_CST:
+    case REAL_CST:
+    case FUNCTION_DECL:
+    case VAR_DECL:
+    case FIELD_DECL:
+    case LABEL_DECL:
+    case PARM_DECL:
+    case RESULT_DECL:
+    case CONST_DECL:
+      return compare_cst_or_decl (t1, t2);
+    default:
+      return return_false_with_msg ("Unknown TREE code reached");
+    }
+}
+
+
 /* Function responsible for comparison of various operands T1 and T2.
    If these components, from functions FUNC1 and FUNC2, are equal, true
    is returned.  */
@@ -404,13 +622,35 @@ func_checker::operand_equal_valueize (const_tree ct1, const_tree ct2, unsigned i
 bool
 func_checker::compare_operand (tree t1, tree t2)
 {
+  bool r;
   if (!t1 && !t2)
-    return true;
+    r = true;
   else if (!t1 || !t2)
-    return false;
-  if (operand_equal_p (t1, t2, OEP_MATCH_SIDE_EFFECTS))
+    r = false;
+  else if (operand_equal_p (t1, t2, OEP_MATCH_SIDE_EFFECTS))
+    r = true;
+  else
+    r = false;
+
+  bool r_legacy = compare_operand_legacy (t1, t2);
+  if (r_legacy && !r)
+    {
+      static int c = 0;
+      if (dump_file)
+	{
+	  fprintf (dump_file, "diff %d: ", c++);
+	  print_generic_expr (dump_file, t1, (dump_flags_t)0);
+	  fprintf (dump_file, " ");
+	  print_generic_expr (dump_file, t2, (dump_flags_t)0);
+	  fprintf (dump_file, "\n");
+	  gcc_unreachable ();
+	}
+    }
+
+  if (r)
     return true;
-  return return_false_with_msg ("operand_equal_p failed");
+  else
+    return return_false_with_msg ("operand_equal_p failed");
 }
 
 bool
