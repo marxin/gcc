@@ -226,7 +226,7 @@ private:
      that do not look same in isolation.
      1 means values are known to be equal, 0 means values are known to be
      different -1 means that operand_equal_p should continue processing.  */
-  int operand_equal_valueize (const_tree, const_tree, unsigned int);
+  virtual int operand_equal_valueize (const_tree, const_tree, unsigned int);
 };
 
 #endif // GCC_FOLD_CONST_H
