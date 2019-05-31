@@ -2946,6 +2946,7 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
   /* When checking, verify at the outermost operand_equal_p call that
      if operand_equal_p returns non-zero then ARG0 and ARG1 has the same
      hash value.  */
+#if 0
   if (flag_checking && !(flags & OEP_NO_HASH_CHECK))
     {
       if (operand_equal_p (arg0, arg1, flags | OEP_NO_HASH_CHECK))
@@ -2964,6 +2965,7 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
       else
 	return false;
     }
+#endif
 
   STRIP_ANY_LOCATION_WRAPPER (arg0);
   STRIP_ANY_LOCATION_WRAPPER (arg1);
