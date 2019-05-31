@@ -3408,6 +3408,27 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
 	    return OP_SAME (0);
 	  return false;
 
+	  /* Virtual table call.  */
+	case OBJ_TYPE_REF:
+	    {
+	      if (!operand_equal_p (OBJ_TYPE_REF_EXPR (arg0),
+				    OBJ_TYPE_REF_EXPR (arg1)))
+		return false;
+	      if (virtual_method_call_p (arg0))
+		{
+		  if (tree_to_uhwi (OBJ_TYPE_REF_TOKEN (arg0))
+		      != tree_to_uhwi (OBJ_TYPE_REF_TOKEN (arg1)))
+		    return false;
+		  if (!types_same_for_odr (obj_type_ref_class (arg0),
+					   obj_type_ref_class (arg1)))
+		    return false;
+		  if (!operand_equal_p (OBJ_TYPE_REF_OBJECT (arg0),
+					OBJ_TYPE_REF_OBJECT (arg1)))
+		    return false;
+		}
+	      return true;
+	    }
+
 	default:
 	  return false;
 	}
