@@ -2940,7 +2940,8 @@ combine_comparisons (location_t loc,
    even if var is volatile.  */
 
 bool
-operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
+operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
+				  unsigned int flags)
 {
   /* When checking, verify at the outermost operand_equal_p call that
      if operand_equal_p returns non-zero then ARG0 and ARG1 has the same
@@ -3093,6 +3094,12 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	  || (flags & OEP_MATCH_SIDE_EFFECTS)
 	  || (! TREE_SIDE_EFFECTS (arg0) && ! TREE_SIDE_EFFECTS (arg1))))
     return true;
+
+  int val = operand_equal_valueize (arg0, arg1, flags);
+  if (val == 1)
+    return 1;
+  if (val == 0)
+    return 0;
 
   /* Next handle constant cases, those for which we can return 1 even
      if ONLY_CONST is set.  */
@@ -3560,6 +3567,28 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 
 #undef OP_SAME
 #undef OP_SAME_WITH_NULL
+}
+
+/* Valueizer is a virtual method that allows to introduce extra equalities
+   that are not directly visible from the operand.
+   N1 means values are known to be equal, 0 means values are known
+   to be different -1 means that operand_equal_p should
+   continue processing.  */
+
+int
+operand_compare::operand_equal_valueize (const_tree, const_tree, unsigned int)
+{
+  return -1;
+}
+
+/* Conveinece wrapper around operand_compare class because usually we do
+   not need to play with the valueizer.  */
+
+bool
+operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
+{
+  static operand_compare default_compare_instance;
+  return default_compare_instance.operand_equal_p (arg0, arg1, flags);
 }
 
 /* Similar to operand_equal_p, but see if ARG0 might be a variant of ARG1
