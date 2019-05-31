@@ -111,13 +111,7 @@ func_checker::compare_ssa_name (tree t1, tree t2)
       tree b1 = SSA_NAME_VAR (t1);
       tree b2 = SSA_NAME_VAR (t2);
 
-      if (b1 == NULL && b2 == NULL)
-	return true;
-
-      if (b1 == NULL || b2 == NULL || TREE_CODE (b1) != TREE_CODE (b2))
-	return return_false ();
-
-      return compare_cst_or_decl (b1, b2);
+      return compare_operand (b1, b2);
     }
 
   return true;
@@ -352,65 +346,6 @@ func_checker::hash_operand_valueize (const_tree arg, inchash::hash &hstate,
   return false;
 }
 
-bool
-func_checker::compare_cst_or_decl (tree t1, tree t2)
-{
-  bool ret;
-
-  switch (TREE_CODE (t1))
-    {
-    case INTEGER_CST:
-    case COMPLEX_CST:
-    case VECTOR_CST:
-    case STRING_CST:
-    case REAL_CST:
-      {
-	ret = compatible_types_p (TREE_TYPE (t1), TREE_TYPE (t2))
-	      && operand_equal_p (t1, t2, OEP_ONLY_CONST);
-	return return_with_debug (ret);
-      }
-    case FUNCTION_DECL:
-      /* All function decls are in the symbol table and known to match
-	 before we start comparing bodies.  */
-      return true;
-    case VAR_DECL:
-      return return_with_debug (compare_variable_decl (t1, t2));
-    case FIELD_DECL:
-      {
-	tree offset1 = DECL_FIELD_OFFSET (t1);
-	tree offset2 = DECL_FIELD_OFFSET (t2);
-
-	tree bit_offset1 = DECL_FIELD_BIT_OFFSET (t1);
-	tree bit_offset2 = DECL_FIELD_BIT_OFFSET (t2);
-
-	ret = compare_operand (offset1, offset2)
-	      && compare_operand (bit_offset1, bit_offset2);
-
-	return return_with_debug (ret);
-      }
-    case LABEL_DECL:
-      {
-	if (t1 == t2)
-	  return true;
-
-	int *bb1 = m_label_bb_map.get (t1);
-	int *bb2 = m_label_bb_map.get (t2);
-
-	/* Labels can point to another function (non-local GOTOs).  */
-	return return_with_debug (bb1 != NULL && bb2 != NULL && *bb1 == *bb2);
-      }
-    case PARM_DECL:
-    case RESULT_DECL:
-    case CONST_DECL:
-      {
-	ret = compare_decl (t1, t2);
-	return return_with_debug (ret);
-      }
-    default:
-      gcc_unreachable ();
-    }
-}
-
 int
 func_checker::operand_equal_valueize (const_tree ct1, const_tree ct2, unsigned int)
 {
@@ -427,9 +362,14 @@ func_checker::operand_equal_valueize (const_tree ct1, const_tree ct2, unsigned i
       return return_with_debug (compare_variable_decl (t1, t2));
     case LABEL_DECL:
       {
+	if (t1 == t2)
+	  return true;
+
 	int *bb1 = m_label_bb_map.get (t1);
 	int *bb2 = m_label_bb_map.get (t2);
-	return return_with_debug (*bb1 == *bb2);
+
+	/* Labels can point to another function (non-local GOTOs).  */
+	return return_with_debug (bb1 != NULL && bb2 != NULL && *bb1 == *bb2);
       }
 
     case PARM_DECL:
