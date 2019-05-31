@@ -210,6 +210,8 @@ public:
      If these components, from functions FUNC1 and FUNC2, are equal, true
      is returned.  */
   bool compare_operand (tree t1, tree t2);
+  bool compare_operand_legacy (tree t1, tree t2);
+  bool compare_cst_or_decl (tree t1, tree t2);
 
   /* Compares GIMPLE ASM inputs (or outputs) where we iterate tree chain
      and compare both TREE_PURPOSEs and TREE_VALUEs.  */
