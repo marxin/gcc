@@ -3016,16 +3016,12 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
       STRIP_NOPS (arg0);
       STRIP_NOPS (arg1);
     }
-#if 0
-  /* FIXME: Fortran FE currently produce ADDR_EXPR of NOP_EXPR. Enable the
-     sanity check once the issue is solved.  */
   else
     /* Addresses of conversions and SSA_NAMEs (and many other things)
        are not defined.  Check that we did not forget to drop the
        OEP_ADDRESS_OF/OEP_CONSTANT_ADDRESS_OF flags.  */
     gcc_checking_assert (!CONVERT_EXPR_P (arg0) && !CONVERT_EXPR_P (arg1)
 			 && TREE_CODE (arg0) != SSA_NAME);
-#endif
 
   /* In case both args are comparisons but with different comparison
      code, try to swap the comparison operands of one arg to produce
