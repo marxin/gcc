@@ -793,8 +793,7 @@ alias_ptr_types_compatible_p (tree t1, tree t2)
       || ref_all_alias_ptr_type_p (t2))
     return false;
 
-  return (TYPE_MAIN_VARIANT (TREE_TYPE (t1))
-	  == TYPE_MAIN_VARIANT (TREE_TYPE (t2)));
+  return get_alias_set (t1) == get_alias_set (t2);
 }
 
 /* Create emptry alias set entry.  */
