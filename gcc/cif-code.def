@@ -136,6 +136,12 @@ DEFCIFCODE(ATTRIBUTE_MISMATCH, CIF_FINAL_ERROR,
 DEFCIFCODE(CILK_SPAWN, CIF_FINAL_ERROR,
 	   N_("caller function contains cilk spawn"))
 
+/* We can't inline because the user requests only static functions
+   but the function has external linkage for live patching purpose.  */
+DEFCIFCODE(EXTERN_LIVE_ONLY_STATIC, CIF_FINAL_ERROR,
+	   N_("function has external linkage when the user requests only"
+	      " inlining static for live patching"))
+
 /* We proved that the call is unreachable.  */
 DEFCIFCODE(UNREACHABLE, CIF_FINAL_ERROR,
 	   N_("unreachable"))
