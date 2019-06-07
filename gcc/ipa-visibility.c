@@ -877,7 +877,7 @@ whole_program_function_and_variable_visibility (void)
 {
   function_and_variable_visibility (flag_whole_program);
   if (optimize)
-    ipa_discover_readonly_nonaddressable_vars ();
+    ipa_discover_variable_flags ();
   return 0;
 }
 
