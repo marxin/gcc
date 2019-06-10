@@ -1828,6 +1828,13 @@ iterative_hash_template_arg (tree arg, hashval_t val)
       val = iterative_hash_object (TEMPLATE_PARM_LEVEL (arg), val);
       return iterative_hash_object (TEMPLATE_PARM_IDX (arg), val);
 
+    case TEMPLATE_TEMPLATE_PARM:
+      {
+	tree idx = TEMPLATE_TYPE_PARM_INDEX (arg);
+	val = iterative_hash_object (TEMPLATE_PARM_LEVEL (idx), val);
+	return iterative_hash_object (TEMPLATE_PARM_IDX (idx), val);
+      }
+
     case TRAIT_EXPR:
       val = iterative_hash_object (TRAIT_EXPR_KIND (arg), val);
       val = iterative_hash_template_arg (TRAIT_EXPR_TYPE1 (arg), val);
