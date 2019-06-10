@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+/* { dg-options "-O2" } */
 
 extern int foo (void);
 extern void *memcpy (void *, const void *, __SIZE_TYPE__);
@@ -32,7 +33,7 @@ baz ()
     e = c.a3;
   else
     e = c.a1;
-  memcpy (d.a, e, 6);
+  memcpy (d.a, e, 6); /* { dg-warning "reading 5 bytes from a region of size 0" } */
   f = bar ();
   memcpy (d.a, f, 1);
 }
