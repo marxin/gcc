@@ -118,7 +118,7 @@ public:
 
 /* A class aggregating all connections and semantic equivalents
    for a given pair of semantic function candidates.  */
-class func_checker
+class func_checker : operand_compare
 {
 public:
   /* Initialize internal structures for a given SOURCE_FUNC_DECL and
@@ -134,7 +134,7 @@ public:
 		hash_set<symtab_node *> *ignored_target_nodes = NULL);
 
   /* Memory release routine.  */
-  ~func_checker();
+  virtual ~func_checker();
 
   /* Function visits all gimple labels and creates corresponding
      mapping between basic blocks and labels.  */
@@ -267,6 +267,10 @@ private:
 
   /* Flag if ignore labels in comparison.  */
   bool m_ignore_labels;
+
+  virtual int operand_equal_valueize (const_tree, const_tree, unsigned int);
+  virtual bool hash_operand_valueize (const_tree, inchash::hash &,
+				      unsigned int);
 };
 
 } // ipa_icf_gimple namespace
