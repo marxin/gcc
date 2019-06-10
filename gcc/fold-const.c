@@ -3462,11 +3462,22 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 	}
 
     case tcc_declaration:
-      /* Consider __builtin_sqrt equal to sqrt.  */
-      return (TREE_CODE (arg0) == FUNCTION_DECL
-	      && fndecl_built_in_p (arg0) && fndecl_built_in_p (arg1)
-	      && DECL_BUILT_IN_CLASS (arg0) == DECL_BUILT_IN_CLASS (arg1)
-	      && DECL_FUNCTION_CODE (arg0) == DECL_FUNCTION_CODE (arg1));
+      switch (TREE_CODE (arg0))
+	{
+	case FUNCTION_DECL:
+	  /* Consider __builtin_sqrt equal to sqrt.  */
+	  return (fndecl_built_in_p (arg0) && fndecl_built_in_p (arg1)
+		  && DECL_BUILT_IN_CLASS (arg0) == DECL_BUILT_IN_CLASS (arg1)
+		  && DECL_FUNCTION_CODE (arg0) == DECL_FUNCTION_CODE (arg1));
+	case FIELD_DECL:
+	  return (operand_equal_p (DECL_FIELD_OFFSET (arg0),
+				   DECL_FIELD_OFFSET (arg1), OEP_ONLY_CONST)
+		  && operand_equal_p (DECL_FIELD_BIT_OFFSET (arg0),
+				      DECL_FIELD_BIT_OFFSET (arg1),
+				      OEP_ONLY_CONST));
+	default:
+	  return false;
+	}
 
     case tcc_exceptional:
       if (TREE_CODE (arg0) == CONSTRUCTOR)
