@@ -83,7 +83,7 @@ extern bool fold_deferring_overflow_warnings_p (void);
 extern void fold_overflow_warning (const char*, enum warn_strict_overflow_code);
 extern enum tree_code fold_div_compare (enum tree_code, tree, tree,
 					tree *, tree *, bool *);
-extern bool operand_equal_p (const_tree, const_tree, unsigned int);
+extern bool operand_equal_p (const_tree, const_tree, unsigned int flags = 0);
 extern int multiple_of_p (tree, const_tree, const_tree);
 #define omit_one_operand(T1,T2,T3)\
    omit_one_operand_loc (UNKNOWN_LOCATION, T1, T2, T3)
@@ -211,4 +211,32 @@ extern tree fold_build_pointer_plus_hwi_loc (location_t loc, tree ptr, HOST_WIDE
 
 #define fold_build_pointer_plus_hwi(p,o) \
 	fold_build_pointer_plus_hwi_loc (UNKNOWN_LOCATION, p, o)
+
+
+/* Class used to compare gimple operands.  */
+
+class operand_compare
+{
+public:
+  /* Return true if two operands are equal.  The flags fields can be used
+     to specify OEP flags described above.  */
+  bool operand_equal_p (const_tree, const_tree, unsigned int flags = 0);
+
+  /* Generate a hash value for an expression.  This can be used iteratively
+     by passing a previous result as the HSTATE argument.  */
+  void hash_operand (const_tree, inchash::hash &, unsigned flags = 0);
+
+private:
+  /* Valueizer can be used to make non-trivial equalities for expressions
+     that do not look same in isolation.
+     1 means values are known to be equal, 0 means values are known to be
+     different -1 means that operand_equal_p should continue processing.  */
+  virtual int operand_equal_valueize (const_tree, const_tree, unsigned int);
+
+  /* Valueizer is a function that returns true when the function can
+     hash the ARG.  If so, hash value is added to H.  */
+  virtual bool hash_operand_valueize (const_tree arg, inchash::hash &h,
+				      unsigned int flags);
+};
+
 #endif // GCC_FOLD_CONST_H
