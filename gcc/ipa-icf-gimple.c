@@ -31,13 +31,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "data-streamer.h"
 #include "gimple-pretty-print.h"
-#include "alias.h"
 #include "fold-const.h"
 #include "gimple-iterator.h"
 #include "ipa-utils.h"
 #include "tree-eh.h"
 #include "builtins.h"
 #include "cfgloop.h"
+#include "gimple-walk.h"
 
 #include "ipa-icf-gimple.h"
 
@@ -55,6 +55,7 @@ func_checker::func_checker (tree source_func_decl, tree target_func_decl,
 			    hash_set<symtab_node *> *ignored_source_nodes,
 			    hash_set<symtab_node *> *ignored_target_nodes)
   : m_source_func_decl (source_func_decl), m_target_func_decl (target_func_decl),
+    m_source_memops (), m_target_memops (),
     m_ignored_source_nodes (ignored_source_nodes),
     m_ignored_target_nodes (ignored_target_nodes),
     m_ignore_labels (ignore_labels)
@@ -208,17 +209,6 @@ func_checker::compatible_types_p (tree t1, tree t2)
 
   if (!types_compatible_p (t1, t2))
     return return_false_with_msg ("types are not compatible");
-
-  /* We do a lot of unnecesary matching of types that are not being
-     accessed and thus do not need to be compatible.  In longer term we should
-     remove these checks on all types which are not accessed as memory
-     locations.
-
-     For time being just avoid calling get_alias_set on types that are not
-     having alias sets defined at all.  */
-  if (type_with_alias_set_p (t1) && type_with_alias_set_p (t2)
-      && get_alias_set (t1) != get_alias_set (t2))
-    return return_false_with_msg ("alias sets are different");
 
   return true;
 }
@@ -397,6 +387,43 @@ func_checker::compare_loops (basic_block bb1, basic_block bb2)
     return return_false_with_msg ("unroll");
   if (!compare_variable_decl (l1->simduid, l2->simduid))
     return return_false_with_msg ("simduid");
+
+  return true;
+}
+
+/* Record a memory OP and store it to DATA vector.  */
+
+static bool
+record_memop (gimple *, tree op, tree, void *data)
+{
+  vec<tree> *vector = (vec<tree> *)data;
+  vector->safe_push (op);
+  return false;
+}
+
+/* Record memory operand for a GIMPLE STMT and store them in VECTOR.  */
+
+void
+func_checker::record_memops (gimple *stmt, vec<tree> *vector)
+{
+  walk_stmt_load_store_ops (stmt, vector, record_memop, record_memop);
+}
+
+/* Compare memory operands for two GIMPLE statements.  */
+bool
+func_checker::compare_memops (gimple *stmt1, gimple *stmt2)
+{
+  m_source_memops.release ();
+  m_target_memops.release ();
+  record_memops (stmt1, &m_source_memops);
+  record_memops (stmt2, &m_target_memops);
+
+  if (m_source_memops.length () != m_target_memops.length ())
+    return return_false ();
+
+  for (unsigned i = 0;i < m_source_memops.length (); i++)
+    if (!compare_operand (m_source_memops[i], m_target_memops[i]))
+      return false;
 
   return true;
 }
