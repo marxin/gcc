@@ -215,6 +215,12 @@ public:
   /* Compare loop information for basic blocks BB1 and BB2.  */
   bool compare_loops (basic_block bb1, basic_block bb2);
 
+  /* Record memory operand for a GIMPLE STMT and store them in VECTOR.  */
+  void record_memops (gimple *stmt, vec<tree> *vector);
+
+  /* Compare memory operands for two GIMPLE statements.  */
+  bool compare_memops (gimple *stmt1, gimple *stmt2);
+
   /* Return true if types are compatible for polymorphic call analysis.
      COMPARE_PTR indicates if polymorphic type comparsion should be
      done for pointers, too.  */
@@ -239,6 +245,12 @@ private:
 
   /* Target TREE function declaration.  */
   tree m_target_func_decl;
+
+  /* Vector of source memory operands for a GIMPLE stmt.  */
+  vec<tree> m_source_memops;
+
+  /* Vector of target memory operands for a GIMPLE stmt.  */
+  vec<tree> m_target_memops;
 
   /* Source symbol nodes that should be skipped by
      declaration comparison.  */
