@@ -340,6 +340,12 @@ can_inline_edge_p (struct cgraph_edge *e, bool report)
 	  inlinable = false;
 	}
     }
+       else if (callee->symbol.externally_visible
+		&& flag_live_patching == LIVE_PATCHING_INLINE_ONLY_STATIC)
+	 {
+	   e->inline_failed = CIF_EXTERN_LIVE_ONLY_STATIC;
+	   inlinable = false;
+	 }
 
   if (!inlinable && report)
     report_inline_failed_reason (e);

@@ -103,3 +103,9 @@ DEFCIFCODE(TARGET_OPTION_MISMATCH, N_("target specific option mismatch"))
 
 /* We can't inline because of mismatched optimization levels.  */
 DEFCIFCODE(OPTIMIZATION_MISMATCH, N_("optimization level attribute mismatch"))
+
+/* We can't inline because the user requests only static functions
+   but the function has external linkage for live patching purpose.  */
+DEFCIFCODE(EXTERN_LIVE_ONLY_STATIC,
+	   N_("function has external linkage when the user requests only"
+	      " inlining static for live patching"))
