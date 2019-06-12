@@ -474,7 +474,7 @@ symtab_remove_unreachable_nodes (bool before_inlining_p, FILE *file)
    make sense to do it before early optimizations.  */
 
 void
-ipa_discover_readonly_nonaddressable_vars (void)
+ipa_discover_variable_flags (void)
 {
   struct varpool_node *vnode;
   if (dump_file)
@@ -1018,7 +1018,7 @@ whole_program_function_and_variable_visibility (void)
 {
   function_and_variable_visibility (flag_whole_program);
   if (optimize)
-    ipa_discover_readonly_nonaddressable_vars ();
+    ipa_discover_variable_flags ();
   return 0;
 }
 

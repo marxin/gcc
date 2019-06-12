@@ -724,7 +724,7 @@ void varpool_node_set_remove (varpool_node_set, struct varpool_node *);
 void dump_varpool_node_set (FILE *, varpool_node_set);
 void debug_varpool_node_set (varpool_node_set);
 void free_varpool_node_set (varpool_node_set);
-void ipa_discover_readonly_nonaddressable_vars (void);
+void ipa_discover_variable_flags (void);
 bool cgraph_comdat_can_be_unshared_p (struct cgraph_node *);
 bool varpool_externally_visible_p (struct varpool_node *, bool);
 

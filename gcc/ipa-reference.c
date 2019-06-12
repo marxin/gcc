@@ -675,7 +675,7 @@ propagate (void)
   if (dump_file)
     dump_cgraph (dump_file);
 
-  ipa_discover_readonly_nonaddressable_vars ();
+  ipa_discover_variable_flags ();
   generate_summary ();
 
   /* Now we know what vars are really statics; prune out those that aren't.  */

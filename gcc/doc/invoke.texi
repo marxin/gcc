@@ -370,7 +370,7 @@ Objective-C and Objective-C++ Dialects}.
 -fif-conversion2 -findirect-inlining @gol
 -finline-functions -finline-functions-called-once -finline-limit=@var{n} @gol
 -finline-small-functions -fipa-cp -fipa-cp-clone @gol
--fipa-pta -fipa-profile -fipa-pure-const -fipa-reference @gol
+-fipa-pta -fipa-profile -fipa-pure-const -fipa-reference -fipa-reference-addressable @gol
 -fira-algorithm=@var{algorithm} @gol
 -fira-region=@var{region} -fira-hoist-pressure @gol
 -fira-loop-pressure -fno-ira-share-save-slots @gol
@@ -6522,6 +6522,7 @@ compilation time.
 -fipa-pure-const @gol
 -fipa-profile @gol
 -fipa-reference @gol
+-fipa-reference-addressable @gol
 -fmerge-constants
 -fsplit-wide-types @gol
 -ftree-bit-ccp @gol
@@ -7457,6 +7458,11 @@ Enabled by default at @option{-O} and higher.
 @opindex fipa-reference
 Discover which static variables do not escape the
 compilation unit.
+Enabled by default at @option{-O} and higher.
+
+@item -fipa-reference-addressable
+@opindex fipa-reference-addressable
+Discover read-only, write-only and non-addressable static variables.
 Enabled by default at @option{-O} and higher.
 
 @item -fipa-pta
