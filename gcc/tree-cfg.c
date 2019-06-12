@@ -63,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "opts.h"
 #include "asan.h"
 #include "profile.h"
+#include "calls.h"
 
 /* This file contains functions for building the Control Flow Graph (CFG)
    for a function tree.  */
@@ -9447,10 +9448,18 @@ do_warn_unused_result (gimple_seq seq)
 	      location_t loc = gimple_location (g);
 
 	      if (fdecl)
-		warning_at (loc, OPT_Wunused_result,
-			    "ignoring return value of %qD "
-			    "declared with attribute %<warn_unused_result%>",
-			    fdecl);
+		{
+		  /* Some C libraries use alloca(0) in order to free previously
+		     allocated memory by alloca calls.  */
+		  if (gimple_maybe_alloca_call_p (g)
+		      && integer_zerop (gimple_call_arg (g, 0)))
+		    ;
+		  else
+		    warning_at (loc, OPT_Wunused_result,
+				"ignoring return value of %qD declared "
+				"with attribute %<warn_unused_result%>",
+				fdecl);
+		}
 	      else
 		warning_at (loc, OPT_Wunused_result,
 			    "ignoring return value of function "
