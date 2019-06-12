@@ -316,6 +316,13 @@ can_inline_edge_p (struct cgraph_edge *e, bool report)
 				    : e->caller->symbol.decl))
            && !caller_growth_limits (e))
     inlinable = false;
+  else if (callee->symbol.externally_visible
+	   && !DECL_DISREGARD_INLINE_LIMITS (callee->symbol.decl)
+	   && flag_live_patching == LIVE_PATCHING_INLINE_ONLY_STATIC)
+    {
+      e->inline_failed = CIF_EXTERN_LIVE_ONLY_STATIC;
+      inlinable = false;
+    }
   /* Don't inline a function with a higher optimization level than the
      caller.  FIXME: this is really just tip of iceberg of handling
      optimization attribute.  */
@@ -340,12 +347,6 @@ can_inline_edge_p (struct cgraph_edge *e, bool report)
 	  inlinable = false;
 	}
     }
-       else if (callee->symbol.externally_visible
-		&& flag_live_patching == LIVE_PATCHING_INLINE_ONLY_STATIC)
-	 {
-	   e->inline_failed = CIF_EXTERN_LIVE_ONLY_STATIC;
-	   inlinable = false;
-	 }
 
   if (!inlinable && report)
     report_inline_failed_reason (e);
