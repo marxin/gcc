@@ -324,7 +324,7 @@ get_stridx (tree exp)
 		      off = TREE_OPERAND (ptr, 1);
 		      /* Scale the array index by the size of the element
 			 type (normally 1 for char).  */
-		      off = fold_build2 (MULT_EXPR, TREE_TYPE (off), off,
+		      off = fold_build2 (MULT_EXPR, TREE_TYPE (eltsize), off,
 					 eltsize);
 		      ptr = TREE_OPERAND (ptr, 0);
 		    }
