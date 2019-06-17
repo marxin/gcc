@@ -7142,6 +7142,12 @@ inline_expand_builtin_string_cmp (tree exp, rtx target)
   const char *src_str1 = c_getstr (arg1, &len1);
   const char *src_str2 = c_getstr (arg2, &len2);
 
+  if (src_str1 != NULL)
+    len1 = strnlen (src_str1, len1) + 1;
+
+  if (src_str2 != NULL)
+    len2 = strnlen (src_str2, len2) + 1;
+
   /* If neither strings is constant string, the call is not qualify.  */
   if (!src_str1 && !src_str2)
     return NULL_RTX;
