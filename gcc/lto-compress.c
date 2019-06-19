@@ -27,13 +27,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "cgraph.h"
 #include "lto-streamer.h"
-/* zlib.h includes other system headers.  Those headers may test feature
-   test macros.  config.h may define feature test macros.  For this reason,
-   zlib.h needs to be included after, rather than before, config.h and
-   system.h.  */
-#include <zlib.h>
 #include "lto-compress.h"
 #include "timevar.h"
+#include <zstd.h>
 
 /* Compression stream structure, holds the flush callback and opaque token,
    the buffered data, and a note of whether compressing or uncompressing.  */
@@ -48,45 +44,23 @@ struct lto_compression_stream
   bool is_compression;
 };
 
-/* Overall compression constants for zlib.  */
-
-static const size_t Z_BUFFER_LENGTH = 4096;
 static const size_t MIN_STREAM_ALLOCATION = 1024;
 
-/* For zlib, allocate SIZE count of ITEMS and return the address, OPAQUE
-   is unused.  */
-
-static void *
-lto_zalloc (void *opaque, unsigned items, unsigned size)
-{
-  gcc_assert (opaque == Z_NULL);
-  return xmalloc (items * size);
-}
-
-/* For zlib, free memory at ADDRESS, OPAQUE is unused.  */
-
-static void
-lto_zfree (void *opaque, void *address)
-{
-  gcc_assert (opaque == Z_NULL);
-  free (address);
-}
-
-/* Return a zlib compression level that zlib will not reject.  Normalizes
+/* Return a zstd compression level that zstd will not reject.  Normalizes
    the compression level from the command line flag, clamping non-default
    values to the appropriate end of their valid range.  */
 
 static int
-lto_normalized_zlib_level (void)
+lto_normalized_zstd_level (void)
 {
   int level = flag_lto_compression_level;
 
-  if (level != Z_DEFAULT_COMPRESSION)
+  if (level != ZSTD_CLEVEL_DEFAULT)
     {
-      if (level < Z_NO_COMPRESSION)
-	level = Z_NO_COMPRESSION;
-      else if (level > Z_BEST_COMPRESSION)
-	level = Z_BEST_COMPRESSION;
+      if (level < 1)
+	level = 1;
+      else if (level > ZSTD_maxCLevel ())
+	level = ZSTD_maxCLevel ();
     }
 
   return level;
@@ -169,57 +143,19 @@ void
 lto_end_compression (struct lto_compression_stream *stream)
 {
   unsigned char *cursor = (unsigned char *) stream->buffer;
-  size_t remaining = stream->bytes;
-  const size_t outbuf_length = Z_BUFFER_LENGTH;
-  unsigned char *outbuf = (unsigned char *) xmalloc (outbuf_length);
-  z_stream out_stream;
-  size_t compressed_bytes = 0;
-  int status;
-
-  gcc_assert (stream->is_compression);
+  size_t size = stream->bytes;
 
   timevar_push (TV_IPA_LTO_COMPRESS);
+  size_t const outbuf_length = ZSTD_compressBound (size);
+  char *outbuf = (char *) xmalloc (outbuf_length);
 
-  out_stream.next_out = outbuf;
-  out_stream.avail_out = outbuf_length;
-  out_stream.next_in = cursor;
-  out_stream.avail_in = remaining;
-  out_stream.zalloc = lto_zalloc;
-  out_stream.zfree = lto_zfree;
-  out_stream.opaque = Z_NULL;
+  size_t const csize = ZSTD_compress (outbuf, outbuf_length, cursor, size,
+				      lto_normalized_zstd_level ());
 
-  status = deflateInit (&out_stream, lto_normalized_zlib_level ());
-  if (status != Z_OK)
-    internal_error ("compressed stream: %s", zError (status));
+  if (ZSTD_isError (csize))
+    internal_error ("compressed stream: %s", ZSTD_getErrorName (csize));
 
-  do
-    {
-      size_t in_bytes, out_bytes;
-
-      status = deflate (&out_stream, Z_FINISH);
-      if (status != Z_OK && status != Z_STREAM_END)
-	internal_error ("compressed stream: %s", zError (status));
-
-      in_bytes = remaining - out_stream.avail_in;
-      out_bytes = outbuf_length - out_stream.avail_out;
-
-      stream->callback ((const char *) outbuf, out_bytes, stream->opaque);
-      lto_stats.num_compressed_il_bytes += out_bytes;
-      compressed_bytes += out_bytes;
-
-      cursor += in_bytes;
-      remaining -= in_bytes;
-
-      out_stream.next_out = outbuf;
-      out_stream.avail_out = outbuf_length;
-      out_stream.next_in = cursor;
-      out_stream.avail_in = remaining;
-    }
-  while (status != Z_STREAM_END);
-
-  status = deflateEnd (&out_stream);
-  if (status != Z_OK)
-    internal_error ("compressed stream: %s", zError (status));
+  stream->callback (outbuf, csize, NULL);
 
   lto_destroy_compression_stream (stream);
   free (outbuf);
@@ -258,61 +194,22 @@ void
 lto_end_uncompression (struct lto_compression_stream *stream)
 {
   unsigned char *cursor = (unsigned char *) stream->buffer;
-  size_t remaining = stream->bytes;
-  const size_t outbuf_length = Z_BUFFER_LENGTH;
-  unsigned char *outbuf = (unsigned char *) xmalloc (outbuf_length);
-  size_t uncompressed_bytes = 0;
+  size_t size = stream->bytes;
 
-  gcc_assert (!stream->is_compression);
   timevar_push (TV_IPA_LTO_DECOMPRESS);
+  unsigned long long const rsize = ZSTD_getFrameContentSize (cursor, size);
+  if (rsize == ZSTD_CONTENTSIZE_ERROR)
+    internal_error ("not compressed by zstd");
+  else if (rsize == ZSTD_CONTENTSIZE_UNKNOWN)
+    internal_error ("original size unknown");
 
-  while (remaining > 0)
-    {
-      z_stream in_stream;
-      size_t out_bytes;
-      int status;
+  char *outbuf = (char *) xmalloc (rsize);
+  size_t const dsize = ZSTD_decompress (outbuf, rsize, cursor, size);
 
-      in_stream.next_out = outbuf;
-      in_stream.avail_out = outbuf_length;
-      in_stream.next_in = cursor;
-      in_stream.avail_in = remaining;
-      in_stream.zalloc = lto_zalloc;
-      in_stream.zfree = lto_zfree;
-      in_stream.opaque = Z_NULL;
+  if (ZSTD_isError (dsize))
+    internal_error ("decompressed stream: %s", ZSTD_getErrorName (dsize));
 
-      status = inflateInit (&in_stream);
-      if (status != Z_OK)
-	internal_error ("compressed stream: %s", zError (status));
-
-      do
-	{
-	  size_t in_bytes;
-
-	  status = inflate (&in_stream, Z_SYNC_FLUSH);
-	  if (status != Z_OK && status != Z_STREAM_END)
-	    internal_error ("compressed stream: %s", zError (status));
-
-	  in_bytes = remaining - in_stream.avail_in;
-	  out_bytes = outbuf_length - in_stream.avail_out;
-
-	  stream->callback ((const char *) outbuf, out_bytes, stream->opaque);
-	  lto_stats.num_uncompressed_il_bytes += out_bytes;
-	  uncompressed_bytes += out_bytes;
-
-	  cursor += in_bytes;
-	  remaining -= in_bytes;
-
-	  in_stream.next_out = outbuf;
-	  in_stream.avail_out = outbuf_length;
-	  in_stream.next_in = cursor;
-	  in_stream.avail_in = remaining;
-	}
-      while (!(status == Z_STREAM_END && out_bytes == 0));
-
-      status = inflateEnd (&in_stream);
-      if (status != Z_OK)
-	internal_error ("compressed stream: %s", zError (status));
-    }
+  stream->callback (outbuf, dsize, stream->opaque);
 
   lto_destroy_compression_stream (stream);
   free (outbuf);
