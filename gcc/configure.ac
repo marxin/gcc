@@ -1237,6 +1237,15 @@ DL_LIB="$LIBS"
 LIBS="$save_LIBS"
 AC_SUBST(DL_LIB)
 
+# LTO can use zstd compression algorithm
+save_LIBS="$LIBS"
+LIBS=
+AC_SEARCH_LIBS(ZSTD_compress, zstd)
+ZSTD_LIB="$LIBS"
+LIBS="$save_LIBS"
+AC_SUBST(ZSTD_LIB)
+
+
 # Use <inttypes.h> only if it exists,
 # doesn't clash with <sys/types.h>, declares intmax_t and defines
 # PRId64
@@ -1256,6 +1265,18 @@ AC_MSG_RESULT($gcc_cv_header_inttypes_h)
 if test $gcc_cv_header_inttypes_h = yes; then
   AC_DEFINE(HAVE_INTTYPES_H, 1,
 	[Define if you have a working <inttypes.h> header file.])
+fi
+
+AC_MSG_CHECKING(for zstd.h)
+AC_CACHE_VAL(gcc_cv_header_zstd_h,
+[AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+[[#include <zstd.h>]])],
+  [gcc_cv_header_zstd_h=yes],
+  [gcc_cv_header_zstd_h=no])])
+AC_MSG_RESULT($gcc_cv_header_zstd_h)
+if test $gcc_cv_header_zstd_h = yes; then
+  AC_DEFINE(HAVE_ZSTD_H, 1,
+	[Define if you have a working <zstd.h> header file.])
 fi
 
 dnl Disabled until we have a complete test for buggy enum bitfields.
