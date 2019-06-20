@@ -6791,6 +6791,10 @@ print_configuration (FILE *file)
 #endif
 
   fnotice (file, "Thread model: %s\n", thrmod);
+  fnotice (file, "Supported LTO compression algorithms: zlib");
+  if (HAVE_ZSTD_H)
+    fnotice (file, " zstd");
+  fnotice (file, "\n");
 
   /* compiler_version is truncated at the first space when initialized
   from version string, so truncate version_string at the first space
