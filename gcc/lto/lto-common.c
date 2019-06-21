@@ -2058,6 +2058,20 @@ lto_file_finalize (struct lto_file_decl_data *file_data, lto_file *file)
 #else
   file_data->mode_table = lto_mode_identity_table;
 #endif
+
+  /* Read and verify LTO meta header.  */
+  data = lto_get_section_data (file_data, LTO_section_meta, NULL, &len, false);
+  if (data == NULL)
+    {
+      fatal_error (input_location, "bytecode stream in file %qs generated "
+		   "with GCC compiler older than 10.0", file_data->file_name);
+      return;
+    }
+
+  lto_check_version (((const lto_header *)data)->major_version,
+		     ((const lto_header *)data)->minor_version,
+		     file_data->file_name);
+
   data = lto_get_section_data (file_data, LTO_section_decls, NULL, &len);
   if (data == NULL)
     {

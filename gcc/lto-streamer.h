@@ -234,6 +234,7 @@ enum lto_section_type
   LTO_section_offload_table,
   LTO_section_mode_table,
   LTO_section_ipa_hsa,
+  LTO_section_meta,
   LTO_N_SECTION_TYPES		/* Must be last.  */
 };
 
@@ -389,7 +390,7 @@ struct lto_header
 
 /* The is the first part of the record in an LTO file for many of the
    IPA passes.  */
-struct lto_simple_header : lto_header
+struct lto_simple_header
 {
   /* Size of main gimple body of function.  */
   int32_t main_size;
