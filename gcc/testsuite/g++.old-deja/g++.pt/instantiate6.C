@@ -2,6 +2,7 @@
 // { dg-options "-frepo" }
 // { dg-require-host-local "" }
 // { dg-skip-if "dkms are not final links" { vxworks_kernel } }
+// { dg-warning "switch '-frepo' is no longer supported" "" { target *-*-* } 0 }
 
 // Simplified from testcase by Erez Louidor Lior <s3824888@techst02.technion.ac.il>
 

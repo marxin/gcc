@@ -2722,6 +2722,8 @@ Enable automatic template instantiation at link time.  This option also
 implies @option{-fno-implicit-templates}.  @xref{Template
 Instantiation}, for more information.
 
+The option is deprecated and might be removed in a later GCC release.
+
 @item -fno-rtti
 @opindex fno-rtti
 @opindex frtti

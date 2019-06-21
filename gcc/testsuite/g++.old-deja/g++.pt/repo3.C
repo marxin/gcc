@@ -2,6 +2,7 @@
 // { dg-options "-frepo" }
 // { dg-require-host-local "" }
 // { dg-skip-if "dkms are not final links" { vxworks_kernel } }
+// { dg-warning "switch '-frepo' is no longer supported" "" { target *-*-* } 0 }
 
 // Test that we properly generate the vtable and such for C.
 // Contributed by scott snyder <snyder@fnal.gov>

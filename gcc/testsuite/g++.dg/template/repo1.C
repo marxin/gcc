@@ -1,6 +1,7 @@
 // { dg-options "-frepo" }
 // { dg-require-host-local "" }
 // { dg-skip-if "dkms are not final links" { vxworks_kernel } }
+// { dg-warning "switch '-frepo' is no longer supported" "" { target *-*-* } 0 }
 
 struct A {
   A();
