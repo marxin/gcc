@@ -6064,4 +6064,7 @@ struct op_location_t
   operator location_t () const { return m_combined_loc; }
 };
 
+extern hash_map<tree, tree> canonical_verification_hash;
+extern hash_map<tree, alias_set_type> alias_verification_hash;
+
 #endif  /* GCC_TREE_H  */

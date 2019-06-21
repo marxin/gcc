@@ -1387,6 +1387,7 @@ OBJS = \
 	ipa-hsa.o \
 	ipa-ref.o \
 	ipa-utils.o \
+	ipa-verification.o \
 	ipa.o \
 	ira.o \
 	ira-build.o \
