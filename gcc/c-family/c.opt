@@ -1732,7 +1732,7 @@ ObjC ObjC++ LTO Var(flag_replace_objc_classes)
 Used in Fix-and-Continue mode to indicate that object files may be swapped in at runtime.
 
 frepo
-C++ ObjC++
+C++ ObjC++ Deprecated
 Enable automatic template instantiation.
 
 frtti

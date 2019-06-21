@@ -316,11 +316,6 @@ proc g++_target_compile { source dest type options } {
     set options [concat $gpp_compile_options $options]
 
     set options [concat "$ALWAYS_CXXFLAGS" $options]
-
-    if { [regexp "(^| )-frepo( |$)" $options] && \
-	 [regexp "\.o(|bj)$" $dest] } then {
-	regsub "\.o(|bj)$" $dest ".rpo" rponame
-	exec rm -f $rponame
     }
 
     # bind_pic_locally adds -fpie/-fPIE flags to flags_to_postpone and it is

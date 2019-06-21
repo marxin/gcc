@@ -242,14 +242,6 @@ proc gcc-dg-test-1 { target_compile prog do_what extra_tool_flags } {
 
     set options [list]
 
-    # Tests should be able to use "dg-do repo".  However, the dg test
-    # driver checks the argument to dg-do against a list of acceptable
-    # options, and "repo" is not among them.  Therefore, we resort to
-    # this ugly approach.
-    if [string match "*-frepo*" $extra_tool_flags] then {
-	set do_what "repo"
-    }
-
     switch $do_what {
 	"preprocess" {
 	    set compile_type "preprocess"
@@ -272,10 +264,6 @@ proc gcc-dg-test-1 { target_compile prog do_what extra_tool_flags } {
 	    set output_file "[file rootname [file tail $prog]].exe"
 	    # The following line is needed for targets like the i960 where
 	    # the default output file is b.out.  Sigh.
-	}
-	"repo" {
-	    set compile_type "object"
-	    set output_file "[file rootname [file tail $prog]].o"
 	}
 	"run" {
 	    set compile_type "executable"
@@ -323,15 +311,6 @@ proc gcc-dg-test-1 { target_compile prog do_what extra_tool_flags } {
     if [string match "*internal compiler error*" $comp_output] {
 	upvar 2 name name
 	fail "$name (internal compiler error)"
-    }
-
-    if { $do_what == "repo" } {
-	set object_file "$output_file"
-	set output_file "[file rootname [file tail $prog]].exe"
-	set comp_output \
-	    [ concat $comp_output \
-		  [$target_compile "$object_file" "$output_file" \
-		       "executable" $options] ]
     }
 
     return [list $comp_output $output_file]
