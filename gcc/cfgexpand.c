@@ -3044,7 +3044,7 @@ expand_asm_stmt (gasm *stmt)
 	      }
 	}
     }
-  unsigned nclobbers = clobber_rvec.length();
+  unsigned nclobbers;
 
   /* First pass over inputs and outputs checks validity and sets
      mark_addressable if needed.  */
@@ -5997,11 +5997,11 @@ construct_init_block (void)
     {
       first_block = e->dest;
       redirect_edge_succ (e, init_block);
-      e = make_single_succ_edge (init_block, first_block, flags);
+      make_single_succ_edge (init_block, first_block, flags);
     }
   else
-    e = make_single_succ_edge (init_block, EXIT_BLOCK_PTR_FOR_FN (cfun),
-			       EDGE_FALLTHRU);
+    make_single_succ_edge (init_block, EXIT_BLOCK_PTR_FOR_FN (cfun),
+			   EDGE_FALLTHRU);
 
   update_bb_for_insn (init_block);
   return init_block;

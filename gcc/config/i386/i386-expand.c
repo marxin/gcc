@@ -16051,8 +16051,6 @@ ix86_expand_rounddf_32 (rtx operand0, rtx operand1)
   mhalf = expand_simple_binop (mode, MINUS, half, one, NULL_RTX,
 			       0, OPTAB_DIRECT);
 
-  /* Compensate.  */
-  tmp = gen_reg_rtx (mode);
   /* xa2 = xa2 - (dxa > 0.5 ? 1 : 0) */
   tmp = ix86_expand_sse_compare_mask (UNGT, dxa, half, false);
   emit_insn (gen_rtx_SET (tmp, gen_rtx_AND (mode, one, tmp)));
