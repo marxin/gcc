@@ -1229,6 +1229,16 @@ cgraph_edge::resolve_speculation (tree callee_decl)
   edge->count += e2->count;
   if (edge->indirect_info && edge->indirect_info->num_of_ics)
     {
+#if 1
+      struct indirect_target_info *item;
+      unsigned i;
+      FOR_EACH_VEC_SAFE_ELT (edge->indirect_info->indirect_call_targets, i,
+			     item)
+	{
+	  if (item->common_target_id == e2->callee->profile_id)
+	    edge->indirect_info->indirect_call_targets->ordered_remove (i);
+	}
+#endif
       edge->indirect_info->num_of_ics--;
       if (edge->indirect_info->num_of_ics == 0)
 	edge->speculative = false;
@@ -1370,6 +1380,17 @@ cgraph_edge::redirect_call_stmt_to_callee (void)
 	  e->count = gimple_bb (e->call_stmt)->count;
 	  if (e2->indirect_info && e2->indirect_info->num_of_ics)
 	    {
+#if 1
+	      struct indirect_target_info *item;
+	      unsigned i;
+	      FOR_EACH_VEC_SAFE_ELT (e2->indirect_info->indirect_call_targets,
+				     i, item)
+		{
+		  if (item->common_target_id == e->callee->profile_id)
+		    e2->indirect_info->indirect_call_targets->ordered_remove (
+		      i);
+		}
+#endif
 	      e2->indirect_info->num_of_ics--;
 	      if (e2->indirect_info->num_of_ics == 0)
 		e2->speculative = false;

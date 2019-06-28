@@ -238,8 +238,6 @@ lto_output_edge (struct lto_simple_output_block *ob, struct cgraph_edge *edge,
   unsigned int uid;
   intptr_t ref;
   struct bitpack_d bp;
-  unsigned i;
-  unsigned len;
 
   if (edge->indirect_unknown_callee)
     streamer_write_enum (ob->main_stream, LTO_symtab_tags, LTO_symtab_last_tag,
@@ -293,27 +291,35 @@ lto_output_edge (struct lto_simple_output_block *ob, struct cgraph_edge *edge,
   streamer_write_bitpack (&bp);
   if (edge->indirect_unknown_callee)
     {
-      struct indirect_target_info *item;
-      int i;
-      len = edge->indirect_info->num_of_ics;
-      gcc_assert (len <= GCOV_DISK_SINGLE_VALUES);
-
-      streamer_write_hwi_stream (ob->main_stream, edge->indirect_info->num_of_ics);
-
-      if (len)
+      if (edge->indirect_info && edge->indirect_info->indirect_call_targets)
 	{
-	  FOR_EACH_VEC_SAFE_ELT (edge->indirect_info->indirect_call_targets, i,
-				 item)
+	  struct indirect_target_info *item;
+	  int i = 0;
+	  unsigned vlen;
+	  vlen = edge->indirect_info->indirect_call_targets->length ();
+	  int ics = edge->indirect_info->num_of_ics;
+	  gcc_assert (vlen <= GCOV_DISK_SINGLE_VALUES);
+
+	  if (ics && ics <= vlen)
 	    {
-	      if (i == edge->indirect_info->num_of_ics)
-		break;
-	      streamer_write_hwi_stream (ob->main_stream,
-					 item->common_target_id);
-	      if (item->common_target_id)
-		streamer_write_hwi_stream (ob->main_stream,
-					   item->common_target_probability);
+	      streamer_write_hwi_stream (ob->main_stream, ics);
+	      FOR_EACH_VEC_SAFE_ELT (edge->indirect_info->indirect_call_targets,
+				     i, item)
+		{
+		  if (i == edge->indirect_info->num_of_ics)
+		    break;
+		  streamer_write_hwi_stream (ob->main_stream,
+					     item->common_target_id);
+		  if (item->common_target_id)
+		    streamer_write_hwi_stream (ob->main_stream,
+					       item->common_target_probability);
+		}
 	    }
+	  else
+	    streamer_write_hwi_stream (ob->main_stream, 0);
 	}
+      else
+	streamer_write_hwi_stream (ob->main_stream, 0);
     }
 }
 

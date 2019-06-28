@@ -590,10 +590,12 @@ ipa_profile (void)
 	      node_map_initialized = true;
 	      ncommon++;
 	      unsigned speculative = 0;
+	      bool remove_item;
 	      struct indirect_target_info *item;
 	      FOR_EACH_VEC_SAFE_ELT (e->indirect_info->indirect_call_targets, i,
 				     item)
 		{
+		  remove_item = true;
 		  if (i > e->indirect_info->num_of_ics)
 		    break;
 		  n2 = find_func_by_profile_id (item->common_target_id);
@@ -680,6 +682,7 @@ ipa_profile (void)
 			    n2, e->count.apply_probability (
 				    item->common_target_probability));
 			  update = true;
+			  remove_item = false;
 			  speculative++;
 			}
 		    }
@@ -691,6 +694,10 @@ ipa_profile (void)
 				 item->common_target_id);
 		      nunknown++;
 		    }
+#if 1
+		  if (remove_item)
+		    e->indirect_info->indirect_call_targets->ordered_remove (i);
+#endif
 		}
 	      if (speculative < e->indirect_info->num_of_ics)
 		e->indirect_info->num_of_ics = speculative;
