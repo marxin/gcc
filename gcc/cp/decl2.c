@@ -3625,12 +3625,12 @@ finish_objects (int method_type, int initp, tree body)
 
   if (method_type == 'I')
     {
-      DECL_STATIC_CONSTRUCTOR (fn) = 1;
+      DECL_SET_STATIC_CONSTRUCTOR (fn, true);
       decl_init_priority_insert (fn, initp);
     }
   else
     {
-      DECL_STATIC_DESTRUCTOR (fn) = 1;
+      DECL_SET_STATIC_DESTRUCTOR (fn, true);
       decl_fini_priority_insert (fn, initp);
     }
 
@@ -5588,7 +5588,7 @@ vtv_finish_verification_constructor_init_function (tree function_body)
 
   finish_compound_stmt (function_body);
   fn = finish_function (/*inline_p=*/false);
-  DECL_STATIC_CONSTRUCTOR (fn) = 1;
+  DECL_SET_STATIC_CONSTRUCTOR (fn, true);
   decl_init_priority_insert (fn, MAX_RESERVED_INIT_PRIORITY - 1);
 
   return fn;

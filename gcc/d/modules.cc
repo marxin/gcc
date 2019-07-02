@@ -906,7 +906,7 @@ d_finish_compilation (tree *vec, int len)
     {
       tree decl = build_funcs_gates_fn (get_file_function_name ("I"),
 					static_ctor_list, NULL);
-      DECL_STATIC_CONSTRUCTOR (decl) = 1;
+      DECL_SET_STATIC_CONSTRUCTOR (decl, true);
       decl_init_priority_insert (decl, DEFAULT_INIT_PRIORITY);
     }
 
@@ -914,7 +914,7 @@ d_finish_compilation (tree *vec, int len)
     {
       tree decl = build_funcs_gates_fn (get_file_function_name ("D"),
 					static_dtor_list, NULL);
-      DECL_STATIC_DESTRUCTOR (decl) = 1;
+      DECL_SET_STATIC_DESTRUCTOR (decl, true);
       decl_fini_priority_insert (decl, DEFAULT_INIT_PRIORITY);
     }
 }

@@ -3022,12 +3022,12 @@ process_attributes (tree *node, struct attrib **attr_list, bool in_place,
 	break;
 
       case ATTR_LINK_CONSTRUCTOR:
-	DECL_STATIC_CONSTRUCTOR (*node) = 1;
+	DECL_SET_STATIC_CONSTRUCTOR (*node, true);
 	TREE_USED (*node) = 1;
 	break;
 
       case ATTR_LINK_DESTRUCTOR:
-	DECL_STATIC_DESTRUCTOR (*node) = 1;
+	DECL_SET_STATIC_DESTRUCTOR (*node, true);
 	TREE_USED (*node) = 1;
 	break;
 

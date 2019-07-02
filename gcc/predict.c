@@ -2450,7 +2450,7 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 	      return NULL;
 	    }
 
-	  if (DECL_IS_MALLOC (decl) || DECL_IS_OPERATOR_NEW (decl))
+	  if (DECL_IS_MALLOC (decl) || DECL_IS_OPERATOR_NEW_P (decl))
 	    {
 	      if (predictor)
 		*predictor = PRED_MALLOC_NONNULL;
@@ -3928,10 +3928,10 @@ compute_function_frequency (void)
   basic_block bb;
   struct cgraph_node *node = cgraph_node::get (current_function_decl);
 
-  if (DECL_STATIC_CONSTRUCTOR (current_function_decl)
+  if (DECL_STATIC_CONSTRUCTOR_P (current_function_decl)
       || MAIN_NAME_P (DECL_NAME (current_function_decl)))
     node->only_called_at_startup = true;
-  if (DECL_STATIC_DESTRUCTOR (current_function_decl))
+  if (DECL_STATIC_DESTRUCTOR_P (current_function_decl))
     node->only_called_at_exit = true;
 
   if (profile_status_for_fn (cfun) != PROFILE_READ)
@@ -3952,8 +3952,8 @@ compute_function_frequency (void)
         node->frequency = NODE_FREQUENCY_EXECUTED_ONCE;
       else if (MAIN_NAME_P (DECL_NAME (current_function_decl)))
         node->frequency = NODE_FREQUENCY_EXECUTED_ONCE;
-      else if (DECL_STATIC_CONSTRUCTOR (current_function_decl)
-	       || DECL_STATIC_DESTRUCTOR (current_function_decl))
+      else if (DECL_STATIC_CONSTRUCTOR_P (current_function_decl)
+	       || DECL_STATIC_DESTRUCTOR_P (current_function_decl))
         node->frequency = NODE_FREQUENCY_EXECUTED_ONCE;
       return;
     }

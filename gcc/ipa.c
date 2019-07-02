@@ -881,11 +881,11 @@ cgraph_build_static_cdtor_1 (char which, tree body, int priority, bool final,
   switch (which)
     {
     case 'I':
-      DECL_STATIC_CONSTRUCTOR (decl) = 1;
+      DECL_SET_STATIC_CONSTRUCTOR (decl, true);
       decl_init_priority_insert (decl, priority);
       break;
     case 'D':
-      DECL_STATIC_DESTRUCTOR (decl) = 1;
+      DECL_SET_STATIC_DESTRUCTOR (decl, true);
       decl_fini_priority_insert (decl, priority);
       break;
     default:
@@ -922,9 +922,9 @@ cgraph_build_static_cdtor (char which, tree body, int priority)
 static void
 record_cdtor_fn (struct cgraph_node *node, vec<tree> *ctors, vec<tree> *dtors)
 {
-  if (DECL_STATIC_CONSTRUCTOR (node->decl))
+  if (DECL_STATIC_CONSTRUCTOR_P (node->decl))
     ctors->safe_push (node->decl);
-  if (DECL_STATIC_DESTRUCTOR (node->decl))
+  if (DECL_STATIC_DESTRUCTOR_P (node->decl))
     dtors->safe_push (node->decl);
   node = cgraph_node::get (node->decl);
   DECL_DISREGARD_INLINE_LIMITS (node->decl) = 1;
@@ -979,9 +979,9 @@ build_cdtor (bool ctor_p, const vec<tree> &cdtors)
 	  fn = cdtors[i];
 	  call = build_call_expr (fn, 0);
 	  if (ctor_p)
-	    DECL_STATIC_CONSTRUCTOR (fn) = 0;
+	    DECL_SET_STATIC_CONSTRUCTOR (fn, false);
 	  else
-	    DECL_STATIC_DESTRUCTOR (fn) = 0;
+	    DECL_SET_STATIC_DESTRUCTOR (fn, false);
 	  /* We do not want to optimize away pure/const calls here.
 	     When optimizing, these should be already removed, when not
 	     optimizing, we want user to be able to breakpoint in them.  */
@@ -1087,8 +1087,8 @@ ipa_cdtor_merge (void)
   auto_vec<tree, 20> dtors;
   struct cgraph_node *node;
   FOR_EACH_DEFINED_FUNCTION (node)
-    if (DECL_STATIC_CONSTRUCTOR (node->decl)
-	|| DECL_STATIC_DESTRUCTOR (node->decl))
+    if (DECL_STATIC_CONSTRUCTOR_P (node->decl)
+	|| DECL_STATIC_DESTRUCTOR_P (node->decl))
        record_cdtor_fn (node, &ctors, &dtors);
   build_cdtor_fns (&ctors, &dtors);
   return 0;

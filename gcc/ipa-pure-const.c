@@ -1392,7 +1392,7 @@ self_recursive_p (struct cgraph_node *node)
 static bool
 cdtor_p (cgraph_node *n, void *)
 {
-  if (DECL_STATIC_CONSTRUCTOR (n->decl) || DECL_STATIC_DESTRUCTOR (n->decl))
+  if (DECL_STATIC_CONSTRUCTOR_P (n->decl) || DECL_STATIC_DESTRUCTOR_P (n->decl))
     return ((!TREE_READONLY (n->decl) && !DECL_PURE_P (n->decl))
 	    || DECL_LOOPING_CONST_OR_PURE_P (n->decl));
   return false;

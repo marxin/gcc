@@ -1801,6 +1801,19 @@ struct GTY(()) tree_decl_non_common {
   tree result;
 };
 
+/* Classify a special function declaration type.  */
+
+enum function_decl_type
+{
+  NONE,
+  STATIC_CTOR,
+  STATIC_DTOR,
+  OPERATOR_NEW,
+  LAMBDA_FUNCTION
+
+  /* 3 values left */
+};
+
 /* FUNCTION_DECL inherits from DECL_NON_COMMON because of the use of the
    arguments/result/saved_tree fields by front ends.   It was either inherit
    FUNCTION_DECL from non_common, or inherit non_common from FUNCTION_DECL,
@@ -1832,27 +1845,27 @@ struct GTY(()) tree_function_decl {
   ENUM_BITFIELD(built_in_function) function_code : 12;
   ENUM_BITFIELD(built_in_class) built_in_class : 2;
 
-  unsigned static_ctor_flag : 1;
-  unsigned static_dtor_flag : 1;
-
   unsigned uninlinable : 1;
   unsigned possibly_inlined : 1;
   unsigned novops_flag : 1;
   unsigned returns_twice_flag : 1;
   unsigned malloc_flag : 1;
-  unsigned operator_new_flag : 1;
   unsigned declared_inline_flag : 1;
   unsigned no_inline_warning_flag : 1;
 
   unsigned no_instrument_function_entry_exit : 1;
   unsigned no_limit_stack : 1;
   unsigned disregard_inline_limits : 1;
+
+  /* Align the bitfield to boundary of a byte.  */
+  ENUM_BITFIELD(function_decl_type) decl_type: 3;
+
   unsigned pure_flag : 1;
   unsigned looping_const_or_pure_flag : 1;
   unsigned has_debug_args_flag : 1;
   unsigned versioned_function : 1;
-  unsigned lambda_function: 1;
-  /* No bits left.  */
+
+  /* 1 bit left.  */
 };
 
 struct GTY(()) tree_translation_unit_decl {

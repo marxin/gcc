@@ -5613,7 +5613,7 @@ generate_coarray_init (gfc_namespace * ns __attribute((unused)))
   fndecl = build_decl (input_location, FUNCTION_DECL,
 		       create_tmp_var_name ("_caf_init"), tmp);
 
-  DECL_STATIC_CONSTRUCTOR (fndecl) = 1;
+  DECL_SET_STATIC_CONSTRUCTOR (fndecl, true);
   SET_DECL_INIT_PRIORITY (fndecl, DEFAULT_INIT_PRIORITY);
 
   decl = build_decl (input_location, RESULT_DECL, NULL_TREE, void_type_node);

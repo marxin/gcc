@@ -655,14 +655,14 @@ function_and_variable_visibility (bool whole_program)
 
       /* Optimize away PURE and CONST constructors and destructors.  */
       if (node->analyzed
-	  && (DECL_STATIC_CONSTRUCTOR (node->decl)
-	      || DECL_STATIC_DESTRUCTOR (node->decl))
+	  && (DECL_STATIC_CONSTRUCTOR_P (node->decl)
+	      || DECL_STATIC_DESTRUCTOR_P (node->decl))
 	  && (flags & (ECF_CONST | ECF_PURE))
 	  && !(flags & ECF_LOOPING_CONST_OR_PURE)
 	  && opt_for_fn (node->decl, optimize))
 	{
-	  DECL_STATIC_CONSTRUCTOR (node->decl) = 0;
-	  DECL_STATIC_DESTRUCTOR (node->decl) = 0;
+	  DECL_SET_STATIC_CONSTRUCTOR (node->decl, false);
+	  DECL_SET_STATIC_DESTRUCTOR (node->decl, false);
 	}
 
       /* Frontends and alias code marks nodes as needed before parsing

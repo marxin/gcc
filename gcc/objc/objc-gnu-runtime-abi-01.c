@@ -968,7 +968,7 @@ build_module_initializer_routine (void)
 #ifndef OBJCPLUS
   /* For Objective-C++, we will need to call __objc_gnu_init
      from objc_generate_static_init_call() below.  */
-  DECL_STATIC_CONSTRUCTOR (current_function_decl) = 1;
+  DECL_SET_STATIC_CONSTRUCTOR (current_function_decl, true);
 #endif
 
   GNU_INIT_decl = current_function_decl;

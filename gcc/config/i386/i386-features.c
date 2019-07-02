@@ -2634,7 +2634,7 @@ make_resolver_func (const tree default_decl,
 
   DECL_CONTEXT (decl) = NULL_TREE;
   DECL_INITIAL (decl) = make_node (BLOCK);
-  DECL_STATIC_CONSTRUCTOR (decl) = 0;
+  DECL_SET_STATIC_CONSTRUCTOR (decl, false);
 
   if (DECL_COMDAT_GROUP (default_decl)
       || TREE_PUBLIC (default_decl))

@@ -452,8 +452,8 @@ simd_clone_create (struct cgraph_node *old_node)
 							   "simdclone");
       SET_DECL_ASSEMBLER_NAME (new_decl, DECL_NAME (new_decl));
       SET_DECL_RTL (new_decl, NULL);
-      DECL_STATIC_CONSTRUCTOR (new_decl) = 0;
-      DECL_STATIC_DESTRUCTOR (new_decl) = 0;
+      DECL_SET_STATIC_CONSTRUCTOR (new_decl, false);
+      DECL_SET_STATIC_DESTRUCTOR (new_decl, false);
       new_node = old_node->create_version_clone (new_decl, vNULL, NULL);
       if (old_node->in_other_partition)
 	new_node->in_other_partition = 1;
