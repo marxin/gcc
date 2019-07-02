@@ -2078,9 +2078,9 @@ cgraph_node::dump (FILE *f)
     fprintf (f, " indirect_call_target");
   if (nonfreeing_fn)
     fprintf (f, " nonfreeing_fn");
-  if (DECL_STATIC_CONSTRUCTOR (decl))
+  if (DECL_STATIC_CONSTRUCTOR_P (decl))
     fprintf (f," static_constructor (priority:%i)", get_init_priority ());
-  if (DECL_STATIC_DESTRUCTOR (decl))
+  if (DECL_STATIC_DESTRUCTOR_P (decl))
     fprintf (f," static_destructor (priority:%i)", get_fini_priority ());
   if (frequency == NODE_FREQUENCY_HOT)
     fprintf (f, " hot");
@@ -2523,14 +2523,14 @@ set_const_flag_1 (cgraph_node *node, bool set_const, bool looping,
      optimized out.  */
   if (set_const && !looping)
     {
-      if (DECL_STATIC_CONSTRUCTOR (node->decl))
+      if (DECL_STATIC_CONSTRUCTOR_P (node->decl))
 	{
-	  DECL_STATIC_CONSTRUCTOR (node->decl) = 0;
+	  DECL_SET_STATIC_CONSTRUCTOR (node->decl, false);
 	  *changed = true;
 	}
-      if (DECL_STATIC_DESTRUCTOR (node->decl))
+      if (DECL_STATIC_DESTRUCTOR_P (node->decl))
 	{
-	  DECL_STATIC_DESTRUCTOR (node->decl) = 0;
+	  DECL_SET_STATIC_DESTRUCTOR (node->decl, false);
 	  *changed = true;
 	}
     }
@@ -2666,14 +2666,14 @@ set_pure_flag_1 (cgraph_node *node, void *data)
      optimized out.  */
   if (info->pure && !info->looping)
     {
-      if (DECL_STATIC_CONSTRUCTOR (node->decl))
+      if (DECL_STATIC_CONSTRUCTOR_P (node->decl))
 	{
-	  DECL_STATIC_CONSTRUCTOR (node->decl) = 0;
+	  DECL_SET_STATIC_CONSTRUCTOR (node->decl, false);
 	  info->changed = true;
 	}
-      if (DECL_STATIC_DESTRUCTOR (node->decl))
+      if (DECL_STATIC_DESTRUCTOR_P (node->decl))
 	{
-	  DECL_STATIC_DESTRUCTOR (node->decl) = 0;
+	  DECL_SET_STATIC_DESTRUCTOR (node->decl, false);
 	  info->changed = true;
 	}
     }

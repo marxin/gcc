@@ -1186,7 +1186,7 @@ vtv_generate_init_routine (void)
          for this routine.  */
       DECL_IGNORED_P (vtv_fndecl) = 1;
       if (flag_vtable_verify == VTV_PREINIT_PRIORITY && !TARGET_PECOFF)
-        DECL_STATIC_CONSTRUCTOR (vtv_fndecl) = 0;
+        DECL_SET_STATIC_CONSTRUCTOR (vtv_fndecl, false);
 
       gimplify_function_tree (vtv_fndecl);
       cgraph_node::add_new_function (vtv_fndecl, false);

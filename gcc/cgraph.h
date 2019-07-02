@@ -2975,8 +2975,8 @@ cgraph_node::only_called_directly_or_aliased_p (void)
 	  && !ifunc_resolver
 	  && !used_from_other_partition
 	  && !DECL_VIRTUAL_P (decl)
-	  && !DECL_STATIC_CONSTRUCTOR (decl)
-	  && !DECL_STATIC_DESTRUCTOR (decl)
+	  && !DECL_STATIC_CONSTRUCTOR_P (decl)
+	  && !DECL_STATIC_DESTRUCTOR_P (decl)
 	  && !used_from_object_file_p ()
 	  && !externally_visible);
 }
@@ -2994,8 +2994,8 @@ cgraph_node::can_remove_if_no_direct_calls_and_refs_p (void)
   /* When function is needed, we cannot remove it.  */
   if (force_output || used_from_other_partition)
     return false;
-  if (DECL_STATIC_CONSTRUCTOR (decl)
-      || DECL_STATIC_DESTRUCTOR (decl))
+  if (DECL_STATIC_CONSTRUCTOR_P (decl)
+      || DECL_STATIC_DESTRUCTOR_P (decl))
     return false;
   /* Only COMDAT functions can be removed if externally visible.  */
   if (externally_visible

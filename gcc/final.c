@@ -4698,12 +4698,12 @@ rest_of_handle_final (void)
   /* Release the blocks that are linked to DECL_INITIAL() to free the memory.  */
   DECL_INITIAL (current_function_decl) = error_mark_node;
 
-  if (DECL_STATIC_CONSTRUCTOR (current_function_decl)
+  if (DECL_STATIC_CONSTRUCTOR_P (current_function_decl)
       && targetm.have_ctors_dtors)
     targetm.asm_out.constructor (XEXP (DECL_RTL (current_function_decl), 0),
 				 decl_init_priority_lookup
 				   (current_function_decl));
-  if (DECL_STATIC_DESTRUCTOR (current_function_decl)
+  if (DECL_STATIC_DESTRUCTOR_P (current_function_decl)
       && targetm.have_ctors_dtors)
     targetm.asm_out.destructor (XEXP (DECL_RTL (current_function_decl), 0),
 				decl_fini_priority_lookup

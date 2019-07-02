@@ -31787,7 +31787,7 @@ make_resolver_func (const tree default_decl,
 
   DECL_CONTEXT (decl) = NULL_TREE;
   DECL_INITIAL (decl) = make_node (BLOCK);
-  DECL_STATIC_CONSTRUCTOR (decl) = 0;
+  DECL_SET_STATIC_CONSTRUCTOR (decl, false);
 
   /* Build result decl and add to function_decl.  */
   tree t = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, ptr_type_node);

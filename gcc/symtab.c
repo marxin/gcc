@@ -909,9 +909,9 @@ symtab_node::dump_base (FILE *f)
     fprintf (f, " artificial");
   if (TREE_CODE (decl) == FUNCTION_DECL)
     {
-      if (DECL_STATIC_CONSTRUCTOR (decl))
+      if (DECL_STATIC_CONSTRUCTOR_P (decl))
 	fprintf (f, " constructor");
-      if (DECL_STATIC_DESTRUCTOR (decl))
+      if (DECL_STATIC_DESTRUCTOR_P (decl))
 	fprintf (f, " destructor");
     }
   fprintf (f, "\n");
@@ -1642,7 +1642,7 @@ symtab_node::set_init_priority (priority_type priority)
   symbol_priority_map *h;
 
   if (is_a <cgraph_node *> (this))
-    gcc_assert (DECL_STATIC_CONSTRUCTOR (this->decl));
+    gcc_assert (DECL_STATIC_CONSTRUCTOR_P (this->decl));
 
   if (priority == DEFAULT_INIT_PRIORITY)
     {
@@ -1660,7 +1660,7 @@ cgraph_node::set_fini_priority (priority_type priority)
 {
   symbol_priority_map *h;
 
-  gcc_assert (DECL_STATIC_DESTRUCTOR (this->decl));
+  gcc_assert (DECL_STATIC_DESTRUCTOR_P (this->decl));
 
   if (priority == DEFAULT_INIT_PRIORITY)
     {
@@ -1841,8 +1841,8 @@ symtab_node::noninterposable_alias (void)
   DECL_VIRTUAL_P (new_decl) = DECL_VIRTUAL_P (node->decl);
   if (TREE_CODE (new_decl) == FUNCTION_DECL)
     {
-      DECL_STATIC_CONSTRUCTOR (new_decl) = 0;
-      DECL_STATIC_DESTRUCTOR (new_decl) = 0;
+      DECL_SET_STATIC_CONSTRUCTOR (new_decl, false);
+      DECL_SET_STATIC_DESTRUCTOR (new_decl, false);
       new_node = cgraph_node::create_alias (new_decl, node->decl);
     }
   else

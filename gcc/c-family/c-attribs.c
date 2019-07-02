@@ -1591,7 +1591,7 @@ handle_constructor_attribute (tree *node, tree name, tree args,
       && decl_function_context (decl) == 0)
     {
       priority_type priority;
-      DECL_STATIC_CONSTRUCTOR (decl) = 1;
+      DECL_SET_STATIC_CONSTRUCTOR (decl, true);
       priority = get_priority (args, /*is_destructor=*/false);
       SET_DECL_INIT_PRIORITY (decl, priority);
       TREE_USED (decl) = 1;
@@ -1621,7 +1621,7 @@ handle_destructor_attribute (tree *node, tree name, tree args,
       && decl_function_context (decl) == 0)
     {
       priority_type priority;
-      DECL_STATIC_DESTRUCTOR (decl) = 1;
+      DECL_SET_STATIC_DESTRUCTOR (decl, true);
       priority = get_priority (args, /*is_destructor=*/true);
       SET_DECL_FINI_PRIORITY (decl, priority);
       TREE_USED (decl) = 1;

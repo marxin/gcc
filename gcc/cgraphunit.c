@@ -260,7 +260,7 @@ symtab_node::needed_p (void)
 
   /* Keep constructors, destructors and virtual functions.  */
    if (TREE_CODE (decl) == FUNCTION_DECL
-       && (DECL_STATIC_CONSTRUCTOR (decl) || DECL_STATIC_DESTRUCTOR (decl)))
+       && (DECL_STATIC_CONSTRUCTOR_P (decl) || DECL_STATIC_DESTRUCTOR_P (decl)))
     return true;
 
   /* Externally visible variables must be output.  The exception is
@@ -1009,8 +1009,8 @@ check_global_declaration (symtab_node *snode)
       && ! (VAR_P (decl) && DECL_REGISTER (decl))
       /* Global ctors and dtors are called by the runtime.  */
       && (TREE_CODE (decl) != FUNCTION_DECL
-	  || (!DECL_STATIC_CONSTRUCTOR (decl)
-	      && !DECL_STATIC_DESTRUCTOR (decl)))
+	  || (!DECL_STATIC_CONSTRUCTOR_P (decl)
+	      && !DECL_STATIC_DESTRUCTOR_P (decl)))
       /* Otherwise, ask the language.  */
       && lang_hooks.decls.warn_unused_global (decl))
     warning_at (DECL_SOURCE_LOCATION (decl),
