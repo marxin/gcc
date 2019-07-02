@@ -3009,6 +3009,14 @@ set_function_decl_type (tree decl, function_decl_type t, bool set)
 #define DECL_SET_IS_OPERATOR_NEW(NODE, VAL) \
   set_function_decl_type (FUNCTION_DECL_CHECK (NODE), OPERATOR_NEW, VAL)
 
+/* Nonzero in a FUNCTION_DECL means this function should be treated as
+   C++ operator delete.  */
+#define DECL_IS_OPERATOR_DELETE_P(NODE) \
+  (FUNCTION_DECL_CHECK (NODE)->function_decl.decl_type == OPERATOR_DELETE)
+
+#define DECL_SET_IS_OPERATOR_DELETE(NODE, VAL) \
+  set_function_decl_type (FUNCTION_DECL_CHECK (NODE), OPERATOR_DELETE, VAL)
+
 /* Nonzero in a FUNCTION_DECL means this function may return more
    than once.  */
 #define DECL_IS_RETURNS_TWICE(NODE) \

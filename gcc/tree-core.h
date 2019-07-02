@@ -1807,6 +1807,7 @@ enum function_decl_type
 {
   NONE,
   OPERATOR_NEW,
+  OPERATOR_DELETE,
   LAMBDA_FUNCTION
 
   /* 0 values left */
