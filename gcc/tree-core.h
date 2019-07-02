@@ -1809,6 +1809,7 @@ enum function_decl_type
   STATIC_CTOR,
   STATIC_DTOR,
   OPERATOR_NEW,
+  OPERATOR_DELETE,
   LAMBDA_FUNCTION
 };
 
