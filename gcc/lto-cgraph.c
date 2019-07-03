@@ -298,7 +298,7 @@ lto_output_edge (struct lto_simple_output_block *ob, struct cgraph_edge *edge,
 	  unsigned vlen;
 	  vlen = edge->indirect_info->indirect_call_targets->length ();
 	  int ics = edge->indirect_info->num_of_ics;
-	  gcc_assert (vlen <= GCOV_DISK_SINGLE_VALUES);
+	  gcc_assert (vlen <= GCOV_TOPN_VALUES);
 
 	  if (ics && ics <= vlen)
 	    {
@@ -1514,7 +1514,7 @@ input_edge (struct lto_input_block *ib, vec<symtab_node *> nodes,
       len = streamer_read_hwi (ib);
       edge->indirect_info->num_of_ics = len;
 
-      gcc_assert (len <= GCOV_SINGLE_VALUE_COUNTERS);
+      gcc_assert (len <= GCOV_TOPN_VALUES_COUNTERS);
 
       if (len)
 	{

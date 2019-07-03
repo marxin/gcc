@@ -220,7 +220,7 @@ ipa_profile_generate_summary (void)
 			  e->indirect_info->num_of_ics++;
 			}
 		      gcc_assert (e->indirect_info->num_of_ics
-				  <= GCOV_DISK_SINGLE_VALUES);
+				  <= GCOV_TOPN_VALUES);
 
 		      gimple_remove_histogram_value (DECL_STRUCT_FUNCTION (
 						       node->decl),
