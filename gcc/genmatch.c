@@ -3310,6 +3310,11 @@ dt_simplify::gen_1 (FILE *f, int indent, bool gimple, operand *result)
 	}
     }
 
+  if (gimple)
+    fprintf_indent (f, indent, "if (__builtin_expect (!dbg_cnt (gimple_match), 0)) return false;\n");
+  else
+    fprintf_indent (f, indent, "if (__builtin_expect (!dbg_cnt (generic_match), 0)) return NULL_TREE;\n");
+
   fprintf_indent (f, indent, "if (__builtin_expect (dump_file && (dump_flags & TDF_FOLDING), 0)) "
 	   "fprintf (dump_file, \"%s ",
 	   s->kind == simplify::SIMPLIFY
