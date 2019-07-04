@@ -1629,6 +1629,7 @@ add_new_edges_to_heap (edge_heap_t *heap, vec<cgraph_edge *> new_edges)
       struct cgraph_edge *edge = new_edges.pop ();
 
       gcc_assert (!edge->aux);
+      gcc_assert (edge->callee);
       if (edge->inline_failed
 	  && can_inline_edge_p (edge, true)
 	  && want_inline_small_function_p (edge, true)
