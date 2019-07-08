@@ -158,7 +158,7 @@ check_types (void)
 
       bool existed;
       tree &tr = canonical_translation.get_or_insert (canonical_type, &existed);
-      if (existed)
+      if (existed && TYPE_CANONICAL (type) != tr)
 	{
 	  fprintf (stderr, "type:\n");
 	  debug_tree (type);
