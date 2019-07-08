@@ -1358,8 +1358,9 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	  return errmsg;
 	}
 
-      /* If we are processing .symtab purge __gnu_lto_slim from it
-	 and any symbols in discarded sections.  */
+      /* If we are processing .symtab purge __gnu_lto_v1 and
+	 __gnu_lto_slim symbols from it and any symbols in discarded
+	 sections.  */
       if (sh_type == SHT_SYMTAB)
 	{
 	  unsigned entsize = ELF_FETCH_FIELD (type_functions, ei_class, Shdr,
@@ -1382,7 +1383,11 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	  /* Find gnu_lto_ in strings.  */
 	  while ((gnu_lto = (char *) memchr (gnu_lto, 'g',
 					     strings + strsz - gnu_lto)))
-	    gnu_lto++;
+	    if (strncmp (gnu_lto, "gnu_lto_v1",
+			 strings + strsz - gnu_lto) == 0)
+	      break;
+	    else
+	      gnu_lto++;
 	  /* Read the section index table if present.  */
 	  if (symtab_indices_shndx[i - 1] != 0)
 	    {
@@ -1419,8 +1424,8 @@ simple_object_elf_copy_lto_debug_sections (simple_object_read *sobj,
 	      if (st_shndx == SHN_XINDEX)
 		st_shndx = type_functions->fetch_Elf_Word
 		    ((unsigned char *)(shndx_table + (ent - buf) / entsize));
-	      /* Eliminate all COMMONs - this includes
-		 __gnu_lto_slim which otherwise cause endless
+	      /* Eliminate all COMMONs - this includes __gnu_lto_v1
+		 and __gnu_lto_slim which otherwise cause endless
 		 LTO plugin invocation.  */
 	      if (st_shndx == SHN_COMMON)
 		discard = 1;
