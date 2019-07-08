@@ -5446,15 +5446,19 @@ free_lang_data_in_type (tree type, struct free_lang_data_d *fld)
 {
   if (type_with_alias_set_p (type) && canonical_type_used_p (type))
     {
+      /*
       fprintf (stderr, "Streaming canonical_type_used_p:\n");
       debug_tree (type);
       fprintf (stderr, "TYPE_CANONICAL is:\n");
       debug_tree (TYPE_CANONICAL (type));
+      */
       canonical_verification_hash.put (type, TYPE_CANONICAL (type));
     }
   if (type_with_alias_set_p (type))
     {
-//      debug_tree (type);
+      /*
+      debug_tree (type);
+      */
       alias_verification_hash.put (type, get_alias_set (type));
     }
 
