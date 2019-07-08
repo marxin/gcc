@@ -5444,7 +5444,7 @@ hash_map<tree, alias_set_type> alias_verification_hash;
 static void
 free_lang_data_in_type (tree type, struct free_lang_data_d *fld)
 {
-  if (canonical_type_used_p (type))
+  if (type_with_alias_set_p (type) && canonical_type_used_p (type))
     {
       fprintf (stderr, "Streaming canonical_type_used_p:\n");
       debug_tree (type);

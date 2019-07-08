@@ -57,8 +57,8 @@ ipa_verification_write_summary (void)
   for (hash_map<tree, tree>::iterator it = canonical_verification_hash.begin ();
        it != canonical_verification_hash.end (); ++it)
     {
-      stream_write_tree (ob, (*it).first, false);
-      stream_write_tree (ob, (*it).second, false);
+      stream_write_tree (ob, (*it).first, true);
+      stream_write_tree (ob, (*it).second, true);
       gcc_assert ((*it).second != NULL_TREE);
     }
 
@@ -122,7 +122,6 @@ ipa_verification_read_summary (void)
 
   while ((file_data = file_data_vec[j++]))
     {
-      fprintf (stderr, "reading: %s\n", file_data->file_name);
       size_t len;
       const char *data = lto_get_section_data (file_data, LTO_section_ipa_verification,
 					       NULL, &len);
@@ -135,6 +134,8 @@ ipa_verification_read_summary (void)
 static unsigned int
 check_types (void)
 {
+  hash_map<tree, tree> canonical_translation;
+
   for (hash_map<tree, tree>::iterator it = wpa_canonical_map.begin ();
        it != wpa_canonical_map.end (); ++it)
     {
@@ -142,7 +143,7 @@ check_types (void)
       tree type = (*it).first;
       tree canonical_type = (*it).second;
 
-      if (!canonical_type_used_p (type))
+      if (!type_with_alias_set_p (type) || !canonical_type_used_p (type))
 	{
 	  fprintf (stderr, "type:\n");
 	  debug_tree (type);
@@ -154,16 +155,21 @@ check_types (void)
 	  debug_tree (type);
 	  internal_error ("TYPE_CANONICAL == NULL_TREE");
 	}
-      if (TYPE_CANONICAL (type) != canonical_type)
+
+      bool existed;
+      tree &tr = canonical_translation.get_or_insert (canonical_type, &existed);
+      if (existed)
 	{
 	  fprintf (stderr, "type:\n");
 	  debug_tree (type);
 	  fprintf (stderr, "TYPE_CANONICAL from LGEN:\n");
 	  debug_tree (canonical_type);
 	  fprintf (stderr, "TYPE_CANONICAL in WPA:\n");
-	  debug_tree (TYPE_CANONICAL (type));
+	  debug_tree (tr);
 	  internal_error ("different canonical type in WPA");
 	}
+      else
+	tr = TYPE_CANONICAL (type);
     }
 
   return 0;
