@@ -150,6 +150,9 @@ check_types (void)
 	}
       if (TYPE_CANONICAL (type) == NULL_TREE)
 	{
+	  /* Skip VLA types.  */
+	  if (variably_modified_type_p (type, NULL_TREE))
+	    continue;
 	  fprintf (stderr, "type:\n");
 	  debug_tree (type);
 	  internal_error ("TYPE_CANONICAL == NULL_TREE");
