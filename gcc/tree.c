@@ -5452,7 +5452,12 @@ free_lang_data_in_type (tree type, struct free_lang_data_d *fld)
       fprintf (stderr, "TYPE_CANONICAL is:\n");
       debug_tree (TYPE_CANONICAL (type));
       */
-      canonical_verification_hash.put (type, TYPE_CANONICAL (type));
+
+      /* VLA integer types have TYPE_CANONICAL set to NULL.  */
+      if (TYPE_CANONICAL (type) == NULL_TREE)
+	gcc_assert (INTEGRAL_TYPE_P (type));
+      else
+	canonical_verification_hash.put (type, TYPE_CANONICAL (type));
     }
   if (type_with_alias_set_p (type))
     {

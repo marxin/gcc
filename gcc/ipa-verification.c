@@ -59,7 +59,6 @@ ipa_verification_write_summary (void)
     {
       stream_write_tree (ob, (*it).first, true);
       stream_write_tree (ob, (*it).second, true);
-      gcc_assert ((*it).second != NULL_TREE);
     }
 
   streamer_write_char_stream (ob->main_stream, 0);
