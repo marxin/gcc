@@ -5439,6 +5439,7 @@ free_lang_data_in_binfo (tree binfo)
 GTY(()) hash_map<tree, tree> *canonical_verification_hash = NULL;
 GTY(()) hash_map<tree, alias_set_type> *alias_verification_hash = NULL;
 GTY(()) hash_map<tree, tree> *wpa_canonical_map = NULL;
+GTY(()) hash_map<tree, tree> *wpa_canonical_translation = NULL;
 
 /* Reset all language specific information still present in TYPE.  */
 

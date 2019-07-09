@@ -95,7 +95,10 @@ ipa_verification_read_section (struct lto_file_decl_data *file_data, const char 
   count = streamer_read_uhwi (&ib_main);
 
   if (wpa_canonical_map == NULL)
-    wpa_canonical_map = hash_map<tree, tree>::create_ggc (13);
+    {
+      wpa_canonical_map = hash_map<tree, tree>::create_ggc (13);
+      wpa_canonical_translation = hash_map<tree, tree>::create_ggc (13);
+    }
 
   for (i = 0; i < count; i++)
     {
@@ -107,10 +110,12 @@ ipa_verification_read_section (struct lto_file_decl_data *file_data, const char 
 	{
 	  if (*value != canonical_type)
 	    {
-	      debug_tree (type);
-	      debug_tree (*value);
-	      debug_tree (canonical_type);
-	      gcc_unreachable ();
+	      bool existed;
+	      tree &tr = wpa_canonical_translation->get_or_insert (canonical_type, &existed);
+	      if (existed)
+		gcc_assert (tr == *value);
+	      else
+		tr = *value;
 	    }
 	}
       else
@@ -144,8 +149,6 @@ ipa_verification_read_summary (void)
 static unsigned int
 check_types (void)
 {
-  hash_map<tree, tree> canonical_translation;
-
   if (wpa_canonical_map == NULL)
     return 0;
 
@@ -173,7 +176,7 @@ check_types (void)
 	}
 
       bool existed;
-      tree &tr = canonical_translation.get_or_insert (canonical_type, &existed);
+      tree &tr = wpa_canonical_translation->get_or_insert (canonical_type, &existed);
       if (existed && TYPE_CANONICAL (type) != tr)
 	{
 	  fprintf (stderr, "type:\n");

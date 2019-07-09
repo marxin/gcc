@@ -6092,5 +6092,6 @@ struct op_location_t
 extern GTY(()) hash_map<tree, tree> *canonical_verification_hash;
 extern GTY(()) hash_map<tree, alias_set_type> *alias_verification_hash;
 extern GTY(()) hash_map<tree, tree> *wpa_canonical_map;
+extern GTY(()) hash_map<tree, tree> *wpa_canonical_translation;
 
 #endif  /* GCC_TREE_H  */
