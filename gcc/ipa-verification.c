@@ -52,21 +52,24 @@ ipa_verification_write_summary (void)
 
   ob = create_output_block (LTO_section_ipa_verification);
   ob->symbol = NULL;
-  streamer_write_uhwi (ob, canonical_verification_hash.elements ());
 
-  for (hash_map<tree, tree>::iterator it = canonical_verification_hash.begin ();
-       it != canonical_verification_hash.end (); ++it)
+  if (canonical_verification_hash != NULL)
     {
-      stream_write_tree (ob, (*it).first, true);
-      stream_write_tree (ob, (*it).second, true);
+      streamer_write_uhwi (ob, canonical_verification_hash->elements ());
+      for (hash_map<tree, tree>::iterator it = canonical_verification_hash->begin ();
+	   it != canonical_verification_hash->end (); ++it)
+	{
+	  stream_write_tree (ob, (*it).first, true);
+	  stream_write_tree (ob, (*it).second, true);
+	}
     }
+  else
+    streamer_write_uhwi (ob, 0);
 
   streamer_write_char_stream (ob->main_stream, 0);
   produce_asm (ob, NULL);
   destroy_output_block (ob);
 }
-
-static hash_map<tree, tree> wpa_canonical_map;
 
 /* Read section in file FILE_DATA of length LEN with data DATA.  */
 
@@ -91,16 +94,27 @@ ipa_verification_read_section (struct lto_file_decl_data *file_data, const char 
 			  header->string_size, vNULL);
   count = streamer_read_uhwi (&ib_main);
 
+  if (wpa_canonical_map == NULL)
+    wpa_canonical_map = hash_map<tree, tree>::create_ggc (13);
+
   for (i = 0; i < count; i++)
     {
       tree type = stream_read_tree (&ib_main, data_in);
       tree canonical_type = stream_read_tree (&ib_main, data_in);
 
-      tree *value = wpa_canonical_map.get (type);
+      tree *value = wpa_canonical_map->get (type);
       if (value != NULL)
-	gcc_assert (*value == canonical_type);
+	{
+	  if (*value != canonical_type)
+	    {
+	      debug_tree (type);
+	      debug_tree (*value);
+	      debug_tree (canonical_type);
+	      gcc_unreachable ();
+	    }
+	}
       else
-	wpa_canonical_map.put (type, canonical_type);
+	wpa_canonical_map->put (type, canonical_type);
     }
   lto_free_section_data (file_data, LTO_section_ipa_verification, NULL, data,
 			 len);
@@ -115,9 +129,6 @@ ipa_verification_read_summary (void)
   struct lto_file_decl_data **file_data_vec = lto_get_file_decl_data ();
   struct lto_file_decl_data *file_data;
   unsigned int j = 0;
-
-  if (hsa_summaries == NULL)
-    hsa_summaries = new hsa_summary_t (symtab);
 
   while ((file_data = file_data_vec[j++]))
     {
@@ -135,8 +146,11 @@ check_types (void)
 {
   hash_map<tree, tree> canonical_translation;
 
-  for (hash_map<tree, tree>::iterator it = wpa_canonical_map.begin ();
-       it != wpa_canonical_map.end (); ++it)
+  if (wpa_canonical_map == NULL)
+    return 0;
+
+  for (hash_map<tree, tree>::iterator it = wpa_canonical_map->begin ();
+       it != wpa_canonical_map->end (); ++it)
     {
       gcc_assert ((*it).second != NULL_TREE);
       tree type = (*it).first;

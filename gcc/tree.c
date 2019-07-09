@@ -5436,8 +5436,9 @@ free_lang_data_in_binfo (tree binfo)
     free_lang_data_in_binfo (t);
 }
 
-hash_map<tree, tree> canonical_verification_hash;
-hash_map<tree, alias_set_type> alias_verification_hash;
+GTY(()) hash_map<tree, tree> *canonical_verification_hash = NULL;
+GTY(()) hash_map<tree, alias_set_type> *alias_verification_hash = NULL;
+GTY(()) hash_map<tree, tree> *wpa_canonical_map = NULL;
 
 /* Reset all language specific information still present in TYPE.  */
 
@@ -5446,6 +5447,8 @@ free_lang_data_in_type (tree type, struct free_lang_data_d *fld)
 {
   if (type_with_alias_set_p (type) && canonical_type_used_p (type))
     {
+      if (canonical_verification_hash == NULL)
+	canonical_verification_hash = hash_map<tree, tree>::create_ggc (13);
       /*
       fprintf (stderr, "Streaming canonical_type_used_p:\n");
       debug_tree (type);
@@ -5457,15 +5460,18 @@ free_lang_data_in_type (tree type, struct free_lang_data_d *fld)
       if (!variably_modified_type_p (type, NULL_TREE))
 	{
 	  gcc_assert (TYPE_CANONICAL (type) != NULL_TREE);
-	  canonical_verification_hash.put (type, TYPE_CANONICAL (type));
+	  canonical_verification_hash->put (type, TYPE_CANONICAL (type));
 	}
     }
   if (type_with_alias_set_p (type))
     {
+      if (alias_verification_hash == NULL)
+	alias_verification_hash
+	  = hash_map<tree, alias_set_type>::create_ggc (13);
       /*
       debug_tree (type);
       */
-      alias_verification_hash.put (type, get_alias_set (type));
+      alias_verification_hash->put (type, get_alias_set (type));
     }
 
   gcc_assert (TYPE_P (type));
