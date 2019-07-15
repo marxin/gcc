@@ -2088,12 +2088,15 @@ eliminate_redundant_comparison (enum tree_code opcode,
 
       /* If we got here, we have a match.  See if we can combine the
 	 two comparisons.  */
+      tree type = TREE_TYPE (gimple_assign_lhs (def1));
       if (opcode == BIT_IOR_EXPR)
-	t = maybe_fold_or_comparisons (lcode, op1, op2,
+	t = maybe_fold_or_comparisons (type,
+				       lcode, op1, op2,
 				       rcode, gimple_assign_rhs1 (def2),
 				       gimple_assign_rhs2 (def2));
       else
-	t = maybe_fold_and_comparisons (lcode, op1, op2,
+	t = maybe_fold_and_comparisons (type,
+					lcode, op1, op2,
 					rcode, gimple_assign_rhs1 (def2),
 					gimple_assign_rhs2 (def2));
       if (!t)
@@ -3833,10 +3836,13 @@ optimize_vec_cond_expr (tree_code opcode, vec<operand_entry *> *ops)
 	  tree y1 = TREE_OPERAND (cond1, 1);
 
 	  tree comb;
+	  tree type = TREE_TYPE (gimple_assign_lhs (stmt0));
 	  if (opcode == BIT_AND_EXPR)
-	    comb = maybe_fold_and_comparisons (cmp0, x0, y0, cmp1, x1, y1);
+	    comb = maybe_fold_and_comparisons (type, cmp0, x0, y0, cmp1, x1,
+					       y1);
 	  else if (opcode == BIT_IOR_EXPR)
-	    comb = maybe_fold_or_comparisons (cmp0, x0, y0, cmp1, x1, y1);
+	    comb = maybe_fold_or_comparisons (type, cmp0, x0, y0, cmp1, x1,
+					      y1);
 	  else
 	    gcc_unreachable ();
 	  if (comb == NULL)
