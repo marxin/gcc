@@ -1860,6 +1860,101 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     { wide_int_to_tree (type, (wi::to_wide (@1)
 			       & (bitpos / BITS_PER_UNIT))); }))))
 
+/* x >  y  &&  x != XXX_MIN  -->  x > y  */
+(for and (truth_and bit_and)
+ (simplify
+  (and:c (gt:c@3 @0 @1) (ne @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && (wi::eq_p (wi::to_wide (@2), wi::min_value (TREE_TYPE (@2)))))
+    @3)))
+
+/* x >  y  &&  x == XXX_MIN  -->  false  */
+(for and (truth_and bit_and)
+ (simplify
+  (and:c (gt:c @0 @1) (eq @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && (wi::eq_p (wi::to_wide (@2), wi::min_value (TREE_TYPE (@2)))))
+    { boolean_false_node; })))
+
+/* x <=  y  &&  x == XXX_MIN  -->  x == XXX_MIN  */
+(for and (truth_and bit_and)
+ (simplify
+  (and:c (le:c @0 @1) (eq@3 @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && (wi::eq_p (wi::to_wide (@2), wi::min_value (TREE_TYPE (@2)))))
+    @3)))
+
+/* x <  y  &&  x != XXX_MAX  -->  x < y  */
+(for and (truth_and bit_and)
+ (simplify
+  (and:c (lt:c@3 @0 @1) (ne @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && (wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2)))))
+    @3)))
+
+/* x <  y  &&  x == XXX_MAX  -->  false  */
+(for and (truth_and bit_and)
+ (simplify
+  (and:c (lt:c @0 @1) (eq @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && (wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2)))))
+    { boolean_false_node; })))
+
+/* x >=  y  &&  x == XXX_MAX  -->  x == XXX_MAX  */
+(for and (truth_and bit_and)
+ (simplify
+  (and:c (ge:c @0 @1) (eq@3 @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && (wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2)))))
+    @3)))
+
+/* x >  y  ||  x != XXX_MIN   -->  x != XXX_MIN  */
+(for or (truth_or bit_ior)
+ (simplify
+  (or:c (gt:c @0 @1) (ne@3 @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && wi::eq_p (wi::to_wide (@2), wi::min_value (TREE_TYPE (@2))))
+    @3)))
+
+/* x <=  y  ||  x != XXX_MIN   -->  true  */
+(for or (truth_or bit_ior)
+ (simplify
+  (or:c (le:c @0 @1) (ne @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && wi::eq_p (wi::to_wide (@2), wi::min_value (TREE_TYPE (@2))))
+    { boolean_true_node; })))
+
+/* x <=  y  ||  x == XXX_MIN   -->  x <= y  */
+(for or (truth_or bit_ior)
+ (simplify
+  (or:c (le:c@3 @0 @1) (eq @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && wi::eq_p (wi::to_wide (@2), wi::min_value (TREE_TYPE (@2))))
+    @3)))
+
+/* x <  y  ||  x != XXX_MAX   -->  x != XXX_MAX  */
+(for or (truth_or bit_ior)
+ (simplify
+  (or:c (lt:c @0 @1) (ne@3 @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2))))
+    @3)))
+
+/* x >=  y  ||  x != XXX_MAX   -->  true  */
+(for or (truth_or bit_ior)
+ (simplify
+  (or:c (ge:c @0 @1) (ne @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2))))
+    { boolean_true_node; })))
+
+/* x >=  y  ||  x == XXX_MAX   -->  x >= y  */
+(for or (truth_or bit_ior)
+ (simplify
+  (or:c (ge:c@3 @0 @1) (eq @0 INTEGER_CST@2))
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) && INTEGRAL_TYPE_P (TREE_TYPE(@1))
+       && wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2))))
+    @3)))
 
 /* We can't reassociate at all for saturating types.  */
 (if (!TYPE_SATURATING (type))
