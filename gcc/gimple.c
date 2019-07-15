@@ -101,7 +101,7 @@ const enum gimple_code gcond::code_;
 
 /* Set the code for statement G to CODE.  */
 
-static inline void
+void
 gimple_set_code (gimple *g, enum gimple_code code)
 {
   g->code = code;
@@ -110,7 +110,7 @@ gimple_set_code (gimple *g, enum gimple_code code)
 /* Return the number of bytes needed to hold a GIMPLE statement with
    code CODE.  */
 
-static inline size_t
+size_t
 gimple_size (enum gimple_code code)
 {
   return gsstruct_code_size[gss_for_code (code)];
