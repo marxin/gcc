@@ -5834,6 +5834,85 @@ and_comparisons_1 (enum tree_code code1, tree op1a, tree op1b,
   return NULL_TREE;
 }
 
+/* Helper function for maybe_fold_and_comparisons and maybe_fold_or_comparisons
+   : try to simplify the AND/OR of the ssa variable VAR with the comparison
+   specified by (OP2A CODE2 OP2B) from match.pd.  Return NULL_EXPR if we can't
+   simplify this to a single expression.  As we are going to lower the cost
+   of building SSA names / gimple stmts significantly, we need to allocate
+   them ont the stack.  This will cause the code to be a bit ugly.  */
+
+static tree
+maybe_fold_comparisons_from_match_pd (enum tree_code code, enum tree_code code1,
+				      tree op1a, tree op1b,
+				      enum tree_code code2, tree op2a,
+				      tree op2b)
+{
+  tree type = TREE_TYPE (op1a);
+  if (TREE_CODE (type) != VECTOR_TYPE)
+    type = boolean_type_node;
+
+  /* Allocate gimple stmt1 on the stack.  */
+  gimple *stmt1 = (gimple *) XALLOCAVEC (char, gimple_size (GIMPLE_ASSIGN, 2));
+  gimple_init (stmt1, GIMPLE_ASSIGN, 3);
+  gimple_assign_set_rhs_code (stmt1, code1);
+  gimple_assign_set_rhs1 (stmt1, op1a);
+  gimple_assign_set_rhs2 (stmt1, op1b);
+
+  /* Allocate gimple stmt2 on the stack.  */
+  gimple *stmt2 = (gimple *) XALLOCAVEC (char, gimple_size (GIMPLE_ASSIGN, 2));
+  gimple_init (stmt2, GIMPLE_ASSIGN, 3);
+  gimple_assign_set_rhs_code (stmt2, code2);
+  gimple_assign_set_rhs1 (stmt2, op2a);
+  gimple_assign_set_rhs2 (stmt2, op2b);
+
+  /* Allocate SSA names(lhs1) on the stack.  */
+  tree lhs1 = (tree)XALLOCA (tree_ssa_name);
+  memset (lhs1, 0, sizeof (tree_ssa_name));
+  TREE_SET_CODE (lhs1, SSA_NAME);
+  TREE_TYPE (lhs1) = type;
+  init_ssa_name_imm_use (lhs1);
+
+  /* Allocate SSA names(lhs2) on the stack.  */
+  tree lhs2 = (tree)XALLOCA (tree_ssa_name);
+  memset (lhs2, 0, sizeof (tree_ssa_name));
+  TREE_SET_CODE (lhs2, SSA_NAME);
+  TREE_TYPE (lhs2) = type;
+  init_ssa_name_imm_use (lhs2);
+
+  gimple_assign_set_lhs (stmt1, lhs1);
+  gimple_assign_set_lhs (stmt2, lhs2);
+
+  gimple_match_op op (gimple_match_cond::UNCOND, code,
+		      type, gimple_assign_lhs (stmt1),
+		      gimple_assign_lhs (stmt2));
+  if (op.resimplify (NULL, follow_all_ssa_edges))
+    {
+      if (gimple_simplified_result_is_gimple_val (&op))
+	{
+	  tree res = op.ops[0];
+	  switch (TREE_CODE (res))
+	    {
+	    case SSA_NAME:
+		{
+		  if (res == lhs1)
+		    return build2 (code1, type, op1a, op1b);
+		  else if (res == lhs2)
+		    return build2 (code2, type, op2a, op2b);
+		  else
+		    return res;
+		}
+	    case INTEGER_CST:
+	      /* Fold expression to boolean_true_node or boolean_false_node.  */
+	      return res;
+	    default:
+	      return NULL_TREE;
+	    }
+	}
+    }
+
+  return NULL_TREE;
+}
+
 /* Try to simplify the AND of two comparisons, specified by
    (OP1A CODE1 OP1B) and (OP2B CODE2 OP2B), respectively.
    If this can be simplified to a single expression (without requiring
@@ -5845,11 +5924,17 @@ tree
 maybe_fold_and_comparisons (enum tree_code code1, tree op1a, tree op1b,
 			    enum tree_code code2, tree op2a, tree op2b)
 {
-  tree t = and_comparisons_1 (code1, op1a, op1b, code2, op2a, op2b);
-  if (t)
+  if (tree t = and_comparisons_1 (code1, op1a, op1b, code2, op2a, op2b))
     return t;
-  else
-    return and_comparisons_1 (code2, op2a, op2b, code1, op1a, op1b);
+
+  if (tree t = and_comparisons_1 (code2, op2a, op2b, code1, op1a, op1b))
+    return t;
+
+  if (tree t = maybe_fold_comparisons_from_match_pd (BIT_AND_EXPR, code1, op1a,
+						     op1b, code2, op2a, op2b))
+    return t;
+
+  return NULL_TREE;
 }
 
 /* Helper function for or_comparisons_1:  try to simplify the OR of the
@@ -6309,13 +6394,18 @@ tree
 maybe_fold_or_comparisons (enum tree_code code1, tree op1a, tree op1b,
 			   enum tree_code code2, tree op2a, tree op2b)
 {
-  tree t = or_comparisons_1 (code1, op1a, op1b, code2, op2a, op2b);
-  if (t)
+  if (tree t = or_comparisons_1 (code1, op1a, op1b, code2, op2a, op2b))
     return t;
-  else
-    return or_comparisons_1 (code2, op2a, op2b, code1, op1a, op1b);
-}
 
+  if (tree t = or_comparisons_1 (code2, op2a, op2b, code1, op1a, op1b))
+    return t;
+
+  if (tree t = maybe_fold_comparisons_from_match_pd (BIT_IOR_EXPR, code1, op1a,
+						     op1b, code2, op2a, op2b))
+    return t;
+
+  return NULL_TREE;
+}
 
 /* Fold STMT to a constant using VALUEIZE to valueize SSA names.
 
