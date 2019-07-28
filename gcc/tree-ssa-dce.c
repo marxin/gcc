@@ -1294,6 +1294,20 @@ eliminate_unnecessary_stmts (void)
 		      && !gimple_plf (def_stmt, STMT_NECESSARY))
 		    gimple_set_plf (stmt, STMT_NECESSARY, false);
 		}
+
+	      /* Some delete operators have 2 arguments, where
+		 the second argument is size of the deallocated memory.  */
+	      if (gimple_call_num_args (stmt) == 2)
+		{
+		  tree ptr = gimple_call_arg (stmt, 1);
+		  if (TREE_CODE (ptr) == SSA_NAME)
+		    {
+		      gimple *def_stmt = SSA_NAME_DEF_STMT (ptr);
+		      if (!gimple_nop_p (def_stmt)
+			  && !gimple_plf (def_stmt, STMT_NECESSARY))
+			gimple_set_plf (stmt, STMT_NECESSARY, false);
+		    }
+		}
 	    }
 
 	  /* If GSI is not necessary then remove it.  */
