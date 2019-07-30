@@ -646,6 +646,18 @@ degenerate_phi_p (gimple *phi)
   return true;
 }
 
+/* Return true when a GIMPLE STMT is a delete call operator that
+   has either one argument or second argument is an integer constant.  */
+
+static bool
+simple_delete_operator_p (gimple *stmt)
+{
+  return (is_gimple_call (stmt)
+	  && (gimple_call_operator_delete_p (as_a <gcall *> (stmt))
+	      && (gimple_call_num_args (stmt) == 1
+		  || TREE_CODE (gimple_call_arg (stmt, 1)) == INTEGER_CST)));
+}
+
 /* Propagate necessity using the operands of necessary statements.
    Process the uses on each statement in the worklist, and add all
    feeding statements which contribute to the calculation of this
@@ -805,9 +817,7 @@ propagate_necessity (bool aggressive)
 	     allocation function do not mark that necessary through
 	     processing the argument.  */
 	  if (gimple_call_builtin_p (stmt, BUILT_IN_FREE)
-	      || (is_gimple_call (stmt)
-		  && gimple_call_operator_delete_p (as_a <gcall *> (stmt))))
-
+	      || simple_delete_operator_p (stmt))
 	    {
 	      tree ptr = gimple_call_arg (stmt, 0);
 	      gimple *def_stmt;
@@ -1306,8 +1316,7 @@ eliminate_unnecessary_stmts (void)
 	     (and thus is getting removed).  */
 	  if (gimple_plf (stmt, STMT_NECESSARY)
 	      && (gimple_call_builtin_p (stmt, BUILT_IN_FREE)
-		  || (is_gimple_call (stmt)
-		      && gimple_call_operator_delete_p (as_a <gcall *> (stmt)))))
+		  || simple_delete_operator_p (stmt)))
 	    {
 	      tree ptr = gimple_call_arg (stmt, 0);
 	      if (TREE_CODE (ptr) == SSA_NAME)
