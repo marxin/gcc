@@ -1008,6 +1008,8 @@ symbol_table::free_edge (cgraph_edge *e)
   if (e->m_summary_id != -1)
     edge_released_summary_ids.safe_push (e->m_summary_id);
 
+  /* Clear out the edge so we do not dangle pointers.  */
+  memset (e, 0, sizeof (*e));
   if (e->indirect_info)
     ggc_free (e->indirect_info);
   ggc_free (e);
