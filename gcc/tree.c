@@ -9817,12 +9817,17 @@ get_file_function_name (const char *type)
 	   || (strncmp (type, "sub_", 4) == 0
 	       && (type[4] == 'I' || type[4] == 'D')))
     {
-      const char *file = main_input_filename;
-      if (! file)
-	file = LOCATION_FILE (input_location);
-      /* Just use the file's basename, because the full pathname
-	 might be quite long.  */
-      p = q = ASTRDUP (lbasename (file));
+      if (flag_wpa)
+	p = q = ASTRDUP ("wpa");
+      else
+	{
+	  const char *file = main_input_filename;
+	  if (! file)
+	    file = LOCATION_FILE (input_location);
+	  /* Just use the file's basename, because the full pathname
+	     might be quite long.  */
+	  p = q = ASTRDUP (lbasename (file));
+	}
     }
   else
     {
