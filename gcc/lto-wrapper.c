@@ -1217,30 +1217,6 @@ init_num_threads (void)
 
 /* FIXME: once using -std=c11, we can use std::thread::hardware_concurrency.  */
 
-/* Return true when a jobserver is running and can accept a job.  */
-
-static bool
-jobserver_active_p (void)
-{
-  const char *makeflags = getenv ("MAKEFLAGS");
-  if (makeflags == NULL)
-    return false;
-
-  const char *needle = "--jobserver-auth=";
-  const char *n = strstr (makeflags, needle);
-  if (n == NULL)
-    return false;
-
-  int rfd = -1;
-  int wfd = -1;
-
-  return ((sscanf(n, "--jobserver-auth=%d,%d", &rfd, &wfd) == 2)
-	  && rfd > 0
-	  && wfd > 0
-	  && fcntl (rfd, F_GETFD) >= 0
-	  && fcntl (wfd, F_GETFD) >= 0);
-}
-
 /* Execute gcc. ARGC is the number of arguments. ARGV contains the arguments. */
 
 static void
@@ -1425,11 +1401,8 @@ run_gcc (unsigned argc, char *argv[])
     }
   else if (!jobserver && parallel)
     {
-      /* If there's no explicit usage of jobserver and
-	 parallel is enabled, then automatically detect
-	 jobserver or number of cores.  */
+      /* Detect number of jobs automatically.  */
       auto_parallel = 1;
-      jobserver = jobserver_active_p ();
     }
 
   if (linker_output)
