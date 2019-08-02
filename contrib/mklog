@@ -444,13 +444,11 @@ otherwise writes to stdout.'
   if len(prs):
     bugmsg = '\n'.join(['\t' + pr for pr in prs]) + '\n'
 
+  out.write("%s  %s  <%s>\n\n" % (date, name, email))
+  out.write("%s" % bugmsg)
   for log_name, msg in sorted(logs.items()):
     out.write("""\
-%s:
-
-%s  %s  <%s>
-
-%s%s\n""" % (log_name, date, name, email, bugmsg, msg))
+%s\n%s""" % (log_name.replace('ChangeLog', '').strip(), msg))
 
   if args.inline:
     # Append patch body
