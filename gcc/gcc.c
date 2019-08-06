@@ -45,6 +45,13 @@ compilation is specified by a string called a "spec".  */
 #include "filenames.h"
 #include "spellcheck.h"
 
+#ifdef __MINGW32__
+
+#include <io.h>
+#define WIN32_LEAN_AND_MEAN 1
+#include <windows.h>
+
+#endif
 
 
 /* Manage the manipulation of env vars.
@@ -8359,6 +8366,21 @@ driver::final_actions () const
     }
 }
 
+/* Return true when FD file descriptor exists.  */
+
+static bool
+fd_exists (int fd)
+{
+#if defined (F_GETFD)
+  return fcntl (fd, F_GETFD) >= 0;
+#elif defined(__MINGW32__)
+  HANDLE h = (HANDLE) _get_osfhandle (fd);
+  return h != (HANDLE) -1;
+#else
+  return false;
+#endif
+}
+
 /* Detect whether jobserver is active and working.  If not drop
    --jobserver-auth from MAKEFLAGS.  */
 
@@ -8380,8 +8402,8 @@ driver::detect_jobserver () const
 	    = (sscanf (n + strlen (needle), "%d,%d", &rfd, &wfd) == 2
 	       && rfd > 0
 	       && wfd > 0
-	       && fcntl (rfd, F_GETFD) >= 0
-	       && fcntl (wfd, F_GETFD) >= 0);
+	       && fd_exists (rfd)
+	       && fd_exists (wfd));
 
 	  /* Drop the jobserver if it's not working now.  */
 	  if (!jobserver)

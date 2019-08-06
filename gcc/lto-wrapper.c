@@ -49,6 +49,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "lto-section-names.h"
 #include "collect-utils.h"
 
+#ifdef __MINGW32__
+
+#include <io.h>
+#define WIN32_LEAN_AND_MEAN 1
+#include <windows.h>
+
+#endif
+
 /* Environment variable, used for passing the names of offload targets from GCC
    driver to lto-wrapper.  */
 #define OFFLOAD_TARGET_NAMES_ENV	"OFFLOAD_TARGET_NAMES"
@@ -1217,6 +1225,21 @@ init_num_threads (void)
 
 /* FIXME: once using -std=c11, we can use std::thread::hardware_concurrency.  */
 
+/* Return true when FD file descriptor exists.  */
+
+static bool
+fd_exists (int fd)
+{
+#if defined (F_GETFD)
+  return fcntl (fd, F_GETFD) >= 0;
+#elif defined(__MINGW32__)
+  HANDLE h = (HANDLE) _get_osfhandle (fd);
+  return h != (HANDLE) -1;
+#else
+  return false;
+#endif
+}
+
 /* Return true when a jobserver is running and can accept a job.  */
 
 static bool
@@ -1237,8 +1260,8 @@ jobserver_active_p (void)
   return (sscanf (n + strlen (needle), "%d,%d", &rfd, &wfd) == 2
 	  && rfd > 0
 	  && wfd > 0
-	  && fcntl (rfd, F_GETFD) >= 0
-	  && fcntl (wfd, F_GETFD) >= 0);
+	  && fd_exists (rfd)
+	  && fd_exists (wfd));
 }
 
 /* Execute gcc. ARGC is the number of arguments. ARGV contains the arguments. */
