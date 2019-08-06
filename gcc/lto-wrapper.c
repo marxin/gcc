@@ -1010,7 +1010,7 @@ find_and_merge_options (int fd, off_t file_offset, const char *prefix,
       struct cl_decoded_option *f2decoded_options;
       unsigned int f2decoded_options_count;
       get_options_from_collect_gcc_options (collect_gcc,
-					    fopts, CL_LANG_ALL,
+					    fopts, (CL_LANG_ALL | CL_DRIVER),
 					    &f2decoded_options,
 					    &f2decoded_options_count);
       if (!fdecoded_options)
