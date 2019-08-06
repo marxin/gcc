@@ -114,6 +114,25 @@ static bool cfg_altered;
 /* When non-NULL holds map from basic block index into the postorder.  */
 static int *bb_postorder;
 
+/* Return true when FNDECL is a new operator and not a clone.  */
+
+static bool
+operator_new_candidate_p (tree fndecl)
+{
+  return (fndecl != NULL_TREE
+	  && DECL_IS_OPERATOR_NEW_P (fndecl)
+	  && DECL_ABSTRACT_ORIGIN (fndecl) == NULL_TREE);
+}
+
+/* Return true when FNDECL is a delete operator and not a clone.  */
+
+static bool
+operator_delete_candidate_p (tree fndecl)
+{
+  return (fndecl != NULL_TREE
+	  && DECL_IS_OPERATOR_DELETE_P (fndecl)
+	  && DECL_ABSTRACT_ORIGIN (fndecl) == NULL_TREE);
+}
 
 /* True if we should treat any stmt with a vdef as necessary.  */
 
@@ -248,7 +267,7 @@ mark_stmt_if_obviously_necessary (gimple *stmt, bool aggressive)
 
 	if (callee != NULL_TREE
 	    && flag_allocation_dce
-	    && DECL_IS_REPLACEABLE_OPERATOR_NEW_P (callee))
+	    && operator_new_candidate_p (callee))
 	  return;
 
 	/* Most, but not all function calls are required.  Function calls that
@@ -613,8 +632,8 @@ mark_all_reaching_defs_necessary_1 (ao_ref *ref ATTRIBUTE_UNUSED,
 	  }
 
       if (callee != NULL_TREE
-	  && (DECL_IS_REPLACEABLE_OPERATOR_NEW_P (callee)
-	      || DECL_IS_OPERATOR_DELETE_P (callee)))
+	  && (operator_new_candidate_p (callee)
+	      || operator_delete_candidate_p (callee)))
 	return false;
     }
 
@@ -806,15 +825,10 @@ propagate_necessity (bool aggressive)
 	     processing the argument.  */
 	  bool is_delete_operator
 	    = (is_gimple_call (stmt)
-	       && gimple_call_operator_delete_p (as_a <gcall *> (stmt)));
+	       && operator_delete_candidate_p (gimple_call_fndecl (as_a <gcall *> (stmt))));
 	  if (is_delete_operator
 	      || gimple_call_builtin_p (stmt, BUILT_IN_FREE))
 	    {
-	      /* It can happen that a user delete operator has the pointer
-		 argument optimized out already.  */
-	      if (gimple_call_num_args (stmt) == 0)
-		continue;
-
 	      tree ptr = gimple_call_arg (stmt, 0);
 	      gimple *def_stmt;
 	      tree def_callee;
@@ -827,7 +841,7 @@ propagate_necessity (bool aggressive)
 		       && (DECL_FUNCTION_CODE (def_callee) == BUILT_IN_ALIGNED_ALLOC
 			   || DECL_FUNCTION_CODE (def_callee) == BUILT_IN_MALLOC
 			   || DECL_FUNCTION_CODE (def_callee) == BUILT_IN_CALLOC))
-		      || DECL_IS_REPLACEABLE_OPERATOR_NEW_P (def_callee)))
+		      || operator_new_candidate_p (def_callee)))
 		{
 		  /* Delete operators can have alignment and (or) size as next
 		     arguments.  When being a SSA_NAME, they must be marked
@@ -900,8 +914,8 @@ propagate_necessity (bool aggressive)
 		continue;
 
 	      if (callee != NULL_TREE
-		  && (DECL_IS_REPLACEABLE_OPERATOR_NEW_P (callee)
-		      || DECL_IS_OPERATOR_DELETE_P (callee)))
+		  && (operator_new_candidate_p (callee)
+		      || operator_delete_candidate_p (callee)))
 		continue;
 
 	      /* Calls implicitly load from memory, their arguments
@@ -1326,20 +1340,15 @@ eliminate_unnecessary_stmts (void)
 	  if (gimple_plf (stmt, STMT_NECESSARY)
 	      && (gimple_call_builtin_p (stmt, BUILT_IN_FREE)
 		  || (is_gimple_call (stmt)
-		      && gimple_call_operator_delete_p (as_a <gcall *> (stmt)))))
+		      && operator_delete_candidate_p (gimple_call_fndecl (as_a <gcall *> (stmt))))))
 	    {
-	      /* It can happen that a user delete operator has the pointer
-		 argument optimized out already.  */
-	      if (gimple_call_num_args (stmt) > 0)
+	      tree ptr = gimple_call_arg (stmt, 0);
+	      if (TREE_CODE (ptr) == SSA_NAME)
 		{
-		  tree ptr = gimple_call_arg (stmt, 0);
-		  if (TREE_CODE (ptr) == SSA_NAME)
-		    {
-		      gimple *def_stmt = SSA_NAME_DEF_STMT (ptr);
-		      if (!gimple_nop_p (def_stmt)
-			  && !gimple_plf (def_stmt, STMT_NECESSARY))
-			gimple_set_plf (stmt, STMT_NECESSARY, false);
-		    }
+		  gimple *def_stmt = SSA_NAME_DEF_STMT (ptr);
+		  if (!gimple_nop_p (def_stmt)
+		      && !gimple_plf (def_stmt, STMT_NECESSARY))
+		    gimple_set_plf (stmt, STMT_NECESSARY, false);
 		}
 	    }
 
@@ -1394,7 +1403,7 @@ eliminate_unnecessary_stmts (void)
 			       && DECL_FUNCTION_CODE (call) != BUILT_IN_CALLOC
 			       && !ALLOCA_FUNCTION_CODE_P
 			       (DECL_FUNCTION_CODE (call))))
-			  && !DECL_IS_REPLACEABLE_OPERATOR_NEW_P (call))))
+			  && !operator_new_candidate_p (call))))
 		{
 		  something_changed = true;
 		  if (dump_file && (dump_flags & TDF_DETAILS))
