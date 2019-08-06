@@ -1237,8 +1237,8 @@ jobserver_active_p (void)
   return (sscanf (n + strlen (needle), "%d,%d", &rfd, &wfd) == 2
 	  && rfd > 0
 	  && wfd > 0
-	  && fcntl (rfd, F_GETFD) >= 0
-	  && fcntl (wfd, F_GETFD) >= 0);
+	  && fd_exists (rfd)
+	  && fd_exists (wfd));
 }
 
 /* Execute gcc. ARGC is the number of arguments. ARGV contains the arguments. */

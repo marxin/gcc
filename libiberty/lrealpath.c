@@ -49,6 +49,7 @@ components will be simplified.  The returned value will be allocated using
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#include <fcntl.h>
 
 /* On GNU libc systems the declaration is only visible with _GNU_SOURCE.  */
 #if defined(HAVE_CANONICALIZE_FILE_NAME) \
@@ -154,4 +155,19 @@ lrealpath (const char *filename)
 
   /* This system is a lost cause, just duplicate the filename.  */
   return strdup (filename);
+}
+
+/* Return true when FD file descriptor exists.  */
+
+int
+fd_exists (int fd)
+{
+#if defined(_WIN32)
+  HANDLE h = (HANDLE) _get_osfhandle (fd);
+  return h != (HANDLE) -1;
+#elif defined(F_GETFD)
+  return fcntl (fd, F_GETFD) >= 0;
+#else
+  return dup2 (fd, fd) < 0;
+#endif
 }
