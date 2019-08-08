@@ -1,4 +1,4 @@
-/* { dg-options "-O2 -fdump-tree-optimized -fdump-ipa-profile" } */
+/* { dg-options "-O2 -fdump-tree-optimized -fdump-ipa-profile-all" } */
 int a[1000];
 int b[1000];
 int size=1;
