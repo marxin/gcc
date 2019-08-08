@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-options "-O3 -fdump-ipa-icf"  } */
+/* { dg-options "-O3 -fdump-ipa-icf-all"  } */
 
 struct A {                                                                      
   A() {ptr=&b;}                                                                 

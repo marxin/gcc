@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -fdump-ipa-icf -fno-inline"  } */
+/* { dg-options "-O2 -fdump-ipa-icf-all -fno-inline"  } */
 
 void destroy (void)
 {
