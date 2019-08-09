@@ -124,9 +124,18 @@ lto_get_section_name (int section_type, const char *name, struct lto_file_decl_d
     {
       gcc_assert (name != NULL);
       if (name[0] == '*')
-	name++;
-      add = name;
-      sep = "";
+	{
+	  /* Symbols starting with '*' can clash with a symbol
+	     that has the same name.  Use then zero as one can't
+	     use digits at the beginning of identifiers.  */
+	  sep = "0";
+	  add = name + 1;
+	}
+      else
+	{
+	  add = name;
+	  sep = "";
+	}
     }
   else if (section_type < LTO_N_SECTION_TYPES)
     {
