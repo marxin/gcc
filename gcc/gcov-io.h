@@ -272,6 +272,9 @@ GCOV_COUNTERS
 /* Total number of single value counters.  */
 #define GCOV_TOPN_VALUES_COUNTERS (2 * GCOV_TOPN_VALUES + 1)
 
+/* Number of loop histogram counter values.  */
+#define GCOV_LOOP_COUNTERS 5
+
 /* Convert a counter index to a tag.  */
 #define GCOV_TAG_FOR_COUNTER(COUNT)				\
 	(GCOV_TAG_COUNTER_BASE + ((gcov_unsigned_t)(COUNT) << 17))

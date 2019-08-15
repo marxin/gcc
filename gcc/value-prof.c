@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dumpfile.h"
 #include "builtins.h"
 #include "params.h"
+#include "cfgloop.h"
 
 /* In this file value profile based optimizations are placed.  Currently the
    following optimizations are implemented (for more detailed descriptions
@@ -113,11 +114,13 @@ static bool gimple_ic_transform (gimple_stmt_iterator *);
 
 histogram_value
 gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, gimple *stmt, tree value)
+			      enum hist_type type, gimple *stmt, tree value,
+			      struct loop *loop)
 {
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = stmt;
+   hist->hvalue.loop = loop;
    hist->type = type;
    return hist;
 }
@@ -300,6 +303,8 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	fprintf (dump_file, "Time profile time:%" PRId64 ".\n",
 		 (int64_t) hist->hvalue.counters[0]);
       break;
+    case HIST_TYPE_LOOP:
+      /* We dump histogram in loop dumps.  */
     case HIST_TYPE_MAX:
       gcc_unreachable ();
    }
@@ -360,7 +365,7 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
       bp = streamer_read_bitpack (ib);
       type = bp_unpack_enum (&bp, hist_type, HIST_TYPE_MAX);
       next = bp_unpack_value (&bp, 1);
-      new_val = gimple_alloc_histogram_value (cfun, type, stmt, NULL);
+      new_val = gimple_alloc_histogram_value (cfun, type, stmt, NULL, NULL);
       switch (type)
 	{
 	case HIST_TYPE_INTERVAL:
@@ -382,6 +387,10 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	case HIST_TYPE_IOR:
         case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 1;
+	  break;
+
+	case HIST_TYPE_LOOP:
+	  ncounters = GCOV_LOOP_COUNTERS;
 	  break;
 
 	case HIST_TYPE_MAX:
@@ -429,7 +438,8 @@ gimple_duplicate_stmt_histograms (struct function *fun, gimple *stmt,
   histogram_value val;
   for (val = gimple_histogram_value (ofun, ostmt); val != NULL; val = val->hvalue.next)
     {
-      histogram_value new_val = gimple_alloc_histogram_value (fun, val->type, NULL, NULL);
+      histogram_value new_val = gimple_alloc_histogram_value (fun, val->type,
+							      NULL, NULL, NULL);
       memcpy (new_val, val, sizeof (*val));
       new_val->hvalue.stmt = stmt;
       new_val->hvalue.counters = XNEWVAR (gcov_type, sizeof (*new_val->hvalue.counters) * new_val->n_counters);
@@ -1798,7 +1808,7 @@ gimple_divmod_values_to_profile (gimple *stmt, histogram_values *values)
 	   of the time.  */
 	values->quick_push (gimple_alloc_histogram_value (cfun,
 						      HIST_TYPE_TOPN_VALUES,
-						      stmt, divisor));
+						      stmt, divisor, NULL));
 
       /* For mod, check whether it is not often a noop (or replaceable by
 	 a few subtractions).  */
@@ -1810,11 +1820,12 @@ gimple_divmod_values_to_profile (gimple *stmt, histogram_values *values)
           /* Check for a special case where the divisor is power of 2.  */
 	  values->quick_push (gimple_alloc_histogram_value (cfun,
 		                                            HIST_TYPE_POW2,
-							    stmt, divisor));
+							    stmt, divisor,
+							    NULL));
 
 	  val = build2 (TRUNC_DIV_EXPR, type, op0, divisor);
 	  hist = gimple_alloc_histogram_value (cfun, HIST_TYPE_INTERVAL,
-					       stmt, val);
+					       stmt, val, NULL);
 	  hist->hdata.intvl.int_start = 0;
 	  hist->hdata.intvl.steps = 2;
 	  values->quick_push (hist);
@@ -1844,9 +1855,16 @@ gimple_indirect_call_to_profile (gimple *stmt, histogram_values *values)
   values->reserve (3);
 
   values->quick_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_INDIR_CALL,
-						    stmt, callee));
+						    stmt, callee, NULL));
 
   return;
+}
+
+static void
+loop_counter_to_profile (struct loop *loop, histogram_values *values)
+{
+  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_LOOP,
+						   NULL, NULL_TREE, loop));
 }
 
 /* Find values inside STMT for that we want to measure histograms for
@@ -1877,14 +1895,14 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
     {
       values->safe_push (gimple_alloc_histogram_value (cfun,
 						       HIST_TYPE_TOPN_VALUES,
-						       stmt, blck_size));
+						       stmt, blck_size, NULL));
       values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_AVERAGE,
-						       stmt, blck_size));
+						       stmt, blck_size, NULL));
     }
 
   if (TREE_CODE (blck_size) != INTEGER_CST)
     values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_IOR,
-						     stmt, dest));
+						     stmt, dest, NULL));
 }
 
 /* Find values inside STMT for that we want to measure histograms and adds
@@ -1906,12 +1924,17 @@ gimple_find_values_to_profile (histogram_values *values)
   unsigned i;
   histogram_value hist = NULL;
   values->create (0);
+  struct loop *loop;
+
+  FOR_EACH_LOOP (loop, 0)
+    loop_counter_to_profile (loop, values);
 
   FOR_EACH_BB_FN (bb, cfun)
-    for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-      gimple_values_to_profile (gsi_stmt (gsi), values);
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	gimple_values_to_profile (gsi_stmt (gsi), values);
 
-  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE, 0, 0));
+  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_TIME_PROFILE,
+						   0, 0, NULL));
 
   FOR_EACH_VEC_ELT (*values, i, hist)
     {
@@ -1940,6 +1963,10 @@ gimple_find_values_to_profile (histogram_values *values)
 
 	case HIST_TYPE_IOR:
 	  hist->n_counters = 1;
+	  break;
+
+	case HIST_TYPE_LOOP:
+	  hist->n_counters = GCOV_LOOP_COUNTERS;
 	  break;
 
 	default:
