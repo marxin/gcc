@@ -56,6 +56,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "stor-layout.h"
 #include "xregex.h"
+#include "cfgloop.h"
 
 static GTY(()) tree gcov_type_node;
 static GTY(()) tree tree_interval_profiler_fn;
@@ -65,6 +66,7 @@ static GTY(()) tree tree_indirect_call_profiler_fn;
 static GTY(()) tree tree_average_profiler_fn;
 static GTY(()) tree tree_ior_profiler_fn;
 static GTY(()) tree tree_time_profiler_counter;
+static GTY(()) tree tree_loop_profiler_fn;
 
 
 static GTY(()) tree ic_tuple_var;
@@ -121,6 +123,7 @@ gimple_init_gcov_profiler (void)
   tree gcov_type_ptr;
   tree ic_profiler_fn_type;
   tree average_profiler_fn_type;
+  tree loop_profiler_fn_type;
   const char *profiler_fn_name;
   const char *fn_name;
 
@@ -222,6 +225,18 @@ gimple_init_gcov_profiler (void)
 	= tree_cons (get_identifier ("leaf"), NULL,
 		     DECL_ATTRIBUTES (tree_ior_profiler_fn));
 
+      /* void (*) (gcov_type *, gcov_type)  */
+      loop_profiler_fn_type
+	= build_function_type_list (void_type_node,
+				    gcov_type_ptr, gcov_type_node, NULL_TREE);
+
+      tree_loop_profiler_fn = build_fn_decl ("__gcov_loop_profiler",
+					     loop_profiler_fn_type);
+      TREE_NOTHROW (tree_loop_profiler_fn) = 1;
+      DECL_ATTRIBUTES (tree_loop_profiler_fn)
+	= tree_cons (get_identifier ("leaf"), NULL,
+		     DECL_ATTRIBUTES (tree_loop_profiler_fn));
+
       /* LTO streamer needs assembler names.  Because we create these decls
          late, we need to initialize them by hand.  */
       DECL_ASSEMBLER_NAME (tree_interval_profiler_fn);
@@ -230,6 +245,7 @@ gimple_init_gcov_profiler (void)
       DECL_ASSEMBLER_NAME (tree_indirect_call_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_average_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_ior_profiler_fn);
+      DECL_ASSEMBLER_NAME (tree_loop_profiler_fn);
     }
 }
 
@@ -598,6 +614,56 @@ gimple_gen_ior_profiler (histogram_value value, unsigned tag, unsigned base)
   val = prepare_instrumented_value (&gsi, value);
   call = gimple_build_call (tree_ior_profiler_fn, 2, ref_ptr, val);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
+}
+
+void
+gimple_gen_loop_profiler (histogram_value value, unsigned tag, unsigned base)
+{
+  edge e;
+  edge_iterator ei;
+  basic_block header = value->hvalue.bb;
+  gimple_stmt_iterator gsi = gsi_start_nondebug_after_labels_bb (header);
+  struct loop *loop = header->loop_father;
+  gcc_checking_assert (header == loop->header);
+  tree ref_ptr = tree_coverage_counter_addr (GCOV_COUNTER_LOOP, base);
+
+  loop_optimizer_init (LOOPS_HAVE_PREHEADERS
+		       | LOOPS_HAVE_SIMPLE_LATCHES
+		       | LOOPS_HAVE_RECORDED_EXITS);
+
+  /* Emit: PROF_loop_counter_87 = PHI <0(16), PROF_loop_counter_88(19)>
+     where 0 comes from loop preheader edge.  */
+  edge preheader_edge = loop_preheader_edge (loop);
+  tree counter = make_temp_ssa_name (gcov_type_node, NULL,
+				     "PROF_loop_counter");
+  tree counter2
+    = make_temp_ssa_name (gcov_type_node, NULL, "PROF_loop_counter");
+  gphi *phi = create_phi_node (counter, header);
+  add_phi_arg (phi, build_int_cst (gcov_type_node, 0),
+	       preheader_edge, UNKNOWN_LOCATION);
+  FOR_EACH_EDGE (e, ei, header->preds)
+    if (e != preheader_edge)
+      add_phi_arg (phi, counter2, e, UNKNOWN_LOCATION);
+
+  /* Emit: PROF_loop_counter_88 = PROF_loop_counter_87 + 1.  */
+  gassign *stmt1 = gimple_build_assign (counter2, PLUS_EXPR,
+					gimple_phi_result (phi),
+					build_int_cst (gcov_type_node, 1));
+  gsi_insert_before (&gsi, stmt1, GSI_NEW_STMT);
+
+  /* Emit:
+     <bb 11> :
+      __gcov_loop_profiler (&__gcov8.main[0], PROF_loop_counter_19);
+
+      where bb_11 is on a loop exit edge.  */
+  vec<edge> loop_exits = get_loop_exit_edges (loop);
+  for (unsigned i = 0; i < loop_exits.length (); i++)
+    {
+      edge e = loop_exits[i];
+      gimple *call = gimple_build_call (tree_loop_profiler_fn, 2, ref_ptr,
+					counter2);
+      gsi_insert_on_edge (e, call);
+    }
 }
 
 static vec<regex_t> profile_filter_files;

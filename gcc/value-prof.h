@@ -32,6 +32,7 @@ enum hist_type
   HIST_TYPE_AVERAGE,	/* Compute average value (sum of all values).  */
   HIST_TYPE_IOR,	/* Used to compute expected alignment.  */
   HIST_TYPE_TIME_PROFILE, /* Used for time profile */
+  HIST_TYPE_LOOP, /* Used for loop iteration histogram.  */
   HIST_TYPE_MAX
 };
 
@@ -47,6 +48,7 @@ struct histogram_value_t
     {
       tree value;		/* The value to profile.  */
       gimple *stmt;		/* Insn containing the value.  */
+      basic_block bb;
       gcov_type *counters;		        /* Pointer to first counter.  */
       struct histogram_value_t *next;		/* Linked list pointer.  */
     } hvalue;
@@ -73,7 +75,7 @@ extern void gimple_find_values_to_profile (histogram_values *);
 extern bool gimple_value_profile_transformations (void);
 
 histogram_value gimple_alloc_histogram_value (struct function *, enum hist_type,
-					      gimple *stmt, tree);
+					      gimple *, tree, basic_block);
 histogram_value gimple_histogram_value (struct function *, gimple *);
 histogram_value gimple_histogram_value_of_type (struct function *, gimple *,
 						enum hist_type);
@@ -106,6 +108,7 @@ extern void gimple_gen_ic_func_profiler (void);
 extern void gimple_gen_time_profiler (unsigned, unsigned);
 extern void gimple_gen_average_profiler (histogram_value, unsigned, unsigned);
 extern void gimple_gen_ior_profiler (histogram_value, unsigned, unsigned);
+extern void gimple_gen_loop_profiler (histogram_value, unsigned, unsigned);
 extern void stream_out_histogram_value (struct output_block *, histogram_value);
 extern void stream_in_histogram_value (class lto_input_block *, gimple *);
 extern struct cgraph_node* find_func_by_profile_id (int func_id);

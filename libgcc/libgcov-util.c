@@ -742,6 +742,20 @@ __gcov_topn_counter_op (gcov_type *counters, unsigned n_counters,
     }
 }
 
+/* Performing FN upon LOOP  counters.  */
+
+static void
+__gcov_loop_counter_op (gcov_type *counters, unsigned n_counters,
+			counter_op_fn fn, void *data1, void *data2)
+{
+  for (; n_counters; counters++, n_counters--)
+    {
+      gcov_type val = *counters;
+      *counters = fn(val, data1, data2);
+    }
+}
+
+
 /* Scaling the counter value V by multiplying *(float*) DATA1.  */
 
 static gcov_type

@@ -113,6 +113,10 @@ struct GTY ((chain_next ("%h.next"))) control_iv {
   struct control_iv *next;
 };
 
+struct GTY ((for_user)) loop_histogram {
+    gcov_type histogram[5];
+};
+
 /* Structure to hold information for each natural loop.  */
 class GTY ((chain_next ("%h.next"))) loop {
 public:
@@ -178,6 +182,9 @@ public:
 
   /* Preferred vectorization factor for the loop if non-zero.  */
   int simdlen;
+
+  /* Loop execution histogram.  */
+  loop_histogram *iteration_histogram;
 
   /* Constraints are generally set by consumers and affect certain
      semantics of niter analyzer APIs.  Currently the APIs affected are

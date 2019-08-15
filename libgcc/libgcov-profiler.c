@@ -265,5 +265,25 @@ __gcov_ior_profiler_atomic (gcov_type *counters, gcov_type value)
 }
 #endif
 
+#ifdef L_gcov_loop_profiler
+
+void
+__gcov_loop_profiler (gcov_type *counters, gcov_type value)
+{
+  /* Loop header is executed N + 1 times.  */
+  value--;
+  gcov_type threshold = 1;
+  for (unsigned i = 0; i < GCOV_LOOP_COUNTERS; i++)
+    {
+      threshold *= 4;
+      if (value < threshold)
+	{
+	  counters[i]++;
+	  break;
+	}
+    }
+}
+#endif
+
 
 #endif /* inhibit_libc */

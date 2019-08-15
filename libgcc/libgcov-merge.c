@@ -158,4 +158,14 @@ __gcov_merge_topn (gcov_type *counters, unsigned n_counters)
 }
 #endif /* L_gcov_merge_topn */
 
+#ifdef L_gcov_merge_loop
+void
+__gcov_merge_loop (gcov_type *counters, unsigned n_counters)
+{
+  for (; n_counters; counters++, n_counters--)
+    *counters += gcov_get_counter ();
+}
+#endif
+
+
 #endif /* inhibit_libc */

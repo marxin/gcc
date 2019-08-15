@@ -1011,7 +1011,7 @@ afdo_indirect_call (gimple_stmt_iterator *gsi, const icall_target_map &map,
   callee = gimple_call_fn (stmt);
 
   histogram_value hist = gimple_alloc_histogram_value (
-      cfun, HIST_TYPE_INDIR_CALL, stmt, callee);
+      cfun, HIST_TYPE_INDIR_CALL, stmt, callee, NULL);
   hist->n_counters = 3;
   hist->hvalue.counters = XNEWVEC (gcov_type, hist->n_counters);
   gimple_add_histogram_value (cfun, stmt, hist);

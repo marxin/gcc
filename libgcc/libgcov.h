@@ -129,6 +129,7 @@ typedef unsigned gcov_position_t;
 #define L_gcov_merge_topn 1
 #define L_gcov_merge_ior 1
 #define L_gcov_merge_time_profile 1
+#define L_gcov_merge_loop 1
 
 extern gcov_type gcov_read_counter_mem ();
 extern unsigned gcov_get_merge_weight ();
@@ -265,6 +266,10 @@ extern void __gcov_merge_topn (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
 /* The merge function that just ors the counters together.  */
 extern void __gcov_merge_ior (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
 
+/* The merge function that adds to loop execution histogram.  */
+extern void __gcov_merge_loop (gcov_type *, unsigned) ATTRIBUTE_HIDDEN;
+
+
 /* The profiler functions.  */
 extern void __gcov_interval_profiler (gcov_type *, gcov_type, int, unsigned);
 extern void __gcov_interval_profiler_atomic (gcov_type *, gcov_type, int,
@@ -280,6 +285,7 @@ extern void __gcov_average_profiler (gcov_type *, gcov_type);
 extern void __gcov_average_profiler_atomic (gcov_type *, gcov_type);
 extern void __gcov_ior_profiler (gcov_type *, gcov_type);
 extern void __gcov_ior_profiler_atomic (gcov_type *, gcov_type);
+extern void __gcov_loop_profiler (gcov_type *, gcov_type);
 
 #ifndef inhibit_libc
 /* The wrappers around some library functions..  */

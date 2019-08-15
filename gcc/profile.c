@@ -187,6 +187,10 @@ instrument_values (histogram_values values)
 	  gimple_gen_time_profiler (t, 0);
 	  break;
 
+	case HIST_TYPE_LOOP:
+	  gimple_gen_loop_profiler (hist, t, 0);
+	  break;
+
 	default:
 	  gcc_unreachable ();
 	}
@@ -859,6 +863,13 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
           if (dump_file)
             fprintf (dump_file, "Read tp_first_run: %d\n", node->tp_first_run);
         }
+      else if (hist->type == HIST_TYPE_LOOP)
+	{
+	  struct loop *loop = hist->hvalue.bb->loop_father;
+	  loop->iteration_histogram = XNEW (struct loop_histogram);
+	  memcpy (loop->iteration_histogram->histogram, hist->hvalue.counters, 
+		  GCOV_LOOP_COUNTERS * sizeof (hist->hvalue.counters[0]));
+	}
     }
 
   for (t = 0; t < GCOV_N_VALUE_COUNTERS; t++)
