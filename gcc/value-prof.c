@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dumpfile.h"
 #include "builtins.h"
 #include "params.h"
+#include "cfgloop.h"
 
 /* In this file value profile based optimizations are placed.  Currently the
    following optimizations are implemented (for more detailed descriptions
@@ -113,11 +114,13 @@ static bool gimple_ic_transform (gimple_stmt_iterator *);
 
 histogram_value
 gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, gimple *stmt, tree value)
+			      enum hist_type type, gimple *stmt, tree value,
+			      struct loop *loop)
 {
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = stmt;
+   hist->hvalue.loop = loop;
    hist->type = type;
    return hist;
 }
@@ -300,6 +303,8 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	fprintf (dump_file, "Time profile time:%" PRId64 ".\n",
 		 (int64_t) hist->hvalue.counters[0]);
       break;
+    case HIST_TYPE_LOOP:
+      /* We dump histogram in loop dumps.  */
     default:
       gcc_unreachable ();
    }
@@ -382,6 +387,10 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	case HIST_TYPE_IOR:
         case HIST_TYPE_TIME_PROFILE:
 	  ncounters = 1;
+	  break;
+
+	case HIST_TYPE_LOOP:
+	  ncounters = GCOV_LOOP_COUNTERS;
 	  break;
 
 	default:
@@ -1844,6 +1853,13 @@ gimple_indirect_call_to_profile (gimple *stmt, histogram_values *values)
   return;
 }
 
+static void
+loop_counter_to_profile (struct loop *loop, histogram_values *values)
+{
+  values->safe_push (gimple_alloc_histogram_value (cfun, HIST_TYPE_LOOP,
+						   NULL, NULL_TREE, loop));
+}
+
 /* Find values inside STMT for that we want to measure histograms for
    string operations.  */
 
@@ -1901,10 +1917,14 @@ gimple_find_values_to_profile (histogram_values *values)
   unsigned i;
   histogram_value hist = NULL;
   values->create (0);
+  struct loop *loop;
+
+  FOR_EACH_LOOP (loop, 0)
+    loop_counter_to_profile (loop, values);
 
   FOR_EACH_BB_FN (bb, cfun)
-    for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-      gimple_values_to_profile (gsi_stmt (gsi), values);
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	gimple_values_to_profile (gsi_stmt (gsi), values);
 
   values->safe_push (gimple_alloc_histogram_value (cfun,
 						   HIST_TYPE_TIME_PROFILE));
@@ -1936,6 +1956,10 @@ gimple_find_values_to_profile (histogram_values *values)
 
 	case HIST_TYPE_IOR:
 	  hist->n_counters = 1;
+	  break;
+
+	case HIST_TYPE_LOOP:
+	  hist->n_counters = GCOV_LOOP_COUNTERS;
 	  break;
 
 	default:

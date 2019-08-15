@@ -158,4 +158,26 @@ __gcov_merge_topn (gcov_type *counters, unsigned n_counters)
 }
 #endif /* L_gcov_merge_topn */
 
+#ifdef L_gcov_merge_loop
+void
+__gcov_merge_loop (gcov_type *counters, unsigned n_counters)
+{
+  for (unsigned i = 0; i < (n_counters / GCOV_LOOP_COUNTERS); i++)
+    {
+      counters[GCOV_LOOP_COUNTERS * i] += gcov_get_counter_target ();
+
+      gcov_type min = gcov_get_counter_ignore_scaling (-1);
+      gcov_type max = gcov_get_counter_ignore_scaling (-1);
+
+      if (min > 0
+	  && (min < counters[GCOV_LOOP_COUNTERS * i + 1]
+	      || counters[GCOV_LOOP_COUNTERS * i + 1] == 0))
+	counters[GCOV_LOOP_COUNTERS * i + 1] = min;
+      if (max > counters[GCOV_LOOP_COUNTERS * i + 2])
+	counters[GCOV_LOOP_COUNTERS * i + 2] = max;
+    }
+}
+#endif
+
+
 #endif /* inhibit_libc */

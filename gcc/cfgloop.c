@@ -31,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "gimple-iterator.h"
 #include "dumpfile.h"
+#include "gcov-io.h"
 
 static void flow_loops_cfg_dump (FILE *);
 
@@ -143,6 +144,15 @@ flow_loop_dump (const class loop *loop, FILE *file,
       if (read_profile_p && !loop->any_estimate)
 	fprintf (file, ";;  profile-based iteration count: %" PRIu64 "\n",
 		 (uint64_t) nit);
+    }
+
+  if (loop->iteration_histogram != NULL)
+    {
+      fprintf (file, ";;  zero iterations: %" PRId64 "\n",
+	       loop->iteration_histogram->zero_executions);
+      fprintf (file, ";;  iteration range: [%" PRId64 ", %" PRId64 "]\n",
+	       loop->iteration_histogram->min_niter,
+	       loop->iteration_histogram->max_niter);
     }
 
   fprintf (file, ";;  nodes:");
