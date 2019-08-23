@@ -1377,7 +1377,10 @@ run_gcc (unsigned argc, char *argv[])
 
 	case OPT_flto_:
 	  if (strcmp (option->arg, "jobserver") == 0)
-	    jobserver = 1;
+	    {
+	      parallel = 1;
+	      jobserver = 1;
+	    }
 	  else if (strcmp (option->arg, "auto") == 0)
 	    {
 	      parallel = 1;
@@ -1426,8 +1429,11 @@ run_gcc (unsigned argc, char *argv[])
       auto_parallel = 0;
       parallel = 0;
     }
-  else if (!jobserver && auto_parallel)
-    jobserver = jobserver_active_p ();
+  else if (!jobserver && auto_parallel && jobserver_active_p ())
+    {
+      parallel = 1;
+      jobserver = 1;
+    }
 
   if (linker_output)
     {
