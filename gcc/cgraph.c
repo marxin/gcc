@@ -3603,11 +3603,11 @@ cgraph_node::get_untransformed_body (void)
 	 = lto_get_function_in_decl_state (file_data, decl);
 
   data = lto_get_section_data (file_data, LTO_section_function_body,
-			       name, &len, decl_state->compressed);
+			       this, &len, decl_state->compressed);
   if (!data)
-    fatal_error (input_location, "%s: section %s is missing",
+    fatal_error (input_location, "%s: section %s/%d is missing",
 		 file_data->file_name,
-		 name);
+		 name, order);
 
   gcc_assert (DECL_STRUCT_FUNCTION (decl) == NULL);
 
@@ -3615,7 +3615,7 @@ cgraph_node::get_untransformed_body (void)
     fprintf (stderr, " in:%s", IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
   lto_input_function_body (file_data, this, data);
   lto_stats.num_function_bodies++;
-  lto_free_section_data (file_data, LTO_section_function_body, name,
+  lto_free_section_data (file_data, LTO_section_function_body, this,
 			 data, len, decl_state->compressed);
   lto_free_function_in_decl_state_for_node (this);
   /* Keep lto file data so ipa-inline-analysis knows about cross module

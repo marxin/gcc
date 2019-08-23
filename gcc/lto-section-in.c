@@ -122,18 +122,18 @@ struct lto_data_header
 
 /* Return a char pointer to the start of a data stream for an LTO pass
    or function.  FILE_DATA indicates where to obtain the data.
-   SECTION_TYPE is the type of information to be obtained.  NAME is
-   the name of the function and is only used when finding a function
+   SECTION_TYPE is the type of information to be obtained.  NODE is
+   the symbtab_node of the function and is only used when finding a function
    body; otherwise it is NULL.  LEN is the size of the data
    returned.  */
 
 const char *
 lto_get_section_data (struct lto_file_decl_data *file_data,
 		      enum lto_section_type section_type,
-		      const char *name,
+		      symtab_node *node,
 		      size_t *len, bool decompress)
 {
-  const char *data = (get_section_f) (file_data, section_type, name, len);
+  const char *data = (get_section_f) (file_data, section_type, node, len);
   const size_t header_length = sizeof (struct lto_data_header);
   struct lto_data_header *header;
   struct lto_buffer buffer;
@@ -176,10 +176,10 @@ lto_get_section_data (struct lto_file_decl_data *file_data,
 const char *
 lto_get_raw_section_data (struct lto_file_decl_data *file_data,
 			  enum lto_section_type section_type,
-			  const char *name,
+			  symtab_node *node,
 			  size_t *len)
 {
-  return (get_section_f) (file_data, section_type, name, len);
+  return (get_section_f) (file_data, section_type, node, len);
 }
 
 /* Free the data found from the above call.  The first three
@@ -189,7 +189,7 @@ lto_get_raw_section_data (struct lto_file_decl_data *file_data,
 void
 lto_free_section_data (struct lto_file_decl_data *file_data,
 		       enum lto_section_type section_type,
-		       const char *name,
+		       symtab_node *node,
 		       const char *data,
 		       size_t len, bool decompress)
 {
@@ -202,13 +202,13 @@ lto_free_section_data (struct lto_file_decl_data *file_data,
 
   if (flag_ltrans && !decompress)
     {
-      (free_section_f) (file_data, section_type, name, data, len);
+      (free_section_f) (file_data, section_type, node, data, len);
       return;
     }
 
   /* The underlying data address has been extracted from the mapping header.
      Free that, then free the allocated uncompression buffer.  */
-  (free_section_f) (file_data, section_type, name, header->data, header->len);
+  (free_section_f) (file_data, section_type, node, header->data, header->len);
   free (CONST_CAST (char *, real_data));
 }
 
@@ -217,11 +217,11 @@ lto_free_section_data (struct lto_file_decl_data *file_data,
 void
 lto_free_raw_section_data (struct lto_file_decl_data *file_data,
 		           enum lto_section_type section_type,
-		           const char *name,
+		           symtab_node *node,
 		           const char *data,
 		           size_t len)
 {
-  (free_section_f) (file_data, section_type, name, data, len);
+  (free_section_f) (file_data, section_type, node, data, len);
 }
 
 /* Load a section of type SECTION_TYPE from FILE_DATA, parse the

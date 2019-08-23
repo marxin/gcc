@@ -299,7 +299,7 @@ varpool_node::get_constructor (void)
 	 = lto_get_function_in_decl_state (file_data, decl);
 
   data = lto_get_section_data (file_data, LTO_section_function_body,
-			       name, &len, decl_state->compressed);
+			       this, &len, decl_state->compressed);
   if (!data)
     fatal_error (input_location, "%s: section %s is missing",
 		 file_data->file_name,
@@ -310,7 +310,7 @@ varpool_node::get_constructor (void)
   lto_input_variable_constructor (file_data, this, data);
   gcc_assert (DECL_INITIAL (decl) != error_mark_node);
   lto_stats.num_function_bodies++;
-  lto_free_section_data (file_data, LTO_section_function_body, name,
+  lto_free_section_data (file_data, LTO_section_function_body, this,
 			 data, len, decl_state->compressed);
   lto_free_function_in_decl_state_for_node (this);
   timevar_pop (TV_IPA_LTO_CTORS_IN);

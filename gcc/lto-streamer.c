@@ -114,7 +114,7 @@ lto_tag_name (enum LTO_tags tag)
    to free the returned name.  */
 
 char *
-lto_get_section_name (int section_type, const char *name, struct lto_file_decl_data *f)
+lto_get_section_name (int section_type, symtab_node *node, struct lto_file_decl_data *f)
 {
   const char *add;
   char post[32];
@@ -122,10 +122,15 @@ lto_get_section_name (int section_type, const char *name, struct lto_file_decl_d
 
   if (section_type == LTO_section_function_body)
     {
-      gcc_assert (name != NULL);
+      const char *name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl));
+      if (node->lto_file_data)
+	name = lto_get_decl_name_mapping (node->lto_file_data, name);
       if (name[0] == '*')
 	name++;
-      add = name;
+      char *buffer = (char *)xmalloc (strlen (name) + 32);
+      sprintf (buffer, "%s.%d", name, (flag_wpa || flag_ltrans) ? node->compile_order :
+	       node->order);
+      add = buffer;
       sep = "";
     }
   else if (section_type < LTO_N_SECTION_TYPES)
@@ -134,7 +139,7 @@ lto_get_section_name (int section_type, const char *name, struct lto_file_decl_d
       sep = ".";
     }
   else
-    internal_error ("bytecode stream: unexpected LTO section %s", name);
+    internal_error ("bytecode stream: unexpected LTO section");
 
   /* Make the section name unique so that ld -r combining sections
      doesn't confuse the reader with merged sections.

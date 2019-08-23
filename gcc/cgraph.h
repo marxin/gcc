@@ -560,6 +560,9 @@ public:
   /* Ordering of all symtab entries.  */
   int order;
 
+  /* WPA read order.  */
+  int compile_order;
+
   /* Declaration representing the symbol.  */
   tree decl;
 

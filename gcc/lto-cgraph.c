@@ -1218,7 +1218,8 @@ input_node (struct lto_file_decl_data *file_data,
   int i, count;
   tree group;
   const char *section;
-  order = streamer_read_hwi (ib) + order_base;
+  int compile_order = streamer_read_hwi (ib);
+  order = compile_order + order_base;
   clone_ref = streamer_read_hwi (ib);
 
   decl_index = streamer_read_uhwi (ib);
@@ -1242,6 +1243,7 @@ input_node (struct lto_file_decl_data *file_data,
       node->register_symbol ();
     }
 
+  node->compile_order = compile_order;
   node->order = order;
   if (order >= symtab->order)
     symtab->order = order + 1;
@@ -1337,7 +1339,8 @@ input_varpool_node (struct lto_file_decl_data *file_data,
   tree group;
   const char *section;
 
-  order = streamer_read_hwi (ib) + order_base;
+  int compile_order = streamer_read_hwi (ib);
+  order = compile_order + order_base;
   decl_index = streamer_read_uhwi (ib);
   var_decl = lto_file_decl_data_get_var_decl (file_data, decl_index);
 
@@ -1348,6 +1351,7 @@ input_varpool_node (struct lto_file_decl_data *file_data,
   node->decl = var_decl;
   node->register_symbol ();
 
+  node->compile_order = compile_order;
   node->order = order;
   if (order >= symtab->order)
     symtab->order = order + 1;

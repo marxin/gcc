@@ -276,12 +276,12 @@ lto_file_decl_data_num_ ## name ## s (struct lto_file_decl_data *data) \
 /* Return a char pointer to the start of a data stream for an lto pass
    or function.  The first parameter is the file data that contains
    the information.  The second parameter is the type of information
-   to be obtained.  The third parameter is the name of the function
+   to be obtained.  The third parameter is the symtab_node of the function
    and is only used when finding a function body; otherwise it is
    NULL.  The fourth parameter is the length of the data returned.  */
 typedef const char* (lto_get_section_data_f) (struct lto_file_decl_data *,
 					      enum lto_section_type,
-					      const char *,
+					      symtab_node *,
 					      size_t *);
 
 /* Return the data found from the above call.  The first three
@@ -289,7 +289,7 @@ typedef const char* (lto_get_section_data_f) (struct lto_file_decl_data *,
    itself and the fifth is the length of the data. */
 typedef void (lto_free_section_data_f) (struct lto_file_decl_data *,
 					enum lto_section_type,
-					const char *,
+					symtab_node *,
 					const char *,
 					size_t);
 
@@ -785,18 +785,18 @@ extern void lto_set_in_hooks (struct lto_file_decl_data **,
 extern struct lto_file_decl_data **lto_get_file_decl_data (void);
 extern const char *lto_get_section_data (struct lto_file_decl_data *,
 					 enum lto_section_type,
-					 const char *, size_t *,
+					 symtab_node *, size_t *,
 					 bool decompress = false);
 extern const char *lto_get_raw_section_data (struct lto_file_decl_data *,
 					     enum lto_section_type,
-					     const char *, size_t *);
+					     symtab_node *, size_t *);
 extern void lto_free_section_data (struct lto_file_decl_data *,
 			           enum lto_section_type,
-				   const char *, const char *, size_t,
+				   symtab_node *, const char *, size_t,
 				   bool decompress = false);
 extern void lto_free_raw_section_data (struct lto_file_decl_data *,
 				       enum lto_section_type,
-				       const char *, const char *, size_t);
+				       symtab_node *, const char *, size_t);
 extern htab_t lto_create_renaming_table (void);
 extern void lto_record_renamed_decl (struct lto_file_decl_data *,
 				     const char *, const char *);
@@ -853,7 +853,7 @@ extern void lto_append_block (struct lto_output_stream *);
 extern bool lto_stream_offload_p;
 
 extern const char *lto_tag_name (enum LTO_tags);
-extern char *lto_get_section_name (int, const char *, struct lto_file_decl_data *);
+extern char *lto_get_section_name (int, symtab_node *, struct lto_file_decl_data *);
 extern void print_lto_report (const char *);
 extern void lto_streamer_init (void);
 extern bool gate_lto_out (void);

@@ -2385,20 +2385,20 @@ lto_read_section_data (struct lto_file_decl_data *file_data,
 }
 
 
-/* Get the section data from FILE_DATA of SECTION_TYPE with NAME.
+/* Get the section data from FILE_DATA of SECTION_TYPE for a NODE.
    NAME will be NULL unless the section type is for a function
    body.  */
 
 static const char *
 get_section_data (struct lto_file_decl_data *file_data,
-		      enum lto_section_type section_type,
-		      const char *name,
-		      size_t *len)
+		  enum lto_section_type section_type,
+		  symtab_node *node,
+		  size_t *len)
 {
   htab_t section_hash_table = file_data->section_hash_table;
   struct lto_section_slot *f_slot;
   struct lto_section_slot s_slot;
-  const char *section_name = lto_get_section_name (section_type, name,
+  const char *section_name = lto_get_section_name (section_type, node,
 						   file_data);
   char *data = NULL;
 
@@ -2416,13 +2416,13 @@ get_section_data (struct lto_file_decl_data *file_data,
 }
 
 
-/* Free the section data from FILE_DATA of SECTION_TYPE with NAME that
+/* Free the section data from FILE_DATA of SECTION_TYPE of a NODE that
    starts at OFFSET and has LEN bytes.  */
 
 static void
 free_section_data (struct lto_file_decl_data *file_data ATTRIBUTE_UNUSED,
 		   enum lto_section_type section_type ATTRIBUTE_UNUSED,
-		   const char *name ATTRIBUTE_UNUSED,
+		   symtab_node *node ATTRIBUTE_UNUSED,
 		   const char *offset, size_t len ATTRIBUTE_UNUSED)
 {
 #if LTO_MMAP_IO
