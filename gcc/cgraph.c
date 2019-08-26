@@ -3602,8 +3602,10 @@ cgraph_node::get_untransformed_body (void)
   struct lto_in_decl_state *decl_state
 	 = lto_get_function_in_decl_state (file_data, decl);
 
+  int stream_order = clone_of != NULL ? clone_of->order : order;
   data = lto_get_section_data (file_data, LTO_section_function_body,
-			       name, &len, decl_state->compressed);
+			       name, stream_order - file_data->order_base, &len,
+			       decl_state->compressed);
   if (!data)
     fatal_error (input_location, "%s: section %s is missing",
 		 file_data->file_name,
