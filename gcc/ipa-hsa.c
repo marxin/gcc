@@ -278,7 +278,7 @@ ipa_hsa_read_summary (void)
     {
       size_t len;
       const char *data = lto_get_section_data (file_data, LTO_section_ipa_hsa,
-					       NULL, &len);
+					       NULL, 0, &len);
 
       if (data)
 	ipa_hsa_read_section (file_data, data, len);
