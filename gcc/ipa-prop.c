@@ -4618,7 +4618,9 @@ ipa_prop_read_jump_functions (void)
   while ((file_data = file_data_vec[j++]))
     {
       size_t len;
-      const char *data = lto_get_section_data (file_data, LTO_section_jump_functions, NULL, &len);
+      const char *data = lto_get_section_data (file_data,
+					       LTO_section_jump_functions,
+					       NULL, 0, &len);
 
       if (data)
         ipa_prop_read_section (file_data, data, len);
@@ -4863,7 +4865,7 @@ ipcp_read_transformation_summaries (void)
       size_t len;
       const char *data = lto_get_section_data (file_data,
 					       LTO_section_ipcp_transform,
-					       NULL, &len);
+					       NULL, 0, &len);
       if (data)
         read_replacements_section (file_data, data, len);
     }

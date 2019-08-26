@@ -2387,7 +2387,7 @@ sem_item_optimizer::read_summary (void)
     {
       size_t len;
       const char *data = lto_get_section_data (file_data,
-			 LTO_section_ipa_icf, NULL, &len);
+			 LTO_section_ipa_icf, NULL, 0, &len);
 
       if (data)
 	read_section (file_data, data, len);

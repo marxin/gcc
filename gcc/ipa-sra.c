@@ -2813,7 +2813,7 @@ ipa_sra_read_summary (void)
     {
       size_t len;
       const char *data = lto_get_section_data (file_data, LTO_section_ipa_sra,
-					       NULL, &len);
+					       NULL, 0, &len);
       if (data)
         isra_read_summary_section (file_data, data, len);
     }

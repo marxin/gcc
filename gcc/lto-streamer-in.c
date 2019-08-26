@@ -1563,7 +1563,7 @@ lto_input_toplevel_asms (struct lto_file_decl_data *file_data, int order_base)
 {
   size_t len;
   const char *data = lto_get_section_data (file_data, LTO_section_asm,
-					   NULL, &len);
+					   NULL, 0, &len);
   const struct lto_simple_header_with_strings *header
     = (const struct lto_simple_header_with_strings *) data;
   int string_offset;
@@ -1602,7 +1602,7 @@ lto_input_mode_table (struct lto_file_decl_data *file_data)
 {
   size_t len;
   const char *data = lto_get_section_data (file_data, LTO_section_mode_table,
-					   NULL, &len);
+					   NULL, 0, &len);
   if (! data)
     {
       internal_error ("cannot read LTO mode table from %s",
