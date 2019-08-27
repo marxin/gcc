@@ -4511,8 +4511,9 @@ cp_fname_init (const char* name, tree *type_p)
 static tree
 cp_make_fname_decl (location_t loc, tree id, int type_dep)
 {
-  const char *const name = (type_dep && in_template_function ()
-			    ? NULL : fname_as_string (type_dep));
+  const char *const name
+    = (type_dep && in_template_function () ? NULL
+       : xstrdup (cxx_printable_name (current_function_decl, 2)));
   tree type;
   tree init = cp_fname_init (name, &type);
   tree decl = build_decl (loc, VAR_DECL, id, type);
