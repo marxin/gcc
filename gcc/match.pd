@@ -1956,6 +1956,74 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
        && wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2))))
     @3)))
 
+/* Convert (X == CST1) && (X OP2 CST2) to a known value
+   based on CST1 OP2 CST2.  Similarly for (X != CST1).  */
+
+(for code1 (eq ne)
+ (for code2 (eq ne lt gt le ge)
+  (for and (truth_and bit_and)
+   (simplify
+    (and:c (code1 @0 INTEGER_CST@1) (code2 @0 INTEGER_CST@2))
+     (with
+      {
+       int cmp = tree_int_cst_compare (@1, @2);
+       bool val;
+       switch (code2)
+         {
+         case EQ_EXPR: val = (cmp == 0); break;
+         case NE_EXPR: val = (cmp != 0); break;
+         case LT_EXPR: val = (cmp < 0); break;
+         case GT_EXPR: val = (cmp > 0); break;
+         case LE_EXPR: val = (cmp <= 0); break;
+         case GE_EXPR: val = (cmp >= 0); break;
+         default: gcc_unreachable ();
+         }
+      }
+      (switch
+       (if (code1 == EQ_EXPR && val) (code1 @0 @1))
+       (if (code1 == EQ_EXPR && !val) { build_zero_cst (type); })
+       (if (code1 == NE_EXPR && !val) (code2 @0 @2))))))))
+
+/* Convert (X OP1 CST1) && (X OP2 CST2).  */
+
+(for code1 (lt le gt ge)
+ (for code2 (lt le gt ge)
+  (for and (truth_and bit_and)
+   (simplify
+   (and (code1:c @0 INTEGER_CST@1) (code2:c @0 INTEGER_CST@2))
+    (with
+     {
+      int cmp = tree_int_cst_compare (@1, @2);
+     }
+     (switch
+      /* Chose the more restrictive of two < or <= comparisons.  */
+      (if ((code1 == LT_EXPR || code1 == LE_EXPR)
+	   && (code2 == LT_EXPR || code2 == LE_EXPR))
+       (if ((cmp < 0) || (cmp == 0 && code1 == LT_EXPR))
+	(code1 @0 @1)
+	(code2 @0 @2)))
+      /* Likewise chose the more restrictive of two > or >= comparisons.  */
+      (if ((code1 == GT_EXPR || code1 == GE_EXPR)
+	   && (code2 == GT_EXPR || code2 == GE_EXPR))
+       (if ((cmp > 0) || (cmp == 0 && code1 == GT_EXPR))
+	(code1 @0 @1)
+	(code2 @0 @2)))
+      /* Check for singleton ranges.  */
+      (if (cmp == 0
+	   && ((code1 == LE_EXPR && code2 == GE_EXPR)
+	       || (code1 == GE_EXPR && code2 == LE_EXPR)))
+       (eq @0 @1))
+      /* Check for disjoint ranges.  */
+      (if (cmp <= 0
+	   && (code1 == LT_EXPR || code1 == LE_EXPR)
+	   && (code2 == GT_EXPR || code2 == GE_EXPR))
+       { build_zero_cst (type); })
+      (if (cmp >= 0
+	   && (code1 == GT_EXPR || code1 == GE_EXPR)
+	   && (code2 == LT_EXPR || code2 == LE_EXPR))
+       { build_zero_cst (type); })
+      ))))))
+
 /* We can't reassociate at all for saturating types.  */
 (if (!TYPE_SATURATING (type))
 
