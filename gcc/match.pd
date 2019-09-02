@@ -1956,6 +1956,13 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
        && wi::eq_p (wi::to_wide (@2), wi::max_value (TREE_TYPE (@2))))
     @3)))
 
+(for and (truth_and bit_and)
+ (for op1 (eq ne lt le gt ge)
+  (for op2 (trunc_div trunc_mod plus minus mult)
+   (simplify
+    (and:c (eq:c @0 INTEGER_CST@1) (op1:c (op2 @0 INTEGER_CST@2) @3))
+     (op1 (op2 @1 @2) @3)))))
+
 /* We can't reassociate at all for saturating types.  */
 (if (!TYPE_SATURATING (type))
 
