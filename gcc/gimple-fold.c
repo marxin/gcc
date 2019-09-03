@@ -5503,7 +5503,7 @@ and_var_with_comparison_1 (gimple *stmt,
 	  && (t = maybe_fold_and_comparisons (gimple_assign_rhs_code (s),
 					      gimple_assign_rhs1 (s),
 					      gimple_assign_rhs2 (s),
-					      code2, op2a, op2b)))
+					      code2, op2a, op2b, NULL)))
 	{
 	  /* Handle the AND case, where we are reassociating:
 	     (inner1 AND inner2) AND (op2a code2 op2b)
@@ -5535,7 +5535,7 @@ and_var_with_comparison_1 (gimple *stmt,
 	  && (t = maybe_fold_and_comparisons (gimple_assign_rhs_code (s),
 					      gimple_assign_rhs1 (s),
 					      gimple_assign_rhs2 (s),
-					      code2, op2a, op2b)))
+					      code2, op2a, op2b, NULL)))
 	{
 	  /* Handle the AND case, where we are reassociating:
 	     (inner1 AND inner2) AND (op2a code2 op2b)
@@ -5715,7 +5715,7 @@ static tree
 maybe_fold_comparisons_from_match_pd (enum tree_code code, enum tree_code code1,
 				      tree op1a, tree op1b,
 				      enum tree_code code2, tree op2a,
-				      tree op2b)
+				      tree op2b, gimple_stmt_iterator *gsi)
 {
   /* Allocate gimple stmt1 on the stack.  */
   gimple *stmt1 = (gimple *) (XALLOCAVEC (char, gimple_size (GIMPLE_ASSIGN)
@@ -5746,19 +5746,30 @@ maybe_fold_comparisons_from_match_pd (enum tree_code code, enum tree_code code1,
   memset (lhs1, 0, sizeof (tree_node));
   TREE_SET_CODE (lhs1, SSA_NAME);
   TREE_TYPE (lhs1) = boolean_type_node;
+  use_operand_p imm;
+  imm = &(SSA_NAME_IMM_USE_NODE (lhs1));
+  imm->use = NULL;
+  imm->prev = imm;
+  imm->next = imm;
 
   /* Allocate SSA names(lhs2) on the stack.  */
   tree lhs2 = XALLOCA (tree_node);
   memset (lhs2, 0, sizeof (tree_node));
   TREE_SET_CODE (lhs2, SSA_NAME);
   TREE_TYPE (lhs2) = boolean_type_node;
+  imm = &(SSA_NAME_IMM_USE_NODE (lhs2));
+  imm->use = NULL;
+  imm->prev = imm;
+  imm->next = imm;
+
 
   gimple_assign_set_lhs (stmt1, lhs1);
   gimple_assign_set_lhs (stmt2, lhs2);
 
   /* Call the interface function of match.pd to simplify the expression.  */
+  gimple_seq seq = NULL;
   tree t = gimple_simplify (code, boolean_type_node, gimple_assign_lhs (stmt1),
-			    gimple_assign_lhs (stmt2), NULL,
+			    gimple_assign_lhs (stmt2), gsi ? &seq : NULL,
 			    follow_all_ssa_edges);
 
   if (t)
@@ -5774,6 +5785,8 @@ maybe_fold_comparisons_from_match_pd (enum tree_code code, enum tree_code code1,
 		    != tcc_comparison)
 		return NULL_TREE;
 
+	      if (gsi)
+		gsi_insert_seq_before (gsi, seq, GSI_SAME_STMT);
 	      return fold_build2 (gimple_assign_rhs_code (def),
 				  boolean_type_node, gimple_assign_rhs1 (def),
 				  gimple_assign_rhs2 (def));
@@ -5798,7 +5811,8 @@ maybe_fold_comparisons_from_match_pd (enum tree_code code, enum tree_code code1,
 
 tree
 maybe_fold_and_comparisons (enum tree_code code1, tree op1a, tree op1b,
-			    enum tree_code code2, tree op2a, tree op2b)
+			    enum tree_code code2, tree op2a, tree op2b,
+			    gimple_stmt_iterator *gsi)
 {
   if (tree t = and_comparisons_1 (code1, op1a, op1b, code2, op2a, op2b))
     return t;
@@ -5807,11 +5821,8 @@ maybe_fold_and_comparisons (enum tree_code code1, tree op1a, tree op1b,
     return t;
 
   if (tree t = maybe_fold_comparisons_from_match_pd (BIT_AND_EXPR, code1, op1a,
-						     op1b, code2, op2a, op2b))
-    return t;
-
-  if (tree t = maybe_fold_comparisons_from_match_pd (BIT_AND_EXPR, code2, op2a,
-						     op2b, code1, op1a, op1b))
+						     op1b, code2, op2a, op2b,
+						     gsi))
     return t;
 
   return NULL_TREE;
@@ -5931,7 +5942,7 @@ or_var_with_comparison_1 (gimple *stmt,
 	  && (t = maybe_fold_or_comparisons (gimple_assign_rhs_code (s),
 					     gimple_assign_rhs1 (s),
 					     gimple_assign_rhs2 (s),
-					     code2, op2a, op2b)))
+					     code2, op2a, op2b, NULL)))
 	{
 	  /* Handle the OR case, where we are reassociating:
 	     (inner1 OR inner2) OR (op2a code2 op2b)
@@ -5963,7 +5974,7 @@ or_var_with_comparison_1 (gimple *stmt,
 	  && (t = maybe_fold_or_comparisons (gimple_assign_rhs_code (s),
 					     gimple_assign_rhs1 (s),
 					     gimple_assign_rhs2 (s),
-					     code2, op2a, op2b)))
+					     code2, op2a, op2b, NULL)))
 	{
 	  /* Handle the OR case, where we are reassociating:
 	     (inner1 OR inner2) OR (op2a code2 op2b)
@@ -6272,7 +6283,8 @@ or_comparisons_1 (enum tree_code code1, tree op1a, tree op1b,
 
 tree
 maybe_fold_or_comparisons (enum tree_code code1, tree op1a, tree op1b,
-			   enum tree_code code2, tree op2a, tree op2b)
+			   enum tree_code code2, tree op2a, tree op2b,
+			   gimple_stmt_iterator *gsi)
 {
   if (tree t = or_comparisons_1 (code1, op1a, op1b, code2, op2a, op2b))
     return t;
@@ -6281,11 +6293,8 @@ maybe_fold_or_comparisons (enum tree_code code1, tree op1a, tree op1b,
     return t;
 
   if (tree t = maybe_fold_comparisons_from_match_pd (BIT_IOR_EXPR, code1, op1a,
-						     op1b, code2, op2a, op2b))
-    return t;
-
-  if (tree t = maybe_fold_comparisons_from_match_pd (BIT_IOR_EXPR, code2, op2a,
-						     op2b, code1, op1a, op1b))
+						     op1b, code2, op2a, op2b,
+						     gsi))
     return t;
 
   return NULL_TREE;
