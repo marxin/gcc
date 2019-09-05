@@ -364,6 +364,7 @@ cgraph_node::create_clone (tree new_decl, profile_count prof_count,
   new_node->rtl = rtl;
   new_node->frequency = frequency;
   new_node->tp_first_run = tp_first_run;
+  new_node->text_sorted_order = text_sorted_order;
   new_node->tm_clone = tm_clone;
   new_node->icf_merged = icf_merged;
   new_node->merged_comdat = merged_comdat;

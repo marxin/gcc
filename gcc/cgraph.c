@@ -1951,6 +1951,8 @@ cgraph_node::dump (FILE *f)
     }
   if (tp_first_run > 0)
     fprintf (f, " first_run:%i", tp_first_run);
+  if (text_sorted_order > 0)
+    fprintf (f, " text_sorted_order:%i", text_sorted_order);
   if (origin)
     fprintf (f, " nested in:%s", origin->asm_name ());
   if (gimple_has_body_p (decl))
@@ -3694,6 +3696,24 @@ cgraph_edge::possibly_call_in_translation_unit_p (void)
     node = symtab_node::get_for_asmname (DECL_ASSEMBLER_NAME (callee->decl));
   gcc_assert (TREE_PUBLIC (node->decl));
   return node->get_availability () >= AVAIL_INTERPOSABLE;
+}
+
+/* Sort cgraph_nodes by text_sorted_order if available, or by order.  */
+
+int
+cgraph_node_cmp_by_text_sorted (const void *pa, const void *pb)
+{
+  const cgraph_node *a = *(const cgraph_node * const *) pa;
+  const cgraph_node *b = *(const cgraph_node * const *) pb;
+
+  /* Functions with text_sorted_order should be before these
+     without profile.  */
+  if (a->text_sorted_order == 0 || b->text_sorted_order == 0)
+    return a->text_sorted_order - b->text_sorted_order;
+
+  return a->text_sorted_order != b->text_sorted_order
+	 ? b->text_sorted_order - a->text_sorted_order
+	 : b->order - a->order;
 }
 
 /* A stashed copy of "symtab" for use by selftest::symbol_table_test.
