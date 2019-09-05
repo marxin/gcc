@@ -138,6 +138,14 @@ enum reorder_blocks_algorithm
   REORDER_BLOCKS_ALGORITHM_STC
 };
 
+/* The algorithm used for function reordering.  */
+enum reorder_functions_algorithm
+{
+  REORDER_FUNCTIONS_ALGORITHM_FIRST_RUN,
+  REORDER_FUNCTIONS_ALGORITHM_CALL_CHAIN_CLUSTERING
+};
+
+
 /* The algorithm used for the integrated register allocator (IRA).  */
 enum ira_algorithm
 {

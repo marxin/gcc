@@ -1446,6 +1446,8 @@ struct GTY((tag ("SYMTAB_FUNCTION"))) cgraph_node : public symtab_node
   unsigned int profile_id;
   /* Time profiler: first run of function.  */
   int tp_first_run;
+  /* Order in .text.sorted.* section.  */
+  int text_sorted_order;
 
   /* Set when decl is an abstract function pointed to by the
      ABSTRACT_DECL_ORIGIN of a reachable function.  */
