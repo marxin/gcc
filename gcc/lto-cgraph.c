@@ -502,6 +502,7 @@ lto_output_node (struct lto_simple_output_block *ob, struct cgraph_node *node,
     section = "";
 
   streamer_write_hwi_stream (ob->main_stream, node->tp_first_run);
+  streamer_write_hwi_stream (ob->main_stream, node->text_sorted_order);
 
   bp = bitpack_create (ob->main_stream);
   bp_pack_value (&bp, node->local, 1);
@@ -1274,6 +1275,7 @@ input_node (struct lto_file_decl_data *file_data,
 		    "node with uid %d", node->get_uid ());
 
   node->tp_first_run = streamer_read_uhwi (ib);
+  node->text_sorted_order = streamer_read_uhwi (ib);
 
   bp = streamer_read_bitpack (ib);
 

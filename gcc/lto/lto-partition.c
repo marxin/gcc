@@ -372,35 +372,6 @@ lto_max_map (void)
     new_partition ("empty");
 }
 
-/* Helper function for qsort; sort nodes by order. noreorder functions must have
-   been removed earlier.  */
-static int
-node_cmp (const void *pa, const void *pb)
-{
-  const struct cgraph_node *a = *(const struct cgraph_node * const *) pa;
-  const struct cgraph_node *b = *(const struct cgraph_node * const *) pb;
-
-  /* Profile reorder flag enables function reordering based on first execution
-     of a function. All functions with profile are placed in ascending
-     order at the beginning.  */
-
-  if (flag_profile_reorder_functions)
-  {
-    /* Functions with time profile are sorted in ascending order.  */
-    if (a->tp_first_run && b->tp_first_run)
-      return a->tp_first_run != b->tp_first_run
-	? a->tp_first_run - b->tp_first_run
-        : a->order - b->order;
-
-    /* Functions with time profile are sorted before the functions
-       that do not have the profile.  */
-    if (a->tp_first_run || b->tp_first_run)
-      return b->tp_first_run - a->tp_first_run;
-  }
-
-  return b->order - a->order;
-}
-
 /* Helper function for qsort; sort nodes by order.  */
 static int
 varpool_node_cmp (const void *pa, const void *pb)
@@ -537,8 +508,8 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
      unit tends to import a lot of global trees defined there.  We should
      get better about minimizing the function bounday, but until that
      things works smoother if we order in source order.  */
-  order.qsort (node_cmp);
-  noreorder.qsort (node_cmp);
+  order.qsort (cgraph_node_cmp_by_text_sorted);
+  noreorder.qsort (cgraph_node_cmp_by_text_sorted);
 
   if (dump_file)
     {
