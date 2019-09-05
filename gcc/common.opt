@@ -2276,6 +2276,20 @@ freorder-functions
 Common Report Var(flag_reorder_functions) Optimization
 Reorder functions to improve code placement.
 
+freorder-functions-algorithm=
+Common Joined RejectNegative Enum(reorder_functions_algorithm) Var(flag_reorder_functions_algorithm) Init(REORDER_FUNCTIONS_ALGORITHM_CALL_CHAIN_CLUSTERING) Optimization
+-freorder-functions-algorithm=[first-run|call-chain-clustering]	Set the used function reordering algorithm.
+
+Enum
+Name(reorder_functions_algorithm) Type(enum reorder_functions_algorithm) UnknownError(unknown function reordering algorithm %qs)
+
+EnumValue
+Enum(reorder_functions_algorithm) String(first-run) Value(REORDER_FUNCTIONS_ALGORITHM_FIRST_RUN)
+
+EnumValue
+Enum(reorder_functions_algorithm) String(call-chain-clustering) Value(REORDER_FUNCTIONS_ALGORITHM_CALL_CHAIN_CLUSTERING)
+
+
 frerun-cse-after-loop
 Common Report Var(flag_rerun_cse_after_loop) Optimization
 Add a common subexpression elimination pass after loop optimizations.

@@ -601,6 +601,15 @@ default_function_section (tree decl, enum node_frequency freq,
   if (exit && freq != NODE_FREQUENCY_UNLIKELY_EXECUTED)
     return get_named_text_section (decl, ".text.exit", NULL);
 
+  cgraph_node *node = cgraph_node::get (decl);
+  if (node->text_sorted_order > 0)
+    {
+      char section_name[64];
+      sprintf (section_name, ".text.sorted.%010d",
+	       node->text_sorted_order);
+      return get_named_text_section (decl, section_name, NULL);
+    }
+
   /* Group cold functions together, similarly for hot code.  */
   switch (freq)
     {

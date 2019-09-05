@@ -1951,6 +1951,8 @@ cgraph_node::dump (FILE *f)
     }
   if (tp_first_run > 0)
     fprintf (f, " first_run:%i", tp_first_run);
+  if (text_sorted_order > 0)
+    fprintf (f, " text_sorted_order:%i", text_sorted_order);
   if (origin)
     fprintf (f, " nested in:%s", origin->asm_name ());
   if (gimple_has_body_p (decl))

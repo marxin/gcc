@@ -2276,13 +2276,7 @@ node_cmp (const void *pa, const void *pb)
   const cgraph_node *a = *(const cgraph_node * const *) pa;
   const cgraph_node *b = *(const cgraph_node * const *) pb;
 
-  /* Functions with time profile must be before these without profile.  */
-  if (!a->tp_first_run || !b->tp_first_run)
-    return a->tp_first_run - b->tp_first_run;
-
-  return a->tp_first_run != b->tp_first_run
-	 ? b->tp_first_run - a->tp_first_run
-	 : b->order - a->order;
+  return b->order - a->order;
 }
 
 /* Expand all functions that must be output.
