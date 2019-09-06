@@ -32,9 +32,11 @@ extern bool fold_stmt (gimple_stmt_iterator *);
 extern bool fold_stmt (gimple_stmt_iterator *, tree (*) (tree));
 extern bool fold_stmt_inplace (gimple_stmt_iterator *);
 extern tree maybe_fold_and_comparisons (enum tree_code, tree, tree, 
-					enum tree_code, tree, tree);
+					enum tree_code, tree, tree,
+					gimple_stmt_iterator *gsi);
 extern tree maybe_fold_or_comparisons (enum tree_code, tree, tree,
-				       enum tree_code, tree, tree);
+				       enum tree_code, tree, tree,
+				       gimple_stmt_iterator *gsi);
 extern bool optimize_atomic_compare_exchange_p (gimple *);
 extern void fold_builtin_atomic_compare_exchange (gimple_stmt_iterator *);
 extern bool arith_overflowed_p (enum tree_code, const_tree, const_tree,
