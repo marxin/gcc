@@ -555,15 +555,16 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
 	return false;
       /* Don't return false so fast, try maybe_fold_or_comparisons?  */
 
+      gimple_stmt_iterator gsi = gsi_for_stmt (inner_cond);
       if (!(t = maybe_fold_and_comparisons (inner_cond_code,
 					    gimple_cond_lhs (inner_cond),
 					    gimple_cond_rhs (inner_cond),
 					    outer_cond_code,
 					    gimple_cond_lhs (outer_cond),
-					    gimple_cond_rhs (outer_cond))))
+					    gimple_cond_rhs (outer_cond),
+					    &gsi)))
 	{
 	  tree t1, t2;
-	  gimple_stmt_iterator gsi;
 	  bool logical_op_non_short_circuit = LOGICAL_OP_NON_SHORT_CIRCUIT;
 	  if (PARAM_VALUE (PARAM_LOGICAL_OP_NON_SHORT_CIRCUIT) != -1)
 	    logical_op_non_short_circuit
