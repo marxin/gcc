@@ -3769,7 +3769,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (bit_and:c (test1 @0 @1) (test2 @0 @1))
   (if (INTEGRAL_TYPE_P (TREE_TYPE (@0))
        || VECTOR_INTEGER_TYPE_P (TREE_TYPE (@0)))
-   { constant_boolean_node (false, type); })))
+   { constant_boolean_node (false, INTEGRAL_TYPE_P (TREE_TYPE (@0)) ? type : TREE_TYPE (@0)); })))
 
 /* A & (2**N - 1) <= 2**K - 1 -> A & (2**N - 2**K) == 0
    A & (2**N - 1) >  2**K - 1 -> A & (2**N - 2**K) != 0
