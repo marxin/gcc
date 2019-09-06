@@ -2091,11 +2091,13 @@ eliminate_redundant_comparison (enum tree_code opcode,
       if (opcode == BIT_IOR_EXPR)
 	t = maybe_fold_or_comparisons (lcode, op1, op2,
 				       rcode, gimple_assign_rhs1 (def2),
-				       gimple_assign_rhs2 (def2));
+				       gimple_assign_rhs2 (def2),
+				       NULL);
       else
 	t = maybe_fold_and_comparisons (lcode, op1, op2,
 					rcode, gimple_assign_rhs1 (def2),
-					gimple_assign_rhs2 (def2));
+					gimple_assign_rhs2 (def2),
+					NULL);
       if (!t)
 	continue;
 
@@ -3834,9 +3836,10 @@ optimize_vec_cond_expr (tree_code opcode, vec<operand_entry *> *ops)
 
 	  tree comb;
 	  if (opcode == BIT_AND_EXPR)
-	    comb = maybe_fold_and_comparisons (cmp0, x0, y0, cmp1, x1, y1);
+	    comb = maybe_fold_and_comparisons (cmp0, x0, y0, cmp1, x1, y1,
+					       NULL);
 	  else if (opcode == BIT_IOR_EXPR)
-	    comb = maybe_fold_or_comparisons (cmp0, x0, y0, cmp1, x1, y1);
+	    comb = maybe_fold_or_comparisons (cmp0, x0, y0, cmp1, x1, y1, NULL);
 	  else
 	    gcc_unreachable ();
 	  if (comb == NULL)
