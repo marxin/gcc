@@ -563,7 +563,6 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
 					    gimple_cond_rhs (outer_cond))))
 	{
 	  tree t1, t2;
-	  gimple_stmt_iterator gsi;
 	  bool logical_op_non_short_circuit = LOGICAL_OP_NON_SHORT_CIRCUIT;
 	  if (PARAM_VALUE (PARAM_LOGICAL_OP_NON_SHORT_CIRCUIT) != -1)
 	    logical_op_non_short_circuit
