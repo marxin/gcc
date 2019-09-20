@@ -5132,6 +5132,28 @@ complete_or_array_type_p (const_tree type)
 	     && COMPLETE_TYPE_P (TREE_TYPE (type)));
 }
 
+static inline tree_code
+comparison_to_vec_cond_comparison (tree_code code)
+{
+  switch (code)
+    {
+    case LT_EXPR:
+      return VEC_COND_LT_EXPR;
+    case LE_EXPR:
+      return VEC_COND_LE_EXPR;
+    case GT_EXPR:
+      return VEC_COND_GT_EXPR;
+    case GE_EXPR:
+      return VEC_COND_GE_EXPR;
+    case EQ_EXPR:
+      return VEC_COND_EQ_EXPR;
+    case NE_EXPR:
+      return VEC_COND_NE_EXPR;
+    default:
+      gcc_unreachable ();
+    }
+}
+
 /* Return true if the value of T could be represented as a poly_widest_int.  */
 
 inline bool

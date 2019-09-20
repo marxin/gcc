@@ -55,6 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "regs.h"
 #include "attribs.h"
+#include "print-tree.h"
 
 /* For lang_hooks.types.type_for_mode.  */
 #include "langhooks.h"
@@ -10157,8 +10158,13 @@ vectorizable_condition (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 	  else
 	    {
 	      new_temp = make_ssa_name (vec_dest);
+
+	      tree_code vec_cond_code
+		= comparison_to_vec_cond_comparison (TREE_CODE (vec_compare));
 	      gassign *new_stmt
-		= gimple_build_assign (new_temp, VEC_COND_EXPR, vec_compare,
+		= gimple_build_assign (new_temp, vec_cond_code,
+				       TREE_OPERAND (vec_compare, 0),
+				       TREE_OPERAND (vec_compare, 1),
 				       vec_then_clause, vec_else_clause);
 	      new_stmt_info
 		= vect_finish_stmt_generation (stmt_info, new_stmt, gsi);

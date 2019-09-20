@@ -620,6 +620,59 @@ dump_ternary_rhs (pretty_printer *buffer, gassign *gs, int spc,
     }
 }
 
+/* Helper for dump_gimple_assign.  Print the quaternary RHS of the
+   assignment GS.  BUFFER, SPC and FLAGS are as in pp_gimple_stmt_1.  */
+
+static void
+dump_quaternary_rhs (pretty_printer *buffer, gassign *gs, int spc,
+		     dump_flags_t flags)
+{
+  enum tree_code code = gimple_assign_rhs_code (gs);
+  switch (code)
+    {
+    case VEC_COND_LT_EXPR:
+    case VEC_COND_LE_EXPR:
+    case VEC_COND_GT_EXPR:
+    case VEC_COND_GE_EXPR:
+    case VEC_COND_EQ_EXPR:
+    case VEC_COND_NE_EXPR:
+      dump_generic_node (buffer, gimple_assign_rhs1 (gs), spc, flags, false);
+	  pp_space (buffer);
+      switch (code)
+	{
+	  // TODO: share code with COND_EXPR
+	case VEC_COND_LT_EXPR:
+	  pp_less (buffer);
+	  break;
+	case VEC_COND_GT_EXPR:
+	  pp_greater (buffer);
+	  break;
+	case VEC_COND_LE_EXPR:
+	  pp_less_equal (buffer);
+	  break;
+	case VEC_COND_GE_EXPR:
+	  pp_greater_equal (buffer);
+	  break;
+	case VEC_COND_EQ_EXPR:
+	  pp_string (buffer, "==");
+	  break;
+	case VEC_COND_NE_EXPR:
+	  pp_string (buffer, "!=");
+	  break;
+	default:
+	  gcc_unreachable ();
+	}
+      pp_space (buffer);
+      dump_generic_node (buffer, gimple_assign_rhs2 (gs), spc, flags, false);
+      pp_string (buffer, " ? ");
+      dump_generic_node (buffer, gimple_assign_rhs3 (gs), spc, flags, false);
+      pp_string (buffer, " : ");
+      dump_generic_node (buffer, gimple_assign_rhs4 (gs), spc, flags, false);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+}
 
 /* Dump the gimple assignment GS.  BUFFER, SPC and FLAGS are as in
    pp_gimple_stmt_1.  */
@@ -675,6 +728,8 @@ dump_gimple_assign (pretty_printer *buffer, gassign *gs, int spc,
         dump_binary_rhs (buffer, gs, spc, flags);
       else if (gimple_num_ops (gs) == 4)
         dump_ternary_rhs (buffer, gs, spc, flags);
+      else if (gimple_num_ops (gs) == 5)
+        dump_quaternary_rhs (buffer, gs, spc, flags);
       else
         gcc_unreachable ();
       if (!(flags & TDF_RHS_ONLY))

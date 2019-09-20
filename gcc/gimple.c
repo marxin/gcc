@@ -436,7 +436,7 @@ gimple_build_assign (tree lhs, tree rhs MEM_STAT_DECL)
 
 static inline gassign *
 gimple_build_assign_1 (tree lhs, enum tree_code subcode, tree op1,
-		       tree op2, tree op3 MEM_STAT_DECL)
+		       tree op2, tree op3, tree op4 MEM_STAT_DECL)
 {
   unsigned num_ops;
   gassign *p;
@@ -462,8 +462,25 @@ gimple_build_assign_1 (tree lhs, enum tree_code subcode, tree op1,
       gimple_assign_set_rhs3 (p, op3);
     }
 
+  if (op4)
+    {
+      gcc_assert (num_ops > 4);
+      gimple_assign_set_rhs4 (p, op4);
+    }
+
   return p;
 }
+
+/* Build a GIMPLE_ASSIGN statement with subcode SUBCODE and operands
+   OP1, OP2, OP3 and OP4.  */
+
+gassign *
+gimple_build_assign (tree lhs, enum tree_code subcode, tree op1,
+		     tree op2, tree op3, tree op4 MEM_STAT_DECL)
+{
+  return gimple_build_assign_1 (lhs, subcode, op1, op2, op3, op4 PASS_MEM_STAT);
+}
+
 
 /* Build a GIMPLE_ASSIGN statement with subcode SUBCODE and operands
    OP1, OP2 and OP3.  */
@@ -472,7 +489,8 @@ gassign *
 gimple_build_assign (tree lhs, enum tree_code subcode, tree op1,
 		     tree op2, tree op3 MEM_STAT_DECL)
 {
-  return gimple_build_assign_1 (lhs, subcode, op1, op2, op3 PASS_MEM_STAT);
+  return gimple_build_assign_1 (lhs, subcode, op1, op2, op3,
+				NULL_TREE PASS_MEM_STAT);
 }
 
 /* Build a GIMPLE_ASSIGN statement with subcode SUBCODE and operands
@@ -482,7 +500,7 @@ gassign *
 gimple_build_assign (tree lhs, enum tree_code subcode, tree op1,
 		     tree op2 MEM_STAT_DECL)
 {
-  return gimple_build_assign_1 (lhs, subcode, op1, op2, NULL_TREE
+  return gimple_build_assign_1 (lhs, subcode, op1, op2, NULL_TREE, NULL_TREE
 				PASS_MEM_STAT);
 }
 
@@ -491,8 +509,8 @@ gimple_build_assign (tree lhs, enum tree_code subcode, tree op1,
 gassign *
 gimple_build_assign (tree lhs, enum tree_code subcode, tree op1 MEM_STAT_DECL)
 {
-  return gimple_build_assign_1 (lhs, subcode, op1, NULL_TREE, NULL_TREE
-				PASS_MEM_STAT);
+  return gimple_build_assign_1 (lhs, subcode, op1, NULL_TREE, NULL_TREE,
+				NULL_TREE PASS_MEM_STAT);
 }
 
 
@@ -2233,6 +2251,8 @@ get_gimple_rhs_num_ops (enum tree_code code)
     return 2;
   else if (rhs_class == GIMPLE_TERNARY_RHS)
     return 3;
+  else if (rhs_class == GIMPLE_QUATERNARY_RHS)
+    return 4;
   else
     gcc_unreachable ();
 }
@@ -2264,6 +2284,13 @@ get_gimple_rhs_num_ops (enum tree_code code)
       || (SYM) == ADDR_EXPR						    \
       || (SYM) == WITH_SIZE_EXPR					    \
       || (SYM) == SSA_NAME) ? GIMPLE_SINGLE_RHS				    \
+   : ((SYM) == VEC_COND_LT_EXPR						    \
+      || (SYM) == VEC_COND_LE_EXPR					    \
+      || (SYM) == VEC_COND_LE_EXPR					    \
+      || (SYM) == VEC_COND_GT_EXPR					    \
+      || (SYM) == VEC_COND_GE_EXPR					    \
+      || (SYM) == VEC_COND_EQ_EXPR					    \
+      || (SYM) == VEC_COND_NE_EXPR) ? GIMPLE_QUATERNARY_RHS		    \
    : GIMPLE_INVALID_RHS),
 #define END_OF_BASE_TREE_CODES (unsigned char) GIMPLE_INVALID_RHS,
 
