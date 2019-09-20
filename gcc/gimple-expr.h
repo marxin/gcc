@@ -36,7 +36,7 @@ extern tree create_tmp_reg_fn (struct function *, tree, const char *);
 
 
 extern void extract_ops_from_tree (tree, enum tree_code *, tree *, tree *,
-				   tree *);
+				   tree *, tree *);
 extern void gimple_cond_get_ops_from_tree (tree, enum tree_code *, tree *,
 					   tree *);
 extern bool is_gimple_lvalue (tree);
@@ -151,8 +151,8 @@ static inline void
 extract_ops_from_tree (tree expr, enum tree_code *code, tree *op0,
 		       tree *op1)
 {
-  tree op2;
-  extract_ops_from_tree (expr, code, op0, op1, &op2);
+  tree op2, op3;
+  extract_ops_from_tree (expr, code, op0, op1, &op2, &op3);
   gcc_assert (op2 == NULL_TREE);
 }
 

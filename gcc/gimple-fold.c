@@ -470,6 +470,10 @@ fold_gimple_assign (gimple_stmt_iterator *si)
         }
       break;
 
+    case GIMPLE_QUATERNARY_RHS:
+      // TODO
+      break;
+
     case GIMPLE_INVALID_RHS:
       gcc_unreachable ();
     }
@@ -4676,7 +4680,8 @@ replace_stmt_with_simplification (gimple_stmt_iterator *gsi,
 	  gimple_assign_set_rhs_with_ops (gsi, res_op->code,
 					  res_op->op_or_null (0),
 					  res_op->op_or_null (1),
-					  res_op->op_or_null (2));
+					  res_op->op_or_null (2),
+					  res_op->op_or_null (3));
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
 	      fprintf (dump_file, "gimple_simplified to ");
@@ -6361,7 +6366,11 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
 				       gimple_expr_type (stmt), op0, op1, op2);
             }
 
-          default:
+	  case GIMPLE_QUATERNARY_RHS:
+	    // TODO
+	    return NULL_TREE;
+
+	  default:
             gcc_unreachable ();
           }
       }
@@ -7628,6 +7637,7 @@ gimple_assign_nonnegative_warnv_p (gimple *stmt, bool *strict_overflow_p,
 					      gimple_assign_rhs2 (stmt),
 					      strict_overflow_p, depth);
     case GIMPLE_TERNARY_RHS:
+    case GIMPLE_QUATERNARY_RHS:
       return false;
     case GIMPLE_SINGLE_RHS:
       return tree_single_nonnegative_warnv_p (gimple_assign_rhs1 (stmt),
@@ -7722,6 +7732,7 @@ gimple_assign_integer_valued_real_p (gimple *stmt, int depth)
 					   gimple_assign_rhs1 (stmt),
 					   gimple_assign_rhs2 (stmt), depth);
     case GIMPLE_TERNARY_RHS:
+    case GIMPLE_QUATERNARY_RHS:
       return false;
     case GIMPLE_SINGLE_RHS:
       return integer_valued_real_single_p (gimple_assign_rhs1 (stmt), depth);

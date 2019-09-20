@@ -4152,20 +4152,9 @@ verify_gimple_assign_ternary (gassign *stmt)
 	  return true;
 	}
       break;
-
     case VEC_COND_EXPR:
-      if (!VECTOR_BOOLEAN_TYPE_P (rhs1_type)
-	  || maybe_ne (TYPE_VECTOR_SUBPARTS (rhs1_type),
-		       TYPE_VECTOR_SUBPARTS (lhs_type)))
-	{
-	  error ("the first argument of a %qs must be of a "
-		 "boolean vector type of the same number of elements "
-		 "as the result", code_name);
-	  debug_generic_expr (lhs_type);
-	  debug_generic_expr (rhs1_type);
-	  return true;
-	}
-      /* Fallthrough.  */
+      error ("%qs in gimple IL", code_name);
+      return true;
     case COND_EXPR:
       if (!is_gimple_val (rhs1)
 	  && verify_gimple_comparison (TREE_TYPE (rhs1),
@@ -4361,6 +4350,87 @@ verify_gimple_assign_ternary (gassign *stmt)
     default:
       gcc_unreachable ();
     }
+  return false;
+}
+
+/* Verify a gimple assignment statement STMT with a quaternary rhs.
+   Returns true if anything is wrong.  */
+
+static bool
+verify_gimple_assign_quaternary (gassign *stmt)
+{
+  enum tree_code rhs_code = gimple_assign_rhs_code (stmt);
+  tree lhs = gimple_assign_lhs (stmt);
+  tree lhs_type = TREE_TYPE (lhs);
+  tree rhs1 = gimple_assign_rhs1 (stmt);
+  tree rhs1_type = TREE_TYPE (rhs1);
+  tree rhs2 = gimple_assign_rhs2 (stmt);
+  tree rhs2_type = TREE_TYPE (rhs2);
+  tree rhs3 = gimple_assign_rhs3 (stmt);
+  tree rhs3_type = TREE_TYPE (rhs3);
+  tree rhs4 = gimple_assign_rhs4 (stmt);
+  tree rhs4_type = TREE_TYPE (rhs4);
+
+  const char *const code_name = get_tree_code_name (rhs_code);
+
+  if (!is_gimple_reg (lhs))
+    {
+      error ("non-register as LHS of ternary operation");
+      return true;
+    }
+
+  /* First handle operations that involve different types.  */
+  switch (rhs_code)
+    {
+    CASE_VEC_COND_EXPR:
+      if (TREE_CODE (rhs1_type) != VECTOR_TYPE
+	  || TREE_CODE (rhs2_type) != VECTOR_TYPE
+	  || TREE_CODE (rhs3_type) != VECTOR_TYPE
+	  || TREE_CODE (rhs4_type) != VECTOR_TYPE)
+	{
+	  error ("vector types expected in %qs", code_name);
+	  debug_generic_expr (lhs_type);
+	  debug_generic_expr (rhs1_type);
+	  debug_generic_expr (rhs2_type);
+	  debug_generic_expr (rhs3_type);
+	  debug_generic_expr (rhs4_type);
+	  return true;
+	}
+      if (maybe_ne (TYPE_VECTOR_SUBPARTS (rhs1_type),
+		    TYPE_VECTOR_SUBPARTS (rhs2_type))
+	  || maybe_ne (TYPE_VECTOR_SUBPARTS (rhs2_type),
+		       TYPE_VECTOR_SUBPARTS (rhs3_type))
+	  || maybe_ne (TYPE_VECTOR_SUBPARTS (rhs3_type),
+		       TYPE_VECTOR_SUBPARTS (rhs4_type))
+	  || maybe_ne (TYPE_VECTOR_SUBPARTS (rhs4_type),
+		       TYPE_VECTOR_SUBPARTS (lhs_type)))
+	{
+	  error ("vectors with different element number found in %qs",
+		 code_name);
+	  debug_generic_expr (lhs_type);
+	  debug_generic_expr (rhs1_type);
+	  debug_generic_expr (rhs2_type);
+	  debug_generic_expr (rhs3_type);
+	  debug_generic_expr (rhs4_type);
+	  return true;
+	}
+      if (!useless_type_conversion_p (lhs_type, rhs3_type)
+	  || !useless_type_conversion_p (lhs_type, rhs4_type)
+	  || !useless_type_conversion_p (rhs1_type, rhs2_type))
+	{
+	  error ("type mismatch in %qs", code_name);
+	  debug_generic_expr (lhs_type);
+	  debug_generic_expr (rhs1_type);
+	  debug_generic_expr (rhs2_type);
+	  debug_generic_expr (rhs3_type);
+	  debug_generic_expr (rhs4_type);
+	  return true;
+	}
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
   return false;
 }
 
@@ -4616,6 +4686,9 @@ verify_gimple_assign (gassign *stmt)
 
     case GIMPLE_TERNARY_RHS:
       return verify_gimple_assign_ternary (stmt);
+
+    case GIMPLE_QUATERNARY_RHS:
+      return verify_gimple_assign_quaternary (stmt);
 
     default:
       gcc_unreachable ();

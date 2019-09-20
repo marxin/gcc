@@ -551,6 +551,13 @@ DEFTREECODE (VEC_SERIES_EXPR, "vec_series_expr", tcc_binary, 2)
 */
 DEFTREECODE (VEC_COND_EXPR, "vec_cond_expr", tcc_expression, 3)
 
+DEFTREECODE (VEC_COND_LT_EXPR, "vec_cond_lt_expr", tcc_expression, 4)
+DEFTREECODE (VEC_COND_LE_EXPR, "vec_cond_le_expr", tcc_expression, 4)
+DEFTREECODE (VEC_COND_GT_EXPR, "vec_cond_gt_expr", tcc_expression, 4)
+DEFTREECODE (VEC_COND_GE_EXPR, "vec_cond_ge_expr", tcc_expression, 4)
+DEFTREECODE (VEC_COND_EQ_EXPR, "vec_cond_eq_expr", tcc_expression, 4)
+DEFTREECODE (VEC_COND_NE_EXPR, "vec_cond_ne_expr", tcc_expression, 4)
+
 /* Vector permutation expression.  A = VEC_PERM_EXPR<v0, v1, mask> means
 
    N = length(mask)

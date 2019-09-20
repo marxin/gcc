@@ -315,7 +315,7 @@ extern rtx expand_vec_perm_const (machine_mode, rtx, rtx,
 extern rtx expand_vec_cmp_expr (tree, tree, rtx);
 
 /* Generate code for VEC_COND_EXPR.  */
-extern rtx expand_vec_cond_expr (tree, tree, tree, tree, rtx);
+extern rtx expand_vec_cond_expr (tree, tree_code, tree, tree, tree, tree, rtx);
 
 /* Generate code for VEC_SERIES_EXPR.  */
 extern rtx expand_vec_series_expr (machine_mode, rtx, rtx, rtx);

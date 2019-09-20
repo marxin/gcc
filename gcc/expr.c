@@ -8450,7 +8450,7 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
   int ignore;
   bool reduce_bit_field;
   location_t loc = ops->location;
-  tree treeop0, treeop1, treeop2;
+  tree treeop0, treeop1, treeop2, treeop3;
 #define REDUCE_BIT_FIELD(expr)	(reduce_bit_field			  \
 				 ? reduce_to_bit_field_precision ((expr), \
 								  target, \
@@ -8464,13 +8464,15 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
   treeop0 = ops->op0;
   treeop1 = ops->op1;
   treeop2 = ops->op2;
+  treeop3 = ops->op3;
 
   /* We should be called only on simple (binary or unary) expressions,
      exactly those that are valid in gimple expressions that aren't
      GIMPLE_SINGLE_RHS (or invalid).  */
   gcc_assert (get_gimple_rhs_class (code) == GIMPLE_UNARY_RHS
 	      || get_gimple_rhs_class (code) == GIMPLE_BINARY_RHS
-	      || get_gimple_rhs_class (code) == GIMPLE_TERNARY_RHS);
+	      || get_gimple_rhs_class (code) == GIMPLE_TERNARY_RHS
+	      || get_gimple_rhs_class (code) == GIMPLE_QUATERNARY_RHS);
 
   ignore = (target == const0_rtx
 	    || ((CONVERT_EXPR_CODE_P (code)
@@ -9141,16 +9143,15 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
       if (temp != 0)
 	return temp;
 
-      /* For vector MIN <x, y>, expand it a VEC_COND_EXPR <x <= y, x, y>
+      /* For vector MIN <x, y>, expand it a VEC_COND_*_EXPR <x <= y, x, y>
 	 and similarly for MAX <x, y>.  */
       if (VECTOR_TYPE_P (type))
 	{
 	  tree t0 = make_tree (type, op0);
 	  tree t1 = make_tree (type, op1);
-	  tree comparison = build2 (code == MIN_EXPR ? LE_EXPR : GE_EXPR,
-				    type, t0, t1);
-	  return expand_vec_cond_expr (type, comparison, t0, t1,
-				       original_target);
+	  return expand_vec_cond_expr (type,
+				       code == MIN_EXPR ? LE_EXPR : GE_EXPR, t0,
+				       t1, t0, t1, original_target);
 	}
 
       /* At this point, a MEM target is no longer useful; we will get better
@@ -9743,8 +9744,9 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
 	return temp;
       }
 
-    case VEC_COND_EXPR:
-      target = expand_vec_cond_expr (type, treeop0, treeop1, treeop2, target);
+    CASE_VEC_COND_EXPR:
+      target = expand_vec_cond_expr (type, code, treeop0, treeop1, treeop2,
+				     treeop3, target);
       return target;
 
     case VEC_DUPLICATE_EXPR:
@@ -9971,6 +9973,9 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	  ops.code = gimple_assign_rhs_code (g);
           switch (get_gimple_rhs_class (ops.code))
 	    {
+	    case GIMPLE_QUATERNARY_RHS:
+	      ops.op3 = gimple_assign_rhs4 (g);
+	      /* Fallthru */
 	    case GIMPLE_TERNARY_RHS:
 	      ops.op2 = gimple_assign_rhs3 (g);
 	      /* Fallthru */
@@ -11774,6 +11779,7 @@ maybe_optimize_pow2p_mod_cmp (enum tree_code code, tree *arg0, tree *arg1)
   ops.op0 = treeop0;
   ops.op1 = treeop1;
   ops.op2 = NULL_TREE;
+  ops.op3 = NULL_TREE;
   start_sequence ();
   rtx mor = expand_expr_real_2 (&ops, NULL_RTX, TYPE_MODE (ops.type),
 				EXPAND_NORMAL);
@@ -11790,6 +11796,7 @@ maybe_optimize_pow2p_mod_cmp (enum tree_code code, tree *arg0, tree *arg1)
   ops.op0 = treeop0;
   ops.op1 = c3;
   ops.op2 = NULL_TREE;
+  ops.op3 = NULL_TREE;
   start_sequence ();
   rtx mur = expand_expr_real_2 (&ops, NULL_RTX, TYPE_MODE (ops.type),
 				EXPAND_NORMAL);
@@ -11977,6 +11984,7 @@ maybe_optimize_mod_cmp (enum tree_code code, tree *arg0, tree *arg1)
   ops.op0 = treeop0;
   ops.op1 = treeop1;
   ops.op2 = NULL_TREE;
+  ops.op3 = NULL_TREE;
   start_sequence ();
   rtx mor = expand_expr_real_2 (&ops, NULL_RTX, TYPE_MODE (ops.type),
 				EXPAND_NORMAL);
@@ -12082,16 +12090,18 @@ do_store_flag (sepops ops, rtx target, machine_mode mode)
      expander for this.  */
   if (TREE_CODE (ops->type) == VECTOR_TYPE)
     {
-      tree ifexp = build2 (ops->code, ops->type, arg0, arg1);
       if (VECTOR_BOOLEAN_TYPE_P (ops->type)
 	  && expand_vec_cmp_expr_p (TREE_TYPE (arg0), ops->type, ops->code))
-	return expand_vec_cmp_expr (ops->type, ifexp, target);
+	{
+	  tree ifexp = build2 (ops->code, ops->type, arg0, arg1);
+	  return expand_vec_cmp_expr (ops->type, ifexp, target);
+	}
       else
 	{
 	  tree if_true = constant_boolean_node (true, ops->type);
 	  tree if_false = constant_boolean_node (false, ops->type);
-	  return expand_vec_cond_expr (ops->type, ifexp, if_true,
-				       if_false, target);
+	  return expand_vec_cond_expr (ops->type, ops->code, arg0, arg1,
+				       if_true, if_false, target);
 	}
     }
 

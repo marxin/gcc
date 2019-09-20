@@ -797,7 +797,6 @@ get_expr_operands (struct function *fn, gimple *stmt, tree *expr_p, int flags)
       return;
 
     case COND_EXPR:
-    case VEC_COND_EXPR:
     case VEC_PERM_EXPR:
       get_expr_operands (fn, stmt, &TREE_OPERAND (expr, 0), uflags);
       get_expr_operands (fn, stmt, &TREE_OPERAND (expr, 1), uflags);

@@ -424,10 +424,10 @@ gassign *
 gimple_build_assign (tree lhs, tree rhs MEM_STAT_DECL)
 {
   enum tree_code subcode;
-  tree op1, op2, op3;
+  tree op1, op2, op3, op4;
 
-  extract_ops_from_tree (rhs, &subcode, &op1, &op2, &op3);
-  return gimple_build_assign (lhs, subcode, op1, op2, op3 PASS_MEM_STAT);
+  extract_ops_from_tree (rhs, &subcode, &op1, &op2, &op3, &op4);
+  return gimple_build_assign (lhs, subcode, op1, op2, op3, op4 PASS_MEM_STAT);
 }
 
 
@@ -436,7 +436,7 @@ gimple_build_assign (tree lhs, tree rhs MEM_STAT_DECL)
 
 static inline gassign *
 gimple_build_assign_1 (tree lhs, enum tree_code subcode, tree op1,
-		       tree op2, tree op3 MEM_STAT_DECL)
+		       tree op2, tree op3, tree op4 MEM_STAT_DECL)
 {
   unsigned num_ops;
   gassign *p;
@@ -462,7 +462,23 @@ gimple_build_assign_1 (tree lhs, enum tree_code subcode, tree op1,
       gimple_assign_set_rhs3 (p, op3);
     }
 
+  if (op4)
+    {
+      gcc_assert (num_ops > 4);
+      gimple_assign_set_rhs4 (p, op4);
+    }
+
   return p;
+}
+
+/* Build a GIMPLE_ASSIGN statement with subcode SUBCODE and operands
+   OP1, OP2, OP3 and OP4.  */
+
+gassign *
+gimple_build_assign (tree lhs, enum tree_code subcode, tree op1, tree op2,
+		     tree op3, tree op4 MEM_STAT_DECL)
+{
+  return gimple_build_assign_1 (lhs, subcode, op1, op2, op3, op4 PASS_MEM_STAT);
 }
 
 /* Build a GIMPLE_ASSIGN statement with subcode SUBCODE and operands
@@ -472,7 +488,8 @@ gassign *
 gimple_build_assign (tree lhs, enum tree_code subcode, tree op1,
 		     tree op2, tree op3 MEM_STAT_DECL)
 {
-  return gimple_build_assign_1 (lhs, subcode, op1, op2, op3 PASS_MEM_STAT);
+  return gimple_build_assign_1 (lhs, subcode, op1, op2, op3,
+				NULL_TREE PASS_MEM_STAT);
 }
 
 /* Build a GIMPLE_ASSIGN statement with subcode SUBCODE and operands
@@ -482,8 +499,8 @@ gassign *
 gimple_build_assign (tree lhs, enum tree_code subcode, tree op1,
 		     tree op2 MEM_STAT_DECL)
 {
-  return gimple_build_assign_1 (lhs, subcode, op1, op2, NULL_TREE
-				PASS_MEM_STAT);
+  return gimple_build_assign_1 (lhs, subcode, op1, op2, NULL_TREE,
+				NULL_TREE PASS_MEM_STAT);
 }
 
 /* Build a GIMPLE_ASSIGN statement with subcode SUBCODE and operand OP1.  */
@@ -491,8 +508,8 @@ gimple_build_assign (tree lhs, enum tree_code subcode, tree op1,
 gassign *
 gimple_build_assign (tree lhs, enum tree_code subcode, tree op1 MEM_STAT_DECL)
 {
-  return gimple_build_assign_1 (lhs, subcode, op1, NULL_TREE, NULL_TREE
-				PASS_MEM_STAT);
+  return gimple_build_assign_1 (lhs, subcode, op1, NULL_TREE, NULL_TREE,
+				NULL_TREE PASS_MEM_STAT);
 }
 
 
@@ -1737,10 +1754,10 @@ void
 gimple_assign_set_rhs_from_tree (gimple_stmt_iterator *gsi, tree expr)
 {
   enum tree_code subcode;
-  tree op1, op2, op3;
+  tree op1, op2, op3, op4;
 
-  extract_ops_from_tree (expr, &subcode, &op1, &op2, &op3);
-  gimple_assign_set_rhs_with_ops (gsi, subcode, op1, op2, op3);
+  extract_ops_from_tree (expr, &subcode, &op1, &op2, &op3, &op4);
+  gimple_assign_set_rhs_with_ops (gsi, subcode, op1, op2, op3, op4);
 }
 
 
@@ -1752,7 +1769,7 @@ gimple_assign_set_rhs_from_tree (gimple_stmt_iterator *gsi, tree expr)
 
 void
 gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *gsi, enum tree_code code,
-				tree op1, tree op2, tree op3)
+				tree op1, tree op2, tree op3, tree op4)
 {
   unsigned new_rhs_ops = get_gimple_rhs_num_ops (code);
   gimple *stmt = gsi_stmt (*gsi);
@@ -1778,6 +1795,8 @@ gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *gsi, enum tree_code code,
     gimple_assign_set_rhs2 (stmt, op2);
   if (new_rhs_ops > 2)
     gimple_assign_set_rhs3 (stmt, op3);
+  if (new_rhs_ops > 3)
+    gimple_assign_set_rhs4 (stmt, op4);
   if (stmt != old_stmt)
     gsi_replace (gsi, stmt, false);
 }
@@ -2234,6 +2253,8 @@ get_gimple_rhs_num_ops (enum tree_code code)
       return 2;
     case GIMPLE_TERNARY_RHS:
       return 3;
+    case GIMPLE_QUATERNARY_RHS:
+      return 4;
     default:
       gcc_unreachable ();
     }
@@ -2266,6 +2287,13 @@ get_gimple_rhs_num_ops (enum tree_code code)
       || (SYM) == ADDR_EXPR						    \
       || (SYM) == WITH_SIZE_EXPR					    \
       || (SYM) == SSA_NAME) ? GIMPLE_SINGLE_RHS				    \
+   : ((SYM) == VEC_COND_LT_EXPR						    \
+      || (SYM) == VEC_COND_LE_EXPR					    \
+      || (SYM) == VEC_COND_LE_EXPR					    \
+      || (SYM) == VEC_COND_GT_EXPR					    \
+      || (SYM) == VEC_COND_GE_EXPR					    \
+      || (SYM) == VEC_COND_EQ_EXPR					    \
+      || (SYM) == VEC_COND_NE_EXPR) ? GIMPLE_QUATERNARY_RHS		    \
    : GIMPLE_INVALID_RHS),
 #define END_OF_BASE_TREE_CODES (unsigned char) GIMPLE_INVALID_RHS,
 
@@ -3269,6 +3297,47 @@ gimple_inexpensive_call_p (gcall *stmt)
   if (decl && is_inexpensive_builtin (decl))
     return true;
   return false;
+}
+
+gassign *
+gimple_build_vec_cond_expr (tree lhs, tree condition, tree then_clause,
+			    tree else_clause)
+{
+  tree cond_lhs, cond_rhs;
+  tree_code code;
+
+  if (TREE_CODE (condition) == SSA_NAME)
+    {
+      gimple *stmt = SSA_NAME_DEF_STMT (condition);
+      code = gimple_assign_rhs_code (stmt);
+      if (TREE_CODE_CLASS (code) == tcc_comparison)
+	{
+	  code = cmp_to_vec_cmp_code (code);
+	  cond_lhs = gimple_assign_rhs1 (stmt);
+	  cond_rhs = gimple_assign_rhs2 (stmt);
+	}
+      else
+	{
+	  code = VEC_COND_EQ_EXPR;
+	  cond_lhs = condition;
+	  cond_rhs = constant_boolean_node (true, TREE_TYPE (condition));
+	}
+    }
+  else if (TREE_CODE (condition) == VECTOR_CST)
+    {
+      // TODO: this should be probably folded right away
+      code = VEC_COND_EQ_EXPR;
+      cond_lhs = condition;
+      cond_rhs = constant_boolean_node (true, TREE_TYPE (condition));
+    }
+  else
+    {
+      code = cmp_to_vec_cmp_code (TREE_CODE (condition));
+      cond_lhs = TREE_OPERAND (condition, 0);
+      cond_rhs = TREE_OPERAND (condition, 1);
+    }
+  return gimple_build_assign (lhs, code, cond_lhs, cond_rhs, then_clause,
+			      else_clause);
 }
 
 #if CHECKING_P

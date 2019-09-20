@@ -526,16 +526,25 @@ create_tmp_reg_fn (struct function *fn, tree type, const char *prefix)
 
 void
 extract_ops_from_tree (tree expr, enum tree_code *subcode_p, tree *op1_p,
-		       tree *op2_p, tree *op3_p)
+		       tree *op2_p, tree *op3_p, tree *op4_p)
 {
   *subcode_p = TREE_CODE (expr);
   switch (get_gimple_rhs_class (*subcode_p))
     {
+    case GIMPLE_QUATERNARY_RHS:
+      {
+	*op1_p = TREE_OPERAND (expr, 0);
+	*op2_p = TREE_OPERAND (expr, 1);
+	*op3_p = TREE_OPERAND (expr, 2);
+	*op4_p = TREE_OPERAND (expr, 3);
+	break;
+      }
     case GIMPLE_TERNARY_RHS:
       {
 	*op1_p = TREE_OPERAND (expr, 0);
 	*op2_p = TREE_OPERAND (expr, 1);
 	*op3_p = TREE_OPERAND (expr, 2);
+	*op4_p = NULL_TREE;
 	break;
       }
     case GIMPLE_BINARY_RHS:
@@ -543,6 +552,7 @@ extract_ops_from_tree (tree expr, enum tree_code *subcode_p, tree *op1_p,
 	*op1_p = TREE_OPERAND (expr, 0);
 	*op2_p = TREE_OPERAND (expr, 1);
 	*op3_p = NULL_TREE;
+	*op4_p = NULL_TREE;
 	break;
       }
     case GIMPLE_UNARY_RHS:
@@ -550,6 +560,7 @@ extract_ops_from_tree (tree expr, enum tree_code *subcode_p, tree *op1_p,
 	*op1_p = TREE_OPERAND (expr, 0);
 	*op2_p = NULL_TREE;
 	*op3_p = NULL_TREE;
+	*op4_p = NULL_TREE;
 	break;
       }
     case GIMPLE_SINGLE_RHS:
@@ -557,6 +568,7 @@ extract_ops_from_tree (tree expr, enum tree_code *subcode_p, tree *op1_p,
 	*op1_p = expr;
 	*op2_p = NULL_TREE;
 	*op3_p = NULL_TREE;
+	*op4_p = NULL_TREE;
 	break;
       }
     default:

@@ -349,6 +349,11 @@ rhs_to_tree (tree type, gimple *stmt)
   enum tree_code code = gimple_assign_rhs_code (stmt);
   switch (get_gimple_rhs_class (code))
     {
+    case GIMPLE_QUATERNARY_RHS:
+      // TODO: use fold_build4_loc
+      return build4_loc (loc, code, type, gimple_assign_rhs1 (stmt),
+			 gimple_assign_rhs2 (stmt), gimple_assign_rhs3 (stmt),
+			 gimple_assign_rhs4 (stmt));
     case GIMPLE_TERNARY_RHS:
       return fold_build3_loc (loc, code, type, gimple_assign_rhs1 (stmt),
 			      gimple_assign_rhs2 (stmt),
@@ -2166,8 +2171,7 @@ simplify_vector_constructor (gimple_stmt_iterator *gsi)
       if (conv_code == ERROR_MARK)
 	gimple_assign_set_rhs_from_tree (gsi, orig[0]);
       else
-	gimple_assign_set_rhs_with_ops (gsi, conv_code, orig[0],
-					NULL_TREE, NULL_TREE);
+	gimple_assign_set_rhs_with_ops (gsi, conv_code, orig[0], NULL_TREE);
     }
   else
     {
@@ -2227,8 +2231,7 @@ simplify_vector_constructor (gimple_stmt_iterator *gsi)
 				   VEC_PERM_EXPR, orig[0], orig[1], op2);
 	  orig[0] = gimple_assign_lhs (perm);
 	  gsi_insert_before (gsi, perm, GSI_SAME_STMT);
-	  gimple_assign_set_rhs_with_ops (gsi, conv_code, orig[0],
-					  NULL_TREE, NULL_TREE);
+	  gimple_assign_set_rhs_with_ops (gsi, conv_code, orig[0]);
 	}
     }
   update_stmt (gsi_stmt (*gsi));

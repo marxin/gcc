@@ -115,12 +115,13 @@ GIMPLE_CHECK2(const gimple *gs)
    get_gimple_rhs_class.  */
 enum gimple_rhs_class
 {
-  GIMPLE_INVALID_RHS,	/* The expression cannot be used on the RHS.  */
-  GIMPLE_TERNARY_RHS,	/* The expression is a ternary operation.  */
-  GIMPLE_BINARY_RHS,	/* The expression is a binary operation.  */
-  GIMPLE_UNARY_RHS,	/* The expression is a unary operation.  */
-  GIMPLE_SINGLE_RHS	/* The expression is a single object (an SSA
-			   name, a _DECL, a _REF, etc.  */
+  GIMPLE_INVALID_RHS,    /* The expression cannot be used on the RHS.  */
+  GIMPLE_QUATERNARY_RHS, /* The expression is a quoternary operation.  */
+  GIMPLE_TERNARY_RHS,    /* The expression is a ternary operation.  */
+  GIMPLE_BINARY_RHS,     /* The expression is a binary operation.  */
+  GIMPLE_UNARY_RHS,      /* The expression is a unary operation.  */
+  GIMPLE_SINGLE_RHS      /* The expression is a single object (an SSA
+			    name, a _DECL, a _REF, etc.  */
 };
 
 /* Specific flags for individual GIMPLE statements.  These flags are
@@ -1458,10 +1459,14 @@ gcall *gimple_build_call_internal_vec (enum internal_fn, vec<tree> );
 gcall *gimple_build_call_from_tree (tree, tree);
 gassign *gimple_build_assign (tree, tree CXX_MEM_STAT_INFO);
 gassign *gimple_build_assign (tree, enum tree_code,
+			      tree, tree, tree, tree CXX_MEM_STAT_INFO);
+gassign *gimple_build_assign (tree, enum tree_code,
 			      tree, tree, tree CXX_MEM_STAT_INFO);
 gassign *gimple_build_assign (tree, enum tree_code,
 			      tree, tree CXX_MEM_STAT_INFO);
 gassign *gimple_build_assign (tree, enum tree_code, tree CXX_MEM_STAT_INFO);
+gassign *gimple_build_vec_cond_expr (tree, tree, tree, tree);
+
 gcond *gimple_build_cond (enum tree_code, tree, tree, tree, tree);
 gcond *gimple_build_cond_from_tree (tree, tree, tree);
 void gimple_cond_set_condition_from_tree (gcond *, tree);
@@ -1530,7 +1535,7 @@ bool gimple_assign_unary_nop_p (gimple *);
 void gimple_set_bb (gimple *, basic_block);
 void gimple_assign_set_rhs_from_tree (gimple_stmt_iterator *, tree);
 void gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *, enum tree_code,
-				     tree, tree, tree);
+				     tree, tree, tree, tree);
 tree gimple_get_lhs (const gimple *);
 void gimple_set_lhs (gimple *, tree);
 gimple *gimple_copy (gimple *);
@@ -2685,25 +2690,80 @@ gimple_assign_set_rhs3 (gimple *gs, tree rhs)
   gimple_assign_set_rhs3 (ass, rhs);
 }
 
+/* Return the fourth operand on the RHS of assignment statement GS.
+   If GS does not have two operands, NULL is returned instead.  */
 
-/* A wrapper around 3 operand gimple_assign_set_rhs_with_ops, for callers
+static inline tree
+gimple_assign_rhs4 (const gassign *gs)
+{
+  if (gimple_num_ops (gs) >= 5)
+    return gs->op[4];
+  else
+    return NULL_TREE;
+}
+
+static inline tree
+gimple_assign_rhs4 (const gimple *gs)
+{
+  const gassign *ass = GIMPLE_CHECK2<const gassign *> (gs);
+  return gimple_assign_rhs4 (ass);
+}
+
+/* Return a pointer to the fourth operand on the RHS of assignment
+   statement GS.  */
+
+static inline tree *
+gimple_assign_rhs4_ptr (gimple *gs)
+{
+  gassign *ass = GIMPLE_CHECK2<gassign *> (gs);
+  gcc_gimple_checking_assert (gimple_num_ops (gs) >= 5);
+  return &ass->op[4];
+}
+
+/* Set RHS to be the fourth operand on the RHS of assignment statement GS.  */
+
+static inline void
+gimple_assign_set_rhs4 (gassign *gs, tree rhs)
+{
+  gcc_gimple_checking_assert (gimple_num_ops (gs) >= 5);
+  gs->op[4] = rhs;
+}
+
+static inline void
+gimple_assign_set_rhs4 (gimple *gs, tree rhs)
+{
+  gassign *ass = GIMPLE_CHECK2<gassign *> (gs);
+  gimple_assign_set_rhs4 (ass, rhs);
+}
+
+/* A wrapper around 4 operand gimple_assign_set_rhs_with_ops, for callers
+   which expect to see only three operands.  */
+
+static inline void
+gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *gsi, enum tree_code code,
+				tree op1, tree op2, tree op3)
+{
+  gimple_assign_set_rhs_with_ops (gsi, code, op1, op2, op3, NULL);
+}
+
+/* A wrapper around 4 operand gimple_assign_set_rhs_with_ops, for callers
    which expect to see only two operands.  */
 
 static inline void
 gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *gsi, enum tree_code code,
 				tree op1, tree op2)
 {
-  gimple_assign_set_rhs_with_ops (gsi, code, op1, op2, NULL);
+  gimple_assign_set_rhs_with_ops (gsi, code, op1, op2, NULL, NULL);
 }
 
-/* A wrapper around 3 operand gimple_assign_set_rhs_with_ops, for callers
+/* A wrapper around 4 operand gimple_assign_set_rhs_with_ops, for callers
    which expect to see only one operands.  */
 
 static inline void
 gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *gsi, enum tree_code code,
 				tree op1)
 {
-  gimple_assign_set_rhs_with_ops (gsi, code, op1, NULL, NULL);
+  gimple_assign_set_rhs_with_ops (gsi, code, op1, NULL, NULL, NULL);
 }
 
 /* Returns true if GS is a nontemporal move.  */

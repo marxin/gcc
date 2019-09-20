@@ -432,6 +432,14 @@ add_hashable_expr (const struct hashable_expr *expr, hash &hstate)
       inchash::add_expr (expr->ops.ternary.opnd2, hstate);
       break;
 
+    case EXPR_QUATERNARY:
+      hstate.add_object (expr->ops.quaternary.op);
+      inchash::add_expr (expr->ops.quaternary.opnd0, hstate);
+      inchash::add_expr (expr->ops.quaternary.opnd1, hstate);
+      inchash::add_expr (expr->ops.quaternary.opnd2, hstate);
+      inchash::add_expr (expr->ops.quaternary.opnd3, hstate);
+      break;
+
     case EXPR_CALL:
       {
         size_t i;
@@ -643,6 +651,19 @@ hashable_expr_equal_p (const struct hashable_expr *expr0,
 	      && operand_equal_p (expr0->ops.ternary.opnd1,
 				  expr1->ops.ternary.opnd0, 0));
 
+    case EXPR_QUATERNARY:
+      if (expr0->ops.quaternary.op != expr1->ops.quaternary.op)
+	return false;
+
+      return (operand_equal_p (expr0->ops.quaternary.opnd0,
+			       expr1->ops.quaternary.opnd0, 0)
+	      && operand_equal_p (expr0->ops.quaternary.opnd1,
+				  expr1->ops.quaternary.opnd1, 0)
+	      && operand_equal_p (expr0->ops.quaternary.opnd2,
+				  expr1->ops.quaternary.opnd2, 0)
+	      && operand_equal_p (expr0->ops.quaternary.opnd3,
+				  expr1->ops.quaternary.opnd3, 0));
+
     case EXPR_CALL:
       {
         size_t i;
@@ -736,7 +757,17 @@ expr_hash_elt::expr_hash_elt (gimple *stmt, tree orig_lhs)
 	  expr->ops.ternary.opnd1 = gimple_assign_rhs2 (stmt);
 	  expr->ops.ternary.opnd2 = gimple_assign_rhs3 (stmt);
 	  break;
-        default:
+	case GIMPLE_QUATERNARY_RHS:
+	  expr->kind = EXPR_TERNARY;
+	  expr->type = TREE_TYPE (gimple_assign_lhs (stmt));
+	  expr->ops.quaternary.op = subcode;
+	  expr->ops.quaternary.opnd0 = gimple_assign_rhs1 (stmt);
+	  expr->ops.quaternary.opnd1 = gimple_assign_rhs2 (stmt);
+	  expr->ops.quaternary.opnd2 = gimple_assign_rhs3 (stmt);
+	  expr->ops.quaternary.opnd3 = gimple_assign_rhs4 (stmt);
+	  break;
+
+	default:
           gcc_unreachable ();
         }
     }
@@ -893,6 +924,19 @@ expr_hash_elt::print (FILE *stream)
 	print_generic_expr (stream, m_expr.ops.ternary.opnd1);
 	fputs (", ", stream);
 	print_generic_expr (stream, m_expr.ops.ternary.opnd2);
+	fputs (">", stream);
+	break;
+
+      case EXPR_QUATERNARY:
+	fprintf (stream, " %s <",
+		 get_tree_code_name (m_expr.ops.quaternary.op));
+	print_generic_expr (stream, m_expr.ops.quaternary.opnd0);
+	fputs (", ", stream);
+	print_generic_expr (stream, m_expr.ops.quaternary.opnd1);
+	fputs (", ", stream);
+	print_generic_expr (stream, m_expr.ops.quaternary.opnd2);
+	fputs (", ", stream);
+	print_generic_expr (stream, m_expr.ops.quaternary.opnd3);
 	fputs (">", stream);
 	break;
 

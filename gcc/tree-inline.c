@@ -4092,7 +4092,7 @@ estimate_operator_cost (enum tree_code code, eni_weights *weights,
     /* Assign cost of 1 to usual operations.
        ??? We may consider mapping RTL costs to this.  */
     case COND_EXPR:
-    case VEC_COND_EXPR:
+    CASE_VEC_COND_EXPR:
     case VEC_PERM_EXPR:
 
     case PLUS_EXPR:

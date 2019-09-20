@@ -3875,11 +3875,10 @@ compute_avail (void)
 		      enum tree_code code = gimple_assign_rhs_code (stmt);
 		      vn_nary_op_t nary;
 
-		      /* COND_EXPR and VEC_COND_EXPR are awkward in
+		      /* COND_EXPR and VEC_COND_*_EXPR are awkward in
 			 that they contain an embedded complex expression.
 			 Don't even try to shove those through PRE.  */
-		      if (code == COND_EXPR
-			  || code == VEC_COND_EXPR)
+		      if (code == COND_EXPR || vec_cond_expr_p (code))
 			continue;
 
 		      vn_nary_op_lookup_stmt (stmt, &nary);

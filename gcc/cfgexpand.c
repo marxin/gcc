@@ -106,6 +106,12 @@ gimple_assign_rhs_to_tree (gimple *stmt)
   tree t;
   switch (get_gimple_rhs_class (gimple_expr_code (stmt)))
     {
+    case GIMPLE_QUATERNARY_RHS:
+      t = build4 (gimple_assign_rhs_code (stmt),
+		  TREE_TYPE (gimple_assign_lhs (stmt)),
+		  gimple_assign_rhs1 (stmt), gimple_assign_rhs2 (stmt),
+		  gimple_assign_rhs3 (stmt), gimple_assign_rhs4 (stmt));
+      break;
     case GIMPLE_TERNARY_RHS:
       t = build3 (gimple_assign_rhs_code (stmt),
 		  TREE_TYPE (gimple_assign_lhs (stmt)),
@@ -3793,17 +3799,20 @@ expand_gimple_stmt_1 (gimple *stmt)
 	    ops.type = TREE_TYPE (lhs);
 	    switch (get_gimple_rhs_class (ops.code))
 	      {
-		case GIMPLE_TERNARY_RHS:
-		  ops.op2 = gimple_assign_rhs3 (assign_stmt);
-		  /* Fallthru */
-		case GIMPLE_BINARY_RHS:
-		  ops.op1 = gimple_assign_rhs2 (assign_stmt);
-		  /* Fallthru */
-		case GIMPLE_UNARY_RHS:
-		  ops.op0 = gimple_assign_rhs1 (assign_stmt);
-		  break;
-		default:
-		  gcc_unreachable ();
+	      case GIMPLE_QUATERNARY_RHS:
+		ops.op3 = gimple_assign_rhs4 (assign_stmt);
+		/* Fallthru */
+	      case GIMPLE_TERNARY_RHS:
+		ops.op2 = gimple_assign_rhs3 (assign_stmt);
+		/* Fallthru */
+	      case GIMPLE_BINARY_RHS:
+		ops.op1 = gimple_assign_rhs2 (assign_stmt);
+		/* Fallthru */
+	      case GIMPLE_UNARY_RHS:
+		ops.op0 = gimple_assign_rhs1 (assign_stmt);
+		break;
+	      default:
+		gcc_unreachable ();
 	      }
 	    ops.location = gimple_location (stmt);
 
@@ -5172,7 +5181,7 @@ expand_debug_expr (tree exp)
 
     /* Vector stuff.  For most of the codes we don't have rtl codes.  */
     case REALIGN_LOAD_EXPR:
-    case VEC_COND_EXPR:
+    CASE_VEC_COND_EXPR:
     case VEC_PACK_FIX_TRUNC_EXPR:
     case VEC_PACK_FLOAT_EXPR:
     case VEC_PACK_SAT_EXPR:

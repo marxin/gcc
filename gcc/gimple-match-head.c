@@ -974,6 +974,9 @@ gimple_simplify (gimple *stmt, gimple_match_op *res_op, gimple_seq *seq,
 	      return (gimple_resimplify3 (seq, res_op, valueize)
 		      || valueized);
 	    }
+	  case GIMPLE_QUATERNARY_RHS:
+	    // TODO: add support
+	    break;
 	  default:
 	    gcc_unreachable ();
 	  }
