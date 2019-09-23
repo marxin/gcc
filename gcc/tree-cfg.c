@@ -4121,7 +4121,7 @@ verify_gimple_assign_ternary (gassign *stmt)
       return true;
     }
 
-  if ((rhs_code == COND_EXPR
+  if (((rhs_code == VEC_COND_EXPR || rhs_code == COND_EXPR)
        ? !is_gimple_condexpr (rhs1) : !is_gimple_val (rhs1))
       || !is_gimple_val (rhs2)
       || !is_gimple_val (rhs3))
@@ -4373,12 +4373,29 @@ verify_gimple_assign_quaternary (gassign *stmt)
 
   const char* const code_name = get_tree_code_name (rhs_code);
 
-  // TODO: check common like in the previous function
+  if (!is_gimple_reg (lhs))
+    {
+      error ("non-register as LHS of ternary operation");
+      return true;
+    }
 
   /* First handle operations that involve different types.  */
   switch (rhs_code)
     {
     CASE_VEC_COND_EXPR:
+      if (TREE_CODE (rhs1_type) != VECTOR_TYPE
+	  || TREE_CODE (rhs2_type) != VECTOR_TYPE
+	  || TREE_CODE (rhs3_type) != VECTOR_TYPE
+	  || TREE_CODE (rhs4_type) != VECTOR_TYPE)
+	{
+	  error ("vector types expected in %qs", code_name);
+	  debug_generic_expr (lhs_type);
+	  debug_generic_expr (rhs1_type);
+	  debug_generic_expr (rhs2_type);
+	  debug_generic_expr (rhs3_type);
+	  debug_generic_expr (rhs4_type);
+	  return true;
+	}
       if (maybe_ne (TYPE_VECTOR_SUBPARTS (rhs1_type),
 		    TYPE_VECTOR_SUBPARTS (rhs2_type))
 	  || maybe_ne (TYPE_VECTOR_SUBPARTS (rhs2_type),
@@ -4397,6 +4414,19 @@ verify_gimple_assign_quaternary (gassign *stmt)
 	  debug_generic_expr (rhs4_type);
 	  return true;
 	}
+      if (!useless_type_conversion_p (lhs_type, rhs3_type)
+	  || !useless_type_conversion_p (lhs_type, rhs4_type)
+	  || !useless_type_conversion_p (rhs1_type, rhs2_type))
+	{
+	  error ("type mismatch in %qs", code_name);
+	  debug_generic_expr (lhs_type);
+	  debug_generic_expr (rhs1_type);
+	  debug_generic_expr (rhs2_type);
+	  debug_generic_expr (rhs3_type);
+	  debug_generic_expr (rhs4_type);
+	  return true;
+	}
+
       // TODO: add from COND_EXPR
       break;
     default:

@@ -569,6 +569,16 @@ dump_ternary_rhs (pretty_printer *buffer, gassign *gs, int spc,
       dump_generic_node (buffer, gimple_assign_rhs3 (gs), spc, flags, false);
       break;
 
+    case VEC_COND_EXPR:
+      pp_string (buffer, "VEC_COND_EXPR <");
+      dump_generic_node (buffer, gimple_assign_rhs1 (gs), spc, flags, false);
+      pp_string (buffer, ", ");
+      dump_generic_node (buffer, gimple_assign_rhs2 (gs), spc, flags, false);
+      pp_string (buffer, ", ");
+      dump_generic_node (buffer, gimple_assign_rhs3 (gs), spc, flags, false);
+      pp_greater (buffer);
+      break;
+
     case BIT_INSERT_EXPR:
       if (flags & TDF_GIMPLE)
 	{

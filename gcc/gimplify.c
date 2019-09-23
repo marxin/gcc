@@ -13812,19 +13812,23 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 
 	case VEC_COND_EXPR:
 	  {
-	    enum gimplify_status r0, r1, r2;
+	    tree type = TREE_TYPE (TREE_OPERAND (*expr_p, 1));
+	    tree cond_expr = TREE_OPERAND (*expr_p, 0);
+	    gcc_assert (TREE_CODE_CLASS (TREE_CODE (cond_expr)) ==
+			tcc_comparison);
 
-	    r0 = gimplify_expr (&TREE_OPERAND (*expr_p, 0), pre_p,
-				post_p, is_gimple_condexpr, fb_rvalue);
-	    r1 = gimplify_expr (&TREE_OPERAND (*expr_p, 1), pre_p,
-				post_p, is_gimple_val, fb_rvalue);
-	    r2 = gimplify_expr (&TREE_OPERAND (*expr_p, 2), pre_p,
-				post_p, is_gimple_val, fb_rvalue);
-
-	    ret = MIN (MIN (r0, r1), r2);
-	    recalculate_side_effects (*expr_p);
+	    tree_code vec_code = cmp_to_vec_cmp_code (TREE_CODE (cond_expr));
+	    *expr_p = build4_loc (input_location, vec_code, type,
+				  TREE_OPERAND (cond_expr, 0),
+				  TREE_OPERAND (cond_expr, 1),
+				  TREE_OPERAND (*expr_p, 1),
+				  TREE_OPERAND (*expr_p, 2));
+	    ret = GS_OK;
+	    break;
 	  }
-	  break;
+
+	CASE_VEC_COND_EXPR:
+	  goto expr_4;
 
 	case VEC_PERM_EXPR:
 	  /* Classified as tcc_expression.  */
@@ -13920,6 +13924,23 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 				    post_p, is_gimple_val, fb_rvalue);
 
 		ret = MIN (MIN (r0, r1), r2);
+		break;
+	      }
+
+	    expr_4:
+	      {
+		enum gimplify_status r0, r1, r2, r3;
+
+		r0 = gimplify_expr (&TREE_OPERAND (*expr_p, 0), pre_p,
+		                    post_p, is_gimple_val, fb_rvalue);
+		r1 = gimplify_expr (&TREE_OPERAND (*expr_p, 1), pre_p,
+				    post_p, is_gimple_val, fb_rvalue);
+		r2 = gimplify_expr (&TREE_OPERAND (*expr_p, 2), pre_p,
+				    post_p, is_gimple_val, fb_rvalue);
+		r3 = gimplify_expr (&TREE_OPERAND (*expr_p, 3), pre_p,
+				    post_p, is_gimple_val, fb_rvalue);
+
+		ret = MIN (MIN (r0, r1), MIN (r2, r3));
 		break;
 	      }
 

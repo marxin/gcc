@@ -470,6 +470,10 @@ fold_gimple_assign (gimple_stmt_iterator *si)
         }
       break;
 
+    case GIMPLE_QUATERNARY_RHS:
+      // TODO
+      break;
+
     case GIMPLE_INVALID_RHS:
       gcc_unreachable ();
     }
@@ -7633,6 +7637,7 @@ gimple_assign_nonnegative_warnv_p (gimple *stmt, bool *strict_overflow_p,
 					      gimple_assign_rhs2 (stmt),
 					      strict_overflow_p, depth);
     case GIMPLE_TERNARY_RHS:
+    case GIMPLE_QUATERNARY_RHS:
       return false;
     case GIMPLE_SINGLE_RHS:
       return tree_single_nonnegative_warnv_p (gimple_assign_rhs1 (stmt),
@@ -7727,6 +7732,7 @@ gimple_assign_integer_valued_real_p (gimple *stmt, int depth)
 					   gimple_assign_rhs1 (stmt),
 					   gimple_assign_rhs2 (stmt), depth);
     case GIMPLE_TERNARY_RHS:
+    case GIMPLE_QUATERNARY_RHS:
       return false;
     case GIMPLE_SINGLE_RHS:
       return integer_valued_real_single_p (gimple_assign_rhs1 (stmt), depth);
