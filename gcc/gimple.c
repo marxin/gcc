@@ -3298,6 +3298,40 @@ gimple_inexpensive_call_p (gcall *stmt)
   return false;
 }
 
+gassign *
+gimple_build_vec_cond_expr (tree lhs, tree condition, tree then_clause,
+			    tree else_clause)
+{
+  tree cond_lhs, cond_rhs;
+  tree_code code;
+
+  if (TREE_CODE (condition) == SSA_NAME)
+    {
+      gimple *stmt = SSA_NAME_DEF_STMT (condition);
+      code = gimple_assign_rhs_code (stmt);
+      if (TREE_CODE_CLASS (code) == tcc_comparison)
+	{
+	  code = cmp_to_vec_cmp_code (code);
+	  cond_lhs = gimple_assign_rhs1 (stmt);
+	  cond_rhs = gimple_assign_rhs2 (stmt);
+	}
+      else
+	{
+	  code = VEC_COND_EQ_EXPR;
+	  cond_lhs = condition;
+	  cond_rhs = constant_boolean_node (true, TREE_TYPE (condition));
+	}
+    }
+  else
+    {
+      code = cmp_to_vec_cmp_code (TREE_CODE (condition));
+      cond_lhs = TREE_OPERAND (condition, 0);
+      cond_rhs = TREE_OPERAND (condition, 1);
+    }
+  return gimple_build_assign (lhs, code, cond_lhs, cond_rhs, then_clause,
+			      else_clause);
+}
+
 #if CHECKING_P
 
 namespace selftest {

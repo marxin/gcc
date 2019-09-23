@@ -7096,8 +7096,8 @@ vectorizable_scan_store (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 			       ? boolean_false_node : boolean_true_node);
 
 	      tree new_temp2 = make_ssa_name (vectype);
-	      g = gimple_build_assign (new_temp2, VEC_COND_EXPR, vb.build (),
-				       new_temp, vec_oprnd1);
+	      g = gimple_build_vec_cond_expr (new_temp2, vb.build (),
+					      new_temp, vec_oprnd1);
 	      new_stmt_info = vect_finish_stmt_generation (stmt_info, g, gsi);
 	      STMT_VINFO_RELATED_STMT (prev_stmt_info) = new_stmt_info;
 	      prev_stmt_info = new_stmt_info;
@@ -9770,7 +9770,7 @@ vect_is_simple_cond (tree cond, vec_info *vinfo,
 
    Check if STMT_INFO is conditional modify expression that can be vectorized.
    If VEC_STMT is also passed, vectorize STMT_INFO: create a vectorized
-   stmt using VEC_COND_EXPR  to replace it, put it in VEC_STMT, and insert it
+   stmt using VEC_COND_*_EXPR  to replace it, put it in VEC_STMT, and insert it
    at GSI.
 
    When STMT_INFO is vectorized as a nested cycle, for_reduction is true.
@@ -10158,38 +10158,10 @@ vectorizable_condition (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 	  else
 	    {
 	      new_temp = make_ssa_name (vec_dest);
-
-	      tree_code code;
-	      tree cond_lhs, cond_rhs;
-
-	      if (TREE_CODE (vec_compare) == SSA_NAME)
-		{
-		  gimple *stmt = SSA_NAME_DEF_STMT (vec_compare);
-		  code = gimple_assign_rhs_code (stmt);
-		  if (TREE_CODE_CLASS (code) == tcc_comparison)
-		    {
-		      code = cmp_to_vec_cmp_code (code);
-		      cond_lhs = gimple_assign_rhs1 (stmt);
-		      cond_rhs = gimple_assign_rhs2 (stmt);
-		    }
-		  else
-		    {
-		      code = VEC_COND_EQ_EXPR;
-		      cond_lhs = vec_compare;
-		      cond_rhs = constant_boolean_node (true, TREE_TYPE
-							(vec_compare));
-		    }
-		}
-	      else
-		{
-		  code = cmp_to_vec_cmp_code (TREE_CODE (vec_compare));
-		  cond_lhs = TREE_OPERAND (vec_compare, 0);
-		  cond_rhs = TREE_OPERAND (vec_compare, 1);
-		}
 	      gassign *new_stmt
-		= gimple_build_assign (new_temp, code,
-				       cond_lhs, cond_rhs,
-				       vec_then_clause, vec_else_clause);
+		= gimple_build_vec_cond_expr (new_temp, vec_compare,
+					      vec_then_clause,
+					      vec_else_clause);
 	      new_stmt_info
 		= vect_finish_stmt_generation (stmt_info, new_stmt, gsi);
 	    }

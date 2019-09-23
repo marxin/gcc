@@ -373,8 +373,9 @@ expand_vector_addition (gimple_stmt_iterator *gsi,
 
 /* Try to expand vector comparison expression OP0 CODE OP1 by
    querying optab if the following expression:
-	VEC_COND_EXPR< OP0 CODE OP1, {-1,...}, {0,...}>
+	VEC_COND_CODE_EXPR< OP0, OP1, {-1,...}, {0,...}>
    can be expanded.  */
+
 static tree
 expand_vector_comparison (gimple_stmt_iterator *gsi, tree type, tree op0,
                           tree op1, enum tree_code code)
@@ -691,12 +692,10 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 	  if (addend == NULL_TREE
 	      && expand_vec_cond_expr_p (type, type, LT_EXPR))
 	    {
-	      tree zero, cst, cond, mask_type;
+	      tree zero, cst;
 	      gimple *stmt;
 
-	      mask_type = build_same_sized_truth_vector_type (type);
 	      zero = build_zero_cst (type);
-	      cond = build2 (LT_EXPR, mask_type, op0, zero);
 	      tree_vector_builder vec (type, nunits, 1);
 	      for (i = 0; i < nunits; i++)
 		vec.quick_push (build_int_cst (TREE_TYPE (type),
@@ -704,7 +703,7 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 						<< shifts[i]) - 1));
 	      cst = vec.build ();
 	      addend = make_ssa_name (type);
-	      stmt = gimple_build_assign (addend, VEC_COND_EXPR, cond,
+	      stmt = gimple_build_assign (addend, VEC_COND_LT_EXPR, op0, zero,
 					  cst, zero);
 	      gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
 	    }
@@ -1964,7 +1963,7 @@ expand_vector_operations_1 (gimple_stmt_iterator *gsi)
       return;
     }
 
-  if (code == VEC_COND_EXPR)
+  if (vec_cond_expr_p (code))
     {
       expand_vector_condition (gsi);
       return;

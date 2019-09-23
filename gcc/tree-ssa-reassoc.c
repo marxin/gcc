@@ -3747,7 +3747,7 @@ optimize_range_tests (enum tree_code opcode,
 }
 
 /* A subroutine of optimize_vec_cond_expr to extract and canonicalize
-   the operands of the VEC_COND_EXPR.  Returns ERROR_MARK on failure,
+   the operands of the VEC_COND_*_EXPR.  Returns ERROR_MARK on failure,
    otherwise the comparison code.  TYPE is a return value that is set
    to type of comparison.  */
 
@@ -3763,7 +3763,7 @@ ovce_extract_ops (tree var, gassign **rets, bool *reti, tree *type)
 
   /* ??? If we start creating more COND_EXPR, we could perform
      this same optimization with them.	For now, simplify.  */
-  if (gimple_assign_rhs_code (stmt) != VEC_COND_EXPR)
+  if (!vec_cond_expr_p (gimple_assign_rhs_code (stmt)))
     return ERROR_MARK;
 
   tree cond = gimple_assign_rhs1 (stmt);

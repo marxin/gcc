@@ -3460,7 +3460,7 @@ check_bool_pattern (tree var, vec_info *vinfo, hash_set<gimple *> &stmts)
 	  tree vecitype, comp_vectype;
 
 	  /* If the comparison can throw, then is_gimple_condexpr will be
-	     false and we can't make a COND_EXPR/VEC_COND_EXPR out of it.  */
+	     false and we can't make a COND_EXPR/VEC_COND_*_EXPR out of it.  */
 	  if (stmt_could_throw_p (cfun, def_stmt))
 	    return false;
 
@@ -3582,7 +3582,7 @@ adjust_bool_pattern (tree var, tree out_type,
 	   S3'  c_T = x2 CMP2 y2 ? a_T : 0;
 	   S4'  f_T = c_T;
 
-	 At least when VEC_COND_EXPR is implemented using masks
+	 At least when VEC_COND_*_EXPR is implemented using masks
 	 cond ? 1 : 0 is as expensive as cond ? var : 0, in both cases it
 	 computes the comparison masks and ands it, in one case with
 	 all ones vector, in the other case with a vector register.

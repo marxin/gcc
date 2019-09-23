@@ -4750,8 +4750,6 @@ vect_create_epilog_for_reduction (vec<tree> vect_defs,
       tree index_vec_type = TREE_TYPE (induction_index);
       gcc_checking_assert (TYPE_UNSIGNED (index_vec_type));
       tree index_scalar_type = TREE_TYPE (index_vec_type);
-      tree index_vec_cmp_type = build_same_sized_truth_vector_type
-	(index_vec_type);
 
       /* Get an unsigned integer version of the type of the data vector.  */
       int scalar_precision
@@ -4794,22 +4792,16 @@ vect_create_epilog_for_reduction (vec<tree> vect_defs,
 	 (VEC_COND) with one data value and the rest zeros.
 	 In the case where the loop never made any matches, every index will
 	 match, resulting in a vector with all data values (which will all be
-	 the default value).  */
-
-      /* Compare the max index vector to the vector of found indexes to find
+	 the default value).
+         Compare the max index vector to the vector of found indexes to find
 	 the position of the max value.  */
-      tree vec_compare = make_ssa_name (index_vec_cmp_type);
-      gimple *vec_compare_stmt = gimple_build_assign (vec_compare, EQ_EXPR,
-						      induction_index,
-						      max_index_vec);
-      gsi_insert_before (&exit_gsi, vec_compare_stmt, GSI_SAME_STMT);
 
       /* Use the compare to choose either values from the data vector or
 	 zero.  */
       tree vec_cond = make_ssa_name (vectype);
-      gimple *vec_cond_stmt = gimple_build_assign (vec_cond, VEC_COND_EXPR,
-						   vec_compare, new_phi_result,
-						   zero_vec);
+      gimple *vec_cond_stmt = gimple_build_assign (vec_cond, VEC_COND_EQ_EXPR,
+						   induction_index, max_index_vec,
+						   new_phi_result, zero_vec);
       gsi_insert_before (&exit_gsi, vec_cond_stmt, GSI_SAME_STMT);
 
       /* Finally we need to extract the data value from the vector (VEC_COND)
@@ -5042,8 +5034,10 @@ vect_create_epilog_for_reduction (vec<tree> vect_defs,
 	     vec = seq ? new_phi_result : vector_identity;
 
 	     VEC is now suitable for a full vector reduction.  */
-	  tree vec = gimple_build (&seq, VEC_COND_EXPR, vectype,
-				   sel, new_phi_result, vector_identity);
+	  tree vec = make_ssa_name (new_phi_result);
+	  gimple *cond_expr = gimple_build_vec_cond_expr (vec, sel, new_phi_result,
+							  vector_identity);
+	  gimple_seq_add_stmt (&seq, cond_expr);
 
 	  /* Do the reduction and convert it to the appropriate type.  */
 	  tree scalar = gimple_build (&seq, as_combined_fn (reduc_fn),
@@ -5644,8 +5638,7 @@ merge_with_identity (gimple_stmt_iterator *gsi, tree mask, tree vectype,
 		     tree vec, tree identity)
 {
   tree cond = make_temp_ssa_name (vectype, NULL, "cond");
-  gimple *new_stmt = gimple_build_assign (cond, VEC_COND_EXPR,
-					  mask, vec, identity);
+  gimple *new_stmt = gimple_build_vec_cond_expr (cond, mask, vec, identity);
   gsi_insert_before (gsi, new_stmt, GSI_SAME_STMT);
   return cond;
 }
@@ -5946,8 +5939,8 @@ build_vect_cond_expr (enum tree_code code, tree vop[3], tree mask,
 	tree vectype = TREE_TYPE (vop[1]);
 	tree zero = build_zero_cst (vectype);
 	tree masked_op1 = make_temp_ssa_name (vectype, NULL, "masked_op1");
-	gassign *select = gimple_build_assign (masked_op1, VEC_COND_EXPR,
-					       mask, vop[1], zero);
+	gassign *select = gimple_build_vec_cond_expr (masked_op1, mask,
+						      vop[1], zero);
 	gsi_insert_before (gsi, select, GSI_SAME_STMT);
 	vop[1] = masked_op1;
 	break;
@@ -5957,8 +5950,8 @@ build_vect_cond_expr (enum tree_code code, tree vop[3], tree mask,
       {
 	tree vectype = TREE_TYPE (vop[1]);
 	tree masked_op1 = make_temp_ssa_name (vectype, NULL, "masked_op1");
-	gassign *select = gimple_build_assign (masked_op1, VEC_COND_EXPR,
-					       mask, vop[1], vop[0]);
+	gassign *select = gimple_build_vec_cond_expr (masked_op1, mask,
+						      vop[1], vop[0]);
 	gsi_insert_before (gsi, select, GSI_SAME_STMT);
 	vop[1] = masked_op1;
 	break;
@@ -6386,7 +6379,7 @@ vectorizable_reduction (stmt_vec_info stmt_info, gimple_stmt_iterator *gsi,
 
 	 we're interested in the last element in x_3 for which a_2 || a_3
 	 is true, whereas the current reduction chain handling would
-	 vectorize x_2 as a normal VEC_COND_EXPR and only treat x_3
+	 vectorize x_2 as a normal VEC_COND_*_EXPR and only treat x_3
 	 as a reduction operation.  */
       if (reduc_index == -1)
 	{

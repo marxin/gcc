@@ -1465,6 +1465,8 @@ gassign *gimple_build_assign (tree, enum tree_code,
 gassign *gimple_build_assign (tree, enum tree_code,
 			      tree, tree CXX_MEM_STAT_INFO);
 gassign *gimple_build_assign (tree, enum tree_code, tree CXX_MEM_STAT_INFO);
+gassign *gimple_build_vec_cond_expr (tree, tree, tree, tree);
+
 gcond *gimple_build_cond (enum tree_code, tree, tree, tree, tree);
 gcond *gimple_build_cond_from_tree (tree, tree, tree);
 void gimple_cond_set_condition_from_tree (gcond *, tree);
