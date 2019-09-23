@@ -4152,11 +4152,8 @@ verify_gimple_assign_ternary (gassign *stmt)
 	  return true;
 	}
       break;
-
     case VEC_COND_EXPR:
-      // TODO
-      error ("VEC_COND_EXPR should not be used: %qs\n", code_name);
-      debug_gimple_stmt(stmt);
+      error ("%qs in gimple IL", code_name);
       return true;
     case COND_EXPR:
       if (!is_gimple_val (rhs1)
@@ -4381,12 +4378,7 @@ verify_gimple_assign_quaternary (gassign *stmt)
   /* First handle operations that involve different types.  */
   switch (rhs_code)
     {
-    case VEC_COND_LT_EXPR:
-    case VEC_COND_LE_EXPR:
-    case VEC_COND_GT_EXPR:
-    case VEC_COND_GE_EXPR:
-    case VEC_COND_EQ_EXPR:
-    case VEC_COND_NE_EXPR:
+    CASE_VEC_COND_EXPR:
       if (maybe_ne (TYPE_VECTOR_SUBPARTS (rhs1_type),
 		    TYPE_VECTOR_SUBPARTS (rhs2_type))
 	  || maybe_ne (TYPE_VECTOR_SUBPARTS (rhs2_type),

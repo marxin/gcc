@@ -9143,7 +9143,7 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
       if (temp != 0)
 	return temp;
 
-      /* For vector MIN <x, y>, expand it a VEC_COND_EXPR <x <= y, x, y>
+      /* For vector MIN <x, y>, expand it a VEC_COND_*_EXPR <x <= y, x, y>
 	 and similarly for MAX <x, y>.  */
       if (VECTOR_TYPE_P (type))
 	{
@@ -9744,12 +9744,7 @@ expand_expr_real_2 (sepops ops, rtx target, machine_mode tmode,
 	return temp;
       }
 
-    case VEC_COND_LT_EXPR:
-    case VEC_COND_LE_EXPR:
-    case VEC_COND_GT_EXPR:
-    case VEC_COND_GE_EXPR:
-    case VEC_COND_EQ_EXPR:
-    case VEC_COND_NE_EXPR:
+    CASE_VEC_COND_EXPR:
       target = expand_vec_cond_expr (type, code, treeop0, treeop1, treeop2,
 				     treeop3, target);
       return target;

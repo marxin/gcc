@@ -5176,26 +5176,25 @@ vec_cmp_to_cmp_code (tree_code code)
     }
 }
 
+#define CASE_VEC_COND_EXPR					\
+  case VEC_COND_LT_EXPR:					\
+  case VEC_COND_LE_EXPR:					\
+  case VEC_COND_GT_EXPR:					\
+  case VEC_COND_GE_EXPR:					\
+  case VEC_COND_EQ_EXPR:					\
+  case VEC_COND_NE_EXPR
+
 static inline bool
 vec_cond_expr_p (tree_code code)
 {
   switch (code)
     {
-    case VEC_COND_LT_EXPR:
-    case VEC_COND_LE_EXPR:
-    case VEC_COND_GT_EXPR:
-    case VEC_COND_GE_EXPR:
-    case VEC_COND_EQ_EXPR:
-    case VEC_COND_NE_EXPR:
+    CASE_VEC_COND_EXPR:
       return true;
     default:
       return false;
     }
 }
-
-#define case_cond_expr case VEC_COND_LT_EXPR: case VEC_COND_LE_EXPR \
-  case VEC_COND_GT_EXPR: case VEC_COND_GE_EXPR: case VEC_COND_EQ_EXPR \
-  case VEC_COND_LE_EXPR:
 
 /* Return true if the value of T could be represented as a poly_widest_int.  */
 
