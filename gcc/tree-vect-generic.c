@@ -908,41 +908,45 @@ expand_vector_divmod (gimple_stmt_iterator *gsi, tree type, tree op0,
 
 /* Expand a vector condition to scalars, by using many conditions
    on the vector's elements.  */
+
 static void
 expand_vector_condition (gimple_stmt_iterator *gsi)
 {
   gassign *stmt = as_a <gassign *> (gsi_stmt (*gsi));
+  tree_code code = vec_cmp_to_cmp_code (gimple_assign_rhs_code (stmt));
   tree type = gimple_expr_type (stmt);
-  tree a = gimple_assign_rhs1 (stmt);
-  tree a1 = a;
-  tree a2 = NULL_TREE;
-  bool a_is_comparison = false;
+  tree a = NULL_TREE;
+  tree a1 = gimple_assign_rhs1 (stmt);
+  tree a2 = gimple_assign_rhs2 (stmt);
+  bool a_is_comparison = true;
   bool a_is_scalar_bitmask = false;
-  tree b = gimple_assign_rhs2 (stmt);
-  tree c = gimple_assign_rhs3 (stmt);
+  tree b = gimple_assign_rhs3 (stmt);
+  tree c = gimple_assign_rhs4 (stmt);
   vec<constructor_elt, va_gc> *v;
   tree constr;
   tree inner_type = TREE_TYPE (type);
-  tree cond_type = TREE_TYPE (TREE_TYPE (a));
-  tree comp_inner_type = cond_type;
+  tree cond_type = TREE_TYPE (TREE_TYPE (a1));
+  tree comp_inner_type = TREE_TYPE (TREE_TYPE (a1));
   tree width = TYPE_SIZE (inner_type);
   tree index = bitsize_int (0);
-  tree comp_width = width;
+  tree comp_width = TYPE_SIZE (comp_inner_type);
   tree comp_index = index;
   int i;
   location_t loc = gimple_location (gsi_stmt (*gsi));
 
-  if (!is_gimple_val (a))
+  if (code == EQ_EXPR
+      && TREE_CODE (a2) == VECTOR_CST
+      && integer_all_onesp (a2))
     {
-      gcc_assert (COMPARISON_CLASS_P (a));
-      a_is_comparison = true;
-      a1 = TREE_OPERAND (a, 0);
-      a2 = TREE_OPERAND (a, 1);
-      comp_inner_type = TREE_TYPE (TREE_TYPE (a1));
-      comp_width = TYPE_SIZE (comp_inner_type);
+      a_is_comparison = false;
+      a = a1;
+
+      comp_inner_type = cond_type;
+      comp_width = width;
     }
 
-  if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), TREE_CODE (a)))
+
+  if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), code))
     return;
 
   /* Handle vector boolean types with bitmasks.  If there is a comparison
@@ -1008,7 +1012,7 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
 				       comp_width, comp_index);
 	  tree aa2 = tree_vec_extract (gsi, comp_inner_type, a2,
 				       comp_width, comp_index);
-	  aa = fold_build2 (TREE_CODE (a), cond_type, aa1, aa2);
+	  aa = fold_build2 (code, cond_type, aa1, aa2);
 	}
       else if (a_is_scalar_bitmask)
 	{
