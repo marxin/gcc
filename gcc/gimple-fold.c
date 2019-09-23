@@ -4676,7 +4676,8 @@ replace_stmt_with_simplification (gimple_stmt_iterator *gsi,
 	  gimple_assign_set_rhs_with_ops (gsi, res_op->code,
 					  res_op->op_or_null (0),
 					  res_op->op_or_null (1),
-					  res_op->op_or_null (2));
+					  res_op->op_or_null (2),
+					  res_op->op_or_null (3));
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
 	      fprintf (dump_file, "gimple_simplified to ");
@@ -6360,6 +6361,10 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
               return fold_ternary_loc (loc, subcode,
 				       gimple_expr_type (stmt), op0, op1, op2);
             }
+
+	  case GIMPLE_QUATERNARY_RHS:
+	    // TODO
+	    return NULL_TREE;
 
           default:
             gcc_unreachable ();

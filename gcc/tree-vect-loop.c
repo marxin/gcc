@@ -4473,7 +4473,7 @@ vect_create_epilog_for_reduction (vec<tree> vect_defs,
       poly_uint64 nunits_out = TYPE_VECTOR_SUBPARTS (vectype);
 
       gimple *vec_stmt = STMT_VINFO_VEC_STMT (stmt_info)->stmt;
-      gcc_assert (gimple_assign_rhs_code (vec_stmt) == VEC_COND_EXPR);
+      gcc_assert (vec_cond_expr_p (gimple_assign_rhs_code (vec_stmt)));
 
       int scalar_precision
 	= GET_MODE_PRECISION (SCALAR_TYPE_MODE (TREE_TYPE (vectype)));
@@ -4521,14 +4521,14 @@ vect_create_epilog_for_reduction (vec<tree> vect_defs,
 	 Finally, we update the phi (NEW_PHI_TREE) to take the value of
 	 the new cond_expr (INDEX_COND_EXPR).  */
 
-      /* Duplicate the condition from vec_stmt.  */
-      tree ccompare = unshare_expr (gimple_assign_rhs1 (vec_stmt));
-
       /* Create a conditional, where the condition is taken from vec_stmt
 	 (CCOMPARE), then is the induction index (INDEX_BEFORE_INCR) and
 	 else is the phi (NEW_PHI_TREE).  */
-      tree index_cond_expr = build3 (VEC_COND_EXPR, cr_index_vector_type,
-				     ccompare, indx_before_incr,
+      tree index_cond_expr = build4 (gimple_assign_rhs_code (vec_stmt),
+				     cr_index_vector_type,
+				     gimple_assign_rhs1 (vec_stmt),
+				     gimple_assign_rhs2 (vec_stmt),
+				     indx_before_incr,
 				     new_phi_tree);
       induction_index = make_ssa_name (cr_index_vector_type);
       gimple *index_condition = gimple_build_assign (induction_index,

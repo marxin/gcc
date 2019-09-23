@@ -51,7 +51,7 @@ typedef struct separate_ops
   enum tree_code code;
   location_t location;
   tree type;
-  tree op0, op1, op2;
+  tree op0, op1, op2, op3;
 } *sepops;
 
 /* This is run during target initialization to set up which modes can be

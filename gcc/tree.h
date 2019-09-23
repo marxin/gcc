@@ -5133,7 +5133,7 @@ complete_or_array_type_p (const_tree type)
 }
 
 static inline tree_code
-comparison_to_vec_cond_comparison (tree_code code)
+cmp_to_vec_cmp_code (tree_code code)
 {
   switch (code)
     {
@@ -5153,6 +5153,49 @@ comparison_to_vec_cond_comparison (tree_code code)
       gcc_unreachable ();
     }
 }
+
+static inline tree_code
+vec_cmp_to_cmp_code (tree_code code)
+{
+  switch (code)
+    {
+    case VEC_COND_LT_EXPR:
+      return LT_EXPR;
+    case VEC_COND_LE_EXPR:
+      return LE_EXPR;
+    case VEC_COND_GT_EXPR:
+      return GT_EXPR;
+    case VEC_COND_GE_EXPR:
+      return GE_EXPR;
+    case VEC_COND_EQ_EXPR:
+      return EQ_EXPR;
+    case VEC_COND_NE_EXPR:
+      return NE_EXPR;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+static inline bool
+vec_cond_expr_p (tree_code code)
+{
+  switch (code)
+    {
+    case VEC_COND_LT_EXPR:
+    case VEC_COND_LE_EXPR:
+    case VEC_COND_GT_EXPR:
+    case VEC_COND_GE_EXPR:
+    case VEC_COND_EQ_EXPR:
+    case VEC_COND_NE_EXPR:
+      return true;
+    default:
+      return false;
+    }
+}
+
+#define case_cond_expr case VEC_COND_LT_EXPR: case VEC_COND_LE_EXPR \
+  case VEC_COND_GT_EXPR: case VEC_COND_GE_EXPR: case VEC_COND_EQ_EXPR \
+  case VEC_COND_LE_EXPR:
 
 /* Return true if the value of T could be represented as a poly_widest_int.  */
 

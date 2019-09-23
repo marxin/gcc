@@ -3793,6 +3793,9 @@ expand_gimple_stmt_1 (gimple *stmt)
 	    ops.type = TREE_TYPE (lhs);
 	    switch (get_gimple_rhs_class (ops.code))
 	      {
+		case GIMPLE_QUATERNARY_RHS:
+		  ops.op3 = gimple_assign_rhs4 (assign_stmt);
+		  /* Fallthru */
 		case GIMPLE_TERNARY_RHS:
 		  ops.op2 = gimple_assign_rhs3 (assign_stmt);
 		  /* Fallthru */

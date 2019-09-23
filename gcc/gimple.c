@@ -424,10 +424,10 @@ gassign *
 gimple_build_assign (tree lhs, tree rhs MEM_STAT_DECL)
 {
   enum tree_code subcode;
-  tree op1, op2, op3;
+  tree op1, op2, op3, op4;
 
-  extract_ops_from_tree (rhs, &subcode, &op1, &op2, &op3);
-  return gimple_build_assign (lhs, subcode, op1, op2, op3 PASS_MEM_STAT);
+  extract_ops_from_tree (rhs, &subcode, &op1, &op2, &op3, &op4);
+  return gimple_build_assign (lhs, subcode, op1, op2, op3, op4 PASS_MEM_STAT);
 }
 
 
@@ -1755,10 +1755,10 @@ void
 gimple_assign_set_rhs_from_tree (gimple_stmt_iterator *gsi, tree expr)
 {
   enum tree_code subcode;
-  tree op1, op2, op3;
+  tree op1, op2, op3, op4;
 
-  extract_ops_from_tree (expr, &subcode, &op1, &op2, &op3);
-  gimple_assign_set_rhs_with_ops (gsi, subcode, op1, op2, op3);
+  extract_ops_from_tree (expr, &subcode, &op1, &op2, &op3, &op4);
+  gimple_assign_set_rhs_with_ops (gsi, subcode, op1, op2, op3, op4);
 }
 
 
@@ -1770,7 +1770,7 @@ gimple_assign_set_rhs_from_tree (gimple_stmt_iterator *gsi, tree expr)
 
 void
 gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *gsi, enum tree_code code,
-				tree op1, tree op2, tree op3)
+				tree op1, tree op2, tree op3, tree op4)
 {
   unsigned new_rhs_ops = get_gimple_rhs_num_ops (code);
   gimple *stmt = gsi_stmt (*gsi);
@@ -1796,6 +1796,8 @@ gimple_assign_set_rhs_with_ops (gimple_stmt_iterator *gsi, enum tree_code code,
     gimple_assign_set_rhs2 (stmt, op2);
   if (new_rhs_ops > 2)
     gimple_assign_set_rhs3 (stmt, op3);
+  if (new_rhs_ops > 3)
+    gimple_assign_set_rhs4 (stmt, op4);
   if (stmt != old_stmt)
     gsi_replace (gsi, stmt, false);
 }

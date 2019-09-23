@@ -526,36 +526,47 @@ create_tmp_reg_fn (struct function *fn, tree type, const char *prefix)
 
 void
 extract_ops_from_tree (tree expr, enum tree_code *subcode_p, tree *op1_p,
-		       tree *op2_p, tree *op3_p)
+		       tree *op2_p, tree *op3_p, tree *op4_p)
 {
   enum gimple_rhs_class grhs_class;
 
   *subcode_p = TREE_CODE (expr);
   grhs_class = get_gimple_rhs_class (*subcode_p);
 
-  if (grhs_class == GIMPLE_TERNARY_RHS)
+  if (grhs_class == GIMPLE_QUATERNARY_RHS)
     {
       *op1_p = TREE_OPERAND (expr, 0);
       *op2_p = TREE_OPERAND (expr, 1);
       *op3_p = TREE_OPERAND (expr, 2);
+      *op4_p = TREE_OPERAND (expr, 3);
+    }
+  else if (grhs_class == GIMPLE_TERNARY_RHS)
+    {
+      *op1_p = TREE_OPERAND (expr, 0);
+      *op2_p = TREE_OPERAND (expr, 1);
+      *op3_p = TREE_OPERAND (expr, 2);
+      *op4_p = NULL_TREE;
     }
   else if (grhs_class == GIMPLE_BINARY_RHS)
     {
       *op1_p = TREE_OPERAND (expr, 0);
       *op2_p = TREE_OPERAND (expr, 1);
       *op3_p = NULL_TREE;
+      *op4_p = NULL_TREE;
     }
   else if (grhs_class == GIMPLE_UNARY_RHS)
     {
       *op1_p = TREE_OPERAND (expr, 0);
       *op2_p = NULL_TREE;
       *op3_p = NULL_TREE;
+      *op4_p = NULL_TREE;
     }
   else if (grhs_class == GIMPLE_SINGLE_RHS)
     {
       *op1_p = expr;
       *op2_p = NULL_TREE;
       *op3_p = NULL_TREE;
+      *op4_p = NULL_TREE;
     }
   else
     gcc_unreachable ();

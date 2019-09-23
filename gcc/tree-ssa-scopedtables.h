@@ -29,6 +29,7 @@ enum expr_kind
   EXPR_UNARY,
   EXPR_BINARY,
   EXPR_TERNARY,
+  EXPR_QUATERNARY,
   EXPR_CALL,
   EXPR_PHI
 };
@@ -42,6 +43,7 @@ struct hashable_expr
     struct { enum tree_code op;  tree opnd; } unary;
     struct { enum tree_code op;  tree opnd0, opnd1; } binary;
     struct { enum tree_code op;  tree opnd0, opnd1, opnd2; } ternary;
+    struct { enum tree_code op;  tree opnd0, opnd1, opnd2, opnd3; } quaternary;
     struct { gcall *fn_from; bool pure; size_t nargs; tree *args; } call;
     struct { size_t nargs; tree *args; } phi;
   } ops;
