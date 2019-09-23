@@ -5831,8 +5831,26 @@ expand_vec_cond_expr (tree vec_cond_type, tree_code tcode,
   machine_mode mode = TYPE_MODE (vec_cond_type);
   machine_mode cmp_op_mode;
   bool unsignedp;
-
   tcode = vec_cmp_to_cmp_code (tcode);
+
+  if (tcode == EQ_EXPR
+      && TREE_CODE (cond_rhs) == VECTOR_CST
+      && integer_all_onesp (cond_rhs))
+    {
+      gcc_assert (VECTOR_BOOLEAN_TYPE_P (TREE_TYPE (cond_lhs)));
+      if (get_vcond_mask_icode (mode, TYPE_MODE (TREE_TYPE (cond_lhs)))
+	  != CODE_FOR_nothing)
+	return expand_vec_cond_mask_expr (vec_cond_type, cond_lhs, if_true,
+					  if_false, target);
+      /* Fake op0 < 0.  */
+      else
+	{
+	  gcc_assert (GET_MODE_CLASS (TYPE_MODE (TREE_TYPE (cond_lhs)))
+		      == MODE_VECTOR_INT);
+	  cond_rhs = build_zero_cst (TREE_TYPE (cond_lhs));
+	  tcode = LT_EXPR;
+	}
+    }
 
   // TODO: maybe add sanity check
   cmp_op_mode = TYPE_MODE (TREE_TYPE (cond_lhs));
