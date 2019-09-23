@@ -3322,6 +3322,13 @@ gimple_build_vec_cond_expr (tree lhs, tree condition, tree then_clause,
 	  cond_rhs = constant_boolean_node (true, TREE_TYPE (condition));
 	}
     }
+  else if (TREE_CODE (condition) == VECTOR_CST)
+    {
+      // TODO: this should be probably folded right away
+      code = VEC_COND_EQ_EXPR;
+      cond_lhs = condition;
+      cond_rhs = constant_boolean_node (true, TREE_TYPE (condition));
+    }
   else
     {
       code = cmp_to_vec_cmp_code (TREE_CODE (condition));

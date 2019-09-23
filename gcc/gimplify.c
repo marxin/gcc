@@ -13814,17 +13814,14 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  {
 	    tree type = TREE_TYPE (TREE_OPERAND (*expr_p, 1));
 	    tree cond_expr = TREE_OPERAND (*expr_p, 0);
-	    gcc_assert (TREE_CODE_CLASS (TREE_CODE (cond_expr)) ==
-			tcc_comparison);
-
 	    tree_code vec_code = cmp_to_vec_cmp_code (TREE_CODE (cond_expr));
 	    *expr_p = build4_loc (input_location, vec_code, type,
 				  TREE_OPERAND (cond_expr, 0),
 				  TREE_OPERAND (cond_expr, 1),
 				  TREE_OPERAND (*expr_p, 1),
 				  TREE_OPERAND (*expr_p, 2));
-	    ret = GS_OK;
-	    break;
+
+	    goto expr_4;
 	  }
 
 	CASE_VEC_COND_EXPR:
