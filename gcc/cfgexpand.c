@@ -108,7 +108,14 @@ gimple_assign_rhs_to_tree (gimple *stmt)
 
   grhs_class = get_gimple_rhs_class (gimple_expr_code (stmt));
 
-  if (grhs_class == GIMPLE_TERNARY_RHS)
+  if (grhs_class == GIMPLE_QUATERNARY_RHS)
+    t = build4 (gimple_assign_rhs_code (stmt),
+		TREE_TYPE (gimple_assign_lhs (stmt)),
+		gimple_assign_rhs1 (stmt),
+		gimple_assign_rhs2 (stmt),
+		gimple_assign_rhs3 (stmt),
+		gimple_assign_rhs4 (stmt));
+  else if (grhs_class == GIMPLE_TERNARY_RHS)
     t = build3 (gimple_assign_rhs_code (stmt),
 		TREE_TYPE (gimple_assign_lhs (stmt)),
 		gimple_assign_rhs1 (stmt),
@@ -5175,7 +5182,7 @@ expand_debug_expr (tree exp)
 
     /* Vector stuff.  For most of the codes we don't have rtl codes.  */
     case REALIGN_LOAD_EXPR:
-    case VEC_COND_EXPR:
+    CASE_VEC_COND_EXPR: 
     case VEC_PACK_FIX_TRUNC_EXPR:
     case VEC_PACK_FLOAT_EXPR:
     case VEC_PACK_SAT_EXPR:
