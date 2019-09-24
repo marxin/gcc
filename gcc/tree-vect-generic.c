@@ -944,7 +944,8 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
       comp_inner_type = cond_type;
       comp_width = width;
     }
-
+  else
+    cond_type = truth_type_for (cond_type);
 
   if (expand_vec_cond_expr_p (type, TREE_TYPE (a1), code))
     return;
@@ -1000,6 +1001,7 @@ expand_vector_condition (gimple_stmt_iterator *gsi)
     }
 
   int nunits = nunits_for_known_piecewise_op (type);
+
   vec_alloc (v, nunits);
   for (i = 0; i < nunits; i++)
     {
