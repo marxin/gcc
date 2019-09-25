@@ -2649,6 +2649,10 @@ ftree-switch-conversion
 Common Report Var(flag_tree_switch_conversion) Optimization
 Perform conversions of switch initializations.
 
+ftree-if-to-switch
+Common Report Var(flag_tree_if_to_switch) Optimization
+Perform conversions of if-elseif chain into a switch statement.
+
 ftree-dce
 Common Report Var(flag_tree_dce) Optimization
 Enable SSA dead code elimination optimization on trees.

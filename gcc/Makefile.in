@@ -1525,6 +1525,7 @@ OBJS = \
 	tree-eh.o \
 	tree-emutls.o \
 	tree-if-conv.o \
+	tree-if-to-switch.o \
 	tree-inline.o \
 	tree-into-ssa.o \
 	tree-iterator.o \
