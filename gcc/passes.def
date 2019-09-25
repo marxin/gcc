@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
       NEXT_PASS (pass_early_warn_uninitialized);
       NEXT_PASS (pass_ubsan);
       NEXT_PASS (pass_nothrow);
+      NEXT_PASS (pass_if_to_switch);
       NEXT_PASS (pass_rebuild_cgraph_edges);
   POP_INSERT_PASSES ()
 
