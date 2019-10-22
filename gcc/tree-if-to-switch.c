@@ -76,7 +76,7 @@ label_cmp (const void *a, const void *b)
   const_tree l1 = *(const const_tree *)a;
   const_tree l2 = *(const const_tree *)b;
 
-  return tree_int_cst_lt (CASE_LOW (l1), CASE_LOW (l2)) ? -1 : 1;
+  return tree_int_cst_compare (CASE_LOW (l1), CASE_LOW (l2));
 }
 
 static void
@@ -215,6 +215,15 @@ if_dom_walker::before_dom_children (basic_block bb)
       /* Follow if-elseif-elseif chain.  */
       edge true_edge, false_edge;
       extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
+
+      // TODO: make it faster
+      for (unsigned i = 0; i < conditions.length (); i++)
+	if (tree_int_cst_equal (gimple_cond_rhs (conditions[i].cond), rhs))
+	  {
+	    warning_at (gimple_location (cond), OPT_Wduplicated_branches,
+			"duplicate if condition");
+	    return NULL;
+	  }
 
       if_chain_entry entry = { cond, bb, true_edge, false_edge };
       conditions.safe_push (entry);
