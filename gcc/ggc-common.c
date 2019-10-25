@@ -886,10 +886,11 @@ struct ggc_usage: public mem_usage
     fprintf (stderr,
 	     "%-48s " PRsa (9) ":%5.1f%%" PRsa (9) ":%5.1f%%"
 	     PRsa (9) ":%5.1f%%" PRsa (9) ":%5.1f%%" PRsa (9) "\n",
-	     prefix, SIZE_AMOUNT (m_collected),
+	     prefix,
+	     SIZE_AMOUNT (balance), get_percent (balance, total.get_balance ()),
+	     SIZE_AMOUNT (m_collected),
 	     get_percent (m_collected, total.m_collected),
 	     SIZE_AMOUNT (m_freed), get_percent (m_freed, total.m_freed),
-	     SIZE_AMOUNT (balance), get_percent (balance, total.get_balance ()),
 	     SIZE_AMOUNT (m_overhead),
 	     get_percent (m_overhead, total.m_overhead),
 	     SIZE_AMOUNT (m_times));
@@ -936,8 +937,8 @@ struct ggc_usage: public mem_usage
   static inline void
   dump_header (const char *name)
   {
-    fprintf (stderr, "%-48s %11s%17s%17s%16s%17s\n", name, "Garbage", "Freed",
-	     "Leak", "Overhead", "Times");
+    fprintf (stderr, "%-48s %11s%17s%17s%16s%17s\n", name, "Leak", "Garbage",
+	     "Freed", "Overhead", "Times");
   }
 
   /* Freed memory in bytes.  */
