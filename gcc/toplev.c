@@ -2032,8 +2032,17 @@ target_reinit (void)
 }
 
 void
-dump_memory_report ()
+dump_memory_report (const char *header)
 {
+  /* Print significant header.  */
+  fputc ('\n', stderr);
+  for (unsigned i = 0; i < 80; i++)
+    fputc ('#', stderr);
+  fprintf (stderr, "\n# %-77s#\n", header);
+  for (unsigned i = 0; i < 80; i++)
+    fputc ('#', stderr);
+  fputs ("\n\n", stderr);
+
   dump_line_table_statistics ();
   ggc_print_statistics ();
   stringpool_statistics ();
@@ -2096,7 +2105,7 @@ finalize (bool no_backend)
     }
 
   if (mem_report)
-    dump_memory_report ();
+    dump_memory_report ("Final");
 
   if (profile_report)
     dump_profile_report ();
