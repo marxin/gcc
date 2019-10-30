@@ -3740,8 +3740,7 @@ ipa_free_all_edge_args (void)
   if (!ipa_edge_args_sum)
     return;
 
-  ipa_edge_args_sum->~ipa_edge_args_sum_t ();
-  ggc_free (ipa_edge_args_sum);
+  ggc_delete (ipa_edge_args_sum);
   ipa_edge_args_sum = NULL;
 }
 
@@ -3750,8 +3749,7 @@ ipa_free_all_edge_args (void)
 void
 ipa_free_all_node_params (void)
 {
-  ipa_node_params_sum->~ipa_node_params_t ();
-  ggc_free (ipa_node_params_sum);
+  ggc_delete (ipa_node_params_sum);
   ipa_node_params_sum = NULL;
 }
 
