@@ -3024,7 +3024,7 @@ lto_process_name (void)
   if (flag_wpa)
     setproctitle ("lto1-wpa");
   if (flag_ltrans)
-    setproctitle ("lto1-ltrans");
+    setproctitle (flag_ltrans_name);
 }
 
 

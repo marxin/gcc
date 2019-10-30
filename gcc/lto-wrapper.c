@@ -1757,11 +1757,16 @@ cont:
       maybe_unlink (ltrans_output_file);
       ltrans_output_file = NULL;
 
+      auto_vec<int> ltrans_reverse_priorities;
       if (parallel)
 	{
 	  makefile = make_temp_file (".mk");
 	  mstream = fopen (makefile, "w");
 	  qsort (ltrans_priorities, nr, sizeof (int) * 2, cmp_priority);
+
+	  ltrans_reverse_priorities.safe_grow (nr);
+	  for (unsigned i = 0; i < nr; i++)
+	    ltrans_reverse_priorities[ltrans_priorities[2 * i + 1]] = i;
 	}
 
       /* Execute the LTRANS stage for each input file (or prepare a
@@ -1780,6 +1785,7 @@ cont:
 	  obstack_grow (&env_obstack, ".ltrans.o", sizeof (".ltrans.o"));
 	  output_name = XOBFINISH (&env_obstack, char *);
 
+	  int index = 0;
 	  /* Adjust the dumpbase if the linker output file was seen.  */
 	  if (linker_output)
 	    {
@@ -1789,14 +1795,22 @@ cont:
 	      snprintf (dumpbase,
 			strlen (linker_output) + sizeof (DUMPBASE_SUFFIX),
 			"%s.ltrans%u", linker_output, i);
-	      argv_ptr[0] = dumpbase;
+	      argv_ptr[index++] = dumpbase;
 	    }
 
-	  argv_ptr[1] = "-fltrans";
-	  argv_ptr[2] = "-o";
-	  argv_ptr[3] = output_name;
-	  argv_ptr[4] = input_name;
-	  argv_ptr[5] = NULL;
+	  if (parallel)
+	    {
+	      char *name = (char *) xmalloc (128);
+	      sprintf (name, "-fltrans-name=ltrans-%03d/%d",
+		       ltrans_reverse_priorities[i] + 1, nr);
+	      argv_ptr[index++] = name;
+	    }
+
+	  argv_ptr[index++] = "-fltrans";
+	  argv_ptr[index++] = "-o";
+	  argv_ptr[index++] = output_name;
+	  argv_ptr[index++] = input_name;
+	  argv_ptr[index++] = NULL;
 	  if (parallel)
 	    {
 	      fprintf (mstream, "%s:\n\t@%s ", output_name, new_argv[0]);

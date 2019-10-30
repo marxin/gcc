@@ -69,6 +69,9 @@ fwpa=
 LTO Driver RejectNegative Joined Var(flag_wpa)
 Whole program analysis (WPA) mode with number of parallel jobs specified.
 
+fltrans-name=
+LTO Report Driver Joined RejectNegative Var(flag_ltrans_name)
+LTRANS process name
 
 list
 LTODump Var(flag_lto_dump_list)
