@@ -8520,7 +8520,7 @@ fold_truth_andor (location_t loc, enum tree_code code, tree type,
   tree tem;
 
   /* We only do these simplifications if we are optimizing.  */
-  if (!optimize)
+  if (!optimize || flag_tree_if_to_switch)
     return NULL_TREE;
 
   /* Check for things like (A || B) && (A || C).  We can convert this
