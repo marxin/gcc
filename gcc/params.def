@@ -44,10 +44,6 @@ along with GCC; see the file COPYING3.  If not see
 
 /* When branch is predicted to be taken with probability lower than this
    threshold (in percent), then it is considered well predictable. */
-DEFPARAM (PARAM_PREDICTABLE_BRANCH_OUTCOME,
-	  "predictable-branch-outcome",
-	  "Maximal estimated outcome of branch considered predictable.",
-	  2, 0, 50)
 
 DEFPARAM (PARAM_INLINE_MIN_SPEEDUP,
 	  "inline-min-speedup",
@@ -852,13 +848,6 @@ DEFPARAM (PARAM_SIMULTANEOUS_PREFETCHES,
 	  "The number of prefetches that can run at the same time.",
 	  3, 0, 0)
 
-/* The size of L1 cache in kB.  */
-
-DEFPARAM (PARAM_L1_CACHE_SIZE,
-	  "l1-cache-size",
-	  "The size of L1 cache.",
-	  64, 0, 0)
-
 /* The size of L1 cache line in bytes.  */
 
 DEFPARAM (PARAM_L1_CACHE_LINE_SIZE,
@@ -1084,12 +1073,6 @@ DEFPARAM (PARAM_MIN_NONDEBUG_INSN_UID,
 	  "min-nondebug-insn-uid",
 	  "The minimum UID to be used for a nondebug insn.",
 	  0, 0, 0)
-
-DEFPARAM (PARAM_IPA_SRA_PTR_GROWTH_FACTOR,
-	  "ipa-sra-ptr-growth-factor",
-	  "Maximum allowed growth of number and total size of new parameters "
-	  "that ipa-sra replaces a pointer to an aggregate with.",
-	  2, 0, 0)
 
 DEFPARAM (PARAM_IPA_SRA_MAX_REPLACEMENTS,
 	  "ipa-sra-max-replacements",

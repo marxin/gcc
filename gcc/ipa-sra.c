@@ -2280,8 +2280,7 @@ process_scan_results (cgraph_node *node, struct function *fun,
       if (!desc->by_ref || optimize_function_for_size_p (fun))
 	param_size_limit = cur_param_size;
       else
-	param_size_limit = (PARAM_VALUE (PARAM_IPA_SRA_PTR_GROWTH_FACTOR)
-			   * cur_param_size);
+	param_size_limit = param_ipa_sra_ptr_growth_factor * cur_param_size;
       if (nonarg_acc_size > param_size_limit
 	  || (!desc->by_ref && nonarg_acc_size == param_size_limit))
 	{

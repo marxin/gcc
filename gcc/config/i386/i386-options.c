@@ -2626,10 +2626,8 @@ ix86_option_override_internal (bool main_args_p,
 			 ix86_tune_cost->prefetch_block,
 			 opts->x_param_values,
 			 opts_set->x_param_values);
-  maybe_set_param_value (PARAM_L1_CACHE_SIZE,
-			 ix86_tune_cost->l1_cache_size,
-			 opts->x_param_values,
-			 opts_set->x_param_values);
+  SET_OPTION_IF_UNSET (opts, opts_set, param_l1_cache_size,
+		       ix86_tune_cost->l1_cache_size);
   maybe_set_param_value (PARAM_L2_CACHE_SIZE,
 			 ix86_tune_cost->l2_cache_size,
 			 opts->x_param_values,

@@ -412,9 +412,9 @@ predictable_edge_p (edge e)
   if (!e->probability.initialized_p ())
     return false;
   if ((e->probability.to_reg_br_prob_base ()
-       <= PARAM_VALUE (PARAM_PREDICTABLE_BRANCH_OUTCOME) * REG_BR_PROB_BASE / 100)
+       <= param_predictable_branch_outcome * REG_BR_PROB_BASE / 100)
       || (REG_BR_PROB_BASE - e->probability.to_reg_br_prob_base ()
-          <= PARAM_VALUE (PARAM_PREDICTABLE_BRANCH_OUTCOME) * REG_BR_PROB_BASE / 100))
+	  <= param_predictable_branch_outcome * REG_BR_PROB_BASE / 100))
     return true;
   return false;
 }

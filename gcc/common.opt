@@ -437,13 +437,6 @@ Common Driver Alias(-target-help)
 fversion
 Common Driver Alias(-version)
 
--param
-Common Separate
---param <param>=<value>	Set parameter <param> to value.  See below for a complete list of parameters.
-
--param=
-Common Joined Alias(-param)
-
 -sysroot
 Driver Separate Alias(-sysroot=)
 
@@ -3345,5 +3338,20 @@ Driver Joined Separate
 fipa-ra
 Common Report Var(flag_ipa_ra) Optimization
 Use caller save register across calls if possible.
+
+; PARAMS start here
+
+-param=predictable-branch-outcome=
+Common Joined UInteger Var(param_predictable_branch_outcome) Init(2) IntegerRange(0, 50) Param
+Maximal estimated outcome of branch considered predictable.
+
+-param=ipa-sra-ptr-growth-factor=
+Common Joined UInteger Var(param_ipa_sra_ptr_growth_factor) Init(2) Param Optimization
+Maximum allowed growth of number and total size of new parameters
+that ipa-sra replaces a pointer to an aggregate with.
+
+-param=l1-cache-size=
+Common Joined UInteger Var(param_l1_cache_size) Init(32) Param
+The size of L1 cache.
 
 ; This comment is to ensure we retain the blank line above.

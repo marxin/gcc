@@ -191,7 +191,7 @@ along with GCC; see the file COPYING3.  If not see
 #define ACCEPTABLE_MISS_RATE 50
 #endif
 
-#define L1_CACHE_SIZE_BYTES ((unsigned) (L1_CACHE_SIZE * 1024))
+#define L1_CACHE_SIZE_BYTES ((unsigned) (param_l1_cache_size * 1024))
 #define L2_CACHE_SIZE_BYTES ((unsigned) (L2_CACHE_SIZE * 1024))
 
 /* We consider a memory access nontemporal if it is not reused sooner than
@@ -2002,7 +2002,8 @@ tree_ssa_prefetch_arrays (void)
       fprintf (dump_file, "    prefetch latency: %d\n", PREFETCH_LATENCY);
       fprintf (dump_file, "    prefetch block size: %d\n", PREFETCH_BLOCK);
       fprintf (dump_file, "    L1 cache size: %d lines, %d kB\n",
-	       L1_CACHE_SIZE_BYTES / L1_CACHE_LINE_SIZE, L1_CACHE_SIZE);
+	       L1_CACHE_SIZE_BYTES / L1_CACHE_LINE_SIZE,
+	       param_l1_cache_size);
       fprintf (dump_file, "    L1 cache line size: %d\n", L1_CACHE_LINE_SIZE);
       fprintf (dump_file, "    L2 cache size: %d kB\n", L2_CACHE_SIZE);
       fprintf (dump_file, "    min insn-to-prefetch ratio: %d \n",
