@@ -298,6 +298,7 @@ public:
   {}
 
   /* opt_pass methods: */
+  virtual bool gate (function *) { return flag_tree_if_to_switch != 0; }
   virtual unsigned int execute (function *);
 
 }; // class pass_if_to_switch

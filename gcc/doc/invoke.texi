@@ -477,7 +477,7 @@ Objective-C and Objective-C++ Dialects}.
 -fthread-jumps  -ftracer  -ftree-bit-ccp @gol
 -ftree-builtin-call-dce  -ftree-ccp  -ftree-ch @gol
 -ftree-coalesce-vars  -ftree-copy-prop  -ftree-dce  -ftree-dominator-opts @gol
--ftree-dse  -ftree-forwprop  -ftree-fre  -fcode-hoisting @gol
+-ftree-dse  -ftree-forwprop  -ftree-fre -ftree-if-to-switch -fcode-hoisting @gol
 -ftree-loop-if-convert  -ftree-loop-im @gol
 -ftree-phiprop  -ftree-loop-distribution  -ftree-loop-distribute-patterns @gol
 -ftree-loop-ivcanon  -ftree-loop-linear  -ftree-loop-optimize @gol
@@ -8412,6 +8412,7 @@ also turns on the following optimization flags:
 -fstrict-aliasing @gol
 -fthread-jumps @gol
 -ftree-builtin-call-dce @gol
+-ftree-if-to-switch @gol
 -ftree-pre @gol
 -ftree-switch-conversion  -ftree-tail-merge @gol
 -ftree-vrp}
@@ -9595,6 +9596,13 @@ except for @option{-Og}.
 @opindex ftree-switch-conversion
 Perform conversion of simple initializations in a switch to
 initializations from a scalar array.  This flag is enabled by default
+at @option{-O2} and higher.
+
+@item -ftree-if-to-switch
+@opindex ftree-if-to-switch
+Perform conversion of an if cascade into a switch statement.
+The transformation can help to produce a faster code for
+the switch statement.  This flag is enabled by default
 at @option{-O2} and higher.
 
 @item -ftree-tail-merge
