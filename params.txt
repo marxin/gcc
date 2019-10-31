@@ -1,0 +1,230 @@
+PARAM_PREDICTABLE_BRANCH_OUTCOME;predictable-branch-outcome;2;0;50;Maximal estimated outcome of branch considered predictable.
+PARAM_INLINE_MIN_SPEEDUP;inline-min-speedup;15;0;100;The minimal estimated speedup allowing inliner to ignore inline-insns-single and inline-insns-auto with -O3 and -Ofast.
+PARAM_INLINE_MIN_SPEEDUP_O2;inline-min-speedup-O2;30;0;100;The minimal estimated speedup allowing inliner to ignore inline-insns-single and inline-insns-auto.
+PARAM_MAX_INLINE_INSNS_SINGLE;max-inline-insns-single;200;0;0;The maximum number of instructions in a single function eligible for inlining with -O3 and -Ofast.
+PARAM_MAX_INLINE_INSNS_SINGLE_O2;max-inline-insns-single-O2;30;0;0;The maximum number of instructions in a single function eligible for inlining.
+PARAM_MAX_INLINE_INSNS_AUTO;max-inline-insns-auto;30;0;0;The maximum number of instructions when automatically inlining with -O3 and -Ofast.
+PARAM_MAX_INLINE_INSNS_AUTO_O2;max-inline-insns-auto-O2;15;0;0;The maximum number of instructions when automatically inlining.
+PARAM_MAX_INLINE_INSNS_SMALL;max-inline-insns-small;0;0;0;The maximum number of instructions when automatically inlining small functions.
+PARAM_INLINE_HEURISTICS_HINT_PERCENT;inline-heuristics-hint-percent;600;100;1000000;The scale (in percents) applied to inline-insns-single and auto limits when heuristics hints that inlining is very profitable with -O3 and -Ofast.
+PARAM_INLINE_HEURISTICS_HINT_PERCENT_O2;inline-heuristics-hint-percent-O2;200;100;1000000;The scale (in percents) applied to inline-insns-single and auto limits when heuristics hints that inlining is very profitable.
+PARAM_MAX_INLINE_INSNS_SIZE;max-inline-insns-size;0;0;0;The maximum number of instructions when inlining for size.
+PARAM_UNINLINED_FUNCTION_INSNS;uninlined-function-insns;2;0;1000000;Instruction accounted for function prologue, epilogue and other overhead.
+PARAM_UNINLINED_FUNCTION_TIME;uninlined-function-time;0;0;1000000;Time accounted for function prologue, epilogue and other overhead.
+PARAM_UNINLINED_FUNCTION_THUNK_INSNS;uninlined-thunk-insns;2;0;1000000;Instruction accounted for function thunk overhead.
+PARAM_UNINLINED_FUNCTION_THUNK_TIME;uninlined-thunk-time;2;0;1000000;Time accounted for function thunk overhead.
+PARAM_MAX_INLINE_INSNS_RECURSIVE;max-inline-insns-recursive;450;0;0;The maximum number of instructions inline function can grow to via recursive inlining.
+PARAM_MAX_INLINE_INSNS_RECURSIVE_AUTO;max-inline-insns-recursive-auto;450;0;0;The maximum number of instructions non-inline function can grow to via recursive inlining.
+PARAM_MAX_INLINE_RECURSIVE_DEPTH;max-inline-recursive-depth;8;0;0;The maximum depth of recursive inlining for inline functions.
+PARAM_MAX_INLINE_RECURSIVE_DEPTH_AUTO;max-inline-recursive-depth-auto;8;0;0;The maximum depth of recursive inlining for non-inline functions.
+PARAM_MIN_INLINE_RECURSIVE_PROBABILITY;min-inline-recursive-probability;10;0;0;Inline recursively only when the probability of call being executed exceeds the parameter.
+PARAM_EARLY_INLINER_MAX_ITERATIONS;max-early-inliner-iterations;1;0;0;The maximum number of nested indirect inlining performed by early inliner.
+PARAM_COMDAT_SHARING_PROBABILITY;comdat-sharing-probability;20;0;0;Probability that COMDAT function will be shared with different compilation unit.
+PARAM_PARTIAL_INLINING_ENTRY_PROBABILITY;partial-inlining-entry-probability;70;0;100;Maximum probability of the entry BB of split region (in percent relative to entry BB of the function) to make partial inlining happen.
+PARAM_MAX_VARIABLE_EXPANSIONS;max-variable-expansions-in-unroller;1;0;0;If -fvariable-expansion-in-unroller is used, the maximum number of times that an individual variable will be expanded during loop unrolling.
+PARAM_MIN_VECT_LOOP_BOUND;min-vect-loop-bound;0;0;0;If -ftree-vectorize is used, the minimal loop bound of a loop to be considered for vectorization.
+PARAM_MAX_DELAY_SLOT_INSN_SEARCH;max-delay-slot-insn-search;100;0;0;The maximum number of instructions to consider to fill a delay slot.
+PARAM_MAX_DELAY_SLOT_LIVE_SEARCH;max-delay-slot-live-search;333;0;0;The maximum number of instructions to consider to find accurate live register information.
+PARAM_MAX_PENDING_LIST_LENGTH;max-pending-list-length;32;0;0;The maximum length of scheduling's pending operations list.
+PARAM_MAX_MODULO_BACKTRACK_ATTEMPTS;max-modulo-backtrack-attempts;40;0;0;The maximum number of backtrack attempts the scheduler should make when modulo scheduling a loop.
+PARAM_LARGE_FUNCTION_INSNS;large-function-insns;2700;0;0;The size of function body to be considered large.
+PARAM_LARGE_FUNCTION_GROWTH;large-function-growth;100;0;0;Maximal growth due to inlining of large function (in percent).
+PARAM_LARGE_UNIT_INSNS;large-unit-insns;10000;0;0;The size of translation unit to be considered large.
+PARAM_INLINE_UNIT_GROWTH;inline-unit-growth;40;0;0;How much can given compilation unit grow because of the inlining (in percent).
+PARAM_IPCP_UNIT_GROWTH;ipcp-unit-growth;10;0;0;How much can given compilation unit grow because of the interprocedural constant propagation (in percent).
+PARAM_EARLY_INLINING_INSNS;early-inlining-insns;14;0;0;Maximal estimated growth of function body caused by early inlining of single call with -O3 and -Ofast.
+PARAM_EARLY_INLINING_INSNS_O2;early-inlining-insns-O2;6;0;0;Maximal estimated growth of function body caused by early inlining of single call with -O1 and -O2.
+PARAM_LARGE_STACK_FRAME;large-stack-frame;256;0;0;The size of stack frame to be considered large.
+PARAM_STACK_FRAME_GROWTH;large-stack-frame-growth;1000;0;0;Maximal stack frame growth due to inlining (in percent).
+PARAM_STACK_CLASH_PROTECTION_GUARD_SIZE;stack-clash-protection-guard-size;12;12;30;Size of the stack guard expressed as a power of two in bytes.
+PARAM_STACK_CLASH_PROTECTION_PROBE_INTERVAL;stack-clash-protection-probe-interval;12;10;16;Interval in which to probe the stack expressed as a power of two in bytes.
+PARAM_MAX_GCSE_MEMORY;max-gcse-memory;134217728;0;0;The maximum amount of memory to be allocated by GCSE.
+PARAM_MAX_GCSE_INSERTION_RATIO;max-gcse-insertion-ratio;20;0;0;The maximum ratio of insertions to deletions of expressions in GCSE.
+PARAM_GCSE_AFTER_RELOAD_PARTIAL_FRACTION;gcse-after-reload-partial-fraction;3;0;0;The threshold ratio for performing partial redundancy elimination after reload.
+PARAM_GCSE_AFTER_RELOAD_CRITICAL_FRACTION;gcse-after-reload-critical-fraction;10;0;0;The threshold ratio of critical edges execution count that permit performing redundancy elimination after reload.
+PARAM_GCSE_COST_DISTANCE_RATIO;gcse-cost-distance-ratio;10;0;0;Scaling factor in calculation of maximum distance an expression can be moved by GCSE optimizations.
+PARAM_GCSE_UNRESTRICTED_COST;gcse-unrestricted-cost;3;0;0;Cost at which GCSE optimizations will not constraint the distance an expression can travel.
+PARAM_MAX_HOIST_DEPTH;max-hoist-depth;30;0;0;Maximum depth of search in the dominator tree for expressions to hoist.
+PARAM_MAX_POW_SQRT_DEPTH;max-pow-sqrt-depth;5;1;32;Maximum depth of sqrt chains to use when synthesizing exponentiation by a real constant.
+PARAM_MAX_UNROLLED_INSNS;max-unrolled-insns;200;0;0;The maximum number of instructions to consider to unroll in a loop.
+PARAM_MAX_AVERAGE_UNROLLED_INSNS;max-average-unrolled-insns;80;0;0;The maximum number of instructions to consider to unroll in a loop on average.
+PARAM_MAX_UNROLL_TIMES;max-unroll-times;8;0;0;The maximum number of unrollings of a single loop.
+PARAM_MAX_PEELED_INSNS;max-peeled-insns;100;0;0;The maximum number of insns of a peeled loop.
+PARAM_MAX_PEEL_TIMES;max-peel-times;16;0;0;The maximum number of peelings of a single loop.
+PARAM_MAX_PEEL_BRANCHES;max-peel-branches;32;0;0;The maximum number of branches on the path through the peeled sequence.
+PARAM_MAX_COMPLETELY_PEELED_INSNS;max-completely-peeled-insns;200;0;0;The maximum number of insns of a completely peeled loop.
+PARAM_MAX_COMPLETELY_PEEL_TIMES;max-completely-peel-times;16;0;0;The maximum number of peelings of a single loop that is peeled completely.
+PARAM_MAX_UNROLL_ITERATIONS;max-completely-peel-loop-nest-depth;8;0;0;The maximum depth of a loop nest we completely peel.
+PARAM_MAX_UNSWITCH_INSNS;max-unswitch-insns;50;0;0;The maximum number of insns of an unswitched loop.
+PARAM_MAX_UNSWITCH_LEVEL;max-unswitch-level;3;0;0;The maximum number of unswitchings in a single loop.
+PARAM_MAX_LOOP_HEADER_INSNS;max-loop-header-insns;20;0;0;The maximum number of insns in loop header duplicated by the copy loop headers pass.
+PARAM_MAX_ITERATIONS_TO_TRACK;max-iterations-to-track;1000;0;0;Bound on the number of iterations the brute force # of iterations analysis algorithm evaluates.
+PARAM_MAX_ITERATIONS_COMPUTATION_COST;max-iterations-computation-cost;10;0;0;Bound on the cost of an expression to compute the number of iterations.
+PARAM_SMS_MAX_II_FACTOR;sms-max-ii-factor;100;0;0;A factor for tuning the upper bound that swing modulo scheduler uses for scheduling a loop.
+PARAM_SMS_MIN_SC;sms-min-sc;2;1;1;The minimum value of stage count that swing modulo scheduler will generate.
+PARAM_SMS_DFA_HISTORY;sms-dfa-history;0;0;0;The number of cycles the swing modulo scheduler considers when checking conflicts using DFA.
+PARAM_SMS_LOOP_AVERAGE_COUNT_THRESHOLD;sms-loop-average-count-threshold;0;0;0;A threshold on the average loop count considered by the swing modulo scheduler.
+HOT_BB_COUNT_FRACTION;hot-bb-count-fraction;10000;0;0;The denominator n of fraction 1/n of the maximal execution count of a basic block in the entire program that a basic block needs to at least have in order to be considered hot (used in non-LTO mode).
+HOT_BB_COUNT_WS_PERMILLE;hot-bb-count-ws-permille;990;0;1000;The number of most executed permilles of the profiled execution of the entire program to which the execution count of a basic block must be part of in order to be considered hot (used in LTO mode).
+HOT_BB_FREQUENCY_FRACTION;hot-bb-frequency-fraction;1000;0;0;The denominator n of fraction 1/n of the execution frequency of the entry block of a function that a basic block of this function needs to at least have in order to be considered hot.
+UNLIKELY_BB_COUNT_FRACTION;unlikely-bb-count-fraction;20;0;0;The denominator n of fraction 1/n of the number of profiled runs of the entire program below which the execution count of a basic block must be in order for the basic block to be considered unlikely.
+PARAM_ALIGN_THRESHOLD;align-threshold;100;1;0;Select fraction of the maximal frequency of executions of basic block in function given basic block get alignment.
+PARAM_ALIGN_LOOP_ITERATIONS;align-loop-iterations;4;0;0;Loops iterating at least selected number of iterations will get loop alignment.
+PARAM_MAX_PREDICTED_ITERATIONS;max-predicted-iterations;100;0;0;The maximum number of loop iterations we predict statically.
+BUILTIN_EXPECT_PROBABILITY;builtin-expect-probability;90;0;100;Set the estimated probability in percentage for builtin expect. The default value is 90% probability.
+BUILTIN_STRING_CMP_INLINE_LENGTH;builtin-string-cmp-inline-length;3;0;100;The maximum length of a constant string for a builtin string cmp call eligible for inlining. The default value is 3.
+TRACER_DYNAMIC_COVERAGE_FEEDBACK;tracer-dynamic-coverage-feedback;95;0;100;The percentage of function, weighted by execution frequency, that must be covered by trace formation. Used when profile feedback is available.
+TRACER_DYNAMIC_COVERAGE;tracer-dynamic-coverage;75;0;100;The percentage of function, weighted by execution frequency, that must be covered by trace formation. Used when profile feedback is not available.
+TRACER_MAX_CODE_GROWTH;tracer-max-code-growth;100;0;0;Maximal code growth caused by tail duplication (in percent).
+TRACER_MIN_BRANCH_RATIO;tracer-min-branch-ratio;10;0;100;Stop reverse growth if the reverse probability of best edge is less than this threshold (in percent).
+TRACER_MIN_BRANCH_PROBABILITY_FEEDBACK;tracer-min-branch-probability-feedback;80;0;100;Stop forward growth if the probability of best edge is less than this threshold (in percent). Used when profile feedback is available.
+TRACER_MIN_BRANCH_PROBABILITY;tracer-min-branch-probability;50;0;100;Stop forward growth if the probability of best edge is less than this threshold (in percent). Used when profile feedback is not available.
+PARAM_MAX_CROSSJUMP_EDGES;max-crossjump-edges;100;0;0;The maximum number of incoming edges to consider for crossjumping.
+PARAM_MIN_CROSSJUMP_INSNS;min-crossjump-insns;5;1;0;The minimum number of matching instructions to consider for crossjumping.
+PARAM_MAX_GROW_COPY_BB_INSNS;max-grow-copy-bb-insns;8;0;0;The maximum expansion factor when copying basic blocks.
+PARAM_MAX_GOTO_DUPLICATION_INSNS;max-goto-duplication-insns;8;0;0;The maximum number of insns to duplicate when unfactoring computed gotos.
+PARAM_MAX_CSE_PATH_LENGTH;max-cse-path-length;10;1;0;The maximum length of path considered in cse.
+PARAM_MAX_CSE_INSNS;max-cse-insns;1000;0;0;The maximum instructions CSE process before flushing.
+PARAM_LIM_EXPENSIVE;lim-expensive;20;0;0;The minimum cost of an expensive expression in the loop invariant motion.
+PARAM_IV_CONSIDER_ALL_CANDIDATES_BOUND;iv-consider-all-candidates-bound;40;0;0;Bound on number of candidates below that all candidates are considered in iv optimizations.
+PARAM_IV_MAX_CONSIDERED_USES;iv-max-considered-uses;250;0;0;Bound on number of iv uses in loop optimized in iv optimizations.
+PARAM_IV_ALWAYS_PRUNE_CAND_SET_BOUND;iv-always-prune-cand-set-bound;10;0;0;If number of candidates in the set is smaller, we always try to remove unused ivs during its optimization.
+PARAM_AVG_LOOP_NITER;avg-loop-niter;10;1;0;Average number of iterations of a loop.
+PARAM_DSE_MAX_OBJECT_SIZE;dse-max-object-size;256;0;0;Maximum size (in bytes) of objects tracked bytewise by dead store elimination.
+PARAM_DSE_MAX_ALIAS_QUERIES_PER_STORE;dse-max-alias-queries-per-store;256;0;0;Maximum number of queries into the alias oracle per store.
+PARAM_SCEV_MAX_EXPR_SIZE;scev-max-expr-size;100;0;0;Bound on size of expressions used in the scalar evolutions analyzer.
+PARAM_SCEV_MAX_EXPR_COMPLEXITY;scev-max-expr-complexity;10;0;0;Bound on the complexity of the expressions in the scalar evolutions analyzer.
+PARAM_MAX_TREE_IF_CONVERSION_PHI_ARGS;max-tree-if-conversion-phi-args;4;2;0;Maximum number of arguments in a PHI supported by TREE if-conversion unless the loop is marked with simd pragma.
+PARAM_VECT_MAX_VERSION_FOR_ALIGNMENT_CHECKS;vect-max-version-for-alignment-checks;6;0;0;Bound on number of runtime checks inserted by the vectorizer's loop versioning for alignment check.
+PARAM_VECT_MAX_VERSION_FOR_ALIAS_CHECKS;vect-max-version-for-alias-checks;10;0;0;Bound on number of runtime checks inserted by the vectorizer's loop versioning for alias check.
+PARAM_VECT_MAX_PEELING_FOR_ALIGNMENT;vect-max-peeling-for-alignment;-1;-1;64;Maximum number of loop peels to enhance alignment of data references in a loop.
+PARAM_MAX_CSELIB_MEMORY_LOCATIONS;max-cselib-memory-locations;500;0;0;The maximum memory locations recorded by cselib.
+GGC_MIN_EXPAND;ggc-min-expand;30;0;0;Minimum heap expansion to trigger garbage collection, as a percentage of the total size of the heap.
+GGC_MIN_HEAPSIZE;ggc-min-heapsize;4096;0;0;Minimum heap size before we start collecting garbage, in kilobytes.
+PARAM_MAX_RELOAD_SEARCH_INSNS;max-reload-search-insns;100;0;0;The maximum number of instructions to search backward when looking for equivalent reload.
+PARAM_SINK_FREQUENCY_THRESHOLD;sink-frequency-threshold;75;0;100;Target block's relative execution frequency (as a percentage) required to sink a statement.
+PARAM_MAX_SCHED_REGION_BLOCKS;max-sched-region-blocks;10;0;0;The maximum number of blocks in a region to be considered for interblock scheduling.
+PARAM_MAX_SCHED_REGION_INSNS;max-sched-region-insns;100;0;0;The maximum number of insns in a region to be considered for interblock scheduling.
+PARAM_MAX_PIPELINE_REGION_BLOCKS;max-pipeline-region-blocks;15;0;0;The maximum number of blocks in a region to be considered for interblock scheduling.
+PARAM_MAX_PIPELINE_REGION_INSNS;max-pipeline-region-insns;200;0;0;The maximum number of insns in a region to be considered for interblock scheduling.
+PARAM_MIN_SPEC_PROB;min-spec-prob;40;0;0;The minimum probability of reaching a source block for interblock speculative scheduling.
+PARAM_MAX_SCHED_EXTEND_REGIONS_ITERS;max-sched-extend-regions-iters;0;0;0;The maximum number of iterations through CFG to extend regions.
+PARAM_MAX_SCHED_INSN_CONFLICT_DELAY;max-sched-insn-conflict-delay;3;1;10;The maximum conflict delay for an insn to be considered for speculative motion.
+PARAM_SCHED_SPEC_PROB_CUTOFF;sched-spec-prob-cutoff;40;0;100;The minimal probability of speculation success (in percents), so that speculative insn will be scheduled.
+PARAM_SCHED_STATE_EDGE_PROB_CUTOFF;sched-state-edge-prob-cutoff;10;0;100;The minimum probability an edge must have for the scheduler to save its state across it.
+PARAM_SELSCHED_MAX_LOOKAHEAD;selsched-max-lookahead;50;0;0;The maximum size of the lookahead window of selective scheduling.
+PARAM_SELSCHED_MAX_SCHED_TIMES;selsched-max-sched-times;2;1;0;Maximum number of times that an insn could be scheduled.
+PARAM_SELSCHED_INSNS_TO_RENAME;selsched-insns-to-rename;2;0;0;Maximum number of instructions in the ready list that are considered eligible for renaming.
+PARAM_SCHED_MEM_TRUE_DEP_COST;sched-mem-true-dep-cost;1;0;0;Minimal distance between possibly conflicting store and load.
+PARAM_SCHED_AUTOPREF_QUEUE_DEPTH;sched-autopref-queue-depth;-1;0;0;Hardware autoprefetcher scheduler model control flag.  Number of lookahead cycles the model looks into, at '0' only enable instruction sorting heuristic.  Disabled by default.
+PARAM_MAX_LAST_VALUE_RTL;max-last-value-rtl;10000;0;0;The maximum number of RTL nodes that can be recorded as combiner's last value.
+PARAM_MAX_COMBINE_INSNS;max-combine-insns;4;2;4;The maximum number of insns combine tries to combine.
+PARAM_INTEGER_SHARE_LIMIT;integer-share-limit;251;2;2;The upper bound for sharing integer constants.
+PARAM_SSP_BUFFER_SIZE;ssp-buffer-size;8;1;0;The lower bound for a buffer to be considered for stack smashing protection.
+PARAM_MIN_SIZE_FOR_STACK_SHARING;min-size-for-stack-sharing;32;0;0;The minimum size of variables taking part in stack slot sharing when not optimizing.
+PARAM_MAX_JUMP_THREAD_DUPLICATION_STMTS;max-jump-thread-duplication-stmts;15;0;0;Maximum number of statements allowed in a block that needs to be duplicated when threading jumps.
+PARAM_MAX_FIELDS_FOR_FIELD_SENSITIVE;max-fields-for-field-sensitive;0;0;0;Maximum number of fields in a structure before pointer analysis treats the structure as a single variable.
+PARAM_MAX_SCHED_READY_INSNS;max-sched-ready-insns;100;1;0;The maximum number of instructions ready to be issued to be considered by the scheduler during the first scheduling pass.
+PARAM_MAX_DSE_ACTIVE_LOCAL_STORES;max-dse-active-local-stores;5000;0;0;Maximum number of active local stores in RTL dead store elimination.
+PARAM_PREFETCH_LATENCY;prefetch-latency;200;0;0;The number of insns executed before prefetch is completed.
+PARAM_SIMULTANEOUS_PREFETCHES;simultaneous-prefetches;3;0;0;The number of prefetches that can run at the same time.
+PARAM_L1_CACHE_SIZE;l1-cache-size;64;0;0;The size of L1 cache.
+PARAM_L1_CACHE_LINE_SIZE;l1-cache-line-size;32;0;0;The size of L1 cache line.
+PARAM_L2_CACHE_SIZE;l2-cache-size;512;0;0;The size of L2 cache.
+PARAM_PREFETCH_DYNAMIC_STRIDES;prefetch-dynamic-strides;1;0;1;Whether software prefetch hints should be issued for non-constant strides.
+PARAM_PREFETCH_MINIMUM_STRIDE;prefetch-minimum-stride;-1;0;0;The minimum constant stride beyond which we should use prefetch hints for.
+PARAM_LOOP_INTERCHANGE_MAX_NUM_STMTS;loop-interchange-max-num-stmts;64;0;0;The maximum number of stmts in loop nest for loop interchange.
+PARAM_LOOP_INTERCHANGE_STRIDE_RATIO;loop-interchange-stride-ratio;2;0;0;The minimum stride ratio for loop interchange to be profitable.
+PARAM_USE_CANONICAL_TYPES;use-canonical-types;1;0;1;Whether to use canonical types.
+PARAM_MAX_PARTIAL_ANTIC_LENGTH;max-partial-antic-length;100;0;0;Maximum length of partial antic set when performing tree pre optimization.
+PARAM_RPO_VN_MAX_LOOP_DEPTH;rpo-vn-max-loop-depth;7;2;0;Maximum depth of a loop nest to fully value-number optimistically.
+PARAM_SCCVN_MAX_ALIAS_QUERIES_PER_ACCESS;sccvn-max-alias-queries-per-access;1000;0;0;Maximum number of disambiguations to perform per memory access.
+PARAM_IRA_MAX_LOOPS_NUM;ira-max-loops-num;100;0;0;Max loops number for regional RA.
+PARAM_IRA_MAX_CONFLICT_TABLE_SIZE;ira-max-conflict-table-size;1000;0;0;Max size of conflict table in MB.
+PARAM_IRA_LOOP_RESERVED_REGS;ira-loop-reserved-regs;2;0;0;The number of registers in each class kept unused by loop invariant motion.
+PARAM_LRA_MAX_CONSIDERED_RELOAD_PSEUDOS;lra-max-considered-reload-pseudos;500;0;0;The max number of reload pseudos which are considered during spilling a non-reload pseudo.
+PARAM_LRA_INHERITANCE_EBB_PROBABILITY_CUTOFF;lra-inheritance-ebb-probability-cutoff;40;0;100;Minimal fall-through edge probability in percentage used to add BB to inheritance EBB in LRA.
+PARAM_SWITCH_CONVERSION_BRANCH_RATIO;switch-conversion-max-branch-ratio;8;1;0;The maximum ratio between array size and switch branches for a switch conversion to take place.
+PARAM_LOOP_BLOCK_TILE_SIZE;loop-block-tile-size;51;0;0;Size of tiles for loop blocking.
+PARAM_GRAPHITE_MAX_NB_SCOP_PARAMS;graphite-max-nb-scop-params;10;0;0;Maximum number of parameters in a SCoP.
+PARAM_GRAPHITE_MAX_ARRAYS_PER_SCOP;graphite-max-arrays-per-scop;100;0;0;Maximum number of arrays per SCoP.
+PARAM_MAX_ISL_OPERATIONS;max-isl-operations;350000;0;0;Maximum number of isl operations, 0 means unlimited.
+PARAM_GRAPHITE_ALLOW_CODEGEN_ERRORS;graphite-allow-codegen-errors;0;0;1;Whether codegen errors should be ICEs when -fchecking.
+PARAM_LOOP_MAX_DATAREFS_FOR_DATADEPS;loop-max-datarefs-for-datadeps;1000;0;0;Maximum number of datarefs in loop for building loop data dependencies.
+PARAM_LOOP_INVARIANT_MAX_BBS_IN_LOOP;loop-invariant-max-bbs-in-loop;10000;0;0;Max basic blocks number in loop for loop invariant motion.
+PARAM_PROFILE_FUNC_INTERNAL_ID;profile-func-internal-id;0;0;1;Use internal function id in profile lookup.
+PARAM_SLP_MAX_INSNS_IN_BB;slp-max-insns-in-bb;1000;0;0;Maximum number of instructions in basic block to be considered for SLP vectorization.
+PARAM_MIN_INSN_TO_PREFETCH_RATIO;min-insn-to-prefetch-ratio;9;0;0;Min. ratio of insns to prefetches to enable prefetching for a loop with an unknown trip count.
+PARAM_PREFETCH_MIN_INSN_TO_MEM_RATIO;prefetch-min-insn-to-mem-ratio;3;0;0;Min. ratio of insns to mem ops to enable prefetching in a loop.
+PARAM_MAX_VARTRACK_SIZE;max-vartrack-size;50000000;0;0;Max. size of var tracking hash tables.
+PARAM_MAX_VARTRACK_EXPR_DEPTH;max-vartrack-expr-depth;12;0;0;Max. recursion depth for expanding var tracking expressions.
+PARAM_MAX_VARTRACK_REVERSE_OP_SIZE;max-vartrack-reverse-op-size;50;0;0;Max. size of loc list for which reverse ops should be added.
+PARAM_MAX_DEBUG_MARKER_COUNT;max-debug-marker-count;100000;0;0;Max. count of debug markers to expand or inline.
+PARAM_MIN_NONDEBUG_INSN_UID;min-nondebug-insn-uid;0;0;0;The minimum UID to be used for a nondebug insn.
+PARAM_IPA_SRA_PTR_GROWTH_FACTOR;ipa-sra-ptr-growth-factor;2;0;0;Maximum allowed growth of number and total size of new parameters that ipa-sra replaces a pointer to an aggregate with.
+PARAM_IPA_SRA_MAX_REPLACEMENTS;ipa-sra-max-replacements;8;0;16;Maximum pieces that IPA-SRA tracks per formal parameter, as a consequence, also the maximum number of replacements of a formal parameter.
+PARAM_TM_MAX_AGGREGATE_SIZE;tm-max-aggregate-size;9;0;0;Size in bytes after which thread-local aggregates should be instrumented with the logging functions instead of save/restore pairs.
+PARAM_SRA_MAX_SCALARIZATION_SIZE_SPEED;sra-max-scalarization-size-Ospeed;0;0;0;Maximum size, in storage units, of an aggregate which should be considered for scalarization when compiling for speed.
+PARAM_SRA_MAX_SCALARIZATION_SIZE_SIZE;sra-max-scalarization-size-Osize;0;0;0;Maximum size, in storage units, of an aggregate which should be considered for scalarization when compiling for size.
+PARAM_IPA_CP_VALUE_LIST_SIZE;ipa-cp-value-list-size;8;0;0;Maximum size of a list of values associated with each parameter for interprocedural constant propagation.
+PARAM_IPA_CP_EVAL_THRESHOLD;ipa-cp-eval-threshold;500;0;0;Threshold ipa-cp opportunity evaluation that is still considered beneficial to clone.
+PARAM_IPA_CP_RECURSION_PENALTY;ipa-cp-recursion-penalty;40;0;100;Percentage penalty the recursive functions will receive when they are evaluated for cloning.
+PARAM_IPA_CP_SINGLE_CALL_PENALTY;ipa-cp-single-call-penalty;15;0;100;Percentage penalty functions containing a single call to another function will receive when they are evaluated for cloning.
+PARAM_IPA_MAX_AGG_ITEMS;ipa-max-agg-items;16;0;0;Maximum number of aggregate content items for a parameter in jump functions and lattices.
+PARAM_IPA_CP_LOOP_HINT_BONUS;ipa-cp-loop-hint-bonus;64;0;0;Compile-time bonus IPA-CP assigns to candidates which make loop bounds or strides known.
+PARAM_IPA_MAX_AA_STEPS;ipa-max-aa-steps;25000;0;0;Maximum number of statements that will be visited by IPA formal parameter analysis based on alias analysis in any given function.
+PARAM_IPA_MAX_SWITCH_PREDICATE_BOUNDS;ipa-max-switch-predicate-bounds;5;0;0;Maximal number of boundary endpoints of case ranges of switch statement used during IPA functoin summary generation.
+PARAM_IPA_MAX_PARAM_EXPR_OPS;ipa-max-param-expr-ops;10;0;0;Maximum number of operations in a parameter expression that can be handled by IPA analysis.
+PARAM_LTO_PARTITIONS;lto-partitions;128;1;0;Number of partitions the program should be split to.
+MIN_PARTITION_SIZE;lto-min-partition;10000;0;0;Minimal size of a partition for LTO (in estimated instructions).
+MAX_PARTITION_SIZE;lto-max-partition;1000000;0;0;Maximal size of a partition for LTO (in estimated instructions).
+PARAM_MAX_LTO_STREAMING_PARALLELISM;lto-max-streaming-parallelism;32;1;0;maximal number of LTO partitions streamed in parallel.
+CXX_MAX_NAMESPACES_FOR_DIAGNOSTIC_HELP;cxx-max-namespaces-for-diagnostic-help;1000;0;0;Maximum number of namespaces to search for alternatives when name lookup fails.
+PARAM_MAX_STORES_TO_SINK;max-stores-to-sink;2;0;0;Maximum number of conditional store pairs that can be sunk.
+PARAM_CASE_VALUES_THRESHOLD;case-values-threshold;0;0;0;The smallest number of different values for which it is best to use a jump-table instead of a tree of conditional branches, if 0, use the default for the machine.
+PARAM_JUMP_TABLE_MAX_GROWTH_RATIO_FOR_SIZE;jump-table-max-growth-ratio-for-size;300;0;0;The maximum code size growth ratio when expanding into a jump table (in percent).  The parameter is used when optimizing for size.
+PARAM_JUMP_TABLE_MAX_GROWTH_RATIO_FOR_SPEED;jump-table-max-growth-ratio-for-speed;800;0;0;The maximum code size growth ratio when expanding into a jump table (in percent).  The parameter is used when optimizing for speed.
+PARAM_TREE_REASSOC_WIDTH;tree-reassoc-width;0;0;0;Set the maximum number of instructions executed in parallel in reassociated tree.  If 0, use the target dependent heuristic.
+PARAM_MAX_TAIL_MERGE_COMPARISONS;max-tail-merge-comparisons;10;0;0;Maximum amount of similar bbs to compare a bb with.
+PARAM_STORE_MERGING_ALLOW_UNALIGNED;store-merging-allow-unaligned;1;0;1;Allow the store merging pass to introduce unaligned stores if it is legal to do so.
+PARAM_MAX_STORES_TO_MERGE;max-stores-to-merge;64;2;0;Maximum number of constant stores to merge in the store merging pass.
+PARAM_STORE_MERGING_MAX_SIZE;store-merging-max-size;65536;1;1;Maximum size of a single store merging region in bytes.
+PARAM_MAX_TAIL_MERGE_ITERATIONS;max-tail-merge-iterations;2;0;0;Maximum amount of iterations of the pass over a function.
+PARAM_MAX_TRACKED_STRLENS;max-tracked-strlens;10000;0;0;Maximum number of strings for which strlen optimization pass will track string lengths.
+PARAM_SCHED_PRESSURE_ALGORITHM;sched-pressure-algorithm;1;1;2;Which -fsched-pressure algorithm to apply.
+PARAM_MAX_SLSR_CANDIDATE_SCAN;max-slsr-cand-scan;50;1;999999;Maximum length of candidate scans for straight-line strength reduction.
+PARAM_ASAN_STACK;asan-stack;1;0;1;Enable asan stack protection.
+PARAM_ASAN_PROTECT_ALLOCAS;asan-instrument-allocas;1;0;1;Enable asan allocas/VLAs protection.
+PARAM_ASAN_GLOBALS;asan-globals;1;0;1;Enable asan globals protection.
+PARAM_ASAN_INSTRUMENT_WRITES;asan-instrument-writes;1;0;1;Enable asan store operations protection.
+PARAM_ASAN_INSTRUMENT_READS;asan-instrument-reads;1;0;1;Enable asan load operations protection.
+PARAM_ASAN_MEMINTRIN;asan-memintrin;1;0;1;Enable asan builtin functions protection.
+PARAM_ASAN_USE_AFTER_RETURN;asan-use-after-return;1;0;1;Enable asan detection of use-after-return bugs.
+PARAM_ASAN_INSTRUMENTATION_WITH_CALL_THRESHOLD;asan-instrumentation-with-call-threshold;7000;0;0;Use callbacks instead of inline code if number of accesses in function becomes greater or equal to this number.
+PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD;use-after-scope-direct-emission-threshold;256;0;0;Use direct poisoning/unpoisoning instructions for variables smaller or equal to this number.
+PARAM_UNINIT_CONTROL_DEP_ATTEMPTS;uninit-control-dep-attempts;1000;1;0;Maximum number of nested calls to search for control dependencies during uninitialized variable analysis.
+PARAM_FSM_SCALE_PATH_STMTS;fsm-scale-path-stmts;2;1;10;Scale factor to apply to the number of statements in a threading path when comparing to the number of (scaled) blocks.
+PARAM_FSM_MAXIMUM_PHI_ARGUMENTS;fsm-maximum-phi-arguments;100;1;999999;Maximum number of arguments a PHI may have before the FSM threader will not try to thread through its block.
+PARAM_FSM_SCALE_PATH_BLOCKS;fsm-scale-path-blocks;3;1;10;Scale factor to apply to the number of blocks in a threading path when comparing to the number of (scaled) statements.
+PARAM_MAX_FSM_THREAD_PATH_INSNS;max-fsm-thread-path-insns;100;1;999999;Maximum number of instructions to copy when duplicating blocks on a finite state automaton jump thread path.
+PARAM_MAX_FSM_THREAD_LENGTH;max-fsm-thread-length;10;1;999999;Maximum number of basic blocks on a finite state automaton jump thread path.
+PARAM_MAX_FSM_THREAD_PATHS;max-fsm-thread-paths;50;1;999999;Maximum number of new jump thread paths to create for a finite state automaton.
+PARAM_PARLOOPS_CHUNK_SIZE;parloops-chunk-size;0;0;0;Chunk size of omp schedule for loops parallelized by parloops.
+PARAM_PARLOOPS_MIN_PER_THREAD;parloops-min-per-thread;100;2;0;Minimum number of iterations per thread of an innermost parallelized loop.
+PARAM_MAX_SSA_NAME_QUERY_DEPTH;max-ssa-name-query-depth;3;1;10;Maximum recursion depth allowed when querying a property of an SSA name.
+PARAM_MAX_RTL_IF_CONVERSION_INSNS;max-rtl-if-conversion-insns;10;0;99;Maximum number of insns in a basic block to consider for RTL if-conversion.
+PARAM_MAX_RTL_IF_CONVERSION_PREDICTABLE_COST;max-rtl-if-conversion-predictable-cost;20;0;200;Maximum permissible cost for the sequence that would be generated by the RTL if-conversion pass for a branch that is considered predictable.
+PARAM_MAX_RTL_IF_CONVERSION_UNPREDICTABLE_COST;max-rtl-if-conversion-unpredictable-cost;40;0;200;Maximum permissible cost for the sequence that would be generated by the RTL if-conversion pass for a branch that is considered unpredictable.
+PARAM_HSA_GEN_DEBUG_STORES;hsa-gen-debug-stores;0;0;1;Level of hsa debug stores verbosity.
+PARAM_MAX_SPECULATIVE_DEVIRT_MAYDEFS;max-speculative-devirt-maydefs;50;0;0;Maximum number of may-defs visited when devirtualizing speculatively.
+PARAM_MAX_VRP_SWITCH_ASSERTIONS;max-vrp-switch-assertions;10;0;0;Maximum number of assertions to add along the default edge of a switch statement during VRP.
+PARAM_VECT_EPILOGUES_NOMASK;vect-epilogues-nomask;1;0;1;Enable loop epilogue vectorization using smaller vector size.
+PARAM_UNROLL_JAM_MIN_PERCENT;unroll-jam-min-percent;1;0;100;Minimum percentage of memrefs that must go away for unroll-and-jam to be considered profitable.
+PARAM_UNROLL_JAM_MAX_UNROLL;unroll-jam-max-unroll;4;0;0;Maximum unroll factor for the unroll-and-jam transformation.
+PARAM_AVOID_FMA_MAX_BITS;avoid-fma-max-bits;0;0;512;Maximum number of bits for which we avoid creating FMAs.
+PARAM_LOGICAL_OP_NON_SHORT_CIRCUIT;logical-op-non-short-circuit;-1;-1;1;True if a non-short-circuit operation is optimal.
+PARAM_LOOP_VERSIONING_MAX_INNER_INSNS;loop-versioning-max-inner-insns;200;0;0;The maximum number of instructions in an inner loop that is being considered for versioning.
+PARAM_LOOP_VERSIONING_MAX_OUTER_INSNS;loop-versioning-max-outer-insns;100;0;0;The maximum number of instructions in an outer loop that is being considered for versioning, on top of the instructions in inner loops.
+PARAM_GIMPLE_FE_COMPUTED_HOT_BB_THRESHOLD;gimple-fe-computed-hot-bb-threshold;0;0;0;The number of executions of a basic block which is considered hot. The parameter is used only in GIMPLE FE.
+PARAM_HASH_TABLE_VERIFICATION_LIMIT;hash-table-verification-limit;10;0;0;The number of elements for which hash table verification is done for each searched element.
+PARAM_SSA_NAME_DEF_CHAIN_LIMIT;ssa-name-def-chain-limit;512;0;0;The maximum number of SSA_NAME assignments to follow in determining a value.
