@@ -41,6 +41,20 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-into-ssa.h"
 #include "cfganal.h"
 
+struct case_range
+{
+  case_range ():
+    m_min (NULL_TREE), m_max (NULL_TREE)
+  {}
+
+  case_range (tree min, tree max = NULL_TREE)
+    : m_min (min), m_max (max)
+  {}
+
+  tree m_min;
+  tree m_max;
+};
+
 struct if_chain_entry
 {
   if_chain_entry (gcond *cond, basic_block bb, edge true_edge,
@@ -51,14 +65,14 @@ struct if_chain_entry
     m_case_values.create (2);
   }
 
-  void add_case_value (tree case_value)
+  void add_case_value (case_range range)
   {
-    m_case_values.safe_push (case_value);
+    m_case_values.safe_push (range);
   }
 
   gcond *m_cond;
   tree m_index;
-  vec<tree> m_case_values;
+  vec<case_range> m_case_values;
   basic_block m_bb;
   edge m_true_edge;
   edge m_false_edge;
@@ -80,10 +94,10 @@ private:
 };
 
 static tree
-build_case_label (tree value, basic_block dest)
+build_case_label (tree min, tree max, basic_block dest)
 {
   tree label = gimple_block_label (dest);
-  return build_case_label (value, NULL, label);
+  return build_case_label (min, max, label);
 }
 
 static int
@@ -165,7 +179,9 @@ convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
       basic_block case_bb = entry.m_true_edge->dest;
 
       for (unsigned j = 0; j < entry.m_case_values.length (); j++)
-	labels.safe_push (build_case_label (entry.m_case_values[j], case_bb));
+	labels.safe_push (build_case_label (entry.m_case_values[j].m_min,
+					    entry.m_case_values[j].m_max,
+					    case_bb));
       default_bb = entry.m_false_edge->dest;
 
       if (i == 0)
@@ -186,7 +202,8 @@ convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
     e = make_edge (first_cond.m_bb, default_bb, 0);
   gswitch *s
     = gimple_build_switch (first_cond.m_index,
-			   build_case_label (NULL_TREE, default_bb), labels);
+			   build_case_label (NULL_TREE, NULL_TREE, default_bb),
+			   labels);
 
   gimple_stmt_iterator gsi = gsi_for_stmt (first_cond.m_cond);
   gsi_remove (&gsi, true);
@@ -229,6 +246,64 @@ extract_condition (tree lhs, tree rhs, tree *index,
     seen_constants->add (rhs);
 
   return true;
+}
+
+bool
+extract_case_from_assignment (gassign *assign, tree *lhs, case_range *range,
+			      unsigned *visited_stmt_count)
+{
+  tree_code code = gimple_assign_rhs_code (assign);
+  if (code == EQ_EXPR)
+    {
+      /* Handle situation 2a:
+	 _1 = aChar_8(D) == 1;  */
+      *lhs = gimple_assign_rhs1 (assign);
+      range->m_min = gimple_assign_rhs2 (assign);
+      *visited_stmt_count += 1;
+      return true;
+    }
+  else if (code == LE_EXPR)
+    {
+      /* Handle situation 2b:
+	 aChar.1_1 = (unsigned int) aChar_10(D);
+	 _2 = aChar.1_1 + 4294967287;
+	 _3 = _2 <= 1;  */
+      tree ssa = gimple_assign_rhs1 (assign);
+      tree range_size = gimple_assign_rhs2 (assign);
+      if (TREE_CODE (ssa) != SSA_NAME
+	  || TREE_CODE (range_size) != INTEGER_CST)
+	return false;
+
+      gassign *subtraction = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (ssa));
+      if (subtraction == NULL
+	  || gimple_assign_rhs_code (subtraction) != PLUS_EXPR)
+	return false;
+
+      tree casted = gimple_assign_rhs1 (subtraction);
+      tree min = gimple_assign_rhs2 (subtraction);
+      if (TREE_CODE (casted) != SSA_NAME
+	  || TREE_CODE (min) != INTEGER_CST)
+	return false;
+
+      // TODO: with unsigned type the cast will not be needed
+      gassign *to_unsigned = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (casted));
+      if (to_unsigned == NULL
+	  || !gimple_assign_unary_nop_p (to_unsigned)
+	  || !TYPE_UNSIGNED (TREE_TYPE (casted)))
+	return false;
+
+      *lhs = gimple_assign_rhs1 (to_unsigned);
+      tree type = TREE_TYPE (*lhs);
+      tree range_min = fold_convert (type, const_unop (NEGATE_EXPR, type, min));
+
+      range->m_min = range_min;
+      range->m_max = const_binop (PLUS_EXPR, TREE_TYPE (*lhs),
+				  range_min, fold_convert (type, range_size));
+      *visited_stmt_count += 3;
+      return true;
+    }
+  else
+    return false;
 }
 
 // TODO
@@ -275,7 +350,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 	    else
 	      goto <bb 4>; [INV]
 
-	 2) if condition with two equal operations:
+	 2a) if condition with two equal operations:
 
 	    <bb 2> :
 	    _1 = aChar_8(D) == 1;
@@ -285,7 +360,20 @@ if_dom_walker::before_dom_children (basic_block bb)
 	      goto <bb 5>; [INV]
 	    else
 	      goto <bb 3>; [INV]
-      */
+
+	2b) if condition with one or two range checks
+
+	    <bb 2> :
+	    aChar.1_1 = (unsigned int) aChar_10(D);
+	    _2 = aChar.1_1 + 4294967287;
+	    _3 = _2 <= 1;
+	    _4 = aChar_10(D) == 12;
+	    _5 = _3 | _4;
+	    if (_5 != 0)
+	      goto <bb 5>; [INV]
+	    else
+	      goto <bb 3>; [INV]
+		*/
 
       tree lhs = gimple_cond_lhs (cond);
       tree rhs = gimple_cond_rhs (cond);
@@ -298,11 +386,11 @@ if_dom_walker::before_dom_children (basic_block bb)
 	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
 	    break;
 	  entry.m_index = lhs;
-	  entry.add_case_value (rhs);
+	  entry.add_case_value (case_range (rhs));
 	  visited_stmt_count = 1;
 	  ++case_values;
 	}
-      /* Situation 2.  */
+      /* Situation 2a and 2b.  */
       else if (code == NE_EXPR
 	       && integer_zerop (rhs)
 	       && TREE_CODE (lhs) == SSA_NAME
@@ -324,27 +412,29 @@ if_dom_walker::before_dom_children (basic_block bb)
 	  if (def1 == NULL
 	      || def2 == NULL
 	      || def1 == def2
-	      || gimple_assign_rhs_code (def1) != EQ_EXPR
-	      || gimple_assign_rhs_code (def2) != EQ_EXPR
 	      || gimple_bb (def1) != bb
 	      || gimple_bb (def2) != bb)
 	    break;
 
-	  lhs = gimple_assign_rhs1 (def1);
+	  case_range range1;
+	  extract_case_from_assignment (def1, &lhs, &range1,
+					&visited_stmt_count);
 	  rhs = gimple_assign_rhs2 (def1);
 	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
 	      break;
 	  entry.m_index = lhs;
-	  entry.add_case_value (rhs);
+	  entry.add_case_value (range1);
 
-	  lhs = gimple_assign_rhs1 (def2);
+	  case_range range2;
+	  extract_case_from_assignment (def2, &lhs, &range2,
+					&visited_stmt_count);
 	  rhs = gimple_assign_rhs2 (def2);
 	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
 	      break;
 	  entry.m_index = lhs;
-	  entry.add_case_value (rhs);
-	  visited_stmt_count = 4;
+	  entry.add_case_value (range2);
 	  case_values += 2;
+	  visited_stmt_count += 2;
 	}
       else
 	break;
