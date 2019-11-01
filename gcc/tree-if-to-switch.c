@@ -375,8 +375,8 @@ if_dom_walker::before_dom_children (basic_block bb)
 	  expanded_location loc
 	    = expand_location (gimple_location (conditions[0].m_cond));
 	  fprintf (dump_file, "Condition chain (at %s:%d) with %d conditions "
-		   "transformed into a switch statement.\n",
-		   loc.file, loc.line, case_values);
+		   "(%d BBs) transformed into a switch statement.\n",
+		   loc.file, loc.line, case_values, conditions.length ());
 	}
 
       all_candidates.safe_push (conditions);
