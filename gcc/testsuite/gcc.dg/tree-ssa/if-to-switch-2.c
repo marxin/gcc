@@ -8,4 +8,4 @@ int IsHTMLWhitespaceNoRange(int aChar)
          aChar == 0x0020;
 }
 
-/* { dg-final { scan-tree-dump "Condition chain \\(at .*if-to-switch-2.c:6\\) with 5 conditions \\(3 BBs) transformed into a switch statement." "iftoswitch" } } */
+/* { dg-final { scan-tree-dump "Condition chain \\(at .*if-to-switch-2.c:7\\) with 5 conditions \\(3 BBs\\) transformed into a switch statement." "iftoswitch" } } */
