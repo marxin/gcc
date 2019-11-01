@@ -232,18 +232,19 @@ extract_condition (tree lhs, tree rhs, tree *index,
   if (TREE_CODE (lhs) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
     return false;
 
-  if (TREE_CODE (rhs) != INTEGER_CST)
-    return false;
+  // TODO: sort and check overlapping
+//  if (TREE_CODE (rhs) != INTEGER_CST)
+//    return false;
 
   if (*index == NULL)
     *index = lhs;
   else if (*index != lhs)
     return false;
 
-  if (seen_constants->contains (rhs))
-    return false;
-  else
-    seen_constants->add (rhs);
+//  if (seen_constants->contains (rhs))
+//    return false;
+//  else
+//    seen_constants->add (rhs);
 
   return true;
 }
@@ -259,6 +260,11 @@ extract_case_from_assignment (gassign *assign, tree *lhs, case_range *range,
 	 _1 = aChar_8(D) == 1;  */
       *lhs = gimple_assign_rhs1 (assign);
       range->m_min = gimple_assign_rhs2 (assign);
+
+      // TODO: remove
+      if (TREE_CODE (gimple_assign_rhs2 (assign)) != INTEGER_CST)
+	return false;
+
       *visited_stmt_count += 1;
       return true;
     }
@@ -383,6 +389,9 @@ if_dom_walker::before_dom_children (basic_block bb)
       /* Situation 1.  */
       if (code == EQ_EXPR)
 	{
+	  // TODO: remove
+	  if (TREE_CODE (rhs) != INTEGER_CST)
+	    break;
 	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
 	    break;
 	  entry.m_index = lhs;
@@ -417,8 +426,9 @@ if_dom_walker::before_dom_children (basic_block bb)
 	    break;
 
 	  case_range range1;
-	  extract_case_from_assignment (def1, &lhs, &range1,
-					&visited_stmt_count);
+	  if (!extract_case_from_assignment (def1, &lhs, &range1,
+					     &visited_stmt_count))
+	    break;
 	  rhs = gimple_assign_rhs2 (def1);
 	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
 	      break;
@@ -426,8 +436,9 @@ if_dom_walker::before_dom_children (basic_block bb)
 	  entry.add_case_value (range1);
 
 	  case_range range2;
-	  extract_case_from_assignment (def2, &lhs, &range2,
-					&visited_stmt_count);
+	  if (!extract_case_from_assignment (def2, &lhs, &range2,
+					     &visited_stmt_count))
+	    break;
 	  rhs = gimple_assign_rhs2 (def2);
 	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
 	      break;
