@@ -43,10 +43,25 @@ along with GCC; see the file COPYING3.  If not see
 
 struct if_chain_entry
 {
-  gcond *cond;
-  basic_block bb;
-  edge true_edge;
-  edge false_edge;
+  if_chain_entry (gcond *cond, basic_block bb, edge true_edge,
+		  edge false_edge)
+    : m_cond (cond), m_index (NULL), m_case_values (), m_bb (bb),
+      m_true_edge (true_edge), m_false_edge (false_edge)
+  {
+    m_case_values.create (2);
+  }
+
+  void add_case_value (tree case_value)
+  {
+    m_case_values.safe_push (case_value);
+  }
+
+  gcond *m_cond;
+  tree m_index;
+  vec<tree> m_case_values;
+  basic_block m_bb;
+  edge m_true_edge;
+  edge m_false_edge;
 };
 
 class if_dom_walker : public dom_walker
@@ -133,46 +148,47 @@ convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
   auto_vec<tree> labels;
   if_chain_entry first_cond = conditions[0];
 
-  edge default_edge = conditions[conditions.length () - 1].false_edge;
+  edge default_edge = conditions[conditions.length () - 1].m_false_edge;
   basic_block default_bb = default_edge->dest;
 
   /* Recond all PHI nodes that will later be fixed.  */
   hash_map<basic_block, vec<tree> > phi_map;
   for (unsigned i = 0; i < conditions.length (); i++)
-    record_phi_arguments (&phi_map, conditions[i].true_edge);
+    record_phi_arguments (&phi_map, conditions[i].m_true_edge);
   record_phi_arguments (&phi_map,
-			conditions[conditions.length () - 1].false_edge);
+			conditions[conditions.length () - 1].m_false_edge);
 
   for (unsigned i = 0; i < conditions.length (); i++)
     {
       if_chain_entry entry = conditions[i];
 
-      basic_block case_bb = entry.true_edge->dest;
-      labels.safe_push (
-	build_case_label (gimple_cond_rhs (entry.cond), case_bb));
-      default_bb = entry.false_edge->dest;
+      basic_block case_bb = entry.m_true_edge->dest;
+
+      for (unsigned j = 0; j < entry.m_case_values.length (); j++)
+	labels.safe_push (build_case_label (entry.m_case_values[j], case_bb));
+      default_bb = entry.m_false_edge->dest;
 
       if (i == 0)
 	{
-	  remove_edge (first_cond.true_edge);
-	  remove_edge (first_cond.false_edge);
+	  remove_edge (first_cond.m_true_edge);
+	  remove_edge (first_cond.m_false_edge);
 	}
       else
-	delete_basic_block (entry.bb);
+	delete_basic_block (entry.m_bb);
 
-      make_edge (first_cond.bb, case_bb, 0);
+      make_edge (first_cond.m_bb, case_bb, 0);
     }
 
   labels.qsort (label_cmp);
 
-  edge e = find_edge (first_cond.bb, default_bb);
+  edge e = find_edge (first_cond.m_bb, default_bb);
   if (e == NULL)
-    e = make_edge (first_cond.bb, default_bb, 0);
+    e = make_edge (first_cond.m_bb, default_bb, 0);
   gswitch *s
-    = gimple_build_switch (gimple_cond_lhs (first_cond.cond),
+    = gimple_build_switch (first_cond.m_index,
 			   build_case_label (NULL_TREE, default_bb), labels);
 
-  gimple_stmt_iterator gsi = gsi_for_stmt (first_cond.cond);
+  gimple_stmt_iterator gsi = gsi_for_stmt (first_cond.m_cond);
   gsi_remove (&gsi, true);
   gsi_insert_before (&gsi, s, GSI_NEW_STMT);
 
@@ -180,7 +196,7 @@ convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
   for (hash_map<basic_block, vec<tree> >::iterator it = phi_map.begin ();
        it != phi_map.end (); ++it)
     {
-      edge e = find_edge (first_cond.bb, (*it).first);
+      edge e = find_edge (first_cond.m_bb, (*it).first);
       unsigned i = 0;
       for (gphi_iterator gsi = gsi_start_phis ((*it).first); !gsi_end_p (gsi);
 	   gsi_next (&gsi))
@@ -192,14 +208,40 @@ convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
     }
 }
 
+static bool
+extract_condition (tree lhs, tree rhs, tree *index,
+		   hash_set<int_cst_hash> *seen_constants)
+{
+  if (TREE_CODE (lhs) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
+    return false;
+
+  if (TREE_CODE (rhs) != INTEGER_CST)
+    return false;
+
+  if (*index == NULL)
+    *index = lhs;
+  else if (*index != lhs)
+    return false;
+
+  if (seen_constants->contains (rhs))
+    return false;
+  else
+    seen_constants->add (rhs);
+
+  return true;
+}
+
+// TODO
+#include "print-tree.h"
+
 edge
 if_dom_walker::before_dom_children (basic_block bb)
 {
-  tree seen_lhs = NULL_TREE;
+  tree index = NULL_TREE;
   vec<if_chain_entry> conditions;
   conditions.create (8);
-
   hash_set<int_cst_hash> seen_constants;
+  unsigned case_values = 0;
 
   while (true)
     {
@@ -218,55 +260,123 @@ if_dom_walker::before_dom_children (basic_block bb)
       if (cond == NULL)
 	break;
 
-      if (gimple_cond_code (cond) != EQ_EXPR)
-	break;
+      edge true_edge, false_edge;
+      extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
+
+      if_chain_entry entry (cond, bb, true_edge, false_edge);
+
+      /* Current we support following patterns (situations):
+
+	 1) if condition with equal operation:
+
+	    <bb 2> :
+	    if (argc_8(D) == 1)
+	      goto <bb 3>; [INV]
+	    else
+	      goto <bb 4>; [INV]
+
+	 2) if condition with two equal operations:
+
+	    <bb 2> :
+	    _1 = aChar_8(D) == 1;
+	    _2 = aChar_8(D) == 10;
+	    _3 = _1 | _2;
+	    if (_3 != 0)
+	      goto <bb 5>; [INV]
+	    else
+	      goto <bb 3>; [INV]
+      */
 
       tree lhs = gimple_cond_lhs (cond);
-      if (TREE_CODE (lhs) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
-	break;
-
       tree rhs = gimple_cond_rhs (cond);
-      if (TREE_CODE (rhs) != INTEGER_CST)
-	break;
+      tree_code code = gimple_cond_code (cond);
+      unsigned visited_stmt_count = 0;
 
-      if (conditions.is_empty ())
-	seen_lhs = lhs;
-      else if (seen_lhs != lhs)
+      /* Situation 1.  */
+      if (code == EQ_EXPR)
+	{
+	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
+	    break;
+	  entry.m_index = lhs;
+	  entry.add_case_value (rhs);
+	  visited_stmt_count = 1;
+	  ++case_values;
+	}
+      /* Situation 2.  */
+      else if (code == NE_EXPR
+	       && integer_zerop (rhs)
+	       && TREE_CODE (lhs) == SSA_NAME
+	       && TREE_CODE (TREE_TYPE (lhs)) == BOOLEAN_TYPE)
+	{
+	  gassign *def = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (lhs));
+	  if (def == NULL
+	      || gimple_assign_rhs_code (def) != BIT_IOR_EXPR
+	      || gimple_bb (def) != bb)
+	    break;
+
+	  tree rhs1 = gimple_assign_rhs1 (def);
+	  tree rhs2 = gimple_assign_rhs2 (def);
+	  if (TREE_CODE (rhs1) != SSA_NAME || TREE_CODE (rhs2) != SSA_NAME)
+	    break;
+
+	  gassign *def1 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs1));
+	  gassign *def2 = dyn_cast<gassign *> (SSA_NAME_DEF_STMT (rhs2));
+	  if (def1 == NULL
+	      || def2 == NULL
+	      || def1 == def2
+	      || gimple_assign_rhs_code (def1) != EQ_EXPR
+	      || gimple_assign_rhs_code (def2) != EQ_EXPR
+	      || gimple_bb (def1) != bb
+	      || gimple_bb (def2) != bb)
+	    break;
+
+	  lhs = gimple_assign_rhs1 (def1);
+	  rhs = gimple_assign_rhs2 (def1);
+	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
+	      break;
+	  entry.m_index = lhs;
+	  entry.add_case_value (rhs);
+
+	  lhs = gimple_assign_rhs1 (def2);
+	  rhs = gimple_assign_rhs2 (def2);
+	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
+	      break;
+	  entry.m_index = lhs;
+	  entry.add_case_value (rhs);
+	  visited_stmt_count = 4;
+	  case_values += 2;
+	}
+      else
 	break;
 
       /* If it's not the first condition, then we need a BB without
 	 any statements.  */
       if (!conditions.is_empty ())
 	{
-	  gsi_prev_nondebug (&gsi);
-	  if (!gsi_end_p (gsi))
+	  unsigned stmt_count = 0;
+	  for (gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
+	       !gsi_end_p (gsi); gsi_next_nondebug (&gsi))
+	    ++stmt_count;
+
+	  if (stmt_count - visited_stmt_count != 0)
 	    break;
 	}
 
-      /* Follow if-elseif-elseif chain.  */
-      edge true_edge, false_edge;
-      extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
-
-      if (seen_constants.contains (rhs))
-	return NULL;
-      else
-	seen_constants.add (rhs);
-
-      if_chain_entry entry = {cond, bb, true_edge, false_edge};
       conditions.safe_push (entry);
 
+      /* Follow if-elseif-elseif chain.  */
       bb = false_edge->dest;
     }
 
-  if (conditions.length () >= 3)
+  if (case_values >= 3)
     {
       if (dump_file)
 	{
 	  expanded_location loc
-	    = expand_location (gimple_location (conditions[0].cond));
+	    = expand_location (gimple_location (conditions[0].m_cond));
 	  fprintf (dump_file, "Condition chain (at %s:%d) with %d conditions "
 		   "transformed into a switch statement.\n",
-		   loc.file, loc.line, conditions.length ());
+		   loc.file, loc.line, case_values);
 	}
 
       all_candidates.safe_push (conditions);
