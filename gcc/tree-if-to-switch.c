@@ -222,7 +222,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 	break;
 
       tree lhs = gimple_cond_lhs (cond);
-      if (TREE_CODE (lhs) != SSA_NAME)
+      if (TREE_CODE (lhs) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
 	break;
 
       tree rhs = gimple_cond_rhs (cond);
