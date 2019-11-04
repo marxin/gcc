@@ -358,7 +358,7 @@ edge
 if_dom_walker::before_dom_children (basic_block bb)
 {
   if_chain chain;
-  unsigned case_values = 0;
+  unsigned total_case_values = 0;
 
   while (true)
     {
@@ -425,17 +425,18 @@ if_dom_walker::before_dom_children (basic_block bb)
       tree rhs = gimple_cond_rhs (cond);
       tree_code code = gimple_cond_code (cond);
       unsigned visited_stmt_count = 0;
+      unsigned case_values = 0;
 
       /* Situation 1.  */
       if (code == EQ_EXPR)
 	{
 	  if (!chain.set_and_check_index (lhs))
 	    break;
-	  if (TREE_CODE (TREE_TYPE (rhs)) != INTEGER_CST)
+	  if (TREE_CODE (rhs) != INTEGER_CST)
 	    break;
 	  entry.m_case_values.safe_push (case_range (rhs));
 	  visited_stmt_count = 1;
-	  ++case_values;
+	  case_values = 1;
 	}
       /* Situation 2a and 2b.  */
       else if (code == NE_EXPR
@@ -480,7 +481,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 	  if (!chain.set_and_check_index (lhs))
 	    break;
 	  entry.m_case_values.safe_push (range2);
-	  case_values += 2;
+	  case_values = 2;
 	  visited_stmt_count += 2;
 	}
       else
@@ -499,13 +500,14 @@ if_dom_walker::before_dom_children (basic_block bb)
 	    break;
 	}
 
+      total_case_values += case_values;
       chain.m_entries.safe_push (entry);
 
       /* Follow if-elseif-elseif chain.  */
       bb = false_edge->dest;
     }
 
-  if (case_values >= 3
+  if (total_case_values >= 3
       && chain.check_non_overlapping_cases ())
     {
       if (dump_file)
@@ -514,7 +516,8 @@ if_dom_walker::before_dom_children (basic_block bb)
 	    = expand_location (gimple_location (chain.m_first_condition));
 	  fprintf (dump_file, "Condition chain (at %s:%d) with %d conditions "
 		   "(%d BBs) transformed into a switch statement.\n",
-		   loc.file, loc.line, case_values, chain.m_entries.length ());
+		   loc.file, loc.line, total_case_values,
+		   chain.m_entries.length ());
 	}
 
       all_candidates.safe_push (chain);
