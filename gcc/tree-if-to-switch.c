@@ -41,12 +41,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-into-ssa.h"
 #include "cfganal.h"
 
+/* Tuple that holds minimum and maximum values in a case.  */
+
 struct case_range
 {
+  /* Default constructor.  */
   case_range ():
     m_min (NULL_TREE), m_max (NULL_TREE)
   {}
 
+  /* Constructor.  */
   case_range (tree min, tree max = NULL_TREE)
     : m_min (min), m_max (max)
   {
@@ -54,12 +58,17 @@ struct case_range
       m_max = min;
   }
 
+  /* Minimum case value.  */
   tree m_min;
+  /* Maximum case value.  */
   tree m_max;
 };
 
+/* One entry of a if chain.  */
+
 struct if_chain_entry
 {
+  /* Constructor.  */
   if_chain_entry (basic_block bb, edge true_edge, edge false_edge)
     : m_case_values (), m_bb (bb),
       m_true_edge (true_edge), m_false_edge (false_edge)
@@ -67,16 +76,17 @@ struct if_chain_entry
     m_case_values.create (2);
   }
 
-  void add_case_value (case_range range)
-  {
-    m_case_values.safe_push (range);
-  }
-
+  /* Vector of at maximum 2 case ranges.  */
   vec<case_range> m_case_values;
+  /* Basic block of the original condition.  */
   basic_block m_bb;
+  /* True edge of the gimple condition.  */
   edge m_true_edge;
+  /* False edge of the gimple condition.  */
   edge m_false_edge;
 };
+
+/* Master structure for one if to switch conversion candidate.  */
 
 struct if_chain
 {
@@ -87,12 +97,17 @@ struct if_chain
     m_entries.create (2);
   }
 
+  /* Set index and check that it is not a different one.  */
   bool set_and_check_index (tree index);
 
+  /* Verify that all case ranges do not overlap.  */
   bool check_non_overlapping_cases ();
 
+  /* First condition of the chain.  */
   gcond *m_first_condition;
+  /* Switch index.  */
   tree m_index;
+  /* If chain entries.  */
   vec<if_chain_entry> m_entries; 
 };
 
@@ -107,6 +122,8 @@ if_chain::set_and_check_index (tree index)
 
   return index == m_index;
 }
+
+/* Compare two case ranges by minimum value.  */
 
 static int
 range_cmp (const void *a, const void *b)
@@ -139,6 +156,8 @@ if_chain::check_non_overlapping_cases ()
   return true;
 }
 
+/* DOM walker for if to switch conversion.  */
+
 class if_dom_walker : public dom_walker
 {
 public:
@@ -148,11 +167,15 @@ public:
 
   virtual edge before_dom_children (basic_block);
 
+  /* List of all found candidates.  */
   auto_vec<if_chain> all_candidates;
 
 private:
+  /* Bitmap of all visited basic blocks.  */
   auto_bitmap m_visited_bbs;
 };
+
+/* Build case label with MIN and MAX values of a given basic block DEST.  */
 
 static tree
 build_case_label (tree min, tree max, basic_block dest)
@@ -160,6 +183,8 @@ build_case_label (tree min, tree max, basic_block dest)
   tree label = gimple_block_label (dest);
   return build_case_label (min, min == max ? NULL_TREE : max, label);
 }
+
+/* Compare two integer constants.  */
 
 static int
 label_cmp (const void *a, const void *b)
@@ -169,6 +194,9 @@ label_cmp (const void *a, const void *b)
 
   return tree_int_cst_compare (CASE_LOW (l1), CASE_LOW (l2));
 }
+
+/* Record all original phi arguments into PHI_MAX.  Do it for
+   a given edge E.  */
 
 static void
 record_phi_arguments (hash_map<basic_block, vec<tree> > *phi_map, edge e)
@@ -188,6 +216,8 @@ record_phi_arguments (hash_map<basic_block, vec<tree> > *phi_map, edge e)
       phi_map->put (e->dest, phi_arguments);
     }
 }
+
+/* Convert a given if CHAIN into a switch GIMPLE statement.  */
 
 static void
 convert_if_conditions_to_switch (if_chain &chain)
@@ -257,6 +287,9 @@ convert_if_conditions_to_switch (if_chain &chain)
 	}
     }
 }
+
+/* Extract case comparison for an ASSIGNment statement.  Set LHS and RANGE
+   of such a comparsion and update VISITED_STMT_COUNT.  */
 
 bool
 extract_case_from_assignment (gassign *assign, tree *lhs, case_range *range,
@@ -400,7 +433,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 	    break;
 	  if (TREE_CODE (TREE_TYPE (rhs)) != INTEGER_CST)
 	    break;
-	  entry.add_case_value (case_range (rhs));
+	  entry.m_case_values.safe_push (case_range (rhs));
 	  visited_stmt_count = 1;
 	  ++case_values;
 	}
@@ -437,7 +470,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 	  rhs = gimple_assign_rhs2 (def1);
 	  if (!chain.set_and_check_index (lhs))
 	    break;
-	  entry.add_case_value (range1);
+	  entry.m_case_values.safe_push (range1);
 
 	  case_range range2;
 	  if (!extract_case_from_assignment (def2, &lhs, &range2,
@@ -446,7 +479,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 	  rhs = gimple_assign_rhs2 (def2);
 	  if (!chain.set_and_check_index (lhs))
 	    break;
-	  entry.add_case_value (range2);
+	  entry.m_case_values.safe_push (range2);
 	  case_values += 2;
 	  visited_stmt_count += 2;
 	}
