@@ -57,9 +57,8 @@ struct case_range
 
 struct if_chain_entry
 {
-  if_chain_entry (gcond *cond, basic_block bb, edge true_edge,
-		  edge false_edge)
-    : m_cond (cond), m_index (NULL), m_case_values (), m_bb (bb),
+  if_chain_entry (basic_block bb, edge true_edge, edge false_edge)
+    : m_case_values (), m_bb (bb),
       m_true_edge (true_edge), m_false_edge (false_edge)
   {
     m_case_values.create (2);
@@ -70,13 +69,39 @@ struct if_chain_entry
     m_case_values.safe_push (range);
   }
 
-  gcond *m_cond;
-  tree m_index;
   vec<case_range> m_case_values;
   basic_block m_bb;
   edge m_true_edge;
   edge m_false_edge;
 };
+
+struct if_chain
+{
+  /* Default constructor.  */
+  if_chain():
+    m_first_condition (NULL), m_index (NULL_TREE), m_entries ()
+  {
+    m_entries.create (2);
+  }
+
+  bool set_and_check_index (tree index);
+
+  gcond *m_first_condition;
+  tree m_index;
+  vec<if_chain_entry> m_entries; 
+};
+
+bool
+if_chain::set_and_check_index (tree index)
+{
+  if (TREE_CODE (index) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (index)))
+    return false;
+
+  if (m_index == NULL)
+    m_index = index;
+
+  return index == m_index;
+}
 
 class if_dom_walker : public dom_walker
 {
@@ -87,7 +112,7 @@ public:
 
   virtual edge before_dom_children (basic_block);
 
-  auto_vec<vec<if_chain_entry> > all_candidates;
+  auto_vec<if_chain> all_candidates;
 
 private:
   auto_bitmap m_visited_bbs;
@@ -157,24 +182,24 @@ struct int_cst_hash : typed_noop_remove<tree>
 };
 
 static void
-convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
+convert_if_conditions_to_switch (if_chain &chain)
 {
   auto_vec<tree> labels;
-  if_chain_entry first_cond = conditions[0];
+  if_chain_entry first_cond = chain.m_entries[0];
 
-  edge default_edge = conditions[conditions.length () - 1].m_false_edge;
+  edge default_edge = chain.m_entries[chain.m_entries.length () - 1].m_false_edge;
   basic_block default_bb = default_edge->dest;
 
   /* Recond all PHI nodes that will later be fixed.  */
   hash_map<basic_block, vec<tree> > phi_map;
-  for (unsigned i = 0; i < conditions.length (); i++)
-    record_phi_arguments (&phi_map, conditions[i].m_true_edge);
+  for (unsigned i = 0; i < chain.m_entries.length (); i++)
+    record_phi_arguments (&phi_map, chain.m_entries[i].m_true_edge);
   record_phi_arguments (&phi_map,
-			conditions[conditions.length () - 1].m_false_edge);
+			chain.m_entries[chain.m_entries.length () - 1].m_false_edge);
 
-  for (unsigned i = 0; i < conditions.length (); i++)
+  for (unsigned i = 0; i < chain.m_entries.length (); i++)
     {
-      if_chain_entry entry = conditions[i];
+      if_chain_entry entry = chain.m_entries[i];
 
       basic_block case_bb = entry.m_true_edge->dest;
 
@@ -201,11 +226,11 @@ convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
   if (e == NULL)
     e = make_edge (first_cond.m_bb, default_bb, 0);
   gswitch *s
-    = gimple_build_switch (first_cond.m_index,
+    = gimple_build_switch (chain.m_index,
 			   build_case_label (NULL_TREE, NULL_TREE, default_bb),
 			   labels);
 
-  gimple_stmt_iterator gsi = gsi_for_stmt (first_cond.m_cond);
+  gimple_stmt_iterator gsi = gsi_for_stmt (chain.m_first_condition);
   gsi_remove (&gsi, true);
   gsi_insert_before (&gsi, s, GSI_NEW_STMT);
 
@@ -223,30 +248,6 @@ convert_if_conditions_to_switch (vec<if_chain_entry> &conditions)
 	    add_phi_arg (phi, (*it).second[i++], e, UNKNOWN_LOCATION);
 	}
     }
-}
-
-static bool
-extract_condition (tree lhs, tree rhs, tree *index,
-		   hash_set<int_cst_hash> *seen_constants)
-{
-  if (TREE_CODE (lhs) != SSA_NAME || !INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
-    return false;
-
-  // TODO: sort and check overlapping
-//  if (TREE_CODE (rhs) != INTEGER_CST)
-//    return false;
-
-  if (*index == NULL)
-    *index = lhs;
-  else if (*index != lhs)
-    return false;
-
-//  if (seen_constants->contains (rhs))
-//    return false;
-//  else
-//    seen_constants->add (rhs);
-
-  return true;
 }
 
 bool
@@ -312,20 +313,16 @@ extract_case_from_assignment (gassign *assign, tree *lhs, case_range *range,
     return false;
 }
 
-// TODO
-#include "print-tree.h"
-
 edge
 if_dom_walker::before_dom_children (basic_block bb)
 {
-  tree index = NULL_TREE;
-  vec<if_chain_entry> conditions;
-  conditions.create (8);
+  if_chain chain;
   hash_set<int_cst_hash> seen_constants;
   unsigned case_values = 0;
 
   while (true)
     {
+      bool first = chain.m_entries.is_empty ();
       if (bitmap_bit_p (m_visited_bbs, bb->index))
 	break;
       bitmap_set_bit (m_visited_bbs, bb->index);
@@ -334,17 +331,20 @@ if_dom_walker::before_dom_children (basic_block bb)
       if (gsi_end_p (gsi))
 	break;
 
-      if (!conditions.is_empty () && EDGE_COUNT (bb->preds) != 1)
+      if (!chain.m_entries.is_empty () && EDGE_COUNT (bb->preds) != 1)
 	break;
 
       gcond *cond = dyn_cast<gcond *> (gsi_stmt (gsi));
       if (cond == NULL)
 	break;
 
+      if (first)
+	chain.m_first_condition = cond;
+
       edge true_edge, false_edge;
       extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
 
-      if_chain_entry entry (cond, bb, true_edge, false_edge);
+      if_chain_entry entry (bb, true_edge, false_edge);
 
       /* Current we support following patterns (situations):
 
@@ -389,12 +389,8 @@ if_dom_walker::before_dom_children (basic_block bb)
       /* Situation 1.  */
       if (code == EQ_EXPR)
 	{
-	  // TODO: remove
-	  if (TREE_CODE (rhs) != INTEGER_CST)
+	  if (!chain.set_and_check_index (lhs))
 	    break;
-	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
-	    break;
-	  entry.m_index = lhs;
 	  entry.add_case_value (case_range (rhs));
 	  visited_stmt_count = 1;
 	  ++case_values;
@@ -430,9 +426,8 @@ if_dom_walker::before_dom_children (basic_block bb)
 					     &visited_stmt_count))
 	    break;
 	  rhs = gimple_assign_rhs2 (def1);
-	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
-	      break;
-	  entry.m_index = lhs;
+	  if (!chain.set_and_check_index (lhs))
+	    break;
 	  entry.add_case_value (range1);
 
 	  case_range range2;
@@ -440,9 +435,8 @@ if_dom_walker::before_dom_children (basic_block bb)
 					     &visited_stmt_count))
 	    break;
 	  rhs = gimple_assign_rhs2 (def2);
-	  if (!extract_condition (lhs, rhs, &index, &seen_constants))
-	      break;
-	  entry.m_index = lhs;
+	  if (!chain.set_and_check_index (lhs))
+	    break;
 	  entry.add_case_value (range2);
 	  case_values += 2;
 	  visited_stmt_count += 2;
@@ -452,7 +446,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 
       /* If it's not the first condition, then we need a BB without
 	 any statements.  */
-      if (!conditions.is_empty ())
+      if (!first)
 	{
 	  unsigned stmt_count = 0;
 	  for (gimple_stmt_iterator gsi = gsi_start_nondebug_bb (bb);
@@ -463,7 +457,7 @@ if_dom_walker::before_dom_children (basic_block bb)
 	    break;
 	}
 
-      conditions.safe_push (entry);
+      chain.m_entries.safe_push (entry);
 
       /* Follow if-elseif-elseif chain.  */
       bb = false_edge->dest;
@@ -474,13 +468,13 @@ if_dom_walker::before_dom_children (basic_block bb)
       if (dump_file)
 	{
 	  expanded_location loc
-	    = expand_location (gimple_location (conditions[0].m_cond));
+	    = expand_location (gimple_location (chain.m_first_condition));
 	  fprintf (dump_file, "Condition chain (at %s:%d) with %d conditions "
 		   "(%d BBs) transformed into a switch statement.\n",
-		   loc.file, loc.line, case_values, conditions.length ());
+		   loc.file, loc.line, case_values, chain.m_entries.length ());
 	}
 
-      all_candidates.safe_push (conditions);
+      all_candidates.safe_push (chain);
     }
 
   return NULL;
