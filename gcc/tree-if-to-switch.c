@@ -108,7 +108,7 @@ struct if_chain
   /* Switch index.  */
   tree m_index;
   /* If chain entries.  */
-  vec<if_chain_entry> m_entries; 
+  vec<if_chain_entry> m_entries;
 };
 
 bool
@@ -225,15 +225,15 @@ convert_if_conditions_to_switch (if_chain &chain)
   auto_vec<tree> labels;
   if_chain_entry first_cond = chain.m_entries[0];
 
-  edge default_edge = chain.m_entries[chain.m_entries.length () - 1].m_false_edge;
+  unsigned entries = chain.m_entries.length ();
+  edge default_edge = chain.m_entries[entries - 1].m_false_edge;
   basic_block default_bb = default_edge->dest;
 
   /* Recond all PHI nodes that will later be fixed.  */
   hash_map<basic_block, vec<tree> > phi_map;
   for (unsigned i = 0; i < chain.m_entries.length (); i++)
     record_phi_arguments (&phi_map, chain.m_entries[i].m_true_edge);
-  record_phi_arguments (&phi_map,
-			chain.m_entries[chain.m_entries.length () - 1].m_false_edge);
+  record_phi_arguments (&phi_map, chain.m_entries[entries - 1].m_false_edge);
 
   for (unsigned i = 0; i < chain.m_entries.length (); i++)
     {
