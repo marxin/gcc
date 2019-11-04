@@ -49,7 +49,10 @@ struct case_range
 
   case_range (tree min, tree max = NULL_TREE)
     : m_min (min), m_max (max)
-  {}
+  {
+    if (max == NULL_TREE)
+      m_max = min;
+  }
 
   tree m_min;
   tree m_max;
@@ -86,6 +89,8 @@ struct if_chain
 
   bool set_and_check_index (tree index);
 
+  bool check_non_overlapping_cases ();
+
   gcond *m_first_condition;
   tree m_index;
   vec<if_chain_entry> m_entries; 
@@ -101,6 +106,37 @@ if_chain::set_and_check_index (tree index)
     m_index = index;
 
   return index == m_index;
+}
+
+static int
+range_cmp (const void *a, const void *b)
+{
+  const case_range *cr1 = *(const case_range * const *) a;
+  const case_range *cr2 = *(const case_range * const *) b;
+
+  return tree_int_cst_compare (cr1->m_min, cr2->m_min);
+}
+
+bool
+if_chain::check_non_overlapping_cases ()
+{
+  auto_vec<case_range *> all_ranges;
+  for (unsigned i = 0; i < m_entries.length (); i++)
+    for (unsigned j =0; j < m_entries[i].m_case_values.length (); j++)
+      all_ranges.safe_push (&m_entries[i].m_case_values[j]);
+
+  all_ranges.qsort (range_cmp);
+
+  for (unsigned i = 0; i < all_ranges.length () - 2; i++)
+    {
+      case_range *left = all_ranges[i];
+      case_range *right = all_ranges[i + 1];
+      if (tree_int_cst_le (left->m_min, right->m_min)
+	  && tree_int_cst_le (right->m_min, left->m_max))
+	return false;
+    }
+
+  return true;
 }
 
 class if_dom_walker : public dom_walker
@@ -122,7 +158,7 @@ static tree
 build_case_label (tree min, tree max, basic_block dest)
 {
   tree label = gimple_block_label (dest);
-  return build_case_label (min, max, label);
+  return build_case_label (min, min == max ? NULL_TREE : max, label);
 }
 
 static int
@@ -152,34 +188,6 @@ record_phi_arguments (hash_map<basic_block, vec<tree> > *phi_map, edge e)
       phi_map->put (e->dest, phi_arguments);
     }
 }
-
-struct int_cst_hash : typed_noop_remove<tree>
-{
-  typedef tree value_type;
-  typedef tree compare_type;
-
-  static hashval_t hash (const tree &ref)
-  {
-    inchash::hash hstate (0);
-    inchash::add_expr (ref, hstate);
-    return hstate.end ();
-  }
-
-  static bool equal (const tree &ref1, const tree &ref2)
-  {
-    return tree_int_cst_equal (ref1, ref2);
-  }
-
-  static void mark_deleted (tree &ref) { ref = reinterpret_cast<tree> (1); }
-  static void mark_empty (tree &ref) { ref = NULL; }
-
-  static bool is_deleted (const tree &ref)
-  {
-    return ref == reinterpret_cast<tree> (1);
-  }
-
-  static bool is_empty (const tree &ref) { return ref == NULL; }
-};
 
 static void
 convert_if_conditions_to_switch (if_chain &chain)
@@ -261,8 +269,8 @@ extract_case_from_assignment (gassign *assign, tree *lhs, case_range *range,
 	 _1 = aChar_8(D) == 1;  */
       *lhs = gimple_assign_rhs1 (assign);
       range->m_min = gimple_assign_rhs2 (assign);
+      range->m_max = range->m_min;
 
-      // TODO: remove
       if (TREE_CODE (gimple_assign_rhs2 (assign)) != INTEGER_CST)
 	return false;
 
@@ -317,7 +325,6 @@ edge
 if_dom_walker::before_dom_children (basic_block bb)
 {
   if_chain chain;
-  hash_set<int_cst_hash> seen_constants;
   unsigned case_values = 0;
 
   while (true)
@@ -391,6 +398,8 @@ if_dom_walker::before_dom_children (basic_block bb)
 	{
 	  if (!chain.set_and_check_index (lhs))
 	    break;
+	  if (TREE_CODE (TREE_TYPE (rhs)) != INTEGER_CST)
+	    break;
 	  entry.add_case_value (case_range (rhs));
 	  visited_stmt_count = 1;
 	  ++case_values;
@@ -463,7 +472,8 @@ if_dom_walker::before_dom_children (basic_block bb)
       bb = false_edge->dest;
     }
 
-  if (case_values >= 3)
+  if (case_values >= 3
+      && chain.check_non_overlapping_cases ())
     {
       if (dump_file)
 	{
