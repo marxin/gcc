@@ -4,17 +4,17 @@
 
 # This script merges libsanitizer sources from upstream.
 
-VCS=${1:-svn}
+if [ "$#" -lt 1 ]; then
+  echo "Usage: merge.sh llvm_project_repository [vcs]"
+  exit 1
+fi
 
-get_upstream() {
-  rm -rf upstream
-  #cp -rf orig upstream
-  svn co http://llvm.org/svn/llvm-project/compiler-rt/trunk upstream
-}
+UPSTREAM=$1
+VCS=${2:-svn}
 
 get_current_rev() {
-  cd upstream
-  svn info | grep Revision | grep -o '[0-9]*'
+  cd $UPSTREAM
+  git rev-parse HEAD
 }
 
 list_files() {
@@ -34,7 +34,7 @@ change_comment_headers() {
 # This function merges changes from the directory upstream_path to
 # the directory  local_path.
 merge() {
-  upstream_path=upstream/$1
+  upstream_path=$UPSTREAM/compiler-rt/$1
   local_path=$2
   change_comment_headers $upstream_path
   echo MERGE: $upstream_path
@@ -64,7 +64,6 @@ fatal() {
 
 pwd | grep 'libsanitizer$' || \
   fatal "Run this script from libsanitizer dir"
-get_upstream
 CUR_REV=$(get_current_rev)
 echo Current upstream revision: $CUR_REV
 merge include/sanitizer include/sanitizer
@@ -77,14 +76,12 @@ merge lib/ubsan ubsan
 
 # Need to merge lib/builtins/assembly.h file:
 mkdir -p builtins
-cp -v upstream/lib/builtins/assembly.h builtins/assembly.h
-
-rm -rf upstream
+cp -v $UPSTREAM/compiler-rt/lib/builtins/assembly.h builtins/assembly.h
 
 # Update the MERGE file.
 cat << EOF > MERGE
 $CUR_REV
 
-The first line of this file holds the svn revision number of the
+The first line of this file holds the git revision number of the
 last merge done from the master library sources.
 EOF
