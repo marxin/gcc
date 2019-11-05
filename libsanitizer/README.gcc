@@ -11,6 +11,7 @@ https://llvm.org/svn/llvm-project/compiler-rt in the following directories:
   lib/tsan
   lib/lsan
   lib/ubsan
+  lib/hwasan
 
 Trivial and urgent fixes (portability, build fixes, etc.) may go directly to the
 GCC tree.  All non-trivial changes, functionality improvements, etc. should go
