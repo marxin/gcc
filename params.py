@@ -526,6 +526,14 @@ params = [Param(x.split(';')) for x in open('params.txt').readlines()]
 params = sorted(params, key = attrgetter('name'))
 
 with open('replacement.txt', 'w+') as f:
+  for k, v in mapping.items():
+    if not v.startswith('PARAM_'):
+      v = 'PARAM_' + v
+    r = ' s/%s/%s/g' % (k, v.lower())
+    f.write('find . -type f -name "*.h" -exec sed -i "%s" {} +\n' % r)
+    f.write('find . -type f -name "*.c" -exec sed -i "%s" {} +\n' % r)
+    f.write('find . -type f -name "*.cc" -exec sed -i "%s" {} +\n' % r)
+
   for p in params:
     r = ' s/PARAM_VALUE (%s)/%s/g' % (p.enum, p.canonical_enum())
     f.write('find . -type f -name "*.h" -exec sed -i "%s" {} +\n' % r)
