@@ -91,8 +91,8 @@ ia64_option_default_params (void)
   set_default_param_value (PARAM_MAX_SCHED_EXTEND_REGIONS_ITERS, 2);
 
   /* Set the default values for cache-related parameters.  */
-  set_default_param_value (PARAM_SIMULTANEOUS_PREFETCHES, 6);
-  set_default_param_value (PARAM_L1_CACHE_LINE_SIZE, 32);
+  set_default_param_value (PARAM_param_simultaneous_prefetches, 6);
+  set_default_param_value (PARAM_param_l1_cache_line_size, 32);
 
   set_default_param_value (PARAM_SCHED_MEM_TRUE_DEP_COST, 4);
 }

@@ -160,13 +160,13 @@ along with GCC; see the file COPYING3.  If not see
 
      - content of shadow memory 8 bytes for slot 7: 0xF1F1F1F1.
        The F1 byte pattern is a magic number called
-       ASAN_STACK_MAGIC_LEFT and is a way for the runtime to know that
+       param_asan_stack_MAGIC_LEFT and is a way for the runtime to know that
        the memory for that shadow byte is part of a the LEFT red zone
        intended to seat at the bottom of the variables on the stack.
 
      - content of shadow memory 8 bytes for slots 6 and 5:
        0xF4F4F400.  The F4 byte pattern is a magic number
-       called ASAN_STACK_MAGIC_PARTIAL.  It flags the fact that the
+       called param_asan_stack_MAGIC_PARTIAL.  It flags the fact that the
        memory region for this shadow byte is a PARTIAL red zone
        intended to pad a variable A, so that the slot following
        {A,padding} is 32 bytes aligned.
@@ -178,7 +178,7 @@ along with GCC; see the file COPYING3.  If not see
 
      - content of shadow memory 8 bytes for slot 4: 0xF2F2F2F2.
        The F2 byte pattern is a magic number called
-       ASAN_STACK_MAGIC_MIDDLE.  It flags the fact that the memory
+       param_asan_stack_MAGIC_MIDDLE.  It flags the fact that the memory
        region for this shadow byte is a MIDDLE red zone intended to
        seat between two 32 aligned slots of {variable,padding}.
 
@@ -190,7 +190,7 @@ along with GCC; see the file COPYING3.  If not see
 
      - content of shadow memory 8 bytes for slot 1: 0xF3F3F3F3.
        The F3 byte pattern is a magic number called
-       ASAN_STACK_MAGIC_RIGHT.  It flags the fact that the memory
+       param_asan_stack_MAGIC_RIGHT.  It flags the fact that the memory
        region for this shadow byte is a RIGHT red zone intended to seat
        at the top of the variables of the stack.
 
@@ -309,13 +309,13 @@ asan_mark_p (gimple *stmt, enum asan_mark_flags flag)
 bool
 asan_sanitize_stack_p (void)
 {
-  return (sanitize_flags_p (SANITIZE_ADDRESS) && ASAN_STACK);
+  return (sanitize_flags_p (SANITIZE_ADDRESS) && param_asan_stack);
 }
 
 bool
 asan_sanitize_allocas_p (void)
 {
-  return (asan_sanitize_stack_p () && ASAN_PROTECT_ALLOCAS);
+  return (asan_sanitize_stack_p () && param_asan_protect_allocas);
 }
 
 /* Checks whether section SEC should be sanitized.  */
@@ -1378,7 +1378,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   HOST_WIDE_INT asan_frame_size = offsets[0] - base_offset;
   HOST_WIDE_INT last_offset, last_size, last_size_aligned;
   int l;
-  unsigned char cur_shadow_byte = ASAN_STACK_MAGIC_LEFT;
+  unsigned char cur_shadow_byte = param_asan_stack_MAGIC_LEFT;
   tree str_cst, decl, id;
   int use_after_return_class = -1;
 
@@ -1429,7 +1429,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 
   /* Emit the prologue sequence.  */
   if (asan_frame_size > 32 && asan_frame_size <= 65536 && pbase
-      && ASAN_USE_AFTER_RETURN)
+      && param_asan_use_after_return)
     {
       use_after_return_class = floor_log2 (asan_frame_size - 1) - 5;
       /* __asan_stack_malloc_N guarantees alignment
@@ -1505,7 +1505,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
     }
   mem = gen_rtx_MEM (ptr_mode, base);
   mem = adjust_address (mem, VOIDmode, base_align_bias);
-  emit_move_insn (mem, gen_int_mode (ASAN_STACK_FRAME_MAGIC, ptr_mode));
+  emit_move_insn (mem, gen_int_mode (param_asan_stack_FRAME_MAGIC, ptr_mode));
   mem = adjust_address (mem, VOIDmode, GET_MODE_SIZE (ptr_mode));
   emit_move_insn (mem, expand_normal (str_cst));
   mem = adjust_address (mem, VOIDmode, GET_MODE_SIZE (ptr_mode));
@@ -1544,7 +1544,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   for (l = length; l; l -= 2)
     {
       if (l == 2)
-	cur_shadow_byte = ASAN_STACK_MAGIC_RIGHT;
+	cur_shadow_byte = param_asan_stack_MAGIC_RIGHT;
       offset = offsets[l - 1];
 
       bool extra_byte = (offset - base_offset) & (ASAN_SHADOW_GRANULARITY - 1);
@@ -1568,7 +1568,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
 	  offset += ASAN_SHADOW_GRANULARITY;
 	}
 
-      cur_shadow_byte = ASAN_STACK_MAGIC_MIDDLE;
+      cur_shadow_byte = param_asan_stack_MAGIC_MIDDLE;
     }
 
   /* As the automatic variables are aligned to
@@ -1585,7 +1585,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   if (use_after_return_class != -1)
     {
       rtx_code_label *lab2 = gen_label_rtx ();
-      char c = (char) ASAN_STACK_MAGIC_USE_AFTER_RET;
+      char c = (char) param_asan_stack_MAGIC_USE_AFTER_RET;
       emit_cmp_and_jump_insns (orig_base, base, EQ, NULL_RTX,
 			       VOIDmode, 0, lab2,
 			       profile_probability::very_likely ());
@@ -1593,7 +1593,7 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
       set_mem_alias_set (shadow_mem, asan_shadow_set);
       mem = gen_rtx_MEM (ptr_mode, base);
       mem = adjust_address (mem, VOIDmode, base_align_bias);
-      emit_move_insn (mem, gen_int_mode (ASAN_STACK_RETIRED_MAGIC, ptr_mode));
+      emit_move_insn (mem, gen_int_mode (param_asan_stack_RETIRED_MAGIC, ptr_mode));
       unsigned HOST_WIDE_INT sz = asan_frame_size >> ASAN_SHADOW_SHIFT;
       if (use_after_return_class < 5
 	  && can_store_by_pieces (sz, builtin_memset_read_str, &c,
@@ -1750,7 +1750,7 @@ is_odr_indicator (tree decl)
 bool
 asan_protect_global (tree decl, bool ignore_decl_rtl_set_p)
 {
-  if (!ASAN_GLOBALS)
+  if (!param_asan_globals)
     return false;
 
   rtx rtl, symbol;
@@ -2190,9 +2190,9 @@ static void
 instrument_derefs (gimple_stmt_iterator *iter, tree t,
 		   location_t location, bool is_store)
 {
-  if (is_store && !ASAN_INSTRUMENT_WRITES)
+  if (is_store && !param_asan_instrument_writes)
     return;
-  if (!is_store && !ASAN_INSTRUMENT_READS)
+  if (!is_store && !param_asan_instrument_reads)
     return;
 
   tree type, base;
@@ -2253,7 +2253,7 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
     {
       if (DECL_THREAD_LOCAL_P (inner))
 	return;
-      if (!ASAN_GLOBALS && is_global_var (inner))
+      if (!param_asan_globals && is_global_var (inner))
         return;
       if (!TREE_STATIC (inner))
 	{
@@ -2346,7 +2346,7 @@ instrument_mem_region_access (tree base, tree len,
 static bool
 instrument_builtin_call (gimple_stmt_iterator *iter)
 {
-  if (!ASAN_MEMINTRIN)
+  if (!param_asan_memintrin)
     return false;
 
   bool iter_advanced_p = false;
@@ -3155,7 +3155,7 @@ asan_store_shadow_bytes (gimple_stmt_iterator *iter, location_t loc,
       gcc_unreachable ();
     }
 
-  unsigned char c = (char) is_clobber ? ASAN_STACK_MAGIC_USE_AFTER_SCOPE : 0;
+  unsigned char c = (char) is_clobber ? param_asan_stack_MAGIC_USE_AFTER_SCOPE : 0;
   unsigned HOST_WIDE_INT val = 0;
   unsigned last_pos = size;
   if (last_chunk_size && !is_clobber)
@@ -3219,7 +3219,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   tree base_addr = gimple_assign_lhs (g);
 
   /* Generate direct emission if size_in_bytes is small.  */
-  if (size_in_bytes <= ASAN_PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD)
+  if (size_in_bytes <= (unsigned)param_use_after_scope_direct_emission_threshold)
     {
       const unsigned HOST_WIDE_INT shadow_size
 	= shadow_mem_size (size_in_bytes);

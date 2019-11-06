@@ -60,18 +60,18 @@ extern hash_set <tree> *asan_used_labels;
 
 /* Shadow memory values for stack protection.  Left is below protected vars,
    the first pointer in stack corresponding to that offset contains
-   ASAN_STACK_FRAME_MAGIC word, the second pointer to a string describing
+   param_asan_stack_FRAME_MAGIC word, the second pointer to a string describing
    the frame.  Middle is for padding in between variables, right is
    above the last protected variable and partial immediately after variables
    up to ASAN_RED_ZONE_SIZE alignment.  */
-#define ASAN_STACK_MAGIC_LEFT		  0xf1
-#define ASAN_STACK_MAGIC_MIDDLE		  0xf2
-#define ASAN_STACK_MAGIC_RIGHT		  0xf3
-#define ASAN_STACK_MAGIC_USE_AFTER_RET	  0xf5
-#define ASAN_STACK_MAGIC_USE_AFTER_SCOPE  0xf8
+#define param_asan_stack_MAGIC_LEFT		  0xf1
+#define param_asan_stack_MAGIC_MIDDLE		  0xf2
+#define param_asan_stack_MAGIC_RIGHT		  0xf3
+#define param_asan_stack_MAGIC_USE_AFTER_RET	  0xf5
+#define param_asan_stack_MAGIC_USE_AFTER_SCOPE  0xf8
 
-#define ASAN_STACK_FRAME_MAGIC		0x41b58ab3
-#define ASAN_STACK_RETIRED_MAGIC	0x45e0360e
+#define param_asan_stack_FRAME_MAGIC		0x41b58ab3
+#define param_asan_stack_RETIRED_MAGIC	0x45e0360e
 
 #define ASAN_USE_AFTER_SCOPE_ATTRIBUTE	"use after scope memory"
 
