@@ -528,9 +528,9 @@ params = sorted(params, key = attrgetter('name'))
 with open('replacement.txt', 'w+') as f:
   for p in params:
     r = ' s/PARAM_VALUE (%s/%s/g' % (p.enum, p.canonical_enum())
-    f.write('find . -name "*.h" -exec sed -i "%s" {} \\;\n' % r)
-    f.write('find . -name "*.c" -exec sed -i "%s" {} \\;\n' % r)
-    f.write('find . -name "*.cc" -exec sed -i "%s" {} \\;\n' % r)
+    f.write('find . -type f -name "*.h" -exec sed -i "%s" {} \\;\n' % r)
+    f.write('find . -type f -name "*.c" -exec sed -i "%s" {} \\;\n' % r)
+    f.write('find . -type f -name "*.cc" -exec sed -i "%s" {} \\;\n' % r)
 
 exit(0)
 
