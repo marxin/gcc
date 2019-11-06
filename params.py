@@ -535,7 +535,7 @@ with open('replacement.txt', 'w+') as f:
     f.write('find . -type f -name "*.cc" -exec sed -i "%s" {} +\n' % r)
 
   for p in params:
-    r = ' s/PARAM_VALUE (%s)/%s/g' % (p.enum, p.canonical_enum())
+    r = ' s/%s/%s/g' % (p.enum, p.canonical_enum())
     f.write('find . -type f -name "*.h" -exec sed -i "%s" {} +\n' % r)
     f.write('find . -type f -name "*.c" -exec sed -i "%s" {} +\n' % r)
     f.write('find . -type f -name "*.cc" -exec sed -i "%s" {} +\n' % r)
