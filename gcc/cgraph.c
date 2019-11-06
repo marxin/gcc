@@ -2738,7 +2738,7 @@ cgraph_edge::maybe_hot_p (void)
   if (caller->frequency == NODE_FREQUENCY_EXECUTED_ONCE
       && sreal_frequency () * 2 < 3)
     return false;
-  if (sreal_frequency () * PARAM_VALUE (HOT_BB_FREQUENCY_FRACTION) <= 1)
+  if (sreal_frequency () * param_hot_bb_frequency_fraction <= 1)
     return false;
   return true;
 }

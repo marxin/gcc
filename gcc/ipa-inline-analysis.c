@@ -448,7 +448,7 @@ estimate_growth (struct cgraph_node *node)
       else if (DECL_COMDAT (node->decl)
 	       && node->can_remove_if_no_direct_calls_p ())
 	d.growth -= (info->size
-		     * (100 - PARAM_VALUE (PARAM_COMDAT_SHARING_PROBABILITY))
+		     * (100 - param_comdat_sharing_probability)
 		     + 50) / 100;
     }
 
