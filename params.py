@@ -507,7 +507,6 @@ for line in usage.strip().split('\n'):
   name = name[:name.index(')')]
   used.add(name)
 
-
 class Param:
   def __init__(self, tokens):
     self.enum = tokens[0]
@@ -525,6 +524,15 @@ class Param:
 
 params = [Param(x.split(';')) for x in open('params.txt').readlines()]
 params = sorted(params, key = attrgetter('name'))
+
+with open('replacement.txt', 'w+') as f:
+  for p in params:
+    r = ' s/PARAM_VALUE (%s/%s/g' % (p.enum, p.canonical_enum())
+    f.write('find . -name "*.h" -exec sed -i "" %s {} +\n' % r)
+    f.write('find . -name "*.c" -exec sed -i "" %s {} +\n' % r)
+    f.write('find . -name "*.cc" -exec sed -i "" %s {} +\n' % r)
+
+exit(0)
 
 #for p in params:
 #  if not p.enum in used and not p.enum in mapping.values():
