@@ -234,7 +234,10 @@ func_checker::hash_operand (const_tree arg, inchash::hash &hstate,
     case CONST_DECL:
     case SSA_NAME:
       return;
-
+    case FIELD_DECL:
+      inchash::add_expr (DECL_FIELD_OFFSET (arg), hstate, flags);
+      inchash::add_expr (DECL_FIELD_BIT_OFFSET (arg), hstate, flags);
+      return;
     default:
       break;
     }
@@ -280,6 +283,12 @@ func_checker::operand_equal_p (const_tree t1, const_tree t2,
       return compare_decl (t1, t2);
     case SSA_NAME:
       return compare_ssa_name (t1, t2);
+    case FIELD_DECL:
+      if (DECL_FIELD_OFFSET (t1) != DECL_FIELD_OFFSET (t2))
+	return false;
+      if (DECL_FIELD_BIT_OFFSET (t1) != DECL_FIELD_BIT_OFFSET (t2))
+	return false;
+      return true;
     default:
       break;
     }
