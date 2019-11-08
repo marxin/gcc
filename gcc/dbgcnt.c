@@ -40,23 +40,11 @@ static struct string2counter_map map[debug_counter_number_of_counters] =
 };
 #undef DEBUG_COUNTER
 
-#define DEBUG_COUNTER(a) UINT_MAX,
-static unsigned int limit_high[debug_counter_number_of_counters] =
-{
-#include "dbgcnt.def"
-};
-#undef DEBUG_COUNTER
+typedef std::pair<unsigned int, unsigned int> limit_tuple;
 
-static unsigned int limit_low[debug_counter_number_of_counters];
+static auto_vec<limit_tuple> *limits[debug_counter_number_of_counters] = {NULL};
 
 static unsigned int count[debug_counter_number_of_counters];
-
-bool
-dbg_cnt_is_enabled (enum debug_counter index)
-{
-  unsigned v = count[index];
-  return v > limit_low[index] && v <= limit_high[index];
-}
 
 static void
 print_limit_reach (const char *counter, int limit, bool upper_p)
@@ -72,47 +60,74 @@ print_limit_reach (const char *counter, int limit, bool upper_p)
 bool
 dbg_cnt (enum debug_counter index)
 {
-  count[index]++;
+  unsigned v = ++count[index];
 
-  /* Do not print the info for default lower limit.  */
-  if (count[index] == limit_low[index] && limit_low[index] > 0)
-    print_limit_reach (map[index].name, limit_low[index], false);
-  else if (count[index] == limit_high[index])
-    print_limit_reach (map[index].name, limit_high[index], true);
+  if (limits[index] == NULL)
+    return true;
+  else if (limits[index]->is_empty ())
+    return false;
 
-  return dbg_cnt_is_enabled (index);
-}
+  /* Reverse intervals exactly once.  */
+  if (v == 1)
+    limits[index]->reverse ();
 
-static void
-dbg_cnt_set_limit_by_index (enum debug_counter index, int low, int high)
-{
-  limit_low[index] = low;
-  limit_high[index] = high;
+  unsigned last = limits[index]->length () - 1;
+  unsigned int min = (*limits[index])[last].first;
+  unsigned int max = (*limits[index])[last].second;
 
-  fprintf (stderr, "dbg_cnt '%s' set to %d-%d\n", map[index].name, low, high);
+  if (v < min)
+    return false;
+  else if (v == min)
+    {
+      print_limit_reach (map[index].name, v, false);
+      if (min == max)
+	limits[index]->pop ();
+      return true;
+    }
+  else if (v < max)
+    return true;
+  else if (v == max)
+    {
+      print_limit_reach (map[index].name, v, true);
+      limits[index]->pop ();
+      return true;
+    }
+  else
+    return false;
 }
 
 static bool
-dbg_cnt_set_limit_by_name (const char *name, int low, int high)
+dbg_cnt_set_limit_by_index (enum debug_counter index, const char *name,
+			    unsigned int low, unsigned int high)
+{
+  if (limits[index] == NULL)
+    limits[index] = new auto_vec<limit_tuple> ();
+
+  if (!limits[index]->is_empty ())
+    {
+      auto_vec<limit_tuple> *intervals = limits[index];
+      unsigned int last_max = (*intervals)[intervals->length () - 1].second;
+      if (last_max >= low)
+	{
+	  error ("Interval minimum %d of %<-fdbg-cnt=%s%> is smaller or equal "
+		 "to previous value %u\n",
+		 low, name, last_max);
+	  return false;
+	}
+    }
+
+  limits[index]->safe_push (limit_tuple (low, high));
+  return true;
+}
+
+static bool
+dbg_cnt_set_limit_by_name (const char *name, unsigned int low,
+			   unsigned int high)
 {
   if (high < low)
     {
-      error ("%<-fdbg-cnt=%s:%d:%d%> has smaller upper limit than the lower",
+      error ("%<-fdbg-cnt=%s:%d-%d%> has smaller upper limit than the lower",
 	     name, low, high);
-      return false;
-    }
-
-  if (low < 0)
-    {
-      error ("Lower limit %d of %<-fdbg-cnt=%s%> must be a non-negative "
-	     "number", low, name);
-      return false;
-    }
-
-  if (high < 0)
-    {
-      error ("Upper limit %d of %<-fdbg-cnt=%s%> must be a non-negative "
-	     "number", high, name);
       return false;
     }
 
@@ -124,31 +139,27 @@ dbg_cnt_set_limit_by_name (const char *name, int low, int high)
   if (i < 0)
     return false;
 
-  dbg_cnt_set_limit_by_index ((enum debug_counter) i, low, high);
-  return true;
+  return dbg_cnt_set_limit_by_index ((enum debug_counter) i, name, low, high);
 }
 
-
-/* Process a single "name:value" pair.
+/* Process a single "low:high" pair.
    Returns NULL if there's no valid pair is found.
    Otherwise returns a pointer to the end of the pair. */
 
 static bool
-dbg_cnt_process_single_pair (const char *arg)
+dbg_cnt_process_single_pair (char *name, char *str)
 {
-  char *str = xstrdup (arg);
-  char *name = strtok (str, ":");
-  char *value1 = strtok (NULL, ":");
-  char *value2 = strtok (NULL, ":");
+  char *value1 = strtok (str, "-");
+  char *value2 = strtok (NULL, "-");
 
-  int high, low;
+  unsigned int high, low;
 
   if (value1 == NULL)
     return false;
 
   if (value2 == NULL)
     {
-      low = 0;
+      low = 1;
       high = strtol (value1, NULL, 10);
     }
   else
@@ -166,17 +177,24 @@ dbg_cnt_process_opt (const char *arg)
   char *str = xstrdup (arg);
   unsigned int start = 0;
 
-  auto_vec<const char *> tokens;
-  for (const char *next = strtok (str, ","); next != NULL;
-       next = strtok (NULL, ","))
+  auto_vec<char *> tokens;
+  for (char *next = strtok (str, ","); next != NULL; next = strtok (NULL, ","))
     tokens.safe_push (next);
 
   unsigned i;
   for (i = 0; i < tokens.length (); i++)
     {
-     if (!dbg_cnt_process_single_pair (tokens[i]))
-       break;
-     start += strlen (tokens[i]) + 1;
+      auto_vec<char *> ranges;
+      char *name = strtok (tokens[i], ":");
+      for (char *part = strtok (NULL, ":"); part; part = strtok (NULL, ":"))
+	ranges.safe_push (part);
+
+      for (unsigned j = 0; j < ranges.length (); j++)
+	{
+	  if (!dbg_cnt_process_single_pair (name, ranges[j]))
+	    break;
+	}
+      start += strlen (tokens[i]) + 1;
     }
 
    if (i != tokens.length ())
@@ -195,11 +213,24 @@ void
 dbg_cnt_list_all_counters (void)
 {
   int i;
-  printf ("  %-32s %-11s %-12s\n", "counter name",  "low limit",
-	  "high limit");
+  printf ("  %-30s %s\n", "counter name", "closed intervals");
   printf ("-----------------------------------------------------------------\n");
   for (i = 0; i < debug_counter_number_of_counters; i++)
-    printf ("  %-30s %11u %12u\n",
-	    map[i].name, limit_low[map[i].counter], limit_high[map[i].counter]);
+    {
+      printf ("  %-30s ", map[i].name);
+      if (limits[i] != NULL)
+	{
+	  for (unsigned j = 0; j < limits[i]->length (); j++)
+	    {
+	      printf ("[%u, %u]", (*limits[i])[j].first,
+		      (*limits[i])[j].second);
+	      if (j != limits[i]->length () - 1)
+		printf (", ");
+	    }
+	  putchar ('\n');
+	}
+      else
+	printf ("unset\n");
+    }
   printf ("\n");
 }
