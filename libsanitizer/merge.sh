@@ -68,6 +68,7 @@ CUR_REV=$(get_current_rev)
 echo Current upstream revision: $CUR_REV
 merge include/sanitizer include/sanitizer
 merge lib/asan asan
+merge lib/hwasan hwasan
 merge lib/lsan lsan
 merge lib/tsan/rtl tsan
 merge lib/sanitizer_common sanitizer_common
