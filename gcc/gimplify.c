@@ -1232,8 +1232,11 @@ asan_poison_variable (tree decl, bool poison, gimple_stmt_iterator *it,
 
   /* It's necessary to have all stack variables aligned to ASAN granularity
      bytes.  */
-  if (DECL_ALIGN_UNIT (decl) <= ASAN_SHADOW_GRANULARITY)
-    SET_DECL_ALIGN (decl, BITS_PER_UNIT * ASAN_SHADOW_GRANULARITY);
+  gcc_assert (!memory_tagging_p () || hwasan_sanitize_stack_p ());
+  unsigned shadow_granularity
+    = memory_tagging_p () ? HWASAN_TAG_GRANULE_SIZE : ASAN_SHADOW_GRANULARITY;
+  if (DECL_ALIGN_UNIT (decl) <= shadow_granularity)
+    SET_DECL_ALIGN (decl, BITS_PER_UNIT * shadow_granularity);
 
   HOST_WIDE_INT flags = poison ? ASAN_MARK_POISON : ASAN_MARK_UNPOISON;
 
@@ -14735,7 +14738,7 @@ gimplify_function_tree (tree fndecl)
       && !needs_to_live_in_memory (ret))
     DECL_GIMPLE_REG_P (ret) = 1;
 
-  if (asan_sanitize_use_after_scope () && sanitize_flags_p (SANITIZE_ADDRESS))
+  if (asan_sanitize_use_after_scope ())
     asan_poisoned_variables = new hash_set<tree> ();
   bind = gimplify_body (fndecl, true);
   if (asan_poisoned_variables)

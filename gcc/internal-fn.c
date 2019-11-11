@@ -457,6 +457,74 @@ expand_UBSAN_OBJECT_SIZE (internal_fn, gcall *)
 /* This should get expanded in the sanopt pass.  */
 
 static void
+expand_HWASAN_CHECK (internal_fn, gcall *)
+{
+  gcc_unreachable ();
+}
+
+static void
+expand_HWASAN_CHOOSE_TAG (internal_fn, gcall *gc)
+{
+  tree tag = gimple_call_lhs (gc);
+  rtx target = expand_expr (tag, NULL_RTX, VOIDmode, EXPAND_NORMAL);
+  machine_mode mode = GET_MODE (target);
+  gcc_assert (mode == QImode);
+
+  rtx base_tag = hwasan_extract_tag (hwasan_base ());
+  gcc_assert (base_tag);
+  rtx tag_offset = GEN_INT (hwasan_current_tag ());
+  rtx chosen_tag = expand_simple_binop (QImode, PLUS, base_tag, tag_offset,
+					target, /* unsignedp = */1,
+					OPTAB_WIDEN);
+
+  gcc_assert (chosen_tag);
+  /* Really need to put the tag into the `target` RTX.  */
+  if (chosen_tag != target)
+    {
+      rtx temp = chosen_tag;
+      machine_mode ret_mode = GET_MODE (chosen_tag);
+      if (ret_mode != mode)
+	temp = simplify_gen_unary (TRUNCATE, mode, chosen_tag, ret_mode);
+
+      emit_move_insn (target, temp);
+    }
+
+  hwasan_increment_tag ();
+}
+
+static void
+expand_HWASAN_MARK (internal_fn, gcall *gc)
+{
+  HOST_WIDE_INT flag = tree_to_shwi (gimple_call_arg (gc, 0));
+  bool is_poison = ((asan_mark_flags)flag) == ASAN_MARK_POISON;
+
+  tree base = gimple_call_arg (gc, 1);
+  gcc_checking_assert (TREE_CODE (base) == ADDR_EXPR);
+  rtx base_rtx = expand_normal (base);
+
+  rtx tag = is_poison ? const0_rtx : hwasan_extract_tag (base_rtx);
+  rtx address = hwasan_create_untagged_base (base_rtx);
+
+  tree len = gimple_call_arg (gc, 2);
+  gcc_assert (tree_fits_shwi_p (len));
+  unsigned HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
+  uint8_t tg_mask = HWASAN_TAG_GRANULE_SIZE - 1;
+  gcc_assert (size_in_bytes);
+  size_in_bytes = (size_in_bytes + tg_mask) & ~tg_mask;
+  rtx size = gen_int_mode (size_in_bytes, Pmode);
+
+  rtx func = init_one_libfunc ("__hwasan_tag_memory");
+  emit_library_call (func,
+      LCT_NORMAL,
+      VOIDmode,
+      address, ptr_mode,
+      tag, QImode,
+      size, ptr_mode);
+}
+
+/* This should get expanded in the sanopt pass.  */
+
+static void
 expand_ASAN_CHECK (internal_fn, gcall *)
 {
   gcc_unreachable ();

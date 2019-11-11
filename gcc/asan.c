@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dojump.h"
 #include "explow.h"
 #include "expr.h"
+#include "except.h"
 #include "output.h"
 #include "langhooks.h"
 #include "cfgloop.h"
@@ -579,15 +580,28 @@ get_last_alloca_addr ()
 static void
 handle_builtin_stack_restore (gcall *call, gimple_stmt_iterator *iter)
 {
-  if (!iter || !asan_sanitize_allocas_p ())
+  if (!iter
+      || !(asan_sanitize_allocas_p () || hwasan_sanitize_stack_p ()))
     return;
 
-  tree last_alloca = get_last_alloca_addr ();
   tree restored_stack = gimple_call_arg (call, 0);
-  tree fn = builtin_decl_implicit (BUILT_IN_ASAN_ALLOCAS_UNPOISON);
-  gimple *g = gimple_build_call (fn, 2, last_alloca, restored_stack);
-  gsi_insert_before (iter, g, GSI_SAME_STMT);
-  g = gimple_build_assign (last_alloca, restored_stack);
+
+  gimple *g;
+
+  if (hwasan_sanitize_stack_p ())
+    {
+      tree fn = builtin_decl_implicit (BUILT_IN_HWASAN_HANDLE_LONGJMP);
+      g = gimple_build_call (fn, 1, restored_stack);
+    }
+  else
+    {
+      tree last_alloca = get_last_alloca_addr ();
+      tree fn = builtin_decl_implicit (BUILT_IN_ASAN_ALLOCAS_UNPOISON);
+      g = gimple_build_call (fn, 2, last_alloca, restored_stack);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      g = gimple_build_assign (last_alloca, restored_stack);
+    }
+
   gsi_insert_before (iter, g, GSI_SAME_STMT);
 }
 
@@ -617,14 +631,12 @@ handle_builtin_stack_restore (gcall *call, gimple_stmt_iterator *iter)
 static void
 handle_builtin_alloca (gcall *call, gimple_stmt_iterator *iter)
 {
-  if (!iter || !asan_sanitize_allocas_p ())
+  if (!iter
+      || !(asan_sanitize_allocas_p () || hwasan_sanitize_stack_p ()))
     return;
 
   gassign *g;
   gcall *gg;
-  const HOST_WIDE_INT redzone_mask = ASAN_RED_ZONE_SIZE - 1;
-
-  tree last_alloca = get_last_alloca_addr ();
   tree callee = gimple_call_fndecl (call);
   tree old_size = gimple_call_arg (call, 0);
   tree ptr_type = gimple_call_lhs (call) ? TREE_TYPE (gimple_call_lhs (call))
@@ -633,6 +645,85 @@ handle_builtin_alloca (gcall *call, gimple_stmt_iterator *iter)
   unsigned int align
     = DECL_FUNCTION_CODE (callee) == BUILT_IN_ALLOCA
       ? 0 : tree_to_uhwi (gimple_call_arg (call, 1));
+
+  if (hwasan_sanitize_stack_p ())
+    {
+      /*
+	 HWASAN needs a different expansion.
+
+	 addr = __builtin_alloca (size, align);
+
+	 should be replaced by
+
+	 new_size = size rounded up to HWASAN_TAG_GRANULE_SIZE byte alignment;
+	 untagged_addr = __builtin_alloca (new_size, align);
+	 tag = __hwasan_choose_alloca_tag ();
+	 addr = __hwasan_tag_pointer (untagged_addr, tag);
+	 __hwasan_tag_memory (addr, tag, new_size);
+	*/
+      /* Ensure alignment at least HWASAN_TAG_GRANULE_SIZE bytes so we start on
+	 a tag granule.  */
+      align = align > HWASAN_TAG_GRANULE_SIZE ? align : HWASAN_TAG_GRANULE_SIZE;
+
+      /* tree new_size = (old_size + 15) & ~15;  */
+      uint8_t tg_mask = HWASAN_TAG_GRANULE_SIZE - 1;
+      tree old_size = gimple_call_arg (call, 0);
+      tree tree_mask = build_int_cst (size_type_node, tg_mask);
+      g = gimple_build_assign (make_ssa_name (size_type_node), PLUS_EXPR,
+			       old_size, tree_mask);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      tree oversize = gimple_assign_lhs (g);
+
+      g = gimple_build_assign (make_ssa_name (size_type_node), BIT_NOT_EXPR,
+			       tree_mask);
+      tree mask = gimple_assign_lhs (g);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+
+      g = gimple_build_assign (make_ssa_name (size_type_node), BIT_AND_EXPR,
+			       oversize, mask);
+      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      tree new_size = gimple_assign_lhs (g);
+
+      /* emit the alloca call */
+      tree fn = builtin_decl_implicit (BUILT_IN_ALLOCA_WITH_ALIGN);
+      gg = gimple_build_call (fn, 2, new_size,
+			      build_int_cst (size_type_node, align));
+      tree untagged_addr = make_ssa_name (ptr_type, gg);
+      gimple_call_set_lhs (gg, untagged_addr);
+      gsi_insert_before (iter, gg, GSI_SAME_STMT);
+
+      /* Insert code choosing the tag.
+	 Here we use an internal function so we can choose the tag at expand
+	 time.  We need the decision to be made after stack variables have been
+	 assigned their tag (i.e. once the tag_offset variable has been set to
+	 one after the last stack variables tag).  */
+
+      gg = gimple_build_call_internal (IFN_HWASAN_CHOOSE_TAG, 0);
+      tree tag = make_ssa_name (unsigned_char_type_node, gg);
+      gimple_call_set_lhs (gg, tag);
+      gsi_insert_before (iter, gg, GSI_SAME_STMT);
+
+      /* Insert code adding tag to pointer.  */
+      fn = builtin_decl_implicit (BUILT_IN_HWASAN_TAG_PTR);
+      gg = gimple_build_call (fn, 2, untagged_addr, tag);
+      tree addr = make_ssa_name (ptr_type, gg);
+      gimple_call_set_lhs (gg, addr);
+      gsi_insert_before (iter, gg, GSI_SAME_STMT);
+
+      /* Insert code tagging shadow memory.
+	 NOTE: require using `untagged_addr` here for libhwasan API.  */
+      fn = builtin_decl_implicit (BUILT_IN_HWASAN_TAG_MEM);
+      gg = gimple_build_call (fn, 3, untagged_addr, tag, new_size);
+      gsi_insert_before (iter, gg, GSI_SAME_STMT);
+
+      /* Finally, replace old alloca ptr with NEW_ALLOCA.  */
+      replace_call_with_value (iter, addr);
+      return;
+    }
+
+  tree last_alloca = get_last_alloca_addr ();
+  const HOST_WIDE_INT redzone_mask = ASAN_RED_ZONE_SIZE - 1;
+
 
   /* If ALIGN > ASAN_RED_ZONE_SIZE, we embed left redzone into first ALIGN
      bytes of allocated space.  Otherwise, align alloca to ASAN_RED_ZONE_SIZE
@@ -786,6 +877,31 @@ get_mem_refs_of_builtin_call (gcall *call,
       break;
 
     case BUILT_IN_STRLEN:
+      /* Special case strlen here since its length is taken from its return
+	 value.
+
+	 The approach taken by the sanitizers is to check a memory access
+	 before it's taken.  For ASAN strlen is intercepted by libasan, so no
+	 check is inserted by the compiler.
+
+	 This function still returns `true` and provides a length to the rest
+	 of the ASAN pass in order to record what areas have been checked,
+	 avoiding superfluous checks later on.
+
+	 HWASAN does not intercept any of these internal functions.
+	 This means that checks for memory accesses must be inserted by the
+	 compiler.
+	 strlen is a special case, because we can tell the length from the
+	 return of the function, but that is not known until after the function
+	 has returned.
+
+	 Hence we can't check the memory access before it happens.
+	 We could check the memory access after it has already happened, but
+	 for now I'm choosing to just ignore `strlen` calls.
+	 This decision was simply made because that means the special case is
+	 limited to this one case of this one function.  */
+      if (memory_tagging_p ())
+	return false;
       source0 = gimple_call_arg (call, 0);
       len = gimple_call_lhs (call);
       break;
@@ -1355,6 +1471,150 @@ asan_redzone_buffer::flush_if_full (void)
     flush_redzone_payload ();
 }
 
+
+/* HWAddressSanitizer (hwasan) is a probabilistic method for detecting
+   out-of-bounds and use-after-free bugs.
+   Read more:
+   http://code.google.com/p/address-sanitizer/
+
+   Similar to AddressSanitizer (asan) it consists of two parts: the
+   instrumentation module in this file, and a run-time library.
+
+   The instrumentation module adds a run-time check before every memory insn in
+   the same manner as asan (see the block comment for AddressSanitizer above).
+   Currently, hwasan only adds out-of-line instrumentation, where each check is
+   implemented as a function call to the run-time library.  Hence a check for a
+   load of N bytes from address X would be implemented with a function call to
+   __hwasan_loadN(X), and checking a store of N bytes from address X would be
+   implemented with a function call to __hwasan_storeN(X).
+
+   The main difference between hwasan and asan is in the information stored to
+   help this checking.  Both sanitizers use a shadow memory area which stores
+   data recording the state of main memory at a corresponding address.
+
+   For hwasan, each 16 byte granule in main memory has a corresponding address
+   in shadow memory.  This shadow address can be calculated with equation:
+     (addr >> HWASAN_TAG_SHIFT_SIZE) + __hwasan_shadow_memory_dynamic_address;
+   The conversion between real and shadow memory for asan is given in the block
+   comment at the top of this file.
+   The description of how this shadow memory is laid out for asan is in the
+   block comment at the top of this file, here we describe how this shadow
+   memory is used for hwasan.
+
+   For hwasan, each variable is assigned a byte-sized 'tag'.  The extent of
+   that variable in the shadow memory is filled with the assigned tag, and
+   every pointer referencing that variable has its top byte set to the same
+   tag.  The run-time library redefines malloc so that every allocation returns
+   a tagged pointer and tags the corresponding shadow memory with the same tag.
+
+   On each pointer dereference the tag found in the pointer is compared to the
+   tag found in the shadow memory corresponding to the accessed memory address.
+   If these tags are found to differ then this memory access is judged to be
+   invalid and a report is generated.
+
+   This method of bug detection is not perfect -- it can not catch every bad
+   access, but catches them probabilistically instead.  There is always the
+   possibility that an invalid memory access will happen to access memory
+   tagged with the same tag as the pointer that this access used.
+   The chances of this are approx. 0.4% for any two uncorrelated objects.
+
+   If this does happen, random tag generation can mitigate the problem by
+   decreasing the probability that it will *always* happen.  i.e. if two
+   objects are tagged the same in one run of the binary they are unlikely to be
+   tagged the same in the next run.
+   Heap allocated objects always have randomly generated tags, while objects on
+   the stack can be given random tags determined by command line flags.
+
+   [16 byte granule implications]
+    Since the shadow memory only has a resolution on real memory of 16 bytes,
+    invalid accesses that are still within the same 16 byte granule as valid
+    memory will not be caught.
+
+    There is a "short-granule" feature in the runtime library which does catch
+    such accesses, but this feature is not implemented for stack objects (since
+    stack objects are allocated and tagged by compiler instrumentation, and
+    this feature has not yet been implemented in GCC instrumentation).
+
+    Another outcome of this 16 byte resolution is that each tagged object must
+    be 16 byte aligned.  If two objects were to share any 16 byte granule in
+    memory, then they both would have to be given the same tag, and invalid
+    accesses to one using a pointer to the other would be undetectable.
+
+   [Compiler instrumentation]
+    Compiler instrumentation ensures that two adjacent buffers on the stack are
+    given different tags, this means an access to one buffer using a pointer
+    generated from the other (e.g. through buffer overrun) will have mismatched
+    tags and be caught by hwasan.
+
+    We never randomly tag every object on the stack, since that would require
+    keeping many registers to record each tag.  Instead we randomly generate a
+    tag for each function frame, and each new stack object uses a tag offset
+    from that frame tag.
+    i.e. each object is tagged as RFT + offset, where RFT is the "random frame
+    tag" generated for this frame.
+
+    As a demonstration, using the same example program as in the asan block
+    comment above:
+
+     int
+     foo ()
+     {
+       char a[23] = {0};
+       int b[2] = {0};
+
+       a[5] = 1;
+       b[1] = 2;
+
+       return a[5] + b[1];
+     }
+
+    On AArch64 the stack will be ordered as follows for the above function:
+
+    Slot 1/ [24 bytes for variable 'a']
+    Slot 2/ [8 bytes padding for alignment]
+    Slot 3/ [8 bytes for variable 'b']
+    Slot 4/ [8 bytes padding for alignment]
+
+    (The padding is there to ensure 16 byte alignment as described in the 16
+     byte granule implications).
+
+    While the shadow memory will be ordered as follows:
+
+    - 2 bytes (representing 32 bytes in real memory) tagged with RFT + 1.
+    - 1 byte (representing 16 bytes in real memory) tagged with RFT + 2.
+
+    And any pointer to "a" will have the tag RFT + 1, and any pointer to "b"
+    will have the tag RFT + 2.
+
+   [Top Byte Ignore requirements]
+    Hwasan requires the ability to store an 8 bit tag in every pointer.  There
+    is no instrumentation done to remove this tag from pointers before
+    dereferencing, which means the hardware must ignore this tag during memory
+    accesses.
+
+    One architecture that provides this feature is the AArch64 architecture.
+    This is the only architecture that hwasan is implemented for at the moment.
+
+   [Stack requires cleanup on unwinding]
+    During normal operation of a hwasan sanitized program, as the stack grows
+    more space in the shadow memory becomes tagged.  As the stack shrinks this
+    shadow memory space must become untagged.  If it is not untagged then when
+    the stack grows again (during other function calls later on in the program)
+    objects on the stack that are usually not tagged (e.g. parameters passed on
+    the stack) can be placed in memory whose shadow space is tagged with
+    something else, and accesses can cause false positive reports.
+
+    Hence we place untagging code on every epilogue of functions which tag some
+    stack objects.
+
+    Moreover, the run-time library intercepts longjmp & setjmp to uncolour
+    when the stack is unwound this way.
+
+    C++ exceptions are not yet handled, which means this sanitizer can not
+    handle C++ code that throws exceptions -- it will give false positives
+    after an exception has been thrown.  */
+
+
 /* Returns whether we are tagging pointers and checking those tags on memory
    access.  This is true when checking with either in software or hardware.  */
 bool
@@ -1848,6 +2108,8 @@ static tree
 report_error_func (bool is_store, bool recover_p, HOST_WIDE_INT size_in_bytes,
 		   int *nargs)
 {
+  gcc_assert (!memory_tagging_p ());
+
   static enum built_in_function report[2][2][6]
     = { { { BUILT_IN_ASAN_REPORT_LOAD1, BUILT_IN_ASAN_REPORT_LOAD2,
 	    BUILT_IN_ASAN_REPORT_LOAD4, BUILT_IN_ASAN_REPORT_LOAD8,
@@ -2184,7 +2446,13 @@ build_check_stmt (location_t loc, tree base, tree len,
   if (is_scalar_access)
     flags |= ASAN_CHECK_SCALAR_ACCESS;
 
-  g = gimple_build_call_internal (IFN_ASAN_CHECK, 4,
+  enum internal_fn fn;
+  if (memory_tagging_p ())
+    fn = IFN_HWASAN_CHECK;
+  else
+    fn = IFN_ASAN_CHECK;
+
+  g = gimple_build_call_internal (fn, 4,
 				  build_int_cst (integer_type_node, flags),
 				  base, len,
 				  build_int_cst (integer_type_node,
@@ -2208,10 +2476,13 @@ static void
 instrument_derefs (gimple_stmt_iterator *iter, tree t,
 		   location_t location, bool is_store)
 {
-  if (is_store && !ASAN_INSTRUMENT_WRITES)
-    return;
-  if (!is_store && !ASAN_INSTRUMENT_READS)
-    return;
+  if (! memory_tagging_p ())
+    {
+    if (is_store && !ASAN_INSTRUMENT_WRITES)
+      return;
+    if (!is_store && !ASAN_INSTRUMENT_READS)
+      return;
+    }
 
   tree type, base;
   HOST_WIDE_INT size_in_bytes;
@@ -2271,7 +2542,8 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
     {
       if (DECL_THREAD_LOCAL_P (inner))
 	return;
-      if (!ASAN_GLOBALS && is_global_var (inner))
+      if ((memory_tagging_p () || !ASAN_GLOBALS)
+	  && is_global_var (inner))
         return;
       if (!TREE_STATIC (inner))
 	{
@@ -2500,10 +2772,13 @@ maybe_instrument_call (gimple_stmt_iterator *iter)
 	      break;
 	    }
 	}
-      tree decl = builtin_decl_implicit (BUILT_IN_ASAN_HANDLE_NO_RETURN);
-      gimple *g = gimple_build_call (decl, 0);
-      gimple_set_location (g, gimple_location (stmt));
-      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      if (! memory_tagging_p ())
+	{
+	  tree decl = builtin_decl_implicit (BUILT_IN_ASAN_HANDLE_NO_RETURN);
+	  gimple *g = gimple_build_call (decl, 0);
+	  gimple_set_location (g, gimple_location (stmt));
+	  gsi_insert_before (iter, g, GSI_SAME_STMT);
+	}
     }
 
   bool instrumented = false;
@@ -2902,6 +3177,9 @@ initialize_sanitizer_builtins (void)
     = build_function_type_list (void_type_node, uint64_type_node,
 				ptr_type_node, NULL_TREE);
 
+  tree BT_FN_PTR_CONST_PTR_UINT8
+    = build_function_type_list (ptr_type_node, const_ptr_type_node,
+				unsigned_char_type_node, NULL_TREE);
   tree BT_FN_VOID_PTR_UINT8_SIZE
     = build_function_type_list (void_type_node, ptr_type_node,
 				unsigned_char_type_node, size_type_node,
@@ -3237,6 +3515,23 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   unsigned HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
   gcc_assert (size_in_bytes);
 
+  if (memory_tagging_p ())
+    {
+      gcc_assert (HWASAN_STACK);
+      /* Here we swap ASAN_MARK calls for HWASAN_MARK.
+	 This is because we are using the approach of using ASAN_MARK as a
+	 synonym until here.
+	 That approach means we don't yet have to duplicate all the special
+	 cases for ASAN_MARK and ASAN_POISON with the exact same handling but
+	 called HWASAN_MARK etc.  */
+      gimple *hw_poison_call
+	= gimple_build_call_internal (IFN_HWASAN_MARK, 3,
+				      gimple_call_arg (g, 0),
+				      base, len);
+      gsi_replace (iter, hw_poison_call, false);
+      return false;
+    }
+
   g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
 			   NOP_EXPR, base);
   gimple_set_location (g, loc);
@@ -3298,6 +3593,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
 bool
 asan_expand_check_ifn (gimple_stmt_iterator *iter, bool use_calls)
 {
+  gcc_assert (!memory_tagging_p ());
   gimple *g = gsi_stmt (*iter);
   location_t loc = gimple_location (g);
   bool recover_p;
@@ -3571,11 +3867,37 @@ asan_expand_poison_ifn (gimple_stmt_iterator *iter,
 
       int nargs;
       bool store_p = gimple_call_internal_p (use, IFN_ASAN_POISON_USE);
-      tree fun = report_error_func (store_p, recover_p, tree_to_uhwi (size),
-				    &nargs);
-
-      gcall *call = gimple_build_call (fun, 1,
-				       build_fold_addr_expr (shadow_var));
+      gcall *call;
+      if (memory_tagging_p ())
+	{
+	  tree fun = builtin_decl_implicit (BUILT_IN_HWASAN_TAG_MISMATCH4);
+	  /* NOTE: hwasan has no __hwasan_report_* functions like asan does.
+		We use __hwasan_tag_mismatch4 with arguments that tell it the
+		size of access and load to report all tag mismatches.  */
+	  unsigned HOST_WIDE_INT size_in_bytes = tree_to_uhwi (size);
+	  unsigned size_indicator = (size_in_bytes > 16)
+	    ? 0xf
+	    : exact_log2 (size_in_bytes);
+	  unsigned access_info = (0x20 * recover_p)
+	    + (0x10 * store_p)
+	    + (size_indicator);
+	  tree long_pointer_type
+	    = build_pointer_type (long_long_unsigned_type_node);
+	  call = gimple_build_call (fun, 3,
+				    build_fold_addr_expr (shadow_var),
+				    build_int_cst (long_long_unsigned_type_node,
+						   access_info),
+				    build_int_cst (long_pointer_type,
+						   0),
+				    size);
+	}
+      else
+	{
+	  tree fun = report_error_func (store_p, recover_p, tree_to_uhwi (size),
+					&nargs);
+	  call = gimple_build_call (fun, 1,
+				    build_fold_addr_expr (shadow_var));
+	}
       gimple_set_location (call, gimple_location (use));
       gimple *call_to_insert = call;
 
@@ -3709,6 +4031,16 @@ make_pass_asan_O0 (gcc::context *ctxt)
   return new pass_asan_O0 (ctxt);
 }
 
+/*  HWASAN  */
+static unsigned int
+hwasan_instrument (void)
+{
+  transform_statements ();
+  last_alloca_addr = NULL_TREE;
+
+  return 0;
+}
+
 void
 hwasan_record_base (rtx base)
 {
@@ -3725,6 +4057,15 @@ uint8_t
 hwasan_current_tag ()
 {
   return tag_offset;
+}
+
+rtx
+hwasan_base ()
+{
+  if (! hwasan_base_ptr)
+    hwasan_record_base (gen_reg_rtx (Pmode));
+
+  return hwasan_base_ptr;
 }
 
 void
@@ -3858,6 +4199,12 @@ hwasan_emit_untag_frame (rtx dynamic, rtx vars, rtx_insn *before)
   do_pending_stack_adjust ();
   rtx_insn *insns = get_insns ();
   end_sequence ();
+
+  /* Clear the hash_map recording which variables are handled by HWASAN_MARK.
+     The only use in HWASAN is to decide which variables need to be tagged in
+     the prologue and which don't.  */
+  delete asan_handled_variables;
+  asan_handled_variables = NULL;
   return insns;
 }
 
@@ -3892,6 +4239,216 @@ hwasan_finish_file (void)
   append_to_statement_list (build_call_expr (fn, 0), &hwasan_ctor_statements);
   cgraph_build_static_cdtor ('I', hwasan_ctor_statements, priority);
   flag_sanitize |= SANITIZE_HWADDRESS;
+}
+
+/* Construct a function tree for __hwasan_{load,store}{1,2,4,8,16,_n}.
+   IS_STORE is either 1 (for a store) or 0 (for a load).  */
+
+static tree
+hwasan_check_func (bool is_store, bool recover_p, HOST_WIDE_INT size_in_bytes,
+		   int *nargs)
+{
+  static enum built_in_function check[2][2][6]
+    = { { { BUILT_IN_HWASAN_LOAD1, BUILT_IN_HWASAN_LOAD2,
+	    BUILT_IN_HWASAN_LOAD4, BUILT_IN_HWASAN_LOAD8,
+	    BUILT_IN_HWASAN_LOAD16, BUILT_IN_HWASAN_LOADN },
+	  { BUILT_IN_HWASAN_STORE1, BUILT_IN_HWASAN_STORE2,
+	    BUILT_IN_HWASAN_STORE4, BUILT_IN_HWASAN_STORE8,
+	    BUILT_IN_HWASAN_STORE16, BUILT_IN_HWASAN_STOREN } },
+	{ { BUILT_IN_HWASAN_LOAD1_NOABORT,
+	    BUILT_IN_HWASAN_LOAD2_NOABORT,
+	    BUILT_IN_HWASAN_LOAD4_NOABORT,
+	    BUILT_IN_HWASAN_LOAD8_NOABORT,
+	    BUILT_IN_HWASAN_LOAD16_NOABORT,
+	    BUILT_IN_HWASAN_LOADN_NOABORT },
+	  { BUILT_IN_HWASAN_STORE1_NOABORT,
+	    BUILT_IN_HWASAN_STORE2_NOABORT,
+	    BUILT_IN_HWASAN_STORE4_NOABORT,
+	    BUILT_IN_HWASAN_STORE8_NOABORT,
+	    BUILT_IN_HWASAN_STORE16_NOABORT,
+	    BUILT_IN_HWASAN_STOREN_NOABORT } } };
+  if (size_in_bytes == -1)
+    {
+      *nargs = 2;
+      return builtin_decl_implicit (check[recover_p][is_store][5]);
+    }
+  *nargs = 1;
+  int size_log2 = exact_log2 (size_in_bytes);
+  return builtin_decl_implicit (check[recover_p][is_store][size_log2]);
+}
+
+
+bool
+hwasan_expand_check_ifn (gimple_stmt_iterator *iter, bool)
+{
+  gimple *g = gsi_stmt (*iter);
+  location_t loc = gimple_location (g);
+  bool recover_p;
+  if (flag_sanitize & SANITIZE_USER_HWADDRESS)
+    recover_p = (flag_sanitize_recover & SANITIZE_USER_HWADDRESS) != 0;
+  else
+    recover_p = (flag_sanitize_recover & SANITIZE_KERNEL_HWADDRESS) != 0;
+
+  HOST_WIDE_INT flags = tree_to_shwi (gimple_call_arg (g, 0));
+  gcc_assert (flags < ASAN_CHECK_LAST);
+  bool is_scalar_access = (flags & ASAN_CHECK_SCALAR_ACCESS) != 0;
+  bool is_store = (flags & ASAN_CHECK_STORE) != 0;
+  bool is_non_zero_len = (flags & ASAN_CHECK_NON_ZERO_LEN) != 0;
+
+  tree base = gimple_call_arg (g, 1);
+  tree len = gimple_call_arg (g, 2);
+
+  /* `align` is unused for HWASAN_CHECK, but I pass the argument anyway
+     since that way the arguments match ASAN_CHECK.  */
+  /* HOST_WIDE_INT align = tree_to_shwi (gimple_call_arg (g, 3));  */
+
+  unsigned HOST_WIDE_INT size_in_bytes
+    = is_scalar_access && tree_fits_shwi_p (len) ? tree_to_shwi (len) : -1;
+
+  gimple_stmt_iterator gsi = *iter;
+
+  if (!is_non_zero_len)
+    {
+      /* So, the length of the memory area to hwasan-protect is
+	 non-constant.  Let's guard the generated instrumentation code
+	 like:
+
+	 if (len != 0)
+	   {
+	     // hwasan instrumentation code goes here.
+	   }
+	 // falltrough instructions, starting with *ITER.  */
+
+      g = gimple_build_cond (NE_EXPR,
+			    len,
+			    build_int_cst (TREE_TYPE (len), 0),
+			    NULL_TREE, NULL_TREE);
+      gimple_set_location (g, loc);
+
+      basic_block then_bb, fallthrough_bb;
+      insert_if_then_before_iter (as_a <gcond *> (g), iter,
+				  /*then_more_likely_p=*/true,
+				  &then_bb, &fallthrough_bb);
+      /* Note that fallthrough_bb starts with the statement that was
+	pointed to by ITER.  */
+
+      /* The 'then block' of the 'if (len != 0) condition is where
+	we'll generate the hwasan instrumentation code now.  */
+      gsi = gsi_last_bb (then_bb);
+    }
+
+  g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			   NOP_EXPR, base);
+  gimple_set_location (g, loc);
+  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
+  tree base_addr = gimple_assign_lhs (g);
+
+  int nargs = 0;
+  tree fun = hwasan_check_func (is_store, recover_p, size_in_bytes, &nargs);
+  if (nargs == 1)
+    g = gimple_build_call (fun, 1, base_addr);
+  else
+    {
+      g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
+			       NOP_EXPR, len);
+      gimple_set_location (g, loc);
+      gsi_insert_after (&gsi, g, GSI_NEW_STMT);
+      tree sz_arg = gimple_assign_lhs (g);
+      g = gimple_build_call (fun, nargs, base_addr, sz_arg);
+    }
+
+  gimple_set_location (g, loc);
+  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
+  gsi_remove (iter, true);
+  *iter = gsi;
+  return false;
+}
+
+bool
+hwasan_expand_mark_ifn (gimple_stmt_iterator *)
+{
+  /* HWASAN_MARK should only ever be available after the sanopt pass.  */
+  gcc_unreachable ();
+}
+
+bool
+gate_hwasan ()
+{
+  return memory_tagging_p ();
+}
+
+namespace {
+
+const pass_data pass_data_hwasan =
+{
+  GIMPLE_PASS, /* type */
+  "hwasan", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_NONE, /* tv_id */
+  ( PROP_ssa | PROP_cfg | PROP_gimple_leh ), /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  TODO_update_ssa, /* todo_flags_finish */
+};
+
+class pass_hwasan : public gimple_opt_pass
+{
+public:
+  pass_hwasan (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_hwasan, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  opt_pass * clone () { return new pass_hwasan (m_ctxt); }
+  virtual bool gate (function *) { return gate_hwasan (); }
+  virtual unsigned int execute (function *) { return hwasan_instrument (); }
+
+}; /* class pass_asan  */
+
+} /* anon namespace  */
+
+gimple_opt_pass *
+make_pass_hwasan (gcc::context *ctxt)
+{
+  return new pass_hwasan (ctxt);
+}
+
+namespace {
+
+const pass_data pass_data_hwasan_O0 =
+{
+  GIMPLE_PASS, /* type */
+  "hwasan_O0", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_NONE, /* tv_id */
+  ( PROP_ssa | PROP_cfg | PROP_gimple_leh ), /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  TODO_update_ssa, /* todo_flags_finish */
+};
+
+class pass_hwasan_O0 : public gimple_opt_pass
+{
+public:
+  pass_hwasan_O0 (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_hwasan_O0, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  opt_pass * clone () { return new pass_hwasan_O0 (m_ctxt); }
+  virtual bool gate (function *) { return !optimize && gate_hwasan (); }
+  virtual unsigned int execute (function *) { return hwasan_instrument (); }
+
+}; // class pass_asan
+
+} // anon namespace
+
+gimple_opt_pass *
+make_pass_hwasan_O0 (gcc::context *ctxt)
+{
+  return new pass_hwasan_O0 (ctxt);
 }
 
 #include "gt-asan.h"

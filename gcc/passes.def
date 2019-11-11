@@ -246,6 +246,7 @@ along with GCC; see the file COPYING3.  If not see
       NEXT_PASS (pass_sink_code);
       NEXT_PASS (pass_sancov);
       NEXT_PASS (pass_asan);
+      NEXT_PASS (pass_hwasan);
       NEXT_PASS (pass_tsan);
       NEXT_PASS (pass_dce);
       /* Pass group that runs when 1) enabled, 2) there are loops
@@ -364,6 +365,7 @@ along with GCC; see the file COPYING3.  If not see
       NEXT_PASS (pass_dce);
       NEXT_PASS (pass_sancov);
       NEXT_PASS (pass_asan);
+      NEXT_PASS (pass_hwasan);
       NEXT_PASS (pass_tsan);
       /* ???  We do want some kind of loop invariant motion, but we possibly
          need to adjust LIM to be more friendly towards preserving accurate
@@ -389,6 +391,7 @@ along with GCC; see the file COPYING3.  If not see
   NEXT_PASS (pass_sancov_O0);
   NEXT_PASS (pass_lower_switch_O0);
   NEXT_PASS (pass_asan_O0);
+  NEXT_PASS (pass_hwasan_O0);
   NEXT_PASS (pass_tsan_O0);
   NEXT_PASS (pass_sanopt);
   NEXT_PASS (pass_cleanup_eh);

@@ -31,10 +31,14 @@ extern rtx hwasan_with_tag (rtx, poly_int64);
 extern void hwasan_tag_init ();
 extern rtx hwasan_create_untagged_base (rtx);
 extern rtx hwasan_extract_tag (rtx tagged_pointer);
+extern rtx hwasan_base ();
 extern void hwasan_emit_prologue (rtx *, rtx *, poly_int64 *, uint8_t *, size_t);
 extern rtx_insn *hwasan_emit_untag_frame (rtx, rtx, rtx_insn *);
+extern bool hwasan_expand_check_ifn (gimple_stmt_iterator *, bool);
+extern bool hwasan_expand_mark_ifn (gimple_stmt_iterator *);
 extern bool memory_tagging_p (void);
 extern bool hwasan_sanitize_stack_p (void);
+extern bool gate_hwasan (void);
 extern rtx_insn *asan_emit_stack_protection (rtx, rtx, unsigned int,
 					     HOST_WIDE_INT *, tree *, int);
 extern rtx_insn *asan_emit_allocas_unpoison (rtx, rtx, rtx_insn *);
@@ -131,6 +135,13 @@ enum asan_mark_flags
 #undef DEF
 };
 
+enum hwasan_mark_flags
+{
+#define DEF(X) HWASAN_MARK_##X
+  IFN_ASAN_MARK_FLAGS
+#undef DEF
+};
+
 /* Return true if STMT is ASAN_MARK with FLAG as first argument.  */
 extern bool asan_mark_p (gimple *stmt, enum asan_mark_flags flag);
 
@@ -180,6 +191,9 @@ extern hash_set<tree> *asan_handled_variables;
 static inline bool
 asan_intercepted_p (enum built_in_function fcode)
 {
+  if (memory_tagging_p ())
+    return false;
+
   return fcode == BUILT_IN_INDEX
 	 || fcode == BUILT_IN_MEMCHR
 	 || fcode == BUILT_IN_MEMCMP
@@ -208,7 +222,8 @@ asan_intercepted_p (enum built_in_function fcode)
 static inline bool
 asan_sanitize_use_after_scope (void)
 {
-  return (flag_sanitize_address_use_after_scope && asan_sanitize_stack_p ());
+  return (flag_sanitize_address_use_after_scope
+	  && (asan_sanitize_stack_p () || hwasan_sanitize_stack_p ()));
 }
 
 /* Return true if DECL should be guarded on the stack.  */
