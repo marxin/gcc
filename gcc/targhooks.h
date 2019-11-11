@@ -283,4 +283,6 @@ extern bool speculation_safe_value_not_needed (bool);
 extern rtx default_speculation_safe_value (machine_mode, rtx, rtx, rtx);
 
 extern bool default_memtag_can_tag_addresses ();
+extern void default_memtag_gentag (rtx, rtx);
+extern rtx default_memtag_addtag (rtx, poly_int64, uint8_t);
 #endif /* GCC_TARGHOOKS_H */

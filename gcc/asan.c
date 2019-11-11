@@ -257,6 +257,9 @@ hash_set<tree> *asan_handled_variables = NULL;
 
 hash_set <tree> *asan_used_labels = NULL;
 
+static uint8_t tag_offset = 0;
+static rtx hwasan_base_ptr = NULL_RTX;
+
 /* Sets shadow offset to value in string VAL.  */
 
 bool
@@ -1350,6 +1353,21 @@ asan_redzone_buffer::flush_if_full (void)
 {
   if (m_shadow_bytes.length () == RZ_BUFFER_SIZE)
     flush_redzone_payload ();
+}
+
+/* Returns whether we are tagging pointers and checking those tags on memory
+   access.  This is true when checking with either in software or hardware.  */
+bool
+memory_tagging_p ()
+{
+    return sanitize_flags_p (SANITIZE_HWADDRESS);
+}
+
+/* Are we tagging the stack?  */
+bool
+hwasan_sanitize_stack_p ()
+{
+  return (memory_tagging_p () && HWASAN_STACK);
 }
 
 /* Insert code to protect stack vars.  The prologue sequence should be emitted
@@ -2884,6 +2902,11 @@ initialize_sanitizer_builtins (void)
     = build_function_type_list (void_type_node, uint64_type_node,
 				ptr_type_node, NULL_TREE);
 
+  tree BT_FN_VOID_PTR_UINT8_SIZE
+    = build_function_type_list (void_type_node, ptr_type_node,
+				unsigned_char_type_node, size_type_node,
+				NULL_TREE);
+
   tree BT_FN_BOOL_VPTR_PTR_IX_INT_INT[5];
   tree BT_FN_IX_CONST_VPTR_INT[5];
   tree BT_FN_IX_VPTR_IX_INT[5];
@@ -2934,6 +2957,8 @@ initialize_sanitizer_builtins (void)
 #define BT_FN_I16_CONST_VPTR_INT BT_FN_IX_CONST_VPTR_INT[4]
 #define BT_FN_I16_VPTR_I16_INT BT_FN_IX_VPTR_IX_INT[4]
 #define BT_FN_VOID_VPTR_I16_INT BT_FN_VOID_VPTR_IX_INT[4]
+#undef ATTR_NOTHROW_LIST
+#define ATTR_NOTHROW_LIST ECF_NOTHROW
 #undef ATTR_NOTHROW_LEAF_LIST
 #define ATTR_NOTHROW_LEAF_LIST ECF_NOTHROW | ECF_LEAF
 #undef ATTR_TMPURE_NOTHROW_LEAF_LIST
@@ -3682,6 +3707,191 @@ gimple_opt_pass *
 make_pass_asan_O0 (gcc::context *ctxt)
 {
   return new pass_asan_O0 (ctxt);
+}
+
+void
+hwasan_record_base (rtx base)
+{
+  /* Initialise tag of the base register.
+     This has to be done as soon as the stack is getting expanded to ensure
+     anything emitted with `get_dynamic_stack_base` will use the value set here
+     instead of using a register without a value.
+     Especially note that RTL expansion of large aligned values does that.  */
+  targetm.memtag.gentag (base, virtual_stack_vars_rtx);
+  hwasan_base_ptr = base;
+}
+
+uint8_t
+hwasan_current_tag ()
+{
+  return tag_offset;
+}
+
+void
+hwasan_increment_tag ()
+{
+  uint8_t tag_bits = HWASAN_TAG_SIZE;
+  tag_offset = (tag_offset + 1) % (1 << tag_bits);
+}
+
+rtx
+hwasan_with_tag (rtx base, poly_int64 offset)
+{
+  gcc_assert (tag_offset < (1 << HWASAN_TAG_SIZE));
+  return targetm.memtag.addtag (base, offset, tag_offset);
+}
+
+/* Clear internal state for the next function.
+   This function is called before variables on the stack get expanded, in
+   `init_vars_expansion`.  */
+void
+hwasan_tag_init ()
+{
+  delete asan_used_labels;
+  asan_used_labels = NULL;
+
+  hwasan_base_ptr = NULL_RTX;
+  tag_offset = HWASAN_STACK_BACKGROUND + 1;
+}
+
+rtx
+hwasan_extract_tag (rtx tagged_pointer)
+{
+  rtx tag = expand_simple_binop (Pmode,
+				 LSHIFTRT,
+				 tagged_pointer,
+				 HWASAN_SHIFT_RTX,
+				 NULL_RTX,
+				 /* unsignedp = */0,
+				 OPTAB_DIRECT);
+  return gen_lowpart (QImode, tag);
+}
+
+void
+hwasan_emit_prologue (rtx *bases,
+		      rtx *untagged_bases,
+		      poly_int64 *offsets,
+		      uint8_t *tags,
+		      size_t length)
+{
+  /* We need untagged base pointers since libhwasan only accepts untagged
+    pointers in __hwasan_tag_memory.  We need the tagged base pointer to obtain
+    the base tag for an offset.  */
+  for (size_t i = 0; (i * 2) + 1 < length; i++)
+    {
+      poly_int64 start = offsets[i * 2];
+      poly_int64 end = offsets[(i * 2) + 1];
+
+      poly_int64 bot, top;
+      if (known_ge (start, end))
+	{
+	  top = start;
+	  bot = end;
+	}
+      else
+	{
+	  top = end;
+	  bot = start;
+	}
+      poly_int64 size = (top - bot);
+
+      /* Can't check that all poly_int64's are aligned, but still nice
+	 to check those that are compile-time constants.  */
+      HOST_WIDE_INT tmp;
+      if (top.is_constant (&tmp))
+	gcc_assert (tmp % HWASAN_TAG_GRANULE_SIZE == 0);
+      if (bot.is_constant (&tmp))
+	gcc_assert (tmp % HWASAN_TAG_GRANULE_SIZE == 0);
+      if (size.is_constant (&tmp))
+	gcc_assert (tmp % HWASAN_TAG_GRANULE_SIZE == 0);
+
+      rtx ret = init_one_libfunc ("__hwasan_tag_memory");
+      rtx base_tag = hwasan_extract_tag (bases[i]);
+      /* In the case of tag overflow we would want modulo wrapping -- which
+	 should be given from the `plus_constant` in QImode.  */
+      rtx tag = plus_constant (QImode, base_tag, tags[i]);
+      emit_library_call (ret,
+			 LCT_NORMAL,
+			 VOIDmode,
+			 plus_constant (ptr_mode, untagged_bases[i], bot),
+			 ptr_mode,
+			 tag,
+			 QImode,
+			 gen_int_mode (size, ptr_mode),
+			 ptr_mode);
+    }
+}
+
+rtx_insn *
+hwasan_emit_untag_frame (rtx dynamic, rtx vars, rtx_insn *before)
+{
+  if (before)
+    push_to_sequence (before);
+  else
+    start_sequence ();
+
+  dynamic = convert_memory_address (ptr_mode, dynamic);
+  vars = convert_memory_address (ptr_mode, vars);
+
+  rtx top_rtx;
+  rtx bot_rtx;
+  if (STACK_GROWS_DOWNWARD)
+    {
+      top_rtx = vars;
+      bot_rtx = dynamic;
+    }
+  else
+    {
+      top_rtx = dynamic;
+      bot_rtx = vars;
+    }
+
+  rtx size_rtx = expand_simple_binop (Pmode, MINUS, top_rtx, bot_rtx,
+				  NULL_RTX, /* unsignedp = */0, OPTAB_DIRECT);
+
+  rtx ret = init_one_libfunc ("__hwasan_tag_memory");
+  emit_library_call (ret, LCT_NORMAL, VOIDmode,
+      bot_rtx, ptr_mode,
+      const0_rtx, QImode,
+      size_rtx, ptr_mode);
+
+  do_pending_stack_adjust ();
+  rtx_insn *insns = get_insns ();
+  end_sequence ();
+  return insns;
+}
+
+rtx
+hwasan_create_untagged_base (rtx orig_base)
+{
+  rtx untagged_base = gen_reg_rtx (Pmode);
+  rtx tag_mask = gen_int_mode ((1ULL << HWASAN_SHIFT) - 1, Pmode);
+  untagged_base = expand_binop (Pmode, and_optab,
+				orig_base, tag_mask,
+				untagged_base, true, OPTAB_DIRECT);
+  gcc_assert (untagged_base);
+  return untagged_base;
+}
+
+/* Needs to be GTY(()), because cgraph_build_static_cdtor may
+   invoke ggc_collect.  */
+static GTY(()) tree hwasan_ctor_statements;
+
+void
+hwasan_finish_file (void)
+{
+  /* Do not emit constructor initialisation for the kernel.
+     (the kernel has its own initialisation already).  */
+  if (flag_sanitize & SANITIZE_KERNEL_HWADDRESS)
+    return;
+
+  /* Avoid instrumenting code in the hwasan constructors/destructors.  */
+  flag_sanitize &= ~SANITIZE_HWADDRESS;
+  int priority = MAX_RESERVED_INIT_PRIORITY - 1;
+  tree fn = builtin_decl_implicit (BUILT_IN_HWASAN_INIT);
+  append_to_statement_list (build_call_expr (fn, 0), &hwasan_ctor_statements);
+  cgraph_build_static_cdtor ('I', hwasan_ctor_statements, priority);
+  flag_sanitize |= SANITIZE_HWADDRESS;
 }
 
 #include "gt-asan.h"

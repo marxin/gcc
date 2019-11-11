@@ -7504,6 +7504,13 @@ force_operand (rtx value, rtx target)
       return subtarget;
     }
 
+  if (targetm.memtag.addtag_force_operand)
+    {
+      rtx ret = targetm.memtag.addtag_force_operand (value, target);
+      if (ret)
+	return ret;
+    }
+
   if (ARITHMETIC_P (value))
     {
       op2 = XEXP (value, 1);

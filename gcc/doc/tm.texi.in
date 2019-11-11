@@ -2379,6 +2379,12 @@ in the reload pass.
 
 @hook TARGET_MEMTAG_CAN_TAG_ADDRESSES
 
+@hook TARGET_MEMTAG_ADDTAG
+
+@hook TARGET_MEMTAG_ADDTAG_FORCE_OPERAND
+
+@hook TARGET_MEMTAG_GENTAG
+
 @node Stack and Calling
 @section Stack Layout and Calling Conventions
 @cindex calling conventions

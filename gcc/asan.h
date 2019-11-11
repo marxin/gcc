@@ -23,6 +23,18 @@ along with GCC; see the file COPYING3.  If not see
 
 extern void asan_function_start (void);
 extern void asan_finish_file (void);
+extern void hwasan_finish_file (void);
+extern void hwasan_record_base (rtx);
+extern uint8_t hwasan_current_tag ();
+extern void hwasan_increment_tag ();
+extern rtx hwasan_with_tag (rtx, poly_int64);
+extern void hwasan_tag_init ();
+extern rtx hwasan_create_untagged_base (rtx);
+extern rtx hwasan_extract_tag (rtx tagged_pointer);
+extern void hwasan_emit_prologue (rtx *, rtx *, poly_int64 *, uint8_t *, size_t);
+extern rtx_insn *hwasan_emit_untag_frame (rtx, rtx, rtx_insn *);
+extern bool memory_tagging_p (void);
+extern bool hwasan_sanitize_stack_p (void);
 extern rtx_insn *asan_emit_stack_protection (rtx, rtx, unsigned int,
 					     HOST_WIDE_INT *, tree *, int);
 extern rtx_insn *asan_emit_allocas_unpoison (rtx, rtx, rtx_insn *);
@@ -74,6 +86,31 @@ extern hash_set <tree> *asan_used_labels;
 #define ASAN_STACK_RETIRED_MAGIC	0x45e0360e
 
 #define ASAN_USE_AFTER_SCOPE_ATTRIBUTE	"use after scope memory"
+
+/* NOTE: The values below define an ABI and are hard-coded to these values in
+   libhwasan, hence they can't be changed independently here.  */
+/* How many bits are used to store a tag in a pointer.
+   HWASAN uses the entire top byte of a pointer (i.e. 8 bits).  */
+#define HWASAN_TAG_SIZE 8
+/* Tag Granule of HWASAN shadow stack.
+   This is the size in real memory that each byte in the shadow memory refers
+   to.  I.e. if a variable is X bytes long in memory then it's tag in shadow
+   memory will span X / HWASAN_TAG_GRANULE_SIZE bytes.
+   Most variables will need to be aligned to this amount since two variables
+   that are neighbours in memory and share a tag granule would need to share
+   the same tag (the shared tag granule can only store one tag).  */
+#define HWASAN_TAG_SHIFT_SIZE 4
+#define HWASAN_TAG_GRANULE_SIZE (1ULL << HWASAN_TAG_SHIFT_SIZE)
+/* Define the tag for the stack background.
+   This defines what tag the stack pointer will be and hence what tag all
+   variables that are not given special tags are (e.g. spilled registers,
+   and parameters passed on the stack).  */
+#define HWASAN_STACK_BACKGROUND 0
+/* How many bits to shift in order to access the tag bits.
+   The tag is stored in the top 8 bits of a pointer hence shifting 56 bits will
+   leave just the tag.  */
+#define HWASAN_SHIFT 56
+#define HWASAN_SHIFT_RTX const_int_rtx[MAX_SAVED_CONST_INT + HWASAN_SHIFT]
 
 /* Various flags for Asan builtins.  */
 enum asan_check_flags

@@ -70,6 +70,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "varasm.h"
 #include "flags.h"
 #include "explow.h"
+#include "expmed.h"
 #include "calls.h"
 #include "expr.h"
 #include "output.h"
@@ -84,6 +85,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "sbitmap.h"
 #include "function-abi.h"
+#include "attribs.h"
+#include "asan.h"
 
 bool
 default_legitimate_address_p (machine_mode mode ATTRIBUTE_UNUSED,
@@ -2369,6 +2372,80 @@ bool
 default_memtag_can_tag_addresses ()
 {
   return false;
+}
+
+void
+default_memtag_gentag (rtx base, rtx untagged)
+{
+  gcc_assert (HWASAN_STACK);
+  if (HWASAN_RANDOM_FRAME_TAG)
+    {
+    rtx temp = gen_reg_rtx (QImode);
+    rtx ret = init_one_libfunc ("__hwasan_generate_tag");
+    rtx new_tag = emit_library_call_value (ret, temp, LCT_NORMAL, QImode);
+    emit_move_insn (base, untagged);
+    /* We know that `base` is not the stack pointer, since we never want to put
+      a randomly generated tag into the stack pointer.  Hence we can use
+      `store_bit_field` which on aarch64 generates a `bfi` which can not act on
+      the stack pointer.  */
+    store_bit_field (base, 8, 56, 0, 0, QImode, new_tag, false);
+    }
+  else
+    {
+      /* NOTE: The kernel API does not have __hwasan_generate_tag exposed.
+	 In the future we may add the option emit random tags with inline
+	 instrumentation instead of function calls.  This would be the same
+	 between the kernel and userland.  */
+      emit_move_insn (base, untagged);
+    }
+}
+
+rtx
+default_memtag_addtag (rtx base, poly_int64 offset, uint8_t tag_offset)
+{
+  /* Need to look into what the most efficient code sequence is.
+     This is a code sequence that would be emitted *many* times, so we
+     want it as small as possible.
+
+     If the tag offset is greater that (1 << 7) then the most efficient
+     sequence here would give UB from signed integer overflow in the
+     poly_int64.  Hence in that case we emit the slightly less efficient
+     sequence.
+
+     There are two places where tag overflow is a question:
+       - Tagging the shadow stack.
+	  (both tagging and untagging).
+       - Tagging addressable pointers.
+
+     We need to ensure both behaviours are the same (i.e. that the tag that
+     ends up in a pointer after "overflowing" the tag bits with a tag addition
+     is the same that ends up in the shadow space).
+
+     The aim is that the behaviour of tag addition should follow modulo
+     wrapping in both instances.
+
+     The libhwasan code doesn't have any path that increments a pointers tag,
+     which means it has no opinion on what happens when a tag increment
+     overflows (and hence we can choose our own behaviour).  */
+
+  if (tag_offset < (1 << 7))
+    {
+      offset += ((uint64_t)tag_offset << HWASAN_SHIFT);
+      return plus_constant (Pmode, base, offset);
+    }
+  else
+    {
+      /* This is the fallback, it would be nice if it had less instructions,
+	 but we can look for cleverer ways later.  */
+      uint64_t tag_mask = ~(0xFFUL << HWASAN_SHIFT);
+      rtx untagged_base = gen_rtx_AND (Pmode, GEN_INT (tag_mask), base);
+      rtx new_addr = plus_constant (Pmode, untagged_base, offset);
+
+      rtx original_tag_value = gen_rtx_LSHIFTRT (Pmode, base, GEN_INT (HWASAN_SHIFT));
+      rtx new_tag_value = plus_constant (Pmode, original_tag_value, tag_offset);
+      rtx new_tag = gen_rtx_ASHIFT (Pmode, new_tag_value, GEN_INT (HWASAN_SHIFT));
+      return gen_rtx_IOR (Pmode, new_addr, new_tag);
+    }
 }
 
 #include "gt-targhooks.h"
