@@ -2669,12 +2669,12 @@ Arranges for the run time of each program started by the GCC driver,
 built in any stage, to be logged to @file{time.log}, in the top level of
 the build tree.
 
-@end table
-
 @item @samp{bootstrap-hwasan}
 Compiles GCC itself using HWAddress Sanitization in order to catch invalid
 memory accesses within the GCC code.  This option is only available on AArch64
 targets with a very recent linux kernel (5.4 or later).
+
+@end table
 
 @section Building a cross compiler
 
