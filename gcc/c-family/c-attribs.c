@@ -54,6 +54,8 @@ static tree handle_cold_attribute (tree *, tree, tree, int, bool *);
 static tree handle_no_sanitize_attribute (tree *, tree, tree, int, bool *);
 static tree handle_no_sanitize_address_attribute (tree *, tree, tree,
 						  int, bool *);
+static tree handle_no_sanitize_hwaddress_attribute (tree *, tree, tree,
+						    int, bool *);
 static tree handle_no_sanitize_thread_attribute (tree *, tree, tree,
 						 int, bool *);
 static tree handle_no_address_safety_analysis_attribute (tree *, tree, tree,
@@ -412,6 +414,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_no_sanitize_attribute, NULL },
   { "no_sanitize_address",    0, 0, true, false, false, false,
 			      handle_no_sanitize_address_attribute, NULL },
+  { "no_sanitize_hwaddress",    0, 0, true, false, false, false,
+			      handle_no_sanitize_hwaddress_attribute, NULL },
   { "no_sanitize_thread",     0, 0, true, false, false, false,
 			      handle_no_sanitize_thread_attribute, NULL },
   { "no_sanitize_undefined",  0, 0, true, false, false, false,
@@ -937,6 +941,22 @@ handle_no_sanitize_address_attribute (tree *node, tree name, tree, int,
     warning (OPT_Wattributes, "%qE attribute ignored", name);
   else
     add_no_sanitize_value (*node, SANITIZE_ADDRESS);
+
+  return NULL_TREE;
+}
+
+/* Handle a "no_sanitize_hwaddress" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_no_sanitize_hwaddress_attribute (tree *node, tree name, tree, int,
+				      bool *no_add_attrs)
+{
+  *no_add_attrs = true;
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    warning (OPT_Wattributes, "%qE attribute ignored", name);
+  else
+    add_no_sanitize_value (*node, SANITIZE_HWADDRESS);
 
   return NULL_TREE;
 }

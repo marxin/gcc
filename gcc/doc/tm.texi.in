@@ -2377,6 +2377,8 @@ in the reload pass.
 
 @hook TARGET_COMPUTE_PRESSURE_CLASSES
 
+@hook TARGET_MEMTAG_CAN_TAG_ADDRESSES
+
 @node Stack and Calling
 @section Stack Layout and Calling Conventions
 @cindex calling conventions

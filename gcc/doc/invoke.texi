@@ -12636,12 +12636,32 @@ more details.  The run-time behavior can be influenced using the
 the available options are shown at startup of the instrumented program.  See
 @url{https://github.com/google/sanitizers/wiki/AddressSanitizerFlags#run-time-flags}
 for a list of supported options.
-The option cannot be combined with @option{-fsanitize=thread}.
+The option cannot be combined with @option{-fsanitize=thread} or
+@option{-fsanitize=hwaddress}.
 
 @item -fsanitize=kernel-address
 @opindex fsanitize=kernel-address
 Enable AddressSanitizer for Linux kernel.
 See @uref{https://github.com/google/kasan/wiki} for more details.
+
+@item -fsanitize=hwaddress
+@opindex fsanitize=hwaddress
+Enable HardwareAddressSanitizer, a fast memory error detector.
+Memory access instructions are instrumented to detect out-of-bounds and
+use-after-free bugs.
+The option enables @option{-fsanitize-address-use-after-scope}.
+See @uref{https://github.com/google/sanitizers/} for
+more details.  The run-time behavior can be influenced using the
+@env{HWASAN_OPTIONS} environment variable.  When set to @code{help=1},
+the available options are shown at startup of the instrumented program.
+The option cannot be combined with @option{-fsanitize=thread} or
+@option{-fsanitize=address}.
+
+@item -fsanitize=kernel-hwaddress
+@opindex fsanitize=kernel-hwaddress
+Enable HardwareAddressSanitizer for Linux kernel.
+Similar to @option{-fsanitize=kernel-address} but using the software tagging
+method of instrumentation.
 
 @item -fsanitize=pointer-compare
 @opindex fsanitize=pointer-compare

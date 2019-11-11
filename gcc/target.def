@@ -6742,6 +6742,17 @@ DEFHOOK
 HOOK_VECTOR_END (mode_switching)
 
 #undef HOOK_PREFIX
+#define HOOK_PREFIX "TARGET_MEMTAG_"
+HOOK_VECTOR (TARGET_MEMTAG_, memtag)
+
+DEFHOOK
+(can_tag_addresses,
+ "True if backend architecture naturally supports ignoring the top byte of\
+ pointers.  This feature means that -fsanitize=hwaddress can work.",
+ bool, (), default_memtag_can_tag_addresses)
+
+HOOK_VECTOR_END (memtag)
+#undef HOOK_PREFIX
 #define HOOK_PREFIX "TARGET_"
 
 #define DEF_TARGET_INSN(NAME, PROTO) \

@@ -1341,6 +1341,17 @@ DEFPARAM (PARAM_USE_AFTER_SCOPE_DIRECT_EMISSION_THRESHOLD,
 	 "smaller or equal to this number.",
 	 256, 0, INT_MAX)
 
+/* HWAsan stands for HardwareAddressSanitizer: https://github.com/google/sanitizers.  */
+DEFPARAM (PARAM_HWASAN_RANDOM_FRAME_TAG,
+	  "hwasan-random-frame-tag",
+	  "Use random base tag for each frame, as opposed to base always zero.",
+	  1, 0, 1)
+
+DEFPARAM (PARAM_HWASAN_STACK,
+	  "hwasan-stack",
+	  "Enable hwasan stack protection.",
+	  1, 0, 1)
+
 DEFPARAM (PARAM_UNINIT_CONTROL_DEP_ATTEMPTS,
 	  "uninit-control-dep-attempts",
 	  "Maximum number of nested calls to search for control dependencies "

@@ -2978,6 +2978,10 @@ This hook defines the machine mode to use for the boolean result of  conditional
 A target hook which lets a backend compute the set of pressure classes to  be used by those optimization passes which take register pressure into  account, as opposed to letting IRA compute them.  It returns the number of  register classes stored in the array @var{pressure_classes}.
 @end deftypefn
 
+@deftypefn {Target Hook} bool TARGET_MEMTAG_CAN_TAG_ADDRESSES ()
+True if backend architecture naturally supports ignoring the top byte of pointers.  This feature means that -fsanitize=hwaddress can work.
+@end deftypefn
+
 @node Stack and Calling
 @section Stack Layout and Calling Conventions
 @cindex calling conventions
