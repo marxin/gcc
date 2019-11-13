@@ -326,5 +326,5 @@ main ()
   T (f5 (231, 0), 2, { 80, 0 });
 }
 
-/* { dg-final { scan-tree-dump-times "Switch converted" 5 "switchconv" } } */
-/* { dg-final { scan-tree-dump-times "= CSWTCH" 8 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times "Switch converted" 5 "switchconv1" } } */
+/* { dg-final { scan-tree-dump-times "= CSWTCH" 8 "switchconv1" } } */

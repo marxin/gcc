@@ -63,5 +63,5 @@ lowerit(char a)
     }
 }
 
-/* { dg-final { scan-tree-dump-times "a_.*\\+ 32" 1 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times "a_.*\\+ 32" 1 "switchconv1" } } */
 /* { dg-final { scan-tree-dump-not "switch" "optimized" } } */

@@ -54,4 +54,4 @@ int main(int argc, char **argv)
   return 0;
 }
 
-/* { dg-final { scan-tree-dump-times "Linear transformation with A = 1 and B = 256" 1 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times "Linear transformation with A = 1 and B = 256" 1 "switchconv1" } } */

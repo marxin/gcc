@@ -2368,6 +2368,7 @@ public:
   {}
 
   /* opt_pass methods: */
+  opt_pass * clone () { return new pass_convert_switch { m_ctxt }; }
   virtual bool gate (function *) { return flag_tree_switch_conversion != 0; }
   virtual unsigned int execute (function *);
 
