@@ -76,4 +76,4 @@ int main ()
   return 0;
 }
 
-/* { dg-final { scan-tree-dump "Switch converted" "switchconv" } } */
+/* { dg-final { scan-tree-dump "Switch converted" "switchconv1" } } */

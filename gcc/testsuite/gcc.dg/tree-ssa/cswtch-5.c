@@ -62,5 +62,5 @@ bar (unsigned int v, int w)
   return v + w;
 }
 
-/* { dg-final { scan-tree-dump-times "Switch converted" 2 "switchconv" } } */
-/* { dg-final { scan-tree-dump-times "= CSWTCH" 2 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times "Switch converted" 2 "switchconv1" } } */
+/* { dg-final { scan-tree-dump-times "= CSWTCH" 2 "switchconv1" } } */

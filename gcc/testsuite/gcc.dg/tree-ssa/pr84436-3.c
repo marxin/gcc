@@ -20,5 +20,5 @@ void f() {
   h(g);
 }
 
-/* { dg-final { scan-tree-dump-times ".* \\+ 4294967247" 1 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times ".* \\+ 4294967247" 1 "switchconv1" } } */
 /* { dg-final { scan-tree-dump-not "switch" "optimized" } } */

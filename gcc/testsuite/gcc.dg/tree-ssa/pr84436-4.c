@@ -1,5 +1,5 @@
 /* PR tree-optimization/84436 */
-/* { dg-options "-O2 -fdump-tree-switchconv -fdump-tree-optimized" } */
+/* { dg-options "-O2 -fdump-tree-optimized" } */
 /* { dg-do run } */
 
 enum E

@@ -53,5 +53,5 @@ frobulate_for_gcc (unsigned int v)
   __builtin_printf ("%s\n", s);
 }
 
-/* { dg-final { scan-tree-dump-times "Switch converted" 2 "switchconv" } } */
-/* { dg-final { scan-tree-dump-times "= CSWTCH" 2 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times "Switch converted" 2 "switchconv1" } } */
+/* { dg-final { scan-tree-dump-times "= CSWTCH" 2 "switchconv1" } } */

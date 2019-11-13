@@ -17,4 +17,4 @@ int h1 (X x)
     }
 }
 
-/* { dg-final { scan-tree-dump-times "CSWTCH" 0 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times "CSWTCH" 0 "switchconv1" } } */

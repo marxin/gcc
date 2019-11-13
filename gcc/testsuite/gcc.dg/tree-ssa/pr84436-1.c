@@ -31,6 +31,6 @@ int main()
 }
 
 
-/* { dg-final { scan-tree-dump-times "100 \\*" 1 "switchconv" } } */
-/* { dg-final { scan-tree-dump-times ".* \\+ 5" 1 "switchconv" } } */
+/* { dg-final { scan-tree-dump-times "100 \\*" 1 "switchconv1" } } */
+/* { dg-final { scan-tree-dump-times ".* \\+ 5" 1 "switchconv1" } } */
 /* { dg-final { scan-tree-dump-not "switch" "optimized" } } */
