@@ -61,20 +61,20 @@ struct cluster
 
 struct cluster_edge
 {
-  cluster_edge (cluster *caller, cluster *callee, uint32_t count):
+  cluster_edge (cluster *caller, cluster *callee, uint64_t count):
     m_caller (caller), m_callee (callee), m_count (count), m_heap_node (NULL)
   {}
 
 
-  uint32_t inverted_count ()
+  uint64_t inverted_count ()
   {
-    return numeric_limits<uint32_t>::max () - m_count;
+    return numeric_limits<uint64_t>::max () - m_count;
   }
 
   cluster *m_caller;
   cluster *m_callee;
-  uint32_t m_count;
-  fibonacci_node<uint32_t, cluster_edge> *m_heap_node;
+  uint64_t m_count;
+  fibonacci_node<uint64_t, cluster_edge> *m_heap_node;
 };
 
 /* Sort functions based of first execution of the function.  */
@@ -104,6 +104,42 @@ cluster_cmp (const void *a_p, const void *b_p)
 
   sreal r = b->m_time * a->m_size - a->m_time * b->m_size;
   return (r < 0) ? -1 : ((r > 0) ? 1 : 0);
+}
+
+/* Visit callgraph edge CS until we reach a real cgraph_node (not a clone).
+   Record such edge to EDGES or traverse recursively.  */
+
+static void
+visit_all_edges_for_caller (auto_vec<cluster_edge *> *edges,
+			    cgraph_node *node, cgraph_edge *cs)
+{
+  if (cs->inline_failed)
+    {
+      gcov_type count;
+      profile_count pcount = cs->count.ipa ();
+      /* A real call edge.  */
+      if (pcount.initialized_p ()
+	  && (count = pcount.to_gcov_type ()) > 0)
+	{
+	  cluster *caller = (cluster *)node->aux;
+	  cluster *callee = (cluster *)cs->callee->aux;
+	  cluster_edge **cedge = callee->m_callers.get (caller);
+	  if (cedge != NULL)
+	    (*cedge)->m_count += count;
+	  else
+	    {
+	      cluster_edge *cedge = new cluster_edge (caller, callee, count);
+	      edges->safe_push (cedge);
+	      callee->m_callers.put (caller, cedge);
+	    }
+	}
+    }
+  else
+    {
+      cgraph_node *clone = cs->callee;
+      for (cgraph_edge *cs = clone->callers; cs; cs = cs->next_caller)
+	visit_all_edges_for_caller (edges, node, cs);
+    }
 }
 
 /* Sort functions based on call chain clustering, which is an algorithm
@@ -136,27 +172,11 @@ sort_functions_by_c3 (void)
     {
       cgraph_node *node = clusters[i]->m_functions[0];
       for (cgraph_edge *cs = node->callers; cs; cs = cs->next_caller)
-	if (cs->count.reliable_p ()
-	    && cs->count.to_gcov_type () > 0)
-	  {
-	    cluster *caller = (cluster *)cs->caller->aux;
-	    cluster *callee = (cluster *)cs->callee->aux;
-	    gcov_type count = cs->count.to_gcov_type ();
-
-	    cluster_edge **cedge = callee->m_callers.get (caller);
-	    if (cedge != NULL)
-	      (*cedge)->m_count += count;
-	    else
-	      {
-		cluster_edge *cedge = new cluster_edge (caller, callee, count);
-		edges.safe_push (cedge);
-		callee->m_callers.put (caller, cedge);
-	      }
-	  }
+	visit_all_edges_for_caller (&edges, cs->caller, cs);
     }
 
   /* Now insert all created edges into a heap.  */
-  fibonacci_heap <uint32_t, cluster_edge> heap (0);
+  fibonacci_heap <uint64_t, cluster_edge> heap (0);
 
   for (unsigned i = 0; i < clusters.length (); i++)
     {
