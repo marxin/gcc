@@ -1240,10 +1240,6 @@ general_init (const char *argv0, bool init_signals)
   /* Initialize register usage now so switches may override.  */
   init_reg_sets ();
 
-  /* This must be done after global_init_params but before argument
-     processing.  */
-  init_ggc_heuristics ();
-
   /* Create the singleton holder for global state.  This creates the
      dump manager.  */
   g = new gcc::context ();

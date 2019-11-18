@@ -285,9 +285,6 @@ extern void ggc_print_statistics (void);
 
 extern void stringpool_statistics (void);
 
-/* Heuristics.  */
-extern void init_ggc_heuristics (void);
-
 /* Report current heap memory use to stderr.  */
 extern void report_heap_memory_use (void);
 
