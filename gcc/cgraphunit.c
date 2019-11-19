@@ -2267,18 +2267,6 @@ cgraph_node::expand (void)
   remove_all_references ();
 }
 
-/* Node comparator that is responsible for the order that corresponds
-   to time when a function was launched for the first time.  */
-
-static int
-node_cmp (const void *pa, const void *pb)
-{
-  const cgraph_node *a = *(const cgraph_node * const *) pa;
-  const cgraph_node *b = *(const cgraph_node * const *) pb;
-
-  return b->order - a->order;
-}
-
 /* Expand all functions that must be output.
 
    Attempt to topologically sort the nodes so function is output when
@@ -2309,7 +2297,8 @@ expand_all_functions (void)
       order[new_order_pos++] = order[i];
 
   if (flag_profile_reorder_functions)
-    qsort (order, new_order_pos, sizeof (cgraph_node *), node_cmp);
+    qsort (order, new_order_pos, sizeof (cgraph_node *),
+	   cgraph_node_cmp_by_text_sorted);
 
   for (i = new_order_pos - 1; i >= 0; i--)
     {

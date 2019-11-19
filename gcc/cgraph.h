@@ -2449,6 +2449,7 @@ bool cgraph_function_possibly_inlined_p (tree);
 
 const char* cgraph_inline_failed_string (cgraph_inline_failed_t);
 cgraph_inline_failed_type_t cgraph_inline_failed_type (cgraph_inline_failed_t);
+int cgraph_node_cmp_by_text_sorted (const void *pa, const void *pb);
 
 /* In cgraphunit.c  */
 void cgraphunit_c_finalize (void);

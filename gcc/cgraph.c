@@ -3698,6 +3698,23 @@ cgraph_edge::possibly_call_in_translation_unit_p (void)
   return node->get_availability () >= AVAIL_INTERPOSABLE;
 }
 
+/* Sort cgraph_nodes by text_sorted_order if available, or by order.  */
+
+int
+cgraph_node_cmp_by_text_sorted (const void *pa, const void *pb)
+{
+  const cgraph_node *a = *(const cgraph_node * const *) pa;
+  const cgraph_node *b = *(const cgraph_node * const *) pb;
+
+  /* Functions with text_sorted_order should be before these without profile.  */
+  if (a->text_sorted_order == 0 || b->text_sorted_order == 0)
+    return a->text_sorted_order - b->text_sorted_order;
+
+  return a->text_sorted_order != b->text_sorted_order
+	 ? b->text_sorted_order - a->text_sorted_order
+	 : b->order - a->order;
+}
+
 /* A stashed copy of "symtab" for use by selftest::symbol_table_test.
    This needs to be a global so that it can be a GC root, and thus
    prevent the stashed copy from being garbage-collected if the GC runs
