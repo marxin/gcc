@@ -275,7 +275,7 @@ init_opts_obstack (void)
   gcc_obstack_init (&opts_obstack);
 }
 
-#if !defined ENABLE_GC_CHECKING && !defined ENABLE_GC_ALWAYS_COLLECT
+#if !defined ENABLE_GC_ALWAYS_COLLECT
 
 /* Modify the bound based on rlimits.  */
 
@@ -373,7 +373,7 @@ ggc_min_heapsize_heuristic (void)
 static void
 init_ggc_heuristics (void)
 {
-#if !defined ENABLE_GC_CHECKING && !defined ENABLE_GC_ALWAYS_COLLECT
+#if !defined ENABLE_GC_ALWAYS_COLLECT
   param_ggc_min_expand = ggc_min_expand_heuristic ();
   param_ggc_min_heapsize = ggc_min_heapsize_heuristic ();
 #endif
