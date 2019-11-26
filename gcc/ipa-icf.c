@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "coverage.h"
 #include "gimple-pretty-print.h"
 #include "data-streamer.h"
+#include "tree-streamer.h"
 #include "fold-const.h"
 #include "calls.h"
 #include "varasm.h"
@@ -84,6 +85,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 #include "dbgcnt.h"
 #include "tree-vector-builder.h"
+#include "gimple-walk.h"
 
 using namespace ipa_icf_gimple;
 
@@ -225,14 +227,16 @@ hash_map<const_tree, hashval_t> sem_item::m_type_hash_cache;
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
 sem_function::sem_function (bitmap_obstack *stack)
-: sem_item (FUNC, stack), m_checker (NULL), m_compared_func (NULL)
+  : sem_item (FUNC, stack), memory_access_types (), m_canonical_types_hash (0),
+    m_checker (NULL), m_compared_func (NULL)
 {
   bb_sizes.create (0);
   bb_sorted.create (0);
 }
 
 sem_function::sem_function (cgraph_node *node, bitmap_obstack *stack)
-: sem_item (FUNC, node, stack), m_checker (NULL), m_compared_func (NULL)
+  : sem_item (FUNC, node, stack), memory_access_types (),
+    m_canonical_types_hash (0), m_checker (NULL), m_compared_func (NULL)
 {
   bb_sizes.create (0);
   bb_sorted.create (0);
@@ -1332,6 +1336,22 @@ sem_function::merge (sem_item *alias_item)
   return true;
 }
 
+/* Callback for walk_stmt_load_store_addr_ops.  */
+
+static bool
+record_memory_op_type (gimple *, tree t, tree, void *data)
+{
+  t = get_base_address (t);
+  if (t != NULL_TREE)
+    {
+      vec<tree> *access_types = (vec<tree> *) data;
+      if (access_types->length () < 3)
+	access_types->safe_push (TREE_TYPE (t));
+    }
+
+  return false;
+}
+
 /* Semantic item initialization function.  */
 
 void
@@ -1385,6 +1405,10 @@ sem_function::init (ipa_icf_gimple::func_checker *checker)
 	      {
 		hash_stmt (stmt, hstate);
 		nondbg_stmt_count++;
+
+		walk_stmt_load_store_addr_ops (stmt, &memory_access_types,
+					       record_memory_op_type,
+					       record_memory_op_type, NULL);
 	      }
 	  }
 
@@ -2134,6 +2158,14 @@ sem_item_optimizer::write_summary (void)
 	  streamer_write_uhwi_stream (ob->main_stream, node_ref);
 
 	  streamer_write_uhwi (ob, (*item)->get_hash ());
+
+	  if ((*item)->type == FUNC)
+	    {
+	      sem_function *fn = static_cast<sem_function *> (*item);
+	      streamer_write_uhwi (ob, fn->memory_access_types.length ());
+	      for (unsigned i = 0; i < fn->memory_access_types.length (); i++)
+		stream_write_tree (ob, fn->memory_access_types[i], true);
+	    }
 	}
     }
 
@@ -2185,6 +2217,14 @@ sem_item_optimizer::read_section (lto_file_decl_data *file_data,
 	  cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
 
 	  sem_function *fn = new sem_function (cnode, &m_bmstack);
+	  unsigned count = streamer_read_uhwi (&ib_main);
+	  inchash::hash hstate (0);
+	  for (unsigned i = 0; i < count; i++)
+	    {
+	      tree type = stream_read_tree (&ib_main, data_in);
+	      hstate.add_ptr (TYPE_CANONICAL (type));
+	    }
+	  fn->m_canonical_types_hash = hstate.end ();
 	  fn->set_hash (hash);
 	  m_items.safe_push (fn);
 	}
@@ -2381,6 +2421,7 @@ sem_item_optimizer::execute (void)
 
   build_graph ();
   update_hash_by_addr_refs ();
+  update_hash_by_memory_access_type ();
   build_hash_based_classes ();
 
   if (dump_file)
@@ -2516,6 +2557,21 @@ sem_item_optimizer::update_hash_by_addr_refs ()
   /* Global hash value replace current hash values.  */
   for (unsigned i = 0; i < m_items.length (); i++)
     m_items[i]->set_hash (m_items[i]->global_hash);
+}
+
+void
+sem_item_optimizer::update_hash_by_memory_access_type ()
+{
+  for (unsigned i = 0; i < m_items.length (); i++)
+    {
+      if (m_items[i]->type == FUNC)
+	{
+	  sem_function *fn = static_cast<sem_function *> (m_items[i]);
+	  inchash::hash hstate (fn->get_hash ());
+	  hstate.add_int (fn->m_canonical_types_hash);
+	  fn->set_hash (hstate.end ());
+	}
+    }
 }
 
 /* Congruence classes are built by hash value.  */
