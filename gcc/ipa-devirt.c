@@ -356,8 +356,13 @@ types_same_for_odr (const_tree type1, const_tree type2)
       || (type_with_linkage_p (type2) && type_in_anonymous_namespace_p (type2)))
     return false;
 
-  return (DECL_ASSEMBLER_NAME (TYPE_NAME (type1))
-	  == DECL_ASSEMBLER_NAME (TYPE_NAME (type2)));
+  tree tn1 = TYPE_NAME (type1);
+  tree tn2 = TYPE_NAME (type2);
+
+  /* We may meet a locally defined ARRAY_TYPE which
+     has not an assembler name.  */
+  return (tn1 != NULL_TREE && tn2 != NULL_TREE
+	  && DECL_ASSEMBLER_NAME (tn1) == DECL_ASSEMBLER_NAME (tn2));
 }
 
 /* Return true if we can decide on ODR equivalency.
