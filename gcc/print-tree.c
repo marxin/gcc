@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "dumpfile.h"
 #include "print-tree.h"
+#include "demangle.h"
 
 /* Define the hash table of nodes already seen.
    Such nodes are not repeated; brief cross-references are used.  */
@@ -1139,6 +1140,22 @@ debug_raw (const tree_node *ptr)
     debug_raw (*ptr);
   else
     fprintf (stderr, "<nil>\n");
+}
+
+/* Print ODR name of a TYPE if available.
+   Use demangler when option DEMANGLE is used.  */
+
+DEBUG_FUNCTION void
+debug_tree_odr_name (tree type, bool demangle)
+{
+  const char *odr = get_odr_name_for_type (type);
+  if (demangle)
+    {
+      const int opts = DMGL_PARAMS | DMGL_ANSI | DMGL_TYPES;
+      odr = cplus_demangle (odr, opts);
+    }
+
+  fprintf (stderr, "%s\n", odr);
 }
 
 static void

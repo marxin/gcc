@@ -23,6 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 extern void debug_tree (tree);
 extern void debug_raw (const tree_node &ref);
 extern void debug_raw (const tree_node *ptr);
+extern void debug_tree_odr_name (tree, bool demangle = true);
 extern void debug (const tree_node &ref);
 extern void debug (const tree_node *ptr);
 extern void debug_verbose (const tree_node &ref);

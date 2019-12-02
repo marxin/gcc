@@ -6222,6 +6222,19 @@ fndecl_built_in_p (const_tree node, built_in_function name)
 	  && DECL_FUNCTION_CODE (node) == name);
 }
 
+/* If TYPE has mangled ODR name, return it.  Otherwise return NULL.  */
+
+inline const char *
+get_odr_name_for_type (tree type)
+{
+  tree type_name = TYPE_NAME (type);
+  if (type_name == NULL_TREE
+      || !DECL_ASSEMBLER_NAME_SET_P (type_name))
+    return NULL;
+
+  return IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (type_name));
+}
+
 /* A struct for encapsulating location information about an operator
    and the operation built from it.
 

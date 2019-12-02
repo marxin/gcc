@@ -1036,20 +1036,13 @@ warn_types_mismatch (tree t1, tree t2, location_t loc1, location_t loc2)
   /* If types have mangled ODR names and they are different, it is most
      informative to output those.
      This also covers types defined in different namespaces.  */
-  if (TYPE_NAME (mt1) && TYPE_NAME (mt2)
-      && TREE_CODE (TYPE_NAME (mt1)) == TYPE_DECL
-      && TREE_CODE (TYPE_NAME (mt2)) == TYPE_DECL
-      && DECL_ASSEMBLER_NAME_SET_P (TYPE_NAME (mt1))
-      && DECL_ASSEMBLER_NAME_SET_P (TYPE_NAME (mt2))
-      && DECL_ASSEMBLER_NAME (TYPE_NAME (mt1))
-	 != DECL_ASSEMBLER_NAME (TYPE_NAME (mt2)))
+  const char *odr1 = get_odr_name_for_type (mt1);
+  const char *odr2 = get_odr_name_for_type (mt2);
+  if (odr1 != NULL && odr2 != NULL && odr1 != odr2)
     {
-      char *name1 = xstrdup (cplus_demangle
-	 (IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (TYPE_NAME (mt1))),
-	  DMGL_PARAMS | DMGL_ANSI | DMGL_TYPES));
-      char *name2 = cplus_demangle
-	 (IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (TYPE_NAME (mt2))),
-	  DMGL_PARAMS | DMGL_ANSI | DMGL_TYPES);
+      const int opts = DMGL_PARAMS | DMGL_ANSI | DMGL_TYPES;
+      char *name1 = xstrdup (cplus_demangle (odr1, opts));
+      char *name2 = xstrdup (cplus_demangle (odr2, opts));
       if (name1 && name2 && strcmp (name1, name2))
 	{
 	  inform (loc_t1,
