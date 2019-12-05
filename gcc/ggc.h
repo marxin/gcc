@@ -185,6 +185,15 @@ ggc_alloc (ALONE_CXX_MEM_STAT_INFO)
 						 PASS_MEM_STAT));
 }
 
+/* Allocate GGC memory of type T and call default constructor.  */
+
+template<typename T>
+inline T *
+ggc_new (ALONE_CXX_MEM_STAT_INFO)
+{
+  return new (ggc_alloc<T> ()) T ();
+}
+
 /* GGC allocation function that does not call finalizer for type
    that have need_finalization_p equal to true.  User is responsible
    for calling of the destructor.  */

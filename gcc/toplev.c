@@ -1243,7 +1243,7 @@ general_init (const char *argv0, bool init_signals)
   /* Create the passes.  */
   g->set_passes (new gcc::pass_manager (g));
 
-  symtab = new (ggc_alloc <symbol_table> ()) symbol_table ();
+  symtab = ggc_new<symbol_table> ();
 
   statistics_early_init ();
   debuginfo_early_init ();
