@@ -861,7 +861,7 @@ process_function_and_variable_attributes (cgraph_node *first,
 			" attribute have effect only on public objects");
 	}
       if (lookup_attribute ("weakref", DECL_ATTRIBUTES (decl))
-	  && (node->definition && !node->alias))
+	  && node->definition)
 	{
 	  warning_at (DECL_SOURCE_LOCATION (node->decl), OPT_Wattributes,
 		      "%<weakref%> attribute ignored"
@@ -869,6 +869,10 @@ process_function_and_variable_attributes (cgraph_node *first,
 	  DECL_WEAK (decl) = 0;
 	  DECL_ATTRIBUTES (decl) = remove_attribute ("weakref",
 						     DECL_ATTRIBUTES (decl));
+	  node->alias_target = NULL_TREE;
+	  node->alias = false;
+	  node->transparent_alias = false;
+	  node->weakref = false;
 	}
       else if (lookup_attribute ("alias", DECL_ATTRIBUTES (decl))
 	  && node->definition
