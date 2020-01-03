@@ -197,7 +197,6 @@
 
    And probably more.  */
 
-static bool use_field_sensitive = true;
 static int in_ipa_mode = 0;
 
 /* Used for predecessor bitmaps. */
@@ -336,6 +335,14 @@ struct obstack final_solutions_obstack;
 /* Table of variable info structures for constraint variables.
    Indexed directly by variable info id.  */
 static vec<varinfo_t> varmap;
+
+/* Return true if the algorithm should be field sensitive.  */
+
+static bool
+use_field_sensitive ()
+{
+  return param_max_fields_for_field_sensitive > 1;
+}
 
 /* Return the varmap element N */
 
@@ -3134,7 +3141,7 @@ get_constraint_for_ptr_offset (tree ptr, tree offset,
 
   /* If we do not do field-sensitive PTA adding offsets to pointers
      does not change the points-to solution.  */
-  if (!use_field_sensitive)
+  if (!use_field_sensitive ())
     {
       get_constraint_for_rhs (ptr, results);
       return;
@@ -6075,7 +6082,7 @@ create_variable_info_for_1 (tree decl, const char *name, bool add_id,
     }
 
   /* Collect field information.  */
-  if (use_field_sensitive
+  if (use_field_sensitive ()
       && var_can_have_subvars (decl)
       /* ???  Force us to not use subfields for globals in IPA mode.
 	 Else we'd have to parse arbitrary initializers.  */
@@ -7182,8 +7189,6 @@ init_base_vars (void)
 static void
 init_alias_vars (void)
 {
-  use_field_sensitive = (param_max_fields_for_field_sensitive > 1);
-
   bitmap_obstack_initialize (&pta_obstack);
   bitmap_obstack_initialize (&oldpta_obstack);
   bitmap_obstack_initialize (&predbitmap_obstack);

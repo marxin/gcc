@@ -427,7 +427,7 @@ Common Joined UInteger Var(param_early_inliner_max_iterations) Init(1) Param
 The maximum number of nested indirect inlining performed by early inliner.
 
 -param=max-fields-for-field-sensitive=
-Common Joined UInteger Var(param_max_fields_for_field_sensitive) Param
+Common Joined UInteger Var(param_max_fields_for_field_sensitive) Param Optimization
 Maximum number of fields in a structure before pointer analysis treats the structure as a single variable.
 
 -param=max-fsm-thread-length=
