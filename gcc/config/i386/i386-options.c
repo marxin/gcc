@@ -2404,8 +2404,6 @@ ix86_option_override_internal (bool main_args_p,
   /* Keep nonleaf frame pointers.  */
   if (opts->x_flag_omit_frame_pointer)
     opts->x_target_flags &= ~MASK_OMIT_LEAF_FRAME_POINTER;
-  else if (TARGET_OMIT_LEAF_FRAME_POINTER_P (opts->x_target_flags))
-    opts->x_flag_omit_frame_pointer = 1;
 
   /* If we're doing fast math, we don't care about comparison order
      wrt NaNs.  This lets us use a shorter comparison sequence.  */
