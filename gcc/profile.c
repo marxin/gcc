@@ -765,9 +765,20 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
 static void
 sort_hist_values (histogram_value hist)
 {
-  /* counters[2] equal to -1 means that all counters are invalidated.  */
-  if (hist->hvalue.counters[2] == -1)
-    return;
+  /* Calculate what number of samples didn't fit into counters.  */
+  gcov_type sample_total = 0;
+  for (unsigned i = 0; i < GCOV_TOPN_VALUES; i++)
+    sample_total += hist->hvalue.counters[2 * i + 2];
+
+  /* Mark the counter invalid if we miss X% of samples or more.  */
+  gcc_assert (hist->hvalue.counters[2] != -1);
+  gcov_type threshold
+    = (100 - param_profile_topn_invalid_threshold) * hist->hvalue.counters[0];
+  if (100 * sample_total <= threshold)
+    {
+      hist->hvalue.counters[2] = -1;
+      return;
+    }
 
   gcc_assert (hist->type == HIST_TYPE_TOPN_VALUES
 	      || hist->type == HIST_TYPE_INDIR_CALL);

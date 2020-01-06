@@ -130,11 +130,17 @@ merge_topn_values_set (gcov_type *counters)
 	    }
 	}
 
-      /* We haven't found a slot, bail out.  */
       if (j == GCOV_TOPN_VALUES)
 	{
-	  counters[1] = -1;
-	  return;
+	  int min = 0;
+	  for (j = 1; j < GCOV_TOPN_VALUES; j++)
+	    if (counters[2 * j + 1] < counters[2 * min + 1])
+	      min = j;
+	  if (counters[2 * min + 1] < read_counters[2 * i + 1])
+	    {
+	      counters[2 * min] = read_counters[2 * i];
+	      counters[2 * min + 1] = read_counters[2 * i + 1];
+	    }
 	}
     }
 }
