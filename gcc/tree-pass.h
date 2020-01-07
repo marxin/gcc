@@ -341,6 +341,8 @@ extern void register_pass (opt_pass* pass, pass_positioning_ops pos,
 
 extern gimple_opt_pass *make_pass_asan (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_asan_O0 (gcc::context *ctxt);
+extern gimple_opt_pass *make_pass_hwasan (gcc::context *ctxt);
+extern gimple_opt_pass *make_pass_hwasan_O0 (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tsan (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_tsan_O0 (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_sancov (gcc::context *ctxt);
