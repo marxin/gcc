@@ -1094,6 +1094,13 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 		  "%<-fsanitize=address%> or %<-fsanitize=kernel-address%>");
     }
 
+  /* Userspace and kernel HWasan conflict with each other.  */
+  if ((opts->x_flag_sanitize & SANITIZE_USER_HWADDRESS)
+      && (opts->x_flag_sanitize & SANITIZE_KERNEL_HWADDRESS))
+    error_at (loc,
+	      "%<-fsanitize=hwaddress%> is incompatible with "
+	      "%<-fsanitize=kernel-hwaddress%>");
+
   /* Userspace and kernel ASan conflict with each other.  */
   if ((opts->x_flag_sanitize & SANITIZE_USER_ADDRESS)
       && (opts->x_flag_sanitize & SANITIZE_KERNEL_ADDRESS))
@@ -1113,6 +1120,20 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
     error_at (loc,
 	      "%<-fsanitize=leak%> is incompatible with %<-fsanitize=thread%>");
 
+  /* HWASan and ASan conflict with each other.  */
+  if ((opts->x_flag_sanitize & SANITIZE_ADDRESS)
+      && (opts->x_flag_sanitize & SANITIZE_HWADDRESS))
+    error_at (loc,
+	      "%<-fsanitize=hwaddress%> is incompatible with both "
+	      "%<-fsanitize=address%> and %<-fsanitize=kernel-address%>");
+
+  /* HWASan conflicts with TSan.  */
+  if ((opts->x_flag_sanitize & SANITIZE_HWADDRESS)
+      && (opts->x_flag_sanitize & SANITIZE_THREAD))
+    error_at (loc,
+	      "%<-fsanitize=hwaddress%> is incompatible with "
+	      "%<-fsanitize=thread%>");
+
   /* Check error recovery for -fsanitize-recover option.  */
   for (int i = 0; sanitizer_opts[i].name != NULL; ++i)
     if ((opts->x_flag_sanitize_recover & sanitizer_opts[i].flag)
@@ -1130,9 +1151,10 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
   if (opts->x_flag_sanitize & ~(SANITIZE_LEAK | SANITIZE_UNREACHABLE))
     opts->x_flag_aggressive_loop_optimizations = 0;
 
-  /* Enable -fsanitize-address-use-after-scope if address sanitizer is
+  /* Enable -fsanitize-address-use-after-scope if either address sanitizer is
      enabled.  */
-  if (opts->x_flag_sanitize & SANITIZE_USER_ADDRESS)
+  if (opts->x_flag_sanitize
+      & (SANITIZE_USER_ADDRESS | SANITIZE_USER_HWADDRESS))
     SET_OPTION_IF_UNSET (opts, opts_set, flag_sanitize_address_use_after_scope,
 			 true);
 
@@ -1711,7 +1733,12 @@ const struct sanitizer_opts_s sanitizer_opts[] =
 #define SANITIZER_OPT(name, flags, recover) \
     { #name, flags, sizeof #name - 1, recover }
   SANITIZER_OPT (address, (SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS), true),
+  SANITIZER_OPT (hwaddress, (SANITIZE_HWADDRESS | SANITIZE_USER_HWADDRESS),
+		 true),
   SANITIZER_OPT (kernel-address, (SANITIZE_ADDRESS | SANITIZE_KERNEL_ADDRESS),
+		 true),
+  SANITIZER_OPT (kernel-hwaddress,
+		 (SANITIZE_HWADDRESS | SANITIZE_KERNEL_HWADDRESS),
 		 true),
   SANITIZER_OPT (pointer-compare, SANITIZE_POINTER_COMPARE, true),
   SANITIZER_OPT (pointer-subtract, SANITIZE_POINTER_SUBTRACT, true),
@@ -2236,6 +2263,12 @@ common_handle_option (struct gcc_options *opts,
 	  SET_OPTION_IF_UNSET (opts, opts_set, param_asan_stack, 0);
 	  SET_OPTION_IF_UNSET (opts, opts_set, param_asan_protect_allocas, 0);
 	  SET_OPTION_IF_UNSET (opts, opts_set, param_asan_use_after_return, 0);
+	}
+      if (opts->x_flag_sanitize & SANITIZE_KERNEL_HWADDRESS)
+	{
+	  SET_OPTION_IF_UNSET (opts, opts_set, param_hwasan_stack, 0);
+	  SET_OPTION_IF_UNSET (opts, opts_set, param_hwasan_random_frame_tag, 0);
+	  SET_OPTION_IF_UNSET (opts, opts_set, param_hwasan_protect_allocas, 0);
 	}
       break;
 
