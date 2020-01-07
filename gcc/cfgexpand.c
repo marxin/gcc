@@ -377,7 +377,13 @@ align_local_variable (tree decl, bool really_expand)
       if (really_expand)
 	SET_DECL_ALIGN (decl, align);
     }
-  return align / BITS_PER_UNIT;
+
+  unsigned int ret_align = align / BITS_PER_UNIT;
+
+  if (hwasan_sanitize_stack_p ())
+    ret_align = MAX (ret_align, HWASAN_TAG_GRANULE_SIZE);
+
+  return ret_align;
 }
 
 /* Align given offset BASE with ALIGN.  Truncate up if ALIGN_UP is true,
@@ -985,7 +991,7 @@ dump_stack_var_partition (void)
 
 static void
 expand_one_stack_var_at (tree decl, rtx base, unsigned base_align,
-			 poly_int64 offset)
+			 poly_int64 offset, rtx stack_base)
 {
   unsigned align;
   rtx x;
@@ -993,7 +999,11 @@ expand_one_stack_var_at (tree decl, rtx base, unsigned base_align,
   /* If this fails, we've overflowed the stack frame.  Error nicely?  */
   gcc_assert (known_eq (offset, trunc_int_for_mode (offset, Pmode)));
 
-  x = plus_constant (Pmode, base, offset);
+  if (hwasan_sanitize_stack_p ())
+    x = hwasan_with_tag (base, offset);
+  else
+    x = plus_constant (Pmode, base, offset);
+
   x = gen_rtx_MEM (TREE_CODE (decl) == SSA_NAME
 		   ? TYPE_MODE (TREE_TYPE (decl))
 		   : DECL_MODE (SSAVAR (decl)), x);
@@ -1003,7 +1013,7 @@ expand_one_stack_var_at (tree decl, rtx base, unsigned base_align,
       /* Set alignment we actually gave this decl if it isn't an SSA name.
          If it is we generate stack slots only accidentally so it isn't as
 	 important, we'll simply use the alignment that is already set.  */
-      if (base == virtual_stack_vars_rtx)
+      if (base == stack_base)
 	offset -= frame_phase;
       align = known_alignment (offset);
       align *= BITS_PER_UNIT;
@@ -1029,8 +1039,18 @@ public:
      The vector is in reversed, highest offset pairs come first.  */
   auto_vec<HOST_WIDE_INT> asan_vec;
 
+  /* HWASAN records the poly_int64 so it can handle any stack variable.  */
+  auto_vec<poly_int64> hwasan_vec;
+  auto_vec<rtx> hwasan_untagged_base_vec;
+  auto_vec<rtx> hwasan_base_vec;
+
   /* Vector of partition representative decls in between the paddings.  */
   auto_vec<tree> asan_decl_vec;
+
+  /* Vector of tag offsets representing the tag for each stack variable.
+     Each offset determines the difference between the randomly generated
+     tag for the current frame and the tag for this stack variable.  */
+  auto_vec<uint8_t> hwasan_tag_vec;
 
   /* Base pseudo register for Address Sanitizer protected automatic vars.  */
   rtx asan_base;
@@ -1049,6 +1069,7 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
   size_t si, i, j, n = stack_vars_num;
   poly_uint64 large_size = 0, large_alloc = 0;
   rtx large_base = NULL;
+  rtx large_untagged_base = NULL;
   unsigned large_align = 0;
   bool large_allocation_done = false;
   tree decl;
@@ -1095,11 +1116,17 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
 	}
     }
 
+  if (hwasan_sanitize_stack_p () && data->asan_base == NULL)
+    {
+      data->asan_base = gen_reg_rtx (Pmode);
+      hwasan_record_base (data->asan_base);
+    }
+
   for (si = 0; si < n; ++si)
     {
       rtx base;
       unsigned base_align, alignb;
-      poly_int64 offset;
+      poly_int64 offset = 0;
 
       i = stack_vars_sorted[si];
 
@@ -1120,10 +1147,36 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
       if (pred && !pred (i))
 	continue;
 
+      base = hwasan_sanitize_stack_p ()
+	? data->asan_base
+	: virtual_stack_vars_rtx;
       alignb = stack_vars[i].alignb;
       if (alignb * BITS_PER_UNIT <= MAX_SUPPORTED_STACK_ALIGNMENT)
 	{
-	  base = virtual_stack_vars_rtx;
+	  if (hwasan_sanitize_stack_p ())
+	    {
+	      /* Allocate zero bytes to take advantage of the
+		 alloc_stack_frame_space logic of ensuring the stack is aligned
+		 despite having poly_int64's to deal with.
+
+		 There must be no tag granule "shared" between different
+		 objects.  This means that no HWASAN_TAG_GRANULE_SIZE byte
+		 chunk can have more than one object in it.
+
+		 We ensure this by forcing the end of the last bit of data to
+		 be aligned to HWASAN_TAG_GRANULE_SIZE bytes here, and setting
+		 the start of each variable to be aligned to
+		 HWASAN_TAG_GRANULE_SIZE bytes in `align_local_variable`.
+
+		 We can't align just one of the start or end, since there are
+		 untagged things stored on the stack that we have no control on
+		 the alignment and these can't share a tag granule with a
+		 tagged variable.  */
+	      gcc_assert (stack_vars[i].alignb >= HWASAN_TAG_GRANULE_SIZE);
+	      offset = alloc_stack_frame_space (0, HWASAN_TAG_GRANULE_SIZE);
+	      data->hwasan_vec.safe_push (offset);
+	      data->hwasan_untagged_base_vec.safe_push (virtual_stack_vars_rtx);
+	    }
 	  /* ASAN description strings don't yet have a syntax for expressing
 	     polynomial offsets.  */
 	  HOST_WIDE_INT prev_offset;
@@ -1203,6 +1256,9 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
 	      offset = alloc_stack_frame_space (stack_vars[i].size, alignb);
 	      base_align = crtl->max_used_stack_slot_alignment;
 	    }
+
+	  if (hwasan_sanitize_stack_p ())
+	    data->hwasan_vec.safe_push (offset);
 	}
       else
 	{
@@ -1222,14 +1278,31 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
 	      loffset = alloc_stack_frame_space
 		(rtx_to_poly_int64 (large_allocsize),
 		 PREFERRED_STACK_BOUNDARY / BITS_PER_UNIT);
-	      large_base = get_dynamic_stack_base (loffset, large_align);
+	      large_base = get_dynamic_stack_base (loffset, large_align, base);
 	      large_allocation_done = true;
 	    }
-	  gcc_assert (large_base != NULL);
 
+	  gcc_assert (large_base != NULL);
 	  large_alloc = aligned_upper_bound (large_alloc, alignb);
+	  if (hwasan_sanitize_stack_p ())
+	    {
+	      /* An object with a large alignment requirement means that the
+		 alignment requirement is greater than the required alignment
+		 for tags.  */
+	      if (!large_untagged_base)
+		large_untagged_base = hwasan_create_untagged_base (large_base);
+	      data->hwasan_vec.safe_push (large_alloc);
+	      data->hwasan_untagged_base_vec.safe_push (large_untagged_base);
+	    }
 	  offset = large_alloc;
 	  large_alloc += stack_vars[i].size;
+	  if (hwasan_sanitize_stack_p ())
+	    {
+	      /* Ensure the end of the variable is also aligned correctly.  */
+	      poly_int64 align_again =
+		aligned_upper_bound (large_alloc, HWASAN_TAG_GRANULE_SIZE);
+	      data->hwasan_vec.safe_push (align_again);
+	    }
 
 	  base = large_base;
 	  base_align = large_align;
@@ -1241,7 +1314,21 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
 	{
 	  expand_one_stack_var_at (stack_vars[j].decl,
 				   base, base_align,
-				   offset);
+				   offset,
+				   hwasan_sanitize_stack_p ()
+				   ? data->asan_base
+				   : virtual_stack_vars_rtx);
+	}
+
+      if (hwasan_sanitize_stack_p ())
+	{
+	  /* Record the tag for this object in `data` so the prologue knows
+	     what tag to put in the shadow memory during cfgexpand.c.
+	     Then increment the tag so that the next object has a different
+	     tag to this object.  */
+	  data->hwasan_base_vec.safe_push (base);
+	  data->hwasan_tag_vec.safe_push (hwasan_current_tag ());
+	  hwasan_increment_tag ();
 	}
     }
 
@@ -1338,7 +1425,8 @@ expand_one_stack_var_1 (tree var)
   offset = alloc_stack_frame_space (size, byte_align);
 
   expand_one_stack_var_at (var, virtual_stack_vars_rtx,
-			   crtl->max_used_stack_slot_alignment, offset);
+			   crtl->max_used_stack_slot_alignment, offset,
+			   virtual_stack_vars_rtx);
 }
 
 /* Wrapper for expand_one_stack_var_1 that checks SSA_NAMEs are
@@ -1551,8 +1639,13 @@ defer_stack_allocation (tree var, bool toplevel)
 
   /* If stack protection is enabled, *all* stack variables must be deferred,
      so that we can re-order the strings to the top of the frame.
-     Similarly for Address Sanitizer.  */
-  if (flag_stack_protect || asan_sanitize_stack_p ())
+     Similarly for Address Sanitizer.
+     When tagging memory we defer all stack variables so we can handle them in
+     one place (handle here meaning ensure they are aligned and record
+     information on each variables position in the stack).  */
+  if (flag_stack_protect
+      || asan_sanitize_stack_p ()
+      || hwasan_sanitize_stack_p ())
     return true;
 
   unsigned int align = TREE_CODE (var) == SSA_NAME
@@ -1944,6 +2037,8 @@ init_vars_expansion (void)
   /* Initialize local stack smashing state.  */
   has_protected_decls = false;
   has_short_buffer = false;
+  if (hwasan_sanitize_stack_p ())
+    hwasan_tag_init ();
 }
 
 /* Free up stack variable graph data.  */
@@ -2266,12 +2361,27 @@ expand_used_vars (void)
 	}
 
       expand_stack_vars (NULL, &data);
+
+      if (hwasan_sanitize_stack_p ())
+	var_end_seq
+	  = hwasan_emit_prologue (data.hwasan_base_vec.address (),
+				  data.hwasan_untagged_base_vec.address (),
+				  data.hwasan_vec.address (),
+				  data.hwasan_tag_vec.address (),
+				  data.hwasan_vec.length ());
     }
 
   if (asan_sanitize_allocas_p () && cfun->calls_alloca)
     var_end_seq = asan_emit_allocas_unpoison (virtual_stack_dynamic_rtx,
 					      virtual_stack_vars_rtx,
 					      var_end_seq);
+  else if (hwasan_sanitize_allocas_p () && cfun->calls_alloca)
+    /* Here we replace `var_end_seq` while for asan we append to `var_end_seq`.
+       This is for the out-of-line case which uses only one function call in
+       either case (and hence we want to replace the previous function call if
+       we're changing things).  */
+    var_end_seq = hwasan_emit_untag_frame (virtual_stack_dynamic_rtx,
+					   virtual_stack_vars_rtx);
 
   fini_vars_expansion ();
 
