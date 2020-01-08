@@ -3322,12 +3322,12 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count,
 	      {
 		dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
 				 "Semantic equality hit:%s->%s\n",
-				 xstrdup_for_dump (source->node->name ()),
-				 xstrdup_for_dump (alias->node->name ()));
+				 source->node->dump_name (),
+				 alias->node->dump_name ());
 		dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
 				 "Assembler symbol names:%s->%s\n",
-				 xstrdup_for_dump (source->node->asm_name ()),
-				 xstrdup_for_dump (alias->node->asm_name ()));
+				 source->node->dump_asm_name ()),
+				 alias->node->dump_asm_name ();
 	      }
 
 	    if (lookup_attribute ("no_icf", DECL_ATTRIBUTES (alias->decl)))
