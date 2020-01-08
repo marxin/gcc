@@ -3326,8 +3326,8 @@ sem_item_optimizer::merge_classes (unsigned int prev_class_count,
 				 alias->node->dump_name ());
 		dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
 				 "Assembler symbol names:%s->%s\n",
-				 source->node->dump_asm_name ()),
-				 alias->node->dump_asm_name ();
+				 source->node->dump_asm_name (),
+				 alias->node->dump_asm_name ());
 	      }
 
 	    if (lookup_attribute ("no_icf", DECL_ATTRIBUTES (alias->decl)))
@@ -3390,7 +3390,7 @@ set_alias_uids (symtab_node *n, int uid)
     {
       if (dump_file)
 	fprintf (dump_file, "  Setting points-to UID of [%s] as %d\n",
-		 xstrdup_for_dump (ref->referring->asm_name ()), uid);
+		 ref->referring->dump_asm_name (), uid);
 
       SET_DECL_PT_UID (ref->referring->decl, uid);
       set_alias_uids (ref->referring, uid);

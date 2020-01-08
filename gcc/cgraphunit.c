@@ -1168,7 +1168,7 @@ analyze_functions (bool first_time)
 		fprintf (symtab->dump_file, "Trivially needed symbols:");
 	      changed = true;
 	      if (symtab->dump_file)
-		fprintf (symtab->dump_file, " %s", node->asm_name ());
+		fprintf (symtab->dump_file, " %s", node->dump_asm_name ());
 	      if (!changed && symtab->dump_file)
 		fprintf (symtab->dump_file, "\n");
 	    }
@@ -2437,7 +2437,7 @@ expand_all_functions (void)
 	  if (symtab->dump_file)
 	    fprintf (symtab->dump_file,
 		     "Time profile order in expand_all_functions:%s:%d\n",
-		     node->asm_name (), node->tp_first_run);
+		     node->dump_asm_name (), node->tp_first_run);
 	  node->process = 0;
 	  node->expand ();
 	}
